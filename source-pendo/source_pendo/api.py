@@ -280,30 +280,21 @@ async def snapshot_metadata(
     yield metadata
 
 
-async def fetch_events(
-        http: HTTPSession,
-        entity: str,
-        model: type[Event],
-        identifying_field: str,
-        log: Logger,
-        log_cursor: LogCursor,
-) -> AsyncGenerator[Event | LogCursor, None]:
-    assert isinstance(log_cursor, datetime)
+async def _fetch_events_between(
+    http: HTTPSession,
+    entity: str,
+    model: type[Event],
+    identifying_field: str,
+    lower_bound: datetime,
+    upper_bound: datetime,
+    log: Logger,
+) -> AsyncGenerator[Event, None]:
     url = f"{API}/aggregation"
-    last_dt = log_cursor
-    horizon = datetime.now(tz=UTC) - API_EVENT_LAG
+    last_dt = lower_bound
+    lower_bound_ts = _dt_to_ms(lower_bound)
+    upper_bound_ts = _dt_to_ms(upper_bound)
 
-    # Avoid requesting data when the current cursor is beyond the eventual consistency horizon.
-    # This should only be possible on invocations shortly after the horizon is implemented. Afterwards,
-    # the cursor should never go beyond horizon naturally since Pendo shouldn't return data generated
-    # after the horizon.
-    if last_dt >= horizon:
-        return
-
-    last_ts = _dt_to_ms(last_dt)
-    upper_bound_ts = _dt_to_ms(horizon)
-
-    body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=last_ts, upper_bound=upper_bound_ts)
+    body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, upper_bound=upper_bound_ts)
 
     response = EventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
     events = response.results
@@ -318,29 +309,23 @@ async def fetch_events(
                 f"Received events out of time order: Current event date is {event.guideTimestamp} vs. prior date {last_dt}"
             )
 
-        if event.guideTimestamp > horizon:
+        if event.guideTimestamp > upper_bound:
             raise RuntimeError(
-                f"Received events beyond the eventual consistency horizon: Current event timestamp is {event.guideTimestamp} vs. horizon {horizon}"
+                f"Received events beyond the requested upper bound: Current event timestamp is {event.guideTimestamp} vs. upper bound {upper_bound}"
             )
 
         doc_count += 1
         last_dt = event.guideTimestamp
+        last_seen_id = getattr(event, identifying_field)
 
         event.meta_ = model.Meta(op="c")
         yield event
 
-    if doc_count == 0:
-        # If there were no documents, don't update the cursor.
-        return
-    elif last_dt > log_cursor:
-        # If there were documents and the last one has a later timestamp than our cursor,
-        # update the cursor.
-        yield last_dt
-    elif last_dt == log_cursor:
-        # If the last document has the same timestamp as our cursor, fetch the remaining documents with
-        # this timestamp & increment the cursor by 1 afterwards.
+    if doc_count > 0 and lower_bound == last_dt:
+        # If the last document has the same timestamp as our cursor, there could be more documents
+        # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
-            body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=last_ts, last_seen_id=last_seen_id)
+            body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, last_seen_id=last_seen_id)
 
             response = EventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
             events = response.results
@@ -361,6 +346,50 @@ async def fetch_events(
             if doc_count < RESPONSE_LIMIT:
                 break
 
+
+async def fetch_events(
+        http: HTTPSession,
+        entity: str,
+        model: type[Event],
+        identifying_field: str,
+        log: Logger,
+        log_cursor: LogCursor,
+) -> AsyncGenerator[Event | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+    last_dt = log_cursor
+    horizon = datetime.now(tz=UTC) - API_EVENT_LAG
+
+    # Avoid requesting data when the current cursor is beyond the eventual consistency horizon.
+    # This should only be possible on invocations shortly after the horizon is implemented. Afterwards,
+    # the cursor should never go beyond horizon naturally since Pendo shouldn't return data generated
+    # after the horizon.
+    if last_dt >= horizon:
+        return
+
+    count = 0
+    async for event in _fetch_events_between(
+        http=http,
+        entity=entity,
+        model=model,
+        identifying_field=identifying_field,
+        lower_bound=log_cursor,
+        upper_bound=horizon,
+        log=log,
+    ):
+        count += 1
+        last_dt = event.guideTimestamp
+        yield event
+
+    # If there were no documents, don't update the cursor.
+    if count == 0:
+        return
+    # If there were documents and the last one has a later
+    # timestamp than our cursor, update the cursor.
+    elif last_dt > log_cursor:
+        yield last_dt
+    # If the last document had the same timestamp as our cursor,
+    # increment the cursor by 1 millisecond.
+    else:
         yield last_dt + timedelta(milliseconds=1)
 
 
@@ -375,7 +404,6 @@ async def backfill_events(
 ) -> AsyncGenerator[Event | PageCursor, None]:
     assert isinstance(page_cursor, int)
     assert isinstance(cutoff, datetime)
-    url = f"{API}/aggregation"
     last_dt = _ms_to_dt(page_cursor)
     upper_bound_dt = last_dt + timedelta(days=EVENT_DATE_WINDOW_SIZE_IN_DAYS)
 
@@ -383,90 +411,48 @@ async def backfill_events(
     if last_dt >= cutoff:
         return
 
-    last_ts = _dt_to_ms(last_dt)
-    upper_bound_ts = _dt_to_ms(upper_bound_dt)
-
-    body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=last_ts, upper_bound=upper_bound_ts)
-
-    response = EventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
-    events = response.results
-
-    doc_count = 0
-    last_seen_id = ""
-    for event in events:
-        # Due to how we're querying the API with the "sort" and "filter" operators, 
-        # we don't expect to receive documents out of order.
-        if event.guideTimestamp < last_dt:
-            raise RuntimeError(
-                f"Received events out of time order: Current event date is {event.guideTimestamp} vs. prior date {last_dt}"
-            )
-
-        doc_count += 1
+    count = 0
+    async for event in _fetch_events_between(
+        http=http,
+        entity=entity,
+        model=model,
+        identifying_field=identifying_field,
+        lower_bound=last_dt,
+        upper_bound=upper_bound_dt,
+        log=log,
+    ):
+        count += 1
         last_dt = event.guideTimestamp
-        last_seen_id = getattr(event, identifying_field)
-
-        event.meta_ = model.Meta(op="c")
         yield event
 
-    if doc_count == 0:
+    if count == 0:
         # If there were no documents, we need to move the cursor forward to slide forward our date window.
         yield _dt_to_ms(last_dt + timedelta(days=EVENT_DATE_WINDOW_SIZE_IN_DAYS))
     elif last_dt > _ms_to_dt(page_cursor):
         # If there were documents and the last one has a later timestamp than our cursor,
         # then update the cursor to the later timestamp.
         yield _dt_to_ms(last_dt)
-    elif last_dt == _ms_to_dt(page_cursor):
-        # If the last document has the same timestamp as our cursor, fetch the remaining documents with
-        # this timestamp & increment the cursor by 1 afterwards.
-        while True:
-            body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=last_ts, upper_bound=upper_bound_ts, last_seen_id=last_seen_id)
-
-            response = EventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
-            events = response.results
-
-            doc_count = 0
-            for event in events:
-                if event.guideTimestamp < last_dt:
-                    raise RuntimeError(
-                        f"Received events out of time order: Current event date is {event.guideTimestamp} vs. prior date {last_dt}"
-                    )
-
-                doc_count += 1
-                last_seen_id = getattr(event, identifying_field)
-
-                event.meta_ = model.Meta(op="c")
-                yield event
-
-            if doc_count < RESPONSE_LIMIT:
-                break
-
+    else:
+        # If the last document had the same timestamp as our cursor,
+        # increment the cursor by 1 millisecond.
         yield _dt_to_ms(last_dt + timedelta(milliseconds=1))
 
 
-async def fetch_aggregated_events(
-        http: HTTPSession,
-        entity: str,
-        model: type[EventAggregate],
-        identifying_field: str,
-        log: Logger,
-        log_cursor: LogCursor,
-) -> AsyncGenerator[EventAggregate | LogCursor, None]:
-    assert isinstance(log_cursor, datetime)
+async def _fetch_aggregated_events_between(
+    http: HTTPSession,
+    entity: str,
+    model: type[EventAggregate],
+    identifying_field: str,
+    lower_bound: datetime,
+    upper_bound: datetime,
+    log: Logger,
+) -> AsyncGenerator[EventAggregate, None]:
     url = f"{API}/aggregation"
-    last_dt = log_cursor
-    horizon = datetime.now(tz=UTC) - API_EVENT_LAG
+    last_dt = lower_bound
+    lower_bound_ts = _dt_to_ms(lower_bound)
+    upper_bound_ts = _dt_to_ms(upper_bound)
 
-    # Avoid requesting data when the current cursor is beyond the eventual consistency horizon.
-    # This should only be possible on invocations shortly after the horizon is implemented. Afterwards,
-    # the cursor should never go beyond horizon naturally since Pendo shouldn't return data generated
-    # after the horizon.
-    if last_dt >= horizon:
-        return
-
-    last_ts = _dt_to_ms(last_dt)
-    upper_bound_ts = _dt_to_ms(horizon)
-
-    body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=last_ts, upper_bound=upper_bound_ts)
+    body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, upper_bound=upper_bound_ts)
 
     response = AggregatedEventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
     aggregates = response.results
@@ -478,12 +464,12 @@ async def fetch_aggregated_events(
         # we don't expect to receive documents out of order.
         if aggregate.lastTime < last_dt:
             raise RuntimeError(
-                f"Received events out of time order: Current event timestamp is {aggregate.lastTime} vs. prior timestamp {last_dt}"
+                f"Received events out of time order: Current event date is {aggregate.lastTime} vs. prior date {last_dt}"
             )
 
-        if aggregate.lastTime > horizon:
+        if aggregate.lastTime > upper_bound:
             raise RuntimeError(
-                f"Received events beyond the eventual consistency horizon: Current event timestamp is {aggregate.lastTime} vs. horizon {horizon}"
+                f"Received events beyond the requested upper bound: Current event timestamp is {aggregate.lastTime} vs. upper bound {upper_bound}"
             )
 
         doc_count += 1
@@ -493,18 +479,11 @@ async def fetch_aggregated_events(
         aggregate.meta_ = model.Meta(op="c")
         yield aggregate
 
-    if doc_count == 0:
-        # If there were no documents, don't update the cursor.
-        return
-    elif last_dt > log_cursor:
-        # If there was at least one document and the last document's timestamp is
-        # later than the cursor, update the cursor.
-        yield last_dt
-    elif last_dt == log_cursor:
-        # If the last document has the same timestamp as our cursor, fetch the remaining documents with
-        # this timestamp & increment the cursor by 1 afterwards.
+    if doc_count > 0 and lower_bound == last_dt:
+        # If the last document has the same timestamp as our cursor, there could be more documents
+        # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
-            body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=last_ts, last_seen_id=last_seen_id)
+            body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, last_seen_id=last_seen_id)
 
             response = AggregatedEventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
             aggregates = response.results
@@ -513,7 +492,7 @@ async def fetch_aggregated_events(
             for aggregate in aggregates:
                 if aggregate.lastTime < last_dt:
                     raise RuntimeError(
-                        f"Received events out of time order: Current event timestamp is {aggregate.lastTime} vs. prior timestamp {last_dt}"
+                        f"Received events out of time order: Current event date is {aggregate.lastTime} vs. prior date {last_dt}"
                     )
 
                 doc_count += 1
@@ -525,6 +504,50 @@ async def fetch_aggregated_events(
             if doc_count < RESPONSE_LIMIT:
                 break
 
+
+async def fetch_aggregated_events(
+        http: HTTPSession,
+        entity: str,
+        model: type[EventAggregate],
+        identifying_field: str,
+        log: Logger,
+        log_cursor: LogCursor,
+) -> AsyncGenerator[EventAggregate | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+    last_dt = log_cursor
+    horizon = datetime.now(tz=UTC) - API_EVENT_LAG
+
+    # Avoid requesting data when the current cursor is beyond the eventual consistency horizon.
+    # This should only be possible on invocations shortly after the horizon is implemented. Afterwards,
+    # the cursor should never go beyond horizon naturally since Pendo shouldn't return data generated
+    # after the horizon.
+    if last_dt >= horizon:
+        return
+
+    count = 0
+    async for aggregate in _fetch_aggregated_events_between(
+        http=http,
+        entity=entity,
+        model=model,
+        identifying_field=identifying_field,
+        lower_bound=log_cursor,
+        upper_bound=horizon,
+        log=log,
+    ):
+        count += 1
+        last_dt = aggregate.lastTime
+        yield aggregate
+
+    # If there were no documents, don't update the cursor.
+    if count == 0:
+        return
+    # If there were documents and the last one has a later
+    # timestamp than our cursor, update the cursor.
+    elif last_dt > log_cursor:
+        yield last_dt
+    # If the last document had the same timestamp as our cursor,
+    # increment the cursor by 1 millisecond.
+    else:
         yield last_dt + timedelta(milliseconds=1)
 
 
@@ -539,7 +562,6 @@ async def backfill_aggregated_events(
 ) -> AsyncGenerator[EventAggregate | PageCursor, None]:
     assert isinstance(page_cursor, int)
     assert isinstance(cutoff, datetime)
-    url = f"{API}/aggregation"
     last_dt = _ms_to_dt(page_cursor)
     upper_bound_dt = last_dt + timedelta(days=EVENT_DATE_WINDOW_SIZE_IN_DAYS)
 
@@ -547,63 +569,30 @@ async def backfill_aggregated_events(
     if last_dt >= cutoff:
         return
 
-    last_ts = _dt_to_ms(last_dt)
-    upper_bound_ts = _dt_to_ms(upper_bound_dt)
-
-    body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=last_ts, upper_bound=upper_bound_ts)
-
-    response = AggregatedEventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
-    aggregates = response.results
-
-    doc_count = 0
-    last_seen_id = ""
-    for aggregate in aggregates:
-        # Due to how we're querying the API with the "sort" and "filter" operators, 
-        # we don't expect to receive documents out of order.
-        if aggregate.lastTime < last_dt:
-            raise RuntimeError(
-                f"Received events out of time order: Current event timestamp is {aggregate.lastTime} vs. prior timestamp {last_dt}"
-            )
-
-        doc_count += 1
+    count = 0
+    async for aggregate in _fetch_aggregated_events_between(
+        http=http,
+        entity=entity,
+        model=model,
+        identifying_field=identifying_field,
+        lower_bound=last_dt,
+        upper_bound=upper_bound_dt,
+        log=log,
+    ):
+        count += 1
         last_dt = aggregate.lastTime
-        last_seen_id = getattr(aggregate, identifying_field)
-
-        aggregate.meta_ = model.Meta(op="c")
         yield aggregate
 
-    if doc_count == 0:
+    if count == 0:
         # If there were no documents, we need to move the cursor forward to slide forward our date window.
         yield _dt_to_ms(last_dt + timedelta(days=EVENT_DATE_WINDOW_SIZE_IN_DAYS))
     elif last_dt > _ms_to_dt(page_cursor):
-        # If there were documents and the last one has a later timestamp than our cursor, then update
-        # the cursor to the later timestamp.
+        # If there were documents and the last one has a later
+        # timestamp than our cursor, update the cursor.
         yield _dt_to_ms(last_dt)
-    elif last_dt == _ms_to_dt(page_cursor):
-        # If the last document has the same timestamp as our cursor, fetch the remaining documents with
-        # this timestamp & increment the cursor by 1 afterwards.
-        while True:
-            body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=last_ts, upper_bound=upper_bound_ts, last_seen_id=last_seen_id)
-
-            response = AggregatedEventResponse.model_validate_json(await http.request(log, url, method="POST", json=body))
-            aggregates = response.results
-
-            doc_count = 0
-            for aggregate in aggregates:
-                if aggregate.lastTime < last_dt:
-                    raise RuntimeError(
-                        f"Received events out of time order: Current event timestamp is {aggregate.lastTime} vs. prior timestamp {last_dt}"
-                    )
-
-                doc_count += 1
-                last_seen_id = getattr(aggregate, identifying_field)
-
-                aggregate.meta_ = model.Meta(op="c")
-                yield aggregate
-
-            if doc_count < RESPONSE_LIMIT:
-                break
-
+    else:
+        # If the last document had the same timestamp as our cursor,
+        # increment the cursor by 1 millisecond.
         yield _dt_to_ms(last_dt + timedelta(milliseconds=1))
 
 
@@ -626,21 +615,22 @@ def _extract_updated_at(doc: BaseDocument, updated_at_field: str, log: Logger) -
     return _ms_to_dt(ms)
 
 
-async def fetch_resources(
-        http: HTTPSession,
-        entity: str,
-        model: type[IncrementalResource],
-        updated_at_field: str,
-        identifying_field: str,
-        log: Logger,
-        log_cursor: LogCursor,
-) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
-    assert isinstance(log_cursor, datetime)
+async def _fetch_resources_between(
+    http: HTTPSession,
+    entity: str,
+    model: type[IncrementalResource],
+    updated_at_field: str,
+    identifying_field: str,
+    lower_bound: datetime,
+    upper_bound: datetime,
+    log: Logger,
+) -> AsyncGenerator[IncrementalResource, None]:
     url = f"{API}/aggregation"
-    last_dt = log_cursor
-    last_ts = _dt_to_ms(last_dt)
+    last_dt = lower_bound
+    lower_bound_ts = _dt_to_ms(lower_bound)
+    upper_bound_ts = _dt_to_ms(upper_bound)
 
-    body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=last_ts)
+    body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, upper_bound=upper_bound_ts)
 
     response_model = TypeAdapter(ResourceResponse[model])
     response = response_model.validate_json(await http.request(log, url, method="POST", json=body))
@@ -656,25 +646,23 @@ async def fetch_resources(
                 f"Received resources out of time order: Current resource timestamp is {updated_at_dt} vs. prior timestamp {last_dt}"
             )
 
+        if updated_at_dt > upper_bound:
+            raise RuntimeError(
+                f"Received resources beyond the requested upper bound: Current resource timestamp is {updated_at_dt} vs. upper bound {upper_bound}"
+            )
+
         doc_count += 1
         last_dt = updated_at_dt
         last_seen_id = getattr(resource, identifying_field)
 
-        if cache.should_yield(entity, last_seen_id, updated_at_dt):
-            yield resource
+        yield resource
 
-    if doc_count == 0:
-        # If there were no documents, don't update the cursor.
-        return
-    elif last_dt > log_cursor:
-        # If there was at least one document and the last document's timestamp is
-        # later than the cursor, update the cursor.
-        yield last_dt
-    elif last_dt == log_cursor:
-        # If the last document has the same timestamp as our cursor, fetch the remaining documents with
-        # this timestamp & increment the cursor by 1 afterwards.
+    if doc_count > 0 and lower_bound == last_dt:
+        # If the last document has the same timestamp as our cursor, there could be more documents
+        # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
-            body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=last_ts, last_seen_id=last_seen_id)
+            body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, last_seen_id=last_seen_id)
+
             response = response_model.validate_json(await http.request(log, url, method="POST", json=body))
 
             doc_count = 0
@@ -682,18 +670,58 @@ async def fetch_resources(
                 updated_at_dt = _extract_updated_at(resource, updated_at_field, log)
                 if updated_at_dt < last_dt:
                     raise RuntimeError(
-                        f"Received events out of time order: Current event timestamp is {updated_at_dt} vs. prior timestamp {last_dt}"
+                        f"Received events out of time order: Current event date is {updated_at_dt} vs. prior date {last_dt}"
                     )
 
                 doc_count += 1
                 last_seen_id = getattr(resource, identifying_field)
 
-                if cache.should_yield(entity, last_seen_id, updated_at_dt):
-                    yield resource
+                yield resource
 
             if doc_count < RESPONSE_LIMIT:
                 break
 
+
+async def fetch_resources(
+        http: HTTPSession,
+        entity: str,
+        model: type[IncrementalResource],
+        updated_at_field: str,
+        identifying_field: str,
+        log: Logger,
+        log_cursor: LogCursor,
+) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+    last_dt = log_cursor
+    upper_bound = datetime.now(tz=UTC)
+
+    count = 0
+    async for resource in _fetch_resources_between(
+        http=http,
+        entity=entity,
+        model=model,
+        updated_at_field=updated_at_field,
+        identifying_field=identifying_field,
+        lower_bound=log_cursor,
+        upper_bound=upper_bound,
+        log=log,
+    ):
+        count += 1
+        last_dt = _extract_updated_at(resource, updated_at_field, log)
+        last_seen_id = getattr(resource, identifying_field)
+        if cache.should_yield(entity, last_seen_id, last_dt):
+            yield resource
+
+    # If there were no documents, don't update the cursor.
+    if count == 0:
+        return
+    # If there were documents and the last one has a later
+    # timestamp than our cursor, update the cursor.
+    elif last_dt > log_cursor:
+        yield last_dt
+    # If the last document had the same timestamp as our cursor,
+    # increment the cursor by 1 millisecond.
+    else:
         yield last_dt + timedelta(milliseconds=1)
 
 
@@ -709,7 +737,6 @@ async def backfill_resources(
 ) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
     assert isinstance(page_cursor, int)
     assert isinstance(cutoff, datetime)
-    url = f"{API}/aggregation"
     last_dt = _ms_to_dt(page_cursor)
     upper_bound_dt = last_dt + timedelta(days=RESOURCE_DATE_WINDOW_SIZE_IN_DAYS)
 
@@ -717,61 +744,29 @@ async def backfill_resources(
     if last_dt >= cutoff:
         return
 
-    last_ts = _dt_to_ms(last_dt)
-    upper_bound_ts = _dt_to_ms(upper_bound_dt)
-
-    body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=last_ts, upper_bound=upper_bound_ts)
-    response_model = TypeAdapter(ResourceResponse[model])
-    response = response_model.validate_json(await http.request(log, url, method="POST", json=body))
-
-    doc_count = 0
-    last_seen_id = ""
-    for resource in response.results:
-        updated_at_dt = _extract_updated_at(resource, updated_at_field, log)
-        # Due to how we're querying the API with the "sort" and "filter" operators, 
-        # we don't expect to receive documents out of order.
-        if updated_at_dt < last_dt:
-            raise RuntimeError(
-                f"Received events out of time order: Current event timestamp is {updated_at_dt} vs. prior timestamp {last_dt}"
-            )
-
-        if updated_at_dt >= cutoff:
-            return
-
-        doc_count += 1
-        last_dt = updated_at_dt
-        last_seen_id = getattr(resource, identifying_field)
-
+    count = 0
+    async for resource in _fetch_resources_between(
+        http=http,
+        entity=entity,
+        model=model,
+        updated_at_field=updated_at_field,
+        identifying_field=identifying_field,
+        lower_bound=last_dt,
+        upper_bound=upper_bound_dt,
+        log=log,
+    ):
+        count += 1
+        last_dt = _extract_updated_at(resource, updated_at_field, log)
         yield resource
 
-    if doc_count == 0:
+    if count == 0:
         # If there were no documents, we need to move the cursor forward to slide forward our date window.
         yield _dt_to_ms(last_dt + timedelta(days=RESOURCE_DATE_WINDOW_SIZE_IN_DAYS))
     elif last_dt > _ms_to_dt(page_cursor):
-        # If there were documents and the last one has a later timestamp than our cursor, then update
-        # the cursor to the later timestamp.
+        # If there were documents and the last one has a later
+        # timestamp than our cursor, update the cursor.
         yield _dt_to_ms(last_dt)
-    elif last_dt == _ms_to_dt(page_cursor):
-        # If the last document has the same timestamp as our cursor, fetch the remaining documents with
-        # this timestamp & increment the cursor by 1 afterwards.
-        while True:
-            body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=last_ts, upper_bound=upper_bound_ts, last_seen_id=last_seen_id)
-            response = response_model.validate_json(await http.request(log, url, method="POST", json=body))
-
-            doc_count = 0
-            for resource in response.results:
-                updated_at_dt = _extract_updated_at(resource, updated_at_field, log)
-                if updated_at_dt < last_dt:
-                    raise RuntimeError(
-                        f"Received events out of time order: Current event timestamp is {updated_at_dt} vs. prior timestamp {last_dt}"
-                    )
-
-                doc_count += 1
-                last_seen_id = getattr(resource, identifying_field)
-
-                yield resource
-
-            if doc_count < RESPONSE_LIMIT:
-                break
-
+    else:
+        # If the last document had the same timestamp as our cursor,
+        # increment the cursor by 1 millisecond.
         yield _dt_to_ms(last_dt + timedelta(milliseconds=1))
