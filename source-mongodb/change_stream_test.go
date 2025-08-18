@@ -142,7 +142,7 @@ func TestPullStream(t *testing.T) {
 				lastEventClusterTime: map[string]primitive.Timestamp{},
 			}
 
-			streams, err := c.initializeStreams(ctx, bindings, nil, true, false, map[string][]string{})
+			streams, err := c.initializeStreams(ctx, bindings, nil, true, true, false, map[string][]string{})
 			require.NoError(t, err)
 			require.Equal(t, 1, len(streams))
 

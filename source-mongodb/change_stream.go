@@ -64,6 +64,7 @@ func (c *capture) initializeStreams(
 	changeStreamBindings []bindingInfo,
 	maxAwaitTime *time.Duration,
 	requestPreImages bool,
+	useStartAfter bool,
 	exclusiveCollectionFilter bool,
 	excludeCollections map[string][]string,
 ) ([]*changeStream, error) {
@@ -130,7 +131,11 @@ func (c *capture) initializeStreams(
 
 		if t, ok := c.state.DatabaseResumeTokens[db]; ok {
 			logEntry = logEntry.WithField("resumeToken", t)
-			opts = opts.SetResumeAfter(t)
+			if useStartAfter {
+				opts = opts.SetStartAfter(t)
+			} else {
+				opts = opts.SetResumeAfter(t)
+			}
 		}
 
 		ms, err := c.client.Database(db).Watch(ctx, pl, opts)
