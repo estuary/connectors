@@ -13,7 +13,8 @@ from .models import (
     EventAggregate,
     EventResponse,
     Metadata,
-    Resource,
+    FullRefreshResource,
+    IncrementalResource,
     ResourceResponse,
 )
 
@@ -250,7 +251,7 @@ async def snapshot_resources(
         http: HTTPSession,
         entity: str,
         log: Logger,
-) -> AsyncGenerator[Resource, None]:
+) -> AsyncGenerator[FullRefreshResource, None]:
     url = f"{API}/{entity}"
 
     params = {
@@ -259,7 +260,7 @@ async def snapshot_resources(
         "expand": "*",
     }
 
-    resources = TypeAdapter(list[Resource]).validate_json(await http.request(log, url, params=params))
+    resources = TypeAdapter(list[FullRefreshResource]).validate_json(await http.request(log, url, params=params))
 
     for resource in resources:
         yield resource
@@ -628,12 +629,12 @@ def _extract_updated_at(doc: BaseDocument, updated_at_field: str, log: Logger) -
 async def fetch_resources(
         http: HTTPSession,
         entity: str,
-        model: type[BaseDocument],
+        model: type[IncrementalResource],
         updated_at_field: str,
         identifying_field: str,
         log: Logger,
         log_cursor: LogCursor,
-) -> AsyncGenerator[BaseDocument | LogCursor, None]:
+) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     url = f"{API}/aggregation"
     last_dt = log_cursor
@@ -699,13 +700,13 @@ async def fetch_resources(
 async def backfill_resources(
         http: HTTPSession,
         entity: str,
-        model: type[BaseDocument],
+        model: type[IncrementalResource],
         updated_at_field: str,
         identifying_field: str,
         log: Logger,
         page_cursor: PageCursor | None,
         cutoff: LogCursor,
-) -> AsyncGenerator[BaseDocument | PageCursor, None]:
+) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
     assert isinstance(page_cursor, int)
     assert isinstance(cutoff, datetime)
     url = f"{API}/aggregation"

@@ -13,7 +13,8 @@ from .models import (
     ResourceState,
     Event,
     EventAggregate,
-    Resource,
+    FullRefreshResource,
+    IncrementalResource,
     Metadata,
     FULL_REFRESH_RESOURCE_TYPES,
     INCREMENTAL_RESOURCE_TYPES,
@@ -77,22 +78,22 @@ def full_refresh_resources(
                 http,
                 entity,
             ),
-            tombstone=Resource(_meta=Resource.Meta(op="d"))
+            tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
 
     resources = [
         common.Resource(
-            name=resource_name,
+            name=stream.resource_name,
             key=["/_meta/row_id"],
-            model=Resource,
-            open=functools.partial(open, entity),
+            model=FullRefreshResource,
+            open=functools.partial(open, stream.entity_name),
             initial_state=ResourceState(),
             initial_config=ResourceConfig(
-                name=resource_name, interval=timedelta(minutes=5)
+                name=stream.resource_name, interval=timedelta(minutes=5)
             ),
             schema_inference=True,
         )
-        for (entity, resource_name) in FULL_REFRESH_RESOURCE_TYPES
+        for stream in FULL_REFRESH_RESOURCE_TYPES
     ]
 
     return resources
@@ -103,7 +104,7 @@ def incremental_resources(
 ) -> list[common.Resource]:
     def open(
         entity: str,
-        model: type[common.BaseDocument],
+        model: type[IncrementalResource],
         updated_at_field: str,
         identifying_field: str,
         binding: CaptureBinding[ResourceConfig],
@@ -140,20 +141,20 @@ def incremental_resources(
 
     resources = [
         common.Resource(
-            name=resource_name,
-            key=[f"/{primary_key}"],
-            model=model,
-            open=functools.partial(open, entity, model, updated_at_field, primary_key),
+            name=stream.resource_name,
+            key=[f"/{stream.primary_key}"],
+            model=stream,
+            open=functools.partial(open, stream.entity_name, stream, stream.cursor_field, stream.primary_key),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
                 backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)
             ),
             initial_config=ResourceConfig(
-                name=resource_name, interval=timedelta(minutes=5)
+                name=stream.resource_name, interval=timedelta(minutes=5)
             ),
             schema_inference=True,
         )
-        for (entity, resource_name, primary_key, updated_at_field, model) in INCREMENTAL_RESOURCE_TYPES
+        for stream in INCREMENTAL_RESOURCE_TYPES
     ]
 
     return resources
@@ -186,17 +187,17 @@ def metadata(
 
     metadata = [
         common.Resource(
-            name=resource_name,
+            name=stream.resource_name,
             key=["/_meta/row_id"],
             model=Metadata,
-            open=functools.partial(open, entity),
+            open=functools.partial(open, stream.path),
             initial_state=ResourceState(),
             initial_config=ResourceConfig(
-                name=resource_name, interval=timedelta(minutes=5)
+                name=stream.resource_name, interval=timedelta(minutes=5)
             ),
             schema_inference=True,
         )
-        for (entity, resource_name) in METADATA_TYPES
+        for stream in METADATA_TYPES
     ]
 
     return metadata
@@ -241,20 +242,20 @@ def events(
 
     events = [
         common.Resource(
-            name=resource_name,
-            key=["/appId", "/guideTimestamp", "/remoteIp", f"/{identifying_field}"],
-            model=model,
-            open=functools.partial(open, entity, model, identifying_field),
+            name=stream.resource_name,
+            key=["/appId", "/guideTimestamp", "/remoteIp", f"/{stream.primary_key}"],
+            model=stream,
+            open=functools.partial(open, stream.entity_name, stream, stream.primary_key),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
                 backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)
             ),
             initial_config=ResourceConfig(
-                name=resource_name, interval=timedelta(minutes=5)
+                name=stream.resource_name, interval=timedelta(minutes=5)
             ),
             schema_inference=True,
         )
-        for (entity, resource_name, identifying_field, model) in EVENT_TYPES
+        for stream in EVENT_TYPES
     ]
 
     return events
@@ -299,20 +300,20 @@ def aggregated_events(
 
     events = [
         common.Resource(
-            name=resource_name,
-            key=["/appId", "/hour", "/remoteIp", f"/{identifying_field}"],
-            model=model,
-            open=functools.partial(open, entity, model, identifying_field),
+            name=stream.resource_name,
+            key=["/appId", "/hour", "/remoteIp", f"/{stream.primary_key}"],
+            model=stream,
+            open=functools.partial(open, stream.entity_name, stream, stream.primary_key),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
                 backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)
             ),
             initial_config=ResourceConfig(
-                name=resource_name, interval=timedelta(minutes=5)
+                name=stream.resource_name, interval=timedelta(minutes=5)
             ),
             schema_inference=True,
         )
-        for (entity, resource_name, identifying_field, model) in AGGREGATED_EVENT_TYPES
+        for stream in AGGREGATED_EVENT_TYPES
     ]
 
     return events

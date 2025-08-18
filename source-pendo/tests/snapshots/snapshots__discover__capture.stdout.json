@@ -42,7 +42,7 @@
           "description": "Document metadata"
         }
       },
-      "title": "Resource",
+      "title": "FullRefreshResource",
       "type": "object",
       "x-infer-schema": true
     },
@@ -93,7 +93,7 @@
           "description": "Document metadata"
         }
       },
-      "title": "Resource",
+      "title": "FullRefreshResource",
       "type": "object",
       "x-infer-schema": true
     },
@@ -144,7 +144,7 @@
           "description": "Document metadata"
         }
       },
-      "title": "Resource",
+      "title": "FullRefreshResource",
       "type": "object",
       "x-infer-schema": true
     },
@@ -195,7 +195,7 @@
           "description": "Document metadata"
         }
       },
-      "title": "Resource",
+      "title": "FullRefreshResource",
       "type": "object",
       "x-infer-schema": true
     },

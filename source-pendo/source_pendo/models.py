@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar
+from typing import ClassVar, Generic, TypeVar
 import pendulum
 from pydantic import AwareDatetime, BaseModel, Field
 
@@ -34,15 +34,83 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
-class Resource(BaseDocument, extra="allow"):
-    pass
-
-
 class Metadata(BaseDocument, extra="allow"):
-    pass
+    path: ClassVar[str]
+    resource_name: ClassVar[str]
 
 
-class EventAggregate(BaseDocument, extra="allow"):
+class AccountMetadata(Metadata):
+    path: ClassVar[str] = "account"
+    resource_name: ClassVar[str] = "AccountMetadata"
+
+
+class VisitorMetadata(Metadata):
+    path: ClassVar[str] = "visitor"
+    resource_name: ClassVar[str] = "VisitorMetadata"
+
+
+class FullRefreshResource(BaseDocument, extra="allow"):
+    entity_name: ClassVar[str]
+    resource_name: ClassVar[str]
+
+
+class Feature(FullRefreshResource):
+    entity_name: ClassVar[str] = "feature"
+    resource_name: ClassVar[str] = "Feature"
+
+
+class Guide(FullRefreshResource):
+    entity_name: ClassVar[str] = "guide"
+    resource_name: ClassVar[str] = "Guide"
+
+
+class Page(FullRefreshResource):
+    entity_name: ClassVar[str] = "page"
+    resource_name: ClassVar[str] = "Page"
+
+
+class Report(FullRefreshResource):
+    entity_name: ClassVar[str] = "report"
+    resource_name: ClassVar[str] = "Report"
+
+
+class IncrementalResource(FullRefreshResource):
+    primary_key: ClassVar[str]
+    cursor_field: ClassVar[str]
+
+
+class Account(IncrementalResource):
+    entity_name: ClassVar[str] = "accounts"
+    resource_name: ClassVar[str] = "Account"
+    primary_key: ClassVar[str] = "accountId"
+    cursor_field: ClassVar[str] = "metadata.auto.lastupdated"
+
+    accountId: str
+
+
+class Visitor(IncrementalResource):
+    entity_name: ClassVar[str] = "visitors"
+    resource_name: ClassVar[str] = "Visitor"
+    primary_key: ClassVar[str] = "visitorId"
+    cursor_field: ClassVar[str] = "metadata.auto.lastupdated"
+
+    visitorId: str
+
+
+class TrackType(IncrementalResource):
+    entity_name: ClassVar[str] = "trackTypes"
+    resource_name: ClassVar[str] = "TrackType"
+    primary_key: ClassVar[str] = "id"
+    cursor_field: ClassVar[str] = "lastUpdatedAt"
+
+    id: str
+
+
+class BaseEvent(FullRefreshResource):
+    primary_key: ClassVar[str]
+
+
+class EventAggregate(BaseEvent):
     appId: int
     hour: int
     remoteIp: str
@@ -50,41 +118,49 @@ class EventAggregate(BaseDocument, extra="allow"):
 
 
 class PageEvent(EventAggregate):
+    entity_name: ClassVar[str] = "pageEvents"
+    resource_name: ClassVar[str] = "PageEvents"
+    primary_key: ClassVar[str] = "pageId"
+
     pageId: str
 
 
 class FeatureEvent(EventAggregate):
+    entity_name: ClassVar[str] = "featureEvents"
+    resource_name: ClassVar[str] = "FeatureEvents"
+    primary_key: ClassVar[str] = "featureId"
+
     featureId: str
 
 
 class TrackEvent(EventAggregate):
+    entity_name: ClassVar[str] = "trackEvents"
+    resource_name: ClassVar[str] = "TrackEvents"
+    primary_key: ClassVar[str] = "trackTypeId"
+
     trackTypeId: str
 
 
-class Event(BaseDocument, extra="allow"):
+class Event(BaseEvent):
     appId: int
     remoteIp: str
     guideTimestamp: AwareDatetime
 
 
 class GuideEvent(Event):
+    entity_name: ClassVar[str] = "guideEvents"
+    resource_name: ClassVar[str] = "GuideEvents"
+    primary_key: ClassVar[str] = "guideId"
+
     guideId: str
 
 
 class PollEvent(Event):
+    entity_name: ClassVar[str] = "pollEvents"
+    resource_name: ClassVar[str] = "PollEvents"
+    primary_key: ClassVar[str] = "pollId"
+
     pollId: str
-
-
-class Account(BaseDocument, extra="allow"):
-    accountId: str
-
-
-class Visitor(BaseDocument, extra="allow"):
-    visitorId: str
-
-
-class TrackType(BaseDocument, extra="allow"):
-    id: str
 
 
 class EventResponse(BaseDocument, extra="forbid"):
@@ -103,46 +179,46 @@ class ResourceResponse(BaseModel, Generic[_ResourceType]):
     results: list[_ResourceType]
 
 
-# Supported snapshot resource types and their corresponding name.
+# Supported snapshot resource types.
 # Most, if not all, of these snapshot resources could be moved over
 # to be incremental resources listed in INCREMENTAL_RESOURCE_TYPES.
 # Doing so would change the primary key for already created collections,
 # so I'm holding off doing that until later. We'll likely want to increment
 # the connector version to let existing users migrate to the newer version
 # at their convenience.
-FULL_REFRESH_RESOURCE_TYPES: list[tuple[str, str]] = [
-    ("feature", "Feature"),
-    ("guide", "Guide"),
-    ("page", "Page"),
-    ("report", "Report"),
+FULL_REFRESH_RESOURCE_TYPES: list[type[FullRefreshResource]] = [
+    Feature,
+    Guide,
+    Page,
+    Report,
 ]
 
 
 # Supported metadata types and their corresponding name.
-METADATA_TYPES: list[tuple[str, str]] = [
-    ("account", "AccountMetadata"),
-    ("visitor", "VisitorMetadata"),
+METADATA_TYPES: list[type[Metadata]] = [
+    AccountMetadata,
+    VisitorMetadata
 ]
 
 
 # Supported event types, their corresponding name, their keys, and their model.
-EVENT_TYPES: list[tuple[str, str, str, type[Event]]] = [
-    ("guideEvents", "GuideEvents", "guideId", GuideEvent),
-    ("pollEvents", "PollEvents", "pollId", PollEvent),
+EVENT_TYPES: list[type[Event]] = [
+    GuideEvent,
+    PollEvent,
 ]
 
 
 # Supported aggregated event types, their corresponding resource name, their keys, and their model.
-AGGREGATED_EVENT_TYPES: list[tuple[str, str, str, type[EventAggregate]]] = [
-    ("pageEvents", "PageEvents", "pageId", PageEvent),
-    ("featureEvents", "FeatureEvents", "featureId", FeatureEvent),
-    ("trackEvents", "TrackEvents", "trackTypeId", TrackEvent),
+AGGREGATED_EVENT_TYPES: list[type[EventAggregate]] = [
+    PageEvent,
+    FeatureEvent,
+    TrackEvent,
 ]
 
 
 # Supported incremental resource types, their corresponding resource name, their key, their updated_at field, and their model.
-INCREMENTAL_RESOURCE_TYPES: list[tuple[str, str, str, str, type[BaseDocument]]] = [
-    ("accounts", "Account", "accountId", "metadata.auto.lastupdated", Account),
-    ("visitors", "Visitor", "visitorId", "metadata.auto.lastupdated", Visitor),
-    ("trackTypes", "TrackType", "id", "lastUpdatedAt", TrackType),
+INCREMENTAL_RESOURCE_TYPES: list[type[IncrementalResource]] = [
+    Account,
+    Visitor,
+    TrackType,
 ]
