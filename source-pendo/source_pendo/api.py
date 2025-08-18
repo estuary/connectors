@@ -7,7 +7,15 @@ from estuary_cdk.capture.common import BaseDocument, LogCursor, PageCursor
 import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.http import HTTPSession
 
-from .models import PageEvent, FeatureEvent, TrackEvent, GuideEvent, PollEvent, AggregatedEventResponse, EventResponse, Resource, Metadata, ResourceResponse
+from .models import (
+    AggregatedEventResponse,
+    Event,
+    EventAggregate,
+    EventResponse,
+    Metadata,
+    Resource,
+    ResourceResponse,
+)
 
 API = "https://app.pendo.io/api/v1"
 RESPONSE_LIMIT = 50000
@@ -274,11 +282,11 @@ async def snapshot_metadata(
 async def fetch_events(
         http: HTTPSession,
         entity: str,
-        model: type[BaseDocument],
+        model: type[Event],
         identifying_field: str,
         log: Logger,
         log_cursor: LogCursor,
-) -> AsyncGenerator[GuideEvent | PollEvent | LogCursor, None]:
+) -> AsyncGenerator[Event | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     url = f"{API}/aggregation"
     last_dt = log_cursor
@@ -358,12 +366,12 @@ async def fetch_events(
 async def backfill_events(
         http: HTTPSession,
         entity: str,
-        model: type[BaseDocument],
+        model: type[Event],
         identifying_field: str,
         log: Logger,
         page_cursor: PageCursor | None,
         cutoff: LogCursor,
-) -> AsyncGenerator[GuideEvent | PollEvent | PageCursor, None]:
+) -> AsyncGenerator[Event | PageCursor, None]:
     assert isinstance(page_cursor, int)
     assert isinstance(cutoff, datetime)
     url = f"{API}/aggregation"
@@ -437,11 +445,11 @@ async def backfill_events(
 async def fetch_aggregated_events(
         http: HTTPSession,
         entity: str,
-        model: type[BaseDocument],
+        model: type[EventAggregate],
         identifying_field: str,
         log: Logger,
         log_cursor: LogCursor,
-) -> AsyncGenerator[PageEvent | FeatureEvent | TrackEvent | LogCursor, None]:
+) -> AsyncGenerator[EventAggregate | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
     url = f"{API}/aggregation"
     last_dt = log_cursor
@@ -522,12 +530,12 @@ async def fetch_aggregated_events(
 async def backfill_aggregated_events(
         http: HTTPSession,
         entity: str,
-        model: type[BaseDocument],
+        model: type[EventAggregate],
         identifying_field: str,
         log: Logger,
         page_cursor: PageCursor | None,
         cutoff: LogCursor,
-) -> AsyncGenerator[PageEvent | FeatureEvent | TrackEvent | PageCursor, None]:
+) -> AsyncGenerator[EventAggregate | PageCursor, None]:
     assert isinstance(page_cursor, int)
     assert isinstance(cutoff, datetime)
     url = f"{API}/aggregation"
