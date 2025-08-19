@@ -142,9 +142,9 @@ def incremental_resources(
     resources = [
         common.Resource(
             name=stream.resource_name,
-            key=[f"/{stream.primary_key}"],
+            key=sorted([f"/{key}" for key in stream.primary_keys]),
             model=stream,
-            open=functools.partial(open, stream.entity_name, stream, stream.cursor_field, stream.primary_key),
+            open=functools.partial(open, stream.entity_name, stream, stream.cursor_field, stream.identifying_field),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
                 backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)
@@ -240,12 +240,22 @@ def events(
     backfill_start_ts = _dt_to_ms(datetime.fromisoformat(config.startDate))
     cutoff = datetime.now(tz=UTC) - API_EVENT_LAG
 
+    shared_keys = [
+        "/accountId",
+        "/appId",
+        "/guideTimestamp",
+        "/remoteIp",
+        "/serverName",
+        "/visitorId",
+        "/userAgent",
+    ]
+
     events = [
         common.Resource(
             name=stream.resource_name,
-            key=["/appId", "/guideTimestamp", "/remoteIp", f"/{stream.primary_key}"],
+            key=sorted(shared_keys + [f"/{key}" for key in stream.primary_keys]),
             model=stream,
-            open=functools.partial(open, stream.entity_name, stream, stream.primary_key),
+            open=functools.partial(open, stream.entity_name, stream, stream.identifying_field),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
                 backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)
@@ -298,12 +308,23 @@ def aggregated_events(
     backfill_start_ts = _dt_to_ms(datetime.fromisoformat(config.startDate))
     cutoff = datetime.now(tz=UTC) - API_EVENT_LAG 
 
+    shared_keys = [
+        "/accountId",
+        "/appId",
+        "/firstTime",
+        "/lastTime",
+        "/remoteIp",
+        "/server",
+        "/visitorId",
+        "/userAgent",
+    ]
+
     events = [
         common.Resource(
             name=stream.resource_name,
-            key=["/appId", "/hour", "/remoteIp", f"/{stream.primary_key}"],
+            key=sorted(shared_keys + [f"/{key}" for key in stream.primary_keys]),
             model=stream,
-            open=functools.partial(open, stream.entity_name, stream, stream.primary_key),
+            open=functools.partial(open, stream.entity_name, stream, stream.identifying_field),
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
                 backfill=ResourceState.Backfill(next_page=backfill_start_ts, cutoff=cutoff)

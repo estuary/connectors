@@ -521,6 +521,10 @@
           },
           "description": "Document metadata"
         },
+        "accountId": {
+          "title": "Accountid",
+          "type": "string"
+        },
         "appId": {
           "title": "Appid",
           "type": "integer"
@@ -529,9 +533,21 @@
           "title": "Remoteip",
           "type": "string"
         },
+        "visitorId": {
+          "title": "Visitorid",
+          "type": "string"
+        },
+        "userAgent": {
+          "title": "Useragent",
+          "type": "string"
+        },
         "guideTimestamp": {
           "format": "date-time",
           "title": "Guidetimestamp",
+          "type": "string"
+        },
+        "serverName": {
+          "title": "Servername",
           "type": "string"
         },
         "guideId": {
@@ -540,9 +556,13 @@
         }
       },
       "required": [
+        "accountId",
         "appId",
         "remoteIp",
+        "visitorId",
+        "userAgent",
         "guideTimestamp",
+        "serverName",
         "guideId"
       ],
       "title": "GuideEvent",
@@ -550,10 +570,14 @@
       "x-infer-schema": true
     },
     "key": [
+      "/accountId",
       "/appId",
+      "/guideId",
       "/guideTimestamp",
       "/remoteIp",
-      "/guideId"
+      "/serverName",
+      "/userAgent",
+      "/visitorId"
     ]
   },
   {
@@ -598,6 +622,10 @@
           },
           "description": "Document metadata"
         },
+        "accountId": {
+          "title": "Accountid",
+          "type": "string"
+        },
         "appId": {
           "title": "Appid",
           "type": "integer"
@@ -606,9 +634,25 @@
           "title": "Remoteip",
           "type": "string"
         },
+        "visitorId": {
+          "title": "Visitorid",
+          "type": "string"
+        },
+        "userAgent": {
+          "title": "Useragent",
+          "type": "string"
+        },
         "guideTimestamp": {
           "format": "date-time",
           "title": "Guidetimestamp",
+          "type": "string"
+        },
+        "serverName": {
+          "title": "Servername",
+          "type": "string"
+        },
+        "guideId": {
+          "title": "Guideid",
           "type": "string"
         },
         "pollId": {
@@ -617,9 +661,14 @@
         }
       },
       "required": [
+        "accountId",
         "appId",
         "remoteIp",
+        "visitorId",
+        "userAgent",
         "guideTimestamp",
+        "serverName",
+        "guideId",
         "pollId"
       ],
       "title": "PollEvent",
@@ -627,10 +676,15 @@
       "x-infer-schema": true
     },
     "key": [
+      "/accountId",
       "/appId",
+      "/guideId",
       "/guideTimestamp",
+      "/pollId",
       "/remoteIp",
-      "/pollId"
+      "/serverName",
+      "/userAgent",
+      "/visitorId"
     ]
   },
   {
@@ -675,17 +729,33 @@
           },
           "description": "Document metadata"
         },
+        "accountId": {
+          "title": "Accountid",
+          "type": "string"
+        },
         "appId": {
           "title": "Appid",
-          "type": "integer"
-        },
-        "hour": {
-          "title": "Hour",
           "type": "integer"
         },
         "remoteIp": {
           "title": "Remoteip",
           "type": "string"
+        },
+        "visitorId": {
+          "title": "Visitorid",
+          "type": "string"
+        },
+        "userAgent": {
+          "title": "Useragent",
+          "type": "string"
+        },
+        "server": {
+          "title": "Server",
+          "type": "string"
+        },
+        "firstTime": {
+          "title": "Firsttime",
+          "type": "integer"
         },
         "lastTime": {
           "format": "date-time",
@@ -698,9 +768,13 @@
         }
       },
       "required": [
+        "accountId",
         "appId",
-        "hour",
         "remoteIp",
+        "visitorId",
+        "userAgent",
+        "server",
+        "firstTime",
         "lastTime",
         "pageId"
       ],
@@ -709,10 +783,15 @@
       "x-infer-schema": true
     },
     "key": [
+      "/accountId",
       "/appId",
-      "/hour",
+      "/firstTime",
+      "/lastTime",
+      "/pageId",
       "/remoteIp",
-      "/pageId"
+      "/server",
+      "/userAgent",
+      "/visitorId"
     ]
   },
   {
@@ -757,17 +836,33 @@
           },
           "description": "Document metadata"
         },
+        "accountId": {
+          "title": "Accountid",
+          "type": "string"
+        },
         "appId": {
           "title": "Appid",
-          "type": "integer"
-        },
-        "hour": {
-          "title": "Hour",
           "type": "integer"
         },
         "remoteIp": {
           "title": "Remoteip",
           "type": "string"
+        },
+        "visitorId": {
+          "title": "Visitorid",
+          "type": "string"
+        },
+        "userAgent": {
+          "title": "Useragent",
+          "type": "string"
+        },
+        "server": {
+          "title": "Server",
+          "type": "string"
+        },
+        "firstTime": {
+          "title": "Firsttime",
+          "type": "integer"
         },
         "lastTime": {
           "format": "date-time",
@@ -780,9 +875,13 @@
         }
       },
       "required": [
+        "accountId",
         "appId",
-        "hour",
         "remoteIp",
+        "visitorId",
+        "userAgent",
+        "server",
+        "firstTime",
         "lastTime",
         "featureId"
       ],
@@ -791,10 +890,15 @@
       "x-infer-schema": true
     },
     "key": [
+      "/accountId",
       "/appId",
-      "/hour",
+      "/featureId",
+      "/firstTime",
+      "/lastTime",
       "/remoteIp",
-      "/featureId"
+      "/server",
+      "/userAgent",
+      "/visitorId"
     ]
   },
   {
@@ -839,17 +943,33 @@
           },
           "description": "Document metadata"
         },
+        "accountId": {
+          "title": "Accountid",
+          "type": "string"
+        },
         "appId": {
           "title": "Appid",
-          "type": "integer"
-        },
-        "hour": {
-          "title": "Hour",
           "type": "integer"
         },
         "remoteIp": {
           "title": "Remoteip",
           "type": "string"
+        },
+        "visitorId": {
+          "title": "Visitorid",
+          "type": "string"
+        },
+        "userAgent": {
+          "title": "Useragent",
+          "type": "string"
+        },
+        "server": {
+          "title": "Server",
+          "type": "string"
+        },
+        "firstTime": {
+          "title": "Firsttime",
+          "type": "integer"
         },
         "lastTime": {
           "format": "date-time",
@@ -862,9 +982,13 @@
         }
       },
       "required": [
+        "accountId",
         "appId",
-        "hour",
         "remoteIp",
+        "visitorId",
+        "userAgent",
+        "server",
+        "firstTime",
         "lastTime",
         "trackTypeId"
       ],
@@ -873,10 +997,15 @@
       "x-infer-schema": true
     },
     "key": [
+      "/accountId",
       "/appId",
-      "/hour",
+      "/firstTime",
+      "/lastTime",
       "/remoteIp",
-      "/trackTypeId"
+      "/server",
+      "/trackTypeId",
+      "/userAgent",
+      "/visitorId"
     ]
   }
 ]

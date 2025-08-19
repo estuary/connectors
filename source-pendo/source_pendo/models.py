@@ -75,14 +75,16 @@ class Report(FullRefreshResource):
 
 
 class IncrementalResource(FullRefreshResource):
-    primary_key: ClassVar[str]
+    primary_keys: ClassVar[list[str]]
     cursor_field: ClassVar[str]
+    identifying_field: ClassVar[str]
 
 
 class Account(IncrementalResource):
     entity_name: ClassVar[str] = "accounts"
     resource_name: ClassVar[str] = "Account"
-    primary_key: ClassVar[str] = "accountId"
+    identifying_field: ClassVar[str] = "accountId"
+    primary_keys: ClassVar[list[str]] = ["accountId"]
     cursor_field: ClassVar[str] = "metadata.auto.lastupdated"
 
     accountId: str
@@ -91,7 +93,8 @@ class Account(IncrementalResource):
 class Visitor(IncrementalResource):
     entity_name: ClassVar[str] = "visitors"
     resource_name: ClassVar[str] = "Visitor"
-    primary_key: ClassVar[str] = "visitorId"
+    identifying_field: ClassVar[str] = "visitorId"
+    primary_keys: ClassVar[list[str]] = ["visitorId"]
     cursor_field: ClassVar[str] = "metadata.auto.lastupdated"
 
     visitorId: str
@@ -100,27 +103,36 @@ class Visitor(IncrementalResource):
 class TrackType(IncrementalResource):
     entity_name: ClassVar[str] = "trackTypes"
     resource_name: ClassVar[str] = "TrackType"
-    primary_key: ClassVar[str] = "id"
+    identifying_field: ClassVar[str] = "id"
+    primary_keys: ClassVar[list[str]] = ["id"]
     cursor_field: ClassVar[str] = "lastUpdatedAt"
+
 
     id: str
 
 
 class BaseEvent(FullRefreshResource):
-    primary_key: ClassVar[str]
+    identifying_field: ClassVar[str]
+    primary_keys: ClassVar[list[str]]
+
+    accountId: str
+    appId: int
+    remoteIp: str
+    visitorId: str
+    userAgent: str
 
 
 class EventAggregate(BaseEvent):
-    appId: int
-    hour: int
-    remoteIp: str
+    server: str
+    firstTime: int
     lastTime: AwareDatetime
 
 
 class PageEvent(EventAggregate):
     entity_name: ClassVar[str] = "pageEvents"
     resource_name: ClassVar[str] = "PageEvents"
-    primary_key: ClassVar[str] = "pageId"
+    identifying_field: ClassVar[str] = "pageId"
+    primary_keys: ClassVar[list[str]] = ["pageId"]
 
     pageId: str
 
@@ -128,7 +140,8 @@ class PageEvent(EventAggregate):
 class FeatureEvent(EventAggregate):
     entity_name: ClassVar[str] = "featureEvents"
     resource_name: ClassVar[str] = "FeatureEvents"
-    primary_key: ClassVar[str] = "featureId"
+    identifying_field: ClassVar[str] = "featureId"
+    primary_keys: ClassVar[list[str]] = ["featureId"]
 
     featureId: str
 
@@ -136,21 +149,22 @@ class FeatureEvent(EventAggregate):
 class TrackEvent(EventAggregate):
     entity_name: ClassVar[str] = "trackEvents"
     resource_name: ClassVar[str] = "TrackEvents"
-    primary_key: ClassVar[str] = "trackTypeId"
+    identifying_field: ClassVar[str] = "trackTypeId"
+    primary_keys: ClassVar[list[str]] = ["trackTypeId"]
 
     trackTypeId: str
 
 
 class Event(BaseEvent):
-    appId: int
-    remoteIp: str
     guideTimestamp: AwareDatetime
+    serverName: str
 
 
 class GuideEvent(Event):
     entity_name: ClassVar[str] = "guideEvents"
     resource_name: ClassVar[str] = "GuideEvents"
-    primary_key: ClassVar[str] = "guideId"
+    identifying_field: ClassVar[str] = "guideId"
+    primary_keys: ClassVar[list[str]] = ["guideId"]
 
     guideId: str
 
@@ -158,8 +172,10 @@ class GuideEvent(Event):
 class PollEvent(Event):
     entity_name: ClassVar[str] = "pollEvents"
     resource_name: ClassVar[str] = "PollEvents"
-    primary_key: ClassVar[str] = "pollId"
+    identifying_field: ClassVar[str] = "pollId"
+    primary_keys: ClassVar[list[str]] = ["guideId", "pollId"]
 
+    guideId: str
     pollId: str
 
 
