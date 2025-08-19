@@ -9,6 +9,8 @@ from typing import (
     ClassVar,
     Literal,
     Any,
+    TypeVar,
+    Generic,
 )
 from pydantic import AwareDatetime, BaseModel, Field
 
@@ -115,6 +117,49 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
+T = TypeVar('T')
+
+
+class GraphQLErrorCode(StrEnum):
+    UNDEFINED_FIELD = "undefinedField"
+    THROTTLED = "THROTTLED"
+    ACCESS_DENIED = "ACCESS_DENIED"
+    SHOP_INACTIVE = "SHOP_INACTIVE"
+    INTERNAL_SERVER_ERROR = "INTERNAL_SERVER_ERROR"
+    MAX_COST_EXCEEDED = "MAX_COST_EXCEEDED"
+    BAD_REQUEST = "BAD_REQUEST"
+
+
+class GraphQLError(BaseModel, extra="allow"):
+    class Extensions(BaseModel, extra="allow"):
+        code: GraphQLErrorCode
+        typeName: str | None = None
+        fieldName: str | None = None
+        cost: int | None = None
+        maxCost: int | None = None
+        documentation: str | None = None
+
+    message: str
+    extensions: Extensions
+
+
+class GraphQLResponse(BaseModel, Generic[T], extra="allow"):
+    class Extensions(BaseModel, extra="allow"):
+        class Cost(BaseModel, extra="allow"):
+            class ThrottleStatus(BaseModel, extra="allow"):
+                maximumAvailable: int
+                currentlyAvailable: int
+                restoreRate: int
+
+            throttleStatus: ThrottleStatus
+
+        cost: Cost
+
+    data: T | None = None
+    extensions: Extensions | None = None
+    errors: list[GraphQLError] | None = None
+
+
 class BulkOperationTypes(StrEnum):
     MUTATION = "MUTATION"
     QUERY = "QUERY"
@@ -156,44 +201,40 @@ class UserErrors(BaseModel, extra="allow"):
     message: str
 
 
-class BulkJobCancelResponse(BaseModel, extra="allow"):
-    class Data(BaseModel, extra="forbid"):
-        class BulkOperationCancel(BaseModel, extra="forbid"):
-            bulkOperation: BulkOperationDetails
-            userErrors: list[UserErrors] | None
-
-        bulkOperationCancel: BulkOperationCancel
-
-    data: Data
-
-
-class BulkCurrentJobResponse(BaseModel, extra="allow"):
-    class Data(BaseModel, extra="forbid"):
-        currentBulkOperation: BulkOperationDetails | None
-
-    data: Data
-
-
-class BulkSpecificJobResponse(BaseModel, extra="allow"):
-    class Data(BaseModel, extra="forbid"):
-        node: BulkOperationDetails
-
-    data: Data
-
-
 class BulkOperationUserErrors(UserErrors):
     code: BulkOperationUserErrorCodes
 
 
-class BulkJobSubmitResponse(BaseModel, extra="allow"):
-    class Data(BaseModel, extra="forbid"):
-        class BulkOperationRunQuery(BaseModel, extra="forbid"):
-            bulkOperation: BulkOperationDetails | None
-            userErrors: list[BulkOperationUserErrors]
+class BulkOperationCancel(BaseModel, extra="forbid"):
+    bulkOperation: BulkOperationDetails
+    userErrors: list[UserErrors] | None
 
-        bulkOperationRunQuery: BulkOperationRunQuery
 
-    data: Data
+class BulkOperationRunQuery(BaseModel, extra="forbid"):
+    bulkOperation: BulkOperationDetails | None
+    userErrors: list[BulkOperationUserErrors]
+
+
+class BulkCancelData(BaseModel, extra="forbid"):
+    bulkOperationCancel: BulkOperationCancel
+
+
+class BulkCurrentData(BaseModel, extra="forbid"):
+    currentBulkOperation: BulkOperationDetails | None
+
+
+class BulkSpecificData(BaseModel, extra="forbid"):
+    node: BulkOperationDetails
+
+
+class BulkSubmitData(BaseModel, extra="forbid"):
+    bulkOperationRunQuery: BulkOperationRunQuery
+
+
+BulkJobCancelResponse = GraphQLResponse[BulkCancelData]
+BulkCurrentJobResponse = GraphQLResponse[BulkCurrentData]  
+BulkSpecificJobResponse = GraphQLResponse[BulkSpecificData]
+BulkJobSubmitResponse = GraphQLResponse[BulkSubmitData]
 
 
 # Names of Shopify plan types. Some plan types do not have access
