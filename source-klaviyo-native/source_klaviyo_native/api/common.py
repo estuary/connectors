@@ -1,6 +1,7 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 from logging import Logger
+import time
 from typing import AsyncGenerator, TypeVar
 from urllib.parse import parse_qs, urlparse
 
@@ -33,6 +34,7 @@ REQUIRED_HEADERS = {
 PAGE_CURSOR_PARAMETER = "page[cursor]"
 CHECKPOINT_INTERVAL = 1_000
 SMALLEST_KLAVIYO_DATETIME_GRAIN = timedelta(seconds=1)
+TARGET_FETCH_PAGE_INVOCATION_RUN_TIME = 60 * 5 # 5 minutes
 
 
 def _extract_page_cursor(next_url: str | None) -> str | None:
@@ -279,6 +281,8 @@ async def backfill_incremental_resources(
     last_seen_dt = start
     count = 0
 
+    start_time = time.time()
+
     async for doc in _paginate_through_resources(
         http, url, params, model, log,
     ):
@@ -296,6 +300,12 @@ async def backfill_incremental_resources(
         ):
             yield dt_to_str(last_seen_dt)
             count = 0
+
+            # If backfill_incremental_resources has been running for more than TARGET_FETCH_PAGE_INVOCATION_RUN_TIME
+            # minutes, then yield control back to the CDK after a checkpoint. This forces backfills to check the
+            # stopping event every so often & gracefully exit if it's set.
+            if time.time() - start_time >= TARGET_FETCH_PAGE_INVOCATION_RUN_TIME:
+                return
 
         yield doc
         count += 1
