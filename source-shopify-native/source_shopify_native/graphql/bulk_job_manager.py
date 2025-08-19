@@ -2,12 +2,11 @@ import asyncio
 from logging import Logger
 from typing import Any
 
-from estuary_cdk.http import HTTPSession
 from source_shopify_native.models import (
-    BulkJobCancelResponse,
-    BulkCurrentJobResponse,
-    BulkSpecificJobResponse,
-    BulkJobSubmitResponse,
+    BulkCancelData,
+    BulkCurrentData,
+    BulkSpecificData,
+    BulkSubmitData,
     BulkOperationDetails,
     BulkOperationErrorCodes,
     BulkOperationStatuses,
@@ -16,7 +15,9 @@ from source_shopify_native.models import (
     ShopifyGraphQLResource,
 )
 
-VERSION = "2025-04"
+from .client import ShopifyGraphQLClient
+
+
 BULK_QUERY_ALREADY_EXISTS_ERROR = (
     r"A bulk query operation for this app and shop is already in progress"
 )
@@ -57,10 +58,9 @@ class BulkJobError(RuntimeError):
 
 
 class BulkJobManager:
-    def __init__(self, http: HTTPSession, log: Logger, store: str):
-        self.http = http
+    def __init__(self, client: ShopifyGraphQLClient, log: Logger):
+        self.client = client
         self.log = log
-        self.url = f"https://{store}.myshopify.com/admin/api/{VERSION}/graphql.json"
 
     # Cancel currently running job
     async def cancel_current(self):
@@ -123,13 +123,13 @@ class BulkJobManager:
             }}
         """
 
-        response = BulkCurrentJobResponse.model_validate_json(
-            await self.http.request(
-                self.log, self.url, method="POST", json={"query": query}
-            )
+        data = await self.client.request(
+            query,
+            data_model=BulkCurrentData,
+            log=self.log,
         )
 
-        return response.data.currentBulkOperation
+        return data.currentBulkOperation
 
     async def _get_job(self, job_id: str) -> BulkOperationDetails:
         query = f"""
@@ -148,13 +148,13 @@ class BulkJobManager:
             }}
         """
 
-        response = BulkSpecificJobResponse.model_validate_json(
-            await self.http.request(
-                self.log, self.url, method="POST", json={"query": query}
-            )
+        data = await self.client.request(
+            query,
+            data_model=BulkSpecificData,
+            log=self.log,
         )
 
-        return response.data.node
+        return data.node
 
     # Cancel a running bulk job
     async def _cancel(self, job_id: str) -> BulkOperationStatuses:
@@ -180,13 +180,13 @@ class BulkJobManager:
 
         self.log.debug(f"Trying to cancel job {job_id}.")
 
-        response = BulkJobCancelResponse.model_validate_json(
-            await self.http.request(
-                self.log, self.url, method="POST", json={"query": query}
-            )
+        data = await self.client.request(
+            query,
+            data_model=BulkCancelData,
+            log=self.log,
         )
 
-        status = response.data.bulkOperationCancel.bulkOperation.status
+        status = data.bulkOperationCancel.bulkOperation.status
 
         match status:
             case BulkOperationStatuses.CANCELED:
@@ -198,7 +198,7 @@ class BulkJobManager:
                     f"Could not cancel bulk job {job_id}.",
                     {
                         "status": status,
-                        "errors": response.data.bulkOperationCancel.userErrors,
+                        "errors": data.bulkOperationCancel.userErrors,
                     },
                 )
 
@@ -296,16 +296,16 @@ class BulkJobManager:
             }}
         """
 
-        response = BulkJobSubmitResponse.model_validate_json(
-            await self.http.request(
-                self.log, self.url, method="POST", json={"query": query}
-            )
+        data = await self.client.request(
+            query,
+            data_model=BulkSubmitData,
+            log=self.log,
         )
 
-        details = response.data.bulkOperationRunQuery.bulkOperation
+        details = data.bulkOperationRunQuery.bulkOperation
 
         if details is None:
-            errors = response.data.bulkOperationRunQuery.userErrors
+            errors = data.bulkOperationRunQuery.userErrors
 
             is_ongoing_query_conflict = any(
                 BULK_QUERY_ALREADY_EXISTS_ERROR in error.message for error in errors
@@ -329,7 +329,7 @@ class BulkJobManager:
                 raise BulkJobError(
                     message="Errors when submitting query.",
                     query=query,
-                    errors=response.data.bulkOperationRunQuery.userErrors,
+                    errors=data.bulkOperationRunQuery.userErrors,
                 )
 
         return details.id

@@ -11,7 +11,7 @@ import source_shopify_native.graphql as gql
 from source_shopify_native.models import ShopifyGraphQLResource
 
 
-async def fetch_incremental(
+async def bulk_fetch_incremental(
     http: HTTPMixin,
     window_size: int,
     bulk_job_manager: gql.bulk_job_manager.BulkJobManager,
@@ -41,7 +41,7 @@ async def fetch_incremental(
     yield end
 
 
-async def fetch_full_refresh(
+async def bulk_fetch_full_refresh(
     http: HTTPMixin,
     start_date: datetime,
     bulk_job_manager: gql.bulk_job_manager.BulkJobManager,

@@ -24,7 +24,7 @@ from .models import (
     PlanName,
 )
 from .api import (
-    fetch_incremental,
+    bulk_fetch_incremental,
 )
 
 AUTHORIZATION_HEADER = "X-Shopify-Access-Token"
@@ -113,7 +113,7 @@ def _incremental_resources(
             state,
             task,
             fetch_changes=functools.partial(
-                fetch_incremental,
+                bulk_fetch_incremental,
                 http,
                 config.advanced.window_size,
                 bulk_job_manager,
@@ -143,7 +143,8 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
         credentials=config.credentials,
         authorization_header=AUTHORIZATION_HEADER,
     )
-    bulk_job_manager = gql.bulk_job_manager.BulkJobManager(http, log, config.store)
+    client = gql.ShopifyGraphQLClient(http, config.store)
+    bulk_job_manager = gql.bulk_job_manager.BulkJobManager(client, log)
 
     try:
         await bulk_job_manager._get_currently_running_job()
@@ -168,7 +169,8 @@ async def all_resources(
         credentials=config.credentials,
         authorization_header=AUTHORIZATION_HEADER,
     )
-    bulk_job_manager = gql.bulk_job_manager.BulkJobManager(http, log, config.store)
+    client = gql.ShopifyGraphQLClient(http, config.store)
+    bulk_job_manager = gql.bulk_job_manager.BulkJobManager(client, log)
 
     # Before opening bindings, cancel any ongoing bulk query jobs before the 
     # connector starts submitting its own bulk query jobs.
@@ -184,7 +186,7 @@ async def all_resources(
     # they may not be able to access certain PII data.
     # https://help.shopify.com/en/manual/apps/app-types/custom-apps
     # https://community.shopify.com/c/shopify-discussions/no-more-customer-pii-in-custom-app-integrations-for-shopify/td-p/2496209
-    if isinstance(config.credentials, AccessToken) and not await _can_access_pii(http, bulk_job_manager.url, log):
+    if isinstance(config.credentials, AccessToken) and not await _can_access_pii(http, client.url, log):
         for model in PII_RESOURCES:
             resources = [
                 r for r in resources if r.name != model.NAME

@@ -1,6 +1,7 @@
 from . import bulk_job_manager
 
 from .abandoned_checkouts import AbandonedCheckouts
+from .client import ShopifyGraphQLClient
 from .collections.collections import CustomCollections, SmartCollections
 from .collections.metafields import (
     CustomCollectionMetafields,
@@ -29,6 +30,7 @@ from .orders.transactions import OrderTransactions
 
 __all__ = [
     "AbandonedCheckouts",
+    "ShopifyGraphQLClient",
     "bulk_job_manager",
     "CustomCollections",
     "SmartCollections",
