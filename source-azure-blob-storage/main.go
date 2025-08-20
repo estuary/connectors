@@ -203,33 +203,43 @@ type azureBlobListing struct {
 }
 
 func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
-	page, err := l.getPage()
+	for {
+		page, err := l.getPage()
 
-	if err != nil {
-		return filesource.ObjectInfo{}, err
+		if err != nil {
+			return filesource.ObjectInfo{}, err
+		}
+
+		if page == nil {
+			log.Debug("No more files to list")
+			return filesource.ObjectInfo{}, io.EOF
+		}
+
+		// Azure sometimes returns empty pages for undetermined reasons. I suspect this is due to how Azure indexes
+		// interact with empty key spaces & if there's a key space with no blobs, an empty page is returned.
+		// We handle this by skipping empty pages.
+		if len(page.Segment.BlobItems) == 0 {
+			log.Debug("No files in page, skipping to the next page")
+			continue
+		}
+
+		blob := page.Segment.BlobItems[l.index]
+		l.index++
+
+		obj := filesource.ObjectInfo{}
+
+		obj.Path = *blob.Name
+		obj.ModTime = *blob.Properties.LastModified
+		obj.ContentType = *blob.Properties.ContentType
+		obj.Size = *blob.Properties.ContentLength
+
+		if blob.Properties.ContentEncoding != nil {
+			obj.ContentEncoding = *blob.Properties.ContentEncoding
+		}
+		log.Debug("Listing object: ", obj.Path)
+
+		return obj, nil
 	}
-
-	if page == nil {
-		log.Debug("No more files to list")
-		return filesource.ObjectInfo{}, io.EOF
-	}
-
-	blob := page.Segment.BlobItems[l.index]
-	l.index++
-
-	obj := filesource.ObjectInfo{}
-
-	obj.Path = *blob.Name
-	obj.ModTime = *blob.Properties.LastModified
-	obj.ContentType = *blob.Properties.ContentType
-	obj.Size = *blob.Properties.ContentLength
-
-	if blob.Properties.ContentEncoding != nil {
-		obj.ContentEncoding = *blob.Properties.ContentEncoding
-	}
-	log.Debug("Listing object: ", obj.Path)
-
-	return obj, nil
 }
 
 func (l *azureBlobListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
