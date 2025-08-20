@@ -134,9 +134,9 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     true,
-				Options: boilerplate.MaterializeOptions{
+				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
-					AckSchedule: &boilerplate.AckScheduleOption{
+					AckSchedule: &m.AckScheduleOption{
 						Config: cfg.Schedule,
 						Jitter: []byte(cfg.Host + cfg.Warehouse),
 					},
@@ -194,7 +194,7 @@ type transactor struct {
 	}
 	templates templates
 	bindings  []*binding
-	be        *boilerplate.BindingEvents
+	be        *m.BindingEvents
 	cp        checkpoint
 
 	// this shard's range spec and version, used to key pipes so they don't collide
@@ -218,7 +218,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-	be *boilerplate.BindingEvents,
+	be *m.BindingEvents,
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 

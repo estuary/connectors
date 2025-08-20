@@ -73,7 +73,7 @@ func (d *Driver[EC, RC]) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.
 	return boilerplate.RunApply(ctx, req, d.newMaterialization)
 }
 
-func (d *Driver[EC, RC]) NewTransactor(ctx context.Context, req pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
+func (d *Driver[EC, RC]) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	return boilerplate.RunNewTransactor(ctx, req, be, d.newMaterialization)
 }
 
@@ -345,7 +345,7 @@ func (s *sqlMaterialization[EC, RC]) NewMaterializerTransactor(
 	open pm.Request_Open,
 	is boilerplate.InfoSchema,
 	bindings []boilerplate.MappedBinding[EC, RC, MappedType],
-	be *boilerplate.BindingEvents,
+	be *m.BindingEvents,
 ) (boilerplate.MaterializerTransactor, error) {
 	tables := make([]Table, 0, len(bindings))
 	for _, binding := range bindings {

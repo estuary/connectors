@@ -45,7 +45,7 @@ type transactor struct {
 	recovery            bool
 	materializationName string
 
-	be        *boilerplate.BindingEvents
+	be        *m.BindingEvents
 	cfg       config
 	bucket    blob.Bucket
 	emrClient *emrClient

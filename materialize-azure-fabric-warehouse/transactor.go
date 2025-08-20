@@ -38,7 +38,7 @@ type transactor struct {
 	storeFiles *boilerplate.StagedFiles
 	loadFiles  *boilerplate.StagedFiles
 	bindings   []*binding
-	be         *boilerplate.BindingEvents
+	be         *m.BindingEvents
 }
 
 func newTransactor(
@@ -49,7 +49,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-	be *boilerplate.BindingEvents,
+	be *m.BindingEvents,
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 	bucket, err := blob.NewAzureBlobBucket(

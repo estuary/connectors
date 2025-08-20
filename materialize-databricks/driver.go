@@ -87,9 +87,9 @@ func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     true,
-				Options: boilerplate.MaterializeOptions{
+				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
-					AckSchedule: &boilerplate.AckScheduleOption{
+					AckSchedule: &m.AckScheduleOption{
 						Config: cfg.Schedule,
 						Jitter: []byte(warehouseId),
 					},
@@ -108,7 +108,7 @@ type transactor struct {
 	wsClient         *databricks.WorkspaceClient
 	localStagingPath string
 	bindings         []*binding
-	be               *boilerplate.BindingEvents
+	be               *m.BindingEvents
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -128,7 +128,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-	be *boilerplate.BindingEvents,
+	be *m.BindingEvents,
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 

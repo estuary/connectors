@@ -74,7 +74,7 @@ func (Driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	return boilerplate.RunApply(ctx, req, newMaterialization)
 }
 
-func (Driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
+func (Driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
 }
 
@@ -142,9 +142,9 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 		MaxFieldLength:        255,
 		CaseInsensitiveFields: true,
 		NoTruncateResources:   true,
-		MaterializeOptions: boilerplate.MaterializeOptions{
+		MaterializeOptions: m.MaterializeOptions{
 			ExtendedLogging: true,
-			AckSchedule: &boilerplate.AckScheduleOption{
+			AckSchedule: &m.AckScheduleOption{
 				Config: d.cfg.Schedule,
 				Jitter: []byte(d.cfg.Compute.ApplicationId),
 			},
@@ -447,7 +447,7 @@ func (d *materialization) NewMaterializerTransactor(
 	req pm.Request_Open,
 	is boilerplate.InfoSchema,
 	mappedBindings []boilerplate.MappedBinding[config, resource, mapped],
-	be *boilerplate.BindingEvents,
+	be *m.BindingEvents,
 ) (boilerplate.MaterializerTransactor, error) {
 	pyFiles, err := d.putPyFiles(ctx)
 	if err != nil {
