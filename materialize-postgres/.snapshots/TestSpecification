@@ -276,7 +276,8 @@
     "type": "object",
     "required": [
       "address",
-      "user"
+      "user",
+      "credentials"
     ],
     "title": "SQL Connection"
   },
