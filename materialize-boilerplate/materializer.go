@@ -83,7 +83,7 @@ type MaterializeCfg struct {
 
 	// MaterializeOptions is a proxy for the options from boilerplate.go.
 	// Eventually this should be consolidated.
-	MaterializeOptions MaterializeOptions
+	MaterializeOptions m.MaterializeOptions
 }
 
 // ElementConverter maps from a TupleElement into a runtime type instance that's
@@ -307,7 +307,7 @@ type Materializer[
 
 	// NewMaterializerTransactor builds a new transactor for handling the
 	// transactions lifecycle of the materialization.
-	NewMaterializerTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[EC, RC, MT], *BindingEvents) (MaterializerTransactor, error)
+	NewMaterializerTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[EC, RC, MT], *m.BindingEvents) (MaterializerTransactor, error)
 
 	// Close performs any cleanup actions that should be done when gracefully
 	// exiting.
@@ -659,9 +659,9 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	ctx context.Context,
 	req pm.Request_Open,
-	be *BindingEvents,
+	be *m.BindingEvents,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
-) (m.Transactor, *pm.Response_Opened, *MaterializeOptions, error) {
+) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	if err := req.Validate(); err != nil {
 		return nil, nil, nil, fmt.Errorf("validating request: %w", err)
 	}

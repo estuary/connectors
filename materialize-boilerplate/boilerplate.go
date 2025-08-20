@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"net/http"
 	_ "net/http/pprof"
@@ -54,7 +53,7 @@ func RunMain(connector Connector) {
 	}
 
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	var stream m.MaterializeStream
+	var stream m.Stream
 
 	switch codec := getEnvDefault("FLOW_RUNTIME_CODEC", "proto"); codec {
 	case "proto":
@@ -88,7 +87,7 @@ func getEnvDefault(name, def string) string {
 	return s
 }
 
-func materialize(ctx context.Context, stream m.MaterializeStream, connector Connector, lvl log.Level) error {
+func materialize(ctx context.Context, stream m.Stream, connector Connector, lvl log.Level) error {
 	for {
 		var request pm.Request
 		if err := stream.RecvMsg(&request); err == io.EOF {
@@ -123,36 +122,14 @@ func materialize(ctx context.Context, stream m.MaterializeStream, connector Conn
 				return err
 			}
 		case request.Open != nil:
-			be := newBindingEvents()
-
-			openStart := time.Now()
-			log.Info("requesting materialization Open")
-			stop := repeatAsync(func() { log.Info("materialization Open in progress") }, loggingFrequency)
-			transactor, opened, options, err := connector.NewTransactor(ctx, *request.Open, be)
-			if err != nil {
-				return err
-			}
-			stop(func() {
-				log.WithFields(log.Fields{"took": time.Since(openStart).String()}).Info("finished waiting for materialization Open")
-			})
-
-			if options == nil {
-				options = &MaterializeOptions{}
-			}
-
-			ts, err := newTransactionsStream(ctx, stream, lvl, *options, be)
-			if err != nil {
-				return fmt.Errorf("creating transactions stream: %w", err)
-			}
-
-			return m.RunTransactions(ctx, ts, *request.Open, *opened, transactor)
+			return m.RunTransactions(ctx, connector, stream, request.Open, lvl)
 		default:
 			return fmt.Errorf("unexpected request %#v", request)
 		}
 	}
 }
 
-func newProtoCodec() m.MaterializeStream {
+func newProtoCodec() m.Stream {
 	return &protoCodec{
 		r: bufio.NewReaderSize(os.Stdin, 1<<21),
 		w: protoio.NewUint32DelimitedWriter(os.Stdout, binary.LittleEndian),
@@ -228,7 +205,7 @@ func (c *protoCodec) peekMessage(size int) ([]byte, error) {
 	return nil, fmt.Errorf("reading message (into buffer): %w", err)
 }
 
-func newJsonCodec() m.MaterializeStream {
+func newJsonCodec() m.Stream {
 	return &jsonCodec{
 		marshaler: jsonpb.Marshaler{
 			EnumsAsInts:  false,

@@ -295,7 +295,7 @@ func (t testMappedTyper) CanMigrate(e ExistingField) bool {
 	return len(t.jsonTypes) > 1
 }
 
-func (m *testMaterializer) NewMaterializerTransactor(ctx context.Context, req pm.Request_Open, is InfoSchema, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *BindingEvents) (MaterializerTransactor, error) {
+func (m *testMaterializer) NewMaterializerTransactor(ctx context.Context, req pm.Request_Open, is InfoSchema, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *m.BindingEvents) (MaterializerTransactor, error) {
 	return &testMaterializerTransactor{}, nil
 }
 

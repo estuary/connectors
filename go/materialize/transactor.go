@@ -5,19 +5,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"time"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/sirupsen/logrus"
+	log "github.com/sirupsen/logrus"
 	pc "go.gazette.dev/core/consumer/protocol"
 )
-
-// MaterializeStream is the basic interface used for sending and receiving
-// protocol messages.
-type MaterializeStream interface {
-	Send(*pm.Response) error
-	RecvMsg(*pm.Request) error
-}
 
 // Transactor is a store-agnostic interface for a materialization connector
 // that implements Flow materialization protocol transactions.
@@ -69,6 +64,17 @@ type Transactor interface {
 	Destroy()
 }
 
+// Stream is the basic interface used for sending and receiving
+// protocol messages.
+type Stream interface {
+	Send(*pm.Response) error
+	RecvMsg(*pm.Request) error
+}
+
+type newTransactorer interface {
+	NewTransactor(context.Context, pm.Request_Open, *BindingEvents) (Transactor, *pm.Response_Opened, *MaterializeOptions, error)
+}
+
 // StartCommitFunc begins to commit a stored transaction.
 // Upon its return a commit operation may still be running in the background,
 // and the returned OpFuture must resolve with its completion.
@@ -108,12 +114,34 @@ type StartCommitFunc = func(
 // over the established stream against a Connector.
 func RunTransactions(
 	ctx context.Context,
-	stream MaterializeStream,
-	open pm.Request_Open,
-	opened pm.Response_Opened,
-	transactor Transactor,
+	connector newTransactorer,
+	stream Stream,
+	open *pm.Request_Open,
+	lvl log.Level,
 ) (_err error) {
+	be := newBindingEvents()
+
+	openStart := time.Now()
+	log.Info("requesting materialization Open")
+	stop := repeatAsync(func() { log.Info("materialization Open in progress") }, loggingFrequency)
+	var transactor, opened, options, err = connector.NewTransactor(ctx, *open, be)
+	if err != nil {
+		return err
+	}
 	defer transactor.Destroy()
+	stop(func() {
+		log.WithFields(log.Fields{"took": time.Since(openStart).String()}).Info("finished waiting for materialization Open")
+	})
+
+	if options == nil {
+		options = &MaterializeOptions{}
+	}
+
+	// Wrap `stream` with additional logging and auxiliary capabilities.
+	stream, err = newTransactionsStream(ctx, stream, lvl, *options, be)
+	if err != nil {
+		return fmt.Errorf("creating transactions stream: %w", err)
+	}
 
 	if err := open.Validate(); err != nil {
 		return fmt.Errorf("open is invalid: %w", err)
@@ -127,8 +155,9 @@ func RunTransactions(
 		}
 	}
 
-	var rxRequest = pm.Request{Open: &open}
-	var txResponse, err = writeOpened(stream, &opened)
+	var txResponse pm.Response
+	var rxRequest = pm.Request{Open: open}
+	txResponse, err = writeOpened(stream, opened)
 	if err != nil {
 		return err
 	}
