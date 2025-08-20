@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/estuary/connectors/materialize-boilerplate/schedule-config",
+  "$id": "https://github.com/estuary/connectors/go/materialize/schedule-config",
   "properties": {
     "syncFrequency": {
       "type": "string",
