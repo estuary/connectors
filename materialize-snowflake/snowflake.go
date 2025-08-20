@@ -405,7 +405,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return nil // Nothing to load.
 	}
 
-	group, groupCtx := errgroup.WithContext(ctx)
+	// NB: Not using errgroup.WithContext() here since the Go Snowflake driver
+	// retains contexts internally, and the group context is cancelled after
+	// group.Wait() returns.
+	var group errgroup.Group
 	group.SetLimit(MaxConcurrentQueries)
 	// Used to ensure we have no data-interleaving when calling |loaded|
 	var mutex sync.Mutex
@@ -417,7 +420,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		group.Go(func() error {
 			// Issue a join of the target table and (now staged) load keys,
 			// and send results to the |loaded| callback.
-			rows, err := d.db.QueryContext(sf.WithStreamDownloader(groupCtx), query)
+			rows, err := d.db.QueryContext(sf.WithStreamDownloader(ctx), query)
 			if err != nil {
 				return fmt.Errorf("querying Load documents: %w", err)
 			}
@@ -726,12 +729,15 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			item := item
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
-				if _, err := d.db.ExecContext(groupCtx, item.Query); err != nil {
+				// NB: Not using groupTx here since the Go Snowflake driver
+				// retains contexts internally, and groupCtx is cancelled after
+				// group.Wait() returns.
+				if _, err := d.db.ExecContext(ctx, item.Query); err != nil {
 					return fmt.Errorf("query %q failed: %w", item.Query, err)
 				}
 
 				d.be.FinishedResourceCommit(path)
-				if err := d.deleteFiles(ctx, []string{item.StagedDir}); err != nil {
+				if err := d.deleteFiles(groupCtx, []string{item.StagedDir}); err != nil {
 					return fmt.Errorf("cleaning up files: %w", err)
 				}
 

@@ -211,7 +211,10 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 			file, f.uuid,
 		)
 		var source, target, sourceSize, targetSize, sourceCompression, targetCompression, status, message string
-		if err := db.QueryRowContext(ctx, query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message); err != nil {
+		// NB: Not using QueryRowContext here since the Go Snowflake driver
+		// retains contexts internally, and this worker is called with a context
+		// that is cancelled after group.Wait() returns.
+		if err := db.QueryRow(query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message); err != nil {
 			return fmt.Errorf("putWorker PUT to stage: %w", err)
 		} else if !strings.EqualFold("uploaded", status) {
 			return fmt.Errorf("putWorker PUT to stage unexpected upload status: %s", status)
