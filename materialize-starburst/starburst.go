@@ -34,7 +34,7 @@ type config struct {
 	Bucket             string `json:"bucket" jsonschema:"title=Bucket" jsonschema_extras:"order=8"`
 	BucketPath         string `json:"bucketPath" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects in S3." jsonschema_extras:"order=9"`
 
-	Schedule boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	Schedule m.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
@@ -136,9 +136,9 @@ func newStarburstDriver() *sql.Driver[config, tableConfig] {
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
-				Options: boilerplate.MaterializeOptions{
+				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
-					AckSchedule: &boilerplate.AckScheduleOption{
+					AckSchedule: &m.AckScheduleOption{
 						Config: cfg.Schedule,
 						Jitter: []byte(cfg.Account),
 					},
@@ -170,7 +170,7 @@ func newTransactor(
 	tables []sql.Table,
 	open pm.Request_Open,
 	_ *boilerplate.InfoSchema,
-	_ *boilerplate.BindingEvents,
+	_ *m.BindingEvents,
 ) (m.Transactor, error) {
 	var err error
 	var cfg = ep.Config

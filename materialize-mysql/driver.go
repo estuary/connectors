@@ -325,7 +325,7 @@ func newMysqlDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       prepareNewTransactor(templates),
 				Tenant:              tenant,
 				ConcurrentApply:     false,
-				Options: boilerplate.MaterializeOptions{
+				Options: m.MaterializeOptions{
 					DBTJobTrigger: &cfg.DBTJobTrigger,
 				},
 			}, nil
@@ -395,7 +395,7 @@ type transactor struct {
 		deleteInfile *infile
 	}
 	bindings []*binding
-	be       *boilerplate.BindingEvents
+	be       *m.BindingEvents
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
@@ -403,7 +403,7 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 func prepareNewTransactor(
 	templates templates,
-) func(context.Context, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, error) {
+) func(context.Context, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *m.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
 		featureFlags map[string]bool,
@@ -412,7 +412,7 @@ func prepareNewTransactor(
 		bindings []sql.Table,
 		open pm.Request_Open,
 		is *boilerplate.InfoSchema,
-		be *boilerplate.BindingEvents,
+		be *m.BindingEvents,
 	) (m.Transactor, error) {
 		var cfg = ep.Config
 		var d = &transactor{dialect: ep.Dialect, templates: templates, cfg: cfg, be: be}

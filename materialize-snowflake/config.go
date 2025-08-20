@@ -10,7 +10,7 @@ import (
 
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	"github.com/estuary/connectors/go/dbt"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	m "github.com/estuary/connectors/go/materialize"
 	sf "github.com/snowflakedb/gosnowflake"
 )
 
@@ -29,7 +29,7 @@ type config struct {
 	Account       string                           `json:"account,omitempty" jsonschema:"title=Account,description=Optional Snowflake account identifier." jsonschema_extras:"order=7,x-hidden-field=true"`
 	HardDelete    bool                             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=8"`
 	Credentials   *snowflake_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
-	Schedule      boilerplate.ScheduleConfig       `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	Schedule      m.ScheduleConfig                 `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 	DBTJobTrigger dbt.JobConfig                    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 	Advanced      advancedConfig                   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }

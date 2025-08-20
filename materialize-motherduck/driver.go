@@ -44,9 +44,9 @@ func newDuckDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     false,
-				Options: boilerplate.MaterializeOptions{
+				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
-					AckSchedule: &boilerplate.AckScheduleOption{
+					AckSchedule: &m.AckScheduleOption{
 						Config: cfg.Schedule,
 						Jitter: []byte(cfg.Token),
 					},
@@ -68,7 +68,7 @@ type transactor struct {
 	storeFiles *boilerplate.StagedFiles
 	loadFiles  *boilerplate.StagedFiles
 	bindings   []*binding
-	be         *boilerplate.BindingEvents
+	be         *m.BindingEvents
 }
 
 func newTransactor(
@@ -79,7 +79,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-	be *boilerplate.BindingEvents,
+	be *m.BindingEvents,
 ) (_ m.Transactor, err error) {
 	var cfg = ep.Config
 

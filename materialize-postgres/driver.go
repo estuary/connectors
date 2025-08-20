@@ -326,7 +326,7 @@ func newPostgresDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     false,
-				Options: boilerplate.MaterializeOptions{
+				Options: m.MaterializeOptions{
 					DBTJobTrigger: &cfg.DBTJobTrigger,
 				},
 			}, nil
@@ -349,7 +349,7 @@ type transactor struct {
 		fence sql.Fence
 	}
 	bindings []*binding
-	be       *boilerplate.BindingEvents
+	be       *m.BindingEvents
 }
 
 func newTransactor(
@@ -360,7 +360,7 @@ func newTransactor(
 	bindings []sql.Table,
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
-	be *boilerplate.BindingEvents,
+	be *m.BindingEvents,
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 

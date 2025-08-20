@@ -198,7 +198,7 @@ func (d driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_
 	return boilerplate.RunApply(ctx, req, newMaterialization)
 }
 
-func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
+func (d driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
 }
 
@@ -335,7 +335,7 @@ func (d *materialization) NewMaterializerTransactor(
 	req pm.Request_Open,
 	is boilerplate.InfoSchema,
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
-	be *boilerplate.BindingEvents,
+	be *m.BindingEvents,
 ) (boilerplate.MaterializerTransactor, error) {
 	var bindings []binding
 	tablesToBindings := make(map[string]int)

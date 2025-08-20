@@ -392,7 +392,7 @@ func (driver) Apply(ctx context.Context, req *pm.Request_Apply) (*pm.Response_Ap
 	return boilerplate.RunApply(ctx, req, newMaterialization)
 }
 
-func (driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
+func (driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	return boilerplate.RunNewTransactor(ctx, req, be, newMaterialization)
 }
 
@@ -572,7 +572,7 @@ func (d *materialization) NewMaterializerTransactor(
 	req pm.Request_Open,
 	is boilerplate.InfoSchema,
 	mappedBindings []boilerplate.MappedBinding[config, resource, property],
-	be *boilerplate.BindingEvents,
+	be *m.BindingEvents,
 ) (boilerplate.MaterializerTransactor, error) {
 	isServerless, err := d.dataClient.isServerless(ctx)
 	if err != nil {

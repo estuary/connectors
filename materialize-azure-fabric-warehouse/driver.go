@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/estuary/connectors/go/dbt"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	m "github.com/estuary/connectors/go/materialize"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/microsoft/go-mssqldb/azuread"
 )
@@ -19,18 +19,18 @@ type advancedConfig struct {
 }
 
 type config struct {
-	ClientID           string                     `json:"clientID" jsonschema:"title=Client ID,description=Client ID for the service principal used to connect to the Azure Fabric Warehouse." jsonschema_extras:"order=0"`
-	ClientSecret       string                     `json:"clientSecret" jsonschema:"title=Client Secret,description=Client Secret for the service principal used to connect to the Azure Fabric Warehouse." jsonschema_extras:"order=1,secret=true"`
-	Warehouse          string                     `json:"warehouse" jsonschema:"title=Warehouse,description=Name of the Azure Fabric Warehouse to connect to." jsonschema_extras:"order=2"`
-	Schema             string                     `json:"schema" jsonschema:"title=Schema,description=Schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=3"`
-	ConnectionString   string                     `json:"connectionString" jsonschema:"title=Connection String,description=SQL connection string for the Azure Fabric Warehouse." jsonschema_extras:"order=4"`
-	StorageAccountName string                     `json:"storageAccountName" jsonschema:"title=Storage Account Name,description=Name of the storage account that temporary files will be written to." jsonschema_extras:"order=5"`
-	StorageAccountKey  string                     `json:"storageAccountKey" jsonschema:"title=Storage Account Key,description=Storage account key for the storage account that temporary files will be written to." jsonschema_extras:"order=6,secret=true"`
-	ContainerName      string                     `json:"containerName" jsonschema:"title=Storage Account Container Name,description=Name of the container in the storage account where temporary files will be written." jsonschema_extras:"order=7"`
-	Directory          string                     `json:"directory,omitempty" jsonschema:"title=Directory,description=Optional prefix that will be used for temporary files." jsonschema_extras:"order=8"`
-	HardDelete         bool                       `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=9"`
-	Schedule           boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
-	DBTJobTrigger      dbt.JobConfig              `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt job when new data is available"`
+	ClientID           string           `json:"clientID" jsonschema:"title=Client ID,description=Client ID for the service principal used to connect to the Azure Fabric Warehouse." jsonschema_extras:"order=0"`
+	ClientSecret       string           `json:"clientSecret" jsonschema:"title=Client Secret,description=Client Secret for the service principal used to connect to the Azure Fabric Warehouse." jsonschema_extras:"order=1,secret=true"`
+	Warehouse          string           `json:"warehouse" jsonschema:"title=Warehouse,description=Name of the Azure Fabric Warehouse to connect to." jsonschema_extras:"order=2"`
+	Schema             string           `json:"schema" jsonschema:"title=Schema,description=Schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=3"`
+	ConnectionString   string           `json:"connectionString" jsonschema:"title=Connection String,description=SQL connection string for the Azure Fabric Warehouse." jsonschema_extras:"order=4"`
+	StorageAccountName string           `json:"storageAccountName" jsonschema:"title=Storage Account Name,description=Name of the storage account that temporary files will be written to." jsonschema_extras:"order=5"`
+	StorageAccountKey  string           `json:"storageAccountKey" jsonschema:"title=Storage Account Key,description=Storage account key for the storage account that temporary files will be written to." jsonschema_extras:"order=6,secret=true"`
+	ContainerName      string           `json:"containerName" jsonschema:"title=Storage Account Container Name,description=Name of the container in the storage account where temporary files will be written." jsonschema_extras:"order=7"`
+	Directory          string           `json:"directory,omitempty" jsonschema:"title=Directory,description=Optional prefix that will be used for temporary files." jsonschema_extras:"order=8"`
+	HardDelete         bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=9"`
+	Schedule           m.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	DBTJobTrigger      dbt.JobConfig    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt job when new data is available"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
@@ -132,9 +132,9 @@ func newDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     true,
-				Options: boilerplate.MaterializeOptions{
+				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
-					AckSchedule: &boilerplate.AckScheduleOption{
+					AckSchedule: &m.AckScheduleOption{
 						Config: cfg.Schedule,
 						Jitter: []byte(cfg.ConnectionString),
 					},

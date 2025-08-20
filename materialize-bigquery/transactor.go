@@ -44,7 +44,7 @@ type transactor struct {
 	loadFiles  *boilerplate.StagedFiles
 
 	bindings []*binding
-	be       *boilerplate.BindingEvents
+	be       *m.BindingEvents
 	cp       checkpoint
 
 	objAndArrayAsJson       bool
@@ -53,7 +53,7 @@ type transactor struct {
 
 func prepareNewTransactor(
 	templates templates,
-) func(context.Context, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *boilerplate.BindingEvents) (m.Transactor, error) {
+) func(context.Context, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *m.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
 		featureFlags map[string]bool,
@@ -62,7 +62,7 @@ func prepareNewTransactor(
 		bindings []sql.Table,
 		open pm.Request_Open,
 		is *boilerplate.InfoSchema,
-		be *boilerplate.BindingEvents,
+		be *m.BindingEvents,
 	) (m.Transactor, error) {
 		var cfg = ep.Config
 

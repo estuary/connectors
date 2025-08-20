@@ -120,7 +120,7 @@ type Endpoint[EC boilerplate.EndpointConfiger] struct {
 		bindings []Table,
 		open pm.Request_Open,
 		is *boilerplate.InfoSchema,
-		be *boilerplate.BindingEvents,
+		be *m.BindingEvents,
 	) (m.Transactor, error)
 	// Tenant owning this task, as determined from the task name.
 	Tenant string
@@ -128,5 +128,5 @@ type Endpoint[EC boilerplate.EndpointConfiger] struct {
 	// for changing many tables in a single apply.
 	ConcurrentApply bool
 	// Options are general materialization options that apply to this task.
-	Options boilerplate.MaterializeOptions
+	Options m.MaterializeOptions
 }

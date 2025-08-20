@@ -138,7 +138,7 @@ func (d FileDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm
 	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *boilerplate.BindingEvents) (m.Transactor, *pm.Response_Opened, *boilerplate.MaterializeOptions, error) {
+func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	driverCfg, err := d.NewConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, nil, err
@@ -176,9 +176,9 @@ func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *
 		})
 	}
 
-	opts := &boilerplate.MaterializeOptions{
-		AckSchedule: &boilerplate.AckScheduleOption{
-			Config: boilerplate.ScheduleConfig{
+	opts := &m.MaterializeOptions{
+		AckSchedule: &m.AckScheduleOption{
+			Config: m.ScheduleConfig{
 				SyncFrequency: driverCfg.CommonConfig().UploadInterval,
 			},
 		},

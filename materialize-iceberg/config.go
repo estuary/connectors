@@ -14,8 +14,8 @@ import (
 	"github.com/cespare/xxhash/v2"
 	"github.com/estuary/connectors/go/blob"
 	"github.com/estuary/connectors/go/dbt"
+	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	"github.com/estuary/connectors/materialize-iceberg/catalog"
 	"github.com/invopop/jsonschema"
 )
@@ -26,15 +26,15 @@ import (
 // cases. See https://github.com/apache/iceberg/issues/11341 &
 // https://github.com/apache/iceberg/issues/11709
 type config struct {
-	URL                   string                     `json:"url" jsonschema:"title=URL,description=Base URL for the catalog. If you are using AWS Glue as a catalog this should look like 'https://glue.<region>.amazonaws.com/iceberg'. Otherwise it may look like 'https://yourserver.com/api/catalog'." jsonschema_extras:"order=0"`
-	Warehouse             string                     `json:"warehouse" jsonschema:"title=Warehouse,description=Warehouse to connect to. For AWS Glue this is the account ID." jsonschema_extras:"order=1"`
-	Namespace             string                     `json:"namespace" jsonschema:"title=Namespace,description=Namespace for bound collection tables (unless overridden within the binding resource configuration).," jsonschema_extras:"order=2,pattern=^[^.]*$"`
-	BaseLocation          string                     `json:"base_location,omitempty" jsonschema:"title=Base Location,description=Base location for the catalog tables. Required if using AWS Glue as a catalog. Example: 's3://your_bucket/your_prefix/'" jsonschema_extras:"order=3"`
-	HardDelete            bool                       `json:"hard_delete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. It is disabled by default and _meta/op in the destination will signify whether rows have been deleted (soft-delete)." jsonschema_extras:"order=4"`
-	CatalogAuthentication catalogAuthConfig          `json:"catalog_authentication"`
-	Compute               computeConfig              `json:"compute"`
-	Schedule              boilerplate.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
-	DBTJobTrigger         dbt.JobConfig              `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
+	URL                   string            `json:"url" jsonschema:"title=URL,description=Base URL for the catalog. If you are using AWS Glue as a catalog this should look like 'https://glue.<region>.amazonaws.com/iceberg'. Otherwise it may look like 'https://yourserver.com/api/catalog'." jsonschema_extras:"order=0"`
+	Warehouse             string            `json:"warehouse" jsonschema:"title=Warehouse,description=Warehouse to connect to. For AWS Glue this is the account ID." jsonschema_extras:"order=1"`
+	Namespace             string            `json:"namespace" jsonschema:"title=Namespace,description=Namespace for bound collection tables (unless overridden within the binding resource configuration).," jsonschema_extras:"order=2,pattern=^[^.]*$"`
+	BaseLocation          string            `json:"base_location,omitempty" jsonschema:"title=Base Location,description=Base location for the catalog tables. Required if using AWS Glue as a catalog. Example: 's3://your_bucket/your_prefix/'" jsonschema_extras:"order=3"`
+	HardDelete            bool              `json:"hard_delete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. It is disabled by default and _meta/op in the destination will signify whether rows have been deleted (soft-delete)." jsonschema_extras:"order=4"`
+	CatalogAuthentication catalogAuthConfig `json:"catalog_authentication"`
+	Compute               computeConfig     `json:"compute"`
+	Schedule              m.ScheduleConfig  `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	DBTJobTrigger         dbt.JobConfig     `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
