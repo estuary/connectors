@@ -13,17 +13,17 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	iam "github.com/estuary/connectors/go/auth/iam"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
-	iam "github.com/estuary/connectors/go/auth/iam"
-	schemagen "github.com/estuary/connectors/go/schema-gen"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	"github.com/invopop/jsonschema"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/invopop/jsonschema"
 	"github.com/jackc/pgx/v5"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
@@ -90,7 +90,7 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 		schemagen.OneOfSubSchema("Password", userPassword{}, string(UserPassword)),
 	}
 	subSchemas = append(subSchemas, (iam.IAMConfig{}).OneOfSubSchemas()...)
-	
+
 	schema := schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword), subSchemas...)
 
 	return schema
@@ -98,13 +98,13 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 
 type config struct {
 	Address    string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 5432 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	User     string   `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
+	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
 	Password   string `json:"password,omitempty" jsonschema:"-"`
 	Database   string `json:"database,omitempty" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=2"`
 	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=3"`
 	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
 
-	Credentials *credentialConfig `json:"credentials,omitempty" jsonschema_extras:"x-iam-auth=true,order=5"`
+	Credentials *credentialConfig `json:"credentials" jsonschema_extras:"x-iam-auth=true,order=5"`
 
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
