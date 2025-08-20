@@ -1,4 +1,4 @@
-package boilerplate
+package materialize
 
 import (
 	"fmt"

@@ -227,7 +227,7 @@ func RunTransactions(
 			loadIt      = LoadIterator{stream: stream, request: &rxRequest, awaitDoneCh: awaitDoneCh, ctx: loadCtx}
 		)
 
-		if err = readAcknowledge(stream, &rxRequest); err != nil {
+		if err = doReadAcknowledge(stream, &rxRequest); err != nil {
 			return err
 		}
 

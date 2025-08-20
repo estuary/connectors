@@ -18,7 +18,6 @@ import (
 	_ "net/http/pprof"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
-	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	protoio "github.com/gogo/protobuf/io"
@@ -27,44 +26,11 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-type MaterializeOptions struct {
-	// ExtendedLogging enables detailed logging of transactions progress.
-	// Typically this should be enabled for materializations that run large,
-	// long-running transactions, such as data warehouses.
-	ExtendedLogging bool
-
-	// AckSchedule is configuration for scheduling of runtime acknowledgements
-	// sent from the connector at the completion of its commits.
-	AckSchedule *AckScheduleOption
-
-	// DBTJobTrigger is configuration for enabling DBT job triggers after commits
-	DBTJobTrigger *dbt.JobConfig
-}
-
-// AckScheduleOption enables a schedule for acknowledgements of the
-// materialization. This will "spread out" transaction processing and result in
-// fewer, larger transactions which may be desirable to reduce warehouse compute
-// costs or comply with rate limits.
-//
-// The value for Jitter can be used to provide synchronization across tasks
-// which access a common destination resource. A good example is Snowflake,
-// where if there are multiple materializations using the same compute
-// warehouse, ideally they would all make requests to the warehouse at the same
-// time to avoid waking it up repeatedly at random times through their sync
-// intervals. In these cases, the jitter should identify the shared resource
-// consistently across different materializations: For the Snowflake example,
-// this would be the combination of the host URL + warehouse name, since
-// warehouses are named uniquely per account.
-type AckScheduleOption struct {
-	Config ScheduleConfig
-	Jitter []byte
-}
-
 type Connector interface {
 	Spec(context.Context, *pm.Request_Spec) (*pm.Response_Spec, error)
 	Validate(context.Context, *pm.Request_Validate) (*pm.Response_Validated, error)
 	Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error)
-	NewTransactor(context.Context, pm.Request_Open, *BindingEvents) (m.Transactor, *pm.Response_Opened, *MaterializeOptions, error)
+	NewTransactor(context.Context, pm.Request_Open, *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error)
 }
 
 // RunMain is the boilerplate main function of a materialization connector.
