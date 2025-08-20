@@ -640,9 +640,14 @@ func (rs *sqlserverReplicationStream) streamToWatermarkFence(ctx context.Context
 			// with the expected value.
 			if event, ok := event.(*sqlserverChangeEvent); ok {
 				if event.Meta.Operation != sqlcapture.DeleteOp && event.Shared.StreamID == watermarkStreamID {
-					var watermarkIndex = slices.IndexFunc(event.Shared.Shape.Names, func(name string) bool {
-						return strings.EqualFold(name, "watermark")
-					})
+					// Identify the watermark column index based on the Shape of this row
+					var watermarkIndex = -1
+					for idx, vidx := range event.Shared.Shape.Swizzle {
+						var name = event.Shared.Shape.Names[idx]
+						if strings.EqualFold(name, "watermark") {
+							watermarkIndex = vidx
+						}
+					}
 					if watermarkIndex < 0 {
 						return fmt.Errorf("watermark column not found in watermarks table %q", watermarkStreamID)
 					}
