@@ -166,7 +166,7 @@ func (it *StoreIterator) Err() error {
 	return it.err
 }
 
-func readAcknowledge(stream MaterializeStream, request *pm.Request) error {
+func doReadAcknowledge(stream MaterializeStream, request *pm.Request) error {
 	if request.Open == nil && request.StartCommit == nil {
 		panic(fmt.Sprintf("expected prior request is Open or StartCommit, got %#v", request))
 	} else if err := recv(stream, request); err != nil {

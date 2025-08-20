@@ -1,4 +1,4 @@
-package boilerplate
+package materialize
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/go/dbt"
-	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/go/schedule"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
@@ -32,6 +31,39 @@ const (
 	storedHistorySize = 5
 )
 
+type MaterializeOptions struct {
+	// ExtendedLogging enables detailed logging of transactions progress.
+	// Typically this should be enabled for materializations that run large,
+	// long-running transactions, such as data warehouses.
+	ExtendedLogging bool
+
+	// AckSchedule is configuration for scheduling of runtime acknowledgements
+	// sent from the connector at the completion of its commits.
+	AckSchedule *AckScheduleOption
+
+	// DBTJobTrigger is configuration for enabling DBT job triggers after commits
+	DBTJobTrigger *dbt.JobConfig
+}
+
+// AckScheduleOption enables a schedule for acknowledgements of the
+// materialization. This will "spread out" transaction processing and result in
+// fewer, larger transactions which may be desirable to reduce warehouse compute
+// costs or comply with rate limits.
+//
+// The value for Jitter can be used to provide synchronization across tasks
+// which access a common destination resource. A good example is Snowflake,
+// where if there are multiple materializations using the same compute
+// warehouse, ideally they would all make requests to the warehouse at the same
+// time to avoid waking it up repeatedly at random times through their sync
+// intervals. In these cases, the jitter should identify the shared resource
+// consistently across different materializations: For the Snowflake example,
+// this would be the combination of the host URL + warehouse name, since
+// warehouses are named uniquely per account.
+type AckScheduleOption struct {
+	Config ScheduleConfig
+	Jitter []byte
+}
+
 // transactionsEvent represents one of the many interesting things that can
 // happen while running materialization transactions.
 type transactionsEvent int
@@ -51,7 +83,7 @@ const (
 
 type transactionsStream struct {
 	ctx     context.Context
-	stream  m.MaterializeStream
+	stream  MaterializeStream
 	handler func(transactionsEvent)
 
 	// Variables used for handling acknowledgement delays when configured.
@@ -67,7 +99,7 @@ type transactionsStream struct {
 // capabilities via specific handling for events.
 func newTransactionsStream(
 	ctx context.Context,
-	stream m.MaterializeStream,
+	stream MaterializeStream,
 	lvl log.Level,
 	options MaterializeOptions,
 	be *BindingEvents,
