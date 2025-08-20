@@ -10,8 +10,8 @@ Binding 0:
         "TestDiscoverycomplex_cheap_oxygenation": {
           "type": "object",
           "required": [
-            "k2",
-            "k1"
+            "k1",
+            "k2"
           ],
           "$anchor": "TestDiscoverycomplex_cheap_oxygenation",
           "properties": {

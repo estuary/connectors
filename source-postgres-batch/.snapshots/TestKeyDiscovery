@@ -17,10 +17,10 @@ Binding 0:
         "type": "object",
         "required": [
           "_meta",
-          "k_smallint",
-          "k_int",
           "k_bigint",
           "k_bool",
+          "k_int",
+          "k_smallint",
           "k_str"
         ],
         "properties": {
