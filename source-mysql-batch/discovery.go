@@ -150,18 +150,28 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 		metadataSchema.Extras["additionalProperties"] = false
 	}
 
-	var required = append([]string{"_meta"}, keyColumns...)
 	var properties = map[string]*jsonschema.Schema{
 		"_meta": metadataSchema,
 	}
+	var required = []string{"_meta"}
+
 	for colName, colType := range columnTypes {
 		var colSchema = colType.JSONSchema()
+		var isPrimaryKey = slices.Contains(keyColumns, colName)
 		if types, ok := colSchema.Extras["type"].([]string); ok && len(types) > 1 && !fullWriteSchema {
 			// Remove null as an option when there are multiple type options and we don't want nullability
 			colSchema.Extras["type"] = slices.DeleteFunc(types, func(t string) bool { return t == "null" })
 		}
 		properties[colName] = colSchema
+
+		// When generating a write schema, only primary key columns are required.
+		// Otherwise, when generating a sourced schema, all columns are required
+		// (and are turned off by inference if they're omitted in captured documents).
+		if !fullWriteSchema || isPrimaryKey {
+			required = append(required, colName)
+		}
 	}
+	slices.Sort(required) // Stable ordering.
 
 	var schema = &jsonschema.Schema{
 		Type:     "object",

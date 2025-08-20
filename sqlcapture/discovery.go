@@ -146,8 +146,10 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	//lint:ignore SA1019 We don't need the title-casing to handle punctuation properly so strings.Title() is sufficient
 	var anchor = strings.Title(table.Schema) + strings.Title(table.Name)
 
-	// Build `properties` schemas for each table column.
+	// Build `properties` schemas for each table column, and track `required` properties.
 	var properties = make(map[string]*jsonschema.Schema)
+	var required []string
+
 	for _, column := range table.Columns {
 		if column.OmitColumn {
 			continue // Skip adding properties corresponding to omitted columns
@@ -184,7 +186,15 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 
 		jsonType.Description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, column.DataType)
 		properties[column.Name] = jsonType
+
+		// When generating a write schema, only primary key columns are required.
+		// Otherwise, when generating a sourced schema, all columns are required
+		// (and are turned off by inference if they're omitted in captured documents).
+		if !fullWriteSchema || isPrimaryKey {
+			required = append(required, column.Name)
+		}
 	}
+	slices.Sort(required) // Stable ordering.
 
 	var beforeSchema = &jsonschema.Schema{
 		Ref:         "#" + anchor,
@@ -274,7 +284,7 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 					"$anchor":    anchor,
 					"properties": properties,
 				},
-				Required: collectionKey,
+				Required: required,
 			},
 		},
 		Extras: make(map[string]any),
