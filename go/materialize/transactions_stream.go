@@ -83,7 +83,7 @@ const (
 
 type transactionsStream struct {
 	ctx     context.Context
-	stream  MaterializeStream
+	stream  Stream
 	handler func(transactionsEvent)
 
 	// Variables used for handling acknowledgement delays when configured.
@@ -99,7 +99,7 @@ type transactionsStream struct {
 // capabilities via specific handling for events.
 func newTransactionsStream(
 	ctx context.Context,
-	stream MaterializeStream,
+	stream Stream,
 	lvl log.Level,
 	options MaterializeOptions,
 	be *BindingEvents,

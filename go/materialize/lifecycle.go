@@ -19,7 +19,7 @@ type LoadIterator struct {
 	PackedKey []byte      // PackedKey of the document to load.
 	Total     int         // Total number of iterated keys.
 
-	stream      MaterializeStream
+	stream      Stream
 	request     *pm.Request     // Request read into.
 	awaitDoneCh <-chan struct{} // Signaled when last commit acknowledgment has completed.
 	err         error           // Terminal error.
@@ -108,7 +108,7 @@ type StoreIterator struct {
 	RawJSON      json.RawMessage // Document to store.
 	Total        int             // Total number of iterated stores.
 
-	stream  MaterializeStream
+	stream  Stream
 	request *pm.Request // Request read into.
 	err     error       // Terminal error.
 	ctx     context.Context
@@ -166,7 +166,7 @@ func (it *StoreIterator) Err() error {
 	return it.err
 }
 
-func doReadAcknowledge(stream MaterializeStream, request *pm.Request) error {
+func doReadAcknowledge(stream Stream, request *pm.Request) error {
 	if request.Open == nil && request.StartCommit == nil {
 		panic(fmt.Sprintf("expected prior request is Open or StartCommit, got %#v", request))
 	} else if err := recv(stream, request); err != nil {
@@ -198,7 +198,7 @@ func checkpointFromStartCommit(request *pm.Request) (*pc.Checkpoint, error) {
 	return request.StartCommit.RuntimeCheckpoint, nil
 }
 
-func writeOpened(stream MaterializeStream, opened *pm.Response_Opened) (pm.Response, error) {
+func writeOpened(stream Stream, opened *pm.Response_Opened) (pm.Response, error) {
 	var response = pm.Response{Opened: opened}
 
 	if err := stream.Send(&response); err != nil {
@@ -207,7 +207,7 @@ func writeOpened(stream MaterializeStream, opened *pm.Response_Opened) (pm.Respo
 	return response, nil
 }
 
-func writeAcknowledged(stream MaterializeStream, state *pf.ConnectorState, response *pm.Response) error {
+func writeAcknowledged(stream Stream, state *pf.ConnectorState, response *pm.Response) error {
 	if response.Opened == nil && response.StartedCommit == nil {
 		panic(fmt.Sprintf("expected prior response is Opened or StartedCommit, got %#v", response))
 	}
@@ -223,7 +223,7 @@ func writeAcknowledged(stream MaterializeStream, state *pf.ConnectorState, respo
 }
 
 func writeLoaded(
-	stream MaterializeStream,
+	stream Stream,
 	response *pm.Response,
 	binding int,
 	document json.RawMessage,
@@ -243,7 +243,7 @@ func writeLoaded(
 	return nil
 }
 
-func writeFlushed(stream MaterializeStream, response *pm.Response) error {
+func writeFlushed(stream Stream, response *pm.Response) error {
 	if response.Acknowledged == nil && response.Loaded == nil {
 		panic(fmt.Sprintf("expected prior response is Acknowledged or Loaded, got %#v", response))
 	}
@@ -257,7 +257,7 @@ func writeFlushed(stream MaterializeStream, response *pm.Response) error {
 }
 
 func writeStartedCommit(
-	stream MaterializeStream,
+	stream Stream,
 	response *pm.Response,
 	checkpoint *pf.ConnectorState,
 ) error {
@@ -276,7 +276,7 @@ func writeStartedCommit(
 }
 
 func recv(
-	stream MaterializeStream,
+	stream Stream,
 	message *pm.Request,
 ) error {
 	return pf.UnwrapGRPCError(stream.RecvMsg(message))
