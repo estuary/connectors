@@ -35,10 +35,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "date": {
@@ -105,10 +101,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "date": {
@@ -193,10 +185,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "date": {
@@ -263,10 +251,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "region": {
@@ -351,10 +335,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "date": {
@@ -427,10 +407,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "date": {
@@ -509,10 +485,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "date": {
@@ -591,10 +563,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "date": {
@@ -661,10 +629,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "date": {

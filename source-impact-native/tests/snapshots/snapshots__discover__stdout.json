@@ -39,10 +39,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -101,10 +97,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -163,10 +155,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -225,10 +213,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -287,10 +271,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -349,10 +329,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -411,10 +387,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -473,10 +445,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -535,10 +503,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -597,10 +561,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         }
       },
@@ -652,10 +612,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         }
       },
@@ -707,10 +663,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         }
       },
@@ -762,10 +714,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         }
       },
@@ -817,10 +765,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         }
       },
@@ -872,10 +816,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -934,10 +874,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -996,10 +932,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -1058,10 +990,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "Id": {
@@ -1120,10 +1048,6 @@
               "$ref": "#/$defs/Meta"
             }
           ],
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         }
       },
