@@ -35,10 +35,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "QuestionID": {
@@ -108,10 +104,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "responseId": {
@@ -175,10 +167,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "id": {

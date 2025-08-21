@@ -41,10 +41,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "id": {
@@ -102,10 +98,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         }
       },
@@ -152,10 +144,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         }
       },
@@ -209,10 +197,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "id": {
@@ -277,10 +261,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "id": {
@@ -345,10 +325,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "id": {
@@ -413,10 +389,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "id": {
@@ -481,10 +453,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "id": {
@@ -542,10 +510,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         }
       },
@@ -599,10 +563,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "id": {
@@ -660,10 +620,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         }
       },
@@ -717,10 +673,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "id": {
@@ -778,10 +730,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         }
       },
@@ -828,10 +776,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         }
       },
@@ -885,10 +829,6 @@
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
-          "default": {
-            "op": "u",
-            "row_id": -1
-          },
           "description": "Document metadata"
         },
         "id": {
