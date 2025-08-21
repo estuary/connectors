@@ -87,9 +87,11 @@ func (cs *CaptureSpec) Validate(ctx context.Context, t testing.TB) ([]*pc.Respon
 // VerifyDiscover runs Discover and then performs snapshot verification on the result.
 func (cs *CaptureSpec) VerifyDiscover(ctx context.Context, t testing.TB, matchers ...*regexp.Regexp) {
 	t.Helper()
-
 	var bindings = cs.Discover(ctx, t, matchers...)
+	cupaloy.SnapshotT(t, SummarizeBindings(t, bindings))
+}
 
+func SummarizeBindings(t testing.TB, bindings []*pc.Response_Discovered_Binding) string {
 	var summary = new(strings.Builder)
 	for idx, binding := range bindings {
 		fmt.Fprintf(summary, "Binding %d:\n", idx)
@@ -101,8 +103,7 @@ func (cs *CaptureSpec) VerifyDiscover(ctx context.Context, t testing.TB, matcher
 	if len(bindings) == 0 {
 		fmt.Fprintf(summary, "(no output)")
 	}
-
-	cupaloy.SnapshotT(t, summary.String())
+	return summary.String()
 }
 
 // Discover performs catalog discovery against the target database and returns

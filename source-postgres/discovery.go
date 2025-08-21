@@ -27,7 +27,7 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.
 	queryAndLogCurrentXID(ctx, db.conn)
 
 	// Get lists of all tables, columns and primary keys in the database
-	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
+	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas, db.config.Advanced.CaptureAsPartitions)
 	if err != nil {
 		return nil, fmt.Errorf("unable to list database tables: %w", err)
 	}
@@ -439,20 +439,28 @@ type postgresTableDiscoveryDetails struct {
 	GeneratedColumns []string // List of the names of generated columns in this table, in no particular order.
 }
 
-const queryDiscoverTables = `
-  SELECT n.nspname, c.relname
-  FROM pg_catalog.pg_class c
-  JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)
-  WHERE n.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron', 'pglogical')
-    AND NOT c.relispartition
-    -- exclude temporary tables ('t') and unlogged tables ('u')
-    AND c.relpersistence = 'p'
-    AND c.relkind IN ('r', 'p');` // 'r' means "Ordinary Table" and 'p' means "Partitioned Table"
-
-func getTables(ctx context.Context, conn *pgxpool.Pool, selectedSchemas []string) ([]*sqlcapture.DiscoveryInfo, error) {
+func getTables(ctx context.Context, conn *pgxpool.Pool, selectedSchemas []string, captureAsPartitions bool) ([]*sqlcapture.DiscoveryInfo, error) {
 	logrus.Debug("listing all tables in the database")
+
+	var query = new(strings.Builder)
+	fmt.Fprintf(query, "SELECT n.nspname, c.relname")
+	fmt.Fprintf(query, "  FROM pg_catalog.pg_class c")
+	fmt.Fprintf(query, "  JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)")
+	fmt.Fprintf(query, "  WHERE n.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron', 'pglogical')")
+	fmt.Fprintf(query, "    AND c.relpersistence = 'p'") // exclude temporary tables ('t') and unlogged tables ('u')
+	if captureAsPartitions {
+		// When capturing as partitions, we want partition leaves only
+		fmt.Fprintf(query, "    AND c.relispartition")
+		fmt.Fprintf(query, "    AND c.relkind = 'r'") // Only ordinary tables (includes partitions but not the root of a partitioned table)
+	} else {
+		// Default behavior: exclude partitions and include root tables
+		fmt.Fprintf(query, "    AND NOT c.relispartition")
+		fmt.Fprintf(query, "    AND c.relkind IN ('r', 'p')") // Both ordinary and partitioned tables
+	}
+	fmt.Fprintf(query, ";")
+
 	var tables []*sqlcapture.DiscoveryInfo
-	var rows, err = conn.Query(ctx, queryDiscoverTables)
+	var rows, err = conn.Query(ctx, query.String())
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
