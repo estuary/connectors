@@ -867,3 +867,67 @@ func TestMessageOverflow(t *testing.T) {
 	cs.Capture(ctx, t, nil)
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+// TestCaptureAsPartitions verifies that the "Capture Partitioned Tables as Partitions" advanced setting works as intended.
+func TestCaptureAsPartitions(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = uniqueTableID(t)
+	var rootName = tb.CreateTable(ctx, t, uniqueID, "(logdate DATE PRIMARY KEY, value TEXT) PARTITION BY RANGE (logdate)")
+
+	var cleanup = func() {
+		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s_2023q1;`, rootName))
+		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s_2023q2;`, rootName))
+		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s_2023q3;`, rootName))
+		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s_2023q4;`, rootName))
+	}
+	cleanup()
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %[1]s_2023q1 PARTITION OF %[1]s FOR VALUES FROM ('2023-01-01') TO ('2023-04-01');`, rootName))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %[1]s_2023q2 PARTITION OF %[1]s FOR VALUES FROM ('2023-04-01') TO ('2023-07-01');`, rootName))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %[1]s_2023q3 PARTITION OF %[1]s FOR VALUES FROM ('2023-07-01') TO ('2023-10-01');`, rootName))
+	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %[1]s_2023q4 PARTITION OF %[1]s FOR VALUES FROM ('2023-10-01') TO ('2024-01-01');`, rootName))
+	t.Cleanup(cleanup)
+
+	// Recreate the publication without the `publish_via_partition_root` flag for this test only
+	t.Cleanup(func() {
+		tb.Query(ctx, t, `DROP PUBLICATION IF EXISTS flow_publication;`)
+		tb.Query(ctx, t, `CREATE PUBLICATION flow_publication FOR ALL TABLES;`)
+		tb.Query(ctx, t, `ALTER PUBLICATION flow_publication SET (publish_via_partition_root = true);`)
+	})
+	tb.Query(ctx, t, `DROP PUBLICATION IF EXISTS flow_publication;`)
+	tb.Query(ctx, t, `CREATE PUBLICATION flow_publication FOR ALL TABLES;`)
+
+	// Test discovery with CaptureAsPartitions enabled
+	var cs = tb.CaptureSpec(ctx, t)
+	cs.EndpointSpec.(*Config).Advanced.CaptureAsPartitions = true
+	var bindings = cs.Discover(ctx, t, regexp.MustCompile(uniqueID))
+	t.Run("Discover", func(t *testing.T) { cupaloy.SnapshotT(t, st.SummarizeBindings(t, bindings)) })
+
+	// Test capture with CaptureAsPartitions enabled
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterCaughtUp(t, true)
+		cs.Bindings = tests.ConvertBindings(t, bindings)
+
+		// Insert test data into the partitions for backfill
+		tb.Insert(ctx, t, rootName, [][]any{
+			{"2023-01-15", "Q1 data 1"},
+			{"2023-02-20", "Q1 data 2"},
+			{"2023-05-10", "Q2 data 1"},
+			{"2023-06-15", "Q2 data 2"},
+			{"2023-08-05", "Q3 data 1"},
+			{"2023-09-25", "Q3 data 2"},
+			{"2023-11-12", "Q4 data 1"},
+			{"2023-12-28", "Q4 data 2"},
+		})
+		cs.Capture(ctx, t, nil)
+
+		// Insert more test data into the partitions for replication
+		tb.Insert(ctx, t, rootName, [][]any{
+			{"2023-03-01", "Q1 replication"},
+			{"2023-04-01", "Q2 replication"},
+			{"2023-07-01", "Q3 replication"},
+			{"2023-10-01", "Q4 replication"},
+		})
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
