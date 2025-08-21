@@ -29,7 +29,6 @@
         "hs_latest_source_data_1": "API",
         "hs_latest_source_data_2": "sample-contact",
         "hs_latest_source_timestamp": "2024-12-18T20:40:00Z",
-        "hs_lifecyclestage_lead_date": "2024-12-18T20:40:46.664Z",
         "hs_marketable_reason_id": "Sample Contact",
         "hs_marketable_reason_type": "SAMPLE_CONTACT",
         "hs_marketable_status": "true",
@@ -215,14 +214,6 @@
             "sourceType": "ANALYTICS",
             "timestamp": "2024-12-18T20:41:04.428000Z",
             "value": "2024-12-18T20:40:00Z"
-          }
-        ],
-        "hs_lifecyclestage_lead_date": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "API",
-            "timestamp": "2024-12-18T20:40:46.664000Z",
-            "value": "2024-12-18T20:40:46.664Z"
           }
         ],
         "hs_marketable_reason_id": [
@@ -497,7 +488,6 @@
         "hs_latest_source_data_1": "API",
         "hs_latest_source_data_2": "sample-contact",
         "hs_latest_source_timestamp": "2024-12-18T20:40:00Z",
-        "hs_lifecyclestage_lead_date": "2024-12-18T20:40:45.833Z",
         "hs_marketable_reason_id": "Sample Contact",
         "hs_marketable_reason_type": "SAMPLE_CONTACT",
         "hs_marketable_status": "true",
@@ -681,14 +671,6 @@
             "sourceType": "ANALYTICS",
             "timestamp": "2024-12-18T20:40:52.988000Z",
             "value": "2024-12-18T20:40:00Z"
-          }
-        ],
-        "hs_lifecyclestage_lead_date": [
-          {
-            "sourceId": "sample-contact",
-            "sourceType": "INTERNAL_PROCESSING",
-            "timestamp": "2024-12-18T20:40:45.833000Z",
-            "value": "2024-12-18T20:40:45.833Z"
           }
         ],
         "hs_marketable_reason_id": [
