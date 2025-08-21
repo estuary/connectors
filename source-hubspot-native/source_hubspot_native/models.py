@@ -417,8 +417,8 @@ class SearchPageResult(BaseModel, Generic[Item], extra="forbid"):
 
 
 # Common shape of a v3 API batch read.
-class BatchResult(BaseModel, Generic[Item], extra="forbid"):
-    class Error(BaseModel, extra="forbid"):
+class BatchResult(BaseModel, Generic[Item], extra="allow"):
+    class Error(BaseModel, extra="allow"):
         status: Literal["error"]
         category: Literal["OBJECT_NOT_FOUND"]
         message: str
