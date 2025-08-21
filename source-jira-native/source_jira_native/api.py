@@ -606,7 +606,7 @@ async def snapshot_board_child_resources(
     domain: str,
     stream: type[BoardChildStream],
     log: Logger,
-) -> AsyncGenerator[FullRefreshResource, None]:
+) -> AsyncGenerator[JiraResource, None]:
     board_ids: list[int] = []
     async for board in _paginate_through_resources(http, domain, Boards.api, Boards.path, Boards.extra_headers, Boards.extra_params, Boards.response_model, log):
         id = board.get("id", None)
@@ -621,9 +621,8 @@ async def snapshot_board_child_resources(
         path = f"{Boards.path}/{id}/{stream.path}"
         try:
             async for record in _paginate_through_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, PaginatedResponse, log):
-                if stream.add_parent_id_to_documents:
-                    record["boardId"] = id
-                yield FullRefreshResource.model_validate(record)
+                # Validate with the JiraResource model so the common `id` field is easily accessible on yielded documents.
+                yield JiraResource.model_validate(record)
         except HTTPError as err:
             if err.code == 400 and BOARD_DOES_NOT_SUPPORT_SPRINTS in err.message:
                 continue
