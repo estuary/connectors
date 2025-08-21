@@ -529,7 +529,6 @@ class Boards(FullRefreshPaginatedStream):
 
 # Software API child streams
 class BoardChildStream(FullRefreshStream):
-    add_parent_id_to_documents: ClassVar[bool] = True
     api: ClassVar[JiraAPI] = JiraAPI.SOFTWARE
 
 
@@ -541,7 +540,6 @@ class Epics(BoardChildStream):
 class Sprints(BoardChildStream):
     name: ClassVar[str] = "sprints"
     path: ClassVar[str] = "sprint"
-    add_parent_id_to_documents: ClassVar[bool] = False
     disable: ClassVar[bool] = False
 
 
