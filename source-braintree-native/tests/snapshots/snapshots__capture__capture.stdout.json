@@ -121,6 +121,7 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "account_funding_transaction": false,
+      "ach_reject_reason": null,
       "ach_return_code": null,
       "ach_return_responses": [],
       "acquirer_reference_number": null,
@@ -622,6 +623,7 @@
       "transactions": [
         {
           "account_funding_transaction": false,
+          "ach_reject_reason": null,
           "ach_return_code": null,
           "acquirer_reference_number": null,
           "add_ons": [],

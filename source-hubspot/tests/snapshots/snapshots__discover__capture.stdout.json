@@ -2733,6 +2733,19 @@
                 "number"
               ]
             },
+            "hs_prospecting_agent_last_enrolled": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_prospecting_agent_total_enrolled_count": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_quarantined_emails": {
               "type": [
                 "null",
@@ -6821,6 +6834,12 @@
               ]
             },
             "hs_call_location": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_call_meeting_event_id": {
               "type": [
                 "null",
                 "string"
@@ -13569,6 +13588,19 @@
                 "number"
               ]
             },
+            "hs_prospecting_agent_last_enrolled": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_prospecting_agent_total_enrolled_count": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_quarantined_emails": {
               "type": [
                 "null",
@@ -15075,6 +15107,12 @@
               ]
             },
             "hs_sla_operating_hours": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_source_url": {
               "type": [
                 "null",
                 "string"
