@@ -142,7 +142,9 @@ class BaseDocument(BaseModel):
         )
 
     meta_: Meta = Field(
-        default=Meta(op="u"), alias="_meta", description="Document metadata"
+        default_factory=lambda: BaseDocument.Meta(op="u"),
+        alias="_meta",
+        description="Document metadata",
     )
 
 
