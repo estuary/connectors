@@ -449,7 +449,16 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 			}
 		case *replication.RowsQueryEvent:
 			implicitFlush = true // Implicit FlushEvent conversion permitted
-			logrus.WithField("query", string(data.Query)).Debug("ignoring Rows Query Event")
+			var queryBytes = data.Query
+			var truncated = len(queryBytes) > 200
+			if truncated {
+				queryBytes = queryBytes[:200]
+			}
+			logrus.WithFields(logrus.Fields{
+				"query":        string(queryBytes),
+				"query_length": len(data.Query),
+				"truncated":    truncated,
+			}).Debug("ignoring Rows Query Event")
 		case *replication.IntVarEvent:
 			implicitFlush = true // Implicit FlushEvent conversion permitted
 			logrus.WithField("type", data.Type).WithField("value", data.Value).Debug("ignoring IntVar Event")
