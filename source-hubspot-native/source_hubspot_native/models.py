@@ -157,7 +157,7 @@ class Property(BaseDocument, extra="allow"):
     hubspotObject: str = "unknown"  # Added by us.
 
 
-class Properties(BaseDocument, extra="forbid"):
+class Properties(BaseDocument, extra="allow"):
     results: list[Property]
 
 
@@ -166,7 +166,7 @@ class DealPipeline(BaseDocument, extra="allow"):
     updatedAt: AwareDatetime | None
 
 
-class DealPipelines(BaseDocument, extra="forbid"):
+class DealPipelines(BaseDocument, extra="allow"):
     results: list[DealPipeline]
 
 
@@ -390,12 +390,12 @@ Item = TypeVar("Item")
 
 # Common shape of a v3 API paged listing for a GET request to the objects endpoint for a particular
 # object.
-class PageResult(BaseModel, Generic[Item], extra="forbid"):
-    class Cursor(BaseModel, extra="forbid"):
+class PageResult(BaseModel, Generic[Item], extra="allow"):
+    class Cursor(BaseModel, extra="allow"):
         after: str
         link: str
 
-    class Paging(BaseModel, extra="forbid"):
+    class Paging(BaseModel, extra="allow"):
         next: "PageResult.Cursor"
 
     results: list[Item]
@@ -404,11 +404,11 @@ class PageResult(BaseModel, Generic[Item], extra="forbid"):
 
 # Common shape of a v3 search API listing, which is the same as PageResult but includes a field for
 # the total number of records returned, and doesn't have a "link" in the paging.next object.
-class SearchPageResult(BaseModel, Generic[Item], extra="forbid"):
-    class Cursor(BaseModel, extra="forbid"):
+class SearchPageResult(BaseModel, Generic[Item], extra="allow"):
+    class Cursor(BaseModel, extra="allow"):
         after: str
 
-    class Paging(BaseModel, extra="forbid"):
+    class Paging(BaseModel, extra="allow"):
         next: "SearchPageResult.Cursor"
 
     results: list[Item]
@@ -540,7 +540,7 @@ class EmailEvent(BaseDocument, extra="allow"):
     )
 
 
-class EmailEventsResponse(BaseModel, extra="forbid"):
+class EmailEventsResponse(BaseModel, extra="allow"):
     hasMore: bool
     offset: str
     events: list[EmailEvent]
