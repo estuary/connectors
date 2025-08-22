@@ -13,6 +13,7 @@ from .models import (
     APIRecord,
     BoardChildStream,
     Boards,
+    Epics,
     Filters,
     FullRefreshArrayedStream,
     FullRefreshNestedArrayStream,
@@ -49,6 +50,7 @@ from .models import (
     ScreenTabFields,
     ScreenTabs,
     SystemAvatarsResponse,
+    EPOCH,
 )
 
 # Jira has documentation stating that its API doesn't provide read-after-write consistency by default.
@@ -65,6 +67,7 @@ MISSING_RESOURCE_TITLE = r"Oops, you&#39;ve found a dead link"
 CUSTOM_FIELD_NOT_FOUND = r"The custom field was not found."
 BOARD_DOES_NOT_SUPPORT_SPRINTS = r"The board does not support sprints"
 DOES_NOT_EXIST = r"does not exist"
+NEXT_GEN_ISSUE = r"The request contains a next-gen issue"
 
 
 ALL_ISSUE_FIELDS = "*all"
@@ -630,6 +633,67 @@ async def snapshot_board_child_resources(
                 raise
 
 
+async def snapshot_epics(
+    http: HTTPSession,
+    domain: str,
+    stream: type[Epics],
+    timezone: ZoneInfo,
+    log: Logger,
+) -> AsyncGenerator[JiraResource, None]:
+    # Epics can be retrieved using two different approaches:
+    # 1. Via boards associated with epics
+    # 2. Via  an issue search (Jira treats epics as a special type of issue)
+    #
+    # We use both approaches for a few reasons:
+    # - Issue searches find epics that aren't associated with any boards.
+    # - Board-based retrieval handles next-gen issues/epics that can't be fetched 
+    #   via the /agile/1.0/epic/:epicId endpoint.
+    # - Board-based retrieval is more API request-efficient than individual
+    #   epic fetches after issue search. Multiple epics are returned when fetching
+    #   them through associated boards.
+    board_epics: set[int] = set()
+
+    async for epic in snapshot_board_child_resources(http, domain, stream, log):
+        if epic.id not in board_epics:
+            yield epic
+            board_epics.add(epic.id)
+
+    issue_epics: set[int] = set()
+    async for issue in _fetch_issues_between(
+        http,
+        domain,
+        log,
+        timezone,
+        projects=None,
+        start=EPOCH,
+        fields="id,key,updated",
+        should_yield_incrementally=True,
+        additional_jql=stream.additional_jql,
+    ):
+        if issue.id not in board_epics:
+            issue_epics.add(issue.id)
+
+    base_url = url_base(domain, stream.api)
+    for id in sorted(issue_epics):
+        url = f"{base_url}/{stream.path}/{id}"
+        try:
+            yield JiraResource.model_validate_json(
+                await http.request(log, url)
+            )
+        except HTTPError as err:
+            if err.code == 400 and NEXT_GEN_ISSUE in err.message:
+                log.debug(f"Couldn't fetch epic for next-gen issue. id: {id}")
+            else:
+                raise
+
+    log.debug("Finished fetching epics", {
+        "count of epics from boards": len(board_epics),
+        "epics from boards": board_epics,
+        "count of epics from issues": len(issue_epics),
+        "epics from issues": issue_epics,
+    })
+
+
 def _is_within_dst_fallback_window(
     dt: datetime,
     tz: ZoneInfo,
@@ -684,21 +748,28 @@ def _build_jql(
     end: datetime,
     timezone: ZoneInfo,
     projects: str | None,
+    additional_jql: str | None = None,
 ) -> str:
-    lower_bound, upper_bound = _determine_bounds(start, end, timezone)
-
-    lower_bound_jql = f"updated >= '{lower_bound}'"
-    upper_bound_jql = f"updated <= '{upper_bound}'"
+    jql_components: list[str] = []
 
     # If users provided specific projects, only request issues from those projects.
     # Otherwise, omitting the `project in (p1,p2,...)` is the same as requesting
     # issues for all projects.
     if projects:
         projects_jql = f"project in ({projects})"
+        jql_components.append(projects_jql)
 
-        jql = " AND ".join([projects_jql, lower_bound_jql, upper_bound_jql])
-    else:
-        jql = " AND ".join([lower_bound_jql, upper_bound_jql])
+    if additional_jql:
+        jql_components.append(additional_jql)
+
+    lower_bound, upper_bound = _determine_bounds(start, end, timezone)
+
+    lower_bound_jql = f"updated >= '{lower_bound}'"
+    upper_bound_jql = f"updated <= '{upper_bound}'"
+
+    jql_components.extend([lower_bound_jql, upper_bound_jql])
+
+    jql = " AND ".join(jql_components)
 
     jql += " ORDER BY updated asc"
 
@@ -721,6 +792,7 @@ async def _fetch_issues_between(
     # to avoid holding open (and potentially timing out) the issues
     # API response as we send separate API requests to fetch child resources.
     should_yield_incrementally: bool = False,
+    additional_jql: str | None = None
 ) -> AsyncGenerator[Issue, None]:
     url = f"{url_base(domain, JiraAPI.PLATFORM)}/search/jql"
 
@@ -745,7 +817,7 @@ async def _fetch_issues_between(
 
     params: dict[str, str | int] = {
         "maxResults": 250,
-        "jql": _build_jql(start, end, timezone, projects),
+        "jql": _build_jql(start, end, timezone, projects, additional_jql),
         "fields": fields,
     }
 

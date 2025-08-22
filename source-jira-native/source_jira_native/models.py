@@ -535,6 +535,7 @@ class BoardChildStream(FullRefreshStream):
 class Epics(BoardChildStream):
     name: ClassVar[str] = "epics"
     path: ClassVar[str] = "epic"
+    additional_jql: ClassVar[str] = "issueType='Epic'"
 
 
 class Sprints(BoardChildStream):
