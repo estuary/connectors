@@ -11,6 +11,7 @@ from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
 from .models import (
     BoardChildStream,
     EndpointConfig,
+    Epics,
     FilterSharing,
     FullRefreshArrayedStream,
     FullRefreshNestedArrayStream,
@@ -47,6 +48,7 @@ from .api import (
     fetch_issues_child_resources,
     fetch_timezone,
     snapshot_board_child_resources,
+    snapshot_epics,
     snapshot_filter_sharing,
     snapshot_issue_custom_field_contexts,
     snapshot_issue_custom_field_options,
@@ -153,6 +155,7 @@ def _get_partial_snapshot_fn(
     stream: type[FullRefreshStream],
     http: HTTPMixin,
     config: EndpointConfig,
+    timezone: ZoneInfo,
 ) -> Callable[[Logger], AsyncGenerator[FullRefreshResource, None]]:
     if issubclass(stream, FullRefreshArrayedStream):
         snapshot_fn = functools.partial(
@@ -238,6 +241,14 @@ def _get_partial_snapshot_fn(
             config.domain,
             stream,
         )
+    elif issubclass(stream, Epics):
+        snapshot_fn = functools.partial(
+            snapshot_epics,
+            http,
+            config.domain,
+            stream,
+            timezone,
+        )
     elif issubclass(stream, BoardChildStream):
         snapshot_fn = functools.partial(
             snapshot_board_child_resources,
@@ -252,7 +263,7 @@ def _get_partial_snapshot_fn(
 
 
 def full_refresh_resources(
-        log: Logger, http: HTTPMixin, config: EndpointConfig
+        log: Logger, http: HTTPMixin, config: EndpointConfig, timezone: ZoneInfo
 ) -> list[common.Resource]:
 
     def open(
@@ -268,7 +279,7 @@ def full_refresh_resources(
             binding_index,
             state,
             task,
-            fetch_snapshot=_get_partial_snapshot_fn(stream, http, config),
+            fetch_snapshot=_get_partial_snapshot_fn(stream, http, config, timezone),
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
 
@@ -421,7 +432,7 @@ async def all_resources(
     timezone = await fetch_timezone(http, config.domain, log) if should_fetch_timezone else ZoneInfo("UTC")
 
     resources = [
-        *full_refresh_resources(log, http, config),
+        *full_refresh_resources(log, http, config, timezone),
         issues(log, http, config, timezone),
         *issue_child_resources(log, http, config, timezone)
     ]
