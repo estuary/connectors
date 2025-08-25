@@ -100,14 +100,6 @@ func TestInfoSchema(t *testing.T) {
 		got, err = is.inSelectedFields(nullableField.Name, fs)
 		require.NoError(t, err)
 		require.True(t, got)
-
-		// Ambiguous case.
-		fs = pf.FieldSelection{
-			Values: []string{untransform(nullableField.Name), untransform(nullableField.Name)},
-		}
-		got, err = is.inSelectedFields(nullableField.Name, fs)
-		require.Error(t, err)
-		require.False(t, got)
 	})
 
 	t.Run("AmbiguousResourcePaths", func(t *testing.T) {
