@@ -51,13 +51,9 @@ type MaterializeCfg struct {
 	// The length of a field name is in terms of characters, not bytes.
 	MaxFieldLength int
 
-	// CaseInsensitiveFields is used to indicate if fields that differ only in
-	// capitalization will conflict in the materialized resource. For example,
-	// "thisfield" and "thisField" may have their capitalization preserved from
-	// the InfoSchema, but the materialized resource creation will still result
-	// in an error due to conflicts if both are included. If enabled, fields
-	// that differ only in capitalization will be constrained as optional, with
-	// only 1 of them being allowed to be selected for materialization.
+	// CaseInsensitiveFields indicates if fields that differ only in
+	// capitalization will conflict in the materialized resource. This value
+	// is passed to the protocol-level case_insensitive_fields setting.
 	CaseInsensitiveFields bool
 
 	// ConcurrentApply of Apply actions, for system that may benefit from a

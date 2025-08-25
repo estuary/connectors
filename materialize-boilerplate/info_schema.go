@@ -176,27 +176,16 @@ func (i *InfoSchema) GetResource(resourcePath []string) *ExistingResource {
 // inSelectedFields returns true if the provided endpoint field name (as reported by the endpoint)
 // exists in the field selection for a materialization.
 func (i *InfoSchema) inSelectedFields(endpointFieldName string, fs pf.FieldSelection) (bool, error) {
-	var found bool
-
 	for _, f := range fs.AllFields() {
-		var matches bool
 		translated := i.translateField(f)
 		if i.caseInsensitiveFields && strings.EqualFold(translated, endpointFieldName) {
-			matches = true
+		    return true, nil
 		} else if translated == endpointFieldName {
-			matches = true
-		}
-
-		if found && matches {
-			// This should never happen since the standard constraints from `Validator` forbid it,
-			// but I'm leaving it here as a sanity check just in case.
-			return false, fmt.Errorf("ambiguous endpoint field name when looking for selected field %q", endpointFieldName)
-		} else if matches {
-			found = true
+			return true, nil
 		}
 	}
 
-	return found, nil
+	return false, nil
 }
 
 // AmbiguousResourcePaths is a utility for determining if a resource path could be ambiguous when
