@@ -343,5 +343,6 @@ Challenging Field Names Materialized Columns:
 {"Field":"value-with-separated-words","Type":"text"}
 {"Field":"valueWithDifferentCaps","Type":"text"}
 {"Field":"value_with-separated_words","Type":"text"}
+{"Field":"value_with_separated_words","Type":"text"}
 {"Field":"valuewithdifferentcaps","Type":"text"}
 
