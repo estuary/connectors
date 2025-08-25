@@ -74,6 +74,11 @@ class Report(FullRefreshResource):
     resource_name: ClassVar[str] = "Report"
 
 
+class Segment(FullRefreshResource):
+    entity_name: ClassVar[str] = "segment"
+    resource_name: ClassVar[str] = "Segment"
+
+
 class IncrementalResource(FullRefreshResource):
     primary_keys: ClassVar[list[str]]
     cursor_field: ClassVar[str]
@@ -191,6 +196,7 @@ FULL_REFRESH_RESOURCE_TYPES: list[type[FullRefreshResource]] = [
     Guide,
     Page,
     Report,
+    Segment,
 ]
 
 
