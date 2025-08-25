@@ -524,6 +524,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "array_int"
+      }
+    },
+    {
+      "userEnteredValue": {
         "stringValue": "binary_field"
       }
     },
@@ -540,6 +545,11 @@
     {
       "userEnteredValue": {
         "stringValue": "flow_published_at"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "multiple"
       }
     },
     {
@@ -566,6 +576,11 @@
         "numberValue": 1
       }
     },
+    {
+      "userEnteredValue": {
+        "stringValue": "[11,12]"
+      }
+    },
     {},
     {
       "userEnteredValue": {
@@ -580,6 +595,11 @@
     {
       "userEnteredValue": {
         "stringValue": "1970-01-01T01:00:13.000000000Z"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "numberValue": 1
       }
     },
     {
@@ -602,6 +622,11 @@
         "numberValue": 2
       }
     },
+    {
+      "userEnteredValue": {
+        "stringValue": "[21,22]"
+      }
+    },
     {},
     {
       "userEnteredValue": {
@@ -616,6 +641,11 @@
     {
       "userEnteredValue": {
         "stringValue": "1970-01-01T01:00:14.000000000Z"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "numberValue": 2.2
       }
     },
     {
@@ -642,6 +672,11 @@
         "numberValue": 3
       }
     },
+    {
+      "userEnteredValue": {
+        "stringValue": "[31,32]"
+      }
+    },
     {},
     {
       "userEnteredValue": {
@@ -656,6 +691,11 @@
     {
       "userEnteredValue": {
         "stringValue": "1970-01-01T01:00:15.000000000Z"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "boolValue": true
       }
     },
     {
@@ -678,6 +718,11 @@
         "numberValue": 4
       }
     },
+    {
+      "userEnteredValue": {
+        "stringValue": "[41,42]"
+      }
+    },
     {},
     {
       "userEnteredValue": {
@@ -692,6 +737,11 @@
     {
       "userEnteredValue": {
         "stringValue": "1970-01-01T01:00:16.000000000Z"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "boolValue": false
       }
     },
     {
@@ -718,6 +768,11 @@
         "numberValue": 5
       }
     },
+    {
+      "userEnteredValue": {
+        "stringValue": "[51,52]"
+      }
+    },
     {},
     {
       "userEnteredValue": {
@@ -732,6 +787,11 @@
     {
       "userEnteredValue": {
         "stringValue": "1970-01-01T01:00:17.000000000Z"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "string five"
       }
     },
     {
@@ -754,6 +814,11 @@
         "numberValue": 6
       }
     },
+    {
+      "userEnteredValue": {
+        "stringValue": "[61,62]"
+      }
+    },
     {},
     {
       "userEnteredValue": {
@@ -768,6 +833,11 @@
     {
       "userEnteredValue": {
         "stringValue": "1970-01-01T02:00:19.000000000Z"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "[\"one\",2,true]"
       }
     },
     {
@@ -794,6 +864,11 @@
         "numberValue": 7
       }
     },
+    {
+      "userEnteredValue": {
+        "stringValue": "[71,72]"
+      }
+    },
     {},
     {
       "userEnteredValue": {
@@ -808,6 +883,11 @@
     {
       "userEnteredValue": {
         "stringValue": "1970-01-01T02:00:20.000000000Z"
+      }
+    },
+    {
+      "userEnteredValue": {
+        "stringValue": "{\"object\":\"seven\"}"
       }
     },
     {
@@ -830,6 +910,11 @@
         "numberValue": 8
       }
     },
+    {
+      "userEnteredValue": {
+        "stringValue": "[81,82]"
+      }
+    },
     {},
     {
       "userEnteredValue": {
@@ -846,6 +931,7 @@
         "stringValue": "1970-01-01T02:00:21.000000000Z"
       }
     },
+    {},
     {
       "userEnteredValue": {
         "stringValue": "i8"
@@ -872,6 +958,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "[91,92]"
+      }
+    },
+    {
+      "userEnteredValue": {
         "stringValue": "YWxvaGEK"
       }
     },
@@ -890,6 +981,7 @@
         "stringValue": "1970-01-01T02:00:22.000000000Z"
       }
     },
+    {},
     {
       "userEnteredValue": {
         "stringValue": "i9"
@@ -912,6 +1004,11 @@
     },
     {
       "userEnteredValue": {
+        "stringValue": "[1,2]"
+      }
+    },
+    {
+      "userEnteredValue": {
         "stringValue": "c2F5xY1uYXJhCg=="
       }
     },
@@ -930,6 +1027,7 @@
         "stringValue": "1970-01-01T02:00:23.000000000Z"
       }
     },
+    {},
     {
       "userEnteredValue": {
         "stringValue": "i10"
