@@ -145,12 +145,13 @@ class HTTPSession(abc.ABC):
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
+        _with_token: bool = True,  # Unstable internal API.
         headers: dict[str, Any] = {},
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and and return the raw response as a stream of bytes"""
 
         async def _do_request() -> tuple[Headers, BodyGeneratorFunction]:
-            return await self._request_stream(log, url, method, params, json, form, True, headers)
+            return await self._request_stream(log, url, method, params, json, form, _with_token, headers)
 
         return await self._retry_on_timeout(log, url, method, _do_request)
 
