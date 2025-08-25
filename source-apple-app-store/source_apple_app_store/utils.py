@@ -14,3 +14,6 @@ def str_to_dt(string: str) -> datetime:
 
 def str_to_date(string: str) -> date:
     return datetime.strptime(string, DATE_STRING_FORMAT).date()
+
+def date_to_str(date: date) -> str:
+    return date.strftime(DATE_STRING_FORMAT)
