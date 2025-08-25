@@ -35,10 +35,9 @@ type Validator struct {
 	// characters, not bytes.
 	maxFieldLength int
 
-	// CaseInsensitiveFields is used to indicate if fields that differ only in capitalization will
-	// conflict in the materialized resource. For example, "thisfield" and "thisField" may have
-	// their capitalization preserved from the information_schema view (or equivalent), but the
-	// materialized resource creation will still result in an error due to conflicts.
+	// caseInsensitiveFields indicates if fields that differ only in capitalization will
+	// conflict in the materialized resource. This is passed to the protocol-level
+	// case_insensitive_fields setting in validated binding responses.
 	caseInsensitiveFields bool
 
 	// featureFlags contains feature flags that control validation behavior.
@@ -164,26 +163,6 @@ func (v Validator) validateNewBinding(
 				Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
 				Reason: "The first collection key component is required to be included for standard updates",
 			}
-		} else if ambiguousFields := v.ambiguousFields(p, boundCollection.Projections); len(ambiguousFields) > 0 && c.Type == pm.Response_Validated_Constraint_LOCATION_RECOMMENDED {
-			if p.Explicit {
-				// User-defined projections of ambiguous fields are allowed as-is.
-			} else {
-				// Any other fields that would be ambiguous to materialize are
-				// marked as optional if they would otherwise be recommended.
-				// Only one of these fields should be selected to materialize,
-				// and that will require manual field selection.
-				c = &pm.Response_Validated_Constraint{
-					Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL,
-					Reason: fmt.Sprintf(
-						// See identical "reason" text in validateMatchesExistingBinding for optional
-						// ambiguous field constraints. These two messages should be kept in sync.
-						"Flow collection field '%s' would be materialized as '%s', which is ambiguous with fields [%s]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields",
-						p.Field,
-						v.is.translateField(p.Field),
-						strings.Join(ambiguousFields, ","),
-					),
-				}
-			}
 		}
 
 		constraints[p.Field] = c
@@ -262,52 +241,15 @@ func (v Validator) validateMatchesExistingResource(
 				Type:   pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
 				Reason: "Cannot add a new key location to the field selection of an existing non-delta-updates materialization witout backfilling",
 			}
-		} else if ambiguousFields := v.ambiguousFields(p, boundCollection.Projections); len(ambiguousFields) > 0 {
-			// Projections that would result in ambiguous materialized fields are forbidden if a
-			// different ambiguous projection has already been selected, or optional if none have
-			// yet been selected.
 			if lastBinding != nil && slices.Contains(lastBinding.FieldSelection.AllFields(), p.Field) {
-				// This field has already been selected as the ambiguous field to materialize.
 				if existingField := existingResource.GetField(p.Field); existingField != nil {
-					// If the field already exists in the destination, make sure
-					// the new projection is compatible.
 					if c, err = v.constraintForExistingField(boundCollection, p, *existingField, fieldConfigJsonMap); err != nil {
-						return nil, fmt.Errorf("evaluating constraint for existing ambiguous field: %w", err)
+						return nil, fmt.Errorf("evaluating constraint for existing field: %w", err)
 					}
 				} else {
 					c = &pm.Response_Validated_Constraint{
 						Type:   pm.Response_Validated_Constraint_LOCATION_RECOMMENDED,
 						Reason: "This location is part of the current materialization",
-					}
-				}
-			} else if lastBinding != nil && v.ambiguousFieldIsSelected(p, lastBinding.FieldSelection.AllFields()) {
-				// A different field has been selected, so this one can't be.
-				c = &pm.Response_Validated_Constraint{
-					Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
-					Reason: fmt.Sprintf(
-						"Flow collection field '%s' is ambiguous with fields already being materialized as '%s' in the destination. Consider using an alternate, unambiguous projection of this field to allow it to be materialized",
-						p.Field,
-						v.is.translateField(p.Field),
-					),
-				}
-			} else if c.Type == pm.Response_Validated_Constraint_LOCATION_RECOMMENDED || c.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL {
-				// None of these ambiguous fields have been selected yet, so it's still possible to
-				// pick one.
-				if p.Explicit || p.IsPrimaryKey {
-					// User-defined projections of ambiguous fields & collection
-					// keys are allowed as-is, which will let them keep their
-					// "recommended" status.
-				} else {
-					c = &pm.Response_Validated_Constraint{
-						Type: pm.Response_Validated_Constraint_FIELD_OPTIONAL,
-						Reason: fmt.Sprintf(
-							// See identical "reason" text in validateNewBinding for optional ambiguous
-							// field constraints. These two messages should be kept in sync.
-							"Flow collection field '%s' would be materialized as '%s', which is ambiguous with fields [%s]. Only a single field from this set should be selected. Consider using alternate projections if you want to materialize more than one of these fields",
-							p.Field,
-							v.is.translateField(p.Field),
-							strings.Join(ambiguousFields, ","),
-						),
 					}
 				}
 			}
@@ -398,50 +340,7 @@ func (v Validator) constraintForExistingField(
 	return out, nil
 }
 
-// ambiguousFields determines if the given projection is part of a set of projections that would
-// result in ambiguous field names in the destination system. Fields are "ambiguous" if their
-// destination treats more than one Flow collection field name as the same materialized field name.
-// For example, if a destination is strictly case-insensitive and lowercases all field names,
-// `ThisField` and `thisField` are ambiguous and cannot be materialized together. If there is a set
-// of ambiguous fields, only a single one of them can be materialized.
-func (v Validator) ambiguousFields(p pf.Projection, ps []pf.Projection) []string {
-	ambiguous := []string{}
 
-	compareFields := func(f1, f2 string) bool {
-		f1 = v.is.translateField(f1)
-		f2 = v.is.translateField(f2)
-
-		if v.caseInsensitiveFields {
-			return strings.EqualFold(f1, f2)
-		}
-
-		return f1 == f2
-	}
-
-	for _, pp := range ps {
-		if p.Field != pp.Field && compareFields(p.Field, pp.Field) {
-			ambiguous = append(ambiguous, pp.Field)
-		}
-	}
-
-	slices.Sort(ambiguous)
-
-	return ambiguous
-}
-
-// ambiguousFieldIsSelected returns true if any of the selected fields are ambiguous with the
-// provided projection, excluding the projection itself being selected.
-func (v Validator) ambiguousFieldIsSelected(p pf.Projection, fieldSelection []string) bool {
-	endpointFieldName := v.is.translateField(p.Field)
-
-	for _, f := range fieldSelection {
-		if f != p.Field && endpointFieldName == v.is.translateField(f) {
-			return true
-		}
-	}
-
-	return false
-}
 
 // findLastBinding locates a binding within a previously applied or validated specification.
 func findLastBinding(resourcePath []string, lastSpec *pf.MaterializationSpec) *pf.MaterializationSpec_Binding {
