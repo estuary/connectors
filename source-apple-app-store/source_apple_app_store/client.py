@@ -16,6 +16,7 @@ from estuary_cdk.incremental_csv_processor import (
     CSVConfig,
     IncrementalCSVProcessor,
 )
+from estuary_cdk.gunzip_stream import GunzipStream
 from pydantic import BaseModel
 
 from .auth import AppleJWTTokenSource
@@ -283,7 +284,7 @@ class AppleAppStoreClient:
 
     async def stream_tsv_data(
         self,
-        app_id: str,
+        filename: str,
         download_url: str,
         model: type[AppleAnalyticsRow],
     ) -> AsyncGenerator[AppleAnalyticsRow, None]:
@@ -297,16 +298,19 @@ class AppleAppStoreClient:
         _, body_generator = await self.http.request_stream(
             self.log,
             download_url,
-            headers={
-                "Accept": "text/tab-separated-values",
-                "Accept-Encoding": "gzip, deflate",
-            },
+            _with_token=False, # Apple's API returns signed/authenticated URLs; using Authorization header causes HTTP 400 errors
         )
 
-        validation_context = model.validation_context_model(app_id=app_id)
+        async def uncompressed_body() -> AsyncGenerator[bytes, None]:
+            async for chunk in GunzipStream(body_generator()):
+                if not chunk:
+                    continue
+                yield chunk
+
+        validation_context = model.validation_context_model(filename=filename)
 
         processor = IncrementalCSVProcessor(
-            body_generator(),
+            uncompressed_body(),
             model,
             config=CSV_CONFIG,
             validation_context=validation_context,
