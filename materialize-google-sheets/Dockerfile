@@ -16,7 +16,7 @@ COPY materialize-boilerplate   ./materialize-boilerplate
 COPY materialize-google-sheets ./materialize-google-sheets
 
 # Test and build the connector.
-#RUN go test  -tags nozstd -v ./materialize-google-sheets/...
+RUN go test  -tags nozstd -v ./materialize-google-sheets/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-google-sheets
 
 # Runtime Stage
