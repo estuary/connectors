@@ -3,22 +3,12 @@ collections:
   acmeCo/app_crashes:
     schema: app_crashes.schema.yaml
     key:
-      - /App Apple Identifier
-      - /App Version
-      - /Date
-      - /Device
-      - /Platform Version
-      - /app_id
+      - /filename
       - /row_number
-  acmeCo/app_downloads:
-    schema: app_downloads.schema.yaml
+  acmeCo/app_downloads_detailed:
+    schema: app_downloads_detailed.schema.yaml
     key:
-      - /App Apple Identifier
-      - /App Version
-      - /Date
-      - /Device
-      - /Platform Version
-      - /app_id
+      - /filename
       - /row_number
   acmeCo/app_reviews:
     schema: app_reviews.schema.yaml
@@ -28,28 +18,20 @@ collections:
   acmeCo/app_sessions:
     schema: app_sessions.schema.yaml
     key:
-      - /App Apple Identifier
-      - /App Version
-      - /Date
-      - /Device
-      - /app_id
+      - /filename
       - /row_number
-  acmeCo/app_store_discovery_and_engagement:
-    schema: app_store_discovery_and_engagement.schema.yaml
+  acmeCo/app_sessions_detailed:
+    schema: app_sessions_detailed.schema.yaml
     key:
-      - /App Apple Identifier
-      - /Date
-      - /Event Type
-      - /Platform Version
-      - /app_id
+      - /filename
       - /row_number
-  acmeCo/app_store_installs_and_deletions:
-    schema: app_store_installs_and_deletions.schema.yaml
+  acmeCo/app_store_discovery_and_engagement_detailed:
+    schema: app_store_discovery_and_engagement_detailed.schema.yaml
     key:
-      - /App Apple Identifier
-      - /App Version
-      - /Date
-      - /Event Type
-      - /Platform Version
-      - /app_id
+      - /filename
+      - /row_number
+  acmeCo/app_store_installs_and_deletions_detailed:
+    schema: app_store_installs_and_deletions_detailed.schema.yaml
+    key:
+      - /filename
       - /row_number

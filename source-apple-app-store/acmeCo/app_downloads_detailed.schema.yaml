@@ -19,7 +19,7 @@ $defs:
     title: Meta
     type: object
 additionalProperties: true
-description: "References:\n    - https://developer.apple.com/documentation/analytics-reports/app-sessions"
+description: "References:\n    - https://developer.apple.com/documentation/analytics-reports/app-download"
 properties:
   _meta:
     $ref: "#/$defs/Meta"
@@ -32,6 +32,7 @@ properties:
     title: Date
     type: string
   filename:
+    default: ""
     title: Filename
     type: string
   row_number:
@@ -40,8 +41,7 @@ properties:
     type: integer
 required:
   - Date
-  - filename
   - row_number
-title: AppSessionsDetailedReportRow
+title: AppDownloadsDetailedReportRow
 type: object
 x-infer-schema: true

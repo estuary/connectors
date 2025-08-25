@@ -27,37 +27,21 @@ properties:
       op: u
       row_id: -1
     description: Document metadata
-  app_id:
-    title: App Id
-    type: string
   Date:
     format: date
     title: Date
+    type: string
+  filename:
+    default: ""
+    title: Filename
     type: string
   row_number:
     description: Row sequence number for deduplication
     title: Row Number
     type: integer
-  App Apple Identifier:
-    title: App Apple Identifier
-    type: string
-  App Version:
-    title: App Version
-    type: string
-  Device:
-    title: Device
-    type: string
-  Platform Version:
-    title: Platform Version
-    type: string
 required:
-  - app_id
   - Date
   - row_number
-  - App Apple Identifier
-  - App Version
-  - Device
-  - Platform Version
 title: AppCrashesReportRow
 type: object
 x-infer-schema: true

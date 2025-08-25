@@ -20,24 +20,24 @@ from .models import (
     ApiFetchChangesFn,
     ApiFetchPageFn,
     AppCrashesReportRow,
-    AppDownloadsReportRow,
+    AppDownloadsDetailedReportRow,
     AppleAnalyticsRow,
     AppleResource,
     AppReview,
-    AppSessionsReportRow,
-    AppStoreDiscoveryAndEngagementReportRow,
-    AppStoreInstallsReportRow,
+    AppSessionsDetailedReportRow,
+    AppStoreDiscoveryAndEngagementDetailedReportRow,
+    AppStoreInstallsDetailedReportRow,
     ConnectorState,
     EndpointConfig,
     ResourceState,
 )
 
 ANALYTICS_RESOURCES: list[type[AppleAnalyticsRow]] = [
-    AppSessionsReportRow,
+    AppSessionsDetailedReportRow,
     AppCrashesReportRow,
-    AppDownloadsReportRow,
-    AppStoreInstallsReportRow,
-    AppStoreDiscoveryAndEngagementReportRow,
+    AppDownloadsDetailedReportRow,
+    AppStoreInstallsDetailedReportRow,
+    AppStoreDiscoveryAndEngagementDetailedReportRow,
 ]
 API_RESOURCES: list[
     tuple[type[AppleResource], ApiFetchPageFn, ApiFetchChangesFn]

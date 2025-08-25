@@ -25,26 +25,28 @@ captures:
             - "789"
     bindings:
       - resource:
-          name: app_sessions
+          name: app_sessions_detailed
           interval: PT1H
-        target: acmeCo/app_sessions
+        target: acmeCo/app_sessions_detailed
       - resource:
           name: app_crashes
           interval: PT1H
         target: acmeCo/app_crashes
       - resource:
-          name: app_downloads
+          name: app_downloads_detailed
           interval: PT1H
-        target: acmeCo/app_downloads
+        target: acmeCo/app_downloads_detailed
       - resource:
-          name: app_store_installs_and_deletions
+          name: app_store_installs_and_deletions_detailed
           interval: PT1H
-        target: acmeCo/app_store_installs_and_deletions
+        target: acmeCo/app_store_installs_and_deletions_detailed
       - resource:
-          name: app_store_discovery_and_engagement
+          name: app_store_discovery_and_engagement_detailed
           interval: PT1H
-        target: acmeCo/app_store_discovery_and_engagement
+        target: acmeCo/app_store_discovery_and_engagement_detailed
       - resource:
           name: app_reviews
           interval: PT1H
         target: acmeCo/app_reviews
+    shards:
+      logLevel: debug
