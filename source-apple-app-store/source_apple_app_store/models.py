@@ -1,4 +1,6 @@
-from datetime import date, timedelta
+import csv
+import os
+from datetime import datetime, date, timedelta
 from enum import StrEnum
 from logging import Logger
 from typing import (
@@ -7,11 +9,8 @@ from typing import (
     AsyncGenerator,
     Callable,
     ClassVar,
-    Dict,
     Generic,
-    List,
     Literal,
-    Optional,
     TypeVar,
 )
 
@@ -79,7 +78,7 @@ class EndpointConfig(BaseModel):
         description="JWT authentication credentials for Apple's API",
     )
 
-    app_ids: List[str] = Field(
+    app_ids: list[str] = Field(
         default_factory=list,
         title="App IDs",
         description="Specific App IDs to sync. If empty, discovers all accessible apps",
@@ -91,10 +90,8 @@ TData = TypeVar("TData")
 
 class ApiResponse(BaseModel, Generic[TData], extra="allow"):
     class Links(BaseModel, extra="allow"):
-        self: str = Field(description="URL of the current page")
-        next: Optional[str] = Field(
-            description="URL of the next page, which includes the cursor"
-        )
+        self: str
+        next: str | None = None
 
     class Meta(BaseModel, extra="allow"):
         class Pagination(BaseModel, extra="allow"):
@@ -104,11 +101,11 @@ class ApiResponse(BaseModel, Generic[TData], extra="allow"):
         paging: Pagination
 
     data: TData
-    links: Links | None
-    meta: Meta | None
+    links: Links | None = None
+    meta: Meta | None = None
 
     @property
-    def cursor(self) -> Optional[str]:
+    def cursor(self) -> str | None:
         if self.links is None:
             return None
         elif self.links.next is None:
@@ -139,9 +136,7 @@ class AppleResource(BaseDocument, extra="allow"):
                 f"Validation context is not set or is not of type AppleResourceValidationContext: {info.context}"
             )
 
-        assert "app_id" not in data, (
-            "App id should not be set before validation."
-        )
+        assert "app_id" not in data, "App id should not be set before validation."
         data["app_id"] = info.context.app_id
         return data
 
@@ -158,8 +153,8 @@ class AppReview(AppleResource):
 
 
 class BaseValidationContext:
-    def __init__(self, app_id: str, **kwargs):
-        self.app_id = app_id
+    def __init__(self, filename: str, **kwargs):
+        self.filename = filename
         self.count = 0
 
     def increment(self):
@@ -173,26 +168,30 @@ class AppleAnalyticsRow(BaseDocument):
         validate_assignment=True,  # necessary since we set app_id after model creation
     )
 
+    _field_types: ClassVar[dict[str, type]] = {
+        "record_date": datetime,
+    }
     report_name: ClassVar[str]
     resource_name: ClassVar[str]
     completeness_lag: ClassVar[timedelta] = timedelta(days=2)
-    primary_keys: ClassVar[list[str]]
+    primary_keys: ClassVar[list[str]] = [
+        "/filename",
+        "/row_number",
+    ]
     validation_context_model: ClassVar[type[BaseValidationContext]] = (
         BaseValidationContext
     )
 
-    app_id: str
     record_date: date = Field(..., alias="Date")
+    filename: str = Field(default="")
     row_number: int = Field(description="Row sequence number for deduplication")
 
     @model_validator(mode="before")
     @classmethod
     def _add_row_metadata(
-        cls, data: Dict[str, Any], info: ValidationInfo
-    ) -> Dict[str, Any]:
-        if not info.context or not isinstance(
-            info.context, BaseValidationContext
-        ):
+        cls, data: dict[str, Any], info: ValidationInfo
+    ) -> dict[str, Any]:
+        if not info.context or not isinstance(info.context, BaseValidationContext):
             raise RuntimeError(
                 f"Validation context is not set or is not of type BaseValidationContext: {info.context}"
             )
@@ -200,6 +199,9 @@ class AppleAnalyticsRow(BaseDocument):
         assert "row_number" not in data, (
             "Row number should not be set before validation."
         )
+        assert "filename" not in data, "Filename should not be set before validation."
+
+        data["filename"] = info.context.filename
         data["row_number"] = info.context.count
         info.context.increment()
 
@@ -208,29 +210,35 @@ class AppleAnalyticsRow(BaseDocument):
     @field_validator("*", mode="before")
     @classmethod
     def parse_by_field_type(cls, value: Any, info):
-        field_types = getattr(cls, "_FIELD_TYPE_MAP", {})
-        field_alias = info.alias or info.field_name
-        field_type = field_types.get(field_alias)
+        field_name = info.field_name
+        field_type = cls._field_types.get(field_name)
 
         if value == "":
             return None
+
         if field_type is int:
             try:
                 return int(value)
             except Exception as e:
-                raise ValueError(
-                    f"Invalid int value for {field_alias}: {value}"
-                ) from e
-        if field_type is date:
+                raise ValueError(f"Invalid int value for {field_name}: {value}") from e
+        elif field_type is date:
             try:
                 if isinstance(value, str) and value.isdigit():
                     return date.fromtimestamp(int(value))
                 return date.fromisoformat(value)
             except Exception as e:
-                raise ValueError(
-                    f"Invalid date value for {field_alias}: {value}"
-                ) from e
-        return value
+                raise ValueError(f"Invalid date value for {field_name}: {value}") from e
+        elif field_type is bool:
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, str):
+                if value.lower() in ("true", "1"):
+                    return True
+                elif value.lower() in ("false", "0"):
+                    return False
+            raise ValueError(f"Invalid bool value for {field_name}: {value}")
+        else:
+            return value
 
 
 class AnalyticsReportAccessType(StrEnum):
@@ -247,7 +255,7 @@ class AnalyticsReportGranularity(StrEnum):
 class AnalyticsReportRequest(BaseModel, extra="allow"):
     class Attributes(BaseModel, extra="allow"):
         accessType: AnalyticsReportAccessType
-        stoppingDueToInactivity: Optional[bool] = False
+        stoppedDueToInactivity: bool | None = False
 
     id: str
     attributes: Attributes
@@ -276,29 +284,32 @@ class AnalyticsReportSegment(BaseModel, extra="allow"):
 
     id: str
     attributes: Attributes
+    filename: str = Field(default="")
+
+    @model_validator(mode="after")
+    def extract_filename_from_url(self):
+        from urllib.parse import urlparse
+
+        url = self.attributes.url
+        parsed_url = urlparse(url)
+
+        # Extract filename from the path, removing query parameters
+        path = parsed_url.path
+        filename = path.lstrip("/") if path else ""
+
+        self.filename = filename
+        return self
 
 
-class AppSessionsReportRow(AppleAnalyticsRow):
+class AppSessionsDetailedReportRow(AppleAnalyticsRow):
     """
     References:
         - https://developer.apple.com/documentation/analytics-reports/app-sessions
     """
 
-    report_name: ClassVar[str] = "App Sessions"
-    resource_name: ClassVar[str] = "app_sessions"
+    report_name: ClassVar[str] = "App Sessions Detailed"
+    resource_name: ClassVar[str] = "app_sessions_detailed"
     completeness_lag: ClassVar[timedelta] = timedelta(days=5)
-    primary_keys: ClassVar[list[str]] = [
-        "/app_id",
-        "/App Apple Identifier",
-        "/Date",
-        "/App Version",
-        "/Device",
-        "/row_number",
-    ]
-
-    app_apple_identifier: str = Field(..., alias="App Apple Identifier")
-    app_version: str = Field(..., alias="App Version")
-    device: str = Field(..., alias="Device")
 
 
 class AppCrashesReportRow(AppleAnalyticsRow):
@@ -310,95 +321,39 @@ class AppCrashesReportRow(AppleAnalyticsRow):
     report_name: ClassVar[str] = "App Crashes"
     resource_name: ClassVar[str] = "app_crashes"
     completeness_lag: ClassVar[timedelta] = timedelta(days=5)
-    primary_keys: ClassVar[list[str]] = [
-        "/app_id",
-        "/App Apple Identifier",
-        "/Date",
-        "/App Version",
-        "/Device",
-        "/Platform Version",
-        "/row_number",
-    ]
-
-    app_apple_identifier: str = Field(..., alias="App Apple Identifier")
-    app_version: str = Field(..., alias="App Version")
-    device: str = Field(..., alias="Device")
-    platform_version: str = Field(..., alias="Platform Version")
 
 
-class AppDownloadsReportRow(AppleAnalyticsRow):
+class AppDownloadsDetailedReportRow(AppleAnalyticsRow):
     """
     References:
         - https://developer.apple.com/documentation/analytics-reports/app-download
     """
 
-    report_name: ClassVar[str] = "App Store Downloads"
-    resource_name: ClassVar[str] = "app_downloads"
+    report_name: ClassVar[str] = "App Downloads Detailed"
+    resource_name: ClassVar[str] = "app_downloads_detailed"
     completeness_lag: ClassVar[timedelta] = timedelta(days=2)
-    primary_keys: ClassVar[list[str]] = [
-        "/app_id",
-        "/App Apple Identifier",
-        "/Date",
-        "/App Version",
-        "/Device",
-        "/Platform Version",
-        "/row_number",
-    ]
-
-    app_apple_identifier: str = Field(..., alias="App Apple Identifier")
-    app_version: str = Field(..., alias="App Version")
-    device: str = Field(..., alias="Device")
-    platform_version: str = Field(..., alias="Platform Version")
 
 
-class AppStoreInstallsReportRow(AppleAnalyticsRow):
+class AppStoreInstallsDetailedReportRow(AppleAnalyticsRow):
     """
     References:
         - https://developer.apple.com/documentation/analytics-reports/app-installs
     """
 
-    report_name: ClassVar[str] = "App Store Installations and Deletions"
-    resource_name: ClassVar[str] = "app_store_installs_and_deletions"
+    report_name: ClassVar[str] = "App Store Installation and Deletion Detailed"
+    resource_name: ClassVar[str] = "app_store_installs_and_deletions_detailed"
     completeness_lag: ClassVar[timedelta] = timedelta(days=5)
-    primary_keys: ClassVar[list[str]] = [
-        "/app_id",
-        "/App Apple Identifier",
-        "/Date",
-        "/App Version",
-        "/Platform Version",
-        "/Event Type",
-        "/row_number",
-    ]
-
-    app_apple_identifier: str = Field(..., alias="App Apple Identifier")
-    app_version: str = Field(..., alias="App Version")
-    device: str = Field(..., alias="Device")
-    platform_version: str = Field(..., alias="Platform Version")
-    event_type: str = Field(..., alias="Event Type")
 
 
-class AppStoreDiscoveryAndEngagementReportRow(AppleAnalyticsRow):
+class AppStoreDiscoveryAndEngagementDetailedReportRow(AppleAnalyticsRow):
     """
     References:
         - https://developer.apple.com/documentation/analytics-reports/app-store-discovery-and-engagement
     """
 
-    report_name: ClassVar[str] = "App Store Discovery and Engagement"
-    resource_name: ClassVar[str] = "app_store_discovery_and_engagement"
+    report_name: ClassVar[str] = "App Store Discovery and Engagement Detailed"
+    resource_name: ClassVar[str] = "app_store_discovery_and_engagement_detailed"
     completeness_lag: ClassVar[timedelta] = timedelta(days=3)
-    primary_keys: ClassVar[list[str]] = [
-        "/app_id",
-        "/App Apple Identifier",
-        "/Date",
-        "/Platform Version",
-        "/Event Type",
-        "/row_number",
-    ]
-
-    app_apple_identifier: str = Field(..., alias="App Apple Identifier")
-    device: str = Field(..., alias="Device")
-    platform_version: str = Field(..., alias="Platform Version")
-    event_type: str = Field(..., alias="Event Type")
 
 
 # Type definitions for API resource functions
@@ -408,6 +363,6 @@ ApiFetchChangesFn = Callable[
 ]
 
 ApiFetchPageFn = Callable[
-    ["AppleAppStoreClient", str, Logger, Optional[PageCursor], LogCursor],
+    ["AppleAppStoreClient", str, Logger, PageCursor | None, LogCursor],
     AsyncGenerator[BaseDocument | PageCursor, None],
 ]
