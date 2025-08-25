@@ -111,7 +111,7 @@ class AppleAppStoreClient:
         app_id: str,
         report_type: AnalyticsReportAccessType,
     ) -> AnalyticsReportRequest:
-        url = f"{API_BASE}/apps/{app_id}/analyticsReportRequests"
+        url = f"{API_BASE}/analyticsReportRequests"
 
         body = {
             "data": {
@@ -153,7 +153,7 @@ class AppleAppStoreClient:
 
         url = f"{API_BASE}/apps/{app_id}/analyticsReportRequests"
         params = {
-            "fields[analyticsReportRequests]": "accessType,stoppingDueToInactivity",
+            "fields[analyticsReportRequests]": "accessType,stoppedDueToInactivity",
             "filter[accessType]": access_type.value,
             "limit": limit,
         }
@@ -270,6 +270,7 @@ class AppleAppStoreClient:
                 app_id,
                 report_type,
             )
+            self.log.debug(f"Created report request {created_report_request.id} for app {app_id}")
             return created_report_request.id
         except HTTPError as e:
             if e.code == 409:
@@ -278,6 +279,7 @@ class AppleAppStoreClient:
                     report_type,
                 )
                 for request in report_requests:
+                    self.log.debug(f"Checking request {request.id} for app {app_id}")
                     # assuming there is only one request
                     return request.id
             raise
