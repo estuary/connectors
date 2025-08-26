@@ -509,7 +509,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil, fmt.Errorf("converting Store: %w", err)
 		} else if b.streaming {
 			if err := d.streamManager.writeRow(ctx, it.Binding, converted); err != nil {
-				return nil, fmt.Errorf("encoding Store to stream: %w", err)
+				return nil, fmt.Errorf("encoding Store to stream for resource %s: %w", b.target.Path, err)
 			}
 		} else if err = b.store.stage.writeRow(converted); err != nil {
 			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
