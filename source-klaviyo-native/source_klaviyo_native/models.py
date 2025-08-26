@@ -267,8 +267,12 @@ class Events(IncrementalStream):
         # with the event.
         if flow_id := event_properties.get("$flow", None):
             values["flow_id"] = flow_id
-        elif _ := event_properties.get("Campaign Name", None):
-            values["campaign_id"] = event_properties["$message"]
+        elif event_properties.get("Campaign Name", None):
+            # Events associated with deleted campaigns do not have a
+            # $message field present with the deleted campaign's id.
+            campaign_id = event_properties.get("$message", None)
+            if campaign_id:
+                values["campaign_id"] = campaign_id
 
         return values
 
