@@ -366,28 +366,36 @@ func (c *capture) readEvent(
 	} else {
 		// This change event is not split.
 		ev.fragments = 1
-		if collRaw, lookupErr := s.ms.Current.LookupErr("ns", "coll"); lookupErr != nil {
-			return false, fmt.Errorf("looking up 'ns.coll' field: %w", lookupErr)
-		} else if binding, trackedBinding = c.trackedChangeStreamBindings[resourceId(s.db, collRaw.StringValue())]; !trackedBinding {
-			// Event is not for a tracked collection. A quick check can be
-			// done prior to fully unmarshalling the change event BSON to
-			// fast-track bailing out on the very common case of events that
-			// are for collections that are not being captured.
-			return
-		} else if err := s.ms.Decode(&ev.fields); err != nil {
+
+		// Quick check to avoid fully decoding events for collections that are
+		// not being captured.
+		if collRaw, lookupErr := s.ms.Current.LookupErr("ns", "coll"); lookupErr == nil {
+			// LookupErr will only error if the `ns.coll` field is missing,
+			// which is only known to happen with dropDatabase and invalidate
+			// events, which are handled specifically a little further down.
+			if binding, trackedBinding = c.trackedChangeStreamBindings[resourceId(s.db, collRaw.StringValue())]; !trackedBinding {
+				return
+			}
+		}
+
+		if err := s.ms.Decode(&ev.fields); err != nil {
 			return false, fmt.Errorf("change stream decoding document: %w", err)
 		}
 	}
 
 	switch ev.fields.OperationType {
-	case "drop":
-		log.WithFields(log.Fields{"database": s.db, "collection": ev.fields.Ns.Collection}).Warn("received drop event for tracked collection")
+	case "drop", "rename":
+		log.WithFields(log.Fields{
+			"database":   s.db,
+			"collection": ev.fields.Ns.Collection,
+			"opType":     ev.fields.OperationType,
+		}).Warn("received collection-level event for tracked collection")
 		return
-	case "rename":
-		log.WithFields(log.Fields{"database": s.db, "collection": ev.fields.Ns.Collection}).Warn("received rename event for tracked collection")
-		return
-	case "dropDatabase":
-		log.WithFields(log.Fields{"database": s.db}).Warn("received dropDatabase event for tracked database")
+	case "dropDatabase", "invalidate": // An invalidate event will always follow a dropDatabase event.
+		log.WithFields(log.Fields{
+			"database": s.db,
+			"opType":   ev.fields.OperationType,
+		}).Warn("received database-level event for tracked database")
 		return
 	case "insert", "update", "replace", "delete":
 		if ev.fields.OperationType != "delete" && ev.fields.FullDocument == nil {
