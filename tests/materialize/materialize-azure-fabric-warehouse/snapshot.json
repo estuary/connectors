@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "\nCREATE TABLE whb_warehouse.estuary_test_schema.simple (\n\tid BIGINT,\n\tcanary VARCHAR(MAX),\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.duplicate_keys_standard (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\t\"int\" BIGINT,\n\tstr VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.duplicate_keys_delta (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\t\"int\" BIGINT,\n\tstr VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.multiple_types (\n\tid BIGINT,\n\tarray_int VARCHAR(MAX),\n\tbinary_field VARBINARY(MAX),\n\tbool_field BIT,\n\tfloat_field FLOAT,\n\tflow_published_at DATETIME2(6),\n\tmultiple VARCHAR(MAX),\n\tnested VARCHAR(MAX),\n\tnullable_int BIGINT,\n\tstr_field VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.formatted_strings (\n\tid BIGINT,\n\t\"date\" DATE,\n\tdatetime DATETIME2(6),\n\tflow_published_at DATETIME2(6),\n\tint_and_str DECIMAL(38,0),\n\tint_str DECIMAL(38,0),\n\tnum_and_str FLOAT,\n\tnum_str FLOAT,\n\t\"time\" TIME(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.deletions (\n\tid BIGINT,\n\t\"_meta/op\" VARCHAR(MAX),\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.binary_key (\n\tid VARBINARY(MAX),\n\tcounter BIGINT,\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.string_escaped_key (\n\tid VARCHAR(MAX),\n\tcounter BIGINT,\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n"
+  "\nCREATE TABLE whb_warehouse.estuary_test_schema.simple (\n\tid BIGINT,\n\tcanary VARCHAR(MAX),\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.duplicate_keys_standard (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\t\"int\" BIGINT,\n\tstr VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.duplicate_keys_delta (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\t\"int\" BIGINT,\n\tstr VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.multiple_types (\n\tid BIGINT,\n\tarray_int VARCHAR(MAX),\n\tbinary_field VARBINARY(MAX),\n\tbool_field BIT,\n\tfloat_field FLOAT,\n\tflow_published_at DATETIME2(6),\n\tmultiple VARCHAR(MAX),\n\tnested VARCHAR(MAX),\n\tnullable_int BIGINT,\n\tstr_field VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.formatted_strings (\n\tid BIGINT,\n\t\"date\" DATE,\n\tdatetime DATETIME2(6),\n\tflow_published_at DATETIME2(6),\n\tint_and_str DECIMAL(38,0),\n\tint_str DECIMAL(38,0),\n\tnum_and_str FLOAT,\n\tnum_str FLOAT,\n\t\"time\" TIME(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.deletions (\n\tid BIGINT,\n\t\"_meta/op\" VARCHAR(MAX),\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.binary_key (\n\tid VARBINARY(MAX),\n\tcounter BIGINT,\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.string_escaped_key (\n\tid VARCHAR(MAX),\n\tcounter BIGINT,\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n"
 ]
 [
   "connectorState",
@@ -168,105 +168,90 @@
   "_table": "duplicate_keys_delta",
   "rows": [
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"78d92f00-1dda-11b2-8000-071353030311\"},\"id\":1,\"int\":1,\"str\":\"str 1\"}",
       "flow_published_at": "1970-01-01 01:00:06 +0000 UTC",
       "id": 1,
       "int": 1,
       "str": "str 1"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"d96c6a00-1de2-11b2-8000-071353030311\"},\"id\":1,\"int\":6,\"str\":\"str 6\"}",
       "flow_published_at": "1970-01-01 02:00:04 +0000 UTC",
       "id": 1,
       "int": 6,
       "str": "str 6"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"7971c580-1dda-11b2-8000-071353030311\"},\"id\":2,\"int\":2,\"str\":\"str 2\"}",
       "flow_published_at": "1970-01-01 01:00:07 +0000 UTC",
       "id": 2,
       "int": 2,
       "str": "str 2"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"da050080-1de2-11b2-8000-071353030311\"},\"id\":2,\"int\":7,\"str\":\"str 7\"}",
       "flow_published_at": "1970-01-01 02:00:05 +0000 UTC",
       "id": 2,
       "int": 7,
       "str": "str 7"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"7a0a5c00-1dda-11b2-8000-071353030311\"},\"id\":3,\"int\":3,\"str\":\"str 3\"}",
       "flow_published_at": "1970-01-01 01:00:08 +0000 UTC",
       "id": 3,
       "int": 3,
       "str": "str 3"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"da9d9700-1de2-11b2-8000-071353030311\"},\"id\":3,\"int\":8,\"str\":\"str 8\"}",
       "flow_published_at": "1970-01-01 02:00:06 +0000 UTC",
       "id": 3,
       "int": 8,
       "str": "str 8"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"7aa2f280-1dda-11b2-8000-071353030311\"},\"id\":4,\"int\":4,\"str\":\"str 4\"}",
       "flow_published_at": "1970-01-01 01:00:09 +0000 UTC",
       "id": 4,
       "int": 4,
       "str": "str 4"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"db362d80-1de2-11b2-8000-071353030311\"},\"id\":4,\"int\":9,\"str\":\"str 9\"}",
       "flow_published_at": "1970-01-01 02:00:07 +0000 UTC",
       "id": 4,
       "int": 9,
       "str": "str 9"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"7b3b8900-1dda-11b2-8000-071353030311\"},\"id\":5,\"int\":5,\"str\":\"str 5\"}",
       "flow_published_at": "1970-01-01 01:00:10 +0000 UTC",
       "id": 5,
       "int": 5,
       "str": "str 5"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"dbcec400-1de2-11b2-8000-071353030311\"},\"id\":5,\"int\":10,\"str\":\"str 10\"}",
       "flow_published_at": "1970-01-01 02:00:08 +0000 UTC",
       "id": 5,
       "int": 10,
       "str": "str 10"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"38ce7800-1deb-11b2-8000-071353030311\"},\"id\":6,\"int\":11,\"str\":\"str 11\"}",
       "flow_published_at": "1970-01-01 03:00:00 +0000 UTC",
       "id": 6,
       "int": 11,
       "str": "str 11"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"39670e80-1deb-11b2-8000-071353030311\"},\"id\":7,\"int\":12,\"str\":\"str 12\"}",
       "flow_published_at": "1970-01-01 03:00:01 +0000 UTC",
       "id": 7,
       "int": 12,
       "str": "str 12"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"39ffa500-1deb-11b2-8000-071353030311\"},\"id\":8,\"int\":13,\"str\":\"str 13\"}",
       "flow_published_at": "1970-01-01 03:00:02 +0000 UTC",
       "id": 8,
       "int": 13,
       "str": "str 13"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"3a983b80-1deb-11b2-8000-071353030311\"},\"id\":9,\"int\":14,\"str\":\"str 14\"}",
       "flow_published_at": "1970-01-01 03:00:03 +0000 UTC",
       "id": 9,
       "int": 14,
       "str": "str 14"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"3b30d200-1deb-11b2-8000-071353030311\"},\"id\":10,\"int\":15,\"str\":\"str 15\"}",
       "flow_published_at": "1970-01-01 03:00:04 +0000 UTC",
       "id": 10,
       "int": 15,
