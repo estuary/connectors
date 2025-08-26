@@ -38,64 +38,39 @@
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
-        "app_id": {
-          "title": "App Id",
-          "type": "string"
-        },
         "Date": {
           "format": "date",
           "title": "Date",
+          "type": "string"
+        },
+        "filename": {
+          "default": "",
+          "title": "Filename",
           "type": "string"
         },
         "row_number": {
           "description": "Row sequence number for deduplication",
           "title": "Row Number",
           "type": "integer"
-        },
-        "App Apple Identifier": {
-          "title": "App Apple Identifier",
-          "type": "string"
-        },
-        "App Version": {
-          "title": "App Version",
-          "type": "string"
-        },
-        "Device": {
-          "title": "Device",
-          "type": "string"
-        },
-        "Platform Version": {
-          "title": "Platform Version",
-          "type": "string"
         }
       },
       "required": [
-        "app_id",
         "Date",
-        "row_number",
-        "App Apple Identifier",
-        "App Version",
-        "Device",
-        "Platform Version"
+        "row_number"
       ],
       "title": "AppCrashesReportRow",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/App Apple Identifier",
-      "/App Version",
-      "/Date",
-      "/Device",
-      "/Platform Version",
-      "/app_id",
+      "/filename",
       "/row_number"
     ]
   },
   {
-    "recommendedName": "app_downloads",
+    "recommendedName": "app_downloads_detailed",
     "resourceConfig": {
-      "name": "app_downloads",
+      "name": "app_downloads_detailed",
       "interval": "PT1H"
     },
     "documentSchema": {
@@ -131,57 +106,32 @@
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
-        "app_id": {
-          "title": "App Id",
-          "type": "string"
-        },
         "Date": {
           "format": "date",
           "title": "Date",
+          "type": "string"
+        },
+        "filename": {
+          "default": "",
+          "title": "Filename",
           "type": "string"
         },
         "row_number": {
           "description": "Row sequence number for deduplication",
           "title": "Row Number",
           "type": "integer"
-        },
-        "App Apple Identifier": {
-          "title": "App Apple Identifier",
-          "type": "string"
-        },
-        "App Version": {
-          "title": "App Version",
-          "type": "string"
-        },
-        "Device": {
-          "title": "Device",
-          "type": "string"
-        },
-        "Platform Version": {
-          "title": "Platform Version",
-          "type": "string"
         }
       },
       "required": [
-        "app_id",
         "Date",
-        "row_number",
-        "App Apple Identifier",
-        "App Version",
-        "Device",
-        "Platform Version"
+        "row_number"
       ],
-      "title": "AppDownloadsReportRow",
+      "title": "AppDownloadsDetailedReportRow",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/App Apple Identifier",
-      "/App Version",
-      "/Date",
-      "/Device",
-      "/Platform Version",
-      "/app_id",
+      "/filename",
       "/row_number"
     ]
   },
@@ -265,9 +215,9 @@
     ]
   },
   {
-    "recommendedName": "app_sessions",
+    "recommendedName": "app_sessions_detailed",
     "resourceConfig": {
-      "name": "app_sessions",
+      "name": "app_sessions_detailed",
       "interval": "PT1H"
     },
     "documentSchema": {
@@ -303,58 +253,39 @@
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
-        "app_id": {
-          "title": "App Id",
-          "type": "string"
-        },
         "Date": {
           "format": "date",
           "title": "Date",
+          "type": "string"
+        },
+        "filename": {
+          "default": "",
+          "title": "Filename",
           "type": "string"
         },
         "row_number": {
           "description": "Row sequence number for deduplication",
           "title": "Row Number",
           "type": "integer"
-        },
-        "App Apple Identifier": {
-          "title": "App Apple Identifier",
-          "type": "string"
-        },
-        "App Version": {
-          "title": "App Version",
-          "type": "string"
-        },
-        "Device": {
-          "title": "Device",
-          "type": "string"
         }
       },
       "required": [
-        "app_id",
         "Date",
-        "row_number",
-        "App Apple Identifier",
-        "App Version",
-        "Device"
+        "row_number"
       ],
-      "title": "AppSessionsReportRow",
+      "title": "AppSessionsDetailedReportRow",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/App Apple Identifier",
-      "/App Version",
-      "/Date",
-      "/Device",
-      "/app_id",
+      "/filename",
       "/row_number"
     ]
   },
   {
-    "recommendedName": "app_store_discovery_and_engagement",
+    "recommendedName": "app_store_discovery_and_engagement_detailed",
     "resourceConfig": {
-      "name": "app_store_discovery_and_engagement",
+      "name": "app_store_discovery_and_engagement_detailed",
       "interval": "PT1H"
     },
     "documentSchema": {
@@ -390,63 +321,39 @@
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
-        "app_id": {
-          "title": "App Id",
-          "type": "string"
-        },
         "Date": {
           "format": "date",
           "title": "Date",
+          "type": "string"
+        },
+        "filename": {
+          "default": "",
+          "title": "Filename",
           "type": "string"
         },
         "row_number": {
           "description": "Row sequence number for deduplication",
           "title": "Row Number",
           "type": "integer"
-        },
-        "App Apple Identifier": {
-          "title": "App Apple Identifier",
-          "type": "string"
-        },
-        "Device": {
-          "title": "Device",
-          "type": "string"
-        },
-        "Platform Version": {
-          "title": "Platform Version",
-          "type": "string"
-        },
-        "Event Type": {
-          "title": "Event Type",
-          "type": "string"
         }
       },
       "required": [
-        "app_id",
         "Date",
-        "row_number",
-        "App Apple Identifier",
-        "Device",
-        "Platform Version",
-        "Event Type"
+        "row_number"
       ],
-      "title": "AppStoreDiscoveryAndEngagementReportRow",
+      "title": "AppStoreDiscoveryAndEngagementDetailedReportRow",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/App Apple Identifier",
-      "/Date",
-      "/Event Type",
-      "/Platform Version",
-      "/app_id",
+      "/filename",
       "/row_number"
     ]
   },
   {
-    "recommendedName": "app_store_installs_and_deletions",
+    "recommendedName": "app_store_installs_and_deletions_detailed",
     "resourceConfig": {
-      "name": "app_store_installs_and_deletions",
+      "name": "app_store_installs_and_deletions_detailed",
       "interval": "PT1H"
     },
     "documentSchema": {
@@ -482,62 +389,32 @@
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
-        "app_id": {
-          "title": "App Id",
-          "type": "string"
-        },
         "Date": {
           "format": "date",
           "title": "Date",
+          "type": "string"
+        },
+        "filename": {
+          "default": "",
+          "title": "Filename",
           "type": "string"
         },
         "row_number": {
           "description": "Row sequence number for deduplication",
           "title": "Row Number",
           "type": "integer"
-        },
-        "App Apple Identifier": {
-          "title": "App Apple Identifier",
-          "type": "string"
-        },
-        "App Version": {
-          "title": "App Version",
-          "type": "string"
-        },
-        "Device": {
-          "title": "Device",
-          "type": "string"
-        },
-        "Platform Version": {
-          "title": "Platform Version",
-          "type": "string"
-        },
-        "Event Type": {
-          "title": "Event Type",
-          "type": "string"
         }
       },
       "required": [
-        "app_id",
         "Date",
-        "row_number",
-        "App Apple Identifier",
-        "App Version",
-        "Device",
-        "Platform Version",
-        "Event Type"
+        "row_number"
       ],
-      "title": "AppStoreInstallsReportRow",
+      "title": "AppStoreInstallsDetailedReportRow",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/App Apple Identifier",
-      "/App Version",
-      "/Date",
-      "/Event Type",
-      "/Platform Version",
-      "/app_id",
+      "/filename",
       "/row_number"
     ]
   }
