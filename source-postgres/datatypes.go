@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"database/sql/driver"
 	"encoding/json"
@@ -246,6 +247,7 @@ func decodeRawJSON(m *pgtype.Map, oid uint32, format int16, src []byte) (any, er
 	if src == nil {
 		return nil, nil
 	}
+	fixUnpairedSurrogates(src)
 	return json.RawMessage(src), nil
 }
 
@@ -262,6 +264,83 @@ func decodeRawJSONB(m *pgtype.Map, oid uint32, format int16, src []byte) (any, e
 		src = src[1:]
 	}
 	return json.RawMessage(src), nil
+}
+
+// fixUnpairedSurrogates handles a very niche edge case. It is possible to store a JSON value into a JSON
+// column in Postgres which contains a string with escapes like "\uD83D\u200B\uDE14". This specific example
+// satisfies the formal grammar of JSON values but is not valid Unicode (it's a surrogate pair with a ZWSP
+// slapped improperly in the middle), and per RFC 8259 "The behavior of software that receives JSON texts
+// containing such values is unpredictable".
+//
+// When such a value occurs as a `json.RawMessage` the Go JSON marshaller will emit it unchanged, but the
+// Rust serde_json parser will reject the document containing it as invalid JSON. So we need to translate
+// any unpaired surrogate codepoints into U+FFFD replacement characters instead.
+//
+// As far as I'm aware, it is not possible for this to occur with the equivalent raw UTF-8 bytes, because
+// PostgreSQL rejects that as invalid UTF-8 when you try to insert the value. Similarly it cannot occur in
+// a JSONB column because the values are required to be valid Unicode text.
+func fixUnpairedSurrogates(buf []byte) {
+	var i = 0
+	for i < len(buf) {
+		// Jump to the next occurrence of \uXXXX, or return immediately if there isn't one
+		if off := bytes.Index(buf[i:], []byte(`\u`)); off >= 0 {
+			i += off
+		} else {
+			return
+		}
+
+		// If there's less than 6 bytes left it can't be a proper \uXXXX escape sequence so we're done
+		if len(buf)-i < 6 {
+			return
+		}
+
+		// Parse the codepoint
+		var codepoint = parseHex16(buf[i+2 : i+6])
+
+		// High surrogates must be followed by low surrogate
+		if 0xD800 <= codepoint && codepoint <= 0xDBFF {
+			if i+12 <= len(buf) && buf[i+6] == '\\' && buf[i+7] == 'u' {
+				// Low surrogate means the pair is valid
+				var codepoint = parseHex16(buf[i+8 : i+12])
+				if 0xDC00 <= codepoint && codepoint <= 0xDFFF {
+					i += 12
+					continue
+				}
+			}
+
+			// High surrogate not followed by a Unicode escape, rewrite to U+FFFD
+			buf[i+2], buf[i+3], buf[i+4], buf[i+5] = 'F', 'F', 'F', 'D'
+			i += 6
+			continue
+		}
+
+		// Low surrogates on their own are always invalid
+		if 0xDC00 <= codepoint && codepoint <= 0xDFFF {
+			buf[i+2], buf[i+3], buf[i+4], buf[i+5] = 'F', 'F', 'F', 'D'
+			i += 6
+			continue
+		}
+
+		// Not a surrogate, skip past it
+		i += 6
+	}
+}
+
+// parseHex16 parses four hex digits into the equivalent uint16 value
+func parseHex16(buf []byte) uint16 {
+	var val uint16
+	for i := range 4 {
+		val <<= 4
+		switch {
+		case buf[i] >= '0' && buf[i] <= '9':
+			val |= uint16(buf[i] - '0')
+		case buf[i] >= 'a' && buf[i] <= 'f':
+			val |= uint16(buf[i] - 'a' + 10)
+		case buf[i] >= 'A' && buf[i] <= 'F':
+			val |= uint16(buf[i] - 'A' + 10)
+		}
+	}
+	return val
 }
 
 func oversizePlaceholderJSON(orig []byte) json.RawMessage {
