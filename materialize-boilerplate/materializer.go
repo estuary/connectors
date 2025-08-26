@@ -850,7 +850,16 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) Compatible(existing ExistingField,
 	}
 
 	mt, _ := c.m.MapType(mapProjection(*p, fieldCfg), fieldCfg)
-	return mt.Compatible(existing) || mt.CanMigrate(existing), nil
+	canMigrate := mt.CanMigrate(existing)
+	if p.IsRootDocumentProjection() || p.IsPrimaryKey {
+		// There are currently no known cases where migrating the root document
+		// column's type would be useful. Somewhat similarly, it would
+		// theoretically be possible for a few systems to migrate collection key
+		// columns, but for the most part this is not practical.
+		canMigrate = false
+	}
+
+	return mt.Compatible(existing) || canMigrate, nil
 }
 
 func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projection, rawFieldConfig json.RawMessage) (string, error) {

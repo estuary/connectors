@@ -186,7 +186,6 @@ func (s *sqlMaterialization[EC, RC]) MapType(p boilerplate.Projection, fc FieldC
 
 	m := s.endpoint.Dialect.MapType(&pp, fc)
 	m.MigratableTypes = s.endpoint.Dialect.MigratableTypes
-	m.IsRootDocumentProjection = p.IsRootDocumentProjection()
 
 	return m, boilerplate.ElementConverter(m.Converter)
 }

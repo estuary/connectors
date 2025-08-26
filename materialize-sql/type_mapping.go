@@ -158,8 +158,6 @@ type MappedType struct {
 	// If the column is using user-defined DDL or not. The selected field will
 	// always pass validation if this is true.
 	UserDefinedDDL bool
-	// Projections of the root document are never migratable.
-	IsRootDocumentProjection bool
 	// Complete list of migration specifications for the endpoint.
 	MigratableTypes MigrationSpecs
 }
@@ -182,16 +180,6 @@ func (m MappedType) Compatible(existing boilerplate.ExistingField) bool {
 }
 
 func (m MappedType) CanMigrate(existing boilerplate.ExistingField) bool {
-	if m.IsRootDocumentProjection {
-		// Do not allow migration of the root document column. There is
-		// currently no known case where this would be useful, and in cases of
-		// pre-existing materializations where the document field was
-		// materialized as stringified JSON migrating it to a JSON column will
-		// most likely break the materialization, since the migrated value will
-		// be a JSON string instead of an object.
-		return false
-	}
-
 	return m.MigratableTypes.FindMigrationSpec(existing.Type, m.NullableDDL) != nil
 }
 
