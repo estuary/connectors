@@ -117,6 +117,17 @@ func (t *Table) Columns() []*Column {
 	return out
 }
 
+// RootLevelColumns returns only columns that represent root-level properties
+func (t *Table) RootLevelColumns() []*Column {
+	var rootLevelCols []*Column
+	for _, col := range t.Columns() {
+		if col.IsRootLevelProjection() {
+			rootLevelCols = append(rootLevelCols, col)
+		}
+	}
+	return rootLevelCols
+}
+
 // KeyPtrs returns all keys of the Table as a single slice.
 func (t *Table) KeyPtrs() []*Column {
 	var out []*Column
