@@ -42,12 +42,11 @@ type namespace struct {
 }
 
 type bsonFields struct {
-	DocumentKey              docKey              `bson:"documentKey"`
-	OperationType            string              `bson:"operationType"`
-	FullDocument             bson.M              `bson:"fullDocument"`
-	FullDocumentBeforeChange bson.M              `bson:"fullDocumentBeforeChange"`
-	Ns                       namespace           `bson:"ns"`
-	ClusterTime              primitive.Timestamp `bson:"clusterTime"`
+	DocumentKey              docKey    `bson:"documentKey"`
+	OperationType            string    `bson:"operationType"`
+	FullDocument             bson.M    `bson:"fullDocument"`
+	FullDocumentBeforeChange bson.M    `bson:"fullDocumentBeforeChange"`
+	Ns                       namespace `bson:"ns"`
 }
 
 type changeEvent struct {
@@ -90,7 +89,6 @@ func (c *capture) initializeStreams(
 				"operationType":            1,
 				"fullDocument":             1,
 				"ns":                       1,
-				"clusterTime":              1,
 				"fullDocumentBeforeChange": 1,
 				"splitEvent":               1,
 			}}},
@@ -375,11 +373,6 @@ func (c *capture) readEvent(
 			// done prior to fully unmarshalling the change event BSON to
 			// fast-track bailing out on the very common case of events that
 			// are for collections that are not being captured.
-			if clusterTimeRaw, err := s.ms.Current.LookupErr("clusterTime"); err != nil {
-				return false, fmt.Errorf("looking up clusterTime: %w", err)
-			} else if err := clusterTimeRaw.Unmarshal(&ev.fields.ClusterTime); err != nil {
-				return false, fmt.Errorf("unmarshalling clusterTime: %w", err)
-			}
 			return
 		} else if err := s.ms.Decode(&ev.fields); err != nil {
 			return false, fmt.Errorf("change stream decoding document: %w", err)
