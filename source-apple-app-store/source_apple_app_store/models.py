@@ -1,5 +1,4 @@
-import csv
-import os
+from urllib.parse import urlparse
 from datetime import datetime, date, timedelta
 from enum import StrEnum
 from logging import Logger
@@ -183,7 +182,7 @@ class AppleAnalyticsRow(BaseDocument):
     )
 
     record_date: date = Field(..., alias="Date")
-    filename: str = Field(default="")
+    filename: str
     row_number: int = Field(description="Row sequence number for deduplication")
 
     @model_validator(mode="before")
@@ -288,8 +287,6 @@ class AnalyticsReportSegment(BaseModel, extra="allow"):
 
     @model_validator(mode="after")
     def extract_filename_from_url(self):
-        from urllib.parse import urlparse
-
         url = self.attributes.url
         parsed_url = urlparse(url)
 
