@@ -20,6 +20,10 @@ var featureFlagDefaults = map[string]bool{
 	// When set, object and array field types will be materialized as JSON
 	// columns, instead of the historical behavior of strings.
 	"objects_and_arrays_as_json": true,
+	// When set, flow_document is materialized for standard bindings and is used
+	// for reduction of documents, otherwise flow_document is an optional field
+	// and load phase constructs the flow_document from root-level fields.
+	"flow_document": true,
 }
 
 type config struct {

@@ -18,7 +18,12 @@ import (
 	_ "github.com/trinodb/trino-go-client/trino"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	// When set, flow_document is materialized for standard bindings and is used
+	// for reduction of documents, otherwise flow_document is an optional field
+	// and load phase constructs the flow_document from root-level fields.
+	"flow_document": true,
+}
 
 // config represents the endpoint configuration for starburst.
 // It must match the one defined for the source specs (flow.yaml) in Rust.

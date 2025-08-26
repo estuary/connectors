@@ -393,6 +393,8 @@ github.com/envoyproxy/protoc-gen-validate v1.2.1 h1:DEo3O99U8j4hBFwbJfrz9VtgcDfU
 github.com/envoyproxy/protoc-gen-validate v1.2.1/go.mod h1:d/C80l/jxXLdfEIhX1W2TmLfsJ31lvEjwamM4DxlWXU=
 github.com/estuary/flow v0.5.21-0.20250825184928-8fa5cd9e1f06 h1:TE/hfL7iTGAJdeKRzcrWEKTPFgzY3pNTY2OnSBT1crs=
 github.com/estuary/flow v0.5.21-0.20250825184928-8fa5cd9e1f06/go.mod h1:/IP6GPHpCOur6cigBVXZg5HoIgAiuWPMoPJnqW9UDrg=
+github.com/estuary/flow v0.5.21-0.20250826211322-7d9e055bca5c h1:aCEyZ16o07Flg3wIfrSE/Q64Obp7sxG9VkI5j94cTPI=
+github.com/estuary/flow v0.5.21-0.20250826211322-7d9e055bca5c/go.mod h1:/IP6GPHpCOur6cigBVXZg5HoIgAiuWPMoPJnqW9UDrg=
 github.com/estuary/vitess v0.15.10 h1:oXJgcG0HGZWuwjdvSp4pIFIAXtKLaR9Fl9VBynSszFA=
 github.com/estuary/vitess v0.15.10/go.mod h1:rSIE8UMfexjblBloleGw6BqQIKggGmU91TduCNIaJEA=
 github.com/evanphx/json-patch/v5 v5.9.0 h1:kcBlZQbplgElYIlo/n1hJbls2z/1awpXxpRi0/FOJfg=

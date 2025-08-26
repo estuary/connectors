@@ -18,6 +18,10 @@ var featureFlagDefaults = map[string]bool{
 	// Use Snowpipe streaming for delta-updates bindings that use JWT
 	// authentication.
 	"snowpipe_streaming": true,
+	// When set, flow_document is materialized for standard bindings and is used
+	// for reduction of documents, otherwise flow_document is an optional field
+	// and load phase constructs the flow_document from root-level fields.
+	"flow_document": true,
 }
 
 type config struct {

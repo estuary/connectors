@@ -21,7 +21,10 @@ config_json_template='{
    "password": "$PGPASSWORD",
    "user":     "$PGUSER",
    "schema":   "public",
-   "hardDelete": true
+   "hardDelete": true,
+   "advanced": {
+      "feature_flags": "no_flow_document"
+   }
 }'
 
 resources_json_template='[
