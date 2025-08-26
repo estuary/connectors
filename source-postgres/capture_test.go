@@ -931,3 +931,41 @@ func TestCaptureAsPartitions(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+// TestUnpairedSurrogatesInJSON tests the handling of unpaired surrogate codepoints
+// inside of JSON values. Because apparently those will be emitted as-is by the Go
+// JSON serializer when present in a json.RawMessage but are considered an error by
+// Rust's serde_json. We have logic which sanitizes these.
+//
+// As far as I'm aware this can only occur with a JSON column using \uXXXX escapes.
+// Values containing the raw UTF-8 bytes representing those codepoints are rejected
+// by the database, and similarly JSONB columns decode the escapes and reject them.
+func TestUnpairedSurrogatesInJSON(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = uniqueTableID(t)
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data JSON)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	setShutdownAfterCaughtUp(t, true)
+
+	// Test values
+	var vals = []string{
+		`{"text": "normal"}`,
+		`{"text": "\ud83d\u200b\ude14"}`,
+		`{"text": "\uDeAd"}`,
+		`{"\uDeAd": "\ud83d\udE14"}`,
+		`{"text": "foo \uDEAD bar \uDEAD baz"}`,
+	}
+
+	// Backfill
+	for idx, val := range vals {
+		tb.Insert(ctx, t, tableName, [][]any{{100 + idx, val}})
+	}
+	cs.Capture(ctx, t, nil)
+
+	// Replication
+	for idx, val := range vals {
+		tb.Insert(ctx, t, tableName, [][]any{{200 + idx, val}})
+	}
+	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}
