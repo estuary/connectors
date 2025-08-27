@@ -49,7 +49,12 @@ const (
 	queryTimeout = 1 * time.Hour
 )
 
-var featureFlagDefaults = map[string]bool{"flow_document": true}
+var featureFlagDefaults = map[string]bool{
+	// When set, flow_document is materialized for standard bindings and is used
+	// for reduction of documents, otherwise flow_document is an optional field
+	// and load phase constructs the flow_document from root-level fields.
+	"flow_document": true,
+}
 
 func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeoutCause(ctx, queryTimeout, errors.New("1 hour query timeout exceeded (is the database disk full?)"))

@@ -51,7 +51,12 @@ const (
 	redshiftTextColumnLength = 256
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	// When set, flow_document is materialized for standard bindings and is used
+	// for reduction of documents, otherwise flow_document is an optional field
+	// and load phase constructs the flow_document from root-level fields.
+	"flow_document": true,
+}
 
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`

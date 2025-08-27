@@ -25,7 +25,12 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	// When set, flow_document is materialized for standard bindings and is used
+	// for reduction of documents, otherwise flow_document is an optional field
+	// and load phase constructs the flow_document from root-level fields.
+	"flow_document": true,
+}
 
 const (
 	// As a very rough approximation, this will limit the amount of memory used for accumulating
