@@ -22,6 +22,7 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/field-addition.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/field-removal.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/backfill-migratable.flow.yaml
+//go:generate ./testdata/generate-spec-proto.sh testdata/materializer/backfill-key-migratable.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/materializer/backfill-nullable.flow.yaml
 
 //go:embed testdata/materializer/generated_specs
@@ -114,6 +115,15 @@ func TestRunApply(t *testing.T) {
 			want: testCalls{
 				truncateResource: [][]string{{"key_value"}},
 				updateResource:   [][]string{{"key_value"}},
+			},
+		},
+		{
+			name:         "binding with backfill & migratable change to key field drops existing resource",
+			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
+			newSpec:      loadMaterializerSpec(t, "backfill-key-migratable.flow.proto"),
+			want: testCalls{
+				createResource: [][]string{{"key_value"}},
+				deleteResource: [][]string{{"key_value"}},
 			},
 		},
 		{
@@ -292,7 +302,7 @@ func (t testMappedTyper) Compatible(e ExistingField) bool {
 }
 
 func (t testMappedTyper) CanMigrate(e ExistingField) bool {
-	return len(t.jsonTypes) > 1
+	return len(t.jsonTypes) > 1 || (e.Name == "key" && t.jsonTypes[0] == "boolean")
 }
 
 func (m *testMaterializer) NewMaterializerTransactor(ctx context.Context, req pm.Request_Open, is InfoSchema, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *m.BindingEvents) (MaterializerTransactor, error) {
