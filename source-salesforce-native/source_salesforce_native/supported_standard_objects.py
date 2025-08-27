@@ -2065,17 +2065,11 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "FeedComment": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
-    "FeedItem": {
-        "cursor_field": CursorFields.SYSTEM_MODSTAMP
-    },
     "FeedPollChoice": {
         "cursor_field": CursorFields.CREATED_DATE
     },
     "FeedPollVote": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
-    },
-    "FeedRevision": {
-        "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "FieldPermissions": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
