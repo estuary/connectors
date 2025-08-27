@@ -127,6 +127,25 @@ func newHttpSource(ctx context.Context, cfg config) (*httpSource, error) {
 		return nil, fmt.Errorf("could not GET %s: %w", cfg.URL, err)
 	}
 
+	// Return an error for a non 2xx responses.
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		var bodyBytes []byte
+		if resp.Body != nil {
+			if bodyBytes, err = io.ReadAll(resp.Body); err != nil {
+				return nil, fmt.Errorf("could not read response body: %w", err)
+			}
+
+			if err = resp.Body.Close(); err != nil {
+				return nil, fmt.Errorf("could not close response body: %w", err)
+			}
+		}
+		bodyText := string(bodyBytes)
+		if len(bodyText) > 500 {
+			bodyText = bodyText[:500] + "..."
+		}
+		return nil, fmt.Errorf("HTTP request failed with status %s: %s", resp.Status, bodyText)
+	}
+
 	return &httpSource{
 		cfg:      &cfg,
 		req:      req,
