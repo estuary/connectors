@@ -550,6 +550,14 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 				}
 				return false
 			})
+
+			// For simplicity, if the collection key has changed the resource
+			// will be re-created, although theoretically some systems could
+			// handle this change without fully dropping & re-creating.
+			if !slices.Equal(lastBinding.Collection.Key, thisBinding.Collection.Key) {
+				doTruncate = false
+			}
+
 		}
 
 		if !mCfg.NoTruncateResources && doTruncate {
