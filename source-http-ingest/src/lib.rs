@@ -141,10 +141,16 @@ pub struct Binding {
 
 impl Binding {
     pub fn url_path(&self) -> String {
-        self.resource_config
+        let path = self
+            .resource_config
             .path
-            .clone()
-            .unwrap_or_else(|| self.collection.name.clone())
+            .as_deref()
+            .unwrap_or_else(|| self.collection.name.as_str());
+        if path.starts_with('/') {
+            path.to_owned()
+        } else {
+            format!("/{path}")
+        }
     }
 }
 

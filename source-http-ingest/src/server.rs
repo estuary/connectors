@@ -12,7 +12,7 @@ use json::validator::Validator;
 use models::RawValue;
 use serde_json::Value;
 use tower_http::{cors, decompression::RequestDecompressionLayer};
-use utoipa::openapi::{self, schema, security, OpenApi, OpenApiBuilder};
+use utoipa::openapi::{self, schema, security, OpenApi, OpenApiBuilder, Type};
 use utoipa_swagger_ui::SwaggerUi;
 
 use std::{
@@ -65,15 +65,13 @@ pub async fn run_server(
 
     for binding in bindings.iter() {
         // The paths in the endpoint and resource config may include parameters, which
-        // are specified using the openapi path syntax (e.g. `/a/{aId}`). We translate
-        // these into axum's path syntax (e.g. `/a/:aId`) so that we can use axum to
-        // extract the path parameters for us.
+        // are specified using the openapi path syntax (e.g. `/a/{aId}`). Axum uses the
+        // same syntax for its path parameters, so we can use them directly.
         let openapi_path = binding.url_path();
-        let axum_path = openapi_to_axum_path(&openapi_path);
-        tracing::info!(path = %openapi_path, %axum_path, "configuring handler for route");
+        tracing::info!(path = %openapi_path, "configuring handler for route");
         router = router
-            .route(&axum_path, routing::post(handle_webhook))
-            .route(&axum_path, routing::get(handle_get));
+            .route(&openapi_path, routing::post(handle_webhook))
+            .route(&openapi_path, routing::get(handle_get));
     }
 
     // Set the body limit to be the same as the max document size allowed by Flow (64MiB)
@@ -386,9 +384,8 @@ impl Handler {
                 .context("adding schema to index")?;
             let index = index_builder.into_index();
 
-            let axum_path = openapi_to_axum_path(&configured_path);
             collections_by_path.insert(
-                axum_path,
+                configured_path.clone(),
                 CollectionHandler {
                     schema_url,
                     schema_index: index,
@@ -539,14 +536,6 @@ fn openapi_path_param(path_component: &str) -> Result<&str, &str> {
     }
 }
 
-// Converts the openapi path syntax to the axum path syntax. This only affects
-// paths that contain path parameters, since openapi uses curly braces for those,
-// while axum uses a leading colon. Paths that don't include parameters will be
-// returned
-fn openapi_to_axum_path(path: &str) -> String {
-    transform_path_params(path, |param| format!(":{}", param))
-}
-
 /// Transforms openapi path parameters using the given `transform`, which will be
 /// passed each parameter name.
 pub fn transform_path_params<F>(path: &str, transform: F) -> String
@@ -587,16 +576,10 @@ pub fn openapi_spec<'a>(
     bindings: &[Binding],
 ) -> anyhow::Result<OpenApi> {
     let failure_schema = schema::ObjectBuilder::new()
-        .property(
-            "error",
-            schema::Object::with_type(schema::SchemaType::String),
-        )
+        .property("error", schema::Object::with_type(Type::String))
         .build();
     let success_schema = schema::ObjectBuilder::new()
-        .property(
-            "published",
-            schema::Object::with_type(schema::SchemaType::Integer),
-        )
+        .property("published", schema::Object::with_type(Type::Integer))
         .build();
     let mut components = schema::ComponentsBuilder::new()
         .response(
@@ -605,7 +588,7 @@ pub fn openapi_spec<'a>(
                 JSON_CONTENT_TYPE,
                 openapi::content::ContentBuilder::new()
                     .example(Some(serde_json::json!({"published": 1})))
-                    .schema(success_schema)
+                    .schema(Some(success_schema))
                     .build(),
             ),
         )
@@ -617,7 +600,7 @@ pub fn openapi_spec<'a>(
                     .example(Some(
                         serde_json::json!({"error": "missing required header 'X-Webhook-Id'"}),
                     ))
-                    .schema(failure_schema)
+                    .schema(Some(failure_schema))
                     .build(),
             ),
         );
@@ -641,7 +624,8 @@ pub fn openapi_spec<'a>(
                     OpenAPI schema. Please ensure that no fields have multiple types or conditional \
                     schemas, as those are unsupported by the connector at this time")?;
 
-        let mut content_builder = openapi::content::ContentBuilder::new().schema(openapi_schema);
+        let mut content_builder =
+            openapi::content::ContentBuilder::new().schema(Some(openapi_schema));
 
         // As a special case, if the key of the target collection is `[/_meta/webhookId]`, then
         // we use an empty document as the example document instead of allowing the example to
@@ -707,8 +691,7 @@ pub fn openapi_spec<'a>(
         }
         let operation = op_builder.build();
         let path_item = openapi::path::PathItemBuilder::new()
-            .operation(openapi::PathItemType::Post, operation.clone())
-            .operation(openapi::PathItemType::Put, operation.clone())
+            .operation(openapi::HttpMethod::Post, operation.clone())
             .build();
         paths = paths.path(url_path, path_item);
     }
@@ -843,26 +826,6 @@ mod test {
             assert_eq!(actual, *expected);
         }
     }
-
-    #[test]
-    fn test_path_to_axum() {
-        for (openapi_path, expected) in &[
-            (
-                "/vendors/{vendorId}/products/{productId}",
-                "/vendors/:vendorId/products/:productId",
-            ),
-            (
-                "/vendors/{vendorId}/products/",
-                "/vendors/:vendorId/products/",
-            ),
-            ("/vendors/{vendorId}", "/vendors/:vendorId"),
-            ("/vendors", "/vendors"),
-            ("/", "/"),
-        ] {
-            let actual = super::openapi_to_axum_path(openapi_path);
-            assert_eq!(actual, *expected);
-        }
-    }
 }
 
 fn err_response(
@@ -889,7 +852,6 @@ enum JsonBody {
 }
 
 pub struct OktaVerificationHeader(String);
-#[async_trait::async_trait]
 impl<S: Send + Sync> axum::extract::FromRequestParts<S> for OktaVerificationHeader {
     type Rejection = (axum::http::StatusCode, &'static str);
 

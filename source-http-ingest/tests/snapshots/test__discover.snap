@@ -51,6 +51,7 @@ expression: result
           "type": "object",
           "x-infer-schema": true
         },
+        "isFallbackKey": true,
         "key": [
           "/_meta/webhookId"
         ],
@@ -123,6 +124,7 @@ expression: result
           "type": "object",
           "x-infer-schema": true
         },
+        "isFallbackKey": true,
         "key": [
           "/_meta/webhookId"
         ],

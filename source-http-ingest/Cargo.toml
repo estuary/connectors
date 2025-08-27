@@ -14,8 +14,7 @@ proto-flow = { git = "https://github.com/estuary/flow", features = [
 ] }
 
 anyhow = "1.0"
-async-trait = "0.1"
-axum = "0.7"
+axum = "0.8"
 futures = "0.3"
 http = "1.0"
 itertools = "0.13"
@@ -30,8 +29,8 @@ tracing-subscriber = { version = "0.3", features = [
     "time",
 ] }
 url = "2.5"
-utoipa = { version = "4.2", features = ["axum_extras"] }
-utoipa-swagger-ui = { version = "7.1", features = ["axum"] }
+utoipa = { version = "5.4", features = ["axum_extras"] }
+utoipa-swagger-ui = { version = "9.0", features = ["axum"] }
 time = { version = "0.3", features = ["formatting"] }
 uuid = { version = "1.7", features = ["v4"] }
 lazy_static = "1.4"
