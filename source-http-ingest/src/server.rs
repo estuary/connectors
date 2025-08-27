@@ -338,6 +338,10 @@ impl CollectionHandler {
     }
 }
 
+fn schema_uri() -> url::Url {
+    url::Url::parse("http://not.areal.host/").unwrap()
+}
+
 struct Handler {
     /// If an Authorization header is required, this will be the full expected value of that header,
     /// including the "Bearer " prefix.
@@ -364,10 +368,7 @@ impl Handler {
 
             let schema_value = serde_json::from_str::<Value>(&binding.collection.write_schema_json)
                 .context("parsing write_schema_json")?;
-            let schema = json::schema::build::build_schema(
-                url::Url::parse("http://not.areal.host/").unwrap(),
-                &schema_value,
-            )?;
+            let schema = json::schema::build::build_schema(schema_uri(), &schema_value)?;
             // We must get the resolved uri after building the schema, since the one we pass in is
             // only used for schemas that don't already have an absolute url as their `$id`.
             let schema_url = schema.curi.clone();
@@ -619,7 +620,7 @@ pub fn openapi_spec<'a>(
         let url_path = ensure_slash_prefix(&binding.url_path());
 
         let openapi_schema =
-            serde_json::from_str::<openapi::Schema>(&binding.collection.write_schema_json)
+            parse_collection_schema(&binding.collection.write_schema_json)
                 .context("The collection JSON schema (or writeSchema) could not be parsed as an \
                     OpenAPI schema. Please ensure that no fields have multiple types or conditional \
                     schemas, as those are unsupported by the connector at this time")?;
@@ -707,6 +708,30 @@ pub fn openapi_spec<'a>(
         .paths(paths.build())
         .build();
     Ok(spec)
+}
+
+/// Parses the collection schema into a form that `utoipa` can use. Note: this
+/// sucks. It's a hacky workaround for limitations in `utoipa`, which only
+/// supports a subset of JSON schema. Collection schemas tend to include `$defs`
+/// and `$ref` fields, which are particularly troublesome. So this function
+/// simplifies the schema by first inferring a `Shape` from the collection
+/// schema, and then converting that back into a schema.
+fn parse_collection_schema(write_schema_json: &str) -> anyhow::Result<openapi::Schema> {
+    let parsed_schema: serde_json::Value = serde_json::from_str(write_schema_json)?;
+
+    let schema = json::schema::build::build_schema::<Annotation>(schema_uri(), &parsed_schema)?;
+
+    let mut index = json::schema::index::IndexBuilder::new();
+    index.add(&schema)?;
+    index.verify_references()?;
+    let index = index.into_index();
+
+    let shape = doc::Shape::infer(&schema, &index);
+    let simplified_schema = doc::shape::schema::to_schema(shape);
+    let simplified_value = serde_json::to_value(simplified_schema)?;
+
+    let parsed: openapi::schema::Object = serde_json::from_value(simplified_value)?;
+    Ok(openapi::Schema::Object(parsed))
 }
 
 pub fn ensure_slash_prefix(path: &str) -> String {
@@ -825,6 +850,105 @@ mod test {
             let actual: Vec<_> = super::openapi_path_parameters(path).collect();
             assert_eq!(actual, *expected);
         }
+    }
+
+    #[test]
+    fn test_schema_parsing() {
+        // This is a typical schema that we'd see in practice. Note that it
+        // includes a top-level $ref, which we'll expect gets transformed by
+        // wrapping it in an `allOf`.
+        let schema_str = r##"{
+              "$defs": {
+                "flow://connector-schema": {
+                  "$id": "flow://connector-schema",
+                  "properties": {
+                    "_meta": {
+                      "description": "These fields are automatically added by the connector, and do not need to be specified in the request body",
+                      "properties": {
+                        "headers": {
+                          "additionalProperties": { "type": "string" },
+                          "description": "HTTP headers that were sent with the request will get added here. Headers that are known to be sensitive or not useful will not be included",
+                          "type": "object"
+                        },
+                        "pathParams": {
+                          "description": "Parameters extracted from the path of the request, if configured",
+                          "properties": {},
+                          "required": [],
+                          "type": "object"
+                        },
+                        "receivedAt": {
+                          "description": "Timestamp of when the request was received by the connector",
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "reqPath": {
+                          "description": "The configured path at which the request was received. Will include parameter placeholders if the path has them",
+                          "type": "string"
+                        },
+                        "webhookId": {
+                          "description": "The id of the webhook request, which is automatically added by the connector",
+                          "type": "string"
+                        }
+                      },
+                      "required": ["webhookId", "receivedAt"],
+                      "type": "object"
+                    }
+                  },
+                  "required": ["_meta"],
+                  "type": "object",
+                  "x-infer-schema": true
+                }
+              },
+              "$ref": "flow://connector-schema"
+            }"##;
+
+        let parsed = parse_collection_schema(schema_str).unwrap();
+
+        insta::assert_json_snapshot!(parsed, @r###"
+        {
+          "type": "object",
+          "required": [
+            "_meta"
+          ],
+          "properties": {
+            "_meta": {
+              "type": "object",
+              "description": "These fields are automatically added by the connector, and do not need to be specified in the request body",
+              "required": [
+                "receivedAt",
+                "webhookId"
+              ],
+              "properties": {
+                "headers": {
+                  "type": "object",
+                  "description": "HTTP headers that were sent with the request will get added here. Headers that are known to be sensitive or not useful will not be included",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                },
+                "pathParams": {
+                  "type": "object",
+                  "description": "Parameters extracted from the path of the request, if configured"
+                },
+                "receivedAt": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Timestamp of when the request was received by the connector"
+                },
+                "reqPath": {
+                  "type": "string",
+                  "description": "The configured path at which the request was received. Will include parameter placeholders if the path has them"
+                },
+                "webhookId": {
+                  "type": "string",
+                  "description": "The id of the webhook request, which is automatically added by the connector"
+                }
+              }
+            }
+          },
+          "x-infer-schema": true
+        }
+        "###);
     }
 }
 
