@@ -3,7 +3,7 @@ source: src/server.rs
 expression: json
 ---
 {
-  "openapi": "3.0.3",
+  "openapi": "3.1.0",
   "info": {
     "title": "Flow HTTP ingest",
     "version": "0.1.0"
@@ -64,108 +64,10 @@ expression: json
             "bearerAuth": []
           }
         ]
-      },
-      "put": {
-        "description": "append a document to the flow collection",
-        "parameters": [
-          {
-            "name": "X-Webhook-Id",
-            "in": "header",
-            "description": "Required header that will be bound to the /_meta/webhookId property",
-            "required": true,
-            "example": "abcd1234"
-          }
-        ],
-        "requestBody": {
-          "description": "a JSON object conforming to the schema of the collection 'aliceCo/test/webhook-data'. Note that '_meta' properties will be added automatically by the connector",
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "_meta"
-                ],
-                "properties": {
-                  "_meta": {
-                    "type": "object",
-                    "required": [
-                      "webhookId"
-                    ],
-                    "properties": {
-                      "webhookId": {
-                        "type": "string"
-                      }
-                    }
-                  }
-                }
-              },
-              "example": {
-                "hello": "world!"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/successResponse"
-          },
-          "400": {
-            "$ref": "#/components/responses/failureResponse"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
       }
     },
     "/another.json": {
       "post": {
-        "description": "append a document to the flow collection",
-        "requestBody": {
-          "description": "a JSON object conforming to the schema of the collection 'aliceCo/another/collection'. Note that '_meta' properties will be added automatically by the connector",
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "required": [
-                  "foo"
-                ],
-                "properties": {
-                  "foo": {
-                    "type": "object",
-                    "required": [
-                      "bar"
-                    ],
-                    "properties": {
-                      "bar": {
-                        "type": "string"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "$ref": "#/components/responses/successResponse"
-          },
-          "400": {
-            "$ref": "#/components/responses/failureResponse"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": []
-          }
-        ]
-      },
-      "put": {
         "description": "append a document to the flow collection",
         "requestBody": {
           "description": "a JSON object conforming to the schema of the collection 'aliceCo/another/collection'. Note that '_meta' properties will be added automatically by the connector",
