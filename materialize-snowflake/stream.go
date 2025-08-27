@@ -114,7 +114,9 @@ func (sm *streamManager) writeRow(ctx context.Context, binding int, row []any) e
 		return fmt.Errorf("bdecWriter writeRow: %w", err)
 	}
 
-	if sm.bdecWriter.done {
+	// Start a new blob based on the size of the current blob, or expiration of
+	// the blob storage bucket credentials.
+	if sm.bdecWriter.done || time.Now().After(sm.bucketExpiresAt) {
 		if err := sm.finishBlob(); err != nil {
 			return fmt.Errorf("finishBlob: %w", err)
 		}
