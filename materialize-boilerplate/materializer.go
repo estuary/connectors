@@ -545,7 +545,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			// No general errors with the new binding spec, so check if any
 			// selected fields are incompatible.
 			doTruncate = !slices.ContainsFunc(mapped.SelectedProjections(), func(m MappedProjection[MT]) bool {
-				if f := existing.GetField(m.Field); f != nil && !m.Mapped.Compatible(*f) && !m.Mapped.CanMigrate(*f) {
+				if f := existing.GetField(m.Field); f != nil && !mustRecreateTypeChange(&m.Projection.Projection, m.Mapped, *f) {
 					return true
 				}
 				return false
@@ -850,6 +850,13 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) Compatible(existing ExistingField,
 	}
 
 	mt, _ := c.m.MapType(mapProjection(*p, fieldCfg), fieldCfg)
+	return mustRecreateTypeChange(p, mt, existing), nil
+}
+
+// mustRecreateTypeChange returns true if the proposed projection requires a
+// drop & re-create of the target based on the existing materialized field.
+// Generally this is true if there is a type change that can't be migrated.
+func mustRecreateTypeChange[MT MappedTyper](p *pf.Projection, mt MT, existing ExistingField) bool {
 	canMigrate := mt.CanMigrate(existing)
 	if p.IsRootDocumentProjection() || p.IsPrimaryKey {
 		// There are currently no known cases where migrating the root document
@@ -859,7 +866,7 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) Compatible(existing ExistingField,
 		canMigrate = false
 	}
 
-	return mt.Compatible(existing) || canMigrate, nil
+	return mt.Compatible(existing) || canMigrate
 }
 
 func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projection, rawFieldConfig json.RawMessage) (string, error) {
