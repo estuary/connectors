@@ -364,7 +364,7 @@ func (sm *streamManager) maybeInitializeBucket(ctx context.Context) error {
 		return fmt.Errorf("unknown stage location type %q", cfg.StageLocation.LocationType)
 	}
 
-	sm.bucketExpiresAt = time.Now().Add(30 * time.Minute)
+	sm.bucketExpiresAt = time.Now().Add(15 * time.Minute)
 	log.WithFields(log.Fields{
 		"locationType": cfg.StageLocation.LocationType,
 		"location":     cfg.StageLocation.Location,
