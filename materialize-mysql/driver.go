@@ -676,7 +676,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	if err = txn.Commit(); err != nil {
-		return fmt.Errorf("commiting Load transaction: %w", err)
+		return fmt.Errorf("committing Load transaction: %w", err)
 	}
 
 	return nil
