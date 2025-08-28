@@ -318,7 +318,7 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 
 	var location *string
 	if d.cfg.BaseLocation != "" {
-		base := strings.TrimSuffix(d.cfg.BaseLocation, "/") + "/" + sanitizeAndAppendHash(name)
+		base := strings.TrimSuffix(d.cfg.BaseLocation, "/") + "/" + sanitizeAndAppendHash(ns+"_"+name)
 		location = &base
 	}
 
