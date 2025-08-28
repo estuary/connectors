@@ -153,33 +153,6 @@ class WorkManager:
     def are_active_workers(self) -> bool:
         return self._active_worker_count > 0
 
-    def worker_health_check(self) -> None:
-        alive_workers = [task for task in self.worker_tasks if not task.done()]
-        expected_count = len(self.worker_tasks)
-        actual_count = len(alive_workers)
-
-        if actual_count != expected_count:
-            missing_count = expected_count - actual_count
-
-            missing_workers = []
-            for task in self.worker_tasks:
-                if task.done():
-                    worker_name = task.get_name()
-                    exception = task.exception()
-                    missing_workers.append({
-                        "name": worker_name,
-                        "exception": str(exception) if exception else "completed without exception"
-                    })
-
-            self.log.error("Worker health check failed.", {
-                "active_worker_count": self._active_worker_count,
-                "expected_worker_count": expected_count,
-                "missing_worker_count": missing_count,
-                "missing_workers": missing_workers,
-            })
-
-            raise RuntimeError("worker health check failed")
-
     async def fetch_events_between(
         self,
         start: datetime,
@@ -242,8 +215,6 @@ class WorkManager:
 
     async def _shutdown_monitor(self) -> None:
         while not self.shutdown_event.is_set():
-            self.worker_health_check()
-
             if not self.are_active_workers() and self.queue_manager.are_all_queues_empty():
                 self.log.debug("All work complete - shutdown monitor initiating shutdown")
                 self.shutdown_event.set()
