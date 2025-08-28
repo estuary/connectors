@@ -14,6 +14,7 @@ import (
 	"github.com/estuary/connectors/filesource"
 	"github.com/estuary/flow/go/parser"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	log "github.com/sirupsen/logrus"
 )
 
 type credentials struct {
@@ -60,6 +61,22 @@ func (c *config) parsedURL() (*url.URL, string, error) {
 	return p, name, nil
 }
 
+func isWikimediaStream(url string) bool {
+	return strings.Contains(url, "stream.wikimedia.org") && strings.Contains(url, "/stream/")
+}
+
+// isStreamCancelledError detects if an error is due to an HTTP/2 stream being cancelled from the server.
+// An error due to HTTP/2 stream cancellation looks like "stream error: stream ID 1; CANCEL; received from peer".
+func isStreamCancelledError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	return strings.Contains(errStr, "stream ID") &&
+		strings.Contains(errStr, "CANCEL") &&
+		strings.Contains(errStr, "received from peer")
+}
+
 func (c config) Validate() error {
 	if _, _, err := c.parsedURL(); err != nil {
 		return err
@@ -94,10 +111,11 @@ func (c config) PathRegex() string {
 }
 
 type httpSource struct {
-	cfg      *config
-	req      *http.Request
-	resp     *http.Response
-	fileName string
+	cfg             *config
+	req             *http.Request
+	resp            *http.Response
+	fileName        string
+	isReconnectable bool
 }
 
 func doHttpRequest(ctx context.Context, cfg *config) (*http.Request, *http.Response, error) {
@@ -164,6 +182,11 @@ func newHttpSource(ctx context.Context, cfg config) (*httpSource, error) {
 		req:      req,
 		resp:     resp,
 		fileName: pathPieces[len(pathPieces)-1],
+		// isReconnectable indicates whether or not the connector should reconnect on an
+		// HTTP/2 connection cancellation error. This is currently a carve out just for
+		// the wikimedia stream. The httpSource does not try to resume where it left off previously,
+		// and it simply creates a new connection that starts reading at the stream's head.
+		isReconnectable: isWikimediaStream(cfg.URL),
 	}, nil
 }
 
@@ -207,10 +230,71 @@ func (s *httpSource) List(_ context.Context, query filesource.Query) (filesource
 func (s *httpSource) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
 	// We already started our read under a different parent context.
 	// Retain this Read `ctx` and wrap so that we cancel appropriately.
-	return &ctxReader{
+	reader := &ctxReader{
 		ReadCloser: s.resp.Body,
 		ctx:        ctx,
-	}, obj, nil
+	}
+
+	if s.isReconnectable {
+		return &reconnectableWrapper{
+			ctxReader: reader,
+			source:    s,
+		}, obj, nil
+	}
+
+	return reader, obj, nil
+}
+
+type reconnectableWrapper struct {
+	*ctxReader
+	source *httpSource
+}
+
+func (w *reconnectableWrapper) reconnect() error {
+	// Close the old connection.
+	if err := w.source.resp.Body.Close(); err != nil {
+		return fmt.Errorf("closing previous connection: %w", err)
+	}
+
+	// Create a new connection.
+	_, resp, err := doHttpRequest(w.ctxReader.ctx, w.source.cfg)
+	if err != nil {
+		return fmt.Errorf("reconnecting to stream: %w", err)
+	}
+
+	w.source.resp = resp
+	w.ctxReader.ReadCloser = resp.Body
+	log.Info("reconnected to stream")
+	return nil
+}
+
+func (w *reconnectableWrapper) Read(p []byte) (n int, err error) {
+	const maxRetries = 3
+
+	for attempt := range maxRetries {
+		n, err = w.ctxReader.Read(p)
+		if err == nil || err == io.EOF || !isStreamCancelledError(err) {
+			return n, err
+		}
+
+		log.WithFields(log.Fields{
+			"error":   err,
+			"attempt": attempt + 1,
+		}).Info("stream was cancelled, attempting to reconnect")
+
+		if err := w.reconnect(); err != nil {
+			log.WithFields(log.Fields{
+				"error":   err,
+				"attempt": attempt + 1,
+			}).Warn("reconnection failed, will retry")
+		}
+	}
+
+	return n, fmt.Errorf("max retries (%d) exceeded for reconnecting to stream", maxRetries)
+}
+
+func (w *reconnectableWrapper) Close() error {
+	return w.source.resp.Body.Close()
 }
 
 type ctxReader struct {
