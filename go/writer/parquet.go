@@ -331,6 +331,14 @@ func (w *ParquetWriter) Close() error {
 	return nil
 }
 
+// FileMetadata returns the current state of the FileMetadata that would be
+// written if this file were to be closed. If the file has already been closed,
+// then this will return the FileMetaData which was written to the file. This is
+// a proxy for the parquet (*file).Writer.FileMetadata() method.
+func (w *ParquetWriter) FileMetadata() (*metadata.FileMetaData, error) {
+	return w.sinkWriter.FileMetadata()
+}
+
 // ScratchSize provides an estimate of the current _uncompressed_ data size for
 // data that has been written to the scratch file. If the current row group is
 // flushed, this is approximately how large the resulting output row group will

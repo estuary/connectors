@@ -278,6 +278,14 @@ func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
 		}
 	}
 
+	log.WithFields(log.Fields{
+		"path":               blob.Path,
+		"md5":                blob.MD5,
+		"rows":               blob.Chunks[0].EPS.Rows,
+		"length":             blob.Chunks[0].ChunkLength,
+		"lengthUncompressed": blob.Chunks[0].ChunkLengthUncompressed,
+	}).Info("registered bdec file")
+
 	return nil
 }
 
@@ -546,6 +554,19 @@ func generateBlobMetadata(
 	}
 
 	out.Chunks = []uploadChunkMetadata{chunkMeta}
+
+	log.WithFields(log.Fields{
+		"fileName":                             tracked.fileName,
+		"md5":                                  md5,
+		"rows":                                 tracked.rows,
+		"length":                               tracked.length,
+		"lengthUncompressed":                   tracked.lengthUncompressed,
+		"parquetMetadata.NumRows":              tracked.parquetMetadata.FileMetaData.NumRows,
+		"parquetMetadata.NumRowGroups":         len(tracked.parquetMetadata.FileMetaData.RowGroups),
+		"parquetMetadata.RowGroups[0].NumRows": tracked.parquetMetadata.FileMetaData.RowGroups[0].NumRows,
+		"parquetMetadata.RowGroups[0].TotalCompressedSize": tracked.parquetMetadata.FileMetaData.RowGroups[0].TotalCompressedSize,
+		"parquetMetadata.RowGroups[0].TotalByteSize":       tracked.parquetMetadata.FileMetaData.RowGroups[0].TotalByteSize,
+	}).Info("generated bdec metadata")
 
 	return &out
 }
