@@ -392,7 +392,7 @@ func post[T any](ctx context.Context, c *streamClient, path string, body any) (*
 		NewRequest().
 		WithContext(ctx).
 		SetHeader("Accept", "application/json").
-		SetHeader("User-Agent", "EstuaryTechnologiesFlow/4.0.0"). // A semver >= 2.0.0 seems to be necessary for GCS to return Oauth client credentials rather than pre-signed URLs
+		SetHeader("User-Agent", "EstuaryTechnologiesFlow/4.0.0 Estuary"). // A semver >= 2.0.0 seems to be necessary for GCS to return Oauth client credentials rather than pre-signed URLs
 		SetAuthToken(token).
 		SetError(&streamingApiError{})
 
