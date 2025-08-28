@@ -282,8 +282,8 @@ func decodeRawJSONB(m *pgtype.Map, oid uint32, format int16, src []byte) (any, e
 func fixUnpairedSurrogates(buf []byte) {
 	var i = 0
 	for i < len(buf) {
-		// Jump to the next occurrence of \uXXXX, or return immediately if there isn't one
-		if off := bytes.Index(buf[i:], []byte(`\u`)); off >= 0 {
+		// Jump to the next backslash, or return immediately if there isn't one
+		if off := bytes.IndexByte(buf[i:], '\\'); off >= 0 {
 			i += off
 		} else {
 			return
@@ -292,6 +292,13 @@ func fixUnpairedSurrogates(buf []byte) {
 		// If there's less than 6 bytes left it can't be a proper \uXXXX escape sequence so we're done
 		if len(buf)-i < 6 {
 			return
+		}
+
+		// Per RFC 8259, all valid escapes other than \uXXXX consist of a backslash followed by a
+		// single byte so we can just skip ahead two bytes if it's not "\u" here.
+		if buf[i+1] != 'u' {
+			i += 2
+			continue
 		}
 
 		// Parse the codepoint
@@ -338,6 +345,12 @@ func parseHex16(buf []byte) uint16 {
 			val |= uint16(buf[i] - 'a' + 10)
 		case buf[i] >= 'A' && buf[i] <= 'F':
 			val |= uint16(buf[i] - 'A' + 10)
+		default:
+			// This particular hex parsing function is used to decode \uXXXX escapes
+			// and it shouldn't be possible to end up with a non-hex value here, so
+			// if we do encounter one zero is the safest value because it won't match
+			// one of the Unicode codepoint ranges of interest.
+			return 0
 		}
 	}
 	return val
