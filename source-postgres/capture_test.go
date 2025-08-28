@@ -954,6 +954,7 @@ func TestUnpairedSurrogatesInJSON(t *testing.T) {
 		`{"text": "\uDeAd"}`,
 		`{"\uDeAd": "\ud83d\udE14"}`,
 		`{"text": "foo \uDEAD bar \uDEAD baz"}`,
+		`[{"type":"text","text":"foo \"bar\\udfs\" /baz"}]`,
 	}
 
 	// Backfill
