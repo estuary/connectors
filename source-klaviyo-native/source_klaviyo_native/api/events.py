@@ -81,7 +81,6 @@ class QueueManager:
     def __init__(self, work_queue_size: int, subdivision_queue_size: int):
         self.work_queue = Queue(maxsize=work_queue_size)
         self.subdivision_request_queue = Queue(maxsize=subdivision_queue_size)
-        self.document_queue = Queue(maxsize=1)
 
     async def get_work_chunk(self, timeout: float = 2.0) -> Optional[DateChunk]:
         try:
@@ -102,20 +101,10 @@ class QueueManager:
         except asyncio.TimeoutError:
             return None
 
-    async def put_document(self, document: IncrementalStream) -> None:
-        await self.document_queue.put(document)
-
-    async def get_document(self, timeout: float = 1.0) -> Optional[IncrementalStream]:
-        try:
-            return await asyncio.wait_for(self.document_queue.get(), timeout=timeout)
-        except asyncio.TimeoutError:
-            return None
-
     def are_all_queues_empty(self) -> bool:
         return (
             self.work_queue.empty() and
-            self.subdivision_request_queue.empty() and
-            self.document_queue.empty()
+            self.subdivision_request_queue.empty()
         )
 
 
@@ -157,7 +146,8 @@ class WorkManager:
         self,
         start: datetime,
         end: datetime,
-    ) -> AsyncGenerator[IncrementalStream, None]:
+        external_queue: asyncio.Queue,
+    ) -> None:
         initial_chunks = self._create_initial_chunks(start, end)
         await self.queue_manager.put_work_chunks(initial_chunks)
 
@@ -171,6 +161,7 @@ class WorkManager:
                         http=self.http,
                         log=self.log,
                         shutdown_event=self.shutdown_event,
+                        document_queue=external_queue,
                     ),
                     name=f"chunk_worker_{i + 1}"
                 )
@@ -191,27 +182,11 @@ class WorkManager:
                 name="shutdown_monitor"
             )
 
-            # Document processing happens within the TaskGroup to ensure task failures immediately interrupt
-            # document processing & prevent partial checkpoints. _get_documents_from_queue checks the same shutdown_event
-            # as the tasks, so it will cleanly exit alongside tasks.
-            #
-            # Note: We don't run _get_documents_from_queue as a separate task in the TaskGroup since
-            # we need to stream documents directly - running as a separate task would require caching
-            # all documents in memory and returning them all as the task's result.
-            async for document in self._get_documents_from_queue():
-                yield document
-
     def _create_initial_chunks(self, start: datetime, end: datetime) -> list[DateChunk]:
         return [
             DateChunk(start=chunk_start, end=chunk_end)
             for chunk_start, chunk_end in split_date_window(start, end, DEFAULT_BACKFILL_CONFIG.initial_chunks)
         ]
-
-    async def _get_documents_from_queue(self) -> AsyncGenerator[IncrementalStream, None]:
-        while not self.shutdown_event.is_set():
-            document = await self.queue_manager.get_document()
-            if document is not None:
-                yield document
 
     async def _shutdown_monitor(self) -> None:
         while not self.shutdown_event.is_set():
@@ -234,6 +209,7 @@ async def chunk_worker(
     http: HTTPSession,
     log: Logger,
     shutdown_event: asyncio.Event,
+    document_queue: asyncio.Queue,
 ) -> None:
     log.debug(f"Event worker {worker_id} started.")
 
@@ -281,7 +257,7 @@ async def chunk_worker(
 
             last_cursor = event_cursor
             count += 1
-            await queue_manager.put_document(event)
+            await document_queue.put(event)
 
             # Check if this is a dense date window that should be divided into smaller chunks.
             if (
@@ -351,13 +327,44 @@ async def backfill_events(
 
     end = min(start + window_size, cutoff)
 
+    queue = asyncio.Queue(maxsize=1)
+
     work_manager = WorkManager(
         http=http,
         log=log,
     )
 
-    async for event in work_manager.fetch_events_between(start, end):
-        yield event
+    async def populate_queue() -> None:
+        try:
+            await work_manager.fetch_events_between(start, end, queue)
+            # All tasks completed successfully. Signal completion with a None sentinel value.
+            await queue.put(None)
+        except* Exception as eg:
+            first_exception = eg.exceptions[0]
+            log.error(f"Populating queue failed: {first_exception}")
+            await queue.put(first_exception)
+
+    # Start populating the queue in the background.
+    task_runner = asyncio.create_task(populate_queue())
+
+    try:
+        while True:
+            item = await queue.get()
+
+            if isinstance(item, IncrementalStream):
+                yield item
+            elif item is None:
+                # Sentinel. All work completed successfully.
+                break
+            elif isinstance(item, Exception):
+                raise item
+            else:
+                raise RuntimeError(f"Unexpected {type(item)} item: {item}")
+    finally:
+        # Clean up the background task.
+        if not task_runner.done():
+            task_runner.cancel()
+        await asyncio.gather(task_runner, return_exceptions=True)
 
     if end >= cutoff:
         return
