@@ -100,15 +100,14 @@ type httpSource struct {
 	fileName string
 }
 
-func newHttpSource(ctx context.Context, cfg config) (*httpSource, error) {
-	var parsedURL, err = url.Parse(cfg.URL)
+func doHttpRequest(ctx context.Context, cfg *config) (*http.Request, *http.Response, error) {
+	parsedURL, err := url.Parse(cfg.URL)
 	if err != nil {
-		return nil, fmt.Errorf("could not parse URL %s: %w", cfg.URL, err)
+		return nil, nil, fmt.Errorf("could not parse URL %s: %w", cfg.URL, err)
 	}
-	var pathPieces = strings.Split(parsedURL.Path, "/")
 
 	// Prepare request.
-	var req = (&http.Request{
+	req := (&http.Request{
 		Method: "GET",
 		URL:    parsedURL,
 		Header: make(http.Header),
@@ -124,7 +123,7 @@ func newHttpSource(ctx context.Context, cfg config) (*httpSource, error) {
 	// Initiate, fetch headers, and queue body for future reading.
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("could not GET %s: %w", cfg.URL, err)
+		return nil, nil, fmt.Errorf("could not GET %s: %w", cfg.URL, err)
 	}
 
 	// Return an error for a non 2xx responses.
@@ -132,18 +131,32 @@ func newHttpSource(ctx context.Context, cfg config) (*httpSource, error) {
 		var bodyBytes []byte
 		if resp.Body != nil {
 			if bodyBytes, err = io.ReadAll(resp.Body); err != nil {
-				return nil, fmt.Errorf("could not read response body: %w", err)
+				return nil, nil, fmt.Errorf("could not read response body: %w", err)
 			}
-
 			if err = resp.Body.Close(); err != nil {
-				return nil, fmt.Errorf("could not close response body: %w", err)
+				return nil, nil, fmt.Errorf("could not close response body: %w", err)
 			}
 		}
 		bodyText := string(bodyBytes)
 		if len(bodyText) > 500 {
 			bodyText = bodyText[:500] + "..."
 		}
-		return nil, fmt.Errorf("HTTP request failed with status %s: %s", resp.Status, bodyText)
+		return nil, nil, fmt.Errorf("HTTP request failed with status %s: %s", resp.Status, bodyText)
+	}
+
+	return req, resp, nil
+}
+
+func newHttpSource(ctx context.Context, cfg config) (*httpSource, error) {
+	var parsedURL, err = url.Parse(cfg.URL)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse URL %s: %w", cfg.URL, err)
+	}
+	var pathPieces = strings.Split(parsedURL.Path, "/")
+
+	req, resp, err := doHttpRequest(ctx, &cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	return &httpSource{
