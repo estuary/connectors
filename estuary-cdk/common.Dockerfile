@@ -30,7 +30,9 @@ ARG USAGE_RATE
 
 RUN apt-get update && \
     apt install -y --no-install-recommends \
-    openssh-client
+    openssh-client \
+    tzdata \
+    tzdata-legacy
 
 LABEL FLOW_RUNTIME_PROTOCOL=${CONNECTOR_TYPE}
 LABEL FLOW_RUNTIME_CODEC=json
