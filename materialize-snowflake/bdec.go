@@ -21,6 +21,7 @@ import (
 	"time"
 
 	"github.com/apache/arrow-go/v18/arrow/decimal128"
+	"github.com/apache/arrow-go/v18/parquet/metadata"
 	"github.com/estuary/connectors/go/writer"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
@@ -239,6 +240,8 @@ func (bw *bdecWriter) writeRow(row []any) error {
 func (bw *bdecWriter) close() error {
 	if err := bw.pq.Close(); err != nil {
 		return fmt.Errorf("closing parquet writer: %w", err)
+	} else if bw.blobStats.parquetMetadata, err = bw.pq.FileMetadata(); err != nil {
+		return fmt.Errorf("getting parquet file metadata: %w", err)
 	}
 
 	return nil
@@ -256,6 +259,8 @@ type blobStatsTracker struct {
 	rows               int          // total number of rows
 	length             int          // total number of bytes in the blob
 	lengthUncompressed int          // estimate of the uncompressed byte size of the blob's data
+
+	parquetMetadata *metadata.FileMetaData // As-written parquet file metadata
 
 	columns []*columnStatsTracker
 
