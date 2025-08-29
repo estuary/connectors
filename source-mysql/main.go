@@ -157,6 +157,7 @@ type advancedConfig struct {
 	SkipBackfills            string   `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	BackfillChunkSize        int      `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
 	DiscoverSchemas          []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
+	SourceTag                string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
 	FeatureFlags             string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 
 	// Deprecated config options which no longer do much of anything.
@@ -416,6 +417,9 @@ func (db *mysqlDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.Sche
 		AllowAdditionalProperties: writeSchema,
 	}).Reflect(&mysqlSourceInfo{})
 	sourceSchema.Version = ""
+	if db.config.Advanced.SourceTag == "" {
+		sourceSchema.Properties.Delete("tag")
+	}
 	return sourceSchema
 }
 
