@@ -11,7 +11,12 @@ import (
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	// When set, flow_document is materialized for standard bindings and is used
+	// for reduction of documents, otherwise flow_document is an optional field
+	// and load phase constructs the flow_document from root-level fields.
+	"flow_document": true,
+}
 
 // config represents the endpoint configuration for sql server.
 type config struct {

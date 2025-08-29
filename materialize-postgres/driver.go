@@ -49,7 +49,12 @@ const (
 	queryTimeout = 1 * time.Hour
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	// When set, flow_document is materialized for standard bindings and is used
+	// for reduction of documents, otherwise flow_document is an optional field
+	// and load phase constructs the flow_document from root-level fields.
+	"flow_document": true,
+}
 
 func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeoutCause(ctx, queryTimeout, errors.New("1 hour query timeout exceeded (is the database disk full?)"))
@@ -389,7 +394,7 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, is); err != nil {
+		if err = d.addBinding(ctx, binding, is, featureFlags); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
@@ -413,8 +418,16 @@ type binding struct {
 	loadQuerySQL   string
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema, featureFlags map[string]bool) error {
 	var b = &binding{target: target}
+
+	// Choose the appropriate load query template based on feature flags
+	var loadQueryTemplate *template.Template
+	if !featureFlags["flow_document"] && !target.DeltaUpdates {
+		loadQueryTemplate = tplLoadQueryNoFlowDocument
+	} else {
+		loadQueryTemplate = tplLoadQuery
+	}
 
 	for _, m := range []struct {
 		sql *string
@@ -424,7 +437,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 		{&b.storeInsertSQL, tplStoreInsert},
 		{&b.storeUpdateSQL, tplStoreUpdate},
 		{&b.deleteQuerySQL, tplDeleteQuery},
-		{&b.loadQuerySQL, tplLoadQuery},
+		{&b.loadQuerySQL, loadQueryTemplate},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
