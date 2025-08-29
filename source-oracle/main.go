@@ -22,6 +22,7 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
+	"github.com/invopop/jsonschema"
 	_ "github.com/sijms/go-ora/v2"
 	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
@@ -317,8 +318,14 @@ func (db *oracleDatabase) Close(ctx context.Context) error {
 	return nil
 }
 
-func (db *oracleDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
-	return &oracleSource{}
+func (db *oracleDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.Schema {
+	var sourceSchema = (&jsonschema.Reflector{
+		ExpandedStruct:            true,
+		DoNotReference:            true,
+		AllowAdditionalProperties: writeSchema,
+	}).Reflect(&oracleSource{})
+	sourceSchema.Version = ""
+	return sourceSchema
 }
 
 func (db *oracleDatabase) FallbackCollectionKey() []string {

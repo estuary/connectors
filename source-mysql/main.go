@@ -22,6 +22,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
+	"github.com/invopop/jsonschema"
 	"github.com/sirupsen/logrus"
 
 	_ "time/tzdata"
@@ -408,8 +409,14 @@ func (db *mysqlDatabase) Close(ctx context.Context) error {
 	return nil
 }
 
-func (db *mysqlDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
-	return &mysqlSourceInfo{}
+func (db *mysqlDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.Schema {
+	var sourceSchema = (&jsonschema.Reflector{
+		ExpandedStruct:            true,
+		DoNotReference:            true,
+		AllowAdditionalProperties: writeSchema,
+	}).Reflect(&mysqlSourceInfo{})
+	sourceSchema.Version = ""
+	return sourceSchema
 }
 
 func (db *mysqlDatabase) FallbackCollectionKey() []string {

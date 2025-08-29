@@ -469,8 +469,14 @@ func (db *postgresDatabase) Close(ctx context.Context) error {
 	return nil
 }
 
-func (db *postgresDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
-	return &postgresSource{}
+func (db *postgresDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.Schema {
+	var sourceSchema = (&jsonschema.Reflector{
+		ExpandedStruct:            true,
+		DoNotReference:            true,
+		AllowAdditionalProperties: writeSchema,
+	}).Reflect(&postgresSource{})
+	sourceSchema.Version = ""
+	return sourceSchema
 }
 
 func (db *postgresDatabase) FallbackCollectionKey() []string {
