@@ -214,10 +214,10 @@ func (s *sqlMaterialization[EC, RC]) NewConstraint(p pf.Projection, deltaUpdates
 	case slices.Equal(p.Inference.Types, []string{"null"}):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
-	case !deltaUpdates && !s.featureFlags["flow_document"] && p.IsRootLevelProjection():
+	case !deltaUpdates && !s.featureFlags["flow_document"] && p.IsRootLevelProjection() && p.Inference.Exists == pf.Inference_MUST:
 		// When flow_document is disabled, all root-level properties become LOCATION_REQUIRED
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "All root-level properties are required when flow_document is disabled"
+		constraint.Reason = "Required root-level properties must be present when flow_document is disabled"
 	case p.Field == "_meta/op":
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The operation type should usually be materialized"

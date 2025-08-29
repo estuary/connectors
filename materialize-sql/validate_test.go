@@ -175,10 +175,10 @@ func (tc testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, _
 	case slices.Equal(p.Inference.Types, []string{"null"}):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 		constraint.Reason = "Cannot materialize this field"
-	case !deltaUpdates && !tc.featureFlags["flow_document"] && p.IsRootLevelProjection():
+	case !deltaUpdates && !tc.featureFlags["flow_document"] && p.IsRootLevelProjection() && p.Inference.Exists == pf.Inference_MUST:
 		// When flow_document is disabled, all root-level properties become LOCATION_REQUIRED
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "All root-level properties are required when flow_document is disabled"
+		constraint.Reason = "Required root-level properties must be present when flow_document is disabled"
 	case p.Field == "locRequiredVal":
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "This location is required to be materialized"
