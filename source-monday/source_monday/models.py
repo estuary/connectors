@@ -186,6 +186,7 @@ class ActivityLogEvents(StrEnum):
     BOARD_VIEW_CHANGED = "board_view_changed"
     BOARD_VIEW_ENABLED = "board_view_enabled"
     BOARD_VIEW_DISABLED = "board_view_disabled"
+    BOARD_VIEW_DUPLICATED = "board_view_duplicated"
     BOARD_WORKSPACE_ID_CHANGED = "board_workspace_id_changed"
     CHANGE_COLUMN_SETTINGS = "change_column_settings"
     CREATE_COLUMN = "create_column"
@@ -281,6 +282,7 @@ class ActivityLog(BaseModel, extra="allow"):
                 | ActivityLogEvents.BOARD_VIEW_ENABLED
                 | ActivityLogEvents.BOARD_VIEW_DISABLED
                 | ActivityLogEvents.BOARD_VIEW_DELETED
+                | ActivityLogEvents.BOARD_VIEW_DUPLICATED
                 | ActivityLogEvents.BOARD_WORKSPACE_ID_CHANGED
                 | ActivityLogEvents.CHANGE_COLUMN_SETTINGS
                 | ActivityLogEvents.UPDATE_BOARD_NICKNAME
