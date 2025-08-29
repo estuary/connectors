@@ -168,6 +168,7 @@ type advancedConfig struct {
 	MinimumBackfillXID    string   `json:"min_backfill_xid,omitempty" jsonschema:"title=Minimum Backfill XID,description=Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases." jsonschema_extras:"pattern=^[0-9]+$"`
 	ReadOnlyCapture       bool     `json:"read_only_capture,omitempty" jsonschema:"title=Read-Only Capture,description=When set the capture will operate in read-only mode and avoid operations such as watermark writes. This comes with some tradeoffs; consult the connector documentation for more information."`
 	CaptureAsPartitions   bool     `json:"capture_as_partitions,omitempty" jsonschema:"title=Capture Partitioned Tables As Partitions,description=When set the capture will discover and capture partitioned tables as individual partitions rather than as a single root table. This requires the publication to be created without 'publish_via_partition_root'."`
+	SourceTag             string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
 	FeatureFlags          string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
@@ -476,6 +477,9 @@ func (db *postgresDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.S
 		AllowAdditionalProperties: writeSchema,
 	}).Reflect(&postgresSource{})
 	sourceSchema.Version = ""
+	if db.config.Advanced.SourceTag == "" {
+		sourceSchema.Properties.Delete("tag")
+	}
 	return sourceSchema
 }
 

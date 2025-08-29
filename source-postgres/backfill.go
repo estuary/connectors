@@ -224,6 +224,7 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 						Table:    table,
 					},
 					Location: [3]int{-1, rowOffset, 0},
+					Tag:      db.config.Advanced.SourceTag,
 				},
 			},
 			RowKey: rowKey,
