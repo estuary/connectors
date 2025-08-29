@@ -1,4 +1,6 @@
 from datetime import datetime
+from logging import Logger
+from typing import AsyncGenerator
 from ..metafields import MetafieldsResource
 
 
@@ -17,6 +19,14 @@ class CustomCollectionMetafields(MetafieldsResource):
             includeCreatedAt=False,
         )
 
+    @staticmethod
+    def process_result(
+        log: Logger, lines: AsyncGenerator[bytes, None]
+    ) -> AsyncGenerator[dict, None]:
+        return MetafieldsResource._process_metafields_result(
+            log, lines, CustomCollectionMetafields.PARENT_ID_KEY
+        )
+
 
 class SmartCollectionMetafields(MetafieldsResource):
     NAME = "smart_collection_metafields"
@@ -31,4 +41,12 @@ class SmartCollectionMetafields(MetafieldsResource):
             end,
             query="AND collection_type:smart",
             includeCreatedAt=False,
+        )
+
+    @staticmethod
+    def process_result(
+        log: Logger, lines: AsyncGenerator[bytes, None]
+    ) -> AsyncGenerator[dict, None]:
+        return MetafieldsResource._process_metafields_result(
+            log, lines, SmartCollectionMetafields.PARENT_ID_KEY
         )

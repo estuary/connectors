@@ -40,6 +40,10 @@ captures:
           interval: PT5M
         target: acmeCo/product_variants
       - resource:
+          name: product_variant_metafields
+          interval: PT5M
+        target: acmeCo/product_variant_metafields
+      - resource:
           name: fulfillment_orders
           interval: PT5M
         target: acmeCo/fulfillment_orders

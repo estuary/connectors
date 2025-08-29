@@ -76,6 +76,10 @@ collections:
     schema: product_metafields.schema.yaml
     key:
       - /id
+  acmeCo/product_variant_metafields:
+    schema: product_variant_metafields.schema.yaml
+    key:
+      - /id
   acmeCo/product_variants:
     schema: product_variants.schema.yaml
     key:

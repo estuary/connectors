@@ -37,6 +37,7 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.ProductMedia,
     gql.ProductMetafields,
     gql.ProductVariants,
+    gql.ProductVariantMetafields,
     gql.FulfillmentOrders,
     gql.Fulfillments,
     gql.Orders,

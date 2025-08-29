@@ -16,6 +16,7 @@ from .products.products import Products
 from .products.variants import ProductVariants
 from .products.media import ProductMedia
 from .products.metafields import ProductMetafields
+from .products.metafields import ProductVariantMetafields
 from .orders.agreements import OrderAgreements
 from .orders.fulfillment_orders import FulfillmentOrders
 from .orders.fulfillments import Fulfillments
@@ -43,6 +44,7 @@ __all__ = [
     "ProductVariants",
     "ProductMedia",
     "ProductMetafields",
+    "ProductVariantMetafields",
     "OrderAgreements",
     "FulfillmentOrders",
     "Fulfillments",
