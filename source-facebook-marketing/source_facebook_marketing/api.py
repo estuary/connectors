@@ -161,7 +161,7 @@ class API:
     def __init__(self, access_token: str):
         self._account_ids = {}
         # design flaw in MyFacebookAdsApi requires such strange set of new default api instance
-        self.api = MyFacebookAdsApi.init(access_token=access_token, crash_log=False, api_version="v21.0")
+        self.api = MyFacebookAdsApi.init(access_token=access_token, crash_log=False, api_version="v23.0")
         FacebookAdsApi.set_default_api(self.api)
 
     def get_account(self, account_id: str) -> AdAccount:

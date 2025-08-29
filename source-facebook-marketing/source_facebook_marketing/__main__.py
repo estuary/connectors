@@ -10,9 +10,9 @@ asyncio.run(
         delegate=SourceFacebookMarketing(),
         oauth2=flow.OAuth2Spec(
             provider="facebook",
-            authUrlTemplate="https://www.facebook.com/v21.0/dialog/oauth?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&state={{#urlencode}}{{{  state }}}{{/urlencode}}&scope=ads_management,ads_read,read_insights,business_management",
+            authUrlTemplate="https://www.facebook.com/v23.0/dialog/oauth?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&state={{#urlencode}}{{{  state }}}{{/urlencode}}&scope=ads_management,ads_read,read_insights,business_management",
             accessTokenResponseMap={"access_token": "/access_token"},
-            accessTokenUrlTemplate="https://graph.facebook.com/v21.0/oauth/access_token?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}",
+            accessTokenUrlTemplate="https://graph.facebook.com/v23.0/oauth/access_token?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}",
             accessTokenBody="",  # Uses query arguments.
             accessTokenHeaders={},
         ),
