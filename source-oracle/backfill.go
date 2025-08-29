@@ -128,6 +128,8 @@ func (db *oracleDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.D
 				// Artificial RSID and SSN during backfill
 				RSID: "0x000000.00000000.0000",
 				SSN:  rowOffset,
+
+				Tag: db.config.Advanced.SourceTag,
 			},
 			Before: nil,
 			After:  fields,

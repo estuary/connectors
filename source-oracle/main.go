@@ -149,6 +149,7 @@ type advancedConfig struct {
 	DiscoverSchemas      []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	NodeID               uint32   `json:"node_id,omitempty" jsonschema:"title=Node ID,description=Node ID for the capture. Each node in a replication cluster must have a unique 32-bit ID. The specific value doesn't matter so long as it is unique. If unset or zero the connector will pick a value."`
 	DictionaryMode       string   `json:"dictionary_mode,omitempty" jsonschema:"title=Dictionary Mode,description=How should dictionaries be used in Logminer: one of online or extract. When using online mode schema changes to the table may break the capture but resource usage is limited. When using extract mode schema changes are handled gracefully but more resources of your database (including disk) are used by the process. Defaults to smart which automatically switches between the two modes based on requirements.,enum=extract,enum=online,enum=smart"`
+	SourceTag            string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
 	FeatureFlags         string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
@@ -325,6 +326,9 @@ func (db *oracleDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.Sch
 		AllowAdditionalProperties: writeSchema,
 	}).Reflect(&oracleSource{})
 	sourceSchema.Version = ""
+	if db.config.Advanced.SourceTag == "" {
+		sourceSchema.Properties.Delete("tag")
+	}
 	return sourceSchema
 }
 
