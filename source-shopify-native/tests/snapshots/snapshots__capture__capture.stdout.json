@@ -27,7 +27,7 @@
       "lastName": "Hirano",
       "legacyResourceId": "7609762938925",
       "locale": "en",
-      "note": null,
+      "note": "",
       "phone": "+16135550127",
       "state": "DISABLED",
       "statistics": {
@@ -36,7 +36,7 @@
       "tags": [],
       "taxExempt": false,
       "taxExemptions": [],
-      "updatedAt": "2025-04-24T20:21:04Z",
+      "updatedAt": "2025-08-29T12:21:21Z",
       "verifiedEmail": true
     }
   ],
@@ -49,8 +49,30 @@
       "createdAt": "2025-01-14T15:10:14Z",
       "id": "gid://shopify/Customer/7609762938925",
       "legacyResourceId": "7609762938925",
-      "metafields": [],
-      "updatedAt": "2025-04-24T20:21:04Z"
+      "metafields": [
+        {
+          "__parentId": "gid://shopify/Customer/7609762938925",
+          "createdAt": "2025-08-29T12:21:21Z",
+          "definition": {
+            "description": "Test metafield",
+            "id": "gid://shopify/MetafieldDefinition/148601176109",
+            "namespace": "custom",
+            "type": {
+              "category": "TEXT",
+              "name": "single_line_text_field"
+            }
+          },
+          "id": "gid://shopify/Metafield/44248438931501",
+          "key": "favorate_color",
+          "legacyResourceId": "44248438931501",
+          "namespace": "custom",
+          "ownerType": "CUSTOMER",
+          "type": "single_line_text_field",
+          "updatedAt": "2025-08-29T12:21:21Z",
+          "value": "Blue"
+        }
+      ],
+      "updatedAt": "2025-08-29T12:21:21Z"
     }
   ],
   [
@@ -147,7 +169,7 @@
       "title": "Gift Card",
       "totalInventory": 0,
       "tracksInventory": false,
-      "updatedAt": "2025-04-10T17:45:43Z",
+      "updatedAt": "2025-08-29T12:12:00Z",
       "variantsCount": {
         "count": 4,
         "precision": "EXACT"
@@ -176,27 +198,20 @@
           }
         }
       ],
-      "updatedAt": "2025-04-10T17:45:43Z"
+      "updatedAt": "2025-08-29T12:12:00Z"
     }
   ],
   [
     "acmeCo/product_metafields",
     {
-      "__parentId": "gid://shopify/Product/8086707994669",
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-01-14T15:10:14Z",
-      "definition": null,
-      "id": "gid://shopify/Metafield/40843185455149",
-      "key": "title_tag",
-      "legacyResourceId": "40843185455149",
+      "id": "gid://shopify/Product/8086707830829",
+      "legacyResourceId": "8086707830829",
       "metafields": [],
-      "namespace": "global",
-      "ownerType": "PRODUCT",
-      "type": "string",
-      "updatedAt": "2025-01-14T15:10:14Z",
-      "value": "Complete Snowboard"
+      "updatedAt": "2025-08-29T12:12:00Z"
     }
   ],
   [
@@ -208,11 +223,11 @@
       "createdAt": "2025-01-14T15:10:14Z",
       "id": "gid://shopify/Product/8086707830829",
       "legacyResourceId": "8086707830829",
-      "updatedAt": "2025-04-10T17:45:43Z",
+      "updatedAt": "2025-08-29T12:12:00Z",
       "variants": [
         {
           "__parentId": "gid://shopify/Product/8086707830829",
-          "barcode": null,
+          "barcode": "",
           "compareAtPrice": null,
           "createdAt": "2025-01-14T15:10:14Z",
           "id": "gid://shopify/ProductVariant/43217823334445",
@@ -239,7 +254,7 @@
           "sku": null,
           "taxable": false,
           "title": "$10",
-          "updatedAt": "2025-01-14T15:10:14Z"
+          "updatedAt": "2025-08-29T12:12:00Z"
         },
         {
           "__parentId": "gid://shopify/Product/8086707830829",
@@ -335,6 +350,42 @@
           "updatedAt": "2025-01-14T15:10:14Z"
         }
       ]
+    }
+  ],
+  [
+    "acmeCo/product_variant_metafields",
+    {
+      "__parentId": "gid://shopify/Product/8086707830829",
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "createdAt": "2025-01-14T15:10:14Z",
+      "id": "gid://shopify/ProductVariant/43217823334445",
+      "legacyResourceId": "43217823334445",
+      "metafields": [
+        {
+          "__parentId": "gid://shopify/ProductVariant/43217823334445",
+          "createdAt": "2025-08-29T12:11:59Z",
+          "definition": {
+            "description": "This is an example custom metafield for product variants.",
+            "id": "gid://shopify/MetafieldDefinition/148599832621",
+            "namespace": "custom",
+            "type": {
+              "category": "TRUE_FALSE",
+              "name": "boolean"
+            }
+          },
+          "id": "gid://shopify/Metafield/44248408752173",
+          "key": "custom_meta_field_example",
+          "legacyResourceId": "44248408752173",
+          "namespace": "custom",
+          "ownerType": "PRODUCTVARIANT",
+          "type": "boolean",
+          "updatedAt": "2025-08-29T12:11:59Z",
+          "value": "true"
+        }
+      ],
+      "updatedAt": "2025-08-29T12:12:00Z"
     }
   ],
   [
@@ -999,29 +1050,14 @@
   [
     "acmeCo/order_metafields",
     {
-      "__parentId": "gid://shopify/Order/5714631688237",
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "createdAt": "2025-04-18T13:20:25Z",
-      "definition": {
-        "description": "Testing out the metafield definition for an order.",
-        "id": "gid://shopify/MetafieldDefinition/79388246061",
-        "namespace": "custom",
-        "type": {
-          "category": "NUMBER",
-          "name": "number_integer"
-        }
-      },
-      "id": "gid://shopify/Metafield/41993463529517",
-      "key": "order_metafield_definition_test",
-      "legacyResourceId": "41993463529517",
+      "createdAt": "2025-04-10T17:42:58Z",
+      "id": "gid://shopify/Order/5714619858989",
+      "legacyResourceId": "5714619858989",
       "metafields": [],
-      "namespace": "custom",
-      "ownerType": "ORDER",
-      "type": "number_integer",
-      "updatedAt": "2025-04-18T13:20:25Z",
-      "value": "5"
+      "updatedAt": "2025-04-10T17:54:23Z"
     }
   ],
   [
@@ -1128,7 +1164,7 @@
       "sku": null,
       "tracked": false,
       "unitCost": null,
-      "updatedAt": "2025-01-14T15:10:14Z",
+      "updatedAt": "2025-08-29T12:12:00Z",
       "variant": {
         "id": "gid://shopify/ProductVariant/43217823334445",
         "legacyResourceId": "43217823334445",
