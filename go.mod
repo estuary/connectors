@@ -68,6 +68,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.16.0
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.17.3
+	github.com/tidwall/sjson v1.2.5
 	github.com/trinodb/trino-go-client v0.313.0
 	github.com/wk8/go-ordered-map/v2 v2.1.8
 	github.com/xitongsys/parquet-go v1.6.2
