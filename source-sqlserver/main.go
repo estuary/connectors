@@ -19,6 +19,7 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 
 	mssqldb "github.com/microsoft/go-mssqldb"
@@ -88,6 +89,7 @@ type advancedConfig struct {
 	AutomaticCaptureInstances   bool   `json:"capture_instance_management,omitempty" jsonschema:"title=Automatic Capture Instance Management,default=false,description=When set the connector will respond to alterations of captured tables by automatically creating updated capture instances and deleting the old ones. Requires DBO permissions to use."`
 	Filegroup                   string `json:"filegroup,omitempty" jsonschema:"title=CDC Instance Filegroup,description=When set the connector will create new CDC instances with the specified 'filegroup_name' argument. Has no effect if CDC instances are managed manually."`
 	RoleName                    string `json:"role_name,omitempty" jsonschema:"title=CDC Instance Access Role,description=When set the connector will create new CDC instances with the specified 'role_name' argument as the gating role. When unset the capture user name is used as the 'role_name' instead. Has no effect if CDC instances are managed manually."`
+	SourceTag                   string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
 	FeatureFlags                string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 	WatermarksTable             string `json:"watermarksTable,omitempty" jsonschema:"default=dbo.flow_watermarks,description=This property is deprecated for new captures as they will no longer use watermark writes by default. The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
 }
@@ -308,9 +310,17 @@ func (db *sqlserverDatabase) Close(ctx context.Context) error {
 	return nil
 }
 
-// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
-func (db *sqlserverDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
-	return &sqlserverSourceInfo{}
+func (db *sqlserverDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.Schema {
+	var sourceSchema = (&jsonschema.Reflector{
+		ExpandedStruct:            true,
+		DoNotReference:            true,
+		AllowAdditionalProperties: writeSchema,
+	}).Reflect(&sqlserverSourceInfo{})
+	sourceSchema.Version = ""
+	if db.config.Advanced.SourceTag == "" {
+		sourceSchema.Properties.Delete("tag")
+	}
+	return sourceSchema
 }
 
 func (db *sqlserverDatabase) FallbackCollectionKey() []string {

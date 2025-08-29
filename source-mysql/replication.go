@@ -581,6 +581,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 				BinlogOffset: eventCursor.BinlogOffset,
 			},
 			TxID: eventTxID,
+			Tag:  rs.db.config.Advanced.SourceTag,
 		},
 	}
 

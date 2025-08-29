@@ -333,6 +333,8 @@ type oracleSource struct {
 	RSID string `json:"rs_id" jsonschema:"description=Record Set ID of the logical change"`
 
 	SSN int `json:"ssn" jsonschema:"description=SQL sequence number of the logical change"`
+
+	Tag string `json:"tag,omitempty" jsonschema:"description=Optional 'Source Tag' property as defined in the endpoint configuration."`
 }
 
 func (s *oracleSource) Common() sqlcapture.SourceCommon {

@@ -1219,6 +1219,7 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 					LSN:        changeLSN,
 					SeqVal:     seqval,
 					UpdateMask: updateMask,
+					Tag:        rs.db.config.Advanced.SourceTag,
 				},
 			},
 			RowKey: rowKey,

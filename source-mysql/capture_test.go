@@ -693,3 +693,18 @@ func TestInconsistentMetadata(t *testing.T) {
 
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+// TestSourceTag verifies the output of a capture with /advanced/source_tag set
+func TestSourceTag(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = uniqueTableID(t)
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.EndpointSpec.(*Config).Advanced.SourceTag = "example_source_tag_1234"
+	setShutdownAfterCaughtUp(t, true)
+	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}})
+	cs.Capture(ctx, t, nil)
+	tb.Insert(ctx, t, tableName, [][]any{{2, "two"}, {3, "three"}})
+	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}

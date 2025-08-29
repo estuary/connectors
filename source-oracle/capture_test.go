@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -553,5 +554,21 @@ func TestCrossSCNTransactions(t *testing.T) {
 		}
 	})
 
+	cupaloy.SnapshotT(t, cs.Summary())
+}
+
+// TestSourceTag verifies the output of a capture with /advanced/source_tag set
+func TestSourceTag(t *testing.T) {
+	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var uniqueID = "66567212"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.EndpointSpec.(*Config).Advanced.SourceTag = "example_source_tag_1234"
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}})
+	cs.Capture(ctx, t, nil)
+	tb.Insert(ctx, t, tableName, [][]any{{2, "two"}, {3, "three"}})
+	cs.Capture(ctx, t, nil)
 	cupaloy.SnapshotT(t, cs.Summary())
 }

@@ -105,12 +105,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 // collection schema (plus the discovered collection key, for convenience).
 func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema bool) (json.RawMessage, []string, error) {
 	// Schema of the embedded "source" property.
-	var sourceSchema = (&jsonschema.Reflector{
-		ExpandedStruct:            true,
-		DoNotReference:            true,
-		AllowAdditionalProperties: fullWriteSchema,
-	}).Reflect(db.EmptySourceMetadata())
-	sourceSchema.Version = ""
+	var sourceSchema = db.SourceMetadataSchema(fullWriteSchema)
 
 	if db.HistoryMode() && fullWriteSchema {
 		sourceSchema.Extras = map[string]interface{}{

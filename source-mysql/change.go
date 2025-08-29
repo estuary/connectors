@@ -87,6 +87,7 @@ type mysqlSourceInfo struct {
 	sqlcapture.SourceCommon
 	Cursor mysqlChangeEventCursor `json:"cursor" jsonschema:"description=Cursor value representing the current position in the binlog."`
 	TxID   string                 `json:"txid,omitempty" jsonschema:"description=The global transaction identifier associated with a change by MySQL. Only set if GTIDs are enabled."`
+	Tag    string                 `json:"tag,omitempty" jsonschema:"description=Optional 'Source Tag' property as defined in the endpoint configuration."`
 }
 
 type mysqlChangeEventCursor struct {
@@ -277,6 +278,10 @@ func (source *mysqlSourceInfo) AppendJSON(buf []byte) ([]byte, error) {
 	if source.TxID != "" {
 		buf = append(buf, `,"txid":`...)
 		buf = json.AppendEscape(buf, source.TxID, 0)
+	}
+	if source.Tag != "" {
+		buf = append(buf, `,"tag":`...)
+		buf = json.AppendEscape(buf, source.Tag, 0)
 	}
 	return append(buf, '}'), nil
 }

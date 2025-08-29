@@ -109,6 +109,8 @@ type postgresSource struct {
 	//    ordering of all events. It's equal to [loc[0], loc[1]].
 
 	TxID uint32 `json:"txid,omitempty" jsonschema:"description=The 32-bit transaction ID assigned by Postgres to the commit which produced this change."`
+
+	Tag string `json:"tag,omitempty" jsonschema:"description=Optional 'Source Tag' property as defined in the endpoint configuration."`
 }
 
 // Named constants for the LSN locations within a postgresSource.Location.
@@ -279,6 +281,10 @@ func (source *postgresSource) AppendJSON(buf []byte) ([]byte, error) {
 	if source.TxID != 0 {
 		buf = append(buf, []byte(`,"txid":`)...)
 		buf = strconv.AppendInt(buf, int64(source.TxID), 10)
+	}
+	if source.Tag != "" {
+		buf = append(buf, `,"tag":`...)
+		buf = json.AppendEscape(buf, source.Tag, 0)
 	}
 	return append(buf, '}'), nil
 }

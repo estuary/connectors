@@ -217,8 +217,8 @@ type Database interface {
 	DiscoverTables(ctx context.Context) (map[StreamID]*DiscoveryInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
 	TranslateDBToJSONType(column ColumnInfo, isPrimaryKey bool) (*jsonschema.Schema, error)
-	// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
-	EmptySourceMetadata() SourceMetadata
+	// Returns the JSON schema of the source-specific metadata object
+	SourceMetadataSchema(writeSchema bool) *jsonschema.Schema
 	// ShouldBackfill returns true if a given table's contents should be backfilled.
 	ShouldBackfill(streamID StreamID) bool
 	// HistoryMode returns whether history mode (non-associative reduction of events) is enabled
