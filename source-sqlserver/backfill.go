@@ -215,6 +215,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 					},
 					LSN:    reused.lsn,
 					SeqVal: reused.seqval,
+					Tag:    db.config.Advanced.SourceTag,
 				},
 			},
 			RowKey: rowKey,
