@@ -106,25 +106,3 @@ collections:
       required: [id]
       type: object
     key: [/id]
-
-  # tests/deletions:
-  #   schema:
-  #     properties:
-  #       id: {type: integer}
-  #       _meta:
-  #         type: object
-  #         properties:
-  #           op: {type: string}
-  #     required: [id]
-  #     type: object
-  #     if:
-  #       properties:
-  #         _meta:
-  #           properties:
-  #             op:
-  #               const: d
-  #     then:
-  #       reduce:
-  #         delete: true
-  #         strategy: lastWriteWins
-  #   key: [/id]
