@@ -19,6 +19,7 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
 
 	mssqldb "github.com/microsoft/go-mssqldb"
@@ -308,9 +309,14 @@ func (db *sqlserverDatabase) Close(ctx context.Context) error {
 	return nil
 }
 
-// Returns an empty instance of the source-specific metadata (used for JSON schema generation).
-func (db *sqlserverDatabase) EmptySourceMetadata() sqlcapture.SourceMetadata {
-	return &sqlserverSourceInfo{}
+func (db *sqlserverDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.Schema {
+	var sourceSchema = (&jsonschema.Reflector{
+		ExpandedStruct:            true,
+		DoNotReference:            true,
+		AllowAdditionalProperties: writeSchema,
+	}).Reflect(&sqlserverSourceInfo{})
+	sourceSchema.Version = ""
+	return sourceSchema
 }
 
 func (db *sqlserverDatabase) FallbackCollectionKey() []string {
