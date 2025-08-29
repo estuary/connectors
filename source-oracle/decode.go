@@ -373,6 +373,7 @@ func (s *replicationStream) decodeMessage(msg logminerMessage) (sqlcapture.Datab
 		RowID: rowid,
 		RSID:  msg.RSID,
 		SSN:   msg.SSN,
+		Tag:   s.db.config.Advanced.SourceTag,
 	}
 
 	var event = &sqlcapture.OldChangeEvent{
