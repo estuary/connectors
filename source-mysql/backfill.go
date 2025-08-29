@@ -93,6 +93,7 @@ func (db *mysqlDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.Di
 			Cursor: mysqlChangeEventCursor{
 				BinlogFile: "backfill",
 			},
+			Tag: db.config.Advanced.SourceTag,
 		},
 	}
 
