@@ -1,38 +1,38 @@
 # ================================
 # Collection "acmeCo/test/test_fullrefresh_902536": 32 Documents
 # ================================
-{"type":"object","required":["_meta","data","id"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-postgres-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"}},"additionalProperties":false,"type":"object","required":["polled","index","row_id"],"additionalProperties":false},"data":{"description":"(source type: text)","type":["string"]},"id":{"type":"integer","description":"(source type: non-nullable int4)"}},"x-infer-schema":true}
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"data":"Value for row 0","id":0}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"data":"Value for row 1","id":1}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"data":"Value for row 2","id":2}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3},"data":"Value for row 3","id":3}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4},"data":"Value for row 4","id":4}
-{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5},"data":"Value for row 5","id":5}
-{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6},"data":"Value for row 6","id":6}
-{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7},"data":"Value for row 7","id":7}
-{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8},"data":"Value for row 8","id":8}
-{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9},"data":"Value for row 9","id":9}
-{"type":"object","required":["_meta","data","id"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-postgres-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"}},"additionalProperties":false,"type":"object","required":["polled","index","row_id"],"additionalProperties":false},"data":{"description":"(source type: text)","type":["string"]},"id":{"type":"integer","description":"(source type: non-nullable int4)"}},"x-infer-schema":true}
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"data":"Value for row 0","id":0}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"data":"Value for row 1","id":1}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2},"data":"Value for row 2","id":2}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3},"data":"Value for row 3","id":3}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4},"data":"Value for row 4","id":4}
-{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5},"data":"Value for row 5","id":5}
-{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6},"data":"Value for row 6","id":6}
-{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7},"data":"Value for row 7","id":7}
-{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8},"data":"Value for row 8","id":8}
-{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9},"data":"Value for row 9","id":9}
-{"_meta":{"polled":"<TIMESTAMP>","index":10,"row_id":10},"data":"Value for row 10","id":10}
-{"_meta":{"polled":"<TIMESTAMP>","index":11,"row_id":11},"data":"Value for row 11","id":11}
-{"_meta":{"polled":"<TIMESTAMP>","index":12,"row_id":12},"data":"Value for row 12","id":12}
-{"_meta":{"polled":"<TIMESTAMP>","index":13,"row_id":13},"data":"Value for row 13","id":13}
-{"_meta":{"polled":"<TIMESTAMP>","index":14,"row_id":14},"data":"Value for row 14","id":14}
-{"_meta":{"polled":"<TIMESTAMP>","index":15,"row_id":15},"data":"Value for row 15","id":15}
-{"_meta":{"polled":"<TIMESTAMP>","index":16,"row_id":16},"data":"Value for row 16","id":16}
-{"_meta":{"polled":"<TIMESTAMP>","index":17,"row_id":17},"data":"Value for row 17","id":17}
-{"_meta":{"polled":"<TIMESTAMP>","index":18,"row_id":18},"data":"Value for row 18","id":18}
-{"_meta":{"polled":"<TIMESTAMP>","index":19,"row_id":19},"data":"Value for row 19","id":19}
+{"type":"object","required":["_meta","data","id"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-postgres-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"},"source":{"properties":{"resource":{"type":"string","description":"Resource name of the binding from which this document was captured."},"schema":{"type":"string","description":"Database schema from which the document was read."},"table":{"type":"string","description":"Database table from which the document was read."},"tag":{"type":"string","description":"Optional 'Source Tag' property as defined in the endpoint configuration."}},"additionalProperties":false,"type":"object","required":["resource"]}},"additionalProperties":false,"type":"object","required":["polled","index","row_id","source"],"additionalProperties":false},"data":{"description":"(source type: text)","type":["string"]},"id":{"type":"integer","description":"(source type: non-nullable int4)"}},"x-infer-schema":true}
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 0","id":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 1","id":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 2","id":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 3","id":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 4","id":4}
+{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 5","id":5}
+{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 6","id":6}
+{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 7","id":7}
+{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 8","id":8}
+{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 9","id":9}
+{"type":"object","required":["_meta","data","id"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-postgres-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"},"source":{"properties":{"resource":{"type":"string","description":"Resource name of the binding from which this document was captured."},"schema":{"type":"string","description":"Database schema from which the document was read."},"table":{"type":"string","description":"Database table from which the document was read."},"tag":{"type":"string","description":"Optional 'Source Tag' property as defined in the endpoint configuration."}},"additionalProperties":false,"type":"object","required":["resource"]}},"additionalProperties":false,"type":"object","required":["polled","index","row_id","source"],"additionalProperties":false},"data":{"description":"(source type: text)","type":["string"]},"id":{"type":"integer","description":"(source type: non-nullable int4)"}},"x-infer-schema":true}
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 0","id":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 1","id":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 2","id":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 3","id":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 4","id":4}
+{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 5","id":5}
+{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 6","id":6}
+{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 7","id":7}
+{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 8","id":8}
+{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 9","id":9}
+{"_meta":{"polled":"<TIMESTAMP>","index":10,"row_id":10,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 10","id":10}
+{"_meta":{"polled":"<TIMESTAMP>","index":11,"row_id":11,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 11","id":11}
+{"_meta":{"polled":"<TIMESTAMP>","index":12,"row_id":12,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 12","id":12}
+{"_meta":{"polled":"<TIMESTAMP>","index":13,"row_id":13,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 13","id":13}
+{"_meta":{"polled":"<TIMESTAMP>","index":14,"row_id":14,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 14","id":14}
+{"_meta":{"polled":"<TIMESTAMP>","index":15,"row_id":15,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 15","id":15}
+{"_meta":{"polled":"<TIMESTAMP>","index":16,"row_id":16,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 16","id":16}
+{"_meta":{"polled":"<TIMESTAMP>","index":17,"row_id":17,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 17","id":17}
+{"_meta":{"polled":"<TIMESTAMP>","index":18,"row_id":18,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 18","id":18}
+{"_meta":{"polled":"<TIMESTAMP>","index":19,"row_id":19,"source":{"resource":"test_fullrefresh_902536","schema":"test","table":"fullrefresh_902536"}},"data":"Value for row 19","id":19}
 # ================================
 # Final State Checkpoint
 # ================================
