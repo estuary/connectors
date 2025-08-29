@@ -9,7 +9,7 @@ airbyte-cdk = "^0.52"
 estuary-cdk = {path="../estuary-cdk", develop = true}
 python = "^3.11"
 types-requests = "^2.31"
-facebook-business = "21.0.0"
+facebook-business = "23.0.0"
 pydantic = "==1.10.14"
 cached-property = "^1.5.2"
 pendulum = "^3"
