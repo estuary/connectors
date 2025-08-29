@@ -950,6 +950,7 @@ func (s *replicationStream) decodeChangeEvent(
 					int(lsn),
 					int(s.nextTxnFinalLSN),
 				},
+				Tag: s.db.config.Advanced.SourceTag,
 			},
 			Before: beforeValues,
 		},
