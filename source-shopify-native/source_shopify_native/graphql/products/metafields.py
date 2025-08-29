@@ -1,4 +1,6 @@
 from datetime import datetime
+from logging import Logger
+from typing import AsyncGenerator
 from ..metafields import MetafieldsResource
 
 
@@ -13,4 +15,12 @@ class ProductMetafields(MetafieldsResource):
             "UPDATED_AT",
             start,
             end,
+        )
+
+    @staticmethod
+    def process_result(
+        log: Logger, lines: AsyncGenerator[bytes, None]
+    ) -> AsyncGenerator[dict, None]:
+        return MetafieldsResource._process_metafields_result(
+            log, lines, ProductMetafields.PARENT_ID_KEY
         )

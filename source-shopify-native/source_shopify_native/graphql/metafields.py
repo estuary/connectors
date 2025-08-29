@@ -48,8 +48,14 @@ class MetafieldsResource(ShopifyGraphQLResource):
         raise NotImplementedError("Subclasses must implement build_query")
 
     @staticmethod
-    async def process_result(
+    def process_result(
         log: Logger, lines: AsyncGenerator[bytes, None]
+    ) -> AsyncGenerator[dict, None]:
+        raise NotImplementedError("Subclasses must implement process_result with parent_id_key")
+
+    @staticmethod
+    async def _process_metafields_result(
+        log: Logger, lines: AsyncGenerator[bytes, None], parent_id_key: str
     ) -> AsyncGenerator[dict, None]:
         METAFIELDS_KEY = "metafields"
         current_parent = None
@@ -58,7 +64,7 @@ class MetafieldsResource(ShopifyGraphQLResource):
             record: dict[str, Any] = json.loads(line)
             id: str = record.get("id", "")
 
-            if MetafieldsResource.PARENT_ID_KEY in id:
+            if parent_id_key in id:
                 if current_parent:
                     yield current_parent
 
