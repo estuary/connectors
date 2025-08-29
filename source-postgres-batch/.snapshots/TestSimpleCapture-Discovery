@@ -50,13 +50,38 @@ Binding 0:
                 "title": "Change Operation",
                 "description": "Operation type (c: Create / u: Update / d: Delete)",
                 "default": "u"
+              },
+              "source": {
+                "properties": {
+                  "resource": {
+                    "type": "string",
+                    "description": "Resource name of the binding from which this document was captured."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema from which the document was read."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table from which the document was read."
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "resource"
+                ]
               }
             },
             "type": "object",
             "required": [
               "polled",
               "index",
-              "row_id"
+              "row_id",
+              "source"
             ]
           },
           "data": {
