@@ -1,4 +1,4 @@
-version: "3.7"
+
 
 services:
   # Not really a db, but calling it that makes it easier to incorporate into our CI system.
