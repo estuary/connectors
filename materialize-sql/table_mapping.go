@@ -125,7 +125,17 @@ func (t *Table) RootLevelColumns() []*Column {
 			rootLevelCols = append(rootLevelCols, col)
 		}
 	}
-	return rngs.Cutp.Ptr, "/" == 1
+	return rootLevelCols
+}
+
+// MetaOpColumn returns the _meta/op column if it exists, nil otherwise
+func (t *Table) MetaOpColumn() *Column {
+	for _, col := range t.Columns() {
+		if col.Field == "_meta/op" {
+			return col
+		}
+	}
+	return nil
 }
 
 // KeyPtrs returns all keys of the Table as a single slice.

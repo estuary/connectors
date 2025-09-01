@@ -436,7 +436,7 @@ func prepareNewTransactor(
 		}
 
 		for _, binding := range bindings {
-			if err := d.addBinding(ctx, binding, is); err != nil {
+			if err := d.addBinding(ctx, binding, is, featureFlags); err != nil {
 				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
@@ -492,8 +492,16 @@ type binding struct {
 	mustDelete bool
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema, featureFlags map[string]bool) error {
 	var b = &binding{target: target}
+
+	// Choose the appropriate load query template based on feature flags
+	var loadQueryTemplate *template.Template
+	if !featureFlags["flow_document"] && !target.DeltaUpdates {
+		loadQueryTemplate = t.templates.loadQueryNoFlowDocument
+	} else {
+		loadQueryTemplate = t.templates.loadQuery
+	}
 
 	for _, m := range []struct {
 		sql *string
@@ -503,7 +511,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 		{&b.createUpdateTableSQL, t.templates.createUpdateTable},
 		{&b.createDeleteTableSQL, t.templates.createDeleteTable},
 		{&b.loadLoadSQL, t.templates.loadLoad},
-		{&b.loadQuerySQL, t.templates.loadQuery},
+		{&b.loadQuerySQL, loadQueryTemplate},
 		{&b.storeInsertSQL, t.templates.insertLoad},
 		{&b.storeUpdateSQL, t.templates.updateLoad},
 		{&b.updateReplaceSQL, t.templates.updateReplace},

@@ -280,7 +280,7 @@ func prepareNewTransactor(
 		}
 
 		for _, binding := range bindings {
-			if err := d.addBinding(ctx, binding); err != nil {
+			if err := d.addBinding(ctx, binding, featureFlags); err != nil {
 				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
@@ -319,8 +319,16 @@ type binding struct {
 	directCopy          string
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFlags map[string]bool) error {
 	var b = &binding{target: target}
+
+	// Choose the appropriate load query template based on feature flags
+	var loadQueryTemplate *template.Template
+	if !featureFlags["flow_document"] && !target.DeltaUpdates {
+		loadQueryTemplate = t.templates.loadQueryNoFlowDocument
+	} else {
+		loadQueryTemplate = t.templates.loadQuery
+	}
 
 	for _, m := range []struct {
 		sql *string
@@ -329,7 +337,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		{&b.createLoadTableSQL, t.templates.createLoadTable},
 		{&b.createStoreTableSQL, t.templates.createStoreTable},
 		{&b.loadInsertSQL, t.templates.loadInsert},
-		{&b.loadQuerySQL, t.templates.loadQuery},
+		{&b.loadQuerySQL, loadQueryTemplate},
 		{&b.tempLoadTruncate, t.templates.tempLoadTruncate},
 		{&b.tempStoreTruncate, t.templates.tempStoreTruncate},
 		{&b.tempStoreTableName, t.templates.tempStoreTableName},
