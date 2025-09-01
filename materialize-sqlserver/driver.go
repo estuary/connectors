@@ -330,6 +330,14 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFl
 		loadQueryTemplate = t.templates.loadQuery
 	}
 
+	// Choose the appropriate merge template based on feature flags
+	var mergeTemplate *template.Template
+	if !featureFlags["flow_document"] && !target.DeltaUpdates {
+		mergeTemplate = t.templates.mergeIntoNoFlowDocument
+	} else {
+		mergeTemplate = t.templates.mergeInto
+	}
+
 	for _, m := range []struct {
 		sql *string
 		tpl *template.Template
@@ -342,7 +350,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFl
 		{&b.tempStoreTruncate, t.templates.tempStoreTruncate},
 		{&b.tempStoreTableName, t.templates.tempStoreTableName},
 		{&b.tempLoadTableName, t.templates.tempLoadTableName},
-		{&b.mergeInto, t.templates.mergeInto},
+		{&b.mergeInto, mergeTemplate},
 		{&b.directCopy, t.templates.directCopy},
 	} {
 		var err error

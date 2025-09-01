@@ -2,6 +2,7 @@ package sql
 
 import (
 	"encoding/json"
+	"strings"
 	"fmt"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
