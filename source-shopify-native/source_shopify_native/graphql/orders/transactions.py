@@ -61,10 +61,17 @@ class OrderTransactions(ShopifyGraphQLResource):
     FRAGMENTS = [money_bag_fragment]
 
     @staticmethod
-    def build_query(start: datetime, end: datetime) -> str:
+    def build_query(
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> str:
         return OrderTransactions.build_query_with_fragment(
             start,
             end,
+            first=first,
+            after=after,
         )
 
     @staticmethod

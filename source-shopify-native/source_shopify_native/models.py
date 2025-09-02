@@ -24,7 +24,7 @@ from estuary_cdk.capture.common import (
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
-from .graphql.common import dt_to_str
+from .graphql.common import dt_to_str, str_to_dt
 
 
 scopes = [
@@ -118,6 +118,7 @@ ConnectorState = GenericConnectorState[ResourceState]
 
 
 T = TypeVar('T')
+TShopifyGraphQLResource = TypeVar('TShopifyGraphQLResource', bound='ShopifyGraphQLResource')
 
 
 class GraphQLErrorCode(StrEnum):
@@ -291,11 +292,32 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
     FRAGMENTS: ClassVar[list[str]] = []
     NAME: ClassVar[str] = ""
     SORT_KEY: ClassVar[SortKey | None] = None
+    SHOULD_USE_BULK_QUERIES: ClassVar[bool] = True
 
     id: str
 
+    def get_cursor_value(self) -> AwareDatetime:
+        if self.SORT_KEY is None or self.SORT_KEY == SortKey.UPDATED_AT:
+            field_name = "updatedAt"
+        else:
+            field_name = "createdAt"
+
+        raw_value = getattr(self, field_name)
+
+        if isinstance(raw_value, str):
+            return str_to_dt(raw_value)
+        elif isinstance(raw_value, datetime):
+            return raw_value
+        else:
+            raise ValueError(f"Expected datetime string, got {type(raw_value)}")
+
     @staticmethod
-    def build_query(start: datetime, end: datetime) -> str:
+    def build_query(
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> str:
         raise NotImplementedError("build_query method must be implemented")
 
     @staticmethod
@@ -333,6 +355,8 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
         start: datetime,
         end: datetime,
         query: str = "",
+        first: int | None = None,
+        after: str | None = None,
         includeLegacyId: bool = True,
         includeCreatedAt: bool = True,
         includeUpdatedAt: bool = True,
@@ -345,6 +369,8 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
             {cls.QUERY_ROOT}(
                 query: "updated_at:>='{lower_bound}' AND updated_at:<='{upper_bound}' {"AND " + query.strip() if query else ""}"
                 {f"sortKey: {cls.SORT_KEY}" if cls.SORT_KEY else ""}
+                {f"first: {first}" if first else ""}
+                {f"after: \"{after}\"" if after else ""}
             ) {{
                 edges {{
                     node {{
@@ -355,6 +381,10 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
                         {cls.QUERY}
                     }}
                 }}
+                {f"""pageInfo {{
+                    hasNextPage
+                    endCursor
+                }}""" if first else ""}
             }}
         }}
         """
@@ -363,3 +393,57 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
             query += fragment
 
         return query
+
+
+class PageInfo(BaseModel):
+    endCursor: str | None = None
+    hasNextPage: bool = False
+
+
+class Edge(BaseModel, Generic[TShopifyGraphQLResource]):
+    node: TShopifyGraphQLResource
+
+
+class EdgesData(BaseModel, Generic[TShopifyGraphQLResource]):
+    edges: list[Edge[TShopifyGraphQLResource]]
+    pageInfo: PageInfo = Field(default_factory=PageInfo)
+
+
+class BaseResponseData(BaseModel, Generic[TShopifyGraphQLResource]):
+    model_config = {"extra": "allow"}
+
+    @property
+    def edges(self) -> list[Edge[TShopifyGraphQLResource]]:
+        raise NotImplementedError("edges property must be implemented by subclass")
+
+    @property 
+    def page_info(self) -> PageInfo:
+        raise NotImplementedError("page_info property must be implemented by subclass")
+
+    @property
+    def nodes(self) -> list[TShopifyGraphQLResource]:
+        return [edge.node for edge in self.edges]
+
+
+# create_response_data_model dynamically creates a model for the data field of
+# each response. Models are created dynamically since the query root/field name
+# under the "data" field is different for each query.
+def create_response_data_model(resource_type: type[TShopifyGraphQLResource]) -> type[BaseResponseData[TShopifyGraphQLResource]]:
+    """Factory function to create typed GraphQL data field models."""
+    query_root = resource_type.QUERY_ROOT
+
+    def get_edges(self) -> list[Edge[TShopifyGraphQLResource]]:
+        return getattr(self, query_root).edges
+
+    def get_page_info(self) -> PageInfo:
+        return getattr(self, query_root).pageInfo
+
+    class_dict = {
+        "__annotations__": {query_root: EdgesData[resource_type]},
+        "edges": property(get_edges),
+        "page_info": property(get_page_info),
+    }
+
+    DataModel = type(f"{query_root.title()}Data", (BaseResponseData[resource_type],), class_dict)
+
+    return DataModel

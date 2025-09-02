@@ -1,14 +1,23 @@
 from datetime import datetime, timedelta, UTC
 from logging import Logger
+import time
 from typing import AsyncGenerator
 
 from estuary_cdk.capture.common import (
     LogCursor,
+    PageCursor,
 )
 from estuary_cdk.http import HTTPMixin
 
+from .graphql.client import ShopifyGraphQLClient
+from .graphql.common import dt_to_str, str_to_dt
 import source_shopify_native.graphql as gql
-from source_shopify_native.models import ShopifyGraphQLResource
+from source_shopify_native.models import BaseResponseData, ShopifyGraphQLResource, TShopifyGraphQLResource
+
+
+CHECKPOINT_INTERVAL = 1_000
+PAGE_SIZE = 250
+TARGET_FETCH_PAGE_INVOCATION_RUN_TIME = 60 * 5 # 5 minutes
 
 
 async def bulk_fetch_incremental(
@@ -63,3 +72,153 @@ async def bulk_fetch_full_refresh(
     async for record in model.process_result(log, lines()):
         resource = model.model_validate(record)
         yield resource
+
+
+async def _paginate_through_resources(
+    client: ShopifyGraphQLClient,
+    model: type[TShopifyGraphQLResource],
+    data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    start: datetime,
+    end: datetime,
+    log: Logger,
+) -> AsyncGenerator[TShopifyGraphQLResource, None]:
+    after: str | None = None
+
+    while True:
+        query = model.build_query(
+            start=start,
+            end=end,
+            first=PAGE_SIZE,
+            after=after,
+        )
+
+        data = await client.request(query, data_model,log)
+
+        for doc in data.nodes:
+            yield doc
+
+        page_info = data.page_info
+        if not page_info.hasNextPage or not page_info.endCursor:
+            return
+
+        after = page_info.endCursor
+
+
+async def fetch_incremental_unsorted(
+    client: ShopifyGraphQLClient,
+    model: type[TShopifyGraphQLResource],
+    data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[TShopifyGraphQLResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+    end = datetime.now(tz=UTC)
+
+    last_dt = log_cursor
+
+    async for doc in _paginate_through_resources(
+        client=client,
+        model=model,
+        data_model=data_model,
+        start=log_cursor,
+        end=end,
+        log=log,
+    ):
+        cursor_value = doc.get_cursor_value()
+        if cursor_value > log_cursor:
+            yield doc
+
+            if cursor_value > last_dt:
+                last_dt = cursor_value
+
+    if last_dt != log_cursor:
+        yield last_dt
+
+
+async def fetch_incremental(
+    client: ShopifyGraphQLClient,
+    model: type[TShopifyGraphQLResource],
+    data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[TShopifyGraphQLResource | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+    end = datetime.now(tz=UTC)
+
+    last_dt = log_cursor
+    count = 0
+
+    async for doc in _paginate_through_resources(
+        client=client,
+        model=model,
+        data_model=data_model,
+        start=log_cursor,
+        end=end,
+        log=log,
+    ):
+        cursor_value = doc.get_cursor_value()
+
+        if cursor_value <= log_cursor:
+            continue
+
+        if (
+            count >= CHECKPOINT_INTERVAL and
+            cursor_value > last_dt
+        ):
+            yield last_dt
+            count = 0
+
+        last_dt = cursor_value
+        count += 1
+        yield doc
+
+    if last_dt != log_cursor and count > 0:
+        yield last_dt
+
+
+async def backfill_incremental(
+    client: ShopifyGraphQLClient,
+    model: type[TShopifyGraphQLResource],
+    data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[TShopifyGraphQLResource | PageCursor, None]:
+    assert isinstance(page, str)
+    assert isinstance(cutoff, datetime)
+
+    start = str_to_dt(page)
+
+    last_seen_dt = start
+    count = 0
+    start_time = time.time()
+
+    async for doc in _paginate_through_resources(
+        client=client,
+        model=model,
+        data_model=data_model,
+        start=start,
+        end=cutoff,
+        log=log,
+    ):
+        cursor_value = doc.get_cursor_value()
+
+        if cursor_value < start:
+            continue
+
+        if cursor_value > cutoff:
+            return
+
+        if (
+            count >= CHECKPOINT_INTERVAL and
+            cursor_value > last_seen_dt
+        ):
+            yield dt_to_str(last_seen_dt)
+            count = 0
+
+            if time.time() - start_time >= TARGET_FETCH_PAGE_INVOCATION_RUN_TIME:
+                return
+
+        yield doc
+        count += 1
+        last_seen_dt = cursor_value

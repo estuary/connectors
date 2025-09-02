@@ -60,10 +60,17 @@ class Fulfillments(ShopifyGraphQLResource):
     """
 
     @staticmethod
-    def build_query(start: datetime, end: datetime) -> str:
+    def build_query(
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> str:
         return Fulfillments.build_query_with_fragment(
             start,
             end,
+            first=first,
+            after=after,
         )
 
     @staticmethod

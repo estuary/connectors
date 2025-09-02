@@ -50,17 +50,28 @@ class _Collections(ShopifyGraphQLResource):
 
     @staticmethod
     def build_query_with_type(
-        collection_type: Literal["custom", "smart"], start: datetime, end: datetime
+        collection_type: Literal["custom", "smart"],
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
     ) -> str:
         return _Collections.build_query_with_fragment(
             start,
             end,
             query=f"collection_type:{collection_type}",
+            first=first,
+            after=after,
             includeCreatedAt=False,
         )
 
     @staticmethod
-    def build_query(start: datetime, end: datetime) -> str:
+    def build_query(
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> str:
         raise NotImplementedError("build_query method must be implemented")
 
     @staticmethod
@@ -132,8 +143,13 @@ class CustomCollections(_Collections):
     COLLECTION_TYPE = "custom"
 
     @staticmethod
-    def build_query(start: datetime, end: datetime) -> str:
-        return _Collections.build_query_with_type("custom", start, end)
+    def build_query(
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> str:
+        return _Collections.build_query_with_type("custom", start, end, first=first, after=after)
 
     @staticmethod
     def process_result(
@@ -147,8 +163,13 @@ class SmartCollections(_Collections):
     COLLECTION_TYPE = "smart"
 
     @staticmethod
-    def build_query(start: datetime, end: datetime) -> str:
-        return _Collections.build_query_with_type("smart", start, end)
+    def build_query(
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> str:
+        return _Collections.build_query_with_type("smart", start, end, first=first, after=after)
 
     @staticmethod
     def process_result(
