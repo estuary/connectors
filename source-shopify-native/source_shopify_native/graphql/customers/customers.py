@@ -9,6 +9,7 @@ class Customers(ShopifyGraphQLResource):
     NAME = "customers"
     QUERY_ROOT = "customers"
     SORT_KEY = SortKey.UPDATED_AT
+    SHOULD_USE_BULK_QUERIES = False
     QUERY = """
     displayName
     email

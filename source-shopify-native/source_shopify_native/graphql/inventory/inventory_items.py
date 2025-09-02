@@ -8,6 +8,7 @@ from ...models import ShopifyGraphQLResource
 class InventoryItems(ShopifyGraphQLResource):
     NAME = "inventory_items"
     QUERY_ROOT = "inventoryItems"
+    SHOULD_USE_BULK_QUERIES = False
     QUERY = """
     id
     legacyResourceId
