@@ -203,6 +203,27 @@ JOIN {{ $.Identifier}} AS r
 {{- end }}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Binding }}, 
+(
+	SELECT 
+		{{- range $i, $col := $.RootLevelColumns}}
+			{{- if $i}},{{end}}
+		{{Literal $col.Field}} = r.{{$col.Identifier}}
+		{{- end}}
+	FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+) as flow_document
+FROM {{ template "temp_name_load" . }} AS l
+JOIN {{ $.Identifier}} AS r
+{{- range $ind, $bound := $.Bounds }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
+	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{ end }}
+
 {{ define "dropLoadTable" }}
 DROP TABLE {{ template "temp_name_load" $ }};
 {{- end }}
@@ -251,6 +272,33 @@ WHERE {{$.Document.Identifier}} <> '"delete"';
 DROP TABLE {{ template "temp_name_store" $ }};
 {{ end }}
 
+-- Alternative store merge query for no_flow_document feature flag - uses _meta/op for deletion detection
+
+{{ define "storeMergeQueryNoFlowDocument" }}
+{{ template "create_store_staging_table" $ }}
+
+DELETE r
+FROM {{$.Identifier}} AS r
+INNER JOIN {{ template "temp_name_store" $ }} AS l
+{{- range $ind, $bound := $.Bounds }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
+	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{- if $.MetaOpColumn }}
+	AND l.{{ $.MetaOpColumn.Identifier }} = 'd'
+{{- end }};
+
+INSERT INTO {{$.Identifier}} ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
+SELECT {{ range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{ template "maybe_unbase64" $col }}{{- end }}
+FROM {{ template "temp_name_store" $ }}
+{{- if $.MetaOpColumn }}
+WHERE {{ $.MetaOpColumn.Identifier }} <> 'd'
+{{- end }};
+
+DROP TABLE {{ template "temp_name_store" $ }};
+{{ end }}
+
 -- storeCopyIntoFromStagedQuery is used when there is no data to
 -- merge, but there are binary columns that must be converted from
 -- the staged CSV data, which is base64 encoded.
@@ -290,14 +338,16 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
 `)
-	tplCreateTargetTable            = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns            = tplAll.Lookup("alterTableColumns")
-	tplCreateMigrationTable         = tplAll.Lookup("createMigrationTable")
-	tplCreateLoadTable              = tplAll.Lookup("createLoadTable")
-	tplLoadQuery                    = tplAll.Lookup("loadQuery")
-	tplDropLoadTable                = tplAll.Lookup("dropLoadTable")
-	tplStoreMergeQuery              = tplAll.Lookup("storeMergeQuery")
-	tplStoreCopyIntoFromStagedQuery = tplAll.Lookup("storeCopyIntoFromStagedQuery")
-	tplStoreCopyIntoDirectQuery     = tplAll.Lookup("storeCopyIntoDirectQuery")
-	tplUpdateFence                  = tplAll.Lookup("updateFence")
+	tplCreateTargetTable               = tplAll.Lookup("createTargetTable")
+	tplAlterTableColumns               = tplAll.Lookup("alterTableColumns")
+	tplCreateMigrationTable            = tplAll.Lookup("createMigrationTable")
+	tplCreateLoadTable                 = tplAll.Lookup("createLoadTable")
+	tplLoadQuery                       = tplAll.Lookup("loadQuery")
+	tplLoadQueryNoFlowDocument         = tplAll.Lookup("loadQueryNoFlowDocument")
+	tplDropLoadTable                   = tplAll.Lookup("dropLoadTable")
+	tplStoreMergeQuery                 = tplAll.Lookup("storeMergeQuery")
+	tplStoreMergeQueryNoFlowDocument   = tplAll.Lookup("storeMergeQueryNoFlowDocument")
+	tplStoreCopyIntoFromStagedQuery    = tplAll.Lookup("storeCopyIntoFromStagedQuery")
+	tplStoreCopyIntoDirectQuery        = tplAll.Lookup("storeCopyIntoDirectQuery")
+	tplUpdateFence                     = tplAll.Lookup("updateFence")
 )

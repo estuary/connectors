@@ -109,6 +109,7 @@ type transactor struct {
 	localStagingPath string
 	bindings         []*binding
 	be               *m.BindingEvents
+	featureFlags     map[string]bool
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -142,7 +143,7 @@ func newTransactor(
 		return nil, fmt.Errorf("initialising workspace client: %w", err)
 	}
 
-	var d = &transactor{cfg: cfg, wsClient: wsClient, be: be}
+	var d = &transactor{cfg: cfg, wsClient: wsClient, be: be, featureFlags: featureFlags}
 
 	db, err := stdsql.Open("databricks", d.cfg.ToURI())
 	if err != nil {
@@ -254,7 +255,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 		var fullPaths = pathsWithRoot(b.rootStagingPath, toLoad)
 
-		if loadQuery, err := RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, tplLoadQuery, b.loadMergeBounds.Build()); err != nil {
+		// Choose appropriate load query template based on feature flags
+		var loadTemplate = tplLoadQuery
+		if !d.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+			loadTemplate = tplLoadQueryNoFlowDocument
+		}
+		
+		if loadQuery, err := RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, loadTemplate, b.loadMergeBounds.Build()); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
 			queries = append(queries, loadQuery)
@@ -413,7 +420,13 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				if end > len(toCopy) {
 					end = len(toCopy)
 				}
-				if query, err := RenderTableWithFiles(b.target, fullPaths[i:end], b.rootStagingPath, tplMergeInto, bounds); err != nil {
+				// Choose appropriate merge template based on feature flags
+				var mergeTemplate = tplMergeInto
+				if !d.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+					mergeTemplate = tplMergeIntoNoFlowDocument
+				}
+				
+				if query, err := RenderTableWithFiles(b.target, fullPaths[i:end], b.rootStagingPath, mergeTemplate, bounds); err != nil {
 					return nil, fmt.Errorf("mergeInto template: %w", err)
 				} else {
 					queries = append(queries, query)

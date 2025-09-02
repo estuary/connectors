@@ -192,10 +192,11 @@ type transactor struct {
 	store struct {
 		conn *stdsql.Conn
 	}
-	templates templates
-	bindings  []*binding
-	be        *m.BindingEvents
-	cp        checkpoint
+	templates    templates
+	bindings     []*binding
+	be           *m.BindingEvents
+	cp           checkpoint
+	featureFlags map[string]bool
 
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
@@ -256,6 +257,7 @@ func newTransactor(
 		_range:        open.Range,
 		version:       open.Version,
 		be:            be,
+		featureFlags:  featureFlags,
 	}
 
 	if db, err := stdsql.Open("snowflake", dsn); err != nil {
@@ -385,10 +387,18 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// Pass.
 		} else if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
-		} else if subqueries[i], err = renderBoundedQueryTemplate(d.templates.loadQuery, b.target, dir, b.load.mergeBounds.Build()); err != nil {
-			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
-			filesToCleanup = append(filesToCleanup, dir)
+			// Choose appropriate load query template based on feature flags
+			var loadTemplate = d.templates.loadQuery
+			if !d.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+				loadTemplate = d.templates.loadQueryNoFlowDocument
+			}
+			
+			if subqueries[i], err = renderBoundedQueryTemplate(loadTemplate, b.target, dir, b.load.mergeBounds.Build()); err != nil {
+				return fmt.Errorf("loadQuery template: %w", err)
+			} else {
+				filesToCleanup = append(filesToCleanup, dir)
+			}
 		}
 	}
 	defer func() {
@@ -565,7 +575,13 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 		}
 
 		if b.store.mustMerge {
-			mergeIntoQuery, err := renderBoundedQueryTemplate(d.templates.mergeInto, b.target, dir, b.store.mergeBounds.Build())
+			// Choose appropriate merge template based on feature flags
+			var mergeTemplate = d.templates.mergeInto
+			if !d.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+				mergeTemplate = d.templates.mergeIntoNoFlowDocument
+			}
+			
+			mergeIntoQuery, err := renderBoundedQueryTemplate(mergeTemplate, b.target, dir, b.store.mergeBounds.Build())
 			if err != nil {
 				return nil, fmt.Errorf("mergeInto template: %w", err)
 			}

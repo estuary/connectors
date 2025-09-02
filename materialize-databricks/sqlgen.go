@@ -174,6 +174,37 @@ SELECT -1, ""
 {{ end -}}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Table.Binding }}, 
+to_json(struct(
+{{- range $i, $col := $.Table.RootLevelColumns}}
+	{{- if $i}},{{end}}
+	{{ $.Table.Identifier }}.{{ $col.Identifier }} AS {{ $col.Field }}
+{{- end}}
+)) as flow_document
+FROM {{ $.Table.Identifier }}
+JOIN (
+	{{- range $fi, $file := $.Files }}
+	{{ if $fi }} UNION ALL {{ end -}}
+	(
+		SELECT
+		{{ range $ind, $key := $.Table.Keys }}
+		{{- if $ind }}, {{ end -}}
+		{{ template "cast" $key -}}
+		{{- end }}
+		FROM json.`+"`{{ $file }}`"+`
+	)
+	{{- end }}
+) AS r
+{{- range $ind, $bound := $.Bounds }}
+{{ if $ind }}AND {{ else }}ON {{ end -}}
+{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{ end }}
+
 -- TODO: this will not work with custom type definitions that require more than a single word
 -- namely: ARRAY, MAP and INTERVAL. We don't have these types ourselves, but users may be able
 -- to specify them as a custom DDL
@@ -249,12 +280,64 @@ SELECT -1, ""
 		{{- end -}}
 	);
 {{ end }}
+
+-- Alternative merge template for no_flow_document feature flag - uses _meta/op for deletion detection
+
+{{ define "mergeIntoNoFlowDocument" }}
+	MERGE INTO {{ $.Table.Identifier }} AS l
+	USING (
+		{{- range $fi, $file := $.Files }}
+		{{ if $fi }} UNION ALL {{ end -}}
+		(
+			SELECT
+			{{ range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{ template "cast" $key -}}
+			{{- end }}
+			FROM json.`+"`{{ $file }}`"+`
+		)
+		{{- end }}
+	) AS r
+  ON {{ range $ind, $bound := $.Bounds }}
+    {{ if $ind -}} AND {{ end -}}
+    l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+    {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+  {{- end }}
+	{{- if $.Table.MetaOpColumn }}
+	WHEN MATCHED AND r.{{ $.Table.MetaOpColumn.Identifier }}='d' THEN
+		DELETE
+	{{- end }}
+	WHEN MATCHED THEN
+		UPDATE SET {{ range $ind, $key := $.Table.Values }}
+		{{- if $ind }}, {{ end -}}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	{{- end }}
+	{{- if $.Table.MetaOpColumn }}
+	WHEN NOT MATCHED AND r.{{ $.Table.MetaOpColumn.Identifier }}!='d' THEN
+	{{- else }}
+	WHEN NOT MATCHED THEN
+	{{- end }}
+		INSERT (
+		{{- range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			{{$key.Identifier -}}
+		{{- end -}}
+	)
+		VALUES (
+		{{- range $ind, $key := $.Table.Columns }}
+			{{- if $ind }}, {{ end -}}
+			r.{{ $key.Identifier }}
+		{{- end -}}
+	);
+{{ end }}
   `)
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplCopyIntoDirect    = tplAll.Lookup("copyIntoDirect")
-	tplMergeInto         = tplAll.Lookup("mergeInto")
+	tplCreateTargetTable        = tplAll.Lookup("createTargetTable")
+	tplAlterTableColumns        = tplAll.Lookup("alterTableColumns")
+	tplLoadQuery                = tplAll.Lookup("loadQuery")
+	tplLoadQueryNoFlowDocument  = tplAll.Lookup("loadQueryNoFlowDocument")
+	tplCopyIntoDirect           = tplAll.Lookup("copyIntoDirect")
+	tplMergeInto                = tplAll.Lookup("mergeInto")
+	tplMergeIntoNoFlowDocument  = tplAll.Lookup("mergeIntoNoFlowDocument")
 )
 
 type tableWithFiles struct {

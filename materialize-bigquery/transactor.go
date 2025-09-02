@@ -43,9 +43,10 @@ type transactor struct {
 	storeFiles *boilerplate.StagedFiles
 	loadFiles  *boilerplate.StagedFiles
 
-	bindings []*binding
-	be       *m.BindingEvents
-	cp       checkpoint
+	bindings     []*binding
+	be           *m.BindingEvents
+	cp           checkpoint
+	featureFlags map[string]bool
 
 	objAndArrayAsJson       bool
 	loggedStorageApiMessage bool
@@ -81,6 +82,7 @@ func prepareNewTransactor(
 			dialect:           ep.Dialect,
 			templates:         templates,
 			objAndArrayAsJson: featureFlags["objects_and_arrays_as_json"],
+			featureFlags:      featureFlags,
 			client:            client,
 			be:                be,
 			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
@@ -227,11 +229,19 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		} else if uris, err := t.loadFiles.Flush(idx); err != nil {
 			return fmt.Errorf("flushing load file: %w", err)
-		} else if loadQuery, err := renderQueryTemplate(b.target, t.templates.loadQuery, b.loadMergeBounds.Build(), t.objAndArrayAsJson); err != nil {
-			return fmt.Errorf("rendering load query template: %w", err)
 		} else {
-			subqueries = append(subqueries, loadQuery)
-			edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
+			// Choose appropriate load query template based on feature flags
+			var loadTemplate = t.templates.loadQuery
+			if !t.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+				loadTemplate = t.templates.loadQueryNoFlowDocument
+			}
+			
+			if loadQuery, err := renderQueryTemplate(b.target, loadTemplate, b.loadMergeBounds.Build(), t.objAndArrayAsJson); err != nil {
+				return fmt.Errorf("rendering load query template: %w", err)
+			} else {
+				subqueries = append(subqueries, loadQuery)
+				edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
+			}
 		}
 	}
 
@@ -321,7 +331,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		var query string
 		if b.mustMerge {
-			mergeQuery, err := renderQueryTemplate(b.target, t.templates.storeUpdate, b.storeMergeBounds.Build(), t.objAndArrayAsJson)
+			// Choose appropriate store update template based on feature flags
+			var storeTemplate = t.templates.storeUpdate
+			if !t.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+				storeTemplate = t.templates.storeUpdateNoFlowDocument
+			}
+			
+			mergeQuery, err := renderQueryTemplate(b.target, storeTemplate, b.storeMergeBounds.Build(), t.objAndArrayAsJson)
 			if err != nil {
 				return nil, fmt.Errorf("rendering merge query template: %w", err)
 			}

@@ -35,10 +35,11 @@ type transactor struct {
 
 	fence sql.Fence
 
-	storeFiles *boilerplate.StagedFiles
-	loadFiles  *boilerplate.StagedFiles
-	bindings   []*binding
-	be         *m.BindingEvents
+	storeFiles   *boilerplate.StagedFiles
+	loadFiles    *boilerplate.StagedFiles
+	bindings     []*binding
+	be           *m.BindingEvents
+	featureFlags map[string]bool
 }
 
 func newTransactor(
@@ -63,11 +64,12 @@ func newTransactor(
 	}
 
 	t := &transactor{
-		cfg:        cfg,
-		fence:      fence,
-		be:         be,
-		loadFiles:  boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, false, false),
-		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, true, false),
+		cfg:          cfg,
+		fence:        fence,
+		be:           be,
+		featureFlags: featureFlags,
+		loadFiles:    boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, false, false),
+		storeFiles:   boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, true, false),
 	}
 
 	for idx, target := range bindings {
@@ -164,8 +166,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("creating load table: %w", err)
 		}
 
+		// Choose appropriate load query template based on feature flags
+		var loadTemplate = tplLoadQuery
+		if !t.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+			loadTemplate = tplLoadQueryNoFlowDocument
+		}
+		
 		var loadQuery strings.Builder
-		if err := tplLoadQuery.Execute(&loadQuery, params); err != nil {
+		if err := loadTemplate.Execute(&loadQuery, params); err != nil {
 			return fmt.Errorf("rendering load query: %w", err)
 		}
 		unionQueries = append(unionQueries, loadQuery.String())
@@ -293,8 +301,14 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 				t.be.StartedResourceCommit(b.target.Path)
 				if b.store.mustMerge {
+					// Choose appropriate store merge template based on feature flags
+					var storeTemplate = tplStoreMergeQuery
+					if !t.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+						storeTemplate = tplStoreMergeQueryNoFlowDocument
+					}
+					
 					var mergeQuery strings.Builder
-					if err := tplStoreMergeQuery.Execute(&mergeQuery, params); err != nil {
+					if err := storeTemplate.Execute(&mergeQuery, params); err != nil {
 						return err
 					} else if _, err := txn.ExecContext(ctx, mergeQuery.String()); err != nil {
 						log.WithField(

@@ -157,14 +157,16 @@ func toBigNumericCast(m sql.ColumnTypeMigration) string {
 }
 
 type templates struct {
-	tempTableName     *template.Template
-	createTargetTable *template.Template
-	alterTableColumns *template.Template
-	installFence      *template.Template
-	updateFence       *template.Template
-	loadQuery         *template.Template
-	storeInsert       *template.Template
-	storeUpdate       *template.Template
+	tempTableName                *template.Template
+	createTargetTable            *template.Template
+	alterTableColumns            *template.Template
+	installFence                 *template.Template
+	updateFence                  *template.Template
+	loadQuery                    *template.Template
+	loadQueryNoFlowDocument      *template.Template
+	storeInsert                  *template.Template
+	storeUpdate                  *template.Template
+	storeUpdateNoFlowDocument    *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -236,6 +238,25 @@ SELECT -1, NULL LIMIT 0
 {{ end }}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" -}}
+SELECT {{ $.Binding }}, 
+TO_JSON(STRUCT(
+{{- range $i, $col := $.RootLevelColumns}}
+	{{- if $i}}, {{end}}
+	l.{{ $col.Identifier }} AS {{ $col.Field }}
+{{- end}}
+)) as flow_document
+FROM {{ $.Identifier }} AS l
+JOIN {{ template "tempTableName" . }} AS r
+{{- range $ind, $bound := $.Bounds }}
+	{{ if $ind }} AND {{ else }} ON {{ end -}}
+	l.{{ $bound.Identifier }} = r.c{{$ind}}
+	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{ end }}
+
 -- Templated query which bulk inserts rows from a source bucket into a target table.
 
 {{ define "storeInsert" -}}
@@ -278,6 +299,44 @@ WHEN MATCHED THEN
 		{{ if $.Values  }}, {{ end }}l.{{$.Document.Identifier}} = r.c{{ Add (len $.Columns) -1 }}
 	{{- end }}
 WHEN NOT MATCHED THEN
+	INSERT (
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }}, {{ end -}}
+		{{$col.Identifier}}
+	{{- end -}}
+	)
+	VALUES (
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }}, {{ end -}}
+		r.c{{$ind}}
+	{{- end -}}
+	);
+{{ end }}
+
+-- Alternative store update template for no_flow_document feature flag - uses _meta/op for deletion detection
+
+{{ define "storeUpdateNoFlowDocument" -}}
+MERGE INTO {{ $.Identifier }} AS l
+USING {{ template "tempTableName" . }} AS r
+ON {{ range $ind, $bound := $.Bounds }}
+	{{ if $ind -}} AND {{end -}}
+	l.{{$bound.Identifier}} = r.c{{$ind}}
+	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end}}
+{{- if $.MetaOpColumn }}
+WHEN MATCHED AND r.c{{ $.MetaOpColumnIndex }}='d' THEN
+	DELETE
+{{- end }}
+WHEN MATCHED THEN
+	UPDATE SET {{ range $ind, $val := $.Values }}
+	{{- if $ind }}, {{end -}}
+		l.{{$val.Identifier}} = r.c{{ Add (len $.Keys) $ind}}
+	{{- end}} 
+{{- if $.MetaOpColumn }}
+WHEN NOT MATCHED AND r.c{{ $.MetaOpColumnIndex }}!='d' THEN
+{{- else }}
+WHEN NOT MATCHED THEN
+{{- end }}
 	INSERT (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
@@ -364,29 +423,47 @@ UPDATE {{ Identifier $.TablePath }}
 `)
 
 	return templates{
-		tempTableName:     tplAll.Lookup("tempTableName"),
-		createTargetTable: tplAll.Lookup("createTargetTable"),
-		alterTableColumns: tplAll.Lookup("alterTableColumns"),
-		installFence:      tplAll.Lookup("installFence"),
-		updateFence:       tplAll.Lookup("updateFence"),
-		loadQuery:         tplAll.Lookup("loadQuery"),
-		storeInsert:       tplAll.Lookup("storeInsert"),
-		storeUpdate:       tplAll.Lookup("storeUpdate"),
+		tempTableName:             tplAll.Lookup("tempTableName"),
+		createTargetTable:         tplAll.Lookup("createTargetTable"),
+		alterTableColumns:         tplAll.Lookup("alterTableColumns"),
+		installFence:              tplAll.Lookup("installFence"),
+		updateFence:               tplAll.Lookup("updateFence"),
+		loadQuery:                 tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument:   tplAll.Lookup("loadQueryNoFlowDocument"),
+		storeInsert:               tplAll.Lookup("storeInsert"),
+		storeUpdate:               tplAll.Lookup("storeUpdate"),
+		storeUpdateNoFlowDocument: tplAll.Lookup("storeUpdateNoFlowDocument"),
 	}
 }
 
 type queryParams struct {
 	sql.Table
-	Bounds            []sql.MergeBound
-	ObjAndArrayAsJson bool
+	Bounds              []sql.MergeBound
+	ObjAndArrayAsJson   bool
+	MetaOpColumn        *sql.Column
+	MetaOpColumnIndex   int
 }
 
 func renderQueryTemplate(table sql.Table, tpl *template.Template, bounds []sql.MergeBound, objAndArrayAsJson bool) (string, error) {
+	// Find the _meta/op column and its index
+	var metaOpColumn *sql.Column
+	var metaOpColumnIndex int = -1
+	
+	for i, col := range table.Columns() {
+		if col.Field == "_meta/op" {
+			metaOpColumn = col
+			metaOpColumnIndex = i
+			break
+		}
+	}
+	
 	var w strings.Builder
 	if err := tpl.Execute(&w, &queryParams{
 		Table:             table,
 		Bounds:            bounds,
 		ObjAndArrayAsJson: objAndArrayAsJson,
+		MetaOpColumn:      metaOpColumn,
+		MetaOpColumnIndex: metaOpColumnIndex,
 	}); err != nil {
 		return "", err
 	}

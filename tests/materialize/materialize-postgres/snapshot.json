@@ -730,7 +730,7 @@
       },
       "flow_published_at": "1970-01-01T01:00:28+00:00",
       "id": 1,
-      "unsigned_bigint": 18446744073709551615
+      "unsigned_bigint": 18446744073709552000
     }
   ],
   "table": "unsigned_bigint"

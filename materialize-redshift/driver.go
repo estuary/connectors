@@ -290,12 +290,13 @@ func newRedshiftDriver() *sql.Driver[config, tableConfig] {
 }
 
 type transactor struct {
-	templates templates
-	dialect   sql.Dialect
-	fence     sql.Fence
-	bindings  []*binding
-	be        *m.BindingEvents
-	cfg       config
+	templates    templates
+	dialect      sql.Dialect
+	fence        sql.Fence
+	bindings     []*binding
+	be           *m.BindingEvents
+	cfg          config
+	featureFlags map[string]bool
 }
 
 func prepareNewTransactor(
@@ -315,11 +316,12 @@ func prepareNewTransactor(
 		var cfg = ep.Config
 
 		var d = &transactor{
-			templates: templates,
-			dialect:   ep.Dialect,
-			fence:     fence,
-			cfg:       cfg,
-			be:        be,
+			templates:    templates,
+			dialect:      ep.Dialect,
+			fence:        fence,
+			cfg:          cfg,
+			be:           be,
+			featureFlags: featureFlags,
 		}
 
 		s3client, err := d.cfg.toS3Client(ctx)
@@ -334,6 +336,7 @@ func prepareNewTransactor(
 				s3client,
 				is,
 				caseSensitiveIdentifierEnabled,
+				featureFlags,
 			); err != nil {
 				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 			}
@@ -387,6 +390,7 @@ func (t *transactor) addBinding(
 	client *s3.Client,
 	is *boilerplate.InfoSchema,
 	caseSensitiveIdentifierEnabled bool,
+	featureFlags map[string]bool,
 ) error {
 	var b = &binding{
 		target:     target,
@@ -422,6 +426,14 @@ func (t *transactor) addBinding(
 		*m.sql = sql.String()
 	}
 
+	// Choose appropriate templates based on feature flags
+	var deleteQueryTemplate = t.templates.deleteQuery
+	var loadQueryTemplate = t.templates.loadQuery
+	if !featureFlags["flow_document"] && !target.DeltaUpdates {
+		deleteQueryTemplate = t.templates.deleteQueryNoFlowDocument
+		loadQueryTemplate = t.templates.loadQueryNoFlowDocument
+	}
+
 	// Render templates that rely only on the target table.
 	for _, m := range []struct {
 		sql *string
@@ -430,8 +442,8 @@ func (t *transactor) addBinding(
 		{&b.createStoreTableSQL, t.templates.createStoreTable},
 		{&b.createDeleteTableSQL, t.templates.createDeleteTable},
 		{&b.mergeIntoSQL, t.templates.mergeInto},
-		{&b.deleteQuerySQL, t.templates.deleteQuery},
-		{&b.loadQuerySQL, t.templates.loadQuery},
+		{&b.deleteQuerySQL, deleteQueryTemplate},
+		{&b.loadQuerySQL, loadQueryTemplate},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
