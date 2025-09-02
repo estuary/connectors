@@ -37,7 +37,7 @@
                 "table": "\"duplicate keys @ with spaces\"",
                 "chunk_start_offset": 0,
                 "chunk_length": "<chunk_length>",
-                "chunk_length_uncompressed": 0,
+                "chunk_length_uncompressed": "<chunk_length_uncompressed>",
                 "channels": [
                   {
                     "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
@@ -144,7 +144,7 @@
                 "table": "DUPLICATE_KEYS_DELTA",
                 "chunk_start_offset": 0,
                 "chunk_length": "<chunk_length>",
-                "chunk_length_uncompressed": 0,
+                "chunk_length_uncompressed": "<chunk_length_uncompressed>",
                 "channels": [
                   {
                     "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
@@ -251,7 +251,7 @@
                 "table": "DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC",
                 "chunk_start_offset": 0,
                 "chunk_length": "<chunk_length>",
-                "chunk_length_uncompressed": 0,
+                "chunk_length_uncompressed": "<chunk_length_uncompressed>",
                 "channels": [
                   {
                     "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
@@ -438,7 +438,7 @@
                 "table": "\"duplicate keys @ with spaces\"",
                 "chunk_start_offset": 0,
                 "chunk_length": "<chunk_length>",
-                "chunk_length_uncompressed": 0,
+                "chunk_length_uncompressed": "<chunk_length_uncompressed>",
                 "channels": [
                   {
                     "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
@@ -545,7 +545,7 @@
                 "table": "DUPLICATE_KEYS_DELTA",
                 "chunk_start_offset": 0,
                 "chunk_length": "<chunk_length>",
-                "chunk_length_uncompressed": 0,
+                "chunk_length_uncompressed": "<chunk_length_uncompressed>",
                 "channels": [
                   {
                     "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
@@ -652,7 +652,7 @@
                 "table": "DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC",
                 "chunk_start_offset": 0,
                 "chunk_length": "<chunk_length>",
-                "chunk_length_uncompressed": 0,
+                "chunk_length_uncompressed": "<chunk_length_uncompressed>",
                 "channels": [
                   {
                     "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
@@ -812,7 +812,7 @@
                 "table": "\"duplicate keys @ with spaces\"",
                 "chunk_start_offset": 0,
                 "chunk_length": "<chunk_length>",
-                "chunk_length_uncompressed": 0,
+                "chunk_length_uncompressed": "<chunk_length_uncompressed>",
                 "channels": [
                   {
                     "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
@@ -919,7 +919,7 @@
                 "table": "DUPLICATE_KEYS_DELTA",
                 "chunk_start_offset": 0,
                 "chunk_length": "<chunk_length>",
-                "chunk_length_uncompressed": 0,
+                "chunk_length_uncompressed": "<chunk_length_uncompressed>",
                 "channels": [
                   {
                     "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
@@ -1026,7 +1026,7 @@
                 "table": "DUPLICATE_KEYS_DELTA_EXCLUDE_FLOW_DOC",
                 "chunk_start_offset": 0,
                 "chunk_length": "<chunk_length>",
-                "chunk_length_uncompressed": 0,
+                "chunk_length_uncompressed": "<chunk_length_uncompressed>",
                 "channels": [
                   {
                     "channel_name": "TESTS_MATERIALIZE_SNOWFLAKE_MATE_99A06F45B5F50222_00000000",
@@ -1158,7 +1158,7 @@
                   }
                 ],
                 "chunk_length": "<chunk_length>",
-                "chunk_length_uncompressed": 0,
+                "chunk_length_uncompressed": "<chunk_length_uncompressed>",
                 "chunk_md5": "<chunk_md5>",
                 "chunk_start_offset": 0,
                 "database": "ESTUARY_DB",
@@ -1264,7 +1264,7 @@
                   }
                 ],
                 "chunk_length": "<chunk_length>",
-                "chunk_length_uncompressed": 0,
+                "chunk_length_uncompressed": "<chunk_length_uncompressed>",
                 "chunk_md5": "<chunk_md5>",
                 "chunk_start_offset": 0,
                 "database": "ESTUARY_DB",
@@ -1370,7 +1370,7 @@
                   }
                 ],
                 "chunk_length": "<chunk_length>",
-                "chunk_length_uncompressed": 0,
+                "chunk_length_uncompressed": "<chunk_length_uncompressed>",
                 "chunk_md5": "<chunk_md5>",
                 "chunk_start_offset": 0,
                 "database": "ESTUARY_DB",

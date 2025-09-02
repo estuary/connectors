@@ -138,11 +138,12 @@ type parquetConfig struct {
 type ParquetWriter struct {
 	cfg parquetConfig
 
-	schema     ParquetSchema
-	schemaRoot *schema.GroupNode
-	sinkWriter *file.Writer
-	cwc        *countingWriteCloser
-	rs         rowSize
+	schema        ParquetSchema
+	schemaRoot    *schema.GroupNode
+	sinkWriter    *file.Writer
+	cwc           *countingWriteCloser
+	rs            rowSize
+	rowGroupCount int
 
 	// Scratch values are re-initialized as scratch files are transposed into the output stream.
 	scratch struct {
@@ -339,12 +340,11 @@ func (w *ParquetWriter) FileMetadata() (*metadata.FileMetaData, error) {
 	return w.sinkWriter.FileMetadata()
 }
 
-// ScratchSize provides an estimate of the current _uncompressed_ data size for
-// data that has been written to the scratch file. If the current row group is
-// flushed, this is approximately how large the resulting output row group will
-// be on an uncompressed basis.
-func (w *ParquetWriter) ScratchSize() int {
-	return w.scratch.sizeBytes
+// RowGroupsWritten returns the number of row groups that have been written to
+// the output so far, which is equivalent to how many times the scratch file has
+// been flushed.
+func (w *ParquetWriter) RowGroupsWritten() int {
+	return w.rowGroupCount
 }
 
 func (w *ParquetWriter) flushScratchFile() error {
@@ -371,6 +371,7 @@ func (w *ParquetWriter) flushScratchFile() error {
 	w.scratch.sizeBytes = 0
 	w.scratch.columnChunkCount = 0
 	w.scratch.rowCount = 0
+	w.rowGroupCount += 1
 
 	return nil
 }

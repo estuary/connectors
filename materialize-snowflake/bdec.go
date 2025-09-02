@@ -128,11 +128,8 @@ func newBdecWriter(
 		writer.WithParquetCompression(writer.Snappy),
 		writer.WithDisableDictionaryEncoding(), // not only for performance, but also to support some column types (VARIANT)
 		writer.WithParquetMetadata(metadata),
-		// We are effectively disabling the new row group creation logic in the
-		// Parquet writer and handling when the file and its single row group
-		// should be closed here.
-		writer.WithParquetRowGroupRowLimit(math.MaxInt64),
-		writer.WithParquetRowGroupByteLimit(math.MaxInt64),
+		writer.WithParquetRowGroupByteLimit(MAX_CHUNK_SIZE_IN_BYTES_DEFAULT),
+		writer.WithParquetRowGroupRowLimit(math.MaxInt64), // no specific limit on the number of rows in a bdec chunk
 	)
 
 	return &bdecWriter{
@@ -226,10 +223,9 @@ func (bw *bdecWriter) writeRow(row []any) error {
 	if err := bw.pq.Write(row); err != nil {
 		return fmt.Errorf("writing row as parquet: %w", err)
 	}
-	if sz := bw.pq.ScratchSize(); sz >= MAX_CHUNK_SIZE_IN_BYTES_DEFAULT {
-		// Since only a single row group can be in a chunk and we only write one
-		// chunk per blob, this blob must be closed out now.
-		bw.blobStats.lengthUncompressed = sz
+
+	if bw.pq.RowGroupsWritten() > 0 {
+		// A bdec blob can only have a single row group.
 		bw.done = true
 	}
 	bw.blobStats.rows++
@@ -243,6 +239,16 @@ func (bw *bdecWriter) close() error {
 	} else if bw.blobStats.parquetMetadata, err = bw.pq.FileMetadata(); err != nil {
 		return fmt.Errorf("getting parquet file metadata: %w", err)
 	}
+
+	// A couple of easy sanity checks to verify the recorded blob metadata vs.
+	// the written parquet file metadata. The uncompressed length is taken
+	// directly from the parquet metadata assuming everything else matches.
+	if bw.blobStats.parquetMetadata.NumRowGroups() != 1 {
+		return fmt.Errorf("internal appication error: expected exactly one row group in bdec file, got %d", bw.blobStats.parquetMetadata.NumRowGroups())
+	} else if bw.blobStats.rows != int(bw.blobStats.parquetMetadata.NumRows) {
+		return fmt.Errorf("internal appication error: row count mismatch: %d rows written, but parquet metadata has %d", bw.blobStats.rows, bw.blobStats.parquetMetadata.NumRows)
+	}
+	bw.blobStats.lengthUncompressed = int(bw.blobStats.parquetMetadata.RowGroups[0].TotalByteSize)
 
 	return nil
 }
