@@ -22,7 +22,7 @@ from estuary_cdk.capture.common import (
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
-from .graphql.common import dt_to_str, round_to_latest_midnight
+from .graphql.common import dt_to_str
 
 
 scopes = [
@@ -292,12 +292,12 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
         includeUpdatedAt: bool = True,
     ) -> str:
         lower_bound = dt_to_str(start)
-        upper_bound = dt_to_str(round_to_latest_midnight(end))
+        upper_bound = dt_to_str(end)
 
         query = f"""
         {{
             {query_root}(
-                query: "updated_at:>={lower_bound} AND updated_at:<={upper_bound} {"AND " + query.strip() if query else ""}"
+                query: "updated_at:>='{lower_bound}' AND updated_at:<='{upper_bound}' {"AND " + query.strip() if query else ""}"
                 {f"sortKey: {sort_key}" if sort_key else ""}
             ) {{
                 edges {{
