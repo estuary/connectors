@@ -8,6 +8,7 @@ from ...models import ShopifyGraphQLResource
 
 class InventoryLevels(ShopifyGraphQLResource):
     NAME = "inventory_levels"
+    QUERY_ROOT = "inventoryItems"
     QUERY = """
     inventoryLevels {
         edges {
@@ -50,8 +51,6 @@ class InventoryLevels(ShopifyGraphQLResource):
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return InventoryLevels.build_query_with_fragment(
-            "inventoryItems",
-            None,
             start,
             end,
         )

@@ -7,6 +7,7 @@ from ...models import ShopifyGraphQLResource
 
 class Locations(ShopifyGraphQLResource):
     NAME = "locations"
+    QUERY_ROOT = "locations"
     QUERY = """
     id
     name
@@ -45,8 +46,6 @@ class Locations(ShopifyGraphQLResource):
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return Locations.build_query_with_fragment(
-            "locations",
-            None,
             start,
             end,
         )

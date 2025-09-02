@@ -7,12 +7,11 @@ from ..metafields import MetafieldsResource
 class LocationMetafields(MetafieldsResource):
     NAME = "location_metafields"
     PARENT_ID_KEY = "gid://shopify/Location/"
+    QUERY_ROOT = "locations"
 
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return LocationMetafields.build_query_with_fragment(
-            "locations",
-            None,
             start,
             end,
         )

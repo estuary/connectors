@@ -4,16 +4,18 @@ import json
 from typing import Any, AsyncGenerator
 from ..metafields import MetafieldsResource
 
+from source_shopify_native.models import SortKey
+
 
 class ProductMetafields(MetafieldsResource):
     NAME = "product_metafields"
     PARENT_ID_KEY = "gid://shopify/Product/"
+    QUERY_ROOT = "products"
+    SORT_KEY = SortKey.UPDATED_AT
 
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return ProductMetafields.build_query_with_fragment(
-            "products",
-            "UPDATED_AT",
             start,
             end,
         )
@@ -29,6 +31,8 @@ class ProductMetafields(MetafieldsResource):
 class ProductVariantMetafields(MetafieldsResource):
     NAME = "product_variant_metafields"
     PARENT_ID_KEY = "gid://shopify/ProductVariant/"
+    QUERY_ROOT = "products"
+    SORT_KEY = SortKey.UPDATED_AT
     QUERY = """
     variants {
         edges {
@@ -69,8 +73,6 @@ class ProductVariantMetafields(MetafieldsResource):
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return ProductVariantMetafields.build_query_with_fragment(
-            "products",
-            "UPDATED_AT",
             start,
             end,
         )

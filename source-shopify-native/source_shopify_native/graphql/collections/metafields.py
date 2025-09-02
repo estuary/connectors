@@ -3,16 +3,18 @@ from logging import Logger
 from typing import AsyncGenerator
 from ..metafields import MetafieldsResource
 
+from source_shopify_native.models import SortKey
+
 
 class CustomCollectionMetafields(MetafieldsResource):
     NAME = "custom_collection_metafields"
     PARENT_ID_KEY = "gid://shopify/Collection/"
+    QUERY_ROOT = "collections"
+    SORT_KEY = SortKey.UPDATED_AT
 
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return CustomCollectionMetafields.build_query_with_fragment(
-            "collections",
-            "UPDATED_AT",
             start,
             end,
             query="AND collection_type:custom",
@@ -31,12 +33,12 @@ class CustomCollectionMetafields(MetafieldsResource):
 class SmartCollectionMetafields(MetafieldsResource):
     NAME = "smart_collection_metafields"
     PARENT_ID_KEY = "gid://shopify/Collection/"
+    QUERY_ROOT = "collections"
+    SORT_KEY = SortKey.UPDATED_AT
 
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return SmartCollectionMetafields.build_query_with_fragment(
-            "collections",
-            "UPDATED_AT",
             start,
             end,
             query="AND collection_type:smart",
