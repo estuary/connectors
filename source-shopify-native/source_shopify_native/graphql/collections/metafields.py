@@ -13,11 +13,18 @@ class CustomCollectionMetafields(MetafieldsResource):
     SORT_KEY = SortKey.UPDATED_AT
 
     @staticmethod
-    def build_query(start: datetime, end: datetime) -> str:
+    def build_query(
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> str:
         return CustomCollectionMetafields.build_query_with_fragment(
             start,
             end,
             query="AND collection_type:custom",
+            first=first,
+            after=after,
             includeCreatedAt=False,
         )
 
@@ -37,11 +44,18 @@ class SmartCollectionMetafields(MetafieldsResource):
     SORT_KEY = SortKey.UPDATED_AT
 
     @staticmethod
-    def build_query(start: datetime, end: datetime) -> str:
+    def build_query(
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> str:
         return SmartCollectionMetafields.build_query_with_fragment(
             start,
             end,
             query="AND collection_type:smart",
+            first=first,
+            after=after,
             includeCreatedAt=False,
         )
 

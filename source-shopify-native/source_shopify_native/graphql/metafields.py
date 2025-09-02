@@ -42,7 +42,12 @@ class MetafieldsResource(ShopifyGraphQLResource):
             raise NotImplementedError("Subclasses must set PARENT_ID_KEY")
 
     @staticmethod
-    def build_query(start: datetime, end: datetime) -> str:
+    def build_query(
+        start: datetime,
+        end: datetime,
+        first: int | None = None,
+        after: str | None = None,
+    ) -> str:
         # This method should be implemented by subclasses
         # pylint: disable=unused-argument
         raise NotImplementedError("Subclasses must implement build_query")
