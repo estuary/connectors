@@ -3,11 +3,13 @@ from datetime import datetime
 from logging import Logger
 from typing import AsyncGenerator, Any
 
-from ...models import ShopifyGraphQLResource
+from ...models import ShopifyGraphQLResource, SortKey
 
 
 class FulfillmentOrders(ShopifyGraphQLResource):
     NAME = "fulfillment_orders"
+    QUERY_ROOT = "orders"
+    SORT_KEY = SortKey.UPDATED_AT
     QUERY = """
     id
     fulfillmentOrders {
@@ -109,8 +111,6 @@ class FulfillmentOrders(ShopifyGraphQLResource):
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return FulfillmentOrders.build_query_with_fragment(
-            "orders",
-            "UPDATED_AT",
             start,
             end,
         )

@@ -3,11 +3,13 @@ from logging import Logger
 import json
 from typing import Any, AsyncGenerator, ClassVar, Literal
 
-from ...models import ShopifyGraphQLResource
+from ...models import ShopifyGraphQLResource, SortKey
 
 
 class _Collections(ShopifyGraphQLResource):
     COLLECTION_TYPE: ClassVar[str] = ""
+    QUERY_ROOT = "collections"
+    SORT_KEY = SortKey.UPDATED_AT
     QUERY = """
     title
     handle
@@ -51,8 +53,6 @@ class _Collections(ShopifyGraphQLResource):
         collection_type: Literal["custom", "smart"], start: datetime, end: datetime
     ) -> str:
         return _Collections.build_query_with_fragment(
-            "collections",
-            "UPDATED_AT",
             start,
             end,
             query=f"collection_type:{collection_type}",

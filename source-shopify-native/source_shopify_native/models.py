@@ -280,10 +280,17 @@ class ShopDetails(BaseModel, extra="allow"):
         """
 
 
+class SortKey(StrEnum):
+    CREATED_AT = "CREATED_AT"
+    UPDATED_AT = "UPDATED_AT"
+
+
 class ShopifyGraphQLResource(BaseDocument, extra="allow"):
     QUERY: ClassVar[str] = ""
+    QUERY_ROOT: ClassVar[str] = ""
     FRAGMENTS: ClassVar[list[str]] = []
     NAME: ClassVar[str] = ""
+    SORT_KEY: ClassVar[SortKey | None] = None
 
     id: str
 
@@ -323,8 +330,6 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
     @classmethod
     def build_query_with_fragment(
         cls,
-        query_root: str,
-        sort_key: Literal["UPDATED_AT", "CREATED_AT"] | None,
         start: datetime,
         end: datetime,
         query: str = "",
@@ -337,9 +342,9 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
 
         query = f"""
         {{
-            {query_root}(
+            {cls.QUERY_ROOT}(
                 query: "updated_at:>='{lower_bound}' AND updated_at:<='{upper_bound}' {"AND " + query.strip() if query else ""}"
-                {f"sortKey: {sort_key}" if sort_key else ""}
+                {f"sortKey: {cls.SORT_KEY}" if cls.SORT_KEY else ""}
             ) {{
                 edges {{
                     node {{

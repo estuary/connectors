@@ -3,11 +3,13 @@ from logging import Logger
 import json
 from typing import Any, AsyncGenerator
 
-from source_shopify_native.models import ShopifyGraphQLResource
+from source_shopify_native.models import ShopifyGraphQLResource, SortKey
 
 
 class ProductVariants(ShopifyGraphQLResource):
     NAME = "product_variants"
+    QUERY_ROOT = "products"
+    SORT_KEY = SortKey.UPDATED_AT
     QUERY = """
     variants {
         edges {
@@ -48,8 +50,6 @@ class ProductVariants(ShopifyGraphQLResource):
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return ProductVariants.build_query_with_fragment(
-            "products",
-            "UPDATED_AT",
             start,
             end,
         )

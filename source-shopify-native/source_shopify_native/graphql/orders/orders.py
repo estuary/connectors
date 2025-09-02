@@ -4,11 +4,13 @@ import json
 from typing import Any, AsyncGenerator, Dict
 
 from ..common import money_bag_fragment
-from ...models import ShopifyGraphQLResource
+from ...models import ShopifyGraphQLResource, SortKey
 
 
 class Orders(ShopifyGraphQLResource):
     NAME = "orders"
+    QUERY_ROOT = "orders"
+    SORT_KEY = SortKey.UPDATED_AT
     QUERY = """
     app {
         id
@@ -332,8 +334,6 @@ class Orders(ShopifyGraphQLResource):
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return Orders.build_query_with_fragment(
-            "orders",
-            "UPDATED_AT",
             start,
             end,
         )

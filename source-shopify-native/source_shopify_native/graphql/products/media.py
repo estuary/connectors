@@ -3,11 +3,13 @@ from logging import Logger
 import json
 from typing import Any, AsyncGenerator
 
-from source_shopify_native.models import ShopifyGraphQLResource
+from source_shopify_native.models import ShopifyGraphQLResource, SortKey
 
 
 class ProductMedia(ShopifyGraphQLResource):
     NAME = "product_media"
+    QUERY_ROOT = "products"
+    SORT_KEY = SortKey.UPDATED_AT
     QUERY = """
     media(query:"media_type:IMAGE") {
         edges {
@@ -29,8 +31,6 @@ class ProductMedia(ShopifyGraphQLResource):
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return ProductMedia.build_query_with_fragment(
-            "products",
-            "UPDATED_AT",
             start,
             end,
         )

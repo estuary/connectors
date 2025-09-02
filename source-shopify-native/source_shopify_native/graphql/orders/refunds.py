@@ -3,11 +3,13 @@ from logging import Logger
 from typing import AsyncGenerator
 
 from ..common import money_bag_fragment
-from ...models import ShopifyGraphQLResource
+from ...models import ShopifyGraphQLResource, SortKey
 
 
 class OrderRefunds(ShopifyGraphQLResource):
     NAME = "order_refunds"
+    QUERY_ROOT = "orders"
+    SORT_KEY = SortKey.UPDATED_AT
     QUERY = """
     displayFinancialStatus
     displayFulfillmentStatus
@@ -54,8 +56,6 @@ class OrderRefunds(ShopifyGraphQLResource):
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return OrderRefunds.build_query_with_fragment(
-            "orders",
-            "UPDATED_AT",
             start,
             end,
         )

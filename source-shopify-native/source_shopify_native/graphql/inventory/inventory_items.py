@@ -7,6 +7,7 @@ from ...models import ShopifyGraphQLResource
 
 class InventoryItems(ShopifyGraphQLResource):
     NAME = "inventory_items"
+    QUERY_ROOT = "inventoryItems"
     QUERY = """
     id
     legacyResourceId
@@ -37,8 +38,6 @@ class InventoryItems(ShopifyGraphQLResource):
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return InventoryItems.build_query_with_fragment(
-            "inventoryItems",
-            None,
             start,
             end,
         )

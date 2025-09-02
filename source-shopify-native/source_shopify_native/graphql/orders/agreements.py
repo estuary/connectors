@@ -4,11 +4,13 @@ from logging import Logger
 from typing import AsyncGenerator, Any
 
 from ..common import money_bag_fragment
-from ...models import ShopifyGraphQLResource
+from ...models import ShopifyGraphQLResource, SortKey
 
 
 class OrderAgreements(ShopifyGraphQLResource):
     NAME = "order_agreements"
+    QUERY_ROOT = "orders"
+    SORT_KEY = SortKey.UPDATED_AT
     QUERY = """
     agreements {
         edges {
@@ -53,8 +55,6 @@ class OrderAgreements(ShopifyGraphQLResource):
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return OrderAgreements.build_query_with_fragment(
-            "orders",
-            "UPDATED_AT",
             start,
             end,
         )

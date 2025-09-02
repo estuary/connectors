@@ -4,11 +4,13 @@ import json
 from typing import Any, AsyncGenerator
 
 from .common import money_bag_fragment
-from ..models import ShopifyGraphQLResource
+from ..models import ShopifyGraphQLResource, SortKey
 
 
 class AbandonedCheckouts(ShopifyGraphQLResource):
     NAME = "abandoned_checkouts"
+    QUERY_ROOT = "abandonedCheckouts"
+    SORT_KEY = SortKey.CREATED_AT
     QUERY = """
     id
     abandonedCheckoutUrl
@@ -107,8 +109,6 @@ class AbandonedCheckouts(ShopifyGraphQLResource):
     @staticmethod
     def build_query(start: datetime, end: datetime) -> str:
         return AbandonedCheckouts.build_query_with_fragment(
-            "abandonedCheckouts",
-            "CREATED_AT",
             start,
             end,
             includeLegacyId=False,
