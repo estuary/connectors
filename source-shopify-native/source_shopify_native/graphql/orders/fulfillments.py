@@ -9,6 +9,7 @@ class Fulfillments(ShopifyGraphQLResource):
     NAME = "fulfillments"
     QUERY_ROOT = "orders"
     SORT_KEY = SortKey.UPDATED_AT
+    SHOULD_USE_BULK_QUERIES = False
     QUERY = """
     fulfillments {
         id

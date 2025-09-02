@@ -10,6 +10,7 @@ class OrderRefunds(ShopifyGraphQLResource):
     NAME = "order_refunds"
     QUERY_ROOT = "orders"
     SORT_KEY = SortKey.UPDATED_AT
+    SHOULD_USE_BULK_QUERIES = False
     QUERY = """
     displayFinancialStatus
     displayFulfillmentStatus

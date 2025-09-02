@@ -8,6 +8,7 @@ from ...models import ShopifyGraphQLResource
 class Locations(ShopifyGraphQLResource):
     NAME = "locations"
     QUERY_ROOT = "locations"
+    SHOULD_USE_BULK_QUERIES = False
     QUERY = """
     id
     name
