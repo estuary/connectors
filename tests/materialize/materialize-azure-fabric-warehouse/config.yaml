@@ -9,6 +9,8 @@ containerName: tmp
 hardDelete: true
 syncSchedule:
     syncFrequency: 0s
+advanced:
+    feature_flags: no_flow_document
 sops:
     kms: []
     gcp_kms:
@@ -18,8 +20,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-01-23T16:43:43Z"
-    mac: ENC[AES256_GCM,data:51LJ2l8bnb26p7GyoHvpsadwGRuNsFrMvvukYamOsWeRi78A/znYmZd40kFnTn7zQydC2EyBzB141Iz5VVPKEmuvM40WTYUby2rdGj5GTaYJvBHsvwITkBW1h+IaDkwU+T7vEb9BiIZnNeFEwbHzBw2wJidnHXPNnxpMgjf93f4=,iv:64mvPbohXVQugJ1qXOtrY9YfPwnFACyF2MzUPLQXxH4=,tag:2wMVeOxkgArRYFY7Ji34SA==,type:str]
+    lastmodified: "2025-09-02T14:54:11Z"
+    mac: ENC[AES256_GCM,data:CMMD628xZLchkQSBIYHKYh9f2t3cyxt7cHTrod2rIxFicOcJMaLoULXt2nVyuQJ/dT6wIm4Is0QAW3uIDWDsTxPT8kniGZwkkNcFIchM3Bh+x6Z5cjSTX1kkTsGY1Yypvonqrh659GYIcXOUll94A3wP3l6BPSvMEEQ3LOD5ork=,iv:mUklcr75mqfdj5cu3g7oUIwGM59Ylut9pU7NLiBSPvI=,tag:w9nnzJ71Bybih3rRYrQpKw==,type:str]
     pgp: []
     encrypted_suffix: _sops
-    version: 3.8.1
+    version: 3.9.4
