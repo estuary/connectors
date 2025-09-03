@@ -297,27 +297,13 @@ WHEN NOT MATCHED THEN
 {{ end }}
 
 {{ define "deleteQuery" }}
-{{ if $.Document -}}
+{{ if not $.DeltaUpdates -}}
 DELETE FROM {{ $.Identifier }}
 USING {{ template "temp_name_deleted" . }} AS r
 WHERE {{ range $ind, $key := $.Keys }}
 {{- if $ind }} AND {{end -}}
 	{{$.Identifier}}.{{$key.Identifier}} = r.{{$key.Identifier}}
 {{- end }}
-{{- end }}
-{{ end }}
-
--- Alternative delete query for no_flow_document feature flag - uses _meta/op for deletion detection
-
-{{ define "deleteQueryNoFlowDocument" }}
-{{- if $.MetaOpColumn }}
-DELETE FROM {{ $.Identifier }}
-USING {{ template "temp_name" . }} AS r
-WHERE {{ range $ind, $key := $.Keys }}
-{{- if $ind }} AND {{end -}}
-	{{$.Identifier}}.{{$key.Identifier}} = r.{{$key.Identifier}}
-{{- end }}
-	AND r.{{ $.MetaOpColumn.Identifier }} = 'd'
 {{- end }}
 {{ end }}
 
@@ -345,7 +331,14 @@ SELECT {{ $.Binding }},
 OBJECT(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}},{{end}}
-	{{Literal $col.Field}}, r.{{$col.Identifier}}
+	{{Literal $col.Field}}, 
+	{{- if eq $col.DDL "DATE" }}
+		TO_CHAR(r.{{$col.Identifier}}, 'YYYY-MM-DD')
+	{{- else if eq $col.DDL "TIMESTAMPTZ" }}
+		TO_CHAR(r.{{$col.Identifier}} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+	{{- else }}
+		r.{{$col.Identifier}}
+	{{- end}}
 {{- end}}
 ) as flow_document
 FROM {{ template "temp_name" . }} AS l

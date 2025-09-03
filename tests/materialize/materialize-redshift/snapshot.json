@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "\nCREATE TABLE IF NOT EXISTS simple (\n\tid BIGINT,\n\tcanary TEXT,\n\tflow_published_at TIMESTAMPTZ,\n\tflow_document SUPER\n);\n\nCOMMENT ON TABLE simple IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/simple';\nCOMMENT ON COLUMN simple.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN simple.canary IS 'auto-generated projection of JSON at: /canary with inferred types: [string]';\nCOMMENT ON COLUMN simple.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN simple.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_standard (\n\tid BIGINT,\n\tflow_published_at TIMESTAMPTZ,\n\tint BIGINT,\n\tstr TEXT,\n\tflow_document SUPER\n);\n\nCOMMENT ON TABLE duplicate_keys_standard IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/duplicated-keys';\nCOMMENT ON COLUMN duplicate_keys_standard.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN duplicate_keys_standard.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN duplicate_keys_standard.int IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\nCOMMENT ON COLUMN duplicate_keys_standard.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\nCOMMENT ON COLUMN duplicate_keys_standard.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_delta (\n\tid BIGINT,\n\tflow_published_at TIMESTAMPTZ,\n\tint BIGINT,\n\tstr TEXT\n);\n\nCOMMENT ON TABLE duplicate_keys_delta IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/duplicated-keys';\nCOMMENT ON COLUMN duplicate_keys_delta.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN duplicate_keys_delta.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN duplicate_keys_delta.int IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\nCOMMENT ON COLUMN duplicate_keys_delta.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_delta_exclude_flow_doc (\n\tid BIGINT,\n\tflow_published_at TIMESTAMPTZ,\n\tint BIGINT,\n\tstr TEXT\n);\n\nCOMMENT ON TABLE duplicate_keys_delta_exclude_flow_doc IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/duplicated-keys';\nCOMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.int IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\nCOMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n\n\nCREATE TABLE IF NOT EXISTS multiple_types (\n\tid BIGINT,\n\tarray_int SUPER,\n\tbinary_field TEXT,\n\tbool_field BOOLEAN,\n\tfloat_field DOUBLE PRECISION,\n\tflow_published_at TIMESTAMPTZ,\n\tmultiple SUPER,\n\tnested SUPER,\n\tnullable_int BIGINT,\n\tstr_field TEXT,\n\tflow_document SUPER\n);\n\nCOMMENT ON TABLE multiple_types IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/multiple-data-types';\nCOMMENT ON COLUMN multiple_types.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN multiple_types.array_int IS 'auto-generated projection of JSON at: /array_int with inferred types: [array]';\nCOMMENT ON COLUMN multiple_types.binary_field IS 'auto-generated projection of JSON at: /binary_field with inferred types: [string]';\nCOMMENT ON COLUMN multiple_types.bool_field IS 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]';\nCOMMENT ON COLUMN multiple_types.float_field IS 'auto-generated projection of JSON at: /float_field with inferred types: [number]';\nCOMMENT ON COLUMN multiple_types.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN multiple_types.multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [array boolean null number object string]';\nCOMMENT ON COLUMN multiple_types.nested IS 'auto-generated projection of JSON at: /nested with inferred types: [object]';\nCOMMENT ON COLUMN multiple_types.nullable_int IS 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]';\nCOMMENT ON COLUMN multiple_types.str_field IS 'auto-generated projection of JSON at: /str_field with inferred types: [string]';\nCOMMENT ON COLUMN multiple_types.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS formatted_strings (\n\tid BIGINT,\n\tdate DATE,\n\tdatetime TIMESTAMPTZ,\n\tflow_published_at TIMESTAMPTZ,\n\tint_and_str NUMERIC(38,0),\n\tint_str NUMERIC(38,0),\n\tnum_and_str DOUBLE PRECISION,\n\tnum_str DOUBLE PRECISION,\n\ttime TEXT,\n\tflow_document SUPER\n);\n\nCOMMENT ON TABLE formatted_strings IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/formatted-strings';\nCOMMENT ON COLUMN formatted_strings.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN formatted_strings.date IS 'auto-generated projection of JSON at: /date with inferred types: [string]';\nCOMMENT ON COLUMN formatted_strings.datetime IS 'auto-generated projection of JSON at: /datetime with inferred types: [string]';\nCOMMENT ON COLUMN formatted_strings.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN formatted_strings.int_and_str IS 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]';\nCOMMENT ON COLUMN formatted_strings.int_str IS 'auto-generated projection of JSON at: /int_str with inferred types: [string]';\nCOMMENT ON COLUMN formatted_strings.num_and_str IS 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]';\nCOMMENT ON COLUMN formatted_strings.num_str IS 'auto-generated projection of JSON at: /num_str with inferred types: [string]';\nCOMMENT ON COLUMN formatted_strings.time IS 'auto-generated projection of JSON at: /time with inferred types: [string]';\nCOMMENT ON COLUMN formatted_strings.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS long_string (\n\tid TEXT,\n\tflow_published_at TIMESTAMPTZ,\n\tstr_field TEXT,\n\tflow_document SUPER\n);\n\nCOMMENT ON TABLE long_string IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/long-string';\nCOMMENT ON COLUMN long_string.id IS 'auto-generated projection of JSON at: /id with inferred types: [string]';\nCOMMENT ON COLUMN long_string.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN long_string.str_field IS 'auto-generated projection of JSON at: /str_field with inferred types: [string]';\nCOMMENT ON COLUMN long_string.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n\n\nCREATE TABLE IF NOT EXISTS deletions (\n\tid BIGINT,\n\t\"_meta/op\" TEXT,\n\tflow_published_at TIMESTAMPTZ,\n\tflow_document SUPER\n);\n\nCOMMENT ON TABLE deletions IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/deletions';\nCOMMENT ON COLUMN deletions.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN deletions.\"_meta/op\" IS 'auto-generated projection of JSON at: /_meta/op with inferred types: [string]';\nCOMMENT ON COLUMN deletions.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN deletions.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';\n"
+  "\nCREATE TABLE IF NOT EXISTS simple (\n\tid BIGINT,\n\t_meta SUPER,\n\tcanary TEXT,\n\tflow_published_at TIMESTAMPTZ\n);\n\nCOMMENT ON TABLE simple IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/simple';\nCOMMENT ON COLUMN simple.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN simple._meta IS 'auto-generated projection of JSON at: /_meta with inferred types: [array boolean null number object string]';\nCOMMENT ON COLUMN simple.canary IS 'auto-generated projection of JSON at: /canary with inferred types: [string]';\nCOMMENT ON COLUMN simple.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_standard (\n\tid BIGINT,\n\t_meta SUPER,\n\tflow_published_at TIMESTAMPTZ,\n\tint BIGINT,\n\tstr TEXT\n);\n\nCOMMENT ON TABLE duplicate_keys_standard IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/duplicated-keys';\nCOMMENT ON COLUMN duplicate_keys_standard.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN duplicate_keys_standard._meta IS 'auto-generated projection of JSON at: /_meta with inferred types: [array boolean null number object string]';\nCOMMENT ON COLUMN duplicate_keys_standard.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN duplicate_keys_standard.int IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\nCOMMENT ON COLUMN duplicate_keys_standard.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_delta (\n\tid BIGINT,\n\tflow_published_at TIMESTAMPTZ,\n\tint BIGINT,\n\tstr TEXT\n);\n\nCOMMENT ON TABLE duplicate_keys_delta IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/duplicated-keys';\nCOMMENT ON COLUMN duplicate_keys_delta.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN duplicate_keys_delta.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN duplicate_keys_delta.int IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\nCOMMENT ON COLUMN duplicate_keys_delta.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_delta_exclude_flow_doc (\n\tid BIGINT,\n\tflow_published_at TIMESTAMPTZ,\n\tint BIGINT,\n\tstr TEXT\n);\n\nCOMMENT ON TABLE duplicate_keys_delta_exclude_flow_doc IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/duplicated-keys';\nCOMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.int IS 'auto-generated projection of JSON at: /int with inferred types: [integer]';\nCOMMENT ON COLUMN duplicate_keys_delta_exclude_flow_doc.str IS 'auto-generated projection of JSON at: /str with inferred types: [string]';\n\n\nCREATE TABLE IF NOT EXISTS multiple_types (\n\tid BIGINT,\n\t_meta SUPER,\n\tarray_int SUPER,\n\tbinary_field TEXT,\n\tbool_field BOOLEAN,\n\tfloat_field DOUBLE PRECISION,\n\tflow_published_at TIMESTAMPTZ,\n\tmultiple SUPER,\n\tnested SUPER,\n\tnullable_int BIGINT,\n\tstr_field TEXT\n);\n\nCOMMENT ON TABLE multiple_types IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/multiple-data-types';\nCOMMENT ON COLUMN multiple_types.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN multiple_types._meta IS 'auto-generated projection of JSON at: /_meta with inferred types: [array boolean null number object string]';\nCOMMENT ON COLUMN multiple_types.array_int IS 'auto-generated projection of JSON at: /array_int with inferred types: [array]';\nCOMMENT ON COLUMN multiple_types.binary_field IS 'auto-generated projection of JSON at: /binary_field with inferred types: [string]';\nCOMMENT ON COLUMN multiple_types.bool_field IS 'auto-generated projection of JSON at: /bool_field with inferred types: [boolean]';\nCOMMENT ON COLUMN multiple_types.float_field IS 'auto-generated projection of JSON at: /float_field with inferred types: [number]';\nCOMMENT ON COLUMN multiple_types.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN multiple_types.multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [array boolean null number object string]';\nCOMMENT ON COLUMN multiple_types.nested IS 'auto-generated projection of JSON at: /nested with inferred types: [object]';\nCOMMENT ON COLUMN multiple_types.nullable_int IS 'auto-generated projection of JSON at: /nullable_int with inferred types: [integer null]';\nCOMMENT ON COLUMN multiple_types.str_field IS 'auto-generated projection of JSON at: /str_field with inferred types: [string]';\n\n\nCREATE TABLE IF NOT EXISTS formatted_strings (\n\tid BIGINT,\n\t_meta SUPER,\n\tdate DATE,\n\tdatetime TIMESTAMPTZ,\n\tflow_published_at TIMESTAMPTZ,\n\tint_and_str NUMERIC(38,0),\n\tint_str NUMERIC(38,0),\n\tnum_and_str DOUBLE PRECISION,\n\tnum_str DOUBLE PRECISION,\n\ttime TEXT\n);\n\nCOMMENT ON TABLE formatted_strings IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/formatted-strings';\nCOMMENT ON COLUMN formatted_strings.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN formatted_strings._meta IS 'auto-generated projection of JSON at: /_meta with inferred types: [array boolean null number object string]';\nCOMMENT ON COLUMN formatted_strings.date IS 'auto-generated projection of JSON at: /date with inferred types: [string]';\nCOMMENT ON COLUMN formatted_strings.datetime IS 'auto-generated projection of JSON at: /datetime with inferred types: [string]';\nCOMMENT ON COLUMN formatted_strings.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN formatted_strings.int_and_str IS 'auto-generated projection of JSON at: /int_and_str with inferred types: [integer string]';\nCOMMENT ON COLUMN formatted_strings.int_str IS 'auto-generated projection of JSON at: /int_str with inferred types: [string]';\nCOMMENT ON COLUMN formatted_strings.num_and_str IS 'auto-generated projection of JSON at: /num_and_str with inferred types: [number string]';\nCOMMENT ON COLUMN formatted_strings.num_str IS 'auto-generated projection of JSON at: /num_str with inferred types: [string]';\nCOMMENT ON COLUMN formatted_strings.time IS 'auto-generated projection of JSON at: /time with inferred types: [string]';\n\n\nCREATE TABLE IF NOT EXISTS long_string (\n\tid TEXT,\n\t_meta SUPER,\n\tflow_published_at TIMESTAMPTZ,\n\tstr_field TEXT\n);\n\nCOMMENT ON TABLE long_string IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/long-string';\nCOMMENT ON COLUMN long_string.id IS 'auto-generated projection of JSON at: /id with inferred types: [string]';\nCOMMENT ON COLUMN long_string._meta IS 'auto-generated projection of JSON at: /_meta with inferred types: [array boolean null number object string]';\nCOMMENT ON COLUMN long_string.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\nCOMMENT ON COLUMN long_string.str_field IS 'auto-generated projection of JSON at: /str_field with inferred types: [string]';\n\n\nCREATE TABLE IF NOT EXISTS deletions (\n\tid BIGINT,\n\t_meta SUPER,\n\t\"_meta/op\" TEXT,\n\tflow_published_at TIMESTAMPTZ\n);\n\nCOMMENT ON TABLE deletions IS 'Generated for materialization tests/materialize-redshift/materialize of collection tests/deletions';\nCOMMENT ON COLUMN deletions.id IS 'auto-generated projection of JSON at: /id with inferred types: [integer]';\nCOMMENT ON COLUMN deletions._meta IS 'auto-generated projection of JSON at: /_meta with inferred types: [object]';\nCOMMENT ON COLUMN deletions.\"_meta/op\" IS 'auto-generated projection of JSON at: /_meta/op with inferred types: [string]';\nCOMMENT ON COLUMN deletions.flow_published_at IS 'Flow Publication Time\nFlow publication date-time of this document\nauto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';\n"
 ]
 [
   "connectorState",
@@ -28,51 +28,61 @@
   "_table": "simple",
   "rows": [
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "canary": "amputation's",
       "flow_published_at": "1970-01-01 01:00:00 +0000 UTC",
       "id": 1
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "canary": "armament's",
       "flow_published_at": "1970-01-01 01:00:01 +0000 UTC",
       "id": 2
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "canary": "splatters",
       "flow_published_at": "1970-01-01 01:00:02 +0000 UTC",
       "id": 3
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "canary": "strengthen",
       "flow_published_at": "1970-01-01 01:00:03 +0000 UTC",
       "id": 4
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "canary": "Kringle's",
       "flow_published_at": "1970-01-01 01:00:04 +0000 UTC",
       "id": 5
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "canary": "grosbeak's",
       "flow_published_at": "1970-01-01 01:00:05 +0000 UTC",
       "id": 6
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "canary": "pieced",
       "flow_published_at": "1970-01-01 02:00:00 +0000 UTC",
       "id": 7
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "canary": "roaches",
       "flow_published_at": "1970-01-01 02:00:01 +0000 UTC",
       "id": 8
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "canary": "devilish",
       "flow_published_at": "1970-01-01 02:00:02 +0000 UTC",
       "id": 9
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "canary": "glucose's",
       "flow_published_at": "1970-01-01 02:00:03 +0000 UTC",
       "id": 10
@@ -83,60 +93,70 @@
   "_table": "duplicate_keys_standard",
   "rows": [
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "flow_published_at": "1970-01-01 02:00:04 +0000 UTC",
       "id": 1,
       "int": 7,
       "str": "str 6"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "flow_published_at": "1970-01-01 02:00:05 +0000 UTC",
       "id": 2,
       "int": 9,
       "str": "str 7"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "flow_published_at": "1970-01-01 02:00:06 +0000 UTC",
       "id": 3,
       "int": 11,
       "str": "str 8"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "flow_published_at": "1970-01-01 02:00:07 +0000 UTC",
       "id": 4,
       "int": 13,
       "str": "str 9"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "flow_published_at": "1970-01-01 02:00:08 +0000 UTC",
       "id": 5,
       "int": 15,
       "str": "str 10"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "flow_published_at": "1970-01-01 03:00:00 +0000 UTC",
       "id": 6,
       "int": 11,
       "str": "str 11"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "flow_published_at": "1970-01-01 03:00:01 +0000 UTC",
       "id": 7,
       "int": 12,
       "str": "str 12"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "flow_published_at": "1970-01-01 03:00:02 +0000 UTC",
       "id": 8,
       "int": 13,
       "str": "str 13"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "flow_published_at": "1970-01-01 03:00:03 +0000 UTC",
       "id": 9,
       "int": 14,
       "str": "str 14"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "flow_published_at": "1970-01-01 03:00:04 +0000 UTC",
       "id": 10,
       "int": 15,
@@ -338,6 +358,7 @@
   "_table": "multiple_types",
   "rows": [
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "array_int": "[11,12]",
       "binary_field": null,
       "bool_field": false,
@@ -350,6 +371,7 @@
       "str_field": "str1"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "array_int": "[21,22]",
       "binary_field": null,
       "bool_field": true,
@@ -362,6 +384,7 @@
       "str_field": "str2"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "array_int": "[31,32]",
       "binary_field": null,
       "bool_field": false,
@@ -374,6 +397,7 @@
       "str_field": "str3"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "array_int": "[41,42]",
       "binary_field": null,
       "bool_field": true,
@@ -386,6 +410,7 @@
       "str_field": "str4"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "array_int": "[51,52]",
       "binary_field": null,
       "bool_field": false,
@@ -398,6 +423,7 @@
       "str_field": "str5"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "array_int": "[61,62]",
       "binary_field": null,
       "bool_field": true,
@@ -410,6 +436,7 @@
       "str_field": "str6 v2"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "array_int": "[71,72]",
       "binary_field": null,
       "bool_field": false,
@@ -422,6 +449,7 @@
       "str_field": "str7 v2"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "array_int": "[81,82]",
       "binary_field": null,
       "bool_field": true,
@@ -434,6 +462,7 @@
       "str_field": "str8 v2"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "array_int": "[91,92]",
       "binary_field": "YWxvaGEK",
       "bool_field": false,
@@ -446,6 +475,7 @@
       "str_field": "str9 v2"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "array_int": "[1,2]",
       "binary_field": "c2F5xY1uYXJhCg==",
       "bool_field": true,
@@ -463,6 +493,7 @@
   "_table": "formatted_strings",
   "rows": [
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "date": "0000-01-01 00:00:00 +0000 UTC",
       "datetime": "0000-01-01 00:00:00 +0000 UTC",
       "flow_published_at": "1970-01-01 02:00:13 +0000 UTC",
@@ -474,6 +505,7 @@
       "time": "00:00:00Z"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "date": "1999-02-02 00:00:00 +0000 UTC",
       "datetime": "1999-02-02 14:20:12.33 +0000 UTC",
       "flow_published_at": "1970-01-01 02:00:14 +0000 UTC",
@@ -485,6 +517,7 @@
       "time": "14:20:12.33Z"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "date": "1000-03-03 00:00:00 +0000 UTC",
       "datetime": "1000-03-03 23:59:38.1 +0000 UTC",
       "flow_published_at": "1970-01-01 01:00:11 +0000 UTC",
@@ -496,6 +529,7 @@
       "time": "23:59:38.10Z"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "date": "2023-08-29 00:00:00 +0000 UTC",
       "datetime": "2023-08-29 23:59:38 +0000 UTC",
       "flow_published_at": "1970-01-01 01:00:12 +0000 UTC",
@@ -507,6 +541,7 @@
       "time": "23:59:38Z"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "date": "9999-12-31 00:00:00 +0000 UTC",
       "datetime": "9999-12-31 23:59:59 +0000 UTC",
       "flow_published_at": "1970-01-01 02:00:15 +0000 UTC",
@@ -518,6 +553,7 @@
       "time": "23:59:59Z"
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "date": null,
       "datetime": null,
       "flow_published_at": "1970-01-01 02:00:16 +0000 UTC",
@@ -529,6 +565,7 @@
       "time": null
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "date": null,
       "datetime": null,
       "flow_published_at": "1970-01-01 02:00:17 +0000 UTC",
@@ -540,6 +577,7 @@
       "time": null
     },
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "date": null,
       "datetime": null,
       "flow_published_at": "1970-01-01 02:00:18 +0000 UTC",
@@ -556,6 +594,7 @@
   "_table": "long_string",
   "rows": [
     {
+      "_meta": "{\"uuid\":\"<uuid>\"}",
       "flow_published_at": "1970-01-01 02:00:24 +0000 UTC",
       "id": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru.",
       "str_field": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru."
@@ -566,11 +605,13 @@
   "_table": "deletions",
   "rows": [
     {
+      "_meta": "{\"op\":\"u\",\"uuid\":\"<uuid>\"}",
       "_meta/op": "u",
       "flow_published_at": "1970-01-01 02:00:26 +0000 UTC",
       "id": 2
     },
     {
+      "_meta": "{\"op\":\"c\",\"uuid\":\"<uuid>\"}",
       "_meta/op": "c",
       "flow_published_at": "1970-01-01 02:00:27 +0000 UTC",
       "id": 3

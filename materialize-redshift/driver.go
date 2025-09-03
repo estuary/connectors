@@ -427,10 +427,8 @@ func (t *transactor) addBinding(
 	}
 
 	// Choose appropriate templates based on feature flags
-	var deleteQueryTemplate = t.templates.deleteQuery
 	var loadQueryTemplate = t.templates.loadQuery
 	if !featureFlags["flow_document"] && !target.DeltaUpdates {
-		deleteQueryTemplate = t.templates.deleteQueryNoFlowDocument
 		loadQueryTemplate = t.templates.loadQueryNoFlowDocument
 	}
 
@@ -442,7 +440,7 @@ func (t *transactor) addBinding(
 		{&b.createStoreTableSQL, t.templates.createStoreTable},
 		{&b.createDeleteTableSQL, t.templates.createDeleteTable},
 		{&b.mergeIntoSQL, t.templates.mergeInto},
-		{&b.deleteQuerySQL, deleteQueryTemplate},
+		{&b.deleteQuerySQL, t.templates.deleteQuery},
 		{&b.loadQuerySQL, loadQueryTemplate},
 	} {
 		var err error

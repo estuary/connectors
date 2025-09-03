@@ -180,6 +180,65 @@ SELECT * FROM read_json(
 ){{ if $.Document }} WHERE {{ $.Document.Identifier }} != '"delete"'{{- end }};
 {{ end }}
 
+-- Alternative store query for no_flow_document feature flag - uses _meta/op for deletion detection
+
+{{ define "storeQueryNoFlowDocument" }}
+INSERT INTO {{$.Identifier}} BY NAME
+SELECT * FROM read_json(
+	[
+	{{- range $ind, $f := $.Files }}
+	{{- if $ind }}, {{ end }}'{{ $f }}'
+	{{- end -}}
+	],
+	format='newline_delimited',
+	compression='gzip',
+	maximum_object_size=1073741824,
+	columns={
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}}: '{{$col.DDL}}'
+	{{- end }}
+	}
+){{- if $.MetaOpColumn }} WHERE {{ $.MetaOpColumn.Identifier }} != 'd'{{- end }};
+{{ end }}
+
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" }}
+{{ if $.DeltaUpdates -}}
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
+{{ else -}}
+SELECT {{ $.Binding }} AS binding, 
+json_object(
+{{- range $i, $col := $.RootLevelColumns}}
+	{{- if $i}}, {{end}}
+	'{{$col.Field}}', l.{{$col.Identifier}}
+{{- end}}
+) as doc
+FROM {{ $.Identifier }} AS l
+JOIN read_json(
+	[
+	{{- range $ind, $f := $.Files }}
+	{{- if $ind }}, {{ end }}'{{ $f }}'
+	{{- end -}}
+	],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+	{{- range $ind, $bound := $.Bounds }}
+		{{- if $ind }},{{ end }}
+		{{$bound.Identifier}}: '{{$bound.DDL}}'
+	{{- end }}
+	}
+) AS r
+{{- range $ind, $bound := $.Bounds }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end -}}
+{{- end }}
+{{ end }}
+
 -- Templated update of a fence checkpoint.
 
 {{ define "updateFence" }}
@@ -191,9 +250,11 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
 `)
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplStoreQuery        = tplAll.Lookup("storeQuery")
-	tplStoreDeleteQuery  = tplAll.Lookup("storeDeleteQuery")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
+	tplCreateTargetTable              = tplAll.Lookup("createTargetTable")
+	tplStoreQuery                     = tplAll.Lookup("storeQuery")
+	tplStoreQueryNoFlowDocument       = tplAll.Lookup("storeQueryNoFlowDocument")
+	tplStoreDeleteQuery               = tplAll.Lookup("storeDeleteQuery")
+	tplLoadQuery                      = tplAll.Lookup("loadQuery")
+	tplLoadQueryNoFlowDocument        = tplAll.Lookup("loadQueryNoFlowDocument")
+	tplUpdateFence                    = tplAll.Lookup("updateFence")
 )
