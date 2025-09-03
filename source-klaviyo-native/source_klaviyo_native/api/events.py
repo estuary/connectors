@@ -1,5 +1,6 @@
 import asyncio
 import time
+import traceback
 from asyncio import Queue
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -151,11 +152,38 @@ class WorkManager:
         initial_chunks = self._create_initial_chunks(start, end)
         await self.queue_manager.put_work_chunks(initial_chunks)
 
+        def callback(task: asyncio.Task):
+            task_name = task.get_name()
+            status: str = ""
+            stack_trace: str | None = None
+
+            if task.cancelled():
+                status = "cancelled"
+            elif exc:= task.exception():
+                status = f"failed with exception {exc}"
+                stack_frames = task.get_stack()
+                if stack_frames:
+                    stack_trace = "\nStack trace:\n" + "".join(traceback.format_list(traceback.extract_tb(exc.__traceback__)))
+            else:
+                status = "completed"
+
+            if self.shutdown_event.is_set():
+                self.log.debug(f"Task {task_name} {status} after the shutdown event was set.")
+            else:
+                self.log.error(f"Task {task_name} {status} before the shutdown event was set.", {
+                    "active_worker_count": self._active_worker_count,
+                    "stack trace": stack_trace,
+                })
+
+        self.log.debug("Entering TaskGroup.")
         async with asyncio.TaskGroup() as tg:
-            self.worker_tasks = [
-                tg.create_task(
+            self.worker_tasks = []
+            for i in range(DEFAULT_BACKFILL_CONFIG.num_event_workers):
+                worker_id = i + 1
+                task_name = f"chunk_worker_{worker_id}"
+                task = tg.create_task(
                     chunk_worker(
-                        worker_id=i,
+                        worker_id=worker_id,
                         queue_manager=self.queue_manager,
                         work_manager=self,
                         http=self.http,
@@ -163,10 +191,10 @@ class WorkManager:
                         shutdown_event=self.shutdown_event,
                         document_queue=external_queue,
                     ),
-                    name=f"chunk_worker_{i + 1}"
+                    name=task_name
                 )
-                for i in range(DEFAULT_BACKFILL_CONFIG.num_event_workers)
-            ]
+                task.add_done_callback(callback)
+                self.worker_tasks.append(task)
 
             self.subdivision_task = tg.create_task(
                 subdivision_worker(
@@ -176,11 +204,15 @@ class WorkManager:
                 ),
                 name="subdivision_worker"
             )
+            self.subdivision_task.add_done_callback(callback)
 
             self.shutdown_monitor_task = tg.create_task(
                 self._shutdown_monitor(),
                 name="shutdown_monitor"
             )
+            self.shutdown_monitor_task.add_done_callback(callback)
+
+        self.log.debug("Exiting TaskGroup.")
 
     def _create_initial_chunks(self, start: datetime, end: datetime) -> list[DateChunk]:
         return [
@@ -189,6 +221,7 @@ class WorkManager:
         ]
 
     async def _shutdown_monitor(self) -> None:
+        self.log.debug("Shutdown monitor started.")
         while not self.shutdown_event.is_set():
             if not self.are_active_workers() and self.queue_manager.are_all_queues_empty():
                 self.log.debug("All work complete - shutdown monitor initiating shutdown")
@@ -196,6 +229,7 @@ class WorkManager:
                 break
 
             await asyncio.sleep(1)
+        self.log.debug("Shutdown monitor exited.")
 
 
 # chunk_worker pulls a date chunk from the queue and fetches events created in
@@ -223,7 +257,7 @@ async def chunk_worker(
             # No work is available. Check the shutdown_event and then check for more work.
             continue
 
-        log.debug(f"Event worker {worker_id} is working on {chunk.start} to {chunk.end}")
+        log.debug(f"Event worker {worker_id} is marking itself active and is working on {chunk.start} to {chunk.end}")
         is_looking_for_work = False
 
         work_manager.mark_worker_active()
@@ -235,46 +269,53 @@ async def chunk_worker(
         is_divisible = chunk.end - chunk.start >= (SMALLEST_KLAVIYO_DATETIME_GRAIN * 3)
         is_dense_date_window = False
 
-        events_gen = _fetch_events_updated_between(http, log, chunk.start, chunk.end)
+        try:
+            events_gen = _fetch_events_updated_between(http, log, chunk.start, chunk.end)
 
-        async for event in events_gen:
-            event_cursor = event.get_cursor_value()
+            async for event in events_gen:
+                event_cursor = event.get_cursor_value()
 
-            # If this date window is dense (i.e. has a lot of events in it) and there's an idle worker,
-            # divide the rest of the current date window up into smaller chunks so the idle worker
-            # can help process it faster.
-            if (
-                is_dense_date_window and
-                event_cursor > last_cursor and
-                work_manager._active_worker_count < DEFAULT_BACKFILL_CONFIG.num_event_workers
-            ):
-                subdivision_chunk = DateChunk(
-                    start=last_cursor,
-                    end=chunk.end
-                )
-                queue_manager.put_subdivision_chunk(subdivision_chunk)
-                break
+                # If this date window is dense (i.e. has a lot of events in it) and there's an idle worker,
+                # divide the rest of the current date window up into smaller chunks so the idle worker
+                # can help process it faster.
+                if (
+                    is_dense_date_window and
+                    event_cursor > last_cursor and
+                    work_manager._active_worker_count < DEFAULT_BACKFILL_CONFIG.num_event_workers
+                ):
+                    subdivision_chunk = DateChunk(
+                        start=last_cursor,
+                        end=chunk.end
+                    )
+                    queue_manager.put_subdivision_chunk(subdivision_chunk)
+                    break
 
-            last_cursor = event_cursor
-            count += 1
-            await document_queue.put(event)
+                last_cursor = event_cursor
+                count += 1
+                await document_queue.put(event)
 
-            # Check if this is a dense date window that should be divided into smaller chunks.
-            if (
-                is_divisible and
-                not is_dense_date_window and
-                # Check every EVENTS_PAGE_SIZE events to avoid checking too frequently.
-                # It's fine for is_dense_date_window to be set after the worker's been
-                # processing for more than dense_date_window_threshold seconds; the
-                # current date range won't be divided into smaller chunks until another
-                # worker is idle anyway.
-                count % EVENTS_PAGE_SIZE == 0
-            ):
-                elapsed = time.time() - start_time
-                if elapsed > DEFAULT_BACKFILL_CONFIG.dense_date_window_threshold:
-                    is_dense_date_window = True
+                # Check if this is a dense date window that should be divided into smaller chunks.
+                if (
+                    is_divisible and
+                    not is_dense_date_window and
+                    # Check every EVENTS_PAGE_SIZE events to avoid checking too frequently.
+                    # It's fine for is_dense_date_window to be set after the worker's been
+                    # processing for more than dense_date_window_threshold seconds; the
+                    # current date range won't be divided into smaller chunks until another
+                    # worker is idle anyway.
+                    count % EVENTS_PAGE_SIZE == 0
+                ):
+                    elapsed = time.time() - start_time
+                    if elapsed > DEFAULT_BACKFILL_CONFIG.dense_date_window_threshold:
+                        is_dense_date_window = True
 
-        work_manager.mark_worker_inactive()
+            log.debug(f"Event worker {worker_id} is marking itself inactive.")
+            work_manager.mark_worker_inactive()
+        except Exception as e:
+            log.error(f"Event worker {worker_id} encountered an error.", {
+                "exception": e,
+            })
+            raise e
 
     log.debug(f"Event worker {worker_id} exited.")
 
