@@ -7,4 +7,4 @@ $SED_CMD -i'' \
   -e 's|"gs://[^/]*/[^"]*"|"gs://[bucket]/<uuid>"|g' \
   ${SNAPSHOT}
 
-$SED_CMD -i'' 's/"uuid": ".\{36\}\"/"uuid": "<uuid>"/g' ${SNAPSHOT}
+$SED_CMD -i'' 's/\\"uuid\\":\\".\{36\}\\\"/\\"uuid\\":\\"<uuid>\\"/g' ${SNAPSHOT}

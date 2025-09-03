@@ -207,14 +207,12 @@ JOIN {{ $.Identifier}} AS r
 
 {{ define "loadQueryNoFlowDocument" }}
 SELECT {{ $.Binding }}, 
-(
-	SELECT 
+	JSON_OBJECT(
 		{{- range $i, $col := $.RootLevelColumns}}
 			{{- if $i}},{{end}}
-		{{Literal $col.Field}} = r.{{$col.Identifier}}
+		{{Literal $col.Field}}: r.{{$col.Identifier}}
 		{{- end}}
-	FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-) as flow_document
+	) as flow_document
 FROM {{ template "temp_name_load" . }} AS l
 JOIN {{ $.Identifier}} AS r
 {{- range $ind, $bound := $.Bounds }}
@@ -285,9 +283,6 @@ INNER JOIN {{ template "temp_name_store" $ }} AS l
 	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
-{{- if $.MetaOpColumn }}
-	AND l.{{ $.MetaOpColumn.Identifier }} = 'd'
-{{- end }};
 
 INSERT INTO {{$.Identifier}} ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
 SELECT {{ range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{ template "maybe_unbase64" $col }}{{- end }}
