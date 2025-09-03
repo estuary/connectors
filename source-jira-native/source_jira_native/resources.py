@@ -35,6 +35,7 @@ from .models import (
     ResourceState,
     ScreenTabFields,
     StandardPermissions,
+    Statuses,
     SystemAvatars,
     FULL_REFRESH_STREAMS,
     ISSUE_CHILD_STREAMS,
@@ -60,6 +61,7 @@ from .api import (
     snapshot_permissions,
     snapshot_project_child_resources,
     snapshot_screen_tab_fields,
+    snapshot_statuses,
     snapshot_system_avatars,
     url_base,
     ISSUE_JQL_SEARCH_LAG,
@@ -230,6 +232,13 @@ def _get_partial_snapshot_fn(
     elif issubclass(stream, ScreenTabFields):
         snapshot_fn = functools.partial(
             snapshot_screen_tab_fields,
+            http,
+            config.domain,
+            stream,
+        )
+    elif issubclass(stream, Statuses):
+        snapshot_fn = functools.partial(
+            snapshot_statuses,
             http,
             config.domain,
             stream,
