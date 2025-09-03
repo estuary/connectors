@@ -45,10 +45,12 @@ from .models import (
     ProjectComponents,
     ProjectEmails,
     Projects,
+    ProjectStyle,
     ProjectVersions,
     ResponseSizeParameter,
     ScreenTabFields,
     ScreenTabs,
+    Statuses,
     SystemAvatarsResponse,
     EPOCH,
 )
@@ -563,6 +565,9 @@ async def _fetch_project_child_resources(
         gen = _paginate_through_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, PaginatedResponse, log)
     elif issubclass(stream, ProjectEmails):
         gen = _fetch_project_email(http, domain, project, log)
+    elif issubclass(stream, Statuses):
+        extra_params = {"projectId": project.id}
+        gen = _paginate_through_resources(http, domain, stream.api, stream.path, stream.extra_headers, extra_params, PaginatedResponse, log)
     else:
         raise RuntimeError(f"Unknown project child stream {stream.name}.")
 
@@ -582,12 +587,13 @@ async def snapshot_project_child_resources(
     domain: str,
     stream: type[ProjectChildStream],
     log: Logger,
+    ignore_classic_projects: bool = False
 ) -> AsyncGenerator[FullRefreshResource, None]:
 
     extra_params = {
         # Trying to fetch child resources of an archived or deleted project fails, so we only use ids
         # of live projects when snapshotting project child resources.
-        "status": "live",
+        "status": stream.project_status_param,
         # Some child resources cannot be accessed if the user does not have permission to edit the project.
         # For those streams, we check the expanded permissions field before making an API request.
         "expand": "permissions"
@@ -595,13 +601,54 @@ async def snapshot_project_child_resources(
 
     projects: list[AbbreviatedProject] = []
     async for record in _paginate_through_resources(http, domain, Projects.api, Projects.path, Projects.extra_headers, extra_params, Projects.response_model, log):
-        projects.append(
-            AbbreviatedProject.model_validate(record)
-        )
+        project = AbbreviatedProject.model_validate(record)
+
+        if project.style == ProjectStyle.CLASSIC and ignore_classic_projects:
+            continue
+
+        projects.append(project)
 
     for project in projects:
         async for doc in _fetch_project_child_resources(http, domain, project, stream, log):
             yield doc
+
+
+async def snapshot_statuses(
+    http: HTTPSession,
+    domain: str,
+    stream: type[Statuses],
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    # Statuses can either be global or scoped to a specific project. To capture
+    # all statuses, we first fetch all global statuses, then fetch project-scoped
+    # statuses.
+    status_ids: set[str] = set()
+
+    # Fetch global statuses.
+    async for record in _paginate_through_resources(http, domain, stream.api, stream.path, stream.extra_headers, stream.extra_params, PaginatedResponse, log):
+        id: str | None = record.get("id", None)
+        assert isinstance(id, str)
+        if id not in status_ids:
+            global_status_count += 1
+            yield FullRefreshResource.model_validate(record)
+            status_ids.add(id)
+
+    # Fetch project-scoped statuses.
+    async for status in snapshot_project_child_resources(
+        http,
+        domain,
+        stream,
+        log,
+        # Classic projects only have global statuses, not project-scoped statuses. Global
+        # statuses were already fetched, so we can safely ignore classic projects.
+        ignore_classic_projects=True
+    ):
+        id: str | None = status.model_dump().get("id", None)
+        assert isinstance(id, str)
+        if id not in status_ids:
+            project_status_count += 1
+            yield status
+            status_ids.add(id)
 
 
 async def snapshot_board_child_resources(

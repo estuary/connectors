@@ -87,6 +87,11 @@ ConnectorState = GenericConnectorState[ResourceState]
 APIRecord = dict[str, Any]
 
 
+class ProjectStyle(StrEnum):
+    CLASSIC = "classic"
+    NEXT_GEN = "next-gen"
+
+
 class AbbreviatedProject(BaseModel):
     model_config = {"extra": "ignore"}
     
@@ -95,6 +100,7 @@ class AbbreviatedProject(BaseModel):
 
     id: str
     permissions: ProjectPermissions
+    style: ProjectStyle
 
 
 class FullRefreshResource(BaseDocument, extra="allow"):
@@ -439,6 +445,10 @@ class ScreenTabFields(FullRefreshStream):
 
 class ProjectChildStream(FullRefreshStream):
     add_parent_id_to_documents: ClassVar[bool] = True
+    # Trying to fetch child resources of an archived or deleted project fails
+    # for most child resources, so we default to only fetching child resources
+    # of live projects.
+    project_status_param: ClassVar[str] = "live"
 
 
 class ProjectAvatars(ProjectChildStream):
@@ -466,6 +476,13 @@ class ProjectVersions(ProjectChildStream):
     name: ClassVar[str] = "project_versions"
     path: ClassVar[str] = "version"
     add_parent_id_to_documents: ClassVar[bool] = False
+
+
+class Statuses(ProjectChildStream):
+    name: ClassVar[str] = "statuses"
+    path: ClassVar[str] = "statuses/search"
+    add_parent_id_to_documents: ClassVar[bool] = False
+    project_status_param: ClassVar[str] = "live,archived"
 
 
 class IssueChildResource(JiraResource):
@@ -611,6 +628,7 @@ FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     Screens,
     ServiceDesks,
     Sprints,
+    Statuses,
     SystemAvatars,
     Users,
     WorkflowSchemes,
