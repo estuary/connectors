@@ -667,12 +667,16 @@ async def snapshot_board_child_resources(
             assert isinstance(id, int)
             board_ids.append(id)
 
+    seen_ids: set[int] = set()
     for id in board_ids:
         path = f"{Boards.path}/{id}/{stream.path}"
         try:
             async for record in _paginate_through_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, PaginatedResponse, log):
                 # Validate with the JiraResource model so the common `id` field is easily accessible on yielded documents.
-                yield JiraResource.model_validate(record)
+                doc = JiraResource.model_validate(record)
+                if doc.id not in seen_ids:
+                    yield doc
+                    seen_ids.add(doc.id)
         except HTTPError as err:
             if err.code == 400 and BOARD_DOES_NOT_SUPPORT_SPRINTS in err.message:
                 continue
