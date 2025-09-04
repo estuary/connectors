@@ -77,8 +77,7 @@ Binding 0:
             "required": [
               "polled",
               "index",
-              "row_id",
-              "source"
+              "row_id"
             ]
           },
           "data": {

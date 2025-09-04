@@ -80,8 +80,7 @@ Binding 0:
             "required": [
               "polled",
               "index",
-              "row_id",
-              "source"
+              "row_id"
             ]
           },
           "id": {
@@ -198,8 +197,7 @@ Binding 1:
             "required": [
               "polled",
               "index",
-              "row_id",
-              "source"
+              "row_id"
             ]
           },
           "id": {

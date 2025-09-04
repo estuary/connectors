@@ -138,7 +138,7 @@ type documentMetadata struct {
 	RowID  int64     `json:"row_id" jsonschema:"title=Row ID,description=Row ID of the Document, counting up from zero."`
 	Op     string    `json:"op,omitempty" jsonschema:"title=Change Operation,description=Operation type (c: Create / u: Update / d: Delete),enum=c,enum=u,enum=d,default=u"`
 
-	Source documentSourceMetadata `json:"source"`
+	Source documentSourceMetadata `json:"source,omitempty"`
 }
 
 // documentSourceMetadata contains the source metadata located at /_meta/source
