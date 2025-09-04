@@ -74,7 +74,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 // is used for a SHOW COLUMNS IN TABLE <table> - it may be more efficient to do
 // SHOW COLUMNS IN SCHEMA, but there is a documented limit of 10,000 results
 // from SHOW COLUMNS and it can't be paginated.
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, resourcePaths [][]string, is *boilerplate.InfoSchema) error {
 	existingSchemas, err := c.ListSchemas(ctx)
 	if err != nil {
 		return fmt.Errorf("listing schemas: %w", err)

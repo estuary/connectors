@@ -78,7 +78,7 @@ func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr 
 	return errs
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, resourcePaths [][]string, is *boilerplate.InfoSchema) error {
 	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, c.ep.Config.Database, resourcePaths)
 }
 

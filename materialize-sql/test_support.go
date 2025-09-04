@@ -431,3 +431,21 @@ func DumpTestTable(t *testing.T, db *stdsql.DB, qualifiedTableName string) (stri
 	}
 	return b.String(), nil
 }
+
+func RunIntegrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	source string,
+	finalResourchPathKey string,
+) {
+	boilerplate.RunIntegrationTest(t, driver.newMaterialization, source, finalResourchPathKey)
+}
+
+func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	sourcePath string,
+	makeResourceFn func(string) RC,
+) {
+	boilerplate.RunApplyTest(t, driver.newMaterialization, sourcePath, makeResourceFn)
+}

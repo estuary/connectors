@@ -20,7 +20,7 @@ type Client interface {
 	// resourcePaths. It doesn't necessarily need to include all tables in the
 	// entire destination system, but must include all tables in the relevant
 	// schemas.
-	PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error
+	PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error
 
 	// CreateTable creates a table in the destination system.
 	CreateTable(ctx context.Context, tc TableCreate) error
@@ -39,6 +39,10 @@ type Client interface {
 	// but all existing materialized columns are still compatible with the
 	// materialized collection.
 	TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error)
+
+	CleanupTestTask(ctx context.Context, taskName string) error
+
+	SnapshotTestResource(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error)
 
 	// Close is called to free up any resources held by the Client.
 	Close()

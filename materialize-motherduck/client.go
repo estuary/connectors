@@ -34,7 +34,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 	}, nil
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, c.ep.Config.Database, resourcePaths)
 }
 
@@ -165,6 +165,51 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 	return sql.StdInstallFence(ctx, c.db, checkpoints, fence)
 }
 
+func (c *client) CleanupTestTask(ctx context.Context, taskName string) error {
+	_, err := c.db.ExecContext(ctx, fmt.Sprintf(
+		"delete from %s where materialization='%s';",
+		duckDialect.Identifier(c.ep.Config.Database, c.ep.Config.Schema, sql.DefaultFlowCheckpoints),
+		taskName,
+	))
+
+	return err
+}
+
+func (c *client) SnapshotTestResource(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	return dumpTable(ctx, c.db, duckDialect.Identifier(path...))
+}
+
 func (c *client) Close() {
 	c.db.Close()
+}
+
+func dumpTable(ctx context.Context, db *stdsql.DB, table string) ([]string, [][]any, error) {
+	sql := fmt.Sprintf("select * from %s;", table)
+
+	rows, err := db.QueryContext(ctx, sql)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to query table %s: %w", table, err)
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get columns for table %s: %w", table, err)
+	}
+
+	var out [][]any
+	for rows.Next() {
+		var data = make([]any, len(cols))
+		var ptrs = make([]any, len(cols))
+		for i := range data {
+			ptrs[i] = &data[i]
+		}
+		if err = rows.Scan(ptrs...); err != nil {
+			return nil, nil, err
+		}
+
+		out = append(out, data)
+	}
+
+	return cols, out, nil
 }
