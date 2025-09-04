@@ -40,8 +40,8 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 	// Generate discovery resource and collection schema for this table
 	var bindings []*pc.Response_Discovered_Binding
 	for tableID, table := range tableInfo {
-		var recommendedName = recommendedCatalogName(table.Schema, table.Name)
-		var res, err = drv.GenerateResource(&cfg, recommendedName, table.Schema, table.Name, table.Type)
+		var resourceName = recommendedResourceName(table.Schema, table.Name)
+		var res, err = drv.GenerateResource(&cfg, resourceName, table.Schema, table.Name, table.Type)
 		if err != nil {
 			log.WithFields(log.Fields{
 				"reason": err,
@@ -63,7 +63,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 		}
 
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
-			RecommendedName:    recommendedName,
+			RecommendedName:    recommendedCatalogName(table.Schema, table.Name),
 			ResourceConfigJson: resourceConfigJSON,
 			DocumentSchemaJson: generatedSchema,
 			Key:                collectionKey,
@@ -541,6 +541,14 @@ var databaseTypeToJSON = map[string]basicColumnType{
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
 
 func recommendedCatalogName(schema, table string) string {
+	schema = catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(schema), "_")
+	table = catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(table), "_")
+	return schema + "/" + table
+}
+
+// recommendedResourceName implements the old name-recommendation logic so that the name
+// field of discovered bindings remains unchanged even though the catalog name is different.
+func recommendedResourceName(schema, table string) string {
 	var catalogName string
 	// Omit 'default schema' names for Postgres and SQL Server. There is
 	// no default schema for MySQL databases.

@@ -38,8 +38,8 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 
 	var bindings []*pc.Response_Discovered_Binding
 	for tableID, table := range tableInfo {
-		var recommendedName = recommendedCatalogName(table.Owner, table.Name)
-		var res, err = drv.GenerateResource(recommendedName, table.Owner, table.Name, "TABLE")
+		var resourceName = recommendedResourceName(table.Owner, table.Name)
+		var res, err = drv.GenerateResource(resourceName, table.Owner, table.Name, "TABLE")
 		if err != nil {
 			log.WithFields(log.Fields{
 				"reason": err,
@@ -58,7 +58,7 @@ func (drv *BatchSQLDriver) Discover(ctx context.Context, req *pc.Request_Discove
 		}
 
 		bindings = append(bindings, &pc.Response_Discovered_Binding{
-			RecommendedName:    recommendedName,
+			RecommendedName:    recommendedCatalogName(table.Owner, table.Name),
 			ResourceConfigJson: resourceConfigJSON,
 			DocumentSchemaJson: collectionSchema,
 			Key:                collectionKey,
@@ -443,6 +443,14 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)
 
 func recommendedCatalogName(schema, table string) string {
+	schema = catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(schema), "_")
+	table = catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(table), "_")
+	return schema + "/" + table
+}
+
+// recommendedResourceName implements the old name-recommendation logic so that the name
+// field of discovered bindings remains unchanged even though the catalog name is different.
+func recommendedResourceName(schema, table string) string {
 	var catalogName = schema + "_" + table
 	return catalogNameSanitizerRe.ReplaceAllString(strings.ToLower(catalogName), "_")
 }
