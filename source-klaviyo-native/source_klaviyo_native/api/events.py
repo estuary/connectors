@@ -1,7 +1,7 @@
 import asyncio
 import time
 import traceback
-from asyncio import Queue
+from asyncio import CancelledError, Queue
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from logging import Logger
@@ -9,6 +9,7 @@ from typing import AsyncGenerator, Optional
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
+from estuary_cdk.utils import format_error_message
 
 from ..models import Events, IncrementalStream, LowerBoundOperator, UpperBoundOperator
 from ..shared import dt_to_str, split_date_window, str_to_dt
@@ -129,6 +130,7 @@ class WorkManager:
         self.shutdown_monitor_task: Optional[asyncio.Task] = None
 
         self._active_worker_count = 0
+        self.first_worker_error: str | None = None
 
     def mark_worker_active(self) -> None:
         if self._active_worker_count >= DEFAULT_BACKFILL_CONFIG.num_event_workers:
@@ -160,7 +162,7 @@ class WorkManager:
             if task.cancelled():
                 status = "cancelled"
             elif exc:= task.exception():
-                status = f"failed with exception {exc}"
+                status = f"failed with exception {format_error_message(exc)}"
                 stack_frames = task.get_stack()
                 if stack_frames:
                     stack_trace = "\nStack trace:\n" + "".join(traceback.format_list(traceback.extract_tb(exc.__traceback__)))
@@ -171,6 +173,7 @@ class WorkManager:
                 self.log.debug(f"Task {task_name} {status} after the shutdown event was set.")
             else:
                 self.log.error(f"Task {task_name} {status} before the shutdown event was set.", {
+                    "first_worker_error": self.first_worker_error,
                     "active_worker_count": self._active_worker_count,
                     "stack trace": stack_trace,
                 })
@@ -245,31 +248,31 @@ async def chunk_worker(
     shutdown_event: asyncio.Event,
     document_queue: asyncio.Queue,
 ) -> None:
-    log.debug(f"Event worker {worker_id} started.")
+    try:
+        log.debug(f"Event worker {worker_id} started.")
 
-    is_looking_for_work = False
-    while not shutdown_event.is_set():
-        chunk = await queue_manager.get_work_chunk(timeout=DEFAULT_BACKFILL_CONFIG.worker_timeout)
-        if chunk is None:
-            if not is_looking_for_work:
-                log.debug(f"Event worker {worker_id} is idle and checking for new work.")
-                is_looking_for_work = True
-            # No work is available. Check the shutdown_event and then check for more work.
-            continue
-
-        log.debug(f"Event worker {worker_id} is marking itself active and is working on {chunk.start} to {chunk.end}")
         is_looking_for_work = False
+        while not shutdown_event.is_set():
+            chunk = await queue_manager.get_work_chunk(timeout=DEFAULT_BACKFILL_CONFIG.worker_timeout)
+            if chunk is None:
+                if not is_looking_for_work:
+                    log.debug(f"Event worker {worker_id} is idle and checking for new work.")
+                    is_looking_for_work = True
+                # No work is available. Check the shutdown_event and then check for more work.
+                continue
 
-        work_manager.mark_worker_active()
+            log.debug(f"Event worker {worker_id} is marking itself active and is working on {chunk.start} to {chunk.end}")
+            is_looking_for_work = False
 
-        start_time = time.time()
-        count = 0
-        elapsed: float  = 0
-        last_cursor = chunk.start
-        is_divisible = chunk.end - chunk.start >= (SMALLEST_KLAVIYO_DATETIME_GRAIN * 3)
-        is_dense_date_window = False
+            work_manager.mark_worker_active()
 
-        try:
+            start_time = time.time()
+            count = 0
+            elapsed: float  = 0
+            last_cursor = chunk.start
+            is_divisible = chunk.end - chunk.start >= (SMALLEST_KLAVIYO_DATETIME_GRAIN * 3)
+            is_dense_date_window = False
+
             events_gen = _fetch_events_updated_between(http, log, chunk.start, chunk.end)
 
             async for event in events_gen:
@@ -311,13 +314,33 @@ async def chunk_worker(
 
             log.debug(f"Event worker {worker_id} is marking itself inactive.")
             work_manager.mark_worker_inactive()
-        except Exception as e:
-            log.error(f"Event worker {worker_id} encountered an error.", {
-                "exception": e,
-            })
-            raise e
 
-    log.debug(f"Event worker {worker_id} exited.")
+        log.debug(f"Event worker {worker_id} exited.")
+    except CancelledError as e:
+        # If no worker has been cancelled or encountered an exception yet,
+        # that means this worker was cancelled from something other than the
+        # TaskGroup. A non-CancelledError should be raised so the
+        # TaskGroup cancels the remaining tasks & propagates an exception
+        # up through the connector.
+        if not work_manager.first_worker_error:
+            msg = format_error_message(e)
+            work_manager.first_worker_error = msg
+
+            raise Exception(f"Event worker {worker_id} was unexpectedly cancelled: {msg}")
+        # If a different worker already failed, then this worker task was cancelled by
+        # the TaskGroup as part of it's exception handling and it's safe to propagate the
+        # CancelledError.
+        else:
+            raise e
+    except BaseException as e:
+        msg = format_error_message(e)
+        if not work_manager.first_worker_error:
+            work_manager.first_worker_error = msg
+
+        log.error(f"Event worker {worker_id} encountered an error.", {
+            "exception": msg,
+        })
+        raise e
 
 
 # subdivision_worker handles splitting date windows with
@@ -382,7 +405,7 @@ async def backfill_events(
             await queue.put(None)
         except* Exception as eg:
             first_exception = eg.exceptions[0]
-            log.error(f"Populating queue failed: {first_exception}")
+            log.error(f"Populating queue failed: {format_error_message(first_exception)}")
             await queue.put(first_exception)
 
     # Start populating the queue in the background.
