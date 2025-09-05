@@ -560,7 +560,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 
 		}
 
-		if !mCfg.NoTruncateResources && doTruncate {
+		if !mCfg.NoTruncateResources && !parsedFlags["always_drop_tables_on_backfill"] && doTruncate {
 			if desc, action, err := materializer.TruncateResource(ctx, thisBinding.ResourcePath); err != nil {
 				return nil, fmt.Errorf("getting TruncateResource action: %w", err)
 			} else {
