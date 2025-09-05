@@ -511,11 +511,6 @@ class HTTPMixin(Mixin, HTTPSession):
                         try:
                             async for chunk in resp.content.iter_any():
                                 yield chunk
-                        except Exception as e:
-                            log.error("Encountered error while streaming response body.", {
-                                "exception": e,
-                            })
-                            raise e
                         finally:
                             await resp.release()
 
