@@ -2,6 +2,16 @@ from collections.abc import Mapping
 from typing import Any
 
 
+def format_error_message(err: BaseException):
+    msg = f"{err}"
+    # If the exeption doesn't have a meaningful string representation,
+    # set it to the exception type's name so something more useful is logged.
+    if msg == "":
+        msg = f"{type(err).__name__}"
+
+    return msg
+
+
 def sort_dict(obj: Any) -> Any:
     if isinstance(obj, Mapping):
         return {k: sort_dict(v) for k, v in sorted(obj.items())}
