@@ -629,7 +629,6 @@ async def snapshot_statuses(
         id: str | None = record.get("id", None)
         assert isinstance(id, str)
         if id not in status_ids:
-            global_status_count += 1
             yield FullRefreshResource.model_validate(record)
             status_ids.add(id)
 
@@ -646,7 +645,6 @@ async def snapshot_statuses(
         id: str | None = status.model_dump().get("id", None)
         assert isinstance(id, str)
         if id not in status_ids:
-            project_status_count += 1
             yield status
             status_ids.add(id)
 
