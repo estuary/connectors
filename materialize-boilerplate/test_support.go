@@ -54,106 +54,146 @@ func loadSpec(t *testing.T, path string) *pf.MaterializationSpec {
 	return &spec
 }
 
-// validateReq makes a mock Validate request object from a built spec fixture. It only works with a
-// single binding.
-func ValidateReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage) *pm.Request_Validate {
-	req := &pm.Request_Validate{
-		Name:          spec.Name,
-		ConnectorType: spec.ConnectorType,
-		ConfigJson:    config,
-		Bindings: []*pm.Request_Validate_Binding{{
-			ResourceConfigJson: resourceConfig,
-			Collection:         spec.Bindings[0].Collection,
-			FieldConfigJsonMap: spec.Bindings[0].FieldSelection.FieldConfigJsonMap,
-			Backfill:           spec.Bindings[0].Backfill,
-		}},
-		LastMaterialization: lastSpec,
-	}
+const testTableIdentifer = "_flow_test_"
 
-	return req
-}
+func RunIntegrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	source string,
+	finalResourchPathKey string,
+) {
+	ctx := context.Background()
 
-// applyReq conjures a pm.Request_Apply from a spec and validate response.
-func ApplyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage, validateRes *pm.Response_Validated, includeOptional bool) *pm.Request_Apply {
-	spec.ConfigJson = config
-	spec.Bindings[0].ResourceConfigJson = resourceConfig
-	spec.Bindings[0].ResourcePath = validateRes.Bindings[0].ResourcePath
-	spec.Bindings[0].DeltaUpdates = validateRes.Bindings[0].DeltaUpdates
-	spec.Bindings[0].FieldSelection = SelectedFields(validateRes.Bindings[0], spec.Bindings[0].Collection, includeOptional)
+	// Parse the bundled spec to extract the tasks and their bindings.
+	var parsed parsedSpec
+	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", source).CombinedOutput()
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(bundled, &parsed))
 
-	req := &pm.Request_Apply{
-		Materialization:     spec,
-		Version:             "someVersion",
-		LastMaterialization: lastSpec,
-	}
+	// Extract each task's config and bindings.
+	ts := time.Now().Unix()
+	tasks := make(map[string]testTask[EC, FC, RC, MT])
+	for taskName, spec := range parsed.Materializations {
+		var cfg EC
+		require.NoError(t, unmarshalStrict(decryptConfig(t, spec.Endpoint.Local.Config), &cfg))
+		materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
+		require.NoError(t, err)
 
-	return req
-}
+		// A suffix is added to the resource final path component. It includes a
+		// random part to ensure that concurrent runs of the test don't
+		// interfere with each other, as well as a timestamp to facilitate
+		// cleaning up leftover resources that weren't cleanup by a prior run
+		// for some reason.
+		suffix := fmt.Sprintf("_%s%s_%d", uuid.NewString()[:8], testTableIdentifer, ts)
 
-// selectedFields creates a field selection that includes all possible fields.
-func SelectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec, includeOptional bool) pf.FieldSelection {
-	out := pf.FieldSelection{}
+		var bindings []testBinding
+		for bIdx, binding := range spec.Bindings {
+			var resourceCfg RC
+			require.NoError(t, unmarshalStrict(binding.Resource, &resourceCfg))
+			path, _, err := resourceCfg.WithDefaults(cfg).Parameters()
+			require.NoError(t, err)
 
-	for field, constraint := range binding.Constraints {
-		if constraint.Type.IsForbidden() || !includeOptional && constraint.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL {
-			continue
+			// Swap out the reported final path component from the spec with one
+			// that has the suffix. This also needs to be added to the spec file
+			// read by `flowctl preview`, which will be written out from the
+			// working bundled spec.
+			path[len(path)-1] = path[len(path)-1] + suffix
+			bundled, err = sjson.SetBytes(
+				bundled,
+				fmt.Sprintf("materializations.%s.bindings.%d.resource.%s", taskName, bIdx, finalResourchPathKey),
+				path[len(path)-1],
+			)
+
+			bindings = append(bindings, testBinding{
+				source: binding.Source,
+				path:   path,
+			})
 		}
 
-		proj := collection.GetProjection(field)
-		if proj.IsPrimaryKey {
-			out.Keys = append(out.Keys, field)
-		} else if proj.IsRootDocumentProjection() {
-			if out.Document == "" {
-				out.Document = field
-			} else {
-				// Handle cases with more than one root document projection selected - the "first"
-				// one is the document, and the rest are materialized as values.
-				out.Values = append(out.Values, field)
+		tasks[taskName] = testTask[EC, FC, RC, MT]{
+			materializer: materializer,
+			bindings:     bindings,
+			suffix:       suffix,
+		}
+	}
+
+	t.Cleanup(func() { cleanupTasks(t, tasks) })
+
+	// Write out the modified bundled spec to a temp file for `flowctl preview`.
+	// This bundle now has the resource suffixes added to it. `flowctl preview`
+	// will drive the materialization using those suffixed paths.
+	dir := t.TempDir()
+	suffixedSource := filepath.Join(dir, "test.flow.yaml")
+	require.NoError(t, os.WriteFile(suffixedSource, bundled, 0o600))
+
+	// Drive the materialization and collect the results.
+	var mu sync.Mutex
+	group, groupCtx := errgroup.WithContext(ctx)
+	var results []taskResult
+	for name, task := range tasks {
+		group.Go(func() error {
+			actionDescription := driveTask(t, ctx, true, suffixedSource, name, "../materialize-boilerplate/testdata/integration/fixture.json")
+			res := taskResult{name: name, flowctlOutput: actionDescription}
+
+			for _, binding := range task.bindings {
+				columnNames, rows, err := task.materializer.SnapshotTestResource(groupCtx, binding.path)
+				require.NoError(t, err)
+
+				sorted, err := sortRows(columnNames, rows)
+				require.NoError(t, err)
+
+				var data strings.Builder
+				enc := json.NewEncoder(&data)
+				for _, r := range sorted {
+					doc := make(map[string]any, len(columnNames))
+					for i, col := range columnNames {
+						doc[col] = r[i]
+					}
+					require.NoError(t, enc.Encode(doc))
+				}
+
+				res.bindingResults = append(res.bindingResults, bindingResult{
+					source: binding.source,
+					path:   binding.path,
+					data:   data.String(),
+				})
 			}
-		} else {
-			out.Values = append(out.Values, field)
-		}
-	}
 
-	slices.Sort(out.Keys)
-	slices.Sort(out.Values)
+			mu.Lock()
+			results = append(results, res)
+			mu.Unlock()
 
-	return out
-}
-
-// snapshotConstraints makes a compact string representation of a set of constraints, with one
-// constraint printed per line.
-func SnapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Constraint) string {
-	t.Helper()
-
-	type constraintRow struct {
-		Field      string
-		Type       int
-		TypeString string
-		Reason     string
-	}
-
-	rows := make([]constraintRow, 0, len(cs))
-	for f, c := range cs {
-		rows = append(rows, constraintRow{
-			Field:      f,
-			Type:       int(c.Type),
-			TypeString: c.Type.String(),
-			Reason:     c.Reason,
+			return nil
 		})
 	}
 
-	slices.SortFunc(rows, func(i, j constraintRow) int {
-		return strings.Compare(i.Field, j.Field)
+	require.NoError(t, group.Wait())
+
+	slices.SortFunc(results, func(a, b taskResult) int {
+		return strings.Compare(a.name, b.name)
 	})
 
-	var out strings.Builder
-	enc := json.NewEncoder(&out)
-	for _, r := range rows {
-		require.NoError(t, enc.Encode(r))
+	var snap strings.Builder
+	for _, res := range results {
+		snap.WriteString(fmt.Sprintf("Task: %s\n\n", res.name))
+		snap.WriteString(res.flowctlOutput)
+		snap.WriteString("\n")
+
+		for _, binding := range res.bindingResults {
+			snap.WriteString(fmt.Sprintf("Resource: %s\n", strings.Join(binding.path, ".")))
+			snap.WriteString(fmt.Sprintf("Source: %s\n", binding.source))
+			snap.WriteString(binding.data)
+			snap.WriteString("\n")
+		}
 	}
 
-	return out.String()
+	// Strip the generated suffixes from the snapshot output.
+	output := snap.String()
+	for _, task := range tasks {
+		output = strings.ReplaceAll(output, task.suffix, "")
+	}
+
+	cupaloy.SnapshotT(t, output)
 }
 
 func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
@@ -221,6 +261,180 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 	})
 
 	cupaloy.SnapshotT(t, snap.String())
+}
+
+func decryptConfig(t *testing.T, cfg json.RawMessage) json.RawMessage {
+	sopsCmd := exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
+	jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+	sopsCmd.Stdin = bytes.NewReader(cfg)
+	var err error
+	jqCmd.Stdin, err = sopsCmd.StdoutPipe()
+	require.NoError(t, err)
+	require.NoError(t, sopsCmd.Start())
+	decryptedConfig, err := jqCmd.Output()
+	require.NoError(t, err)
+	require.NoError(t, sopsCmd.Wait())
+
+	return decryptedConfig
+}
+
+type testTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper] struct {
+	materializer Materializer[EC, FC, RC, MT]
+	bindings     []testBinding
+	suffix       string
+}
+
+type testBinding struct {
+	source string
+	path   []string
+}
+
+type taskResult struct {
+	name           string
+	flowctlOutput  string
+	bindingResults []bindingResult
+}
+
+type bindingResult struct {
+	source string
+	path   []string
+	data   string
+}
+
+type parsedSpec struct {
+	Materializations map[string]struct {
+		Endpoint struct {
+			Local struct {
+				Config json.RawMessage
+			}
+		}
+		Bindings []struct {
+			Resource json.RawMessage
+			Source   string
+		}
+	}
+}
+
+func cleanupTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	tasks map[string]testTask[EC, FC, RC, MT],
+) {
+	t.Helper()
+
+	ctx := context.Background()
+	var group errgroup.Group
+
+	for taskName, task := range tasks {
+		// Cleanup actions for the task itself.
+		group.Go(func() error {
+			if err := task.materializer.CleanupTestTask(ctx, taskName); err != nil {
+				t.Log("failed to clean up task", taskName)
+			}
+
+			t.Log("cleaned up task", taskName)
+			return nil
+		})
+
+		// Cleanup actions for the task's resources.
+		group.Go(func() error {
+			var paths [][]string
+			for _, b := range task.bindings {
+				paths = append(paths, b.path)
+			}
+
+			cleanupBySuffix(t, ctx, task.materializer, paths, task.suffix)
+
+			return nil
+		})
+	}
+
+	require.NoError(t, group.Wait())
+}
+
+func driveTask(t *testing.T, ctx context.Context, outputState bool, source, name, fixturePath string) string {
+	t.Helper()
+
+	args := []string{
+		"preview",
+		"--name", name,
+		"--source", source,
+		"--fixture", fixturePath,
+		"--network", "flow-test",
+		"--output-apply",
+	}
+
+	if outputState {
+		args = append(args, "--output-state")
+	}
+
+	cmd := exec.Command("flowctl", args...)
+	cmd.Env = append(cmd.Environ(), "RUST_LOG=info")
+
+	stdout, err := cmd.StdoutPipe()
+	require.NoError(t, err)
+	stderr, err := cmd.StderrPipe()
+	require.NoError(t, err)
+	require.NoError(t, cmd.Start())
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			t.Log(scanner.Text())
+		}
+	}()
+
+	var stdoutBuf bytes.Buffer
+	stdoutOp := m.RunAsyncOperation(func() error {
+		_, err = io.Copy(&stdoutBuf, stdout)
+		return err
+	})
+
+	select {
+	case <-ctx.Done():
+		// Early exit on context cancellation, which would arise from a failure
+		// of one of the other configured tasks.
+		t.Fatal(ctx.Err())
+	case <-stdoutOp.Done():
+	}
+
+	require.NoError(t, stdoutOp.Err())
+	require.NoError(t, cmd.Wait())
+	wg.Wait()
+
+	return stdoutBuf.String()
+}
+
+// sortRows sorts rows by the "flow_published_at" column, which is expected to
+// be present in all materialized tables. This is more generally applicable than
+// sorting by a specific key column, since a test task might have a different
+// key name, or more than one key. But it means "flow_published_at" must be
+// selected.
+func sortRows(columnNames []string, rows [][]any) ([][]any, error) {
+	publishedAtIdx := slices.IndexFunc(columnNames, func(s string) bool {
+		return strings.EqualFold(s, "flow_published_at")
+	})
+	if publishedAtIdx == -1 {
+		return nil, errors.New("no flow_published_at column found in columnNames")
+	}
+
+	slices.SortFunc(rows, func(a, b []any) int {
+		l, r := a[publishedAtIdx], b[publishedAtIdx]
+
+		switch l := l.(type) {
+		case string:
+			return strings.Compare(l, r.(string))
+		case time.Time:
+			return l.Compare(r.(time.Time))
+		default:
+			panic(fmt.Sprintf("unsupported flow_published_at column type %T", l))
+		}
+	})
+
+	return rows, nil
 }
 
 func runBigSchemaApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
@@ -387,219 +601,106 @@ func runChallengingNamesApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Res
 	snap.WriteString(dumpSchema(t, ctx, m, res))
 }
 
-type testTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper] struct {
-	materializer Materializer[EC, FC, RC, MT]
-	bindings     []testBinding
-	suffix       string
+// validateReq makes a mock Validate request object from a built spec fixture. It only works with a
+// single binding.
+func ValidateReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage) *pm.Request_Validate {
+	req := &pm.Request_Validate{
+		Name:          spec.Name,
+		ConnectorType: spec.ConnectorType,
+		ConfigJson:    config,
+		Bindings: []*pm.Request_Validate_Binding{{
+			ResourceConfigJson: resourceConfig,
+			Collection:         spec.Bindings[0].Collection,
+			FieldConfigJsonMap: spec.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			Backfill:           spec.Bindings[0].Backfill,
+		}},
+		LastMaterialization: lastSpec,
+	}
+
+	return req
 }
 
-type testBinding struct {
-	source string
-	path   []string
+// applyReq conjures a pm.Request_Apply from a spec and validate response.
+func ApplyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage, validateRes *pm.Response_Validated, includeOptional bool) *pm.Request_Apply {
+	spec.ConfigJson = config
+	spec.Bindings[0].ResourceConfigJson = resourceConfig
+	spec.Bindings[0].ResourcePath = validateRes.Bindings[0].ResourcePath
+	spec.Bindings[0].DeltaUpdates = validateRes.Bindings[0].DeltaUpdates
+	spec.Bindings[0].FieldSelection = selectedFields(validateRes.Bindings[0], spec.Bindings[0].Collection, includeOptional)
+
+	req := &pm.Request_Apply{
+		Materialization:     spec,
+		Version:             "someVersion",
+		LastMaterialization: lastSpec,
+	}
+
+	return req
 }
 
-type taskResult struct {
-	name           string
-	flowctlOutput  string
-	bindingResults []bindingResult
-}
+// selectedFields creates a field selection that includes all possible fields.
+func selectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec, includeOptional bool) pf.FieldSelection {
+	out := pf.FieldSelection{}
 
-type bindingResult struct {
-	source string
-	path   []string
-	data   string
-}
+	for field, constraint := range binding.Constraints {
+		if constraint.Type.IsForbidden() || !includeOptional && constraint.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL {
+			continue
+		}
 
-type parsedSpec struct {
-	Materializations map[string]struct {
-		Endpoint struct {
-			Local struct {
-				Config json.RawMessage
+		proj := collection.GetProjection(field)
+		if proj.IsPrimaryKey {
+			out.Keys = append(out.Keys, field)
+		} else if proj.IsRootDocumentProjection() {
+			if out.Document == "" {
+				out.Document = field
+			} else {
+				// Handle cases with more than one root document projection selected - the "first"
+				// one is the document, and the rest are materialized as values.
+				out.Values = append(out.Values, field)
 			}
-		}
-		Bindings []struct {
-			Resource json.RawMessage
-			Source   string
+		} else {
+			out.Values = append(out.Values, field)
 		}
 	}
+
+	slices.Sort(out.Keys)
+	slices.Sort(out.Values)
+
+	return out
 }
 
-const testTableIdentifer = "_flow_test_"
-
-func RunIntegrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
-	t *testing.T,
-	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
-	source string,
-	finalResourchPathKey string,
-) {
-	ctx := context.Background()
-
-	// Parse the bundled spec to extract the tasks and their bindings.
-	var parsed parsedSpec
-	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", source).CombinedOutput()
-	require.NoError(t, err)
-	require.NoError(t, json.Unmarshal(bundled, &parsed))
-
-	// Extract each task's config and bindings.
-	ts := time.Now().Unix()
-	tasks := make(map[string]testTask[EC, FC, RC, MT])
-	for taskName, spec := range parsed.Materializations {
-		var cfg EC
-		require.NoError(t, unmarshalStrict(decryptConfig(t, spec.Endpoint.Local.Config), &cfg))
-		materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
-		require.NoError(t, err)
-
-		// A suffix is added to the resource final path component. It includes a
-		// random part to ensure that concurrent runs of the test don't
-		// interfere with each other, as well as a timestamp to facilitate
-		// cleaning up leftover resources that weren't cleanup by a prior run
-		// for some reason.
-		suffix := fmt.Sprintf("_%s%s_%d", uuid.NewString()[:8], testTableIdentifer, ts)
-
-		var bindings []testBinding
-		for bIdx, binding := range spec.Bindings {
-			var resourceCfg RC
-			require.NoError(t, unmarshalStrict(binding.Resource, &resourceCfg))
-			path, _, err := resourceCfg.WithDefaults(cfg).Parameters()
-			require.NoError(t, err)
-
-			// Swap out the reported final path component from the spec with one
-			// that has the suffix. This also needs to be added to the spec file
-			// read by `flowctl preview`, which will be written out from the
-			// working bundled spec.
-			path[len(path)-1] = path[len(path)-1] + suffix
-			bundled, err = sjson.SetBytes(
-				bundled,
-				fmt.Sprintf("materializations.%s.bindings.%d.resource.%s", taskName, bIdx, finalResourchPathKey),
-				path[len(path)-1],
-			)
-
-			bindings = append(bindings, testBinding{
-				source: binding.Source,
-				path:   path,
-			})
-		}
-
-		tasks[taskName] = testTask[EC, FC, RC, MT]{
-			materializer: materializer,
-			bindings:     bindings,
-			suffix:       suffix,
-		}
-	}
-
-	t.Cleanup(func() { cleanupTasks(t, tasks) })
-
-	// Write out the modified bundled spec to a temp file for `flowctl preview`.
-	// This bundle now has the resource suffixes added to it. `flowctl preview`
-	// will drive the materialization using those suffixed paths.
-	dir := t.TempDir()
-	suffixedSource := filepath.Join(dir, "test.flow.yaml")
-	require.NoError(t, os.WriteFile(suffixedSource, bundled, 0o600))
-
-	// Drive the materialization and collect the results.
-	var mu sync.Mutex
-	group, groupCtx := errgroup.WithContext(ctx)
-	var results []taskResult
-	for name, task := range tasks {
-		group.Go(func() error {
-			actionDescription := driveTask(t, ctx, true, suffixedSource, name, "../materialize-boilerplate/testdata/integration/fixture.json")
-			res := taskResult{name: name, flowctlOutput: actionDescription}
-
-			for _, binding := range task.bindings {
-				columnNames, rows, err := task.materializer.SnapshotTestResource(groupCtx, binding.path)
-				require.NoError(t, err)
-
-				sorted, err := sortRows(columnNames, rows)
-				require.NoError(t, err)
-
-				var data strings.Builder
-				enc := json.NewEncoder(&data)
-				for _, r := range sorted {
-					doc := make(map[string]any, len(columnNames))
-					for i, col := range columnNames {
-						doc[col] = r[i]
-					}
-					require.NoError(t, enc.Encode(doc))
-				}
-
-				res.bindingResults = append(res.bindingResults, bindingResult{
-					source: binding.source,
-					path:   binding.path,
-					data:   data.String(),
-				})
-			}
-
-			mu.Lock()
-			results = append(results, res)
-			mu.Unlock()
-
-			return nil
-		})
-	}
-
-	require.NoError(t, group.Wait())
-
-	slices.SortFunc(results, func(a, b taskResult) int {
-		return strings.Compare(a.name, b.name)
-	})
-
-	var snap strings.Builder
-	for _, res := range results {
-		snap.WriteString(fmt.Sprintf("Task: %s\n\n", res.name))
-		snap.WriteString(res.flowctlOutput)
-		snap.WriteString("\n")
-
-		for _, binding := range res.bindingResults {
-			snap.WriteString(fmt.Sprintf("Resource: %s\n", strings.Join(binding.path, ".")))
-			snap.WriteString(fmt.Sprintf("Source: %s\n", binding.source))
-			snap.WriteString(binding.data)
-			snap.WriteString("\n")
-		}
-	}
-
-	// Strip the generated suffixes from the snapshot output.
-	output := snap.String()
-	for _, task := range tasks {
-		output = strings.ReplaceAll(output, task.suffix, "")
-	}
-
-	cupaloy.SnapshotT(t, output)
-}
-
-func cleanupTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
-	t *testing.T,
-	tasks map[string]testTask[EC, FC, RC, MT],
-) {
+// snapshotConstraints makes a compact string representation of a set of constraints, with one
+// constraint printed per line.
+func SnapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Constraint) string {
 	t.Helper()
 
-	ctx := context.Background()
-	var group errgroup.Group
+	type constraintRow struct {
+		Field      string
+		Type       int
+		TypeString string
+		Reason     string
+	}
 
-	for taskName, task := range tasks {
-		// Cleanup actions for the task itself.
-		group.Go(func() error {
-			if err := task.materializer.CleanupTestTask(ctx, taskName); err != nil {
-				t.Log("failed to clean up task", taskName)
-			}
-
-			t.Log("cleaned up task", taskName)
-			return nil
-		})
-
-		// Cleanup actions for the task's resources.
-		group.Go(func() error {
-			var paths [][]string
-			for _, b := range task.bindings {
-				paths = append(paths, b.path)
-			}
-
-			cleanupBySuffix(t, ctx, task.materializer, paths, task.suffix)
-
-			return nil
+	rows := make([]constraintRow, 0, len(cs))
+	for f, c := range cs {
+		rows = append(rows, constraintRow{
+			Field:      f,
+			Type:       int(c.Type),
+			TypeString: c.Type.String(),
+			Reason:     c.Reason,
 		})
 	}
 
-	require.NoError(t, group.Wait())
+	slices.SortFunc(rows, func(i, j constraintRow) int {
+		return strings.Compare(i.Field, j.Field)
+	})
+
+	var out strings.Builder
+	enc := json.NewEncoder(&out)
+	for _, r := range rows {
+		require.NoError(t, enc.Encode(r))
+	}
+
+	return out.String()
 }
 
 func cleanupBySuffix[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
@@ -655,107 +756,6 @@ func cleanupBySuffix[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC]
 	}
 
 	require.NoError(t, group.Wait())
-}
-
-func decryptConfig(t *testing.T, cfg json.RawMessage) json.RawMessage {
-	sopsCmd := exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
-	jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
-	sopsCmd.Stdin = bytes.NewReader(cfg)
-	var err error
-	jqCmd.Stdin, err = sopsCmd.StdoutPipe()
-	require.NoError(t, err)
-	require.NoError(t, sopsCmd.Start())
-	decryptedConfig, err := jqCmd.Output()
-	require.NoError(t, err)
-	require.NoError(t, sopsCmd.Wait())
-
-	return decryptedConfig
-}
-
-// sortRows sorts rows by the "flow_published_at" column, which is expected to
-// be present in all materialized tables. This is more generally applicable than
-// sorting by a specific key column, since a test task might have a different
-// key name, or more than one key. But it means "flow_published_at" must be
-// selected.
-func sortRows(columnNames []string, rows [][]any) ([][]any, error) {
-	publishedAtIdx := slices.IndexFunc(columnNames, func(s string) bool {
-		return strings.EqualFold(s, "flow_published_at")
-	})
-	if publishedAtIdx == -1 {
-		return nil, errors.New("no flow_published_at column found in columnNames")
-	}
-
-	slices.SortFunc(rows, func(a, b []any) int {
-		l, r := a[publishedAtIdx], b[publishedAtIdx]
-
-		switch l := l.(type) {
-		case string:
-			return strings.Compare(l, r.(string))
-		case time.Time:
-			return l.Compare(r.(time.Time))
-		default:
-			panic(fmt.Sprintf("unsupported flow_published_at column type %T", l))
-		}
-	})
-
-	return rows, nil
-}
-
-func driveTask(t *testing.T, ctx context.Context, outputState bool, source, name, fixturePath string) string {
-	t.Helper()
-
-	args := []string{
-		"preview",
-		"--name", name,
-		"--source", source,
-		"--fixture", fixturePath,
-		"--network", "flow-test",
-		"--output-apply",
-	}
-
-	if outputState {
-		args = append(args, "--output-state")
-	}
-
-	cmd := exec.Command("flowctl", args...)
-	cmd.Env = append(cmd.Environ(), "RUST_LOG=info")
-
-	stdout, err := cmd.StdoutPipe()
-	require.NoError(t, err)
-	stderr, err := cmd.StderrPipe()
-	require.NoError(t, err)
-	require.NoError(t, cmd.Start())
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			t.Log(scanner.Text())
-		}
-	}()
-
-	var stdoutBuf bytes.Buffer
-	stdoutOp := m.RunAsyncOperation(func() error {
-		_, err = io.Copy(&stdoutBuf, stdout)
-		return err
-	})
-
-	select {
-	case <-ctx.Done():
-		// Early exit on context cancellation, which would arise from a failure
-		// of one of the other configured tasks.
-		t.Fatal(ctx.Err())
-	case <-stdoutOp.Done():
-	}
-
-	require.NoError(t, stdoutOp.Err())
-	require.NoError(t, cmd.Wait())
-	wg.Wait()
-
-	return stdoutBuf.String()
 }
 
 func dumpSchema[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
