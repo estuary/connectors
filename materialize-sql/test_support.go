@@ -449,3 +449,12 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, 
 ) {
 	boilerplate.RunApplyTest(t, driver.newMaterialization, sourcePath, makeResourceFn)
 }
+
+func RunApplyTestV2[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	sourcePath string,
+	makeResourceFn func(string) RC,
+) {
+	boilerplate.RunApplyTestV2(t, driver, driver.newMaterialization, sourcePath, makeResourceFn)
+}

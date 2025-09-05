@@ -60,6 +60,12 @@ func TestApply(t *testing.T) {
 	})
 }
 
+func TestApplyV2(t *testing.T) {
+	sql.RunApplyTestV2(t, newDuckDriver(), "testdata/test-apply.flow.yaml", func(path string) tableConfig {
+		return tableConfig{Table: path}
+	})
+}
+
 func TestValidateAndApply(t *testing.T) {
 	ctx := context.Background()
 

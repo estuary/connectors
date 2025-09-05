@@ -400,6 +400,246 @@ func loadIntegrationSpecBundled(t *testing.T, file string) json.RawMessage {
 	return specBundled
 }
 
+func RunApplyTestV2[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	driver Connector,
+	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	sourcePath string,
+	makeResourceFn func(finalResourcePathPart string) RC,
+) {
+	ctx := context.Background()
+	var snap strings.Builder
+
+	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
+	require.NoError(t, err)
+
+	ts := time.Now().Unix()
+
+	gjson.GetBytes(bundled, "materializations").ForEach(func(key, value gjson.Result) bool {
+		rawCfg := json.RawMessage(gjson.Get(value.Raw, "endpoint.local.config").Raw)
+		decrypted := decryptConfig(t, rawCfg)
+
+		var cfg EC
+		require.NoError(t, unmarshalStrict(decrypted, &cfg))
+
+		materializer, err := newMaterializer(ctx, key.String(), cfg, parseFlags(cfg))
+		require.NoError(t, err)
+
+		var testResourcePaths [][]string
+		t.Cleanup(func() { cleanupByTS(t, ctx, materializer, testResourcePaths, ts) })
+
+		snap.WriteString("\n--- Materialization: " + key.String() + " ---\n\n")
+
+		{
+			tableName := "bigschema_" + uuid.NewString()[:8] + testTableIdentifer + fmt.Sprintf("%d", ts)
+			res := makeResourceFn(tableName).WithDefaults(cfg)
+			resourcePath, _, err := res.Parameters()
+			require.NoError(t, err)
+			testResourcePaths = append(testResourcePaths, resourcePath)
+			runBigSchemaApplyTests(t, ctx, &snap, driver, materializer, cfg, res)
+		}
+
+		{
+			tableName := "addandremovefields_" + uuid.NewString()[:8] + testTableIdentifer + fmt.Sprintf("%d", ts)
+			res := makeResourceFn(tableName).WithDefaults(cfg)
+			resourcePath, _, err := res.Parameters()
+			require.NoError(t, err)
+			testResourcePaths = append(testResourcePaths, resourcePath)
+			runAddAndRemoveFieldsApplyTests(t, ctx, &snap, driver, materializer, cfg, res)
+		}
+
+		{
+			tableName := "challengingnames_" + uuid.NewString()[:8] + testTableIdentifer + fmt.Sprintf("%d", ts)
+			res := makeResourceFn(tableName).WithDefaults(cfg)
+			resourcePath, _, err := res.Parameters()
+			require.NoError(t, err)
+			testResourcePaths = append(testResourcePaths, resourcePath)
+			runChallengingNamesApplyTests(t, ctx, &snap, driver, materializer, cfg, res)
+		}
+
+		return true
+	})
+
+	cupaloy.SnapshotT(t, snap.String())
+}
+
+func runBigSchemaApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	snap *strings.Builder,
+	driver Connector,
+	m Materializer[EC, FC, RC, MT],
+	cfg EC,
+	res RC,
+) {
+
+	resourcePath, _, err := res.Parameters()
+	configJson, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	resourceConfigJson, err := json.Marshal(res)
+	require.NoError(t, err)
+
+	fixture := loadSpec(t, "big-schema.flow.proto")
+
+	// Initial validation with no previously existing table.
+	validateRes, err := driver.Validate(ctx, ValidateReq(fixture, nil, configJson, resourceConfigJson))
+	require.NoError(t, err)
+
+	snap.WriteString("Big Schema Initial Constraints:\n")
+	snap.WriteString(SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
+
+	// Initial apply with no previously existing table.
+	_, err = driver.Apply(ctx, ApplyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
+	require.NoError(t, err)
+
+	sch := dumpSchema(t, ctx, m, resourcePath)
+
+	// Validate again.
+	validateRes, err = driver.Validate(ctx, ValidateReq(fixture, fixture, configJson, resourceConfigJson))
+	require.NoError(t, err)
+
+	snap.WriteString("\nBig Schema Re-validated Constraints:\n")
+	snap.WriteString(SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
+
+	// Apply again - this should be a no-op.
+	_, err = driver.Apply(ctx, ApplyReq(fixture, fixture, configJson, resourceConfigJson, validateRes, true))
+	require.NoError(t, err)
+	require.Equal(t, sch, dumpSchema(t, ctx, m, resourcePath))
+
+	// Validate with most of the field types changed somewhat randomly.
+	changed := loadSpec(t, "big-schema-changed.flow.proto")
+	validateRes, err = driver.Validate(ctx, ValidateReq(changed, fixture, configJson, resourceConfigJson))
+	require.NoError(t, err)
+
+	snap.WriteString("\nBig Schema Changed Types Constraints:\n")
+	snap.WriteString(SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
+
+	snap.WriteString("\nBig Schema Materialized Resource Schema With All Fields Required:\n")
+	snap.WriteString(sch)
+
+	// Validate and apply the schema with all fields removed from required and snapshot the
+	// table output.
+	nullable := loadSpec(t, "big-schema-nullable.flow.proto")
+	validateRes, err = driver.Validate(ctx, ValidateReq(nullable, fixture, configJson, resourceConfigJson))
+	require.NoError(t, err)
+
+	_, err = driver.Apply(ctx, ApplyReq(nullable, fixture, configJson, resourceConfigJson, validateRes, true))
+	require.NoError(t, err)
+
+	// A second apply of the nullable schema should be a no-op.
+	sch = dumpSchema(t, ctx, m, resourcePath)
+	_, err = driver.Apply(ctx, ApplyReq(nullable, nullable, configJson, resourceConfigJson, validateRes, true))
+	require.NoError(t, err)
+	require.Equal(t, sch, dumpSchema(t, ctx, m, resourcePath))
+
+	snap.WriteString("\nBig Schema Materialized Resource Schema With No Fields Required:\n")
+	snap.WriteString(sch)
+
+	// Apply the spec with the randomly changed types, but this time with a backfill.
+	changed.Bindings[0].Backfill = 1
+	validateRes, err = driver.Validate(ctx, ValidateReq(changed, nullable, configJson, resourceConfigJson))
+	require.NoError(t, err)
+
+	snap.WriteString("\nBig Schema Changed Types With Backfill Constraints:\n")
+	snap.WriteString(SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
+
+	_, err = driver.Apply(ctx, ApplyReq(changed, nullable, configJson, resourceConfigJson, validateRes, true))
+	require.NoError(t, err)
+	snap.WriteString("\nBig Schema Materialized Resource Schema Changed Types With Backfill:\n")
+	snap.WriteString(dumpSchema(t, ctx, m, resourcePath) + "\n")
+}
+
+func runAddAndRemoveFieldsApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	snap *strings.Builder,
+	driver Connector,
+	m Materializer[EC, FC, RC, MT],
+	cfg EC,
+	res RC,
+) {
+	tests := []struct {
+		name    string
+		newSpec *pf.MaterializationSpec
+	}{
+		{
+			name:    "add a single field",
+			newSpec: loadSpec(t, "add-single-optional.flow.proto"),
+		},
+		{
+			name:    "remove a single optional field",
+			newSpec: loadSpec(t, "remove-single-optional.flow.proto"),
+		},
+		{
+			name:    "remove a single required field",
+			newSpec: loadSpec(t, "remove-single-required.flow.proto"),
+		},
+		{
+			name:    "add and remove many fields",
+			newSpec: loadSpec(t, "add-and-remove-many.flow.proto"),
+		},
+	}
+
+	resourcePath, _, err := res.Parameters()
+	configJson, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	resourceConfigJson, err := json.Marshal(res)
+	require.NoError(t, err)
+
+	for _, tt := range tests {
+		initial := loadSpec(t, "base.flow.proto")
+
+		// Validate and Apply the base spec.
+		validateRes, err := driver.Validate(ctx, ValidateReq(initial, nil, configJson, resourceConfigJson))
+		require.NoError(t, err)
+		_, err = driver.Apply(ctx, ApplyReq(initial, nil, configJson, resourceConfigJson, validateRes, true))
+		require.NoError(t, err)
+
+		// Validate and Apply the updated spec.
+		validateRes, err = driver.Validate(ctx, ValidateReq(tt.newSpec, initial, configJson, resourceConfigJson))
+		require.NoError(t, err)
+		_, err = driver.Apply(ctx, ApplyReq(tt.newSpec, initial, configJson, resourceConfigJson, validateRes, true))
+		require.NoError(t, err)
+
+		snap.WriteString(tt.name + ":\n")
+		snap.WriteString(string(dumpSchema(t, ctx, m, resourcePath)) + "\n")
+		_, fn, err := m.DeleteResource(ctx, resourcePath)
+		require.NoError(t, err)
+		require.NoError(t, fn(ctx))
+	}
+}
+
+func runChallengingNamesApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	snap *strings.Builder,
+	driver Connector,
+	m Materializer[EC, FC, RC, MT],
+	cfg EC,
+	res RC,
+) {
+	resourcePath, _, err := res.Parameters()
+	configJson, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	resourceConfigJson, err := json.Marshal(res)
+	require.NoError(t, err)
+
+	fixture := loadSpec(t, "challenging-fields.flow.proto")
+
+	// Validate and apply twice to make sure that a re-application does not attempt to re-create
+	// any columns. This makes sure we are able to read back the schema we have created
+	// correctly.
+	for range 2 {
+		validateRes, err := driver.Validate(ctx, ValidateReq(fixture, nil, configJson, resourceConfigJson))
+		require.NoError(t, err)
+		_, err = driver.Apply(ctx, ApplyReq(fixture, nil, configJson, resourceConfigJson, validateRes, false))
+		require.NoError(t, err)
+	}
+
+	snap.WriteString("Challenging Field Names Materialized Columns:\n")
+	snap.WriteString(string(dumpSchema(t, ctx, m, resourcePath)))
+}
+
 type applyScenario struct {
 	name               string
 	bundledBindingSpec json.RawMessage
@@ -748,6 +988,60 @@ func cleanupTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 	require.NoError(t, group.Wait())
 }
 
+func cleanupByTS[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	m Materializer[EC, FC, RC, MT],
+	paths [][]string,
+	ts int64,
+) {
+	t.Helper()
+
+	now := time.Now()
+	var toCleanup [][]string
+
+	is := initInfoSchema(m.Config())
+	if err := m.PopulateInfoSchema(ctx, is, paths, true); err != nil {
+		// Couldn't list existing resources for some reason. At least try to
+		// clean up the paths that were passed in.
+		toCleanup = paths
+		t.Log("failed to populate info schema for cleanup", err)
+	} else {
+		for _, r := range is.resources {
+			last := r.location[len(r.location)-1]
+			if !strings.Contains(last, testTableIdentifer) {
+				// Not a test table.
+			} else if parts := strings.Split(last, "_"); parts[len(parts)-1] == fmt.Sprintf("%d", ts) {
+				// This resource was created by this test run.
+				toCleanup = append(toCleanup, r.location)
+			} else if seconds, err := strconv.Atoi(parts[len(parts)-1]); err != nil {
+				// Not a test table.
+				t.Log("failed to parse timestamp from test table name", last, err)
+			} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 6*time.Hour {
+				t.Log("will cleanup old test table", r.location)
+				toCleanup = append(toCleanup, r.location)
+			}
+		}
+	}
+
+	var group errgroup.Group
+	for _, path := range toCleanup {
+		group.Go(func() error {
+			if _, fn, err := m.DeleteResource(ctx, path); err != nil {
+				return err
+			} else if err := fn(ctx); err != nil {
+				t.Log("failed to clean up resource", path, err)
+				return nil
+			}
+
+			t.Log("cleaned up resource", path)
+			return nil
+		})
+	}
+
+	require.NoError(t, group.Wait())
+}
+
 func decryptConfig(t *testing.T, cfg json.RawMessage) json.RawMessage {
 	sopsCmd := exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
 	jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
@@ -847,4 +1141,35 @@ func driveTask(t *testing.T, ctx context.Context, outputState bool, source, name
 	wg.Wait()
 
 	return stdoutBuf.String()
+}
+
+func dumpSchema[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	m Materializer[EC, FC, RC, MT],
+	resourcePath []string,
+) string {
+	t.Helper()
+
+	is := initInfoSchema(m.Config())
+	require.NoError(t, m.PopulateInfoSchema(ctx, is, [][]string{resourcePath}, false))
+
+	type field struct {
+		Name     string
+		Nullable bool
+		Type     string
+	}
+
+	var out strings.Builder
+	enc := json.NewEncoder(&out)
+	for _, f := range is.GetResource(resourcePath).AllFields() {
+		require.NoError(t, enc.Encode(field{
+			Name:     f.Name,
+			Nullable: f.Nullable,
+			Type:     f.Type,
+		}))
+	}
+
+	return out.String()
+
 }
