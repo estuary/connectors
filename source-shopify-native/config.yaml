@@ -4,7 +4,7 @@ credentials:
 store: estuary-alex-testing
 start_date: "2025-01-10T00:00:00Z"
 advanced:
-    window_size: 50000
+    window_size: P50000D
 sops:
     kms: []
     gcp_kms:
@@ -14,8 +14,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-01-15T20:49:00Z"
-    mac: ENC[AES256_GCM,data:IcKCvsGVyeQnIAREIC/6nd47ozM6g+iGZAsfwvrllPTkkhjFKpFQF77c0OYKHU1rOFC7DXWFWtsMD/yKgeUMgclm2Vw7EBe6MLwtcWbagiZ7WsVIpzOXb6rbhRImcu8dFkaWgVS742llsOfCA/RZquTJ4OlOsWpGTdxZDhoIEaA=,iv:YEslMowXvReoZbgPMRqjwjanRQIBKUuY8UCLpmbc9Zk=,tag:2WAsc4HHDBX488FcSADg1g==,type:str]
+    lastmodified: "2025-09-05T13:06:45Z"
+    mac: ENC[AES256_GCM,data:I4FWGsOWyKxrI4ud+Ul5b8MR2qCOGeK0HyOtRnxpdC6cc2g7qa9o0ZNi70Uz+1LtigCfFgRKyJkU1lry7AFyPJsT9IEDo4mt/4+taSkoo7T1aFakwnN5GLDeD3j0ktKvlFXPt5/RoWGczTfgZ0U+q8IsjBF1gPPA2BgJ5+kP1S4=,iv:flzhyYQLxi/5vFPXywtE0ENHM67oWehJglMWHnvIclE=,tag:JXkLiXB8p/NHbj/UBqW69A==,type:str]
     pgp: []
     encrypted_suffix: _sops
-    version: 3.7.3
+    version: 3.9.0

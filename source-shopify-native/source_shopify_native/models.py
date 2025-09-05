@@ -97,12 +97,12 @@ class EndpointConfig(BaseModel):
 
     class Advanced(BaseModel):
         window_size: Annotated[
-            int,
+            timedelta,
             Field(
-                description="Window size in days for incremental streams.",
+                description="Window size for incremental streams in ISO 8601 format. ex: P30D means 30 days, PT6H means 6 hours.",
                 title="Window Size",
-                default=30,
-                gt=0,
+                default=timedelta(days=30),
+                ge=timedelta(minutes=1),
             ),
         ]
 
