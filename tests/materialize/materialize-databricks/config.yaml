@@ -9,7 +9,7 @@ credentials:
     auth_type: PAT
     personal_access_token_sops: ENC[AES256_GCM,data:XIk56zlHUY/JOcXcJHEjn1lwBPkHrnEeelbwlluZpJLsxO5F,iv:5wFjIu/MRFf9NSGZJ7NVYql8n6v46DZ1+NjpKlBBaek=,tag:+zjtRfAA4ak/krR78PQyMA==,type:str]
 advanced:
-    feature_flags: no_flow_document
+    no_flow_document: true
 sops:
     kms: []
     gcp_kms:
@@ -19,8 +19,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-09-02T14:55:10Z"
-    mac: ENC[AES256_GCM,data:9gWJ3e+rK5V14M94GPUKxkudoXJ8fKt3JHJuiwp3jQUbRqXmnqdFxlVytzhtBk6kDWA3bTdui9KaQSfhIamzAyLnh0J/xkhcU8n1xf2H7Gd4LCPK16N4vohYmAulUNVS14VPNgD83QiOQCsANm5Ke8IcemY4g4fmahRIjYcBUGA=,iv:XQq5EbhtJJPvpgqMZQeFHQkxj4VBeYVefOPNqw9ArHY=,tag:6htHoOblShFIlMzqyal2Iw==,type:str]
+    lastmodified: "2025-09-05T13:20:35Z"
+    mac: ENC[AES256_GCM,data:c9PJZT2gqp0KLSC29MxVw0e0oduxjPl52cpGlbBSS+xOtym5W2TYxk6jTYVbTXn1RnlTKs42v12Gtw7J4c3g8Gol86AmvjuagYK6suaTkrmTAIuMtETrfsrO503BFARAv7W5iDHn5nPt6OdKPylQZrp6zxuAp9YYvORp9zkFr7U=,iv:0gUdgNcH04YL9UFH57eoFgF0baUYkI0EdsDVVtxjDZY=,tag:l7UXLhnmcLRd0lLouHyNvQ==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.4

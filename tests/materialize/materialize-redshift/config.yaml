@@ -11,7 +11,7 @@ hardDelete: true
 syncSchedule:
     syncFrequency: 0s
 advanced:
-    feature_flags: no_flow_document
+    no_flow_document: true
 sops:
     kms: []
     gcp_kms:
@@ -21,8 +21,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-09-02T14:54:30Z"
-    mac: ENC[AES256_GCM,data:YahQEc02pzd7HsHFxodVkrSJVTomM9lsSb+F8bU0T91vLlcsMjFX9oS0hKyyuOdluoOThwyPJyn+QBK/SKAV+SLzK0CmKqr5Q/vRwmQrPyJYPgIN/Vg+Tlp5QFNosknD0Jo0F5VuNU7Le8J8zWd3hTUlisuJjpWPo5Sq/uuLEYo=,iv:J6tTEBA0KdkYjvYSFPvpTvdB3lnKueszCh5Iw3GZI1k=,tag:BEpnwAIbVHobNvw6bCFpJQ==,type:str]
+    lastmodified: "2025-09-05T13:18:59Z"
+    mac: ENC[AES256_GCM,data:4/bWBWDihoW14+Chw+/V3X2KBFwRLIbenKPVfy0Dld/1UZX+7xf4Ffl6Ee2uLc12sbnBLPeB4ZAi9WMdUW3a5JYEx7xJuJFmpgXhhlA1BNvyUT687UCm2xF1rJCKfAZtI3jsJseLOaqZXHUpRisV87BbOJdGn0QeVVPdrJdSSL0=,iv:GBJTrptG1N1awSwKgyoLDOmnBtsIaPKpTbcok7cXiJo=,tag:ARwu2Eyrfu+QEKkGTnbZng==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.4

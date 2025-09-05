@@ -8,7 +8,7 @@ credentials_json_sops: ENC[AES256_GCM,data:QC0oLGXdDdgmNC+PU3MxzvJccm9i0PyE2ZwGE
 syncSchedule:
     syncFrequency: 0s
 advanced:
-    feature_flags: no_flow_document
+    no_flow_document: true
 sops:
     kms: []
     gcp_kms:
@@ -18,8 +18,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-09-02T14:53:59Z"
-    mac: ENC[AES256_GCM,data:JiW/u7NTq2ERl6UVcVA3t9eDMbzjUWc/asNwor7lIQcJthd2I3K+wal+09c4F4fPkUpXoeDjZN8BcMS0yt8USfXHtnYbOii/GD6xJ8jnZFN6jbJb92DOZPEXUhdj2XeZbjDfmxdTK5oqU1C0eoYx+L8tdbfl9C5rfN/fd8S0zdQ=,iv:koLqd58vEPMXD2bqh14rt8Est2Fyc3qduJDMUYEIo34=,tag:MiAc4iJZwnp40t4hDEUEJA==,type:str]
+    lastmodified: "2025-09-05T13:18:26Z"
+    mac: ENC[AES256_GCM,data:mfnPnzInnTlMvRa38Z0UskAjtZ0JEAvJGhhjY0RjJ1X4tB/ubVhQ0g3dWtRbfCh7yyOL8emGZVPwWA76cVJSyI1IDa/kagCJ2DjFzl9WcZDlCOfgfJwQ9TcVa+4rFcrakUXJOEy4MT4e4taMVHqIf5A9JwRTi1mlTdB5JMVSwGw=,iv:7/6z3+mVrivEdRLOv80zgK6jMqL1dNRE2tGWtXOIn0s=,tag:uFZMJIfaAjPvD752xnCikA==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.4

@@ -11,7 +11,7 @@ stagingBucket:
 syncSchedule:
     syncFrequency: 0s
 advanced:
-    feature_flags: no_flow_document
+    no_flow_document: true
 sops:
     kms: []
     gcp_kms:
@@ -21,8 +21,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-09-02T14:53:45Z"
-    mac: ENC[AES256_GCM,data:ncNjcFijrh4L5ulVCBxL7hP9oq1Yb/OIR2Fy660KOXE3Tu6fm0MYo0SiJtFHwOs2X+wTcPBxyaueIgHfGOWZrAET3hzu+jzA4TWA8xy2p85a2Xs6DwhZOo0qYHnIHIZF3oV6LETNLAPotYEjfh8OjSziJv+MQ415SHTrF136N8k=,iv:qAfyyAbf4QV3qRYSGkWkFv7OZ35LwCydU9Akh9tDAj8=,tag:bAX9vx1JYTYUkYx5hmkdMw==,type:str]
+    lastmodified: "2025-09-05T13:18:49Z"
+    mac: ENC[AES256_GCM,data:rH0IWeQv4ecasP7DTKkUTDwnWW6n75zXvHW5F0PIlZ1vlHDRqrhvvl8d9y/MsZM108gqEtLm9gDTprPjzZm8Xr5eC7Vx+DpOBTQ5qA/YjnqYTMJJlYQUhI2OJ+r0bSp/H2xQx3aUQBiZ5ugLPP4xPo98aiWDpSPrfUjormgfuE0=,iv:1l6fwcjAo7hTsHAH/B44pBAOeHUNdCfZUqdKdWLwH0Y=,tag:qZRnbaSyd0jndws3o3CuYQ==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.4
