@@ -30,6 +30,8 @@ from .flow import (
     GoogleServiceAccount,
     GoogleServiceAccountSpec,
 )
+from .utils import format_error_message
+
 
 DEFAULT_AUTHORIZATION_HEADER = "Authorization"
 DEFAULT_AUTHORIZATION_TOKEN_TYPE = "Bearer"
@@ -172,7 +174,7 @@ class HTTPSession(abc.ABC):
                 if attempt <= max_attempts:
                     log.warning(
                         f"Connection timeout error (will retry)",
-                        {"url": url, "method": method, "attempt": attempt, "error": str(e)}
+                        {"url": url, "method": method, "attempt": attempt, "error": format_error_message(e)}
                     )
                     attempt += 1
                 else:
@@ -509,11 +511,6 @@ class HTTPMixin(Mixin, HTTPSession):
                         try:
                             async for chunk in resp.content.iter_any():
                                 yield chunk
-                        except Exception as e:
-                            log.error("Encountered error while streaming response body.", {
-                                "exception": e,
-                            })
-                            raise e
                         finally:
                             await resp.release()
 

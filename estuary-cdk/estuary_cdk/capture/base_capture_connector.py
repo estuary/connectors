@@ -21,7 +21,7 @@ from ..flow import (
 )
 from ..http import HTTPError, HTTPMixin, TokenSource
 from ..logger import FlowLogger
-from ..utils import sort_dict
+from ..utils import format_error_message, sort_dict
 
 class BaseCaptureConnector(
     BaseConnector[Request[EndpointConfig, ResourceConfig, _ConnectorState]],
@@ -122,11 +122,7 @@ class BaseCaptureConnector(
 
             # When capture() completes, the connector exits.
             if stopping.first_error:
-                msg = f"{stopping.first_error}"
-                # If the first_error doesn't have a meaningful string representation,
-                # set it to the exception type's name so something more useful is logged.
-                if msg == "":
-                    msg = f"{type(stopping.first_error).__name__}"
+                msg = format_error_message(stopping.first_error)
 
                 raise Stopped(
                     f"Task {stopping.first_error_task}: {msg}"
