@@ -22,14 +22,14 @@ TARGET_FETCH_PAGE_INVOCATION_RUN_TIME = 60 * 5 # 5 minutes
 
 async def bulk_fetch_incremental(
     http: HTTPMixin,
-    window_size: int,
+    window_size: timedelta,
     bulk_job_manager: gql.bulk_job_manager.BulkJobManager,
     model: type[ShopifyGraphQLResource],
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ShopifyGraphQLResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
-    max_end = log_cursor + timedelta(days=window_size)
+    max_end = log_cursor + window_size
     end = min(max_end, datetime.now(tz=UTC))
     query = model.build_query(log_cursor, end)
 
