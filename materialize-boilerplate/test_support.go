@@ -346,31 +346,35 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 
 		snap.WriteString("\n--- Materialization: " + key.String() + " ---\n\n")
 
-		{
-			tableName := "bigschema_" + uuid.NewString()[:8] + suffix
+		for _, tc := range []struct {
+			tableStartsWith string
+			do              func(RC)
+		}{
+			{
+				tableStartsWith: "bigschema_",
+				do: func(res RC) {
+					runBigSchemaApplyTests(t, ctx, &snap, driver, materializer, cfg, res)
+				},
+			},
+			{
+				tableStartsWith: "addandremovefields_",
+				do: func(res RC) {
+					runAddAndRemoveFieldsApplyTests(t, ctx, &snap, driver, materializer, cfg, res)
+				},
+			},
+			{
+				tableStartsWith: "challengingnames_",
+				do: func(res RC) {
+					runChallengingNamesApplyTests(t, ctx, &snap, driver, materializer, cfg, res)
+				},
+			},
+		} {
+			tableName := tc.tableStartsWith + uuid.NewString()[:8] + suffix
 			res := makeResourceFn(tableName).WithDefaults(cfg)
 			resourcePath, _, err := res.Parameters()
 			require.NoError(t, err)
 			testResourcePaths = append(testResourcePaths, resourcePath)
-			runBigSchemaApplyTests(t, ctx, &snap, driver, materializer, cfg, res)
-		}
-
-		{
-			tableName := "addandremovefields_" + uuid.NewString()[:8] + suffix
-			res := makeResourceFn(tableName).WithDefaults(cfg)
-			resourcePath, _, err := res.Parameters()
-			require.NoError(t, err)
-			testResourcePaths = append(testResourcePaths, resourcePath)
-			runAddAndRemoveFieldsApplyTests(t, ctx, &snap, driver, materializer, cfg, res)
-		}
-
-		{
-			tableName := "challengingnames_" + uuid.NewString()[:8] + suffix
-			res := makeResourceFn(tableName).WithDefaults(cfg)
-			resourcePath, _, err := res.Parameters()
-			require.NoError(t, err)
-			testResourcePaths = append(testResourcePaths, resourcePath)
-			runChallengingNamesApplyTests(t, ctx, &snap, driver, materializer, cfg, res)
+			tc.do(res)
 		}
 
 		return true
@@ -388,13 +392,7 @@ func runBigSchemaApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 	cfg EC,
 	res RC,
 ) {
-
-	resourcePath, _, err := res.Parameters()
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
-	resourceConfigJson, err := json.Marshal(res)
-	require.NoError(t, err)
-
+	configJson, resourceConfigJson := rawJson(t, cfg), rawJson(t, res)
 	fixture := loadSpec(t, "big-schema.flow.proto")
 
 	// Initial validation with no previously existing table.
@@ -408,7 +406,7 @@ func runBigSchemaApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 	_, err = driver.Apply(ctx, ApplyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
 
-	sch := dumpSchema(t, ctx, m, resourcePath)
+	sch := dumpSchema(t, ctx, m, res)
 
 	// Validate again.
 	validateRes, err = driver.Validate(ctx, ValidateReq(fixture, fixture, configJson, resourceConfigJson))
@@ -420,7 +418,7 @@ func runBigSchemaApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 	// Apply again - this should be a no-op.
 	_, err = driver.Apply(ctx, ApplyReq(fixture, fixture, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
-	require.Equal(t, sch, dumpSchema(t, ctx, m, resourcePath))
+	require.Equal(t, sch, dumpSchema(t, ctx, m, res))
 
 	// Validate with most of the field types changed somewhat randomly.
 	changed := loadSpec(t, "big-schema-changed.flow.proto")
@@ -443,10 +441,10 @@ func runBigSchemaApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 	require.NoError(t, err)
 
 	// A second apply of the nullable schema should be a no-op.
-	sch = dumpSchema(t, ctx, m, resourcePath)
+	sch = dumpSchema(t, ctx, m, res)
 	_, err = driver.Apply(ctx, ApplyReq(nullable, nullable, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
-	require.Equal(t, sch, dumpSchema(t, ctx, m, resourcePath))
+	require.Equal(t, sch, dumpSchema(t, ctx, m, res))
 
 	snap.WriteString("\nBig Schema Materialized Resource Schema With No Fields Required:\n")
 	snap.WriteString(sch)
@@ -462,7 +460,7 @@ func runBigSchemaApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 	_, err = driver.Apply(ctx, ApplyReq(changed, nullable, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
 	snap.WriteString("\nBig Schema Materialized Resource Schema Changed Types With Backfill:\n")
-	snap.WriteString(dumpSchema(t, ctx, m, resourcePath) + "\n")
+	snap.WriteString(dumpSchema(t, ctx, m, res) + "\n")
 }
 
 func runAddAndRemoveFieldsApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
@@ -497,10 +495,8 @@ func runAddAndRemoveFieldsApplyTests[EC EndpointConfiger, FC FieldConfiger, RC R
 	}
 
 	resourcePath, _, err := res.Parameters()
-	configJson, err := json.Marshal(cfg)
 	require.NoError(t, err)
-	resourceConfigJson, err := json.Marshal(res)
-	require.NoError(t, err)
+	configJson, resourceConfigJson := rawJson(t, cfg), rawJson(t, res)
 
 	for _, tt := range tests {
 		initial := loadSpec(t, "base.flow.proto")
@@ -518,7 +514,7 @@ func runAddAndRemoveFieldsApplyTests[EC EndpointConfiger, FC FieldConfiger, RC R
 		require.NoError(t, err)
 
 		snap.WriteString(tt.name + ":\n")
-		snap.WriteString(string(dumpSchema(t, ctx, m, resourcePath)) + "\n")
+		snap.WriteString(dumpSchema(t, ctx, m, res) + "\n")
 		_, fn, err := m.DeleteResource(ctx, resourcePath)
 		require.NoError(t, err)
 		require.NoError(t, fn(ctx))
@@ -534,12 +530,7 @@ func runChallengingNamesApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Res
 	cfg EC,
 	res RC,
 ) {
-	resourcePath, _, err := res.Parameters()
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
-	resourceConfigJson, err := json.Marshal(res)
-	require.NoError(t, err)
-
+	configJson, resourceConfigJson := rawJson(t, cfg), rawJson(t, res)
 	fixture := loadSpec(t, "challenging-fields.flow.proto")
 
 	// Validate and apply twice to make sure that a re-application does not attempt to re-create
@@ -553,7 +544,7 @@ func runChallengingNamesApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Res
 	}
 
 	snap.WriteString("Challenging Field Names Materialized Columns:\n")
-	snap.WriteString(string(dumpSchema(t, ctx, m, resourcePath)))
+	snap.WriteString(dumpSchema(t, ctx, m, res))
 }
 
 type testTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper] struct {
@@ -931,12 +922,15 @@ func dumpSchema[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT 
 	t *testing.T,
 	ctx context.Context,
 	m Materializer[EC, FC, RC, MT],
-	resourcePath []string,
+	res RC,
 ) string {
 	t.Helper()
 
+	path, _, err := res.Parameters()
+	require.NoError(t, err)
+
 	is := initInfoSchema(m.Config())
-	require.NoError(t, m.PopulateInfoSchema(ctx, is, [][]string{resourcePath}, false))
+	require.NoError(t, m.PopulateInfoSchema(ctx, is, [][]string{path}, false))
 
 	type field struct {
 		Name     string
@@ -946,7 +940,7 @@ func dumpSchema[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT 
 
 	var out strings.Builder
 	enc := json.NewEncoder(&out)
-	for _, f := range is.GetResource(resourcePath).AllFields() {
+	for _, f := range is.GetResource(path).AllFields() {
 		require.NoError(t, enc.Encode(field{
 			Name:     f.Name,
 			Nullable: f.Nullable,
@@ -955,5 +949,13 @@ func dumpSchema[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT 
 	}
 
 	return out.String()
+}
 
+func rawJson(t *testing.T, v any) json.RawMessage {
+	t.Helper()
+
+	b, err := json.Marshal(v)
+	require.NoError(t, err)
+
+	return b
 }
