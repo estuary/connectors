@@ -346,21 +346,15 @@ func driveApplyScenario[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, 
 	taskName string,
 	rawBundledSource []byte,
 	bindingSpecPath string,
-	finalResourcePathSuffix string,
-	makeResourceFn func(finalResourcePathPart string) RC,
-) (string, []string) {
+	resource RC,
+) string {
 	t.Helper()
-
-	finalResourcePathPart := fmt.Sprintf("test_apply_%s%s", uuid.NewString()[:8], finalResourcePathSuffix)
 
 	// Construct the test resource configuration for this task.
 	cfgRaw := json.RawMessage(gjson.GetBytes(rawBundledSource, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
 	var cfg EC
 	require.NoError(t, unmarshalStrict(decryptConfig(t, cfgRaw), &cfg))
-	res := makeResourceFn(finalResourcePathPart).WithDefaults(cfg)
-	resCfg, err := json.Marshal(res)
-	require.NoError(t, err)
-	resourcePath, _, err := res.Parameters()
+	resCfg, err := json.Marshal(resource)
 	require.NoError(t, err)
 
 	// Prepare the binding spec for this step of the test.
@@ -389,7 +383,7 @@ func driveApplyScenario[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, 
 	sourcePath := filepath.Join(tmpDir, "source.flow.yaml")
 	require.NoError(t, os.WriteFile(sourcePath, rawBundledSource, 0o600))
 
-	return driveTask(t, ctx, false, sourcePath, taskName, "../materialize-boilerplate/testdata/integration/empty.fixture.json"), resourcePath
+	return driveTask(t, ctx, false, sourcePath, taskName, "../materialize-boilerplate/testdata/integration/empty.fixture.json")
 }
 
 func loadIntegrationSpecBundled(t *testing.T, file string) json.RawMessage {
@@ -455,28 +449,37 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 		require.NoError(t, err)
 
 		for _, s := range scenarios {
-			_, _ = driveApplyScenario(
+			finalResourcePathPart := fmt.Sprintf("test_apply_%s%s", uuid.NewString()[:8], suffix)
+			resource := makeResourceFn(finalResourcePathPart).WithDefaults(cfg)
+			resourcePath, _, err := resource.Parameters()
+			require.NoError(t, err)
+			t.Cleanup(func() {
+				_, fn, err := materializer.DeleteResource(ctx, resourcePath)
+				require.NoError(t, err)
+				require.NoError(t, fn(ctx))
+				t.Log("cleaned up resource", resourcePath)
+			})
+
+			_ = driveApplyScenario(
 				t,
 				ctx,
 				materializer,
 				taskName,
 				rawBundledSource,
 				bundledBaseBindingSpecPath,
-				suffix,
-				makeResourceFn,
+				resource,
 			)
 
 			bindingSpecPath := filepath.Join(tDir, s.name)
 			require.NoError(t, os.WriteFile(bindingSpecPath, s.bundledBindingSpec, 0o600))
-			finalApplyDescription, resourcePath := driveApplyScenario(
+			finalApplyDescription := driveApplyScenario(
 				t,
 				ctx,
 				materializer,
 				taskName,
 				rawBundledSource,
 				bindingSpecPath,
-				suffix,
-				makeResourceFn,
+				resource,
 			)
 
 			fmt.Println("-----")
