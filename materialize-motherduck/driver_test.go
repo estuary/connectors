@@ -9,7 +9,6 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
@@ -59,48 +58,6 @@ func TestApply(t *testing.T) {
 		return tableConfig{Table: path}
 	})
 }
-
-func TestValidateAndApply(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := mustGetCfg(t)
-
-	resourceConfig := tableConfig{
-		Table:    "target",
-		Schema:   cfg.Schema,
-		Delta:    true,
-		database: cfg.Database,
-	}
-
-	boilerplate.RunValidateAndApplyTestCases(
-		t,
-		newDuckDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
-
-			db, err := cfg.db(ctx)
-			require.NoError(t, err)
-			defer db.Close()
-
-			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T) {
-			t.Helper()
-
-			db, err := cfg.db(ctx)
-			require.NoError(t, err)
-			defer db.Close()
-
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", duckDialect.Identifier(cfg.Database, resourceConfig.Schema, resourceConfig.Table)))
-		},
-	)
-}
-
 func TestValidateAndApplyMigrations(t *testing.T) {
 	ctx := context.Background()
 

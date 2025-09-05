@@ -84,7 +84,7 @@ func RunIntegrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, 
 		// interfere with each other, as well as a timestamp to facilitate
 		// cleaning up leftover resources that weren't cleanup by a prior run
 		// for some reason.
-		suffix := fmt.Sprintf("_%s%s_%d", uuid.NewString()[:8], testTableIdentifer, ts)
+		suffix := fmt.Sprintf("_%s%s%d", uuid.NewString()[:8], testTableIdentifer, ts)
 
 		var bindings []testBinding
 		for bIdx, binding := range spec.Bindings {
