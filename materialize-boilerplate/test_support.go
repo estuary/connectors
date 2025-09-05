@@ -12,7 +12,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -317,90 +316,7 @@ func SnapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Cons
 	return out.String()
 }
 
-/*
-	Strategy for running Apply tests:
-
-	- Run scenarios individually. A scenario is a particular materialization
-	  spec, coupled with a particular end apply test spec
-
-	- Running a scenario:
-	  - Apply the base bindings
-	    - Generate a resource based on a randomized table name
-		- All table names should use the same suffix, but for an individual scenario the table name should be completely random
-	    - Take the bindings from the "base" and stick them into the test spec
-		- Replace the test spec binding with the generated resource
-		- Use flowctl preview with an empty fixture to do the application
-	  - Apply the end bindings
-	    - Use the same generated resource as before
-		- Swap out the bindings from "base" and stick them into the test spec
-		- Replace the test spec binding with the generated resource
-		- Run flowctl preview again
-	  - Populate the info schema for that resource
-	  - Return the result
-*/
-
-func driveApplyScenario[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
-	t *testing.T,
-	ctx context.Context,
-	m Materializer[EC, FC, RC, MT],
-	taskName string,
-	rawBundledSource []byte,
-	bindingSpecPath string,
-	resource RC,
-) string {
-	t.Helper()
-
-	// Construct the test resource configuration for this task.
-	cfgRaw := json.RawMessage(gjson.GetBytes(rawBundledSource, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
-	var cfg EC
-	require.NoError(t, unmarshalStrict(decryptConfig(t, cfgRaw), &cfg))
-	resCfg, err := json.Marshal(resource)
-	require.NoError(t, err)
-
-	// Prepare the binding spec for this step of the test.
-	bindingSpecBundled, err := exec.Command("flowctl", "raw", "bundle", "--source", bindingSpecPath).CombinedOutput()
-	require.NoError(t, err)
-	tasks := gjson.GetBytes(bindingSpecBundled, "materializations").Map()
-	require.Len(t, tasks, 1)
-	var bindingsRaw, collectionsRaw json.RawMessage
-	for taskName := range tasks {
-		bindings := gjson.GetBytes(bindingSpecBundled, fmt.Sprintf("materializations.%s.bindings", taskName))
-		require.Len(t, bindings.Array(), 1)
-		bindingsRaw, err = sjson.SetBytes([]byte(bindings.Raw), "0.resource", json.RawMessage(resCfg))
-		require.NoError(t, err)
-
-		collectionsRaw = json.RawMessage(gjson.GetBytes(bindingSpecBundled, "collections").Raw)
-	}
-
-	// Swap those bindings into the working bundled source.
-	rawBundledSource, err = sjson.SetRawBytes(rawBundledSource, fmt.Sprintf("materializations.%s.bindings", taskName), bindingsRaw)
-	require.NoError(t, err)
-	rawBundledSource, err = sjson.SetRawBytes(rawBundledSource, "collections", collectionsRaw)
-	require.NoError(t, err)
-
-	// Run the scenario.
-	tmpDir := t.TempDir()
-	sourcePath := filepath.Join(tmpDir, "source.flow.yaml")
-	require.NoError(t, os.WriteFile(sourcePath, rawBundledSource, 0o600))
-
-	return driveTask(t, ctx, false, sourcePath, taskName, "../materialize-boilerplate/testdata/integration/empty.fixture.json")
-}
-
-func loadIntegrationSpecBundled(t *testing.T, file string) json.RawMessage {
-	t.Helper()
-
-	// get the current directory of this go file
-	_, filename, _, ok := runtime.Caller(0)
-	require.True(t, ok)
-	dir := filepath.Dir(filename)
-
-	specBundled, err := exec.Command("flowctl", "raw", "bundle", "--source", filepath.Join(dir, "testdata", "integration", file)).CombinedOutput()
-	require.NoError(t, err)
-
-	return specBundled
-}
-
-func RunApplyTestV2[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	t *testing.T,
 	driver Connector,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
@@ -638,100 +554,6 @@ func runChallengingNamesApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Res
 
 	snap.WriteString("Challenging Field Names Materialized Columns:\n")
 	snap.WriteString(string(dumpSchema(t, ctx, m, resourcePath)))
-}
-
-type applyScenario struct {
-	name               string
-	bundledBindingSpec json.RawMessage
-}
-
-func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
-	t *testing.T,
-	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
-	sourcePath string,
-	makeResourceFn func(finalResourcePathPart string) RC,
-) {
-	t.Helper()
-	ctx := context.Background()
-
-	rawBundledSource, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
-	require.NoError(t, err)
-
-	tDir := t.TempDir()
-	bundledBaseBindingSpec := loadIntegrationSpecBundled(t, "apply-base.flow.yaml")
-	bundledBaseBindingSpecPath := filepath.Join(tDir, "apply-base.flow.yaml")
-	require.NoError(t, os.WriteFile(bundledBaseBindingSpecPath, bundledBaseBindingSpec, 0o600))
-
-	var scenarios []applyScenario
-	for _, scenarioPath := range []string{
-		"apply-add-field.flow.yaml",
-		"apply-backfill-replace.flow.yaml",
-		"apply-backfill-truncate.flow.yaml",
-		"apply-remove-field.flow.yaml",
-	} {
-		scenarios = append(scenarios, applyScenario{
-			name:               scenarioPath,
-			bundledBindingSpec: loadIntegrationSpecBundled(t, scenarioPath),
-		})
-	}
-
-	ts := time.Now().Unix()
-	suffix := testTableIdentifer + fmt.Sprintf("%s_%d", uuid.NewString()[:8], ts)
-	gjson.GetBytes(rawBundledSource, "materializations").ForEach(func(key, value gjson.Result) bool {
-		taskName := key.String()
-
-		cfgRaw := json.RawMessage(gjson.GetBytes(rawBundledSource, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
-		var cfg EC
-		require.NoError(t, unmarshalStrict(decryptConfig(t, cfgRaw), &cfg))
-
-		featureFlags := parseFlags(cfg)
-		materializer, err := newMaterializer(ctx, taskName, cfg, featureFlags)
-		require.NoError(t, err)
-
-		for _, s := range scenarios {
-			finalResourcePathPart := fmt.Sprintf("test_apply_%s%s", uuid.NewString()[:8], suffix)
-			resource := makeResourceFn(finalResourcePathPart).WithDefaults(cfg)
-			resourcePath, _, err := resource.Parameters()
-			require.NoError(t, err)
-			t.Cleanup(func() {
-				_, fn, err := materializer.DeleteResource(ctx, resourcePath)
-				require.NoError(t, err)
-				require.NoError(t, fn(ctx))
-				t.Log("cleaned up resource", resourcePath)
-			})
-
-			_ = driveApplyScenario(
-				t,
-				ctx,
-				materializer,
-				taskName,
-				rawBundledSource,
-				bundledBaseBindingSpecPath,
-				resource,
-			)
-
-			bindingSpecPath := filepath.Join(tDir, s.name)
-			require.NoError(t, os.WriteFile(bindingSpecPath, s.bundledBindingSpec, 0o600))
-			finalApplyDescription := driveApplyScenario(
-				t,
-				ctx,
-				materializer,
-				taskName,
-				rawBundledSource,
-				bindingSpecPath,
-				resource,
-			)
-
-			fmt.Println("-----")
-			fmt.Printf("Scenario: %s\n", s.name)
-			fmt.Println(finalApplyDescription)
-			fmt.Printf("Resource: %s\n", strings.Join(resourcePath, "."))
-			fmt.Println("-----")
-		}
-
-		return true
-	})
-
 }
 
 type testTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper] struct {
