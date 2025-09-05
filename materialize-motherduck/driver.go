@@ -9,6 +9,7 @@ import (
 	"path"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/materialize"
@@ -195,7 +196,15 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}()
 
 	d.be.StartedEvaluatingLoads()
-	rows, err := d.conn.QueryContext(ctx, fmt.Sprintf("COPY (%s) to '%s';", loadAllSql, loadResURI))
+	// TODO(whb): Motherduck has occasional issues where queries hang forever,
+	// never completing but also never erroring out. A 4 hour timeout is quite
+	// generous but should allow the connector to restart rather than getting
+	// stuck indefinitely, while still allowing any reasonable query to
+	// complete. Hopefully MD will fix this eventually and we can remove this
+	// timeout.
+	queryCtx, cancel := context.WithTimeout(ctx, 4*time.Hour)
+	defer cancel()
+	rows, err := d.conn.QueryContext(queryCtx, fmt.Sprintf("COPY (%s) to '%s';", loadAllSql, loadResURI))
 	if err != nil {
 		return fmt.Errorf("querying Load documents: %w", err)
 	}
@@ -363,10 +372,6 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
 				continue
 			}
 
-			// TODO(whb): This extra diagnostic logging can be removed once a
-			// complete list of retryable errors is established.
-			log.WithField("errorType", fmt.Sprintf("%T", err)).Info("commit failed with error of type")
-
 			return err
 		}
 
@@ -381,7 +386,16 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
 }
 
 func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommit, fenceUpdate string) error {
-	txn, err := d.conn.BeginTx(ctx, nil)
+	// TODO(whb): Motherduck has occasional issues where queries hang forever,
+	// never completing but also never erroring out. A 4 hour timeout is quite
+	// generous but should allow the connector to restart rather than getting
+	// stuck indefinitely, while still allowing any reasonable query to
+	// complete. Hopefully MD will fix this eventually and we can remove this
+	// timeout.
+	txnCtx, cancel := context.WithTimeout(ctx, 4*time.Hour)
+	defer cancel()
+
+	txn, err := d.conn.BeginTx(txnCtx, nil)
 	if err != nil {
 		return fmt.Errorf("store BeginTx: %w", err)
 	}
@@ -390,14 +404,14 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 	for _, b := range bindings {
 		d.be.StartedResourceCommit(b.path)
 		for _, query := range b.queries {
-			if _, err := txn.ExecContext(ctx, query); err != nil {
+			if _, err := txn.ExecContext(txnCtx, query); err != nil {
 				return fmt.Errorf("executing store query for %s: %w", b.path, err)
 			}
 		}
 		d.be.FinishedResourceCommit(b.path)
 	}
 
-	if res, err := txn.ExecContext(ctx, fenceUpdate); err != nil {
+	if res, err := txn.ExecContext(txnCtx, fenceUpdate); err != nil {
 		return fmt.Errorf("updating checkpoints: %w", err)
 	} else if rows, err := res.RowsAffected(); err != nil {
 		return fmt.Errorf("getting fence update rows affected: %w", err)
