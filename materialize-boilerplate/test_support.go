@@ -329,7 +329,7 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
 	require.NoError(t, err)
 
-	ts := time.Now().Unix()
+	suffix := testTableIdentifer + fmt.Sprintf("%d", time.Now().Unix())
 
 	gjson.GetBytes(bundled, "materializations").ForEach(func(key, value gjson.Result) bool {
 		rawCfg := json.RawMessage(gjson.Get(value.Raw, "endpoint.local.config").Raw)
@@ -342,12 +342,12 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 		require.NoError(t, err)
 
 		var testResourcePaths [][]string
-		t.Cleanup(func() { cleanupByTS(t, ctx, materializer, testResourcePaths, ts) })
+		t.Cleanup(func() { cleanupBySuffix(t, ctx, materializer, testResourcePaths, suffix) })
 
 		snap.WriteString("\n--- Materialization: " + key.String() + " ---\n\n")
 
 		{
-			tableName := "bigschema_" + uuid.NewString()[:8] + testTableIdentifer + fmt.Sprintf("%d", ts)
+			tableName := "bigschema_" + uuid.NewString()[:8] + suffix
 			res := makeResourceFn(tableName).WithDefaults(cfg)
 			resourcePath, _, err := res.Parameters()
 			require.NoError(t, err)
@@ -356,7 +356,7 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 		}
 
 		{
-			tableName := "addandremovefields_" + uuid.NewString()[:8] + testTableIdentifer + fmt.Sprintf("%d", ts)
+			tableName := "addandremovefields_" + uuid.NewString()[:8] + suffix
 			res := makeResourceFn(tableName).WithDefaults(cfg)
 			resourcePath, _, err := res.Parameters()
 			require.NoError(t, err)
@@ -365,7 +365,7 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 		}
 
 		{
-			tableName := "challengingnames_" + uuid.NewString()[:8] + testTableIdentifer + fmt.Sprintf("%d", ts)
+			tableName := "challengingnames_" + uuid.NewString()[:8] + suffix
 			res := makeResourceFn(tableName).WithDefaults(cfg)
 			resourcePath, _, err := res.Parameters()
 			require.NoError(t, err)
@@ -623,7 +623,7 @@ func RunIntegrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, 
 		// interfere with each other, as well as a timestamp to facilitate
 		// cleaning up leftover resources that weren't cleanup by a prior run
 		// for some reason.
-		suffix := testTableIdentifer + fmt.Sprintf("%s_%d", uuid.NewString()[:8], ts)
+		suffix := fmt.Sprintf("_%s%s_%d", uuid.NewString()[:8], testTableIdentifer, ts)
 
 		var bindings []testBinding
 		for bIdx, binding := range spec.Bindings {
@@ -742,7 +742,6 @@ func cleanupTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 	t.Helper()
 
 	ctx := context.Background()
-	now := time.Now()
 	var group errgroup.Group
 
 	for taskName, task := range tasks {
@@ -763,45 +762,7 @@ func cleanupTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 				paths = append(paths, b.path)
 			}
 
-			var toCleanup [][]string
-
-			is := initInfoSchema(task.materializer.Config())
-			if err := task.materializer.PopulateInfoSchema(ctx, is, paths, true); err != nil {
-				// Couldn't list existing resources for some reason. At least
-				// try to clean up the tables that are part of this task.
-				toCleanup = paths
-				t.Log("failed to populate info schema for cleanup", err)
-			} else {
-				for _, r := range is.resources {
-					last := r.location[len(r.location)-1]
-					if i := strings.LastIndex(last, testTableIdentifer); i == -1 {
-						// Not a test table.
-					} else if s := last[i:]; s == task.suffix {
-						// This resource was created by this test run.
-						toCleanup = append(toCleanup, r.location)
-					} else if parts := strings.Split(s, "_"); len(parts) != 2 {
-						// Not a test table.
-					} else if seconds, err := strconv.Atoi(parts[1]); err != nil {
-						// Not a test table.
-					} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 6*time.Hour {
-						t.Log("will cleanup old test table", r.location)
-						toCleanup = append(toCleanup, r.location)
-					}
-				}
-			}
-
-			for _, path := range toCleanup {
-				group.Go(func() error {
-					if _, fn, err := task.materializer.DeleteResource(ctx, path); err != nil {
-						return err
-					} else if err := fn(ctx); err != nil {
-						return err
-					}
-
-					t.Log("cleaned up resource", path)
-					return nil
-				})
-			}
+			cleanupBySuffix(t, ctx, task.materializer, paths, task.suffix)
 
 			return nil
 		})
@@ -810,12 +771,12 @@ func cleanupTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 	require.NoError(t, group.Wait())
 }
 
-func cleanupByTS[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func cleanupBySuffix[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	t *testing.T,
 	ctx context.Context,
 	m Materializer[EC, FC, RC, MT],
 	paths [][]string,
-	ts int64,
+	suffix string,
 ) {
 	t.Helper()
 
@@ -833,11 +794,12 @@ func cleanupByTS[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 			last := r.location[len(r.location)-1]
 			if !strings.Contains(last, testTableIdentifer) {
 				// Not a test table.
-			} else if parts := strings.Split(last, "_"); parts[len(parts)-1] == fmt.Sprintf("%d", ts) {
+			} else if strings.HasSuffix(last, suffix) {
 				// This resource was created by this test run.
 				toCleanup = append(toCleanup, r.location)
+			} else if parts := strings.Split(last, "_"); len(parts) < 2 {
+				t.Log("malformed test table name", last)
 			} else if seconds, err := strconv.Atoi(parts[len(parts)-1]); err != nil {
-				// Not a test table.
 				t.Log("failed to parse timestamp from test table name", last, err)
 			} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 6*time.Hour {
 				t.Log("will cleanup old test table", r.location)
