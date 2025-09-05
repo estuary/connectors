@@ -395,6 +395,8 @@ github.com/estuary/flow v0.5.21-0.20250825184928-8fa5cd9e1f06 h1:TE/hfL7iTGAJdeK
 github.com/estuary/flow v0.5.21-0.20250825184928-8fa5cd9e1f06/go.mod h1:/IP6GPHpCOur6cigBVXZg5HoIgAiuWPMoPJnqW9UDrg=
 github.com/estuary/flow v0.5.21-0.20250826211322-7d9e055bca5c h1:aCEyZ16o07Flg3wIfrSE/Q64Obp7sxG9VkI5j94cTPI=
 github.com/estuary/flow v0.5.21-0.20250826211322-7d9e055bca5c/go.mod h1:/IP6GPHpCOur6cigBVXZg5HoIgAiuWPMoPJnqW9UDrg=
+github.com/estuary/flow v0.5.22-0.20250904235012-8ebdb22afa01 h1:anSa8J/epTHpHDS/s9g8/S1Wt10ddldyojhJp8iTJsU=
+github.com/estuary/flow v0.5.22-0.20250904235012-8ebdb22afa01/go.mod h1:/IP6GPHpCOur6cigBVXZg5HoIgAiuWPMoPJnqW9UDrg=
 github.com/estuary/vitess v0.15.10 h1:oXJgcG0HGZWuwjdvSp4pIFIAXtKLaR9Fl9VBynSszFA=
 github.com/estuary/vitess v0.15.10/go.mod h1:rSIE8UMfexjblBloleGw6BqQIKggGmU91TduCNIaJEA=
 github.com/evanphx/json-patch/v5 v5.9.0 h1:kcBlZQbplgElYIlo/n1hJbls2z/1awpXxpRi0/FOJfg=

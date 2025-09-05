@@ -20,10 +20,6 @@ var featureFlagDefaults = map[string]bool{
 	// When set, object and array field types will be materialized as JSON
 	// columns, instead of the historical behavior of strings.
 	"objects_and_arrays_as_json": true,
-	// When set, flow_document is materialized for standard bindings and is used
-	// for reduction of documents, otherwise flow_document is an optional field
-	// and load phase constructs the flow_document from root-level fields.
-	"flow_document": true,
 }
 
 type config struct {
@@ -43,6 +39,7 @@ type config struct {
 
 type advancedConfig struct {
 	DisableFieldTruncation bool   `json:"disableFieldTruncation,omitempty" jsonschema:"title=Disable Field Truncation,description=Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures."`
+	NoFlowDocument         bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the flow_document column will not be materialized in destination tables.,default=false"`
 	FeatureFlags           string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 

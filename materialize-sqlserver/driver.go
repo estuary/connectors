@@ -22,12 +22,7 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
-var featureFlagDefaults = map[string]bool{
-	// When set, flow_document is materialized for standard bindings and is used
-	// for reduction of documents, otherwise flow_document is an optional field
-	// and load phase constructs the flow_document from root-level fields.
-	"flow_document": true,
-}
+var featureFlagDefaults = map[string]bool{}
 
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
@@ -39,7 +34,8 @@ type tunnelConfig struct {
 }
 
 type advancedConfig struct {
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the flow_document column will not be materialized in destination tables.,default=false"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // config represents the endpoint configuration for sql server.
@@ -322,17 +318,17 @@ type binding struct {
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFlags map[string]bool) error {
 	var b = &binding{target: target}
 
-	// Choose the appropriate load query template based on feature flags
+	// Choose the appropriate load query template based on configuration
 	var loadQueryTemplate *template.Template
-	if !featureFlags["flow_document"] && !target.DeltaUpdates {
+	if t.cfg.Advanced.NoFlowDocument && !target.DeltaUpdates {
 		loadQueryTemplate = t.templates.loadQueryNoFlowDocument
 	} else {
 		loadQueryTemplate = t.templates.loadQuery
 	}
 
-	// Choose the appropriate merge template based on feature flags
+	// Choose the appropriate merge template based on configuration
 	var mergeTemplate *template.Template
-	if !featureFlags["flow_document"] && !target.DeltaUpdates {
+	if t.cfg.Advanced.NoFlowDocument && !target.DeltaUpdates {
 		mergeTemplate = t.templates.mergeIntoNoFlowDocument
 	} else {
 		mergeTemplate = t.templates.mergeInto

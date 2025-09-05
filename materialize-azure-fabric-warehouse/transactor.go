@@ -166,9 +166,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("creating load table: %w", err)
 		}
 
-		// Choose appropriate load query template based on feature flags
+		// Choose appropriate load query template based on configuration
 		var loadTemplate = tplLoadQuery
-		if !t.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+		if t.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
 			loadTemplate = tplLoadQueryNoFlowDocument
 		}
 		
@@ -301,9 +301,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 				t.be.StartedResourceCommit(b.target.Path)
 				if b.store.mustMerge {
-					// Choose appropriate store merge template based on feature flags
+					// Choose appropriate store merge template based on configuration
 					var storeTemplate = tplStoreMergeQuery
-					if !t.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+					if t.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
 						storeTemplate = tplStoreMergeQueryNoFlowDocument
 					}
 					

@@ -49,12 +49,7 @@ const (
 	queryTimeout = 1 * time.Hour
 )
 
-var featureFlagDefaults = map[string]bool{
-	// When set, flow_document is materialized for standard bindings and is used
-	// for reduction of documents, otherwise flow_document is an optional field
-	// and load phase constructs the flow_document from root-level fields.
-	"flow_document": true,
-}
+var featureFlagDefaults = map[string]bool{}
 
 func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeoutCause(ctx, queryTimeout, errors.New("1 hour query timeout exceeded (is the database disk full?)"))
@@ -119,8 +114,9 @@ type config struct {
 }
 
 type advancedConfig struct {
-	SSLMode      string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	SSLMode        string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the flow_document column will not be materialized in destination tables.,default=false"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c config) DefaultNamespace() string {
@@ -421,9 +417,9 @@ type binding struct {
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema, featureFlags map[string]bool) error {
 	var b = &binding{target: target}
 
-	// Choose the appropriate load query template based on feature flags
+	// Choose the appropriate load query template based on configuration
 	var loadQueryTemplate *template.Template
-	if !featureFlags["flow_document"] && !target.DeltaUpdates {
+	if t.cfg.Advanced.NoFlowDocument && !target.DeltaUpdates {
 		loadQueryTemplate = tplLoadQueryNoFlowDocument
 	} else {
 		loadQueryTemplate = tplLoadQuery

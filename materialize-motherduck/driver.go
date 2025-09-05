@@ -163,9 +163,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		} else if uris, err := d.loadFiles.Flush(idx); err != nil {
 			return fmt.Errorf("flushing load file: %w", err)
 		} else {
-			// Choose appropriate load query template based on feature flags
+			// Choose appropriate load query template based on configuration
 			var loadTemplate = tplLoadQuery
-			if !d.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+			if d.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
 				loadTemplate = tplLoadQueryNoFlowDocument
 			}
 			
@@ -343,10 +343,10 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
 		var queries []string
 		params := &queryParams{Table: b.target, Files: uris, Bounds: b.storeMergeBounds.Build()}
 		
-		// Choose appropriate templates based on feature flags
+		// Choose appropriate templates based on configuration
 		var storeDeleteTemplate = tplStoreDeleteQuery
 		var storeTemplate = tplStoreQuery
-		if !d.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+		if d.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
 			storeTemplate = tplStoreQueryNoFlowDocument
 		}
 		

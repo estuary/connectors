@@ -230,9 +230,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		} else if uris, err := t.loadFiles.Flush(idx); err != nil {
 			return fmt.Errorf("flushing load file: %w", err)
 		} else {
-			// Choose appropriate load query template based on feature flags
+			// Choose appropriate load query template based on configuration
 			var loadTemplate = t.templates.loadQuery
-			if !t.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+			if t.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
 				loadTemplate = t.templates.loadQueryNoFlowDocument
 			}
 			
@@ -331,9 +331,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		var query string
 		if b.mustMerge {
-			// Choose appropriate store update template based on feature flags
+			// Choose appropriate store update template based on configuration
 			var storeTemplate = t.templates.storeUpdate
-			if !t.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+			if t.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
 				storeTemplate = t.templates.storeUpdateNoFlowDocument
 			}
 			

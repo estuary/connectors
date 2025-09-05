@@ -29,7 +29,7 @@ config_json_template='{
    "user":     "$SQLSERVER_USER",
    "hardDelete": true,
    "advanced": {
-      "feature_flags": "no_flow_document"
+      "no_flow_document": true
    }
 }'
 

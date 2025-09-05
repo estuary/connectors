@@ -255,9 +255,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 		var fullPaths = pathsWithRoot(b.rootStagingPath, toLoad)
 
-		// Choose appropriate load query template based on feature flags
+		// Choose appropriate load query template based on configuration
 		var loadTemplate = tplLoadQuery
-		if !d.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+		if d.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
 			loadTemplate = tplLoadQueryNoFlowDocument
 		}
 		
@@ -420,9 +420,9 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				if end > len(toCopy) {
 					end = len(toCopy)
 				}
-				// Choose appropriate merge template based on feature flags
+				// Choose appropriate merge template based on configuration
 				var mergeTemplate = tplMergeInto
-				if !d.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+				if d.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
 					mergeTemplate = tplMergeIntoNoFlowDocument
 				}
 				

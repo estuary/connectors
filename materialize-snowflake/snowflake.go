@@ -388,9 +388,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		} else if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
 		} else {
-			// Choose appropriate load query template based on feature flags
+			// Choose appropriate load query template based on configuration
 			var loadTemplate = d.templates.loadQuery
-			if !d.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+			if d.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
 				loadTemplate = d.templates.loadQueryNoFlowDocument
 			}
 			
@@ -575,9 +575,9 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 		}
 
 		if b.store.mustMerge {
-			// Choose appropriate merge template based on feature flags
+			// Choose appropriate merge template based on configuration
 			var mergeTemplate = d.templates.mergeInto
-			if !d.featureFlags["flow_document"] && !b.target.DeltaUpdates {
+			if d.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
 				mergeTemplate = d.templates.mergeIntoNoFlowDocument
 			}
 			

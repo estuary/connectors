@@ -30,6 +30,7 @@ func mustGetCfg(t *testing.T) config {
 			AuthType: snowflake_auth.JWT,
 		},
 		Advanced: advancedConfig{
+			NoFlowDocument: true,
 			FeatureFlags: "allow_existing_tables_for_new_bindings",
 		},
 	}

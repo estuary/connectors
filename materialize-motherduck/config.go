@@ -16,12 +16,7 @@ import (
 	"google.golang.org/api/option"
 )
 
-var featureFlagDefaults = map[string]bool{
-	// When set, flow_document is materialized for standard bindings and is used
-	// for reduction of documents, otherwise flow_document is an optional field
-	// and load phase constructs the flow_document from root-level fields.
-	"flow_document": true,
-}
+var featureFlagDefaults = map[string]bool{}
 
 type config struct {
 	Token         string              `json:"token" jsonschema:"title=Motherduck Service Token,description=Service token for authenticating with MotherDuck." jsonschema_extras:"secret=true,order=0"`
@@ -35,7 +30,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the flow_document column will not be materialized in destination tables.,default=false"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c config) Validate() error {

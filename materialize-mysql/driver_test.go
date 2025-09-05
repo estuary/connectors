@@ -33,6 +33,7 @@ func testConfig() config {
 		Database: "flow",
 		Timezone: "UTC",
 		Advanced: advancedConfig{
+			NoFlowDocument: true,
 			FeatureFlags: "allow_existing_tables_for_new_bindings",
 		},
 	}
@@ -46,6 +47,7 @@ func testMariaConfig() config {
 		Database: "flow",
 		Timezone: "UTC",
 		Advanced: advancedConfig{
+			NoFlowDocument: true,
 			FeatureFlags: "allow_existing_tables_for_new_bindings",
 		},
 	}

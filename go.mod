@@ -35,7 +35,7 @@ require (
 	github.com/databricks/databricks-sql-go v1.6.2-0.20250318155202-2a39cfaf0c27
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
-	github.com/estuary/flow v0.5.21-0.20250826211322-7d9e055bca5c
+	github.com/estuary/flow v0.5.22-0.20250904235012-8ebdb22afa01
 	github.com/estuary/vitess v0.15.10
 	github.com/evanphx/json-patch/v5 v5.9.0
 	github.com/firebolt-db/firebolt-go-sdk v1.2.0

@@ -30,6 +30,7 @@ func testConfig() config {
 		Database: "crate",
 		Schema:   "doc",
 		Advanced: advancedConfig{
+			NoFlowDocument: true,
 			FeatureFlags: "allow_existing_tables_for_new_bindings",
 		},
 	}

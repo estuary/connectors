@@ -25,6 +25,7 @@ func mustGetCfg(t *testing.T) config {
 
 	out := config{
 		Advanced: advancedConfig{
+			NoFlowDocument: true,
 			FeatureFlags: "allow_existing_tables_for_new_bindings",
 		},
 	}

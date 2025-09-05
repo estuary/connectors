@@ -23,7 +23,7 @@ config_json_template='{
    "schema":   "public",
    "hardDelete": true,
    "advanced": {
-      "feature_flags": "no_flow_document"
+      "no_flow_document": true
    }
 }'
 
