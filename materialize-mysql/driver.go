@@ -27,12 +27,7 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
-var featureFlagDefaults = map[string]bool{
-	// When set, flow_document is materialized for standard bindings and is used
-	// for reduction of documents, otherwise flow_document is an optional field
-	// and load phase constructs the flow_document from root-level fields.
-	"flow_document": true,
-}
+var featureFlagDefaults = map[string]bool{}
 
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
@@ -66,7 +61,8 @@ type advancedConfig struct {
 	SSLClientCert string `json:"ssl_client_cert,omitempty" jsonschema:"title=SSL Client Certificate,description=Optional client certificate to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 	SSLClientKey  string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=Optional client key to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the flow_document column will not be materialized in destination tables.,default=false"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c config) Validate() error {
@@ -495,9 +491,9 @@ type binding struct {
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema, featureFlags map[string]bool) error {
 	var b = &binding{target: target}
 
-	// Choose the appropriate load query template based on feature flags
+	// Choose the appropriate load query template based on configuration
 	var loadQueryTemplate *template.Template
-	if !featureFlags["flow_document"] && !target.DeltaUpdates {
+	if t.cfg.Advanced.NoFlowDocument && !target.DeltaUpdates {
 		loadQueryTemplate = t.templates.loadQueryNoFlowDocument
 	} else {
 		loadQueryTemplate = t.templates.loadQuery
