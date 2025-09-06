@@ -496,18 +496,14 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		if it.Exists {
-			b.store.mustMerge = true
+		var flowDelete = d.cfg.HardDelete && it.Delete
+		if flowDelete && !it.Exists {
+			// Ignore items which do not exist and are already deleted
+			continue
 		}
 
-		var flowDocument = it.RawJSON
-		if d.cfg.HardDelete && it.Delete {
-			if it.Exists {
-				flowDocument = json.RawMessage(`"delete"`)
-			} else {
-				// Ignore items which do not exist and are already deleted
-				continue
-			}
+		if it.Exists {
+			b.store.mustMerge = true
 		}
 
 		if !b.streaming {
@@ -515,13 +511,13 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				return nil, err
 			}
 		}
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
+		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
 		} else if b.streaming {
 			if err := d.streamManager.writeRow(ctx, it.Binding, converted); err != nil {
 				return nil, fmt.Errorf("encoding Store to stream for resource %s: %w", b.target.Path, err)
 			}
-		} else if err = b.store.stage.writeRow(converted); err != nil {
+		} else if err = b.store.stage.writeRow(append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
 		} else {
 			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
@@ -575,13 +571,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 		}
 
 		if b.store.mustMerge {
-			// Choose appropriate merge template based on configuration
-			var mergeTemplate = d.templates.mergeInto
-			if d.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
-				mergeTemplate = d.templates.mergeIntoNoFlowDocument
-			}
-			
-			mergeIntoQuery, err := renderBoundedQueryTemplate(mergeTemplate, b.target, dir, b.store.mergeBounds.Build())
+			mergeIntoQuery, err := renderBoundedQueryTemplate(d.templates.mergeInto, b.target, dir, b.store.mergeBounds.Build())
 			if err != nil {
 				return nil, fmt.Errorf("mergeInto template: %w", err)
 			}

@@ -166,7 +166,6 @@ type templates struct {
 	loadQueryNoFlowDocument      *template.Template
 	storeInsert                  *template.Template
 	storeUpdate                  *template.Template
-	storeUpdateNoFlowDocument    *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -282,14 +281,8 @@ ON {{ range $ind, $bound := $.Bounds }}
 	l.{{$bound.Identifier}} = r.c{{$ind}}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end}}
-{{- if $.Document }}
-WHEN MATCHED AND {{ if $.ObjAndArrayAsJson -}}
-	TO_JSON_STRING(r.c{{ Add (len $.Columns) -1 }})
-{{- else -}}
-	r.c{{ Add (len $.Columns) -1 }}
-{{- end }}='"delete"' THEN
+WHEN MATCHED AND r._flow_delete THEN
 	DELETE
-{{- end }}
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{end -}}
@@ -298,7 +291,7 @@ WHEN MATCHED THEN
 	{{- if $.Document -}}
 		{{ if $.Values  }}, {{ end }}l.{{$.Document.Identifier}} = r.c{{ Add (len $.Columns) -1 }}
 	{{- end }}
-WHEN NOT MATCHED THEN
+WHEN NOT MATCHED AND NOT r._flow_delete THEN
 	INSERT (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
@@ -313,43 +306,6 @@ WHEN NOT MATCHED THEN
 	);
 {{ end }}
 
--- Alternative store update template for no_flow_document feature flag - uses _meta/op for deletion detection
-
-{{ define "storeUpdateNoFlowDocument" -}}
-MERGE INTO {{ $.Identifier }} AS l
-USING {{ template "tempTableName" . }} AS r
-ON {{ range $ind, $bound := $.Bounds }}
-	{{ if $ind -}} AND {{end -}}
-	l.{{$bound.Identifier}} = r.c{{$ind}}
-	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
-{{- end}}
-{{- if $.MetaOpColumn }}
-WHEN MATCHED AND r.c{{ $.MetaOpColumnIndex }}='d' THEN
-	DELETE
-{{- end }}
-WHEN MATCHED THEN
-	UPDATE SET {{ range $ind, $val := $.Values }}
-	{{- if $ind }}, {{end -}}
-		l.{{$val.Identifier}} = r.c{{ Add (len $.Keys) $ind}}
-	{{- end}} 
-{{- if $.MetaOpColumn }}
-WHEN NOT MATCHED AND r.c{{ $.MetaOpColumnIndex }}!='d' THEN
-{{- else }}
-WHEN NOT MATCHED THEN
-{{- end }}
-	INSERT (
-	{{- range $ind, $col := $.Columns }}
-		{{- if $ind }}, {{ end -}}
-		{{$col.Identifier}}
-	{{- end -}}
-	)
-	VALUES (
-	{{- range $ind, $col := $.Columns }}
-		{{- if $ind }}, {{ end -}}
-		r.c{{$ind}}
-	{{- end -}}
-	);
-{{ end }}
 
 {{ define "installFence" }}
 -- Our desired fence
@@ -432,7 +388,6 @@ UPDATE {{ Identifier $.TablePath }}
 		loadQueryNoFlowDocument:   tplAll.Lookup("loadQueryNoFlowDocument"),
 		storeInsert:               tplAll.Lookup("storeInsert"),
 		storeUpdate:               tplAll.Lookup("storeUpdate"),
-		storeUpdateNoFlowDocument: tplAll.Lookup("storeUpdateNoFlowDocument"),
 	}
 }
 

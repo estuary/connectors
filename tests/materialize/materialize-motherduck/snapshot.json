@@ -875,7 +875,7 @@
     "int_and_str": null,
     "int_str": null,
     "num_and_str": null,
-    "num_str": 1.7976931348623157E+308,
+    "num_str": 1.7976931348623157e+308,
     "time": null
   }
 }
@@ -892,7 +892,7 @@
     "int_and_str": null,
     "int_str": null,
     "num_and_str": null,
-    "num_str": -1.7976931348623157E+308,
+    "num_str": -1.7976931348623157e+308,
     "time": null
   }
 }
@@ -904,7 +904,7 @@
     },
     "flow_published_at": "1970-01-01 01:00:28+00",
     "id": 1,
-    "unsigned_bigint": 18446744073709551615
+    "unsigned_bigint": 18446744073709552000
   }
 }
 {

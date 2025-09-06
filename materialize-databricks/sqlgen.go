@@ -244,7 +244,7 @@ JOIN (
 			{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
 			{{ template "cast" $key -}}
-			{{- end }}
+			{{- end }}, _flow_delete::BOOLEAN
 			FROM json.`+"`{{ $file }}`"+`
 		)
 		{{- end }}
@@ -254,10 +254,8 @@ JOIN (
     l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
     {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
   {{- end }}
-	{{- if $.Table.Document }}
-	WHEN MATCHED AND r.{{ $.Table.Document.Identifier }}='"delete"' THEN
+	WHEN MATCHED AND r._flow_delete THEN
 		DELETE
-	{{- end }}
 	WHEN MATCHED THEN
 		UPDATE SET {{ range $ind, $key := $.Table.Values }}
 		{{- if $ind }}, {{ end -}}
@@ -266,57 +264,7 @@ JOIN (
 	{{- if $.Table.Document -}}
 	{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
 	{{- end }}
-	WHEN NOT MATCHED AND r.{{ $.Table.Document.Identifier }}!='"delete"' THEN
-		INSERT (
-		{{- range $ind, $key := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
-			{{$key.Identifier -}}
-		{{- end -}}
-	)
-		VALUES (
-		{{- range $ind, $key := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
-			r.{{ $key.Identifier }}
-		{{- end -}}
-	);
-{{ end }}
-
--- Alternative merge template for no_flow_document feature flag - uses _meta/op for deletion detection
-
-{{ define "mergeIntoNoFlowDocument" }}
-	MERGE INTO {{ $.Table.Identifier }} AS l
-	USING (
-		{{- range $fi, $file := $.Files }}
-		{{ if $fi }} UNION ALL {{ end -}}
-		(
-			SELECT
-			{{ range $ind, $key := $.Table.Columns }}
-			{{- if $ind }}, {{ end -}}
-			{{ template "cast" $key -}}
-			{{- end }}
-			FROM json.`+"`{{ $file }}`"+`
-		)
-		{{- end }}
-	) AS r
-  ON {{ range $ind, $bound := $.Bounds }}
-    {{ if $ind -}} AND {{ end -}}
-    l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
-    {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
-  {{- end }}
-	{{- if $.Table.MetaOpColumn }}
-	WHEN MATCHED AND r.{{ $.Table.MetaOpColumn.Identifier }}='d' THEN
-		DELETE
-	{{- end }}
-	WHEN MATCHED THEN
-		UPDATE SET {{ range $ind, $key := $.Table.Values }}
-		{{- if $ind }}, {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
-	{{- end }}
-	{{- if $.Table.MetaOpColumn }}
-	WHEN NOT MATCHED AND r.{{ $.Table.MetaOpColumn.Identifier }}!='d' THEN
-	{{- else }}
-	WHEN NOT MATCHED THEN
-	{{- end }}
+	WHEN NOT MATCHED AND NOT r._flow_delete THEN
 		INSERT (
 		{{- range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
@@ -337,7 +285,6 @@ JOIN (
 	tplLoadQueryNoFlowDocument  = tplAll.Lookup("loadQueryNoFlowDocument")
 	tplCopyIntoDirect           = tplAll.Lookup("copyIntoDirect")
 	tplMergeInto                = tplAll.Lookup("mergeInto")
-	tplMergeIntoNoFlowDocument  = tplAll.Lookup("mergeIntoNoFlowDocument")
 )
 
 type tableWithFiles struct {

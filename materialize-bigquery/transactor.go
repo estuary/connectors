@@ -133,6 +133,10 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 	if err != nil {
 		return err
 	}
+	storeSchema = append(storeSchema, &bigquery.FieldSchema{
+		Name: "_flow_delete",
+		Type: bigquery.BooleanFieldType,
+	})
 
 	b := &binding{
 		target:           target,
@@ -297,24 +301,21 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
 	for it.Next() {
-		if t.cfg.HardDelete && it.Delete && !it.Exists {
-			// Ignore documents which do not exist and are being deleted.
+		var b = t.bindings[it.Binding]
+
+		var flowDelete = t.cfg.HardDelete && it.Delete
+		if flowDelete && !it.Exists {
+			// Ignore items which do not exist and are already deleted
 			continue
 		}
 
-		var b = t.bindings[it.Binding]
 		if it.Exists {
 			b.mustMerge = true
 		}
 
-		var flowDocument = it.RawJSON
-		if t.cfg.HardDelete && it.Delete {
-			flowDocument = json.RawMessage(`"delete"`)
-		}
-
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
+		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err = t.storeFiles.WriteRow(ctx, it.Binding, converted); err != nil {
+		} else if err = t.storeFiles.WriteRow(ctx, it.Binding, append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
 		} else {
 			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
@@ -331,13 +332,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 		var query string
 		if b.mustMerge {
-			// Choose appropriate store update template based on configuration
-			var storeTemplate = t.templates.storeUpdate
-			if t.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
-				storeTemplate = t.templates.storeUpdateNoFlowDocument
-			}
-			
-			mergeQuery, err := renderQueryTemplate(b.target, storeTemplate, b.storeMergeBounds.Build(), t.objAndArrayAsJson)
+			mergeQuery, err := renderQueryTemplate(b.target, t.templates.storeUpdate, b.storeMergeBounds.Build(), t.objAndArrayAsJson)
 			if err != nil {
 				return nil, fmt.Errorf("rendering merge query template: %w", err)
 			}

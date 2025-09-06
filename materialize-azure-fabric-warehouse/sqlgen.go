@@ -231,11 +231,12 @@ CREATE TABLE {{ template "temp_name_store" $ }} (
 {{- range $ind, $col := $.Columns }}
 	{{- if $ind }},{{ end }}
 	{{$col.Identifier}} {{- if eq $col.DDL "VARBINARY(MAX)" }} VARCHAR(MAX) {{- else }} {{$col.DDL}} {{- end }}
-{{- end }}
+{{- end }},
+	_flow_delete BIT
 );
 
 COPY INTO {{ template "temp_name_store" $ }}
-({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
+({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }}, _flow_delete)
 FROM {{ range $ind, $uri := $.URIs }}{{- if $ind }}, {{ end }}'{{$uri}}'{{- end }}
 WITH (
 	FILE_TYPE = 'CSV',
@@ -265,34 +266,11 @@ INNER JOIN {{ template "temp_name_store" $ }} AS l
 INSERT INTO {{$.Identifier}} ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
 SELECT {{ range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{ template "maybe_unbase64" $col }}{{- end }}
 FROM {{ template "temp_name_store" $ }}
-WHERE {{$.Document.Identifier}} <> '"delete"';
+WHERE _flow_delete = 0;
 
 DROP TABLE {{ template "temp_name_store" $ }};
 {{ end }}
 
--- Alternative store merge query for no_flow_document feature flag - uses _meta/op for deletion detection
-
-{{ define "storeMergeQueryNoFlowDocument" }}
-{{ template "create_store_staging_table" $ }}
-
-DELETE r
-FROM {{$.Identifier}} AS r
-INNER JOIN {{ template "temp_name_store" $ }} AS l
-{{- range $ind, $bound := $.Bounds }}
-	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
-	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
-{{- end }}
-
-INSERT INTO {{$.Identifier}} ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
-SELECT {{ range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{ template "maybe_unbase64" $col }}{{- end }}
-FROM {{ template "temp_name_store" $ }}
-{{- if $.MetaOpColumn }}
-WHERE {{ $.MetaOpColumn.Identifier }} <> 'd'
-{{- end }};
-
-DROP TABLE {{ template "temp_name_store" $ }};
-{{ end }}
 
 -- storeCopyIntoFromStagedQuery is used when there is no data to
 -- merge, but there are binary columns that must be converted from
@@ -341,7 +319,6 @@ UPDATE {{ Identifier $.TablePath }}
 	tplLoadQueryNoFlowDocument         = tplAll.Lookup("loadQueryNoFlowDocument")
 	tplDropLoadTable                   = tplAll.Lookup("dropLoadTable")
 	tplStoreMergeQuery                 = tplAll.Lookup("storeMergeQuery")
-	tplStoreMergeQueryNoFlowDocument   = tplAll.Lookup("storeMergeQueryNoFlowDocument")
 	tplStoreCopyIntoFromStagedQuery    = tplAll.Lookup("storeCopyIntoFromStagedQuery")
 	tplStoreCopyIntoDirectQuery        = tplAll.Lookup("storeCopyIntoDirectQuery")
 	tplUpdateFence                     = tplAll.Lookup("updateFence")

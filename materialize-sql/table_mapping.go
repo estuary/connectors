@@ -129,10 +129,10 @@ func (t *Table) RootLevelColumns() []*Column {
 	return rootLevelCols
 }
 
-// MetaOpColumn returns the _meta/op column if it exists, nil otherwise
-func (t *Table) MetaOpColumn() *Column {
+// MetaColumn returns the _meta column if it exists, nil otherwise
+func (t *Table) MetaColumn() *Column {
 	for _, col := range t.Columns() {
-		if col.Field == "_meta/op" {
+		if col.Field == "_meta" {
 			return col
 		}
 	}

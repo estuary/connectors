@@ -74,7 +74,7 @@ func newTransactor(
 
 	for idx, target := range bindings {
 		t.loadFiles.AddBinding(idx, target.KeyNames())
-		t.storeFiles.AddBinding(idx, target.ColumnNames())
+		t.storeFiles.AddBinding(idx, append(target.ColumnNames(), "_flow_delete"))
 
 		hasBinaryColumns := false
 		for _, col := range target.Columns() {
@@ -230,23 +230,22 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	for it.Next() {
-		if t.cfg.HardDelete && it.Delete && !it.Exists {
+		var b = t.bindings[it.Binding]
+
+		var flowDocument = it.RawJSON
+		var flowDelete = t.cfg.HardDelete && it.Delete
+		if flowDelete && !it.Exists {
+			// Ignore items which do not exist and are already deleted
 			continue
 		}
 
-		b := t.bindings[it.Binding]
 		if it.Exists {
 			b.store.mustMerge = true
 		}
 
-		flowDocument := it.RawJSON
-		if t.cfg.HardDelete && it.Delete {
-			flowDocument = json.RawMessage(`"delete"`)
-		}
-
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err := t.storeFiles.WriteRow(ctx, it.Binding, converted); err != nil {
+		} else if err := t.storeFiles.WriteRow(ctx, it.Binding, append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing row for store: %w", err)
 		} else {
 			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
@@ -301,14 +300,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 				t.be.StartedResourceCommit(b.target.Path)
 				if b.store.mustMerge {
-					// Choose appropriate store merge template based on configuration
-					var storeTemplate = tplStoreMergeQuery
-					if t.cfg.Advanced.NoFlowDocument && !b.target.DeltaUpdates {
-						storeTemplate = tplStoreMergeQueryNoFlowDocument
-					}
-					
 					var mergeQuery strings.Builder
-					if err := storeTemplate.Execute(&mergeQuery, params); err != nil {
+					if err := tplStoreMergeQuery.Execute(&mergeQuery, params); err != nil {
 						return err
 					} else if _, err := txn.ExecContext(ctx, mergeQuery.String()); err != nil {
 						log.WithField(
