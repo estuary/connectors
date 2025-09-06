@@ -198,6 +198,10 @@ func (s *sqlMaterialization[EC, RC]) NewConstraint(p pf.Projection, deltaUpdates
 	case p.IsPrimaryKey:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "All Locations that are part of the collections key are recommended"
+	case p.IsRootDocumentProjection() && !s.featureFlags["flow_document"] && !deltaUpdates:
+		// When flow_document is disabled, root document projection becomes optional
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Root document projection is optional when flow_document is disabled"
 	case p.IsRootDocumentProjection() && deltaUpdates:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The root document should usually be materialized"
@@ -207,6 +211,13 @@ func (s *sqlMaterialization[EC, RC]) NewConstraint(p pf.Projection, deltaUpdates
 	case len(p.Inference.Types) == 0:
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 		constraint.Reason = "Cannot materialize a field with no types"
+	case slices.Equal(p.Inference.Types, []string{"null"}):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
+	case !deltaUpdates && !s.featureFlags["flow_document"] && strings.Count(p.Ptr, "/") == 1 && p.Inference.Exists == pf.Inference_MUST:
+		// When flow_document is disabled, all root-level properties become LOCATION_REQUIRED
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "Required root-level properties must be present when flow_document is disabled"
 	case p.Field == "_meta/op":
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The operation type should usually be materialized"
@@ -216,9 +227,6 @@ func (s *sqlMaterialization[EC, RC]) NewConstraint(p pf.Projection, deltaUpdates
 	case p.Inference.IsSingleScalarType() || isNumeric:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
-	case slices.Equal(p.Inference.Types, []string{"null"}):
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
 	case p.Inference.IsSingleType() && slices.Contains(p.Inference.Types, "object"):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "Object fields may be materialized"

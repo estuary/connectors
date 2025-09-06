@@ -63,7 +63,8 @@ type tunnelConfig struct {
 }
 
 type advancedConfig struct {
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the flow_document column will not be materialized in destination tables.,default=false"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 type config struct {
@@ -285,12 +286,13 @@ func newRedshiftDriver() *sql.Driver[config, tableConfig] {
 }
 
 type transactor struct {
-	templates templates
-	dialect   sql.Dialect
-	fence     sql.Fence
-	bindings  []*binding
-	be        *m.BindingEvents
-	cfg       config
+	templates    templates
+	dialect      sql.Dialect
+	fence        sql.Fence
+	bindings     []*binding
+	be           *m.BindingEvents
+	cfg          config
+	featureFlags map[string]bool
 }
 
 func prepareNewTransactor(
@@ -310,11 +312,12 @@ func prepareNewTransactor(
 		var cfg = ep.Config
 
 		var d = &transactor{
-			templates: templates,
-			dialect:   ep.Dialect,
-			fence:     fence,
-			cfg:       cfg,
-			be:        be,
+			templates:    templates,
+			dialect:      ep.Dialect,
+			fence:        fence,
+			cfg:          cfg,
+			be:           be,
+			featureFlags: featureFlags,
 		}
 
 		s3client, err := d.cfg.toS3Client(ctx)
@@ -329,6 +332,7 @@ func prepareNewTransactor(
 				s3client,
 				is,
 				caseSensitiveIdentifierEnabled,
+				featureFlags,
 			); err != nil {
 				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 			}
@@ -382,6 +386,7 @@ func (t *transactor) addBinding(
 	client *s3.Client,
 	is *boilerplate.InfoSchema,
 	caseSensitiveIdentifierEnabled bool,
+	featureFlags map[string]bool,
 ) error {
 	var b = &binding{
 		target:     target,
@@ -417,6 +422,12 @@ func (t *transactor) addBinding(
 		*m.sql = sql.String()
 	}
 
+	// Choose appropriate templates based on configuration
+	var loadQueryTemplate = t.templates.loadQuery
+	if t.cfg.Advanced.NoFlowDocument && !target.DeltaUpdates {
+		loadQueryTemplate = t.templates.loadQueryNoFlowDocument
+	}
+
 	// Render templates that rely only on the target table.
 	for _, m := range []struct {
 		sql *string
@@ -426,7 +437,7 @@ func (t *transactor) addBinding(
 		{&b.createDeleteTableSQL, t.templates.createDeleteTable},
 		{&b.mergeIntoSQL, t.templates.mergeInto},
 		{&b.deleteQuerySQL, t.templates.deleteQuery},
-		{&b.loadQuerySQL, t.templates.loadQuery},
+		{&b.loadQuerySQL, loadQueryTemplate},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {

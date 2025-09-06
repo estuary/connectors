@@ -34,7 +34,8 @@ type tunnelConfig struct {
 }
 
 type advancedConfig struct {
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the flow_document column will not be materialized in destination tables.,default=false"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // config represents the endpoint configuration for sql server.
@@ -275,7 +276,7 @@ func prepareNewTransactor(
 		}
 
 		for _, binding := range bindings {
-			if err := d.addBinding(ctx, binding); err != nil {
+			if err := d.addBinding(ctx, binding, featureFlags); err != nil {
 				return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 			}
 		}
@@ -314,8 +315,24 @@ type binding struct {
 	directCopy          string
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFlags map[string]bool) error {
 	var b = &binding{target: target}
+
+	// Choose the appropriate load query template based on configuration
+	var loadQueryTemplate *template.Template
+	if t.cfg.Advanced.NoFlowDocument && !target.DeltaUpdates {
+		loadQueryTemplate = t.templates.loadQueryNoFlowDocument
+	} else {
+		loadQueryTemplate = t.templates.loadQuery
+	}
+
+	// Choose the appropriate merge template based on configuration
+	var mergeTemplate *template.Template
+	if t.cfg.Advanced.NoFlowDocument && !target.DeltaUpdates {
+		mergeTemplate = t.templates.mergeIntoNoFlowDocument
+	} else {
+		mergeTemplate = t.templates.mergeInto
+	}
 
 	for _, m := range []struct {
 		sql *string
@@ -324,12 +341,12 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		{&b.createLoadTableSQL, t.templates.createLoadTable},
 		{&b.createStoreTableSQL, t.templates.createStoreTable},
 		{&b.loadInsertSQL, t.templates.loadInsert},
-		{&b.loadQuerySQL, t.templates.loadQuery},
+		{&b.loadQuerySQL, loadQueryTemplate},
 		{&b.tempLoadTruncate, t.templates.tempLoadTruncate},
 		{&b.tempStoreTruncate, t.templates.tempStoreTruncate},
 		{&b.tempStoreTableName, t.templates.tempStoreTableName},
 		{&b.tempLoadTableName, t.templates.tempLoadTableName},
-		{&b.mergeInto, t.templates.mergeInto},
+		{&b.mergeInto, mergeTemplate},
 		{&b.directCopy, t.templates.directCopy},
 	} {
 		var err error

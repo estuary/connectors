@@ -114,8 +114,9 @@ type config struct {
 }
 
 type advancedConfig struct {
-	SSLMode      string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	SSLMode        string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Overrides SSL connection behavior by setting the 'sslmode' parameter.,enum=disable,enum=allow,enum=prefer,enum=require,enum=verify-ca,enum=verify-full"`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the flow_document column will not be materialized in destination tables.,default=false"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c config) DefaultNamespace() string {
@@ -389,7 +390,7 @@ func newTransactor(
 	}
 
 	for _, binding := range bindings {
-		if err = d.addBinding(ctx, binding, is); err != nil {
+		if err = d.addBinding(ctx, binding, is, featureFlags); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
 	}
@@ -413,8 +414,16 @@ type binding struct {
 	loadQuerySQL   string
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
+func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema, featureFlags map[string]bool) error {
 	var b = &binding{target: target}
+
+	// Choose the appropriate load query template based on configuration
+	var loadQueryTemplate *template.Template
+	if t.cfg.Advanced.NoFlowDocument && !target.DeltaUpdates {
+		loadQueryTemplate = tplLoadQueryNoFlowDocument
+	} else {
+		loadQueryTemplate = tplLoadQuery
+	}
 
 	for _, m := range []struct {
 		sql *string
@@ -424,7 +433,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 		{&b.storeInsertSQL, tplStoreInsert},
 		{&b.storeUpdateSQL, tplStoreUpdate},
 		{&b.deleteQuerySQL, tplDeleteQuery},
-		{&b.loadQuerySQL, tplLoadQuery},
+		{&b.loadQuerySQL, loadQueryTemplate},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {

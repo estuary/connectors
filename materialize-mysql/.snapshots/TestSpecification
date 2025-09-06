@@ -133,6 +133,12 @@
             "multiline": true,
             "secret": true
           },
+          "no_flow_document": {
+            "type": "boolean",
+            "title": "Exclude Flow Document",
+            "description": "When enabled the flow_document column will not be materialized in destination tables.",
+            "default": false
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
