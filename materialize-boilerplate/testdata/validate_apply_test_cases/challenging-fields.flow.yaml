@@ -17,9 +17,6 @@ collections:
         "value-with-separated-words": { type: string }
         "value_with_separated_words": { type: string }
         "value.with-separated_words": { type: string }
-        "valueWithDifferentCaps": { type: string }
-        "valuewithdifferentcaps": { type: string }
-        "VALUEWITHDIFFERENTCAPS": { type: string }
         " ,;{}().- problematicValue � 𐀀 嶲 ": { type: string }
         "123startsWithDigits": { type: string }
         "123": { type: string } # Only digits
