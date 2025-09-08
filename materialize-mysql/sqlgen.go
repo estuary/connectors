@@ -197,24 +197,25 @@ func rfc3339TimeToTZ(loc *time.Location) sql.ElementConverter {
 }
 
 type templates struct {
-	tempTableName     *template.Template
-	tempTruncate      *template.Template
-	createLoadTable   *template.Template
-	createUpdateTable *template.Template
-	createDeleteTable *template.Template
-	createTargetTable *template.Template
-	alterTableColumns *template.Template
-	updateLoad        *template.Template
-	updateReplace     *template.Template
-	updateTruncate    *template.Template
-	insertLoad        *template.Template
-	loadQuery         *template.Template
-	loadLoad          *template.Template
-	deleteLoad        *template.Template
-	deleteQuery       *template.Template
-	deleteTruncate    *template.Template
-	installFence      *template.Template
-	updateFence       *template.Template
+	tempTableName           *template.Template
+	tempTruncate            *template.Template
+	createLoadTable         *template.Template
+	createUpdateTable       *template.Template
+	createDeleteTable       *template.Template
+	createTargetTable       *template.Template
+	alterTableColumns       *template.Template
+	updateLoad              *template.Template
+	updateReplace           *template.Template
+	updateTruncate          *template.Template
+	insertLoad              *template.Template
+	loadQuery               *template.Template
+	loadQueryNoFlowDocument *template.Template
+	loadLoad                *template.Template
+	deleteLoad              *template.Template
+	deleteQuery             *template.Template
+	deleteTruncate          *template.Template
+	installFence            *template.Template
+	updateFence             *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -325,6 +326,24 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ end }}
+{{ end }}
+
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Binding }}, 
+JSON_OBJECT(
+{{- range $i, $col := $.RootLevelColumns}}
+	{{- if $i}},{{end}}
+    {{Literal $col.Field}}, r.{{$col.Identifier}}
+{{- end}}
+) as flow_document
+FROM {{ $.Identifier}} AS r
+JOIN {{ template "temp_load_name" . }} AS l
+{{- range $ind, $key := $.Keys }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end }}
 {{ end }}
 
 -- Template to load data into target table
@@ -495,24 +514,25 @@ UPDATE {{ Identifier $.TablePath }}
 `)
 
 	return templates{
-		tempTableName:     tplAll.Lookup("temp_load_name"),
-		tempTruncate:      tplAll.Lookup("truncateTempTable"),
-		createLoadTable:   tplAll.Lookup("createLoadTable"),
-		createUpdateTable: tplAll.Lookup("createUpdateTable"),
-		createTargetTable: tplAll.Lookup("createTargetTable"),
-		createDeleteTable: tplAll.Lookup("createDeleteTable"),
-		alterTableColumns: tplAll.Lookup("alterTableColumns"),
-		updateLoad:        tplAll.Lookup("updateLoad"),
-		updateReplace:     tplAll.Lookup("updateReplace"),
-		updateTruncate:    tplAll.Lookup("truncateUpdateTable"),
-		insertLoad:        tplAll.Lookup("insertLoad"),
-		deleteLoad:        tplAll.Lookup("deleteLoad"),
-		deleteQuery:       tplAll.Lookup("deleteQuery"),
-		deleteTruncate:    tplAll.Lookup("truncateDeleteTable"),
-		loadQuery:         tplAll.Lookup("loadQuery"),
-		loadLoad:          tplAll.Lookup("loadLoad"),
-		installFence:      tplAll.Lookup("installFence"),
-		updateFence:       tplAll.Lookup("updateFence"),
+		tempTableName:           tplAll.Lookup("temp_load_name"),
+		tempTruncate:            tplAll.Lookup("truncateTempTable"),
+		createLoadTable:         tplAll.Lookup("createLoadTable"),
+		createUpdateTable:       tplAll.Lookup("createUpdateTable"),
+		createTargetTable:       tplAll.Lookup("createTargetTable"),
+		createDeleteTable:       tplAll.Lookup("createDeleteTable"),
+		alterTableColumns:       tplAll.Lookup("alterTableColumns"),
+		updateLoad:              tplAll.Lookup("updateLoad"),
+		updateReplace:           tplAll.Lookup("updateReplace"),
+		updateTruncate:          tplAll.Lookup("truncateUpdateTable"),
+		insertLoad:              tplAll.Lookup("insertLoad"),
+		deleteLoad:              tplAll.Lookup("deleteLoad"),
+		deleteQuery:             tplAll.Lookup("deleteQuery"),
+		deleteTruncate:          tplAll.Lookup("truncateDeleteTable"),
+		loadQuery:               tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
+		loadLoad:                tplAll.Lookup("loadLoad"),
+		installFence:            tplAll.Lookup("installFence"),
+		updateFence:             tplAll.Lookup("updateFence"),
 	}
 }
 

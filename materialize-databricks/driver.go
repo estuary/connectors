@@ -87,6 +87,7 @@ func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       newTransactor,
 				Tenant:              tenant,
 				ConcurrentApply:     true,
+				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{
@@ -212,7 +213,7 @@ func (t *transactor) addBinding(target sql.Table) error {
 	}
 
 	b.loadFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.KeyNames()))
-	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.ColumnNames()))
+	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"))
 	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, databricksDialect.Literal)
 	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, databricksDialect.Literal)
 
@@ -254,7 +255,13 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 		var fullPaths = pathsWithRoot(b.rootStagingPath, toLoad)
 
-		if loadQuery, err := RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, tplLoadQuery, b.loadMergeBounds.Build()); err != nil {
+		// Choose appropriate load query template based on configuration
+		var loadTemplate = tplLoadQuery
+		if d.cfg.Advanced.NoFlowDocument {
+			loadTemplate = tplLoadQueryNoFlowDocument
+		}
+
+		if loadQuery, err := RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, loadTemplate, b.loadMergeBounds.Build()); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
 			queries = append(queries, loadQuery)
@@ -338,20 +345,17 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		var b = d.bindings[it.Binding]
 
 		var flowDocument = it.RawJSON
-		if d.cfg.HardDelete && it.Delete {
-			if it.Exists {
-				flowDocument = json.RawMessage(`"delete"`)
-			} else {
-				// Ignore items which do not exist and are already deleted
-				continue
-			}
+		var flowDelete = d.cfg.HardDelete && it.Delete
+		if flowDelete && !it.Exists {
+			// Ignore items which do not exist and are already deleted
+			continue
 		}
 
 		if err := b.storeFile.start(ctx); err != nil {
 			return nil, err
 		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err := b.storeFile.writeRow(converted); err != nil {
+		} else if err := b.storeFile.writeRow(append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing row for store: %w", err)
 		} else {
 			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
@@ -413,6 +417,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				if end > len(toCopy) {
 					end = len(toCopy)
 				}
+
 				if query, err := RenderTableWithFiles(b.target, fullPaths[i:end], b.rootStagingPath, tplMergeInto, bounds); err != nil {
 					return nil, fmt.Errorf("mergeInto template: %w", err)
 				} else {
