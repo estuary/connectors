@@ -112,6 +112,48 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 
 --- End delta_updates loadQuery ---
 
+--- Begin key_value loadQueryNoFlowDocument ---
+
+SELECT 0, 
+JSON_BUILD_OBJECT(
+    'key1', r.key1,
+    'key2', r.key2,
+    'key!binary', r."key!binary",
+    'array', r."array",
+    'binary', r."binary",
+    'boolean', r."boolean",
+    'integer', r."integer",
+    'integerGt64Bit', r."integerGt64Bit",
+    'integerWithUserDDL', r."integerWithUserDDL",
+    'multiple', r.multiple,
+    'number', r.number,
+    'numberCastToString', r."numberCastToString",
+    'object', r.object,
+    'string', r.string,
+    'stringInteger', r."stringInteger",
+    'stringInteger39Chars', r."stringInteger39Chars",
+    'stringInteger66Chars', r."stringInteger66Chars",
+    'stringNumber', r."stringNumber"
+) as flow_document
+FROM key_value AS r
+JOIN flow_temp_table_0 AS l
+	 ON  l.key1 = r.key1
+	 AND l.key2 = r.key2
+	 AND l."key!binary" = r."key!binary"
+--- End key_value loadQueryNoFlowDocument ---
+
+--- Begin delta_updates loadQueryNoFlowDocument ---
+
+SELECT 1, 
+JSON_BUILD_OBJECT(
+    'theKey', r."theKey",
+    'aValue', r."aValue"
+) as flow_document
+FROM delta_updates AS r
+JOIN flow_temp_table_1 AS l
+	 ON  l."theKey" = r."theKey"
+--- End delta_updates loadQueryNoFlowDocument ---
+
 --- Begin key_value storeInsert ---
 
 INSERT INTO key_value (

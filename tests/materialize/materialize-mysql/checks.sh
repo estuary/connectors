@@ -6,3 +6,9 @@ if [[ "$new_length" != "257" ]]; then
 	echo "id column of long-string table did not have expected length of 257, instead it had $new_length"
 	exit 1
 fi
+
+SED_CMD="sed"
+if [ "$(uname -s)" = "Darwin" ]; then
+  SED_CMD="gsed"
+fi
+$SED_CMD -i'' 's/"uuid": ".\{36\}\"/"uuid": "<uuid>"/g' ${SNAPSHOT}

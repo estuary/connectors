@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "\nIF OBJECT_ID(N'flow_checkpoints_v1', 'U') IS NULL BEGIN\nCREATE TABLE flow_checkpoints_v1 (\n\t\tmaterialization varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\t\"checkpoint\" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\nEND;\n\n\nIF OBJECT_ID(N'Simple', 'U') IS NULL BEGIN\nCREATE TABLE \"Simple\" (\n\t\tid BIGINT NOT NULL,\n\t\tcanary varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tflow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_standard', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_standard (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\t\tflow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta_exclude_flow_doc', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta_exclude_flow_doc (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'Multiple Types', 'U') IS NULL BEGIN\nCREATE TABLE \"Multiple Types\" (\n\t\tid BIGINT NOT NULL,\n\t\tarray_int varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tbinary_field varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tbool_field BIT,\n\t\tfloat_field DOUBLE PRECISION,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tmultiple varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tnested varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tnullable_int BIGINT,\n\t\tstr_field varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\t\tflow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'Formatted Strings', 'U') IS NULL BEGIN\nCREATE TABLE \"Formatted Strings\" (\n\t\tid BIGINT NOT NULL,\n\t\t\"date\" DATE,\n\t\tdatetime DATETIME2,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tint_and_str BIGINT,\n\t\tint_str BIGINT,\n\t\tnum_and_str DOUBLE PRECISION,\n\t\tnum_str DOUBLE PRECISION,\n\t\t\"time\" TIME,\n\t\tflow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'compound_key', 'U') IS NULL BEGIN\nCREATE TABLE compound_key (\n\t\tyin varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\t\tyan varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tnum BIGINT NOT NULL,\n\t\tflow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\n\t\tPRIMARY KEY (yin, yan)\n);\nEND;\n\n\nIF OBJECT_ID(N'unsigned_bigint', 'U') IS NULL BEGIN\nCREATE TABLE unsigned_bigint (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tunsigned_bigint varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tflow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'deletions', 'U') IS NULL BEGIN\nCREATE TABLE deletions (\n\t\tid BIGINT NOT NULL,\n\t\t\"_meta/op\" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tflow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n"
+  "\nIF OBJECT_ID(N'flow_checkpoints_v1', 'U') IS NULL BEGIN\nCREATE TABLE flow_checkpoints_v1 (\n\t\tmaterialization varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\t\tkey_begin BIGINT NOT NULL,\n\t\tkey_end BIGINT NOT NULL,\n\t\tfence BIGINT NOT NULL,\n\t\t\"checkpoint\" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\nEND;\n\n\nIF OBJECT_ID(N'Simple', 'U') IS NULL BEGIN\nCREATE TABLE \"Simple\" (\n\t\tid BIGINT NOT NULL,\n\t\t_meta varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tcanary varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_standard', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_standard (\n\t\tid BIGINT NOT NULL,\n\t\t_meta varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'duplicate_keys_delta_exclude_flow_doc', 'U') IS NULL BEGIN\nCREATE TABLE duplicate_keys_delta_exclude_flow_doc (\n\t\tid BIGINT NOT NULL,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\t\"int\" BIGINT,\n\t\tstr varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL\n);\nEND;\n\n\nIF OBJECT_ID(N'Multiple Types', 'U') IS NULL BEGIN\nCREATE TABLE \"Multiple Types\" (\n\t\tid BIGINT NOT NULL,\n\t\t_meta varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tarray_int varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tbinary_field varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tbool_field BIT,\n\t\tfloat_field DOUBLE PRECISION,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tmultiple varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tnested varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tnullable_int BIGINT,\n\t\tstr_field varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'Formatted Strings', 'U') IS NULL BEGIN\nCREATE TABLE \"Formatted Strings\" (\n\t\tid BIGINT NOT NULL,\n\t\t_meta varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\t\"date\" DATE,\n\t\tdatetime DATETIME2,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tint_and_str BIGINT,\n\t\tint_str BIGINT,\n\t\tnum_and_str DOUBLE PRECISION,\n\t\tnum_str DOUBLE PRECISION,\n\t\t\"time\" TIME,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'compound_key', 'U') IS NULL BEGIN\nCREATE TABLE compound_key (\n\t\tyin varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\t\tyan varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\t\t_meta varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tnum BIGINT NOT NULL,\n\n\t\tPRIMARY KEY (yin, yan)\n);\nEND;\n\n\nIF OBJECT_ID(N'unsigned_bigint', 'U') IS NULL BEGIN\nCREATE TABLE unsigned_bigint (\n\t\tid BIGINT NOT NULL,\n\t\t_meta varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\t\tunsigned_bigint varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n\n\nIF OBJECT_ID(N'deletions', 'U') IS NULL BEGIN\nCREATE TABLE deletions (\n\t\tid BIGINT NOT NULL,\n\t\t_meta varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,\n\t\t\"_meta/op\" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,\n\t\tflow_published_at DATETIME2 NOT NULL,\n\n\t\tPRIMARY KEY (id)\n);\nEND;\n"
 ]
 [
   "connectorState",
@@ -27,51 +27,61 @@
 {
   "rows": [
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "canary": "amputation's",
       "flow_published_at": "1970-01-01T01:00:00Z",
       "id": 1
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "canary": "armament's",
       "flow_published_at": "1970-01-01T01:00:01Z",
       "id": 2
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "canary": "splatters",
       "flow_published_at": "1970-01-01T01:00:02Z",
       "id": 3
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "canary": "strengthen",
       "flow_published_at": "1970-01-01T01:00:03Z",
       "id": 4
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "canary": "Kringle's",
       "flow_published_at": "1970-01-01T01:00:04Z",
       "id": 5
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "canary": "grosbeak's",
       "flow_published_at": "1970-01-01T01:00:05Z",
       "id": 6
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "canary": "pieced",
       "flow_published_at": "1970-01-01T02:00:00Z",
       "id": 7
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "canary": "roaches",
       "flow_published_at": "1970-01-01T02:00:01Z",
       "id": 8
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "canary": "devilish",
       "flow_published_at": "1970-01-01T02:00:02Z",
       "id": 9
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "canary": "glucose's",
       "flow_published_at": "1970-01-01T02:00:03Z",
       "id": 10
@@ -82,60 +92,70 @@
 {
   "rows": [
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T02:00:04Z",
       "id": 1,
       "int": 7,
       "str": "str 6"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T02:00:05Z",
       "id": 2,
       "int": 9,
       "str": "str 7"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T02:00:06Z",
       "id": 3,
       "int": 11,
       "str": "str 8"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T02:00:07Z",
       "id": 4,
       "int": 13,
       "str": "str 9"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T02:00:08Z",
       "id": 5,
       "int": 15,
       "str": "str 10"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T03:00:00Z",
       "id": 6,
       "int": 11,
       "str": "str 11"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T03:00:01Z",
       "id": 7,
       "int": 12,
       "str": "str 12"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T03:00:02Z",
       "id": 8,
       "int": 13,
       "str": "str 13"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T03:00:03Z",
       "id": 9,
       "int": 14,
       "str": "str 14"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T03:00:04Z",
       "id": 10,
       "int": 15,
@@ -337,6 +357,7 @@
 {
   "rows": [
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "array_int": "[11,12]",
       "binary_field": null,
       "bool_field": false,
@@ -349,6 +370,7 @@
       "str_field": "str1"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "array_int": "[21,22]",
       "binary_field": null,
       "bool_field": true,
@@ -361,6 +383,7 @@
       "str_field": "str2"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "array_int": "[31,32]",
       "binary_field": null,
       "bool_field": false,
@@ -373,6 +396,7 @@
       "str_field": "str3"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "array_int": "[41,42]",
       "binary_field": null,
       "bool_field": true,
@@ -385,6 +409,7 @@
       "str_field": "str4"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "array_int": "[51,52]",
       "binary_field": null,
       "bool_field": false,
@@ -397,6 +422,7 @@
       "str_field": "str5"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "array_int": "[61,62]",
       "binary_field": null,
       "bool_field": true,
@@ -409,6 +435,7 @@
       "str_field": "str6 v2"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "array_int": "[71,72]",
       "binary_field": null,
       "bool_field": false,
@@ -421,6 +448,7 @@
       "str_field": "str7 v2"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "array_int": "[81,82]",
       "binary_field": null,
       "bool_field": true,
@@ -433,6 +461,7 @@
       "str_field": "str8 v2"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "array_int": "[91,92]",
       "binary_field": "YWxvaGEK",
       "bool_field": false,
@@ -445,6 +474,7 @@
       "str_field": "str9 v2"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "array_int": "[1,2]",
       "binary_field": "c2F5xY1uYXJhCg==",
       "bool_field": true,
@@ -462,6 +492,7 @@
 {
   "rows": [
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "date": "0001-01-01T00:00:00Z",
       "datetime": "0001-01-01T00:00:00Z",
       "flow_published_at": "1970-01-01T02:00:13Z",
@@ -473,6 +504,7 @@
       "time": "0001-01-01T00:00:00Z"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "date": "1999-02-02T00:00:00Z",
       "datetime": "1999-02-02T14:20:12.33Z",
       "flow_published_at": "1970-01-01T02:00:14Z",
@@ -484,6 +516,7 @@
       "time": "0001-01-01T14:20:12.33Z"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "date": "1000-03-03T00:00:00Z",
       "datetime": "1000-03-03T23:59:38.1Z",
       "flow_published_at": "1970-01-01T01:00:11Z",
@@ -495,6 +528,7 @@
       "time": "0001-01-01T23:59:38.1Z"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "date": "2023-08-29T00:00:00Z",
       "datetime": "2023-08-29T23:59:38Z",
       "flow_published_at": "1970-01-01T01:00:12Z",
@@ -506,6 +540,7 @@
       "time": "0001-01-01T23:59:38Z"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "date": "9999-12-31T00:00:00Z",
       "datetime": "9999-12-31T23:59:59Z",
       "flow_published_at": "1970-01-01T02:00:15Z",
@@ -517,6 +552,7 @@
       "time": "0001-01-01T23:59:59Z"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "date": null,
       "datetime": null,
       "flow_published_at": "1970-01-01T02:00:16Z",
@@ -528,6 +564,7 @@
       "time": null
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "date": null,
       "datetime": null,
       "flow_published_at": "1970-01-01T02:00:17Z",
@@ -539,6 +576,7 @@
       "time": null
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "date": null,
       "datetime": null,
       "flow_published_at": "1970-01-01T02:00:18Z",
@@ -555,24 +593,28 @@
 {
   "rows": [
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T02:00:12Z",
       "num": 4,
       "yan": "ab",
       "yin": ""
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T02:00:09Z",
       "num": 1,
       "yan": "b",
       "yin": "a"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T02:00:11Z",
       "num": 3,
       "yan": "",
       "yin": "ab"
     },
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T02:00:10Z",
       "num": 2,
       "yan": "a",
@@ -584,6 +626,7 @@
 {
   "rows": [
     {
+      "_meta": "{\"uuid\": \"<uuid>\"}",
       "flow_published_at": "1970-01-01T01:00:28Z",
       "id": 1,
       "unsigned_bigint": "18446744073709551615"
@@ -594,11 +637,13 @@
 {
   "rows": [
     {
+      "_meta": "{\"op\":\"u\",\"uuid\": \"<uuid>\"}",
       "_meta/op": "u",
       "flow_published_at": "1970-01-01T02:00:26Z",
       "id": 2
     },
     {
+      "_meta": "{\"op\":\"c\",\"uuid\": \"<uuid>\"}",
       "_meta/op": "c",
       "flow_published_at": "1970-01-01T02:00:27Z",
       "id": 3

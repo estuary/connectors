@@ -6,7 +6,7 @@
            "id": { "type": "integer" },
            "canary": { "type": "string" }
           },
-          "required": ["id", "canary"],
+          "required": ["id", "canary", "_meta"],
           "type": "object"
        },
        "key": ["/id"]
@@ -18,7 +18,7 @@
            "int": { "type": "integer", "reduce": {"strategy": "sum"} },
            "str": { "type": "string" }
           },
-          "required": ["id", "str"],
+          "required": ["id", "str", "_meta"],
           "type": "object",
           "reduce": { "strategy": "merge" }
        },
@@ -37,7 +37,7 @@
            "multiple": {"type": ["array", "object", "string", "integer", "number", "boolean", "null"]},
            "binary_field": {"type": "string", "contentEncoding": "base64"}
           },
-          "required": ["id", "str_field"],
+          "required": ["id", "str_field", "_meta"],
           "type": "object"
        },
        "key": ["/id"]
@@ -54,7 +54,7 @@
            "date": {"type": "string", "format": "date"},
            "time": {"type": "string", "format": "time"}
           },
-          "required": ["id"],
+          "required": ["id", "_meta"],
           "type": "object"
        },
        "key": ["/id"]
@@ -65,7 +65,7 @@
            "id": { "type": "string" },
            "str_field": { "type": "string" },
           },
-          "required": ["id", "str_field"],
+          "required": ["id", "str_field", "_meta"],
           "type": "object"
        },
        "key": ["/id"]
@@ -77,7 +77,7 @@
           "yan": { "type": "string" },
           "num": { "type": "integer" }
         },
-        "required": ["yin", "yan", "num"],
+        "required": ["yin", "yan", "num", "_meta"],
         "type": "object"
       },
       "key": ["/yin", "/yan"]
@@ -88,7 +88,7 @@
            "id": { "type": "string" },
           "testing (%s)": { "type": "string" }
         },
-        "required": ["testing (%s)"],
+        "required": ["testing (%s)", "_meta"],
         "type": "object"
       },
       "key": ["/testing (%s)"]
@@ -99,7 +99,7 @@
            "id": { "type": "integer" },
            "unsigned_bigint": { "type": "integer", "maximum": 18446744073709551615 },
           },
-          "required": ["id"],
+          "required": ["id", "_meta"],
           "type": "object"
        },
        "key": ["/id"]
@@ -117,7 +117,7 @@
              }
            }
         },
-        "required": ["id"],
+        "required": ["id", "_meta"],
         "type": "object",
 
         "if": {
@@ -146,7 +146,7 @@
            "id": {"type": "string", "contentEncoding": "base64"},
            "counter": { "type": "integer" }
           },
-          "required": ["id"],
+          "required": ["id", "_meta"],
           "type": "object"
        },
        "key": ["/id"]
@@ -157,7 +157,7 @@
            "id": {"type": "string"},
            "counter": { "type": "integer", "reduce": { "strategy": "sum" } }
           },
-          "required": ["id"],
+          "required": ["id", "_meta"],
           "type": "object",
           "reduce": { "strategy": "merge" }
        },
@@ -169,7 +169,7 @@
            "_id": {"type": "integer"},
            "__some_field": { "type": "string" }
           },
-          "required": ["_id", "__some_field"],
+          "required": ["_id", "__some_field", "_meta"],
           "type": "object"
        },
        "key": ["/_id"]

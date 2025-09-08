@@ -106,21 +106,53 @@ SELECT 0, TO_JSON("a-schema".key_value.flow_document)
 	AND "a-schema".key_value."key!binary" = r."key!binary" AND "a-schema".key_value."key!binary" >= 'aGVsbG8K' AND "a-schema".key_value."key!binary" <= 'Z29vZGJ5ZQo='
 --- End "a-schema".key_value loadQuery ---
 
+--- Begin "a-schema".key_value loadQueryNoFlowDocument ---
+SELECT 0, 
+OBJECT_CONSTRUCT(
+	'key1', "a-schema".key_value.key1,
+	'key2', "a-schema".key_value.key2,
+	'key!binary', "a-schema".key_value."key!binary",
+	'array', "a-schema".key_value.array,
+	'binary', "a-schema".key_value.binary,
+	'boolean', "a-schema".key_value.boolean,
+	'integer', "a-schema".key_value.integer,
+	'integerGt64Bit', "a-schema".key_value.integerGt64Bit,
+	'integerWithUserDDL', "a-schema".key_value.integerWithUserDDL,
+	'multiple', "a-schema".key_value.multiple,
+	'number', "a-schema".key_value.number,
+	'numberCastToString', "a-schema".key_value.numberCastToString,
+	'object', "a-schema".key_value.object,
+	'string', "a-schema".key_value.string,
+	'stringInteger', "a-schema".key_value.stringInteger,
+	'stringInteger39Chars', "a-schema".key_value.stringInteger39Chars,
+	'stringInteger66Chars', "a-schema".key_value.stringInteger66Chars,
+	'stringNumber', "a-schema".key_value.stringNumber
+) as flow_document
+FROM "a-schema".key_value
+JOIN (
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary"
+	FROM test-file
+) AS r
+ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key1 >= 10 AND "a-schema".key_value.key1 <= 100
+AND "a-schema".key_value.key2 = r.key2
+AND "a-schema".key_value."key!binary" = r."key!binary" AND "a-schema".key_value."key!binary" >= 'aGVsbG8K' AND "a-schema".key_value."key!binary" <= 'Z29vZGJ5ZQo='
+--- End "a-schema".key_value loadQueryNoFlowDocument ---
+
 --- Begin "a-schema".key_value mergeInto ---
 MERGE INTO "a-schema".key_value AS l
 USING (
-	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerGt64Bit, $1[9] AS integerWithUserDDL, NULLIF($1[10], PARSE_JSON('null')) AS multiple, $1[11] AS number, $1[12] AS numberCastToString, NULLIF($1[13], PARSE_JSON('null')) AS object, $1[14] AS string, $1[15] AS stringInteger, $1[16] AS stringInteger39Chars, $1[17] AS stringInteger66Chars, $1[18] AS stringNumber, $1[19] AS flow_document
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS flow_published_at, $1[7] AS integer, $1[8] AS integerGt64Bit, $1[9] AS integerWithUserDDL, NULLIF($1[10], PARSE_JSON('null')) AS multiple, $1[11] AS number, $1[12] AS numberCastToString, NULLIF($1[13], PARSE_JSON('null')) AS object, $1[14] AS string, $1[15] AS stringInteger, $1[16] AS stringInteger39Chars, $1[17] AS stringInteger66Chars, $1[18] AS stringNumber, $1[19] AS flow_document, $1[20] AS _flow_delete
 	FROM test-file
 ) AS r
 ON 
 	l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.key2
 	AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='
-WHEN MATCHED AND r.flow_document='delete' THEN
+WHEN MATCHED AND r._flow_delete=true THEN
 	DELETE
 WHEN MATCHED THEN
 	UPDATE SET l.array = r.array, l.binary = r.binary, l.boolean = r.boolean, l.flow_published_at = r.flow_published_at, l.integer = r.integer, l.integerGt64Bit = r.integerGt64Bit, l.integerWithUserDDL = r.integerWithUserDDL, l.multiple = r.multiple, l.number = r.number, l.numberCastToString = r.numberCastToString, l.object = r.object, l.string = r.string, l.stringInteger = r.stringInteger, l.stringInteger39Chars = r.stringInteger39Chars, l.stringInteger66Chars = r.stringInteger66Chars, l.stringNumber = r.stringNumber, l.flow_document = r.flow_document
-WHEN NOT MATCHED and r.flow_document!='delete' THEN
+WHEN NOT MATCHED AND r._flow_delete=false THEN
 	INSERT (key1, key2, "key!binary", array, binary, boolean, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
 	VALUES (r.key1, r.key2, r."key!binary", r.array, r.binary, r.boolean, r.flow_published_at, r.integer, r.integerGt64Bit, r.integerWithUserDDL, r.multiple, r.number, r.numberCastToString, r.object, r.string, r.stringInteger, r.stringInteger39Chars, r.stringInteger66Chars, r.stringNumber, r.flow_document);
 --- End "a-schema".key_value mergeInto ---

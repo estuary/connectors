@@ -17,3 +17,5 @@ $SED_CMD -i'' 's/"last_insert_time_in_ms": [0-9]\+/"last_insert_time_in_ms": "<l
 $SED_CMD -i'' 's/"flush_start_ms": [0-9]\+/"flush_start_ms": "<flush_start_ms>"/g' ${SNAPSHOT}
 $SED_CMD -i'' 's/"build_duration_ms": [0-9]\+/"build_duration_ms": "<build_duration_ms>"/g' ${SNAPSHOT}
 $SED_CMD -i'' 's/"upload_duration_ms": [0-9]\+/"upload_duration_ms": "<upload_duration_ms>"/g' ${SNAPSHOT}
+$SED_CMD -i'' 's/"uuid": ".\{36\}\"/"uuid": "<uuid>"/g' ${SNAPSHOT}
+$SED_CMD -i'' 's/\\"uuid\\": \\".\{36\}\\\"/\\"uuid\\": \\"<uuid>\\"/g' ${SNAPSHOT}

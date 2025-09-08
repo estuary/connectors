@@ -65,17 +65,57 @@ SELECT 0, `a-schema`.key_value.flow_document
 	AND `a-schema`.key_value.`key!binary` = r.`key!binary` AND `a-schema`.key_value.`key!binary` >= 'aGVsbG8K' AND `a-schema`.key_value.`key!binary` <= 'Z29vZGJ5ZQo='
 --- End `a-schema`.key_value loadQuery ---
 
+--- Begin `a-schema`.key_value loadQueryNoFlowDocument ---
+SELECT 0, 
+to_json(struct(
+	`a-schema`.key_value.key1 AS key1,
+	`a-schema`.key_value.key2 AS key2,
+	`a-schema`.key_value.`key!binary` AS key!binary,
+	`a-schema`.key_value.array AS array,
+	`a-schema`.key_value.binary AS binary,
+	`a-schema`.key_value.boolean AS boolean,
+	`a-schema`.key_value.integer AS integer,
+	`a-schema`.key_value.`integerGt64Bit` AS integerGt64Bit,
+	`a-schema`.key_value.`integerWithUserDDL` AS integerWithUserDDL,
+	`a-schema`.key_value.multiple AS multiple,
+	`a-schema`.key_value.number AS number,
+	`a-schema`.key_value.`numberCastToString` AS numberCastToString,
+	`a-schema`.key_value.object AS object,
+	`a-schema`.key_value.string AS string,
+	`a-schema`.key_value.`stringInteger` AS stringInteger,
+	`a-schema`.key_value.`stringInteger39Chars` AS stringInteger39Chars,
+	`a-schema`.key_value.`stringInteger66Chars` AS stringInteger66Chars,
+	`a-schema`.key_value.`stringNumber` AS stringNumber
+)) as flow_document
+FROM `a-schema`.key_value
+JOIN (
+	(
+		SELECT
+		key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+		FROM json.`file1`
+	)
+	 UNION ALL (
+		SELECT
+		key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+		FROM json.`file2`
+	)
+) AS r
+ON `a-schema`.key_value.key1 = r.key1 AND `a-schema`.key_value.key1 >= 10 AND `a-schema`.key_value.key1 <= 100
+AND `a-schema`.key_value.key2 = r.key2
+AND `a-schema`.key_value.`key!binary` = r.`key!binary` AND `a-schema`.key_value.`key!binary` >= 'aGVsbG8K' AND `a-schema`.key_value.`key!binary` <= 'Z29vZGJ5ZQo='
+--- End `a-schema`.key_value loadQueryNoFlowDocument ---
+
 --- Begin `a-schema`.key_value mergeInto ---
 	MERGE INTO `a-schema`.key_value AS l
 	USING (
 		(
 			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::LONG, `integerGt64Bit`::NUMERIC(38,0), `integerWithUserDDL`::DECIMAL(20), multiple::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::NUMERIC(38,0), `stringInteger39Chars`::STRING, `stringInteger66Chars`::STRING, `stringNumber`::DOUBLE, flow_document::STRING
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::LONG, `integerGt64Bit`::NUMERIC(38,0), `integerWithUserDDL`::DECIMAL(20), multiple::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::NUMERIC(38,0), `stringInteger39Chars`::STRING, `stringInteger66Chars`::STRING, `stringNumber`::DOUBLE, flow_document::STRING, _flow_delete::BOOLEAN
 			FROM json.`file1`
 		)
 		 UNION ALL (
 			SELECT
-			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::LONG, `integerGt64Bit`::NUMERIC(38,0), `integerWithUserDDL`::DECIMAL(20), multiple::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::NUMERIC(38,0), `stringInteger39Chars`::STRING, `stringInteger66Chars`::STRING, `stringNumber`::DOUBLE, flow_document::STRING
+			key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`, array::STRING, unbase64(binary)::BINARY as binary, boolean::BOOLEAN, flow_published_at::TIMESTAMP, integer::LONG, `integerGt64Bit`::NUMERIC(38,0), `integerWithUserDDL`::DECIMAL(20), multiple::STRING, number::DOUBLE, `numberCastToString`::STRING, object::STRING, string::STRING, `stringInteger`::NUMERIC(38,0), `stringInteger39Chars`::STRING, `stringInteger66Chars`::STRING, `stringNumber`::DOUBLE, flow_document::STRING, _flow_delete::BOOLEAN
 			FROM json.`file2`
 		)
 	) AS r
@@ -83,11 +123,11 @@ SELECT 0, `a-schema`.key_value.flow_document
     l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
     AND l.key2 = r.key2
     AND l.`key!binary` = r.`key!binary` AND l.`key!binary` >= 'aGVsbG8K' AND l.`key!binary` <= 'Z29vZGJ5ZQo='
-	WHEN MATCHED AND r.flow_document='"delete"' THEN
+	WHEN MATCHED AND r._flow_delete THEN
 		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET l.array = r.array, l.binary = r.binary, l.boolean = r.boolean, l.flow_published_at = r.flow_published_at, l.integer = r.integer, l.`integerGt64Bit` = r.`integerGt64Bit`, l.`integerWithUserDDL` = r.`integerWithUserDDL`, l.multiple = r.multiple, l.number = r.number, l.`numberCastToString` = r.`numberCastToString`, l.object = r.object, l.string = r.string, l.`stringInteger` = r.`stringInteger`, l.`stringInteger39Chars` = r.`stringInteger39Chars`, l.`stringInteger66Chars` = r.`stringInteger66Chars`, l.`stringNumber` = r.`stringNumber`, l.flow_document = r.flow_document
-	WHEN NOT MATCHED AND r.flow_document!='"delete"' THEN
+	WHEN NOT MATCHED AND NOT r._flow_delete THEN
 		INSERT (key1, key2, `key!binary`, array, binary, boolean, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document)
 		VALUES (r.key1, r.key2, r.`key!binary`, r.array, r.binary, r.boolean, r.flow_published_at, r.integer, r.`integerGt64Bit`, r.`integerWithUserDDL`, r.multiple, r.number, r.`numberCastToString`, r.object, r.string, r.`stringInteger`, r.`stringInteger39Chars`, r.`stringInteger66Chars`, r.`stringNumber`, r.flow_document);
 --- End `a-schema`.key_value mergeInto ---
