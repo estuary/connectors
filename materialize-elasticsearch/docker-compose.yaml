@@ -1,5 +1,4 @@
 version: '3.7'
-
 services:
   db:
     image: "docker.elastic.co/elasticsearch/elasticsearch:8.9.0"
