@@ -1,0 +1,14 @@
+---
+# Hacker News Flow Configuration
+collections:
+  acmeCo/items:
+    schema: items.schema.yaml
+    key: [/id]
+
+  acmeCo/users:
+    schema: users.schema.yaml
+    key: [/id]
+
+  acmeCo/updates:
+    schema: updates.schema.yaml
+    key: [/_meta/row_id]
