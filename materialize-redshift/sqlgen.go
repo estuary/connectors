@@ -190,14 +190,16 @@ type loadTableParams struct {
 }
 
 type templates struct {
-	createTargetTable *template.Template
-	createLoadTable   *template.Template
-	createStoreTable  *template.Template
-	createDeleteTable *template.Template
-	mergeInto         *template.Template
-	deleteQuery       *template.Template
-	loadQuery         *template.Template
-	copyFromS3        *template.Template
+	createTargetTable         *template.Template
+	createLoadTable           *template.Template
+	createStoreTable          *template.Template
+	createDeleteTable         *template.Template
+	mergeInto                 *template.Template
+	deleteQuery               *template.Template
+	deleteQueryNoFlowDocument *template.Template
+	loadQuery                 *template.Template
+	loadQueryNoFlowDocument   *template.Template
+	copyFromS3                *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -295,7 +297,7 @@ WHEN NOT MATCHED THEN
 {{ end }}
 
 {{ define "deleteQuery" }}
-{{ if $.Document -}}
+{{ if not $.DeltaUpdates -}}
 DELETE FROM {{ $.Identifier }}
 USING {{ template "temp_name_deleted" . }} AS r
 WHERE {{ range $ind, $key := $.Keys }}
@@ -319,6 +321,31 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 	{{- end }}
 {{- else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
+{{- end }}
+{{ end }}
+
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Binding }}, 
+OBJECT(
+{{- range $i, $col := $.RootLevelColumns}}
+	{{- if $i}},{{end}}
+	{{Literal $col.Field}}, 
+	{{- if eq $col.DDL "DATE" }}
+		TO_CHAR(r.{{$col.Identifier}}, 'YYYY-MM-DD')
+	{{- else if eq $col.DDL "TIMESTAMPTZ" }}
+		TO_CHAR(r.{{$col.Identifier}} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+	{{- else }}
+		r.{{$col.Identifier}}
+	{{- end}}
+{{- end}}
+) as flow_document
+FROM {{ template "temp_name" . }} AS l
+JOIN {{ $.Identifier}} AS r
+{{- range $ind, $key := $.Keys }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ end }}
 
@@ -347,14 +374,16 @@ TRUNCATECOLUMNS;
 {{ end }}
 	`)
 	return templates{
-		createTargetTable: tplAll.Lookup("createTargetTable"),
-		createLoadTable:   tplAll.Lookup("createLoadTable"),
-		createStoreTable:  tplAll.Lookup("createStoreTable"),
-		createDeleteTable: tplAll.Lookup("createDeleteTable"),
-		mergeInto:         tplAll.Lookup("mergeInto"),
-		deleteQuery:       tplAll.Lookup("deleteQuery"),
-		loadQuery:         tplAll.Lookup("loadQuery"),
-		copyFromS3:        tplAll.Lookup("copyFromS3"),
+		createTargetTable:         tplAll.Lookup("createTargetTable"),
+		createLoadTable:           tplAll.Lookup("createLoadTable"),
+		createStoreTable:          tplAll.Lookup("createStoreTable"),
+		createDeleteTable:         tplAll.Lookup("createDeleteTable"),
+		mergeInto:                 tplAll.Lookup("mergeInto"),
+		deleteQuery:               tplAll.Lookup("deleteQuery"),
+		deleteQueryNoFlowDocument: tplAll.Lookup("deleteQueryNoFlowDocument"),
+		loadQuery:                 tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument:   tplAll.Lookup("loadQueryNoFlowDocument"),
+		copyFromS3:                tplAll.Lookup("copyFromS3"),
 	}
 }
 

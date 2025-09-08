@@ -44,6 +44,7 @@ func newDuckDriver() *sql.Driver[config, tableConfig] {
 				CreateTableTemplate: tplCreateTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     false,
+				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{
@@ -60,10 +61,10 @@ func newDuckDriver() *sql.Driver[config, tableConfig] {
 type transactor struct {
 	cfg config
 
-	fence      sql.Fence
-	conn       *stdsql.Conn
-	bucket     blob.Bucket
-	bucketPath string
+	fence        sql.Fence
+	conn         *stdsql.Conn
+	bucket       blob.Bucket
+	bucketPath   string
 
 	storeFiles *boilerplate.StagedFiles
 	loadFiles  *boilerplate.StagedFiles
@@ -99,19 +100,19 @@ func newTransactor(
 	}
 
 	t := &transactor{
-		cfg:        cfg,
-		conn:       conn,
-		bucket:     bucket,
-		bucketPath: bucketPath,
-		fence:      fence,
-		be:         be,
-		loadFiles:  boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, bucketPath, false, false),
-		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, bucketPath, true, false),
+		cfg:          cfg,
+		conn:         conn,
+		bucket:       bucket,
+		bucketPath:   bucketPath,
+		fence:        fence,
+		be:           be,
+		loadFiles:    boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, bucketPath, false, false),
+		storeFiles:   boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, bucketPath, true, false),
 	}
 
 	for idx, target := range bindings {
 		t.loadFiles.AddBinding(idx, target.KeyNames())
-		t.storeFiles.AddBinding(idx, target.ColumnNames())
+		t.storeFiles.AddBinding(idx, append(target.ColumnNames(), "_flow_delete"))
 		t.bindings = append(t.bindings, &binding{
 			target:           target,
 			loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, duckDialect.Literal),
@@ -160,12 +161,20 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		} else if uris, err := d.loadFiles.Flush(idx); err != nil {
 			return fmt.Errorf("flushing load file: %w", err)
-		} else if err := tplLoadQuery.Execute(&loadQuery, &queryParams{
-			Table:  b.target,
-			Bounds: b.loadMergeBounds.Build(),
-			Files:  uris,
-		}); err != nil {
-			return fmt.Errorf("rendering load query: %w", err)
+		} else {
+			// Choose appropriate load query template based on configuration
+			var loadTemplate = tplLoadQuery
+			if d.cfg.Advanced.NoFlowDocument {
+				loadTemplate = tplLoadQueryNoFlowDocument
+			}
+
+			if err := loadTemplate.Execute(&loadQuery, &queryParams{
+				Table:  b.target,
+				Bounds: b.loadMergeBounds.Build(),
+				Files:  uris,
+			}); err != nil {
+				return fmt.Errorf("rendering load query: %w", err)
+			}
 		}
 
 		subqueries = append(subqueries, loadQuery.String())
@@ -270,24 +279,21 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	for it.Next() {
-		if d.cfg.HardDelete && it.Delete && !it.Exists {
-			// Ignore documents which do not exist and are being deleted.
+		var b = d.bindings[it.Binding]
+
+		var flowDelete = d.cfg.HardDelete && it.Delete
+		if flowDelete && !it.Exists {
+			// Ignore items which do not exist and are already deleted
 			continue
 		}
 
-		b := d.bindings[it.Binding]
 		if it.Exists {
 			b.mustMerge = true
 		}
 
-		flowDocument := it.RawJSON
-		if d.cfg.HardDelete && it.Delete {
-			flowDocument = json.RawMessage(`"delete"`)
-		}
-
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
+		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err := d.storeFiles.WriteRow(ctx, it.Binding, converted); err != nil {
+		} else if err := d.storeFiles.WriteRow(ctx, it.Binding, append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing row for store: %w", err)
 		} else {
 			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
@@ -340,6 +346,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
 
 		var queries []string
 		params := &queryParams{Table: b.target, Files: uris, Bounds: b.storeMergeBounds.Build()}
+
 		if b.mustMerge {
 			// In-place updates are accomplished by deleting the
 			// existing row and inserting the updated row.

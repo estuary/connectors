@@ -132,6 +132,7 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     true,
+				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{
@@ -190,10 +191,10 @@ type transactor struct {
 	store struct {
 		conn *stdsql.Conn
 	}
-	templates templates
-	bindings  []*binding
-	be        *m.BindingEvents
-	cp        checkpoint
+	templates    templates
+	bindings     []*binding
+	be           *m.BindingEvents
+	cp           checkpoint
 
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
@@ -383,10 +384,18 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// Pass.
 		} else if dir, err := b.load.stage.flush(); err != nil {
 			return fmt.Errorf("load.stage(): %w", err)
-		} else if subqueries[i], err = renderBoundedQueryTemplate(d.templates.loadQuery, b.target, dir, b.load.mergeBounds.Build()); err != nil {
-			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
-			filesToCleanup = append(filesToCleanup, dir)
+			// Choose appropriate load query template based on configuration
+			var loadTemplate = d.templates.loadQuery
+			if d.cfg.Advanced.NoFlowDocument {
+				loadTemplate = d.templates.loadQueryNoFlowDocument
+			}
+
+			if subqueries[i], err = renderBoundedQueryTemplate(loadTemplate, b.target, dir, b.load.mergeBounds.Build()); err != nil {
+				return fmt.Errorf("loadQuery template: %w", err)
+			} else {
+				filesToCleanup = append(filesToCleanup, dir)
+			}
 		}
 	}
 	defer func() {
@@ -484,18 +493,14 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		if it.Exists {
-			b.store.mustMerge = true
+		var flowDelete = d.cfg.HardDelete && it.Delete
+		if flowDelete && !it.Exists {
+			// Ignore items which do not exist and are already deleted
+			continue
 		}
 
-		var flowDocument = it.RawJSON
-		if d.cfg.HardDelete && it.Delete {
-			if it.Exists {
-				flowDocument = json.RawMessage(`"delete"`)
-			} else {
-				// Ignore items which do not exist and are already deleted
-				continue
-			}
+		if it.Exists {
+			b.store.mustMerge = true
 		}
 
 		if !b.streaming {
@@ -503,13 +508,13 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				return nil, err
 			}
 		}
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
+		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
 		} else if b.streaming {
 			if err := d.streamManager.writeRow(ctx, it.Binding, converted); err != nil {
 				return nil, fmt.Errorf("encoding Store to stream for resource %s: %w", b.target.Path, err)
 			}
-		} else if err = b.store.stage.writeRow(converted); err != nil {
+		} else if err = b.store.stage.writeRow(append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
 		} else {
 			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])

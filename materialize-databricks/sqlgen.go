@@ -174,6 +174,37 @@ SELECT -1, ""
 {{ end -}}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Table.Binding }}, 
+to_json(struct(
+{{- range $i, $col := $.Table.RootLevelColumns}}
+	{{- if $i}},{{end}}
+	{{ $.Table.Identifier }}.{{ $col.Identifier }} AS {{ $col.Field }}
+{{- end}}
+)) as flow_document
+FROM {{ $.Table.Identifier }}
+JOIN (
+	{{- range $fi, $file := $.Files }}
+	{{ if $fi }} UNION ALL {{ end -}}
+	(
+		SELECT
+		{{ range $ind, $key := $.Table.Keys }}
+		{{- if $ind }}, {{ end -}}
+		{{ template "cast" $key -}}
+		{{- end }}
+		FROM json.`+"`{{ $file }}`"+`
+	)
+	{{- end }}
+) AS r
+{{- range $ind, $bound := $.Bounds }}
+{{ if $ind }}AND {{ else }}ON {{ end -}}
+{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{ end }}
+
 -- TODO: this will not work with custom type definitions that require more than a single word
 -- namely: ARRAY, MAP and INTERVAL. We don't have these types ourselves, but users may be able
 -- to specify them as a custom DDL
@@ -213,7 +244,7 @@ SELECT -1, ""
 			{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
 			{{ template "cast" $key -}}
-			{{- end }}
+			{{- end }}, _flow_delete::BOOLEAN
 			FROM json.`+"`{{ $file }}`"+`
 		)
 		{{- end }}
@@ -223,10 +254,8 @@ SELECT -1, ""
     l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
     {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
   {{- end }}
-	{{- if $.Table.Document }}
-	WHEN MATCHED AND r.{{ $.Table.Document.Identifier }}='"delete"' THEN
+	WHEN MATCHED AND r._flow_delete THEN
 		DELETE
-	{{- end }}
 	WHEN MATCHED THEN
 		UPDATE SET {{ range $ind, $key := $.Table.Values }}
 		{{- if $ind }}, {{ end -}}
@@ -235,7 +264,7 @@ SELECT -1, ""
 	{{- if $.Table.Document -}}
 	{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
 	{{- end }}
-	WHEN NOT MATCHED AND r.{{ $.Table.Document.Identifier }}!='"delete"' THEN
+	WHEN NOT MATCHED AND NOT r._flow_delete THEN
 		INSERT (
 		{{- range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
@@ -250,11 +279,12 @@ SELECT -1, ""
 	);
 {{ end }}
   `)
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplCopyIntoDirect    = tplAll.Lookup("copyIntoDirect")
-	tplMergeInto         = tplAll.Lookup("mergeInto")
+	tplCreateTargetTable       = tplAll.Lookup("createTargetTable")
+	tplAlterTableColumns       = tplAll.Lookup("alterTableColumns")
+	tplLoadQuery               = tplAll.Lookup("loadQuery")
+	tplLoadQueryNoFlowDocument = tplAll.Lookup("loadQueryNoFlowDocument")
+	tplCopyIntoDirect          = tplAll.Lookup("copyIntoDirect")
+	tplMergeInto               = tplAll.Lookup("mergeInto")
 )
 
 type tableWithFiles struct {

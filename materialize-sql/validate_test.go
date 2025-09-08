@@ -2,7 +2,6 @@ package sql
 
 import (
 	"encoding/json"
-	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -24,6 +23,7 @@ func TestValidateMigrations(t *testing.T) {
 		proposedSpec       *pf.MaterializationSpec
 		fieldNameTransform func(string) string
 		maxFieldLength     int
+		featureFlags       map[string]bool
 	}
 
 	tests := []testCase{
@@ -60,7 +60,7 @@ func TestValidateMigrations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := testInfoSchemaFromSpec(t, tt.specForInfoSchema, tt.fieldNameTransform)
-			validator := boilerplate.NewValidator(testConstrainter{}, is, tt.maxFieldLength, true, nil)
+			validator := boilerplate.NewValidator(testConstrainter{}, is, tt.maxFieldLength, true, tt.featureFlags)
 
 			cs, err := validator.ValidateBinding(
 				[]string{"key_value"},
@@ -79,7 +79,68 @@ func TestValidateMigrations(t *testing.T) {
 	cupaloy.SnapshotT(t, snap.String())
 }
 
-type testConstrainter struct{}
+func TestValidateNoFlowDocument(t *testing.T) {
+	type testCase struct {
+		name               string
+		deltaUpdates       bool
+		specForInfoSchema  *pf.MaterializationSpec
+		existingSpec       *pf.MaterializationSpec
+		proposedSpec       *pf.MaterializationSpec
+		fieldNameTransform func(string) string
+		maxFieldLength     int
+		featureFlags       map[string]bool
+		noFlowDocument     bool
+	}
+
+	tests := []testCase{
+		{
+			name:               "new materialization - standard updates - no_flow_document",
+			deltaUpdates:       false,
+			specForInfoSchema:  nil,
+			existingSpec:       nil,
+			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
+			noFlowDocument:     true,
+		},
+		{
+			name:               "new materialization - delta updates - no_flow_document",
+			deltaUpdates:       true,
+			specForInfoSchema:  nil,
+			existingSpec:       nil,
+			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
+			fieldNameTransform: simpleTestTransform,
+			maxFieldLength:     0,
+			noFlowDocument:     true,
+		},
+	}
+
+	var snap strings.Builder
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			is := testInfoSchemaFromSpec(t, tt.specForInfoSchema, tt.fieldNameTransform)
+			validator := boilerplate.NewValidator(testConstrainter{noFlowDocument: tt.noFlowDocument}, is, tt.maxFieldLength, true, tt.featureFlags)
+
+			cs, err := validator.ValidateBinding(
+				[]string{"key_value"},
+				tt.deltaUpdates,
+				tt.proposedSpec.Bindings[0].Backfill,
+				tt.proposedSpec.Bindings[0].Collection,
+				tt.proposedSpec.Bindings[0].FieldSelection.FieldConfigJsonMap,
+				tt.existingSpec,
+			)
+			require.NoError(t, err)
+
+			snap.WriteString(tt.name + ":\n")
+			snap.WriteString(boilerplate.SnapshotConstraints(t, cs) + "\n")
+		})
+	}
+	cupaloy.SnapshotT(t, snap.String())
+}
+
+type testConstrainter struct {
+	noFlowDocument bool
+}
 
 func (testConstrainter) Compatible(existing boilerplate.ExistingField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
 	var migratable = (existing.Type == "integer,string" && strings.Join(proposed.Inference.Types, ",") == "string") ||
@@ -91,29 +152,37 @@ func (testConstrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) 
 	return strings.Join(p.Inference.Types, ", "), nil
 }
 
-func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, _ json.RawMessage) (*pm.Response_Validated_Constraint, error) {
+func (tc testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, _ json.RawMessage) (*pm.Response_Validated_Constraint, error) {
 	_, numericString := m.AsFormattedNumeric(p)
 
 	var constraint = new(pm.Response_Validated_Constraint)
 	switch {
 	case p.IsPrimaryKey:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "All Locations that are part of the collections key are required"
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+		constraint.Reason = "All Locations that are part of the collections key are recommended"
+	case p.IsRootDocumentProjection() && tc.noFlowDocument:
+		// When flow_document is disabled, root document projection becomes optional
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "Root document projection is optional when flow_document is disabled"
 	case p.IsRootDocumentProjection() && deltaUpdates:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The root document should usually be materialized"
 	case p.IsRootDocumentProjection():
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "The root document is required for a standard updates materialization"
+	case slices.Equal(p.Inference.Types, []string{"null"}):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize a field where the only possible type is 'null'"
+	case tc.noFlowDocument && strings.Count(p.Ptr, "/") == 1 && p.Inference.Exists == pf.Inference_MUST:
+		// When flow_document is disabled, all root-level properties become LOCATION_REQUIRED
+		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+		constraint.Reason = "Required root-level properties must be present when flow_document is disabled"
 	case p.Field == "locRequiredVal":
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "This location is required to be materialized"
 	case p.Inference.IsSingleScalarType() || numericString:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
-	case reflect.DeepEqual(p.Inference.Types, []string{"null"}):
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-		constraint.Reason = "Cannot materialize this field"
 
 	default:
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL

@@ -203,6 +203,24 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Binding }}, 
+JSON_BUILD_OBJECT(
+{{- range $i, $col := $.RootLevelColumns}}
+	{{- if $i}},{{end}}
+    {{Literal $col.Field}}, r.{{$col.Identifier}}
+{{- end}}
+) as flow_document
+FROM {{ $.Identifier}} AS r
+JOIN {{ template "temp_name" . }} AS l
+{{- range $ind, $key := $.Keys }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end }}
+{{ end }}
+
 -- Templated query which inserts a new, complete row to the target table:
 
 {{ define "storeInsert" }}
@@ -302,16 +320,17 @@ BEGIN
 END $$;
 {{ end }}
 `)
-	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
-	tplLoadInsert        = tplAll.Lookup("loadInsert")
-	tplStoreInsert       = tplAll.Lookup("storeInsert")
-	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
-	tplDeleteQuery       = tplAll.Lookup("deleteQuery")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplInstallFence      = tplAll.Lookup("installFence")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
+	tplCreateLoadTable         = tplAll.Lookup("createLoadTable")
+	tplCreateTargetTable       = tplAll.Lookup("createTargetTable")
+	tplAlterTableColumns       = tplAll.Lookup("alterTableColumns")
+	tplLoadInsert              = tplAll.Lookup("loadInsert")
+	tplStoreInsert             = tplAll.Lookup("storeInsert")
+	tplStoreUpdate             = tplAll.Lookup("storeUpdate")
+	tplDeleteQuery             = tplAll.Lookup("deleteQuery")
+	tplLoadQuery               = tplAll.Lookup("loadQuery")
+	tplLoadQueryNoFlowDocument = tplAll.Lookup("loadQueryNoFlowDocument")
+	tplInstallFence            = tplAll.Lookup("installFence")
+	tplUpdateFence             = tplAll.Lookup("updateFence")
 )
 
 // truncatedIdentifier produces a truncated form of an identifier, in accordance with Postgres'

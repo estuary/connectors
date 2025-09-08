@@ -24,7 +24,8 @@ func testConfig() config {
 		Database: "flow",
 		Schema:   "public",
 		Advanced: advancedConfig{
-			FeatureFlags: "allow_existing_tables_for_new_bindings",
+			NoFlowDocument: true,
+			FeatureFlags:   "allow_existing_tables_for_new_bindings",
 		},
 	}
 }

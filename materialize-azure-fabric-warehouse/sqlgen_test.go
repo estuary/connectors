@@ -45,6 +45,7 @@ func TestSQLGeneration(t *testing.T) {
 	for _, tpl := range []*template.Template{
 		tplCreateLoadTable,
 		tplLoadQuery,
+		tplLoadQueryNoFlowDocument,
 		tplDropLoadTable,
 		tplStoreMergeQuery,
 	} {
