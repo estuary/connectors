@@ -27,7 +27,10 @@ config_json_template='{
    "database": "$SQLSERVER_DATABASE",
    "password": "$SQLSERVER_PASSWORD",
    "user":     "$SQLSERVER_USER",
-   "hardDelete": true
+   "hardDelete": true,
+   "advanced": {
+      "no_flow_document": true
+   }
 }'
 
 resources_json_template='[

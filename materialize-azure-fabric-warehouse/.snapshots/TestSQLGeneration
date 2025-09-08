@@ -70,11 +70,12 @@ CREATE TABLE flow_temp_table_store_0 (
 	"stringInteger39Chars" VARCHAR(MAX),
 	"stringInteger66Chars" VARCHAR(MAX),
 	"stringNumber" FLOAT,
-	flow_document VARCHAR(MAX)
+	flow_document VARCHAR(MAX),
+	_flow_delete BIT
 );
 
 COPY INTO flow_temp_table_store_0
-(key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
+(key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document, _flow_delete)
 FROM 'https://some/file1', 'https://some/file2'
 WITH (
 	FILE_TYPE = 'CSV',
@@ -106,11 +107,12 @@ WITH (
 CREATE TABLE flow_temp_table_store_1 (
 	"theKey" VARCHAR(MAX),
 	"aValue" BIGINT,
-	flow_published_at DATETIME2(6)
+	flow_published_at DATETIME2(6),
+	_flow_delete BIT
 );
 
 COPY INTO flow_temp_table_store_1
-("theKey", "aValue", flow_published_at)
+("theKey", "aValue", flow_published_at, _flow_delete)
 FROM 'https://some/file1', 'https://some/file2'
 WITH (
 	FILE_TYPE = 'CSV',
@@ -165,6 +167,35 @@ JOIN "a-warehouse"."a-schema".key_value AS r
 	 AND BASE64_DECODE(l."key!binary") = r."key!binary"
 --- End "a-warehouse"."a-schema".key_value loadQuery ---
 
+--- Begin "a-warehouse"."a-schema".key_value loadQueryNoFlowDocument ---
+SELECT 0, 
+	JSON_OBJECT(
+		'key1': r.key1,
+		'key2': r.key2,
+		'key!binary': r."key!binary",
+		'array': r."array",
+		'binary': r."binary",
+		'boolean': r."boolean",
+		'integer': r."integer",
+		'integerGt64Bit': r."integerGt64Bit",
+		'integerWithUserDDL': r."integerWithUserDDL",
+		'multiple': r.multiple,
+		'number': r.number,
+		'numberCastToString': r."numberCastToString",
+		'object': r."object",
+		'string': r.string,
+		'stringInteger': r."stringInteger",
+		'stringInteger39Chars': r."stringInteger39Chars",
+		'stringInteger66Chars': r."stringInteger66Chars",
+		'stringNumber': r."stringNumber"
+	) as flow_document
+FROM flow_temp_table_load_0 AS l
+JOIN "a-warehouse"."a-schema".key_value AS r
+	 ON  l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100
+	 AND l.key2 = r.key2
+	 AND BASE64_DECODE(l."key!binary") = r."key!binary"
+--- End "a-warehouse"."a-schema".key_value loadQueryNoFlowDocument ---
+
 --- Begin "a-warehouse"."a-schema".key_value dropLoadTable ---
 DROP TABLE flow_temp_table_load_0;--- End "a-warehouse"."a-schema".key_value dropLoadTable ---
 
@@ -189,11 +220,12 @@ CREATE TABLE flow_temp_table_store_0 (
 	"stringInteger39Chars" VARCHAR(MAX),
 	"stringInteger66Chars" VARCHAR(MAX),
 	"stringNumber" FLOAT,
-	flow_document VARCHAR(MAX)
+	flow_document VARCHAR(MAX),
+	_flow_delete BIT
 );
 
 COPY INTO flow_temp_table_store_0
-(key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
+(key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document, _flow_delete)
 FROM 'https://some/file1', 'https://some/file2'
 WITH (
 	FILE_TYPE = 'CSV',
@@ -212,7 +244,7 @@ INNER JOIN flow_temp_table_store_0 AS l
 INSERT INTO "a-warehouse"."a-schema".key_value (key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
 SELECT key1, key2, BASE64_DECODE("key!binary"), "array", BASE64_DECODE("binary"), "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
 FROM flow_temp_table_store_0
-WHERE flow_document <> '"delete"';
+WHERE _flow_delete = 0;
 
 DROP TABLE flow_temp_table_store_0;
 --- End "a-warehouse"."a-schema".key_value storeMergeQuery ---
