@@ -193,6 +193,37 @@ SELECT -1, ""
 {{ end -}}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Table.Binding }}, 
+to_json(struct(
+{{- range $i, $col := $.Table.RootLevelColumns}}
+	{{- if $i}},{{end}}
+	{{ $.Table.Identifier }}.{{ $col.Identifier }} AS {{ $col.Field }}
+{{- end}}
+)) as flow_document
+FROM {{ $.Table.Identifier }}
+JOIN (
+	{{- range $fi, $file := $.Files }}
+	{{ if $fi }} UNION ALL {{ end -}}
+	(
+		SELECT
+		{{ range $ind, $key := $.Table.Keys }}
+		{{- if $ind }}, {{ end -}}
+		{{ template "cast" $key -}}
+		{{- end }}
+		FROM json.`+"`{{ $file }}`"+`
+	)
+	{{- end }}
+) AS r
+{{- range $ind, $bound := $.Bounds }}
+{{ if $ind }}AND {{ else }}ON {{ end -}}
+{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{ end }}
+
 -- TODO: this will not work with custom type definitions that require more than a single word
 -- namely: ARRAY, MAP and INTERVAL. We don't have these types ourselves, but users may be able
 -- to specify them as a custom DDL
@@ -272,6 +303,7 @@ SELECT -1, ""
 		createTargetTable: tplAll.Lookup("createTargetTable"),
 		alterTableColumns: tplAll.Lookup("alterTableColumns"),
 		loadQuery:         tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
 		copyIntoDirect:    tplAll.Lookup("copyIntoDirect"),
 		mergeInto:         tplAll.Lookup("mergeInto"),
 	}

@@ -154,6 +154,7 @@ type templates struct {
 	createMigrationTable         *template.Template
 	createLoadTable              *template.Template
 	loadQuery                    *template.Template
+	loadQueryNoFlowDocument 	 *template.Template
 	dropLoadTable                *template.Template
 	storeMergeQuery              *template.Template
 	storeCopyIntoFromStagedQuery *template.Template
@@ -169,6 +170,7 @@ func renderTemplates(dialect sql.Dialect) *templates {
 		createMigrationTable:         tplAll.Lookup("createMigrationTable"),
 		createLoadTable:              tplAll.Lookup("createLoadTable"),
 		loadQuery:                    tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument:      tplAll.Lookup("loadQueryNoFlowDocument"),
 		dropLoadTable:                tplAll.Lookup("dropLoadTable"),
 		storeMergeQuery:              tplAll.Lookup("storeMergeQuery"),
 		storeCopyIntoFromStagedQuery: tplAll.Lookup("storeCopyIntoFromStagedQuery"),
@@ -250,6 +252,25 @@ JOIN {{ $.Identifier}} AS r
 {{- end }}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Binding }}, 
+	JSON_OBJECT(
+		{{- range $i, $col := $.RootLevelColumns}}
+			{{- if $i}},{{end}}
+		{{Literal $col.Field}}: r.{{$col.Identifier}}
+		{{- end}}
+	) as flow_document
+FROM {{ template "temp_name_load" . }} AS l
+JOIN {{ $.Identifier}} AS r
+{{- range $ind, $bound := $.Bounds }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
+	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{ end }}
+
 {{ define "dropLoadTable" }}
 DROP TABLE {{ template "temp_name_load" $ }};
 {{- end }}
@@ -298,6 +319,7 @@ WHERE _flow_delete = 0;
 
 DROP TABLE {{ template "temp_name_store" $ }};
 {{ end }}
+
 
 -- storeCopyIntoFromStagedQuery is used when there is no data to
 -- merge, but there are binary columns that must be converted from

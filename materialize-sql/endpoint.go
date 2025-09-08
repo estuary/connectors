@@ -125,6 +125,8 @@ type Endpoint[EC boilerplate.EndpointConfiger] struct {
 	// ConcurrentApply of Apply actions, for system that may benefit from a scatter/gather strategy
 	// for changing many tables in a single apply.
 	ConcurrentApply bool
+	// NoFlowDocument indicates whether flow_document projection should be optional (true) or mandatory (false)
+	NoFlowDocument bool
 	// Options are general materialization options that apply to this task.
 	Options m.MaterializeOptions
 }

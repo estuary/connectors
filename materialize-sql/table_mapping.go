@@ -3,6 +3,7 @@ package sql
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -115,6 +116,17 @@ func (t *Table) Columns() []*Column {
 		out = append(out, t.Document)
 	}
 	return out
+}
+
+// RootLevelColumns returns only columns that represent root-level properties
+func (t *Table) RootLevelColumns() []*Column {
+	var rootLevelCols []*Column
+	for _, col := range t.Columns() {
+		if strings.Count(col.Ptr, "/") == 1 {
+			rootLevelCols = append(rootLevelCols, col)
+		}
+	}
+	return rootLevelCols
 }
 
 // KeyPtrs returns all keys of the Table as a single slice.

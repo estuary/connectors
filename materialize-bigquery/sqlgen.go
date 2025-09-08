@@ -170,14 +170,15 @@ func toBigNumericCast(m sql.ColumnTypeMigration) string {
 }
 
 type templates struct {
-	tempTableName     *template.Template
-	createTargetTable *template.Template
-	alterTableColumns *template.Template
-	installFence      *template.Template
-	updateFence       *template.Template
-	loadQuery         *template.Template
-	storeInsert       *template.Template
-	storeUpdate       *template.Template
+	tempTableName           *template.Template
+	createTargetTable       *template.Template
+	alterTableColumns       *template.Template
+	installFence            *template.Template
+	updateFence             *template.Template
+	loadQuery               *template.Template
+	loadQueryNoFlowDocument *template.Template
+	storeInsert             *template.Template
+	storeUpdate             *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -249,6 +250,25 @@ SELECT -1, NULL LIMIT 0
 {{ end }}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" -}}
+SELECT {{ $.Binding }}, 
+TO_JSON(STRUCT(
+{{- range $i, $col := $.RootLevelColumns}}
+	{{- if $i}}, {{end}}
+	l.{{ $col.Identifier }} AS {{ $col.Field }}
+{{- end}}
+)) as flow_document
+FROM {{ $.Identifier }} AS l
+JOIN {{ template "tempTableName" . }} AS r
+{{- range $ind, $bound := $.Bounds }}
+	{{ if $ind }} AND {{ else }} ON {{ end -}}
+	l.{{ $bound.Identifier }} = r.c{{$ind}}
+	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{ end }}
+
 -- Templated query which bulk inserts rows from a source bucket into a target table.
 
 {{ define "storeInsert" -}}
@@ -298,6 +318,7 @@ WHEN NOT MATCHED AND NOT r._flow_delete THEN
 	{{- end -}}
 	);
 {{ end }}
+
 
 {{ define "installFence" }}
 -- Our desired fence
@@ -371,14 +392,15 @@ UPDATE {{ Identifier $.TablePath }}
 `)
 
 	return templates{
-		tempTableName:     tplAll.Lookup("tempTableName"),
-		createTargetTable: tplAll.Lookup("createTargetTable"),
-		alterTableColumns: tplAll.Lookup("alterTableColumns"),
-		installFence:      tplAll.Lookup("installFence"),
-		updateFence:       tplAll.Lookup("updateFence"),
-		loadQuery:         tplAll.Lookup("loadQuery"),
-		storeInsert:       tplAll.Lookup("storeInsert"),
-		storeUpdate:       tplAll.Lookup("storeUpdate"),
+		tempTableName:           tplAll.Lookup("tempTableName"),
+		createTargetTable:       tplAll.Lookup("createTargetTable"),
+		alterTableColumns:       tplAll.Lookup("alterTableColumns"),
+		installFence:            tplAll.Lookup("installFence"),
+		updateFence:             tplAll.Lookup("updateFence"),
+		loadQuery:               tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
+		storeInsert:             tplAll.Lookup("storeInsert"),
+		storeUpdate:             tplAll.Lookup("storeUpdate"),
 	}
 }
 

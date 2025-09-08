@@ -170,19 +170,20 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 }
 
 type templates struct {
-	tempLoadTableName  *template.Template
-	tempStoreTableName *template.Template
-	tempLoadTruncate   *template.Template
-	tempStoreTruncate  *template.Template
-	createLoadTable    *template.Template
-	createStoreTable   *template.Template
-	alterTableColumns  *template.Template
-	createTargetTable  *template.Template
-	directCopy         *template.Template
-	mergeInto          *template.Template
-	loadInsert         *template.Template
-	loadQuery          *template.Template
-	updateFence        *template.Template
+	tempLoadTableName       *template.Template
+	tempStoreTableName      *template.Template
+	tempLoadTruncate        *template.Template
+	tempStoreTruncate       *template.Template
+	createLoadTable         *template.Template
+	createStoreTable        *template.Template
+	alterTableColumns       *template.Template
+	createTargetTable       *template.Template
+	directCopy              *template.Template
+	mergeInto               *template.Template
+	loadInsert              *template.Template
+	loadQuery               *template.Template
+	loadQueryNoFlowDocument *template.Template
+	updateFence             *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -315,6 +316,26 @@ SELECT TOP 0 -1, NULL
 {{ end }}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Binding }}, 
+(
+	SELECT 
+		{{- range $i, $col := $.RootLevelColumns}}
+			{{- if $i}},{{end}}
+		{{Literal $col.Field}} = r.{{$col.Identifier}}
+		{{- end}}
+	FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+) as flow_document
+FROM {{ $.Identifier}} AS r
+JOIN {{ template "temp_load_name" . }} AS l
+{{- range $ind, $key := $.Keys }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end }}
+{{ end }}
+
 -- If there are no updates to a table, we can just do a direct copy from temporary table into target table
 
 {{ define "directCopy" }}
@@ -346,10 +367,8 @@ SELECT TOP 0 -1, NULL
 		{{- if $ind }} AND {{ end -}}
 		{{ $.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
-	{{- if $.Document }}
 	WHEN MATCHED AND r._flow_delete = 1 THEN
 		DELETE
-	{{- end }}
 	WHEN MATCHED THEN
 		UPDATE SET {{ range $ind, $key := $.Values }}
 		{{- if $ind }}, {{ end -}}
@@ -373,6 +392,7 @@ SELECT TOP 0 -1, NULL
 	);
 {{ end }}
 
+
 {{ define "updateFence" }}
 UPDATE {{ Identifier $.TablePath }}
 	SET   "checkpoint" = {{ Literal (Base64Std $.Checkpoint) }}
@@ -384,18 +404,19 @@ UPDATE {{ Identifier $.TablePath }}
 	`)
 
 	return templates{
-		tempLoadTableName:  tplAll.Lookup("temp_load_name"),
-		tempStoreTableName: tplAll.Lookup("temp_store_name"),
-		tempLoadTruncate:   tplAll.Lookup("truncateTempLoadTable"),
-		tempStoreTruncate:  tplAll.Lookup("truncateTempStoreTable"),
-		createLoadTable:    tplAll.Lookup("createLoadTable"),
-		createStoreTable:   tplAll.Lookup("createStoreTable"),
-		alterTableColumns:  tplAll.Lookup("alterTableColumns"),
-		createTargetTable:  tplAll.Lookup("createTargetTable"),
-		directCopy:         tplAll.Lookup("directCopy"),
-		mergeInto:          tplAll.Lookup("mergeInto"),
-		loadInsert:         tplAll.Lookup("loadInsert"),
-		loadQuery:          tplAll.Lookup("loadQuery"),
-		updateFence:        tplAll.Lookup("updateFence"),
+		tempLoadTableName:       tplAll.Lookup("temp_load_name"),
+		tempStoreTableName:      tplAll.Lookup("temp_store_name"),
+		tempLoadTruncate:        tplAll.Lookup("truncateTempLoadTable"),
+		tempStoreTruncate:       tplAll.Lookup("truncateTempStoreTable"),
+		createLoadTable:         tplAll.Lookup("createLoadTable"),
+		createStoreTable:        tplAll.Lookup("createStoreTable"),
+		alterTableColumns:       tplAll.Lookup("alterTableColumns"),
+		createTargetTable:       tplAll.Lookup("createTargetTable"),
+		directCopy:              tplAll.Lookup("directCopy"),
+		mergeInto:               tplAll.Lookup("mergeInto"),
+		loadInsert:              tplAll.Lookup("loadInsert"),
+		loadQuery:               tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
+		updateFence:             tplAll.Lookup("updateFence"),
 	}
 }

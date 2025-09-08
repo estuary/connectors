@@ -179,7 +179,7 @@ func (i *InfoSchema) inSelectedFields(endpointFieldName string, fs pf.FieldSelec
 	for _, f := range fs.AllFields() {
 		translated := i.translateField(f)
 		if i.caseInsensitiveFields && strings.EqualFold(translated, endpointFieldName) {
-		    return true, nil
+			return true, nil
 		} else if translated == endpointFieldName {
 			return true, nil
 		}

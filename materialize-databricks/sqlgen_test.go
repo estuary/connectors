@@ -29,6 +29,7 @@ func TestSQLGeneration(t *testing.T) {
 
 	for _, tpl := range []*template.Template{
 		testTemplates.loadQuery,
+		testTemplates.loadQueryNoFlowDocument,
 		testTemplates.mergeInto,
 	} {
 		tbl := tables[0]

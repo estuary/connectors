@@ -28,6 +28,7 @@ func TestSQLGeneration(t *testing.T) {
 				testTemplates.createStoreTable,
 				testTemplates.mergeInto,
 				testTemplates.loadQuery,
+				testTemplates.loadQueryNoFlowDocument,
 				testTemplates.createDeleteTable,
 				testTemplates.deleteQuery,
 			},

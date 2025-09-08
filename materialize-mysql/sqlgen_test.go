@@ -30,6 +30,7 @@ func TestSQLGeneration(t *testing.T) {
 				testTemplates.tempTruncate,
 				testTemplates.loadLoad,
 				testTemplates.loadQuery,
+				testTemplates.loadQueryNoFlowDocument,
 				testTemplates.insertLoad,
 				testTemplates.updateLoad,
 				testTemplates.updateReplace,

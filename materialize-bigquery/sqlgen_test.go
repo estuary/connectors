@@ -31,8 +31,9 @@ func TestSQLGeneration(t *testing.T) {
 	)
 
 	for _, tpl := range []*template.Template{
-		testTemplates.storeUpdate,
-		testTemplates.loadQuery,
+		templates.storeUpdate,
+		templates.loadQuery,
+		templates.loadQueryNoFlowDocument,
 	} {
 		tbl := tables[0]
 		require.False(t, tbl.DeltaUpdates)
