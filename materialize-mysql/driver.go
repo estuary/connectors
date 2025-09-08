@@ -63,7 +63,8 @@ type advancedConfig struct {
 	SSLClientCert string `json:"ssl_client_cert,omitempty" jsonschema:"title=SSL Client Certificate,description=Optional client certificate to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 	SSLClientKey  string `json:"ssl_client_key,omitempty" jsonschema:"title=SSL Client Key,description=Optional client key to use when connecting with custom SSL mode." jsonschema_extras:"secret=true,multiline=true"`
 
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the flow_document column will not be materialized in destination tables.,default=false"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c config) Validate() error {
@@ -326,6 +327,7 @@ func newMysqlDriver() *sql.Driver[config, tableConfig] {
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       prepareNewTransactor(templates),
 				ConcurrentApply:     false,
+				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 				Options: m.MaterializeOptions{
 					DBTJobTrigger: &cfg.DBTJobTrigger,
 				},
@@ -491,6 +493,14 @@ type binding struct {
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
 	var b = &binding{target: target}
 
+	// Choose the appropriate load query template based on configuration
+	var loadQueryTemplate *template.Template
+	if t.cfg.Advanced.NoFlowDocument {
+		loadQueryTemplate = t.templates.loadQueryNoFlowDocument
+	} else {
+		loadQueryTemplate = t.templates.loadQuery
+	}
+
 	for _, m := range []struct {
 		sql *string
 		tpl *template.Template
@@ -499,7 +509,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 		{&b.createUpdateTableSQL, t.templates.createUpdateTable},
 		{&b.createDeleteTableSQL, t.templates.createDeleteTable},
 		{&b.loadLoadSQL, t.templates.loadLoad},
-		{&b.loadQuerySQL, t.templates.loadQuery},
+		{&b.loadQuerySQL, loadQueryTemplate},
 		{&b.storeInsertSQL, t.templates.insertLoad},
 		{&b.storeUpdateSQL, t.templates.updateLoad},
 		{&b.updateReplaceSQL, t.templates.updateReplace},

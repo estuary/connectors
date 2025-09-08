@@ -36,10 +36,10 @@ type transactor struct {
 
 	fence sql.Fence
 
-	storeFiles *boilerplate.StagedFiles
-	loadFiles  *boilerplate.StagedFiles
-	bindings   []*binding
-	be         *m.BindingEvents
+	storeFiles   *boilerplate.StagedFiles
+	loadFiles    *boilerplate.StagedFiles
+	bindings     []*binding
+	be           *m.BindingEvents
 }
 
 func newTransactor(
@@ -168,8 +168,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("creating load table: %w", err)
 		}
 
+		// Choose appropriate load query template based on configuration
+		var loadTemplate = t.templates.loadQuery
+		if t.cfg.Advanced.NoFlowDocument {
+			loadTemplate = t.templates.loadQueryNoFlowDocument
+		}
+
 		var loadQuery strings.Builder
-		if err := t.templates.loadQuery.Execute(&loadQuery, params); err != nil {
+		if err := loadTemplate.Execute(&loadQuery, params); err != nil {
 			return fmt.Errorf("rendering load query: %w", err)
 		}
 		unionQueries = append(unionQueries, loadQuery.String())
@@ -226,12 +232,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	for it.Next() {
+		var b = t.bindings[it.Binding]
+
 		flowDelete := t.cfg.HardDelete && it.Delete
 		if flowDelete && !it.Exists {
 			continue
 		}
 
-		b := t.bindings[it.Binding]
 		if it.Exists {
 			b.store.mustMerge = true
 		}

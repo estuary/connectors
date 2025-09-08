@@ -33,6 +33,7 @@ func TestSQLGeneration(t *testing.T) {
 				testTemplates.mergeInto,
 				testTemplates.loadInsert,
 				testTemplates.loadQuery,
+				testTemplates.loadQueryNoFlowDocument,
 			},
 			TplAddColumns:  testTemplates.alterTableColumns,
 			TplUpdateFence: testTemplates.updateFence,

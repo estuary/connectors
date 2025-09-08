@@ -28,6 +28,7 @@ func TestSQLGeneration(t *testing.T) {
 				testTemplates.createLoadTable,
 				testTemplates.loadInsert,
 				testTemplates.loadQuery,
+				testTemplates.loadQueryNoFlowDocumen,
 				testTemplates.storeInsert,
 				testTemplates.storeUpdate,
 				testTemplates.deleteQuery,
@@ -94,4 +95,55 @@ func TestTruncatedIdentifier(t *testing.T) {
 			require.Equal(t, tt.want, truncatedIdentifier(tt.input))
 		})
 	}
+}
+
+func TestLoadQueryNoFlowDocumentTemplate(t *testing.T) {
+	// Create a test table with root-level columns
+	table := sql.Table{
+		TableShape: sql.TableShape{
+			Path:    []string{"test_schema", "test_table"},
+			Binding: 0,
+		},
+		Identifier: `"test_schema"."test_table"`,
+		Keys: []sql.Column{
+			{
+				Projection: sql.Projection{
+					Projection: pf.Projection{Field: "id", Ptr: "/id"},
+				},
+				Identifier: `"id"`,
+			},
+		},
+		Values: []sql.Column{
+			{
+				Projection: sql.Projection{
+					Projection: pf.Projection{Field: "name", Ptr: "/name"},
+				},
+				Identifier: `"name"`,
+			},
+			{
+				Projection: sql.Projection{
+					Projection: pf.Projection{Field: "age", Ptr: "/age"},
+				},
+				Identifier: `"age"`,
+			},
+			{
+				Projection: sql.Projection{
+					Projection: pf.Projection{Field: "nested_field", Ptr: "/nested/field"},
+				},
+				Identifier: `"nested_field"`,
+			},
+		},
+	}
+
+	// Test the loadQueryNoFlowDocument template
+	result, err := sql.RenderTableTemplate(table, tplLoadQueryNoFlowDocument)
+	require.NoError(t, err)
+
+	cupaloy.SnapshotT(t, result)
+
+	// Verify that nested fields are not included in the JSON reconstruction
+	require.Contains(t, result, `'id', r."id"`)
+	require.Contains(t, result, `'name', r."name"`)
+	require.Contains(t, result, `'age', r."age"`)
+	require.NotContains(t, result, "nested_field") // Should not be included as it's not root-level
 }

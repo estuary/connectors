@@ -17,7 +17,8 @@ var featureFlagDefaults = map[string]bool{
 }
 
 type advancedConfig struct {
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the flow_document column will not be materialized in destination tables.,default=false"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 type config struct {
@@ -135,6 +136,7 @@ func newDriver() *sql.Driver[config, tableConfig] {
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     true,
+				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{

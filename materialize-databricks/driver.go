@@ -88,6 +88,7 @@ func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 				CreateTableTemplate: renderTemplates(dialect).createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     true,
+				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{
@@ -257,7 +258,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 		var fullPaths = pathsWithRoot(b.rootStagingPath, toLoad)
 
-		if loadQuery, err := RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, d.templates.loadQuery, b.loadMergeBounds.Build()); err != nil {
+		var loadTemplate = d.templates.loadQuery
+		if d.cfg.Advanced.NoFlowDocument {
+			loadTemplate = d.templates.loadQueryNoFlowDocument
+		}
+
+		if loadQuery, err := RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, loadTemplate, b.loadMergeBounds.Build()); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
 			queries = append(queries, loadQuery)

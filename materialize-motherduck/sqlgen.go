@@ -95,6 +95,7 @@ type templates struct {
 	storeQuery        *template.Template
 	storeDeleteQuery  *template.Template
 	loadQuery         *template.Template
+	loadQueryNoFlowDocument         *template.Template
 	updateFence       *template.Template
 }
 
@@ -105,6 +106,7 @@ func renderTemplates(dialect sql.Dialect) *templates {
 		storeQuery:        tplAll.Lookup("storeQuery"),
 		storeDeleteQuery:  tplAll.Lookup("storeDeleteQuery"),
 		loadQuery:         tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument:         tplAll.Lookup("loadQueryNoFlowDocument"),
 		updateFence:       tplAll.Lookup("updateFence"),
 	}
 }
@@ -210,6 +212,41 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	}
 ) WHERE NOT _flow_delete;
 {{ end }}
+
+{{ define "loadQueryNoFlowDocument" }}                                                                                                                             
+{{ if $.DeltaUpdates -}}                                                                                                                                           
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc                                                                                                     
+{{ else -}}                                                                                                                                                        
+SELECT {{ $.Binding }} AS binding,                                                                                                                                 
+json_object(                                                                                                                                                       
+{{- range $i, $col := $.RootLevelColumns}}                                                                                                                         
+       {{- if $i}}, {{end}}                                                                                                                                        
+       '{{$col.Field}}', l.{{$col.Identifier}}                                                                                                                     
+{{- end}}                                                                                                                                                          
+) as doc                                                                                                                                                           
+FROM {{ $.Identifier }} AS l                                                                                                                                       
+JOIN read_json(                                                                                                                                                    
+       [                                                                                                                                                           
+       {{- range $ind, $f := $.Files }}                                                                                                                            
+       {{- if $ind }}, {{ end }}'{{ $f }}'                                                                                                                         
+       {{- end -}}                                                                                                                                                 
+       ],                                                                                                                                                          
+       format='newline_delimited',                                                                                                                                 
+       compression='gzip',                                                                                                                                         
+       columns={                                                                                                                                                   
+       {{- range $ind, $bound := $.Bounds }}                                                                                                                       
+               {{- if $ind }},{{ end }}                                                                                                                            
+               {{$bound.Identifier}}: '{{$bound.DDL}}'                                                                                                             
+       {{- end }}                                                                                                                                                  
+       }                                                                                                                                                           
+) AS r                                                                                                                                                             
+{{- range $ind, $bound := $.Bounds }}                                                                                                                              
+       {{ if $ind }} AND {{ else }} ON  {{ end -}}                                                                                                                 
+       l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}                                                                                                       
+       {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end -}}                                                                                                                                                        
+{{- end }}                                                                                                                                                         
+{{ end }} 
 
 -- Templated update of a fence checkpoint.
 

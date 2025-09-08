@@ -153,14 +153,15 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 }
 
 type templates struct {
-	createTargetTable *template.Template
-	alterTableColumns *template.Template
-	loadQuery         *template.Template
-	copyInto          *template.Template
-	mergeInto         *template.Template
-	pipeName          *template.Template
-	createPipe        *template.Template
-	copyHistory       *template.Template
+	createTargetTable       *template.Template
+	alterTableColumns       *template.Template
+	loadQuery               *template.Template
+	loadQueryNoFlowDocument *template.Template
+	copyInto                *template.Template
+	mergeInto               *template.Template
+	pipeName                *template.Template
+	createPipe              *template.Template
+	copyHistory             *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -245,6 +246,31 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{ end -}}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Table.Binding }}, 
+OBJECT_CONSTRUCT(
+{{- range $i, $col := $.Table.RootLevelColumns}}
+	{{- if $i}},{{end}}
+	{{Literal $col.Field}}, {{ $.Table.Identifier }}.{{ $col.Identifier }}
+{{- end}}
+) as flow_document
+FROM {{ $.Table.Identifier }}
+JOIN (
+	SELECT {{ range $ind, $bound := $.Bounds }}
+	{{- if $ind }}, {{ end -}}
+	$1[{{$ind}}] AS {{$bound.Identifier -}}
+	{{- end }}
+	FROM {{ $.File }}
+) AS r
+{{- range $ind, $bound := $.Bounds }}
+{{ if $ind }}AND {{ else }}ON {{ end -}}
+{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{ end }}
+
 {{ define "createPipe" }}
 CREATE PIPE {{ $.PipeName }}
   COMMENT = 'Pipe for table {{ $.Table.Path }}'
@@ -292,10 +318,8 @@ ON {{ range $ind, $bound := $.Bounds }}
 	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
-{{- if $.Table.Document }}
 WHEN MATCHED AND r._flow_delete=true THEN
 	DELETE
-{{- end }}
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $key := $.Table.Values }}
 	{{- if $ind }}, {{ end -}}
@@ -319,6 +343,7 @@ WHEN NOT MATCHED AND r._flow_delete=false THEN
 );
 {{ end }}
 
+
 {{ define "copyHistory" }}
 SELECT FILE_NAME, STATUS, FIRST_ERROR_MESSAGE FROM TABLE(INFORMATION_SCHEMA.COPY_HISTORY(
   TABLE_NAME=>'{{ $.TableName }}',
@@ -329,14 +354,15 @@ FILE_NAME IN ('{{ Join $.Files "','" }}')
   `)
 
 	return templates{
-		createTargetTable: tplAll.Lookup("createTargetTable"),
-		alterTableColumns: tplAll.Lookup("alterTableColumns"),
-		loadQuery:         tplAll.Lookup("loadQuery"),
-		copyInto:          tplAll.Lookup("copyInto"),
-		mergeInto:         tplAll.Lookup("mergeInto"),
-		pipeName:          tplAll.Lookup("pipe_name"),
-		createPipe:        tplAll.Lookup("createPipe"),
-		copyHistory:       tplAll.Lookup("copyHistory"),
+		createTargetTable:       tplAll.Lookup("createTargetTable"),
+		alterTableColumns:       tplAll.Lookup("alterTableColumns"),
+		loadQuery:               tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
+		copyInto:                tplAll.Lookup("copyInto"),
+		mergeInto:               tplAll.Lookup("mergeInto"),
+		pipeName:                tplAll.Lookup("pipe_name"),
+		createPipe:              tplAll.Lookup("createPipe"),
+		copyHistory:             tplAll.Lookup("copyHistory"),
 	}
 }
 

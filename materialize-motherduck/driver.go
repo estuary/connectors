@@ -47,6 +47,7 @@ func newDuckDriver() *sql.Driver[config, tableConfig] {
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     false,
+				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
 					AckSchedule: &m.AckScheduleOption{
@@ -63,10 +64,10 @@ func newDuckDriver() *sql.Driver[config, tableConfig] {
 type transactor struct {
 	cfg config
 
-	fence      sql.Fence
-	conn       *stdsql.Conn
-	bucket     blob.Bucket
-	bucketPath string
+	fence        sql.Fence
+	conn         *stdsql.Conn
+	bucket       blob.Bucket
+	bucketPath   string
 
 	storeFiles *boilerplate.StagedFiles
 	loadFiles  *boilerplate.StagedFiles
@@ -165,12 +166,20 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		} else if uris, err := d.loadFiles.Flush(idx); err != nil {
 			return fmt.Errorf("flushing load file: %w", err)
-		} else if err := d.templates.loadQuery.Execute(&loadQuery, &queryParams{
-			Table:  b.target,
-			Bounds: b.loadMergeBounds.Build(),
-			Files:  uris,
-		}); err != nil {
-			return fmt.Errorf("rendering load query: %w", err)
+		} else {
+			// Choose appropriate load query template based on configuration
+			var loadTemplate = d.templates.loadQuery
+			if d.cfg.Advanced.NoFlowDocument {
+				loadTemplate = d.templates.loadQueryNoFlowDocument
+			}
+
+			if err := loadTemplate.Execute(&loadQuery, &queryParams{
+				Table:  b.target,
+				Bounds: b.loadMergeBounds.Build(),
+				Files:  uris,
+			}); err != nil {
+				return fmt.Errorf("rendering load query: %w", err)
+			}
 		}
 
 		subqueries = append(subqueries, loadQuery.String())
@@ -275,13 +284,14 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	for it.Next() {
+		var b = d.bindings[it.Binding]
+
 		flowDelete := d.cfg.HardDelete && it.Delete
 		if flowDelete && !it.Exists {
 			// Ignore documents which do not exist and are being deleted.
 			continue
 		}
 
-		b := d.bindings[it.Binding]
 		if it.Exists {
 			b.mustMerge = true
 		}
@@ -341,6 +351,7 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
 
 		var queries []string
 		params := &queryParams{Table: b.target, Files: uris, Bounds: b.storeMergeBounds.Build()}
+
 		if b.mustMerge {
 			// In-place updates are accomplished by deleting the
 			// existing row and inserting the updated row.

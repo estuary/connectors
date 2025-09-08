@@ -340,8 +340,6 @@ func (v Validator) constraintForExistingField(
 	return out, nil
 }
 
-
-
 // findLastBinding locates a binding within a previously applied or validated specification.
 func findLastBinding(resourcePath []string, lastSpec *pf.MaterializationSpec) *pf.MaterializationSpec_Binding {
 	if lastSpec == nil {

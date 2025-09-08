@@ -43,9 +43,9 @@ type transactor struct {
 	storeFiles *boilerplate.StagedFiles
 	loadFiles  *boilerplate.StagedFiles
 
-	bindings []*binding
-	be       *m.BindingEvents
-	cp       checkpoint
+	bindings     []*binding
+	be           *m.BindingEvents
+	cp           checkpoint
 
 	objAndArrayAsJson       bool
 	loggedStorageApiMessage bool
@@ -231,11 +231,19 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		} else if uris, err := t.loadFiles.Flush(idx); err != nil {
 			return fmt.Errorf("flushing load file: %w", err)
-		} else if loadQuery, err := renderQueryTemplate(b.target, t.templates.loadQuery, b.loadMergeBounds.Build(), t.objAndArrayAsJson); err != nil {
-			return fmt.Errorf("rendering load query template: %w", err)
 		} else {
-			subqueries = append(subqueries, loadQuery)
-			edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
+			// Choose appropriate load query template based on configuration
+			var loadTemplate = t.templates.loadQuery
+			if t.cfg.Advanced.NoFlowDocument {
+				loadTemplate = t.templates.loadQueryNoFlowDocument
+			}
+
+			if loadQuery, err := renderQueryTemplate(b.target, loadTemplate, b.loadMergeBounds.Build(), t.objAndArrayAsJson); err != nil {
+				return fmt.Errorf("rendering load query template: %w", err)
+			} else {
+				subqueries = append(subqueries, loadQuery)
+				edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
+			}
 		}
 	}
 
@@ -291,13 +299,14 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
 	for it.Next() {
+		var b = t.bindings[it.Binding]
+
 		flowDelete := t.cfg.HardDelete && it.Delete
 		if flowDelete && !it.Exists {
 			// Ignore documents which do not exist and are being deleted.
 			continue
 		}
 
-		var b = t.bindings[it.Binding]
 		if it.Exists {
 			b.mustMerge = true
 		}
