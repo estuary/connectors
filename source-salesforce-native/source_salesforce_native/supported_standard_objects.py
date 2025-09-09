@@ -4579,6 +4579,12 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "SurveyInvitation": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "SurveyQuestion": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+    },
+    "SurveyQuestionResponse": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+    },
     "SurveyQuestionScore": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
