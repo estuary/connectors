@@ -1,10 +1,10 @@
 # ================================
 # Collection "acmeCo/test/fullrefresh_902536": 4 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"data":"Value for row 0","id":0}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"data":"Value for row 1","id":1}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"data":"Value for row 2","id":2}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"data":"Value for row 3","id":3}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"fullrefresh_902536","schema":"testdata","table":"fullrefresh_902536"}},"data":"Value for row 0","id":0}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"fullrefresh_902536","schema":"testdata","table":"fullrefresh_902536"}},"data":"Value for row 1","id":1}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"fullrefresh_902536","schema":"testdata","table":"fullrefresh_902536"}},"data":"Value for row 2","id":2}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"fullrefresh_902536","schema":"testdata","table":"fullrefresh_902536"}},"data":"Value for row 3","id":3}
 # ================================
 # Final State Checkpoint
 # ================================
