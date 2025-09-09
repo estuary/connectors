@@ -12,7 +12,7 @@ Binding 0:
       "capturewithemptypoll_890703"
     ],
     "collection": {
-      "name": "acmeCo/test/capturewithemptypoll_890703",
+      "name": "acmeCo/test/dbo/capturewithemptypoll_890703",
       "read_schema_json": {
         "type": "object",
         "required": [

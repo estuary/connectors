@@ -12,7 +12,7 @@ Binding 0:
       "nonexistentcursor_140869"
     ],
     "collection": {
-      "name": "acmeCo/test/nonexistentcursor_140869",
+      "name": "acmeCo/test/public/nonexistentcursor_140869",
       "read_schema_json": {
         "type": "object",
         "required": [

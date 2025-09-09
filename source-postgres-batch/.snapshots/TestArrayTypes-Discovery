@@ -12,7 +12,7 @@ Binding 0:
       "test_arraytypes_371544"
     ],
     "collection": {
-      "name": "acmeCo/test/test_arraytypes_371544",
+      "name": "acmeCo/test/test/arraytypes_371544",
       "read_schema_json": {
         "type": "object",
         "required": [

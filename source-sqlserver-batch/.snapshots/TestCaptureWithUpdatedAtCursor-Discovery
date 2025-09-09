@@ -12,7 +12,7 @@ Binding 0:
       "capturewithupdatedatcursor_792371"
     ],
     "collection": {
-      "name": "acmeCo/test/capturewithupdatedatcursor_792371",
+      "name": "acmeCo/test/dbo/capturewithupdatedatcursor_792371",
       "read_schema_json": {
         "type": "object",
         "required": [

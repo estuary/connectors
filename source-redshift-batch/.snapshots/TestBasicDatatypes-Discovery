@@ -9,7 +9,7 @@ Binding 0:
       "basicdatatypes_261881"
     ],
     "collection": {
-      "name": "acmeCo/test/basicdatatypes_261881",
+      "name": "acmeCo/test/public/basicdatatypes_261881",
       "read_schema_json": {
         "type": "object",
         "required": [

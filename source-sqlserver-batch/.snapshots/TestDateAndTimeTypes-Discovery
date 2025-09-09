@@ -12,7 +12,7 @@ Binding 0:
       "dateandtimetypes_307398"
     ],
     "collection": {
-      "name": "acmeCo/test/dateandtimetypes_307398",
+      "name": "acmeCo/test/dbo/dateandtimetypes_307398",
       "read_schema_json": {
         "type": "object",
         "required": [

@@ -12,7 +12,7 @@ Binding 0:
       "test_sourcetag_281837"
     ],
     "collection": {
-      "name": "acmeCo/test/test_sourcetag_281837",
+      "name": "acmeCo/test/test/sourcetag_281837",
       "read_schema_json": {
         "type": "object",
         "required": [

@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/querytemplateoverride_638679": 10 Documents
+# Collection "acmeCo/test/public/querytemplateoverride_638679": 10 Documents
 # ================================
 {"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"data":"Value for row 0","id":0,"updated_at":"2025-02-13T12:00:00Z"}
 {"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1},"data":"Value for row 1","id":1,"updated_at":"2025-02-13T12:01:00Z"}

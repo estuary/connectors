@@ -12,7 +12,7 @@ Binding 0:
       "test_jsontypes_447235"
     ],
     "collection": {
-      "name": "acmeCo/test/test_jsontypes_447235",
+      "name": "acmeCo/test/test/jsontypes_447235",
       "read_schema_json": {
         "type": "object",
         "required": [

@@ -12,7 +12,7 @@ Binding 0:
       "test_modificationsanddeletions_172811"
     ],
     "collection": {
-      "name": "acmeCo/test/test_modificationsanddeletions_172811",
+      "name": "acmeCo/test/test/modificationsanddeletions_172811",
       "read_schema_json": {
         "type": "object",
         "required": [

@@ -12,7 +12,7 @@ Binding 0:
       "keylesscapture_315710"
     ],
     "collection": {
-      "name": "acmeCo/test/keylesscapture_315710",
+      "name": "acmeCo/test/public/keylesscapture_315710",
       "read_schema_json": {
         "type": "object",
         "required": [

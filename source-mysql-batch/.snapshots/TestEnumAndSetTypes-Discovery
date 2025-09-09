@@ -12,7 +12,7 @@ Binding 0:
       "test_enumandsettypes_344361"
     ],
     "collection": {
-      "name": "acmeCo/test/test_enumandsettypes_344361",
+      "name": "acmeCo/test/test/enumandsettypes_344361",
       "read_schema_json": {
         "type": "object",
         "required": [

@@ -9,7 +9,7 @@ Binding 0:
       "schemafilter_428403"
     ],
     "collection": {
-      "name": "acmeCo/test/schemafilter_428403",
+      "name": "acmeCo/test/dbo/schemafilter_428403",
       "read_schema_json": {
         "type": "object",
         "required": [

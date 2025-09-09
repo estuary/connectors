@@ -12,7 +12,7 @@ Binding 0:
       "test_stringtypes_339419"
     ],
     "collection": {
-      "name": "acmeCo/test/test_stringtypes_339419",
+      "name": "acmeCo/test/test/stringtypes_339419",
       "read_schema_json": {
         "type": "object",
         "required": [

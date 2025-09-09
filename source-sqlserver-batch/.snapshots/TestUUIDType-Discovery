@@ -12,7 +12,7 @@ Binding 0:
       "uuidtype_694251"
     ],
     "collection": {
-      "name": "acmeCo/test/uuidtype_694251",
+      "name": "acmeCo/test/dbo/uuidtype_694251",
       "read_schema_json": {
         "type": "object",
         "required": [

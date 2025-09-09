@@ -12,7 +12,7 @@ Binding 0:
       "binarytypes_537491"
     ],
     "collection": {
-      "name": "acmeCo/test/binarytypes_537491",
+      "name": "acmeCo/test/dbo/binarytypes_537491",
       "read_schema_json": {
         "type": "object",
         "required": [

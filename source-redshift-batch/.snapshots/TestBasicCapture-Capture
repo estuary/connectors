@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/basiccapture_884124": 50 Documents
+# Collection "acmeCo/test/public/basiccapture_884124": 50 Documents
 # ================================
 {"_meta":{"polled":"<TIMESTAMP>","index":999,"row_id":0},"data":"Value for row 0","id":0}
 {"_meta":{"polled":"<TIMESTAMP>","index":999,"row_id":1},"data":"Value for row 1","id":1}

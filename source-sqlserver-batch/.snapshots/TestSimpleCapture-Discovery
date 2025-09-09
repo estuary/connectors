@@ -12,7 +12,7 @@ Binding 0:
       "simplecapture_140272"
     ],
     "collection": {
-      "name": "acmeCo/test/simplecapture_140272",
+      "name": "acmeCo/test/dbo/simplecapture_140272",
       "read_schema_json": {
         "type": "object",
         "required": [

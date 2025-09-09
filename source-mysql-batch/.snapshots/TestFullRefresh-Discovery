@@ -9,7 +9,7 @@ Binding 0:
       "test_fullrefresh_902536"
     ],
     "collection": {
-      "name": "acmeCo/test/test_fullrefresh_902536",
+      "name": "acmeCo/test/test/fullrefresh_902536",
       "read_schema_json": {
         "type": "object",
         "required": [

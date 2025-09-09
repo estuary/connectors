@@ -9,7 +9,7 @@ Binding 0:
       "fullrefresh_902536"
     ],
     "collection": {
-      "name": "acmeCo/test/fullrefresh_902536",
+      "name": "acmeCo/test/dbo/fullrefresh_902536",
       "read_schema_json": {
         "type": "object",
         "required": [

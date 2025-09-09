@@ -9,7 +9,7 @@ Binding 0:
       "basiccapture_884124"
     ],
     "collection": {
-      "name": "acmeCo/test/basiccapture_884124",
+      "name": "acmeCo/test/public/basiccapture_884124",
       "read_schema_json": {
         "type": "object",
         "required": [

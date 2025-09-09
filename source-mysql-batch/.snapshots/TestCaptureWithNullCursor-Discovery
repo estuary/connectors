@@ -12,7 +12,7 @@ Binding 0:
       "test_capturewithnullcursor_662607"
     ],
     "collection": {
-      "name": "acmeCo/test/test_capturewithnullcursor_662607",
+      "name": "acmeCo/test/test/capturewithnullcursor_662607",
       "read_schema_json": {
         "type": "object",
         "required": [

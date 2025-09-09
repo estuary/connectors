@@ -13,7 +13,7 @@ Binding 0:
       "capturewithtwocolumncursor_321285"
     ],
     "collection": {
-      "name": "acmeCo/test/capturewithtwocolumncursor_321285",
+      "name": "acmeCo/test/dbo/capturewithtwocolumncursor_321285",
       "read_schema_json": {
         "type": "object",
         "required": [
