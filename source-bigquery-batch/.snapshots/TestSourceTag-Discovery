@@ -1,0 +1,108 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "sourcetag_281837",
+      "schema": "testdata",
+      "table": "sourcetag_281837"
+    },
+    "resource_path": [
+      "sourcetag_281837"
+    ],
+    "collection": {
+      "name": "acmeCo/test/sourcetag_281837",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta",
+          "id"
+        ],
+        "properties": {
+          "_meta": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-bigquery-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document as executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              },
+              "row_id": {
+                "type": "integer",
+                "title": "Row ID",
+                "description": "Row ID of the Document"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Change Operation",
+                "description": "Operation type (c: Create / u: Update / d: Delete)",
+                "default": "u"
+              },
+              "source": {
+                "properties": {
+                  "resource": {
+                    "type": "string",
+                    "description": "Resource name of the binding from which this document was captured."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema from which the document was read."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table from which the document was read."
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "resource"
+                ]
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index",
+              "row_id",
+              "source"
+            ]
+          },
+          "data": {
+            "description": "(source type: STRING)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "description": "(source type: INT64)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ],
+      "projections": null
+    },
+    "state_key": "sourcetag_281837"
+  }
+
