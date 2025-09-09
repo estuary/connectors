@@ -12,7 +12,7 @@ Binding 0:
       "modificationsanddeletions_172811"
     ],
     "collection": {
-      "name": "acmeCo/test/modificationsanddeletions_172811",
+      "name": "acmeCo/test/dbo/modificationsanddeletions_172811",
       "read_schema_json": {
         "type": "object",
         "required": [

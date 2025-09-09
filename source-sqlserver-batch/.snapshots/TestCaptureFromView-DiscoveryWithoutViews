@@ -9,7 +9,7 @@ Binding 0:
       "capturefromview_194890"
     ],
     "collection": {
-      "name": "acmeCo/test/capturefromview_194890",
+      "name": "acmeCo/test/dbo/capturefromview_194890",
       "read_schema_json": {
         "type": "object",
         "required": [

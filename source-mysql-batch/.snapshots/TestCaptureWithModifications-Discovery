@@ -12,7 +12,7 @@ Binding 0:
       "test_capturewithmodifications_786099"
     ],
     "collection": {
-      "name": "acmeCo/test/test_capturewithmodifications_786099",
+      "name": "acmeCo/test/test/capturewithmodifications_786099",
       "read_schema_json": {
         "type": "object",
         "required": [

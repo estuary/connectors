@@ -12,7 +12,7 @@ Binding 0:
       "test_spatialtypes_702639"
     ],
     "collection": {
-      "name": "acmeCo/test/test_spatialtypes_702639",
+      "name": "acmeCo/test/test/spatialtypes_702639",
       "read_schema_json": {
         "type": "object",
         "required": [

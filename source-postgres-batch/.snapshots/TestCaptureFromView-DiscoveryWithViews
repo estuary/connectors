@@ -12,7 +12,7 @@ Binding 0:
       "test_capturefromview_194890"
     ],
     "collection": {
-      "name": "acmeCo/test/test_capturefromview_194890",
+      "name": "acmeCo/test/test/capturefromview_194890",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -131,7 +131,7 @@ Binding 1:
       "test_capturefromview_227836"
     ],
     "collection": {
-      "name": "acmeCo/test/test_capturefromview_227836",
+      "name": "acmeCo/test/test/capturefromview_227836",
       "read_schema_json": {
         "type": "object",
         "required": [

@@ -12,7 +12,7 @@ Binding 0:
       "integertypes_795898"
     ],
     "collection": {
-      "name": "acmeCo/test/integertypes_795898",
+      "name": "acmeCo/test/dbo/integertypes_795898",
       "read_schema_json": {
         "type": "object",
         "required": [

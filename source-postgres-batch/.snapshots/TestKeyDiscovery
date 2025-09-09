@@ -12,7 +12,7 @@ Binding 0:
       "test_keydiscovery_608585"
     ],
     "collection": {
-      "name": "acmeCo/test/test_keydiscovery_608585",
+      "name": "acmeCo/test/test/keydiscovery_608585",
       "read_schema_json": {
         "type": "object",
         "required": [

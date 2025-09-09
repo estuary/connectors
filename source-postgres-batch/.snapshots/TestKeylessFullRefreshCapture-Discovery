@@ -9,7 +9,7 @@ Binding 0:
       "test_keylessfullrefreshcapture_941246"
     ],
     "collection": {
-      "name": "acmeCo/test/test_keylessfullrefreshcapture_941246",
+      "name": "acmeCo/test/test/keylessfullrefreshcapture_941246",
       "read_schema_json": {
         "type": "object",
         "required": [

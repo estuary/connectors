@@ -11,7 +11,7 @@ Binding 0:
       "querytemplateoverride_638679"
     ],
     "collection": {
-      "name": "acmeCo/test/querytemplateoverride_638679",
+      "name": "acmeCo/test/public/querytemplateoverride_638679",
       "read_schema_json": {
         "type": "object",
         "required": [

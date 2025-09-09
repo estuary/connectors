@@ -9,7 +9,7 @@ Binding 0:
       "floatnans_198258"
     ],
     "collection": {
-      "name": "acmeCo/test/floatnans_198258",
+      "name": "acmeCo/test/public/floatnans_198258",
       "read_schema_json": {
         "type": "object",
         "required": [

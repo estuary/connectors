@@ -9,7 +9,7 @@ Binding 0:
       "featureflaguseschemainference_697727"
     ],
     "collection": {
-      "name": "acmeCo/test/featureflaguseschemainference_697727",
+      "name": "acmeCo/test/public/featureflaguseschemainference_697727",
       "read_schema_json": {
         "type": "object",
         "required": [

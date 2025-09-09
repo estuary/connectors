@@ -12,7 +12,7 @@ Binding 0:
       "test_geometrictypes_696406"
     ],
     "collection": {
-      "name": "acmeCo/test/test_geometrictypes_696406",
+      "name": "acmeCo/test/test/geometrictypes_696406",
       "read_schema_json": {
         "type": "object",
         "required": [

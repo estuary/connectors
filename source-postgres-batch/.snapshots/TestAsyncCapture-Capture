@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/test_asynccapture_817595": 250 Documents
+# Collection "acmeCo/test/test/asynccapture_817595": 250 Documents
 # ================================
 {"_meta":{"polled":"<TIMESTAMP>","index":999,"row_id":0,"source":{"resource":"test_asynccapture_817595","schema":"test","table":"asynccapture_817595"}},"data":"Value for row 0","id":0,"txid":999999}
 {"_meta":{"polled":"<TIMESTAMP>","index":999,"row_id":1,"source":{"resource":"test_asynccapture_817595","schema":"test","table":"asynccapture_817595"}},"data":"Value for row 1","id":1,"txid":999999}

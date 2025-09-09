@@ -12,7 +12,7 @@ Binding 0:
       "test_xmltype_831740"
     ],
     "collection": {
-      "name": "acmeCo/test/test_xmltype_831740",
+      "name": "acmeCo/test/test/xmltype_831740",
       "read_schema_json": {
         "type": "object",
         "required": [

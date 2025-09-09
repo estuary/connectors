@@ -9,7 +9,7 @@ Binding 0:
       "featureflagkeylessrowid_enabled_905157"
     ],
     "collection": {
-      "name": "acmeCo/test/featureflagkeylessrowid_enabled_905157",
+      "name": "acmeCo/test/public/featureflagkeylessrowid_enabled_905157",
       "read_schema_json": {
         "type": "object",
         "required": [

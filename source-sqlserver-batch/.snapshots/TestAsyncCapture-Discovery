@@ -12,7 +12,7 @@ Binding 0:
       "asynccapture_817595"
     ],
     "collection": {
-      "name": "acmeCo/test/asynccapture_817595",
+      "name": "acmeCo/test/dbo/asynccapture_817595",
       "read_schema_json": {
         "type": "object",
         "required": [

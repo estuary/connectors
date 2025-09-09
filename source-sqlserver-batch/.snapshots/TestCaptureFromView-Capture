@@ -1,5 +1,5 @@
 # ================================
-# Collection "acmeCo/test/capturefromview_194890": 26 Documents
+# Collection "acmeCo/test/dbo/capturefromview_194890": 26 Documents
 # ================================
 {"type":"object","required":["_meta","id","name","updated_at","visible"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-sqlserver-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"}},"additionalProperties":false,"type":"object","required":["polled","index","row_id"],"additionalProperties":false},"id":{"type":"integer"},"name":{"type":["string"]},"updated_at":{"format":"date-time","type":["string"]},"visible":{"type":["boolean"]}},"x-infer-schema":true}
 {"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0},"id":0,"name":"Row 0","updated_at":"2025-02-13T12:00:00Z","visible":true}
@@ -28,7 +28,7 @@
 {"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":21},"id":3,"name":"Row 3","updated_at":"2025-02-13T12:20:00Z","visible":true}
 {"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":22},"id":4,"name":"Row 4","updated_at":"2025-02-13T12:20:00Z","visible":false}
 # ================================
-# Collection "acmeCo/test/capturefromview_227836": 14 Documents
+# Collection "acmeCo/test/dbo/capturefromview_227836": 14 Documents
 # ================================
 {"type":"object","required":["_meta","id","name","updated_at"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-sqlserver-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"}},"additionalProperties":false,"type":"object","required":["polled","index","row_id"],"additionalProperties":false},"id":{"type":"integer"},"name":{"type":["string"]},"updated_at":{"format":"date-time","type":["string"]}},"x-infer-schema":true}
 {"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"op":"c"},"id":0,"name":"Row 0","updated_at":"2025-02-13T12:00:00Z"}

@@ -12,7 +12,7 @@ Binding 0:
       "test_numerictypes_559424"
     ],
     "collection": {
-      "name": "acmeCo/test/test_numerictypes_559424",
+      "name": "acmeCo/test/test/numerictypes_559424",
       "read_schema_json": {
         "type": "object",
         "required": [
