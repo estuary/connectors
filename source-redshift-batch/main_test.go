@@ -728,3 +728,23 @@ func TestNonexistentCursor(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+// TestSourceTag verifies the output of a capture with /advanced/source_tag set
+func TestSourceTag(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	cs.EndpointSpec.(*Config).Advanced.SourceTag = "example_source_tag_1234"
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data) VALUES (1, 'one'), (2, 'two')", tableName))
+		cs.Capture(ctx, t, nil)
+		executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s (id, data) VALUES (3, 'three'), (4, 'four')", tableName))
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
