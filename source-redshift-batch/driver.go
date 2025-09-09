@@ -108,12 +108,22 @@ func (r Resource) Validate() error {
 	return nil
 }
 
-// documentMetadata contains the source metadata located at /_meta
+// documentMetadata contains the metadata located at /_meta
 type documentMetadata struct {
 	Polled time.Time `json:"polled" jsonschema:"title=Polled Timestamp,description=The time at which the update query which produced this document as executed."`
 	Index  int       `json:"index" jsonschema:"title=Result Index,description=The index of this document within the query execution which produced it."`
 	RowID  int64     `json:"row_id" jsonschema:"title=Row ID,description=Row ID of the Document, counting up from zero."`
 	Op     string    `json:"op,omitempty" jsonschema:"title=Change Operation,description=Operation type (c: Create / u: Update / d: Delete),enum=c,enum=u,enum=d,default=u"`
+
+	Source documentSourceMetadata `json:"source"`
+}
+
+// documentSourceMetadata contains the source metadata located at /_meta/source
+type documentSourceMetadata struct {
+	Resource string `json:"resource" jsonschema:"description=Resource name of the binding from which this document was captured."`
+	Schema   string `json:"schema,omitempty" jsonschema:"description=Database schema from which the document was read."`
+	Table    string `json:"table,omitempty" jsonschema:"description=Database table from which the document was read."`
+	Tag      string `json:"tag,omitempty" jsonschema:"description=Optional 'Source Tag' property as defined in the endpoint configuration."`
 }
 
 // Spec returns metadata about the capture connector.
@@ -526,6 +536,12 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo, tmpl *template
 			RowID:  nextRowID,
 			Polled: pollTime,
 			Index:  count,
+			Source: documentSourceMetadata{
+				Resource: res.Name,
+				Schema:   res.SchemaName,
+				Table:    res.TableName,
+				Tag:      c.Config.Advanced.SourceTag,
+			},
 		}
 		if isRowIDKey {
 			// When the output key of a binding is the row ID, we can provide useful
