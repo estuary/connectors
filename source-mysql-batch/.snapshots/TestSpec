@@ -47,6 +47,11 @@
             "title": "Database Name",
             "description": "The name of database to connect to. In general this shouldn't matter. The connector can discover and capture from all databases it's authorized to access."
           },
+          "source_tag": {
+            "type": "string",
+            "title": "Source Tag",
+            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document."
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
