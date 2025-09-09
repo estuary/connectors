@@ -58,6 +58,13 @@ func TestApply(t *testing.T) {
 		return tableConfig{Table: path}
 	})
 }
+
+func TestMigration(t *testing.T) {
+	sql.RunMigrationTest(t, newDuckDriver(), "testdata/test-migrate.flow.yaml", func(path string) tableConfig {
+		return tableConfig{Table: path}
+	})
+}
+
 func TestValidateAndApplyMigrations(t *testing.T) {
 	ctx := context.Background()
 

@@ -59,14 +59,14 @@ const testTableIdentifer = "_flow_test_"
 func RunIntegrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	t *testing.T,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
-	source string,
+	sourcePath string,
 	finalResourchPathKey string,
 ) {
 	ctx := context.Background()
 
 	// Parse the bundled spec to extract the tasks and their bindings.
 	var parsed parsedSpec
-	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", source).CombinedOutput()
+	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
 	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(bundled, &parsed))
 
@@ -261,6 +261,127 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 	})
 
 	cupaloy.SnapshotT(t, snap.String())
+}
+
+func RunMigrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	driver Connector,
+	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	sourcePath string,
+	makeResourceFn func(finalResourcePathPart string) RC,
+) {
+	ctx := context.Background()
+	var snap strings.Builder
+
+	bundledSource, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
+	require.NoError(t, err)
+
+	bundledMigratedCollection, err := exec.Command("flowctl", "raw", "bundle", "--source", "../materialize-boilerplate/testdata/integration/migration-migrated-collection.flow.yaml").CombinedOutput()
+	require.NoError(t, err)
+
+	suffix := testTableIdentifer + fmt.Sprintf("%d", time.Now().Unix())
+
+	initialBundled := bundledSource
+	gjson.GetBytes(bundledSource, "materializations").ForEach(func(task, spec gjson.Result) bool {
+		taskName := task.String()
+		rawCfg := json.RawMessage(gjson.Get(spec.Raw, "endpoint.local.config").Raw)
+		decrypted := decryptConfig(t, rawCfg)
+
+		var cfg EC
+		require.NoError(t, unmarshalStrict(decrypted, &cfg))
+
+		materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
+		require.NoError(t, err)
+
+		table := "migration_initial_" + uuid.NewString()[:8] + suffix
+
+		var res RC
+		var testResourcePaths [][]string
+		t.Cleanup(func() { cleanupBySuffix(t, ctx, materializer, testResourcePaths, suffix) })
+
+		spec.Get("bindings").ForEach(func(_, binding gjson.Result) bool {
+			res = makeResourceFn(table).WithDefaults(cfg)
+			resCfgRaw, err := json.Marshal(res)
+			require.NoError(t, err)
+
+			path, _, err := res.Parameters()
+			require.NoError(t, err)
+			testResourcePaths = append(testResourcePaths, path)
+
+			initialBundled, err = sjson.SetBytes(
+				initialBundled,
+				fmt.Sprintf("materializations.%s.bindings.0.resource", taskName),
+				json.RawMessage(resCfgRaw),
+			)
+
+			return false // migration test spec should only have one binding
+		})
+
+		suffixedSource := filepath.Join(t.TempDir(), "test-migration-initial.flow.yaml")
+		require.NoError(t, os.WriteFile(suffixedSource, initialBundled, 0o600))
+		actionDescription := driveTask(t, ctx, false, suffixedSource, taskName, "../materialize-boilerplate/testdata/integration/fixture.migration-initial.json")
+
+		columnNames, rows, err := materializer.SnapshotTestResource(ctx, testResourcePaths[0])
+		require.NoError(t, err)
+		schema := dumpSchema(t, ctx, materializer, res)
+
+		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
+		snap.WriteString(actionDescription)
+		snap.WriteString("\n")
+		snap.WriteString(schema)
+		snap.WriteString("\n")
+		snap.WriteString(renderTestTableData(t, columnNames, rows))
+		snap.WriteString("\n")
+
+		// Swap out the collection, and then run it again with the other fixture.
+		gjson.GetBytes(bundledMigratedCollection, "collections").ForEach(func(collectionName, spec gjson.Result) bool {
+			initialBundled, err = sjson.SetBytes(initialBundled, fmt.Sprintf("collections.%s", collectionName.String()), spec.Value())
+			require.NoError(t, err)
+			return true
+		})
+
+		suffixedSource = filepath.Join(t.TempDir(), "test-migration-migrated.flow.yaml")
+		require.NoError(t, os.WriteFile(suffixedSource, initialBundled, 0o600))
+		actionDescription = driveTask(t, ctx, false, suffixedSource, taskName, "../materialize-boilerplate/testdata/integration/fixture.migration-migrated.json")
+
+		{
+			columnNames, rows, err := materializer.SnapshotTestResource(ctx, testResourcePaths[0])
+			require.NoError(t, err)
+			schema := dumpSchema(t, ctx, materializer, res)
+
+			snap.WriteString(actionDescription)
+			snap.WriteString("\n")
+			snap.WriteString(schema)
+			snap.WriteString("\n")
+			snap.WriteString(renderTestTableData(t, columnNames, rows))
+			snap.WriteString("\n")
+		}
+
+		if err := materializer.CleanupTestTask(ctx, taskName); err != nil {
+			t.Log("failed to clean up task", taskName)
+		}
+
+		return true
+	})
+
+	cupaloy.SnapshotT(t, snap.String())
+}
+
+func renderTestTableData(t *testing.T, columnNames []string, rows [][]any) string {
+	sorted, err := sortRows(columnNames, rows)
+	require.NoError(t, err)
+
+	var data strings.Builder
+	enc := json.NewEncoder(&data)
+	for _, r := range sorted {
+		doc := make(map[string]any, len(columnNames))
+		for i, col := range columnNames {
+			doc[col] = r[i]
+		}
+		require.NoError(t, enc.Encode(doc))
+	}
+
+	return data.String()
 }
 
 func decryptConfig(t *testing.T, cfg json.RawMessage) json.RawMessage {

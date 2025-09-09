@@ -1,0 +1,34 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/migration-base-collection.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-motherduck/s3:
+    endpoint:
+      local:
+        command:
+          - go
+          - run
+          - .
+        protobuf: true
+        config: config.s3.yaml
+    bindings: &bindings
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
+        exclude:
+          - durationToString # TODO(whb): Fix
+          - datetimeToString
+          - uuidToString
+
+  acmeCo/tests/materialize-motherduck/gcs:
+    endpoint:
+      local:
+        command:
+          - go
+          - run
+          - .
+        protobuf: true
+        config: config.gcs.yaml
+    bindings: *bindings
