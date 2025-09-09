@@ -112,10 +112,20 @@ func (r Resource) Validate() error {
 	return nil
 }
 
-// documentMetadata contains the source metadata located at /_meta
+// documentMetadata contains the metadata located at /_meta
 type documentMetadata struct {
 	Polled time.Time `json:"polled" jsonschema:"title=Polled Timestamp,description=The time at which the update query which produced this document as executed."`
 	Index  int       `json:"index" jsonschema:"title=Result Index,description=The index of this document within the query execution which produced it."`
+
+	Source documentSourceMetadata `json:"source"`
+}
+
+// documentSourceMetadata contains the source metadata located at /_meta/source
+type documentSourceMetadata struct {
+	Resource string `json:"resource" jsonschema:"description=Resource name of the binding from which this document was captured."`
+	Owner    string `json:"owner,omitempty" jsonschema:"description=The name of the owner of the table from which the document was read."`
+	Table    string `json:"table,omitempty" jsonschema:"description=Database table from which the document was read."`
+	Tag      string `json:"tag,omitempty" jsonschema:"description=Optional 'Source Tag' property as defined in the endpoint configuration."`
 }
 
 // Spec returns metadata about the capture connector.
@@ -537,6 +547,12 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 		rowValues[len(rowValues)-1] = &documentMetadata{
 			Polled: pollTime,
 			Index:  count,
+			Source: documentSourceMetadata{
+				Resource: res.Name,
+				Owner:    res.Owner,
+				Table:    res.TableName,
+				Tag:      c.Config.Advanced.SourceTag,
+			},
 		}
 
 		serializedDocument, err = shape.Encode(serializedDocument[:0], rowValues)
