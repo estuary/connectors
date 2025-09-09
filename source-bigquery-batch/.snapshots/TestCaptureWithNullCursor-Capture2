@@ -1,8 +1,8 @@
 # ================================
 # Collection "acmeCo/test/capturewithnullcursor_662607": 2 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"data":"Final value cursor 30","id":9,"sort_col":30}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99},"data":"Value with cursor 25","id":7,"sort_col":25}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithnullcursor_662607","schema":"testdata","table":"capturewithnullcursor_662607"}},"data":"Final value cursor 30","id":9,"sort_col":30}
+{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithnullcursor_662607","schema":"testdata","table":"capturewithnullcursor_662607"}},"data":"Value with cursor 25","id":7,"sort_col":25}
 # ================================
 # Final State Checkpoint
 # ================================
