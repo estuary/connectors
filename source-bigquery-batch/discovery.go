@@ -145,6 +145,9 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 	}
 	if fullWriteSchema {
 		metadataSchema.AdditionalProperties = nil
+		if sourceSchema, ok := metadataSchema.Properties.Get("source"); ok {
+			sourceSchema.AdditionalProperties = nil
+		}
 	} else {
 		metadataSchema.Extras["additionalProperties"] = false
 	}
