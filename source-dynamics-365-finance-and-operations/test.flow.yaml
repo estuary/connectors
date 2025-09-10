@@ -1,0 +1,15 @@
+captures:
+  acmeCo/source-dynamics-365-finance-and-operations:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_dynamics_365_finance_and_operations
+        config:
+          account_name: my_account_name
+          credentials:
+            credentials_title: SAS Token
+            sas_token: my_sas_token
+          filesystem: my_filesystem
+    bindings: []
