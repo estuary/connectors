@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -34,6 +35,11 @@ func TestIntegration(t *testing.T) {
 			Delta: delta,
 		}
 	}
+
+	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
+	t.Cleanup(func() {
+		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
+	})
 
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, newPostgresDriver(), "testdata/materialize.flow.yaml", makeResourceFn)
