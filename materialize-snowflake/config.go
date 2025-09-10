@@ -43,7 +43,7 @@ type advancedConfig struct {
 // `includeSchema`, to preserve legacy behavior where having the schema set on
 // the connection level is necessary for queries involving tables that don't
 // have the schema as part of their resource path.
-func (c config) toURI(tenant string, includeSchema bool) (string, error) {
+func (c config) toURI(includeSchema bool) (string, error) {
 	var uri = url.URL{
 		Host: c.Host + ":443",
 	}
@@ -55,7 +55,7 @@ func (c config) toURI(tenant string, includeSchema bool) (string, error) {
 	}
 
 	// Required params
-	queryParams.Add("application", fmt.Sprintf("%s_EstuaryFlow", tenant))
+	queryParams.Add("application", "EstuaryFlow")
 	queryParams.Add("database", c.Database)
 	// GO_QUERY_RESULT_FORMAT is json in order to enable stream downloading of load results.
 	queryParams.Add("GO_QUERY_RESULT_FORMAT", "json")

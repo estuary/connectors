@@ -39,7 +39,7 @@ func TestConfigURI(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			require.NoError(t, cfg.Validate())
-			uri, err := cfg.toURI("mytenant", true)
+			uri, err := cfg.toURI(true)
 			require.NoError(t, err)
 			cupaloy.SnapshotT(t, uri)
 		})
