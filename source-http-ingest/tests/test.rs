@@ -156,8 +156,7 @@ async fn run_http_request_processing(
                     b_docs += 1;
                 } else {
                     anyhow::bail!(
-                        "got document with unexpected binding {binding}: {}",
-                        doc_json
+                        "got document with unexpected binding {binding}: {doc_json:?}",
                     );
                 }
             }

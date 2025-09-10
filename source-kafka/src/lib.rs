@@ -39,8 +39,8 @@ pub async fn run_connector(
             let res = Response {
                 spec: Some(Spec {
                     protocol: 3032023,
-                    config_schema_json: serde_json::to_string(&schema_for::<EndpointConfig>())?,
-                    resource_config_schema_json: serde_json::to_string(&schema_for::<Resource>())?,
+                    config_schema_json: serde_json::to_string(&schema_for::<EndpointConfig>())?.into(),
+                    resource_config_schema_json: serde_json::to_string(&schema_for::<Resource>())?.into(),
                     documentation_url: "https://go.estuary.dev/source-kafka".to_string(),
                     oauth2: None,
                     resource_path_pointers: vec!["/topic".to_string()],
@@ -128,7 +128,7 @@ pub fn write_capture_response(
 }
 
 async fn do_validate(req: Validate) -> Result<Vec<ValidatedBinding>> {
-    let config: EndpointConfig = serde_json::from_str(&req.config_json)?;
+    let config: EndpointConfig = serde_json::from_slice(&req.config_json)?;
     let consumer = config.to_consumer().await?;
 
     consumer
@@ -153,7 +153,7 @@ async fn do_validate(req: Validate) -> Result<Vec<ValidatedBinding>> {
     req.bindings
         .iter()
         .map(|binding| {
-            let res: Resource = serde_json::from_str(&binding.resource_config_json)?;
+            let res: Resource = serde_json::from_slice(&binding.resource_config_json)?;
             Ok(ValidatedBinding {
                 resource_path: vec![res.topic],
             })

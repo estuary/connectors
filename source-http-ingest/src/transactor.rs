@@ -34,7 +34,7 @@ impl Emitter {
         use tokio::io::AsyncWriteExt;
 
         let resp = Response {
-            captured: Some(Captured { binding, doc_json }),
+            captured: Some(Captured { binding, doc_json: doc_json.into() }),
             ..Default::default()
         };
         let resp = serde_json::to_vec(&resp).context("serializing response")?;
@@ -47,11 +47,11 @@ impl Emitter {
     }
 
     pub async fn commit(&mut self, cp: &impl Serialize, merge_patch: bool) -> anyhow::Result<()> {
-        let updated_json = serde_json::to_string(cp).context("serializing driver checkpoint")?;
+        let updated_json = serde_json::to_vec(cp).context("serializing driver checkpoint")?;
         let resp = Response {
             checkpoint: Some(Checkpoint {
                 state: Some(ConnectorState {
-                    updated_json,
+                    updated_json: updated_json.into(),
                     merge_patch,
                 }),
             }),

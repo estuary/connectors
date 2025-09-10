@@ -17,7 +17,7 @@ pub async fn do_apply(req: Apply) -> Result<String> {
         .materialization
         .expect("must have a materialization spec");
 
-    let config: EndpointConfig = serde_json::from_str(&spec.config_json)?;
+    let config: EndpointConfig = serde_json::from_slice(&spec.config_json)?;
     let admin = config.to_admin()?;
     let admin_opts = AdminOptions::default().request_timeout(Some(KAFKA_TIMEOUT));
 
@@ -34,7 +34,7 @@ pub async fn do_apply(req: Apply) -> Result<String> {
         .bindings
         .iter()
         .map(|binding| {
-            let res: Resource = serde_json::from_str(&binding.resource_config_json)?;
+            let res: Resource = serde_json::from_slice(&binding.resource_config_json)?;
             Ok(res.topic)
         })
         .collect::<Result<Vec<String>>>()?;

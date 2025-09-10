@@ -14,7 +14,7 @@ use crate::{
 };
 
 pub async fn do_validate(req: Validate) -> Result<Vec<Binding>> {
-    let config: EndpointConfig = serde_json::from_str(&req.config_json)?;
+    let config: EndpointConfig = serde_json::from_slice(&req.config_json)?;
     config.validate()?;
     let producer = config.to_producer()?;
 
@@ -43,7 +43,7 @@ pub async fn do_validate(req: Validate) -> Result<Vec<Binding>> {
     req.bindings
         .iter()
         .map(|binding| {
-            let res: Resource = serde_json::from_str(&binding.resource_config_json)?;
+            let res: Resource = serde_json::from_slice(&binding.resource_config_json)?;
 
             Ok(Binding {
                 constraints: binding
@@ -61,6 +61,7 @@ pub async fn do_validate(req: Validate) -> Result<Vec<Binding>> {
                     .collect(),
                 resource_path: vec![res.topic],
                 delta_updates: true,
+                case_insensitive_fields: false,
                 ser_policy: Some(SerPolicy {
                     str_truncate_after: 1 << 16,
                     nested_obj_truncate_after: 1000,

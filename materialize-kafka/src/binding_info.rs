@@ -310,7 +310,7 @@ fn field_to_shape(
 
     if !inference.default_json.is_empty() {
         let val: serde_json::Value =
-            serde_json::from_str(&inference.default_json).expect("default must be valid JSON");
+            serde_json::from_slice(&inference.default_json).expect("default must be valid JSON");
         shape.default = Some(Box::new((val, None)));
     }
 

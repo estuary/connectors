@@ -24,7 +24,7 @@ use crate::{
 static KAFKA_INTERNAL_TOPICS: [&str; 3] = ["__consumer_offsets", "__amazon_msk_canary", "_schemas"];
 
 pub async fn do_discover(req: Discover) -> Result<Vec<discovered::Binding>> {
-    let config: EndpointConfig = serde_json::from_str(&req.config_json)?;
+    let config: EndpointConfig = serde_json::from_slice(&req.config_json)?;
     let consumer = config.to_consumer().await?;
 
     let meta = consumer
@@ -88,9 +88,9 @@ pub async fn do_discover(req: Discover) -> Result<Vec<discovered::Binding>> {
                 resource_config_json: serde_json::to_string(&Resource {
                     topic: topic.to_owned(),
                 })
-                .expect("resource config must serialize"),
+                .expect("resource config must serialize").into(),
                 document_schema_json: serde_json::to_string(&collection_schema)
-                    .expect("document schema must serialize"),
+                    .expect("document schema must serialize").into(),
                 key: key_ptrs,
                 resource_path: vec![topic.to_owned()],
                 ..Default::default()
@@ -305,7 +305,7 @@ fn avro_key_schema_to_shape(schema: &AvroSchema) -> Result<Shape> {
 }
 
 fn json_key_schema_to_shape(schema: &serde_json::Value) -> Result<Shape> {
-    let json_schema = doc::validation::build_bundle(&schema.to_string())?;
+    let json_schema = doc::validation::build_bundle(schema.to_string().as_bytes())?;
     let validator = doc::Validator::new(json_schema)?;
     Ok(doc::Shape::infer(
         &validator.schemas()[0],
@@ -413,11 +413,14 @@ mod tests {
                                 {"name": "firstKey", "type": "string", "doc": "the first key field"},
                                 {
                                     "name": "nestedRecord",
-                                    "type": "record",
-                                    "fields": [
-                                        {"name": "secondKeyNested", "type": "long", "doc": "the second key field"},
-                                        {"name": "thirdKeyNested", "type": "bytes", "doc": "the third key field"},
-                                    ],
+                                    "type": {
+                                        "type": "record",
+                                        "name": "NestedRecord",
+                                        "fields": [
+                                            {"name": "secondKeyNested", "type": "long", "doc": "the second key field"},
+                                            {"name": "thirdKeyNested", "type": "bytes", "doc": "the third key field"},
+                                        ]
+                                    }
                                 },
                             ],
                         }))

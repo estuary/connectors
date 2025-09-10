@@ -25,8 +25,8 @@ pub async fn run_connector(mut input: Input, mut output: Output) -> Result<()> {
             let res = Response {
                 spec: Some(Spec {
                     protocol: 3032023,
-                    config_schema_json: serde_json::to_string(&schema_for::<EndpointConfig>())?,
-                    resource_config_schema_json: serde_json::to_string(&schema_for::<Resource>())?,
+                    config_schema_json: serde_json::to_string(&schema_for::<EndpointConfig>())?.into(),
+                    resource_config_schema_json: serde_json::to_string(&schema_for::<Resource>())?.into(),
                     documentation_url: "https://go.estuary.dev/materialize-kafka".to_string(),
                     oauth2: None,
                 }),

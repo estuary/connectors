@@ -15,6 +15,7 @@ proto-flow = { git = "https://github.com/estuary/flow", features = [
 
 anyhow = "1.0"
 axum = "0.8"
+bytes = "1"
 futures = "0.3"
 http = "1.0"
 itertools = "0.13"

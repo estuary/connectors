@@ -26,6 +26,7 @@ fn test_spec() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_discover() {
     setup_test().await;
 
@@ -56,6 +57,7 @@ async fn test_discover() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_capture() {
     setup_test().await;
 
@@ -83,6 +85,7 @@ async fn test_capture() {
 }
 
 #[tokio::test]
+#[serial_test::serial]
 async fn test_capture_resume() {
     setup_test().await;
 
@@ -127,7 +130,16 @@ async fn test_capture_resume() {
 
     assert!(output.status.success());
 
-    let snap = std::str::from_utf8(&output.stdout).unwrap();
+    // Filter all but the last connectorState line, as they're non-deterministic:
+    // Messages across topics may be polled in any order, but the final state is consistent.
+    let lines: Vec<&str> = std::str::from_utf8(&output.stdout).unwrap().lines().collect();
+    let last_connector_idx = lines.iter().rposition(|l| l.starts_with(r#"["connectorState","#));
+    
+    let snap = lines.iter().enumerate()
+        .filter(|(i, l)| !l.starts_with(r#"["connectorState","#) || Some(*i) == last_connector_idx)
+        .map(|(_, l)| *l)
+        .collect::<Vec<_>>()
+        .join("\n");
 
     insta::assert_snapshot!(snap);
 }

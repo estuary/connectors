@@ -366,7 +366,7 @@ impl Handler {
 
             tracing::info!(%configured_path, collection = %binding.collection.name, "binding http url path to collection");
 
-            let schema_value = serde_json::from_str::<Value>(&binding.collection.write_schema_json)
+            let schema_value = serde_json::from_slice::<Value>(&binding.collection.write_schema_json)
                 .context("parsing write_schema_json")?;
             let schema = json::schema::build::build_schema(schema_uri(), &schema_value)?;
             // We must get the resolved uri after building the schema, since the one we pass in is
@@ -716,8 +716,8 @@ pub fn openapi_spec<'a>(
 /// and `$ref` fields, which are particularly troublesome. So this function
 /// simplifies the schema by first inferring a `Shape` from the collection
 /// schema, and then converting that back into a schema.
-fn parse_collection_schema(write_schema_json: &str) -> anyhow::Result<openapi::Schema> {
-    let parsed_schema: serde_json::Value = serde_json::from_str(write_schema_json)?;
+fn parse_collection_schema(write_schema_json: &[u8]) -> anyhow::Result<openapi::Schema> {
+    let parsed_schema: serde_json::Value = serde_json::from_slice(write_schema_json)?;
 
     let schema = json::schema::build::build_schema::<Annotation>(schema_uri(), &parsed_schema)?;
 
@@ -730,7 +730,7 @@ fn parse_collection_schema(write_schema_json: &str) -> anyhow::Result<openapi::S
     let simplified_schema = doc::shape::schema::to_schema(shape);
     let simplified_value = serde_json::to_value(simplified_schema)?;
 
-    let parsed: openapi::schema::Object = serde_json::from_value(simplified_value)?;
+    let parsed: openapi::schema::Object = serde_json::from_value(simplified_value).context("parsing openapi schema object")?;
     Ok(openapi::Schema::Object(parsed))
 }
 
@@ -857,7 +857,7 @@ mod test {
         // This is a typical schema that we'd see in practice. Note that it
         // includes a top-level $ref, which we'll expect gets transformed by
         // wrapping it in an `allOf`.
-        let schema_str = r##"{
+        let schema_str = br##"{
               "$defs": {
                 "flow://connector-schema": {
                   "$id": "flow://connector-schema",
@@ -899,7 +899,13 @@ mod test {
                   "x-infer-schema": true
                 }
               },
-              "$ref": "flow://connector-schema"
+              "$ref": "flow://connector-schema",
+              "reduce": {"strategy": "merge"},
+              "properties": {
+                "one": { "type": "string" },
+                "two": { "type": "object", "redact": {"strategy": "block" } },
+                "three": { "type": "string", "redact": {"strategy": "sha256" } }
+              }
             }"##;
 
         let parsed = parse_collection_schema(schema_str).unwrap();
@@ -944,6 +950,15 @@ mod test {
                   "description": "The id of the webhook request, which is automatically added by the connector"
                 }
               }
+            },
+            "one": {
+              "type": "string"
+            },
+            "three": {
+              "type": "string"
+            },
+            "two": {
+              "type": "object"
             }
           },
           "x-infer-schema": true

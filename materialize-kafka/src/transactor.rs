@@ -25,7 +25,7 @@ pub async fn run_transactions(input: &mut Input, output: &mut Output, open: Open
         .materialization
         .expect("must have a materialization spec");
 
-    let config: EndpointConfig = serde_json::from_str(&spec.config_json)?;
+    let config: EndpointConfig = serde_json::from_slice(&spec.config_json)?;
     let producer = config.to_producer()?;
     let producer_context = producer.context();
 
@@ -140,7 +140,7 @@ fn msg_for_store<'a>(
     if !doc_json.is_empty() {
         // The root document field, if selected, is always materialized as a
         // string.
-        converted_values.push(serde_json::Value::String(doc_json));
+        converted_values.push(serde_json::Value::String(String::from_utf8(doc_json.to_vec()).expect("doc_json must be valid UTF-8")));
     }
 
     Ok(match message_format {
