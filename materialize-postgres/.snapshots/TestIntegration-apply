@@ -1,5 +1,4 @@
-
---- Materialization: acmeCo/tests/materialize-postgres ---
+Task: acmeCo/tests/materialize-postgres
 
 Big Schema Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}

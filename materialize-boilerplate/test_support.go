@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
-	"golang.org/x/sync/errgroup"
 )
 
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/add-and-remove-many.flow.yaml
@@ -68,12 +67,12 @@ func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 	bundledSource, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
 	require.NoError(t, err)
 
-	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	gjson.GetBytes(bundledSource, "materializations").ForEach(func(task, _ gjson.Result) bool {
 		taskName := task.String()
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
-		snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundledSource, suffix, makeResourceFn))
+		snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundledSource, tsSuffix, makeResourceFn))
 
 		return true
 	})
@@ -87,18 +86,14 @@ func runMaterializationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Res
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
 	taskName string,
 	bundled []byte,
-	suffix string,
+	tsSuffix string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) string {
 	var snap strings.Builder
 
-	nameTrailer := "_" + uuid.NewString()[:8] + suffix
-	workingTaskName := taskName + nameTrailer
-
-	var cfg EC
-	rawCfg := json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
-	decrypted := decryptConfig(t, rawCfg)
-	require.NoError(t, unmarshalStrict(decrypted, &cfg))
+	rngSuffix := "_" + uuid.NewString()[:8] + tsSuffix
+	workingTaskName := taskName + rngSuffix
+	cfg := decryptConfig[EC](t, bundled, taskName)
 
 	materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
 	require.NoError(t, err)
@@ -110,7 +105,7 @@ func runMaterializationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Res
 		require.NoError(t, unmarshalStrict(json.RawMessage(gjson.Get(binding.Raw, "resource").Raw), &res))
 		path, deltaUpdates, err := res.WithDefaults(cfg).Parameters()
 		require.NoError(t, err)
-		lastPathPart := path[len(path)-1] + nameTrailer
+		lastPathPart := path[len(path)-1] + rngSuffix
 
 		res = makeResourceFn(lastPathPart, deltaUpdates).WithDefaults(cfg)
 		path, _, err = res.WithDefaults(cfg).Parameters()
@@ -140,27 +135,13 @@ func runMaterializationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Res
 	require.NoError(t, os.WriteFile(source, bundled, 0o600))
 
 	t.Cleanup(func() {
-		cleanupTestResources(t, ctx, materializer, testResourcePaths, suffix)
-		cleanupTestTasks(t, ctx, materializer, suffix)
+		cleanupTestResources(t, ctx, materializer, testResourcePaths, tsSuffix)
+		cleanupTestTasks(t, ctx, materializer, tsSuffix)
 	})
 
 	actionDescription := driveTask(t, ctx, true, source, workingTaskName, "../materialize-boilerplate/testdata/integration/fixture.json")
-	actionDescription = strings.ReplaceAll(actionDescription, nameTrailer, "")
 	for _, res := range snapshotResources {
-		path, _, err := res.Parameters()
-		require.NoError(t, err)
-		columnNames, rows, err := materializer.SnapshotTestResource(ctx, path)
-		require.NoError(t, err)
-		schema := dumpSchema(t, ctx, materializer, res)
-
-		snap.WriteString("Resource: " + strings.TrimSuffix(strings.Join(path, "."), nameTrailer))
-		snap.WriteString("\n")
-		snap.WriteString(actionDescription)
-		snap.WriteString("\n")
-		snap.WriteString(schema)
-		snap.WriteString("\n")
-		snap.WriteString(renderTestTableData(t, columnNames, rows))
-		snap.WriteString("\n")
+		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rngSuffix, true))
 	}
 
 	return snap.String()
@@ -179,22 +160,17 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
 	require.NoError(t, err)
 
-	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	gjson.GetBytes(bundled, "materializations").ForEach(func(key, value gjson.Result) bool {
-		rawCfg := json.RawMessage(gjson.Get(value.Raw, "endpoint.local.config").Raw)
-		decrypted := decryptConfig(t, rawCfg)
-
-		var cfg EC
-		require.NoError(t, unmarshalStrict(decrypted, &cfg))
-
+		cfg := decryptConfig[EC](t, bundled, key.String())
 		materializer, err := newMaterializer(ctx, key.String(), cfg, parseFlags(cfg))
 		require.NoError(t, err)
 
 		var testResourcePaths [][]string
-		t.Cleanup(func() { cleanupTestResources(t, ctx, materializer, testResourcePaths, suffix) })
+		t.Cleanup(func() { cleanupTestResources(t, ctx, materializer, testResourcePaths, tsSuffix) })
 
-		snap.WriteString("\n--- Materialization: " + key.String() + " ---\n\n")
+		snap.WriteString("Task: " + key.String() + "\n\n")
 
 		for _, tc := range []struct {
 			tableStartsWith string
@@ -219,7 +195,7 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 				},
 			},
 		} {
-			tableName := tc.tableStartsWith + uuid.NewString()[:8] + suffix
+			tableName := tc.tableStartsWith + uuid.NewString()[:8] + tsSuffix
 			res := makeResourceFn(tableName, false).WithDefaults(cfg)
 			resourcePath, _, err := res.Parameters()
 			require.NoError(t, err)
@@ -269,18 +245,14 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 ) string {
 	var snap strings.Builder
 
-	nameTrailer := "_" + uuid.NewString()[:8] + suffix
-	workingTableName := "migration_test" + nameTrailer
-	workingTaskName := taskName + nameTrailer
+	rngSuffix := "_" + uuid.NewString()[:8] + suffix
+	workingTableName := "migration_test" + rngSuffix
+	workingTaskName := taskName + rngSuffix
 
 	bundledMigratedCollection, err := exec.Command("flowctl", "raw", "bundle", "--source", "../materialize-boilerplate/testdata/integration/migration-migrated-collection.flow.yaml").CombinedOutput()
 	require.NoError(t, err)
 
-	var cfg EC
-	rawCfg := json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
-	decrypted := decryptConfig(t, rawCfg)
-	require.NoError(t, unmarshalStrict(decrypted, &cfg))
-
+	cfg := decryptConfig[EC](t, bundled, taskName)
 	materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
 	require.NoError(t, err)
 
@@ -307,11 +279,12 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 	initialSource := filepath.Join(t.TempDir(), "test-migration-initial.flow.yaml")
 	require.NoError(t, os.WriteFile(initialSource, bundled, 0o600))
 
-	// TODO: Clean up, verify length is one and do it that way
-	gjson.GetBytes(bundledMigratedCollection, "collections").ForEach(func(collectionName, spec gjson.Result) bool {
+	collections := gjson.GetBytes(bundledMigratedCollection, "collections")
+	require.Len(t, collections.Map(), 1)
+	collections.ForEach(func(collectionName, spec gjson.Result) bool {
 		bundled, err = sjson.SetBytes(bundled, fmt.Sprintf("collections.%s", collectionName.String()), spec.Value())
 		require.NoError(t, err)
-		return true
+		return false
 	})
 
 	migratedSource := filepath.Join(t.TempDir(), "test-migration-migrated.flow.yaml")
@@ -325,34 +298,44 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 		cleanupTestTasks(t, ctx, materializer, suffix)
 	})
 
-	{
-		actionDescription := driveTask(t, ctx, false, initialSource, workingTaskName, "../materialize-boilerplate/testdata/integration/fixture.migration-initial.json")
-		actionDescription = strings.ReplaceAll(actionDescription, nameTrailer, "")
-
-		columnNames, rows, err := materializer.SnapshotTestResource(ctx, path)
-		require.NoError(t, err)
-		schema := dumpSchema(t, ctx, materializer, res)
-
-		snap.WriteString(actionDescription)
-		snap.WriteString("\n")
-		snap.WriteString(schema)
-		snap.WriteString("\n")
-		snap.WriteString(renderTestTableData(t, columnNames, rows))
-		snap.WriteString("\n")
+	for _, tc := range []struct{ source, fixture string }{
+		{source: initialSource, fixture: "../materialize-boilerplate/testdata/integration/fixture.migration-initial.json"},
+		{source: migratedSource, fixture: "../materialize-boilerplate/testdata/integration/fixture.migration-migrated.json"},
+	} {
+		actionDescription := driveTask(t, ctx, false, tc.source, workingTaskName, tc.fixture)
+		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rngSuffix, true))
 	}
 
-	{
-		actionDescription := driveTask(t, ctx, false, migratedSource, workingTaskName, "../materialize-boilerplate/testdata/integration/fixture.migration-migrated.json")
-		actionDescription = strings.ReplaceAll(actionDescription, nameTrailer, "")
+	return snap.String()
+}
 
-		columnNames, rows, err := materializer.SnapshotTestResource(ctx, path)
+func snapshotTestTable[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	m Materializer[EC, FC, RC, MT],
+	res RC,
+	actionDescription string,
+	rngSuffix string,
+	withTableData bool,
+) string {
+	t.Helper()
+
+	var snap strings.Builder
+
+	path, _, err := res.Parameters()
+	require.NoError(t, err)
+
+	schema := dumpSchema(t, ctx, m, res)
+
+	snap.WriteString("Resource: " + strings.TrimSuffix(strings.Join(path, "."), rngSuffix))
+	snap.WriteString("\n")
+	snap.WriteString(strings.ReplaceAll(actionDescription, rngSuffix, ""))
+	snap.WriteString("\n")
+	snap.WriteString(schema)
+	snap.WriteString("\n")
+	if withTableData {
+		columnNames, rows, err := m.SnapshotTestResource(ctx, path)
 		require.NoError(t, err)
-		schema := dumpSchema(t, ctx, materializer, res)
-
-		snap.WriteString(actionDescription)
-		snap.WriteString("\n")
-		snap.WriteString(schema)
-		snap.WriteString("\n")
 		snap.WriteString(renderTestTableData(t, columnNames, rows))
 		snap.WriteString("\n")
 	}
@@ -377,32 +360,28 @@ func renderTestTableData(t *testing.T, columnNames []string, rows [][]any) strin
 	return data.String()
 }
 
-func decryptConfig(t *testing.T, cfg json.RawMessage) json.RawMessage {
+func decryptConfig[EC EndpointConfiger](t *testing.T, bundled []byte, taskName string) EC {
 	t.Helper()
 
-	// Check for sops metadata. If none, return the config as-is, assuming it is
-	// not encrypted, as would be the case for local test configs.
-	type skimCfg struct {
-		Sops json.RawMessage `json:"sops"`
-	}
-	var skim skimCfg
-	require.NoError(t, json.Unmarshal(cfg, &skim))
-	if len(skim.Sops) == 0 {
-		return cfg
+	raw := json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
+	if gjson.GetBytes(raw, "sops").Exists() {
+		// Decrypt with sops and strip _sops suffixes.
+		sopsCmd := exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
+		jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+		sopsCmd.Stdin = bytes.NewReader(raw)
+		var err error
+		jqCmd.Stdin, err = sopsCmd.StdoutPipe()
+		require.NoError(t, err)
+		require.NoError(t, sopsCmd.Start())
+		raw, err = jqCmd.Output()
+		require.NoError(t, err)
+		require.NoError(t, sopsCmd.Wait())
 	}
 
-	sopsCmd := exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
-	jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
-	sopsCmd.Stdin = bytes.NewReader(cfg)
-	var err error
-	jqCmd.Stdin, err = sopsCmd.StdoutPipe()
-	require.NoError(t, err)
-	require.NoError(t, sopsCmd.Start())
-	decryptedConfig, err := jqCmd.Output()
-	require.NoError(t, err)
-	require.NoError(t, sopsCmd.Wait())
+	var out EC
+	require.NoError(t, unmarshalStrict(raw, &out))
 
-	return decryptedConfig
+	return out
 }
 
 func driveTask(t *testing.T, ctx context.Context, outputState bool, source, name, fixturePath string) string {
@@ -449,8 +428,6 @@ func driveTask(t *testing.T, ctx context.Context, outputState bool, source, name
 
 	select {
 	case <-ctx.Done():
-		// Early exit on context cancellation, which would arise from a failure
-		// of one of the other configured tasks.
 		t.Fatal(ctx.Err())
 	case <-stdoutOp.Done():
 	}
@@ -504,37 +481,37 @@ func runBigSchemaApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 	fixture := loadSpec(t, "big-schema.flow.proto")
 
 	// Initial validation with no previously existing table.
-	validateRes, err := driver.Validate(ctx, ValidateReq(fixture, nil, configJson, resourceConfigJson))
+	validateRes, err := driver.Validate(ctx, validateReq(fixture, nil, configJson, resourceConfigJson))
 	require.NoError(t, err)
 
 	snap.WriteString("Big Schema Initial Constraints:\n")
-	snap.WriteString(SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
 	// Initial apply with no previously existing table.
-	_, err = driver.Apply(ctx, ApplyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
+	_, err = driver.Apply(ctx, applyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
 
 	sch := dumpSchema(t, ctx, m, res)
 
 	// Validate again.
-	validateRes, err = driver.Validate(ctx, ValidateReq(fixture, fixture, configJson, resourceConfigJson))
+	validateRes, err = driver.Validate(ctx, validateReq(fixture, fixture, configJson, resourceConfigJson))
 	require.NoError(t, err)
 
 	snap.WriteString("\nBig Schema Re-validated Constraints:\n")
-	snap.WriteString(SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
 	// Apply again - this should be a no-op.
-	_, err = driver.Apply(ctx, ApplyReq(fixture, fixture, configJson, resourceConfigJson, validateRes, true))
+	_, err = driver.Apply(ctx, applyReq(fixture, fixture, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
 	require.Equal(t, sch, dumpSchema(t, ctx, m, res))
 
 	// Validate with most of the field types changed somewhat randomly.
 	changed := loadSpec(t, "big-schema-changed.flow.proto")
-	validateRes, err = driver.Validate(ctx, ValidateReq(changed, fixture, configJson, resourceConfigJson))
+	validateRes, err = driver.Validate(ctx, validateReq(changed, fixture, configJson, resourceConfigJson))
 	require.NoError(t, err)
 
 	snap.WriteString("\nBig Schema Changed Types Constraints:\n")
-	snap.WriteString(SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
 	snap.WriteString("\nBig Schema Materialized Resource Schema With All Fields Required:\n")
 	snap.WriteString(sch)
@@ -542,15 +519,15 @@ func runBigSchemaApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 	// Validate and apply the schema with all fields removed from required and snapshot the
 	// table output.
 	nullable := loadSpec(t, "big-schema-nullable.flow.proto")
-	validateRes, err = driver.Validate(ctx, ValidateReq(nullable, fixture, configJson, resourceConfigJson))
+	validateRes, err = driver.Validate(ctx, validateReq(nullable, fixture, configJson, resourceConfigJson))
 	require.NoError(t, err)
 
-	_, err = driver.Apply(ctx, ApplyReq(nullable, fixture, configJson, resourceConfigJson, validateRes, true))
+	_, err = driver.Apply(ctx, applyReq(nullable, fixture, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
 
 	// A second apply of the nullable schema should be a no-op.
 	sch = dumpSchema(t, ctx, m, res)
-	_, err = driver.Apply(ctx, ApplyReq(nullable, nullable, configJson, resourceConfigJson, validateRes, true))
+	_, err = driver.Apply(ctx, applyReq(nullable, nullable, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
 	require.Equal(t, sch, dumpSchema(t, ctx, m, res))
 
@@ -559,13 +536,13 @@ func runBigSchemaApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 
 	// Apply the spec with the randomly changed types, but this time with a backfill.
 	changed.Bindings[0].Backfill = 1
-	validateRes, err = driver.Validate(ctx, ValidateReq(changed, nullable, configJson, resourceConfigJson))
+	validateRes, err = driver.Validate(ctx, validateReq(changed, nullable, configJson, resourceConfigJson))
 	require.NoError(t, err)
 
 	snap.WriteString("\nBig Schema Changed Types With Backfill Constraints:\n")
-	snap.WriteString(SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
+	snap.WriteString(snapshotConstraints(t, validateRes.Bindings[0].Constraints))
 
-	_, err = driver.Apply(ctx, ApplyReq(changed, nullable, configJson, resourceConfigJson, validateRes, true))
+	_, err = driver.Apply(ctx, applyReq(changed, nullable, configJson, resourceConfigJson, validateRes, true))
 	require.NoError(t, err)
 	snap.WriteString("\nBig Schema Materialized Resource Schema Changed Types With Backfill:\n")
 	snap.WriteString(dumpSchema(t, ctx, m, res) + "\n")
@@ -610,15 +587,15 @@ func runAddAndRemoveFieldsApplyTests[EC EndpointConfiger, FC FieldConfiger, RC R
 		initial := loadSpec(t, "base.flow.proto")
 
 		// Validate and Apply the base spec.
-		validateRes, err := driver.Validate(ctx, ValidateReq(initial, nil, configJson, resourceConfigJson))
+		validateRes, err := driver.Validate(ctx, validateReq(initial, nil, configJson, resourceConfigJson))
 		require.NoError(t, err)
-		_, err = driver.Apply(ctx, ApplyReq(initial, nil, configJson, resourceConfigJson, validateRes, true))
+		_, err = driver.Apply(ctx, applyReq(initial, nil, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 
 		// Validate and Apply the updated spec.
-		validateRes, err = driver.Validate(ctx, ValidateReq(tt.newSpec, initial, configJson, resourceConfigJson))
+		validateRes, err = driver.Validate(ctx, validateReq(tt.newSpec, initial, configJson, resourceConfigJson))
 		require.NoError(t, err)
-		_, err = driver.Apply(ctx, ApplyReq(tt.newSpec, initial, configJson, resourceConfigJson, validateRes, true))
+		_, err = driver.Apply(ctx, applyReq(tt.newSpec, initial, configJson, resourceConfigJson, validateRes, true))
 		require.NoError(t, err)
 
 		snap.WriteString(tt.name + ":\n")
@@ -645,9 +622,9 @@ func runChallengingNamesApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Res
 	// any columns. This makes sure we are able to read back the schema we have created
 	// correctly.
 	for range 2 {
-		validateRes, err := driver.Validate(ctx, ValidateReq(fixture, nil, configJson, resourceConfigJson))
+		validateRes, err := driver.Validate(ctx, validateReq(fixture, nil, configJson, resourceConfigJson))
 		require.NoError(t, err)
-		_, err = driver.Apply(ctx, ApplyReq(fixture, nil, configJson, resourceConfigJson, validateRes, false))
+		_, err = driver.Apply(ctx, applyReq(fixture, nil, configJson, resourceConfigJson, validateRes, false))
 		require.NoError(t, err)
 	}
 
@@ -657,7 +634,7 @@ func runChallengingNamesApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Res
 
 // validateReq makes a mock Validate request object from a built spec fixture. It only works with a
 // single binding.
-func ValidateReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage) *pm.Request_Validate {
+func validateReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage) *pm.Request_Validate {
 	req := &pm.Request_Validate{
 		Name:          spec.Name,
 		ConnectorType: spec.ConnectorType,
@@ -675,7 +652,7 @@ func ValidateReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec,
 }
 
 // applyReq conjures a pm.Request_Apply from a spec and validate response.
-func ApplyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage, validateRes *pm.Response_Validated, includeOptional bool) *pm.Request_Apply {
+func applyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, config json.RawMessage, resourceConfig json.RawMessage, validateRes *pm.Response_Validated, includeOptional bool) *pm.Request_Apply {
 	spec.ConfigJson = config
 	spec.Bindings[0].ResourceConfigJson = resourceConfig
 	spec.Bindings[0].ResourcePath = validateRes.Bindings[0].ResourcePath
@@ -724,7 +701,7 @@ func selectedFields(binding *pm.Response_Validated_Binding, collection pf.Collec
 
 // snapshotConstraints makes a compact string representation of a set of constraints, with one
 // constraint printed per line.
-func SnapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Constraint) string {
+func snapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Constraint) string {
 	t.Helper()
 
 	type constraintRow struct {
@@ -761,7 +738,7 @@ func cleanupTestTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	t *testing.T,
 	ctx context.Context,
 	m Materializer[EC, FC, RC, MT],
-	suffix string,
+	tsSuffix string,
 ) {
 	t.Helper()
 
@@ -769,30 +746,14 @@ func cleanupTestTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	require.NoError(t, err)
 	now := time.Now()
 	for _, task := range tasks {
-		if !strings.Contains(task, testItemIdentifier) {
-			// Not a test table.
-		} else if strings.HasSuffix(task, suffix) {
-			// This resource was created by this test run.
+		if shouldCleanup(t, now, task, tsSuffix) {
 			if err := m.CleanupTestTask(ctx, task); err != nil {
-				t.Log("failed to clean up test item", t, err)
+				t.Log("failed to clean up task", err)
 			} else {
-				t.Log("cleaned up test item", task)
-			}
-		} else if parts := strings.Split(task, "_"); len(parts) < 2 {
-			t.Log("malformed test item name", t)
-		} else if seconds, err := strconv.Atoi(parts[len(parts)-1]); err != nil {
-			t.Log("failed to parse timestamp from test item name", t, err)
-		} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 5*time.Minute {
-			t.Log("will cleanup old test item", task)
-			if err := m.CleanupTestTask(ctx, task); err != nil {
-				t.Log("failed to clean up test task", t, err)
-			} else {
-				t.Log("cleaned up test item", task)
+				t.Log("cleaned up task", task)
 			}
 		}
-
 	}
-
 }
 
 func cleanupTestResources[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
@@ -800,54 +761,43 @@ func cleanupTestResources[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC
 	ctx context.Context,
 	m Materializer[EC, FC, RC, MT],
 	paths [][]string,
-	suffix string,
+	tsSuffix string,
 ) {
 	t.Helper()
 
-	now := time.Now()
-	var toCleanup [][]string
-
 	is := initInfoSchema(m.Config())
-	if err := m.PopulateInfoSchema(ctx, is, paths, true); err != nil {
-		// Couldn't list existing resources for some reason. At least try to
-		// clean up the paths that were passed in.
-		toCleanup = paths
-		t.Log("failed to populate info schema for cleanup", err)
-	} else {
-		for _, r := range is.resources {
-			last := r.location[len(r.location)-1]
-			if !strings.Contains(last, testItemIdentifier) {
-				// Not a test table.
-			} else if strings.HasSuffix(last, suffix) {
-				// This resource was created by this test run.
-				toCleanup = append(toCleanup, r.location)
-			} else if parts := strings.Split(last, "_"); len(parts) < 2 {
-				t.Log("malformed test table name", last)
-			} else if seconds, err := strconv.Atoi(parts[len(parts)-1]); err != nil {
-				t.Log("failed to parse timestamp from test table name", last, err)
-			} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 6*time.Hour {
-				t.Log("will cleanup old test table", r.location)
-				toCleanup = append(toCleanup, r.location)
+	require.NoError(t, m.PopulateInfoSchema(ctx, is, paths, true))
+	now := time.Now()
+
+	for _, r := range is.resources {
+		if shouldCleanup(t, now, r.location[len(r.location)-1], tsSuffix) {
+			_, fn, err := m.DeleteResource(ctx, r.location)
+			require.NoError(t, err)
+
+			if err := fn(ctx); err != nil {
+				t.Log("failed to clean up resource", err)
+			} else {
+				t.Log("cleaned up resource", r.location)
 			}
 		}
 	}
+}
 
-	var group errgroup.Group
-	for _, path := range toCleanup {
-		group.Go(func() error {
-			if _, fn, err := m.DeleteResource(ctx, path); err != nil {
-				return err
-			} else if err := fn(ctx); err != nil {
-				t.Log("failed to clean up resource", path, err)
-				return nil
-			}
-
-			t.Log("cleaned up resource", path)
-			return nil
-		})
+func shouldCleanup(t *testing.T, now time.Time, item string, suffix string) bool {
+	if !strings.Contains(item, testItemIdentifier) {
+		return false
+	} else if strings.HasSuffix(item, suffix) {
+		return true
+	} else if parts := strings.Split(item, "_"); len(parts) < 2 {
+		t.Log("malformed test item name")
+	} else if seconds, err := strconv.Atoi(parts[len(parts)-1]); err != nil {
+		t.Log("failed to parse timestamp from test item name", item, err)
+	} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 5*time.Minute {
+		t.Log("will cleanup old test item", item)
+		return true
 	}
 
-	require.NoError(t, group.Wait())
+	return false
 }
 
 func dumpSchema[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](

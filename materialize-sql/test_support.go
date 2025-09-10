@@ -5,10 +5,8 @@ import (
 	"context"
 	stdsql "database/sql"
 	"embed"
-	"encoding/json"
 	"fmt"
 	"math"
-	"path/filepath"
 	"strings"
 	"testing"
 	"text/template"
@@ -298,88 +296,6 @@ func RunSqlGenTests(
 	}
 
 	return &snap, tables
-}
-
-//go:generate ../materialize-boilerplate/testdata/generate-spec-proto.sh testdata/validate/base.flow.yaml
-//go:generate ../materialize-boilerplate/testdata/generate-spec-proto.sh testdata/validate/migratable-changes.flow.yaml
-
-//go:embed testdata/validate/generated_specs
-var validateFS embed.FS
-
-func loadValidateSpec(t *testing.T, path string) *pf.MaterializationSpec {
-	t.Helper()
-
-	specBytes, err := validateFS.ReadFile(filepath.Join("testdata/validate/generated_specs", path))
-	require.NoError(t, err)
-	var spec pf.MaterializationSpec
-	require.NoError(t, spec.Unmarshal(specBytes))
-
-	return &spec
-}
-
-func RunValidateAndApplyMigrationsTests(
-	t *testing.T,
-	driver boilerplate.Connector,
-	config any,
-	resourceConfig any,
-	dumpSchema func(t *testing.T) string,
-	insertData func(t *testing.T, cols []string, values []string),
-	dumpData func(t *testing.T) string,
-	cleanup func(t *testing.T),
-) {
-	ctx := context.Background()
-	var snap strings.Builder
-
-	configJson, err := json.Marshal(config)
-	require.NoError(t, err)
-
-	resourceConfigJson, err := json.Marshal(resourceConfig)
-	require.NoError(t, err)
-
-	t.Run("validate and apply migratable type changes", func(t *testing.T) {
-		defer cleanup(t)
-
-		fixture := loadValidateSpec(t, "base.flow.proto")
-
-		// Initial validation with no previously existing table.
-		validateRes, err := driver.Validate(ctx, boilerplate.ValidateReq(fixture, nil, configJson, resourceConfigJson))
-		require.NoError(t, err)
-
-		snap.WriteString("Base Initial Constraints:\n")
-		snap.WriteString(boilerplate.SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
-
-		// Initial apply with no previously existing table.
-		_, err = driver.Apply(ctx, boilerplate.ApplyReq(fixture, nil, configJson, resourceConfigJson, validateRes, true))
-		require.NoError(t, err)
-
-		insertData(t,
-			[]string{"key", "scalarValue", "numericString", "dateValue", "datetimeValue", "timeValue", "int64", "requiredNumeric", "stringWidenedToJson", "intWidenedToJson", "boolWidenedToJson", "intToNumber", "int64ToNumber"},
-			[]string{"'1'", "'test'", "123", "'2024-01-01'", "'2024-01-01 01:01:01.111111111'", "'01:01:01'", "1", "456", "'hello'", "999", "true", "9223372036854775807", "10000000000000000000"})
-
-		snap.WriteString("\nMigratable Changes Before Apply Schema:\n")
-		snap.WriteString(dumpSchema(t) + "\n")
-		snap.WriteString("\nMigratable Changes Before Apply Data:\n")
-		snap.WriteString(dumpData(t) + "\n")
-
-		// Validate with migratable changes
-		changed := loadValidateSpec(t, "migratable-changes.flow.proto")
-		validateRes, err = driver.Validate(ctx, boilerplate.ValidateReq(changed, fixture, configJson, resourceConfigJson))
-		require.NoError(t, err)
-
-		snap.WriteString("\nMigratable Changes Constraints:\n")
-		snap.WriteString(boilerplate.SnapshotConstraints(t, validateRes.Bindings[0].Constraints))
-
-		_, err = driver.Apply(ctx, boilerplate.ApplyReq(changed, fixture, configJson, resourceConfigJson, validateRes, true))
-		require.NoError(t, err)
-
-		snap.WriteString("\nMigratable Changes Applied Schema:\n")
-		snap.WriteString(dumpSchema(t) + "\n")
-
-		snap.WriteString("\nMigratable Changes Applied Data:\n")
-		snap.WriteString(dumpData(t) + "\n")
-	})
-
-	cupaloy.SnapshotT(t, snap.String())
 }
 
 func DumpTestTable(t *testing.T, db *stdsql.DB, qualifiedTableName string) (string, error) {
