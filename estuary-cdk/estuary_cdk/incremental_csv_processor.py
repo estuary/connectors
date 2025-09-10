@@ -147,10 +147,7 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
 
         try:
             row_data = await self._row_iterator.__anext__()
-            if self.validation_context:
-                return self.streamed_item_cls.model_validate(row_data, context=self.validation_context)
-            else:
-                return self.streamed_item_cls.model_validate(row_data)
+            return self.streamed_item_cls.model_validate(row_data, context=self.validation_context)
         except StopAsyncIteration:
             raise
 
