@@ -2,12 +2,12 @@ package iam
 
 import (
 	"errors"
+
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/invopop/jsonschema"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
+	"github.com/invopop/jsonschema"
 )
-
 
 type AuthType string
 
@@ -18,7 +18,7 @@ const (
 )
 
 type AWSConfig struct {
-	AWSRegion string `json:"aws_region" jsonschema:"title=AWS Region,description=AWS Region of your database"`
+	AWSRegion string `json:"aws_region" jsonschema:"title=AWS Region,description=AWS Region of your resource"`
 	AWSRole   string `json:"aws_role_arn" jsonschema:"title=AWS Role ARN,description=AWS Role which has access to the resource which will be assumed by Flow"`
 }
 
@@ -39,7 +39,7 @@ type AWSTokens struct {
 }
 
 type GCPTokens struct {
-	GCPAccessToken  string `json:"gcp_access_token,omitempty"`
+	GCPAccessToken string `json:"gcp_access_token,omitempty"`
 }
 
 type AzureTokens struct {
@@ -131,7 +131,7 @@ func (IAMConfig) OneOfSubSchemas() []schemagen.OneOfSubSchemaT {
 
 func (c IAMConfig) JSONSchema() *jsonschema.Schema {
 	schema := schemagen.OneOfSchema("Authentication", "", "auth_type", string(AWSIAM),
-		c.OneOfSubSchemas()...
+		c.OneOfSubSchemas()...,
 	)
 
 	return schema

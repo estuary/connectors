@@ -73,7 +73,7 @@
               "aws_region": {
                 "type": "string",
                 "title": "AWS Region",
-                "description": "AWS Region of your database"
+                "description": "AWS Region of your resource"
               },
               "aws_role_arn": {
                 "type": "string",
