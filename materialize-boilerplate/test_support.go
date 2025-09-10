@@ -263,9 +263,111 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 	cupaloy.SnapshotT(t, snap.String())
 }
 
+func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	taskName string,
+	bundled []byte,
+	suffix string,
+	makeResourceFn func(finalResourcePathPart string) RC,
+) string {
+	var snap strings.Builder
+
+	nameTrailer := "_" + uuid.NewString()[:8] + suffix
+	workingTableName := "migration_test" + nameTrailer
+	workingTaskName := taskName + nameTrailer
+
+	bundledMigratedCollection, err := exec.Command("flowctl", "raw", "bundle", "--source", "../materialize-boilerplate/testdata/integration/migration-migrated-collection.flow.yaml").CombinedOutput()
+	require.NoError(t, err)
+
+	var cfg EC
+	rawCfg := json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
+	decrypted := decryptConfig(t, rawCfg)
+	require.NoError(t, unmarshalStrict(decrypted, &cfg))
+
+	materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
+	require.NoError(t, err)
+
+	bindings := gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.bindings", taskName)).Array()
+	require.Equal(t, 1, len(bindings))
+
+	res := makeResourceFn(workingTableName).WithDefaults(cfg)
+	resCfgRaw, err := json.Marshal(res)
+	require.NoError(t, err)
+
+	bundled, err = sjson.SetBytes(
+		bundled,
+		fmt.Sprintf("materializations.%s.bindings.0.resource", taskName),
+		json.RawMessage(resCfgRaw),
+	)
+
+	bundled, err = sjson.SetBytes(
+		bundled,
+		"materializations."+workingTaskName,
+		json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s", taskName)).Raw),
+	)
+	require.NoError(t, err)
+
+	initialSource := filepath.Join(t.TempDir(), "test-migration-initial.flow.yaml")
+	require.NoError(t, os.WriteFile(initialSource, bundled, 0o600))
+
+	// TODO: Clean up, verify length is one and do it that way
+	gjson.GetBytes(bundledMigratedCollection, "collections").ForEach(func(collectionName, spec gjson.Result) bool {
+		bundled, err = sjson.SetBytes(bundled, fmt.Sprintf("collections.%s", collectionName.String()), spec.Value())
+		require.NoError(t, err)
+		return true
+	})
+
+	migratedSource := filepath.Join(t.TempDir(), "test-migration-migrated.flow.yaml")
+	require.NoError(t, os.WriteFile(migratedSource, bundled, 0o600))
+
+	path, _, err := res.Parameters()
+	require.NoError(t, err)
+
+	t.Cleanup(func() {
+		cleanupBySuffix(t, ctx, materializer, [][]string{path}, suffix)
+		// materializer.CleanupTestTask(ctx, workingTaskName)
+	})
+
+	{
+		actionDescription := driveTask(t, ctx, false, initialSource, workingTaskName, "../materialize-boilerplate/testdata/integration/fixture.migration-initial.json")
+		actionDescription = strings.ReplaceAll(actionDescription, nameTrailer, "")
+
+		columnNames, rows, err := materializer.SnapshotTestResource(ctx, path)
+		require.NoError(t, err)
+		schema := dumpSchema(t, ctx, materializer, res)
+
+		snap.WriteString(actionDescription)
+		snap.WriteString("\n")
+		snap.WriteString(schema)
+		snap.WriteString("\n")
+		snap.WriteString(renderTestTableData(t, columnNames, rows))
+		snap.WriteString("\n")
+	}
+
+	{
+		actionDescription := driveTask(t, ctx, false, migratedSource, workingTaskName, "../materialize-boilerplate/testdata/integration/fixture.migration-migrated.json")
+		actionDescription = strings.ReplaceAll(actionDescription, nameTrailer, "")
+
+		columnNames, rows, err := materializer.SnapshotTestResource(ctx, path)
+		require.NoError(t, err)
+		schema := dumpSchema(t, ctx, materializer, res)
+
+		snap.WriteString(actionDescription)
+		snap.WriteString("\n")
+		snap.WriteString(schema)
+		snap.WriteString("\n")
+		snap.WriteString(renderTestTableData(t, columnNames, rows))
+		snap.WriteString("\n")
+	}
+
+	return snap.String()
+}
+
 func RunMigrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	t *testing.T,
-	driver Connector,
+	driver Connector, // TODO: Not used?
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string) RC,
@@ -276,90 +378,12 @@ func RunMigrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	bundledSource, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
 	require.NoError(t, err)
 
-	bundledMigratedCollection, err := exec.Command("flowctl", "raw", "bundle", "--source", "../materialize-boilerplate/testdata/integration/migration-migrated-collection.flow.yaml").CombinedOutput()
-	require.NoError(t, err)
-
 	suffix := testTableIdentifer + fmt.Sprintf("%d", time.Now().Unix())
 
-	initialBundled := bundledSource
-	gjson.GetBytes(bundledSource, "materializations").ForEach(func(task, spec gjson.Result) bool {
+	gjson.GetBytes(bundledSource, "materializations").ForEach(func(task, _ gjson.Result) bool {
 		taskName := task.String()
-		rawCfg := json.RawMessage(gjson.Get(spec.Raw, "endpoint.local.config").Raw)
-		decrypted := decryptConfig(t, rawCfg)
-
-		var cfg EC
-		require.NoError(t, unmarshalStrict(decrypted, &cfg))
-
-		materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
-		require.NoError(t, err)
-
-		table := "migration_initial_" + uuid.NewString()[:8] + suffix
-
-		var res RC
-		var testResourcePaths [][]string
-		t.Cleanup(func() { cleanupBySuffix(t, ctx, materializer, testResourcePaths, suffix) })
-
-		spec.Get("bindings").ForEach(func(_, binding gjson.Result) bool {
-			res = makeResourceFn(table).WithDefaults(cfg)
-			resCfgRaw, err := json.Marshal(res)
-			require.NoError(t, err)
-
-			path, _, err := res.Parameters()
-			require.NoError(t, err)
-			testResourcePaths = append(testResourcePaths, path)
-
-			initialBundled, err = sjson.SetBytes(
-				initialBundled,
-				fmt.Sprintf("materializations.%s.bindings.0.resource", taskName),
-				json.RawMessage(resCfgRaw),
-			)
-
-			return false // migration test spec should only have one binding
-		})
-
-		suffixedSource := filepath.Join(t.TempDir(), "test-migration-initial.flow.yaml")
-		require.NoError(t, os.WriteFile(suffixedSource, initialBundled, 0o600))
-		actionDescription := driveTask(t, ctx, false, suffixedSource, taskName, "../materialize-boilerplate/testdata/integration/fixture.migration-initial.json")
-
-		columnNames, rows, err := materializer.SnapshotTestResource(ctx, testResourcePaths[0])
-		require.NoError(t, err)
-		schema := dumpSchema(t, ctx, materializer, res)
-
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
-		snap.WriteString(actionDescription)
-		snap.WriteString("\n")
-		snap.WriteString(schema)
-		snap.WriteString("\n")
-		snap.WriteString(renderTestTableData(t, columnNames, rows))
-		snap.WriteString("\n")
-
-		// Swap out the collection, and then run it again with the other fixture.
-		gjson.GetBytes(bundledMigratedCollection, "collections").ForEach(func(collectionName, spec gjson.Result) bool {
-			initialBundled, err = sjson.SetBytes(initialBundled, fmt.Sprintf("collections.%s", collectionName.String()), spec.Value())
-			require.NoError(t, err)
-			return true
-		})
-
-		suffixedSource = filepath.Join(t.TempDir(), "test-migration-migrated.flow.yaml")
-		require.NoError(t, os.WriteFile(suffixedSource, initialBundled, 0o600))
-		actionDescription = driveTask(t, ctx, false, suffixedSource, taskName, "../materialize-boilerplate/testdata/integration/fixture.migration-migrated.json")
-
-		{
-			columnNames, rows, err := materializer.SnapshotTestResource(ctx, testResourcePaths[0])
-			require.NoError(t, err)
-			schema := dumpSchema(t, ctx, materializer, res)
-
-			snap.WriteString(actionDescription)
-			snap.WriteString("\n")
-			snap.WriteString(schema)
-			snap.WriteString("\n")
-			snap.WriteString(renderTestTableData(t, columnNames, rows))
-			snap.WriteString("\n")
-		}
-
-		if err := materializer.CleanupTestTask(ctx, taskName); err != nil {
-			t.Log("failed to clean up task", taskName)
-		}
+		snap.WriteString(runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundledSource, suffix, makeResourceFn))
 
 		return true
 	})
