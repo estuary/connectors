@@ -43,9 +43,9 @@ func TestIntegration(t *testing.T) {
 		sql.RunApplyTest(t, newPostgresDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
-	// t.Run("migrate", func(t *testing.T) {
-	// 	sql.RunMigrationTest(t, newPostgresDriver(), "testdata/migrate.flow.yaml", makeResourceFn)
-	// })
+	t.Run("migrate", func(t *testing.T) {
+		sql.RunMigrationTest(t, newPostgresDriver(), "testdata/migrate.flow.yaml", makeResourceFn)
+	})
 }
 
 func TestFencingCases(t *testing.T) {

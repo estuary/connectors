@@ -119,12 +119,13 @@ Big Schema Changed Types Constraints:
 {"Field":"stringUuidField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringUuidField' is already being materialized as endpoint type 'UUID' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
 
 Big Schema Materialized Resource Schema With All Fields Required:
-{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 {"Name":"arrayField","Nullable":false,"Type":"JSON"}
 {"Name":"boolField","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 {"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"intField","Nullable":false,"Type":"BIGINT"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"multipleField","Nullable":false,"Type":"JSON"}
 {"Name":"numField","Nullable":false,"Type":"DOUBLE"}
 {"Name":"objField","Nullable":false,"Type":"JSON"}
@@ -154,15 +155,15 @@ Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"stringUriReferenceField","Nullable":false,"Type":"VARCHAR"}
 {"Name":"stringUriTemplateField","Nullable":false,"Type":"VARCHAR"}
 {"Name":"stringUuidField","Nullable":false,"Type":"UUID"}
-{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 
 Big Schema Materialized Resource Schema With No Fields Required:
-{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 {"Name":"arrayField","Nullable":true,"Type":"JSON"}
 {"Name":"boolField","Nullable":true,"Type":"BOOLEAN"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 {"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"intField","Nullable":true,"Type":"BIGINT"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"multipleField","Nullable":true,"Type":"JSON"}
 {"Name":"numField","Nullable":true,"Type":"DOUBLE"}
 {"Name":"objField","Nullable":true,"Type":"JSON"}
@@ -192,7 +193,6 @@ Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"stringUriReferenceField","Nullable":true,"Type":"VARCHAR"}
 {"Name":"stringUriTemplateField","Nullable":true,"Type":"VARCHAR"}
 {"Name":"stringUuidField","Nullable":true,"Type":"UUID"}
-{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 
 Big Schema Changed Types With Backfill Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
@@ -234,12 +234,13 @@ Big Schema Changed Types With Backfill Constraints:
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
 Big Schema Materialized Resource Schema Changed Types With Backfill:
-{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 {"Name":"arrayField","Nullable":false,"Type":"JSON"}
 {"Name":"boolField","Nullable":false,"Type":"BIGINT"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 {"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"intField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"multipleField","Nullable":false,"Type":"JSON"}
 {"Name":"nullField","Nullable":true,"Type":"JSON"}
 {"Name":"numField","Nullable":false,"Type":"BOOLEAN"}
@@ -270,12 +271,13 @@ Big Schema Materialized Resource Schema Changed Types With Backfill:
 {"Name":"stringUriReferenceField","Nullable":false,"Type":"VARCHAR"}
 {"Name":"stringUriTemplateField","Nullable":false,"Type":"VARCHAR"}
 {"Name":"stringUuidField","Nullable":false,"Type":"VARCHAR"}
-{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 
 add a single field:
-{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"addedOptionalString","Nullable":true,"Type":"VARCHAR"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 {"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"optionalBoolean","Nullable":true,"Type":"BOOLEAN"}
 {"Name":"optionalInteger","Nullable":true,"Type":"BIGINT"}
 {"Name":"optionalObject","Nullable":true,"Type":"JSON"}
@@ -284,13 +286,12 @@ add a single field:
 {"Name":"requiredInteger","Nullable":false,"Type":"BIGINT"}
 {"Name":"requiredObject","Nullable":false,"Type":"JSON"}
 {"Name":"requiredString","Nullable":false,"Type":"VARCHAR"}
-{"Name":"flow_document","Nullable":false,"Type":"JSON"}
-{"Name":"addedOptionalString","Nullable":true,"Type":"VARCHAR"}
 
 remove a single optional field:
-{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 {"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"optionalBoolean","Nullable":true,"Type":"BOOLEAN"}
 {"Name":"optionalInteger","Nullable":true,"Type":"BIGINT"}
 {"Name":"optionalObject","Nullable":true,"Type":"JSON"}
@@ -299,12 +300,12 @@ remove a single optional field:
 {"Name":"requiredInteger","Nullable":false,"Type":"BIGINT"}
 {"Name":"requiredObject","Nullable":false,"Type":"JSON"}
 {"Name":"requiredString","Nullable":false,"Type":"VARCHAR"}
-{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 
 remove a single required field:
-{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 {"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"optionalBoolean","Nullable":true,"Type":"BOOLEAN"}
 {"Name":"optionalInteger","Nullable":true,"Type":"BIGINT"}
 {"Name":"optionalObject","Nullable":true,"Type":"JSON"}
@@ -313,12 +314,14 @@ remove a single required field:
 {"Name":"requiredInteger","Nullable":false,"Type":"BIGINT"}
 {"Name":"requiredObject","Nullable":false,"Type":"JSON"}
 {"Name":"requiredString","Nullable":true,"Type":"VARCHAR"}
-{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 
 add and remove many fields:
-{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"addedOptionalString","Nullable":true,"Type":"VARCHAR"}
+{"Name":"addedRequiredString","Nullable":true,"Type":"VARCHAR"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 {"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
 {"Name":"optionalBoolean","Nullable":true,"Type":"BOOLEAN"}
 {"Name":"optionalInteger","Nullable":true,"Type":"BIGINT"}
 {"Name":"optionalObject","Nullable":true,"Type":"JSON"}
@@ -327,23 +330,20 @@ add and remove many fields:
 {"Name":"requiredInteger","Nullable":false,"Type":"BIGINT"}
 {"Name":"requiredObject","Nullable":true,"Type":"JSON"}
 {"Name":"requiredString","Nullable":true,"Type":"VARCHAR"}
-{"Name":"flow_document","Nullable":false,"Type":"JSON"}
-{"Name":"addedOptionalString","Nullable":true,"Type":"VARCHAR"}
-{"Name":"addedRequiredString","Nullable":true,"Type":"VARCHAR"}
 
 Challenging Field Names Materialized Columns:
 {"Name":" ,;{}().- problematicKey � 𐀀 嶲 ","Nullable":false,"Type":"VARCHAR"}
-{"Name":"_id","Nullable":false,"Type":"VARCHAR"}
 {"Name":" ,;{}().- problematicValue � 𐀀 嶲 ","Nullable":true,"Type":"VARCHAR"}
 {"Name":"$dollar$signs","Nullable":true,"Type":"VARCHAR"}
 {"Name":"123","Nullable":true,"Type":"VARCHAR"}
 {"Name":"123startsWithDigits","Nullable":true,"Type":"VARCHAR"}
+{"Name":"_id","Nullable":false,"Type":"VARCHAR"}
 {"Name":"a\"string`with`quote'characters","Nullable":true,"Type":"VARCHAR"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 {"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"value with separated words","Nullable":true,"Type":"VARCHAR"}
 {"Name":"value-with-separated-words","Nullable":true,"Type":"VARCHAR"}
 {"Name":"value.with-separated_words","Nullable":true,"Type":"VARCHAR"}
 {"Name":"value.with.separated.words","Nullable":true,"Type":"VARCHAR"}
 {"Name":"value_with_separated_words","Nullable":true,"Type":"VARCHAR"}
-{"Name":"flow_document","Nullable":false,"Type":"JSON"}
 

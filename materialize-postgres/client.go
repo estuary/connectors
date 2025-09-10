@@ -228,7 +228,20 @@ func (c *client) CleanupTestTask(ctx context.Context, taskName string) error {
 }
 
 func (c *client) SnapshotTestResource(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
-	return sql.DumpTableRows(ctx, c.db, pgDialect.Identifier(path...))
+	// Use a fresh connection for this operation to prevent problems with cached
+	// query plans for migration test cases.
+	uri, err := c.cfg.ToURI(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("building connection URI: %w", err)
+	}
+
+	db, err := stdsql.Open("pgx", uri)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer db.Close()
+
+	return sql.DumpTableRows(ctx, db, pgDialect.Identifier(path...))
 }
 
 func (c *client) Close() {

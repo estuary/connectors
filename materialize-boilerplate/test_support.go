@@ -56,7 +56,7 @@ func loadSpec(t *testing.T, path string) *pf.MaterializationSpec {
 
 const testItemIdentifier = "_flow_test_"
 
-func RunMaterializationTestV2[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	t *testing.T,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
@@ -164,144 +164,6 @@ func runMaterializationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Res
 	}
 
 	return snap.String()
-
-}
-
-func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
-	t *testing.T,
-	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
-	sourcePath string,
-	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
-) {
-	ctx := context.Background()
-
-	// Parse the bundled spec to extract the tasks and their bindings.
-	var parsed parsedSpec
-	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
-	require.NoError(t, err)
-	require.NoError(t, json.Unmarshal(bundled, &parsed))
-
-	// Extract each task's config and bindings.
-	ts := time.Now().Unix()
-	tasks := make(map[string]testTask[EC, FC, RC, MT])
-	for taskName, spec := range parsed.Materializations {
-		var cfg EC
-		require.NoError(t, unmarshalStrict(decryptConfig(t, spec.Endpoint.Local.Config), &cfg))
-		materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
-		require.NoError(t, err)
-
-		suffix := fmt.Sprintf("_%s%s%d", uuid.NewString()[:8], testItemIdentifier, ts)
-
-		var bindings []testBinding
-		for bIdx, binding := range spec.Bindings {
-			var res RC
-			require.NoError(t, unmarshalStrict(binding.Resource, &res))
-			path, deltaUpdates, err := res.WithDefaults(cfg).Parameters()
-			require.NoError(t, err)
-			lastPathPart := path[len(path)-1] + suffix
-
-			res = makeResourceFn(lastPathPart, deltaUpdates).WithDefaults(cfg)
-			path, _, err = res.WithDefaults(cfg).Parameters()
-			require.NoError(t, err)
-			resCfgRaw, err := json.Marshal(res)
-			require.NoError(t, err)
-
-			bundled, err = sjson.SetBytes(
-				bundled,
-				fmt.Sprintf("materializations.%s.bindings.%d.resource", taskName, bIdx),
-				json.RawMessage(resCfgRaw),
-			)
-
-			bindings = append(bindings, testBinding{
-				source: binding.Source,
-				path:   path,
-			})
-		}
-
-		tasks[taskName] = testTask[EC, FC, RC, MT]{
-			materializer: materializer,
-			bindings:     bindings,
-			suffix:       suffix,
-		}
-	}
-
-	t.Cleanup(func() { cleanupTasks(t, tasks) })
-
-	// Write out the modified bundled spec to a temp file for `flowctl preview`.
-	// This bundle now has the resource suffixes added to it. `flowctl preview`
-	// will drive the materialization using those suffixed paths.
-	dir := t.TempDir()
-	suffixedSource := filepath.Join(dir, "test.flow.yaml")
-	require.NoError(t, os.WriteFile(suffixedSource, bundled, 0o600))
-
-	// Drive the materialization and collect the results.
-	var mu sync.Mutex
-	group, groupCtx := errgroup.WithContext(ctx)
-	var results []taskResult
-	for name, task := range tasks {
-		group.Go(func() error {
-			actionDescription := driveTask(t, ctx, true, suffixedSource, name, "../materialize-boilerplate/testdata/integration/fixture.json")
-			res := taskResult{name: name, flowctlOutput: actionDescription}
-
-			for _, binding := range task.bindings {
-				columnNames, rows, err := task.materializer.SnapshotTestResource(groupCtx, binding.path)
-				require.NoError(t, err)
-
-				sorted, err := sortRows(columnNames, rows)
-				require.NoError(t, err)
-
-				var data strings.Builder
-				enc := json.NewEncoder(&data)
-				for _, r := range sorted {
-					doc := make(map[string]any, len(columnNames))
-					for i, col := range columnNames {
-						doc[col] = r[i]
-					}
-					require.NoError(t, enc.Encode(doc))
-				}
-
-				res.bindingResults = append(res.bindingResults, bindingResult{
-					source: binding.source,
-					path:   binding.path,
-					data:   data.String(),
-				})
-			}
-
-			mu.Lock()
-			results = append(results, res)
-			mu.Unlock()
-
-			return nil
-		})
-	}
-
-	require.NoError(t, group.Wait())
-
-	slices.SortFunc(results, func(a, b taskResult) int {
-		return strings.Compare(a.name, b.name)
-	})
-
-	var snap strings.Builder
-	for _, res := range results {
-		snap.WriteString(fmt.Sprintf("Task: %s\n\n", res.name))
-		snap.WriteString(res.flowctlOutput)
-		snap.WriteString("\n")
-
-		for _, binding := range res.bindingResults {
-			snap.WriteString(fmt.Sprintf("Resource: %s\n", strings.Join(binding.path, ".")))
-			snap.WriteString(fmt.Sprintf("Source: %s\n", binding.source))
-			snap.WriteString(binding.data)
-			snap.WriteString("\n")
-		}
-	}
-
-	// Strip the generated suffixes from the snapshot output.
-	output := snap.String()
-	for _, task := range tasks {
-		output = strings.ReplaceAll(output, task.suffix, "")
-	}
-
-	cupaloy.SnapshotT(t, output)
 }
 
 func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
@@ -541,79 +403,6 @@ func decryptConfig(t *testing.T, cfg json.RawMessage) json.RawMessage {
 	require.NoError(t, sopsCmd.Wait())
 
 	return decryptedConfig
-}
-
-type testTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper] struct {
-	materializer Materializer[EC, FC, RC, MT]
-	bindings     []testBinding
-	suffix       string
-}
-
-type testBinding struct {
-	source string
-	path   []string
-}
-
-type taskResult struct {
-	name           string
-	flowctlOutput  string
-	bindingResults []bindingResult
-}
-
-type bindingResult struct {
-	source string
-	path   []string
-	data   string
-}
-
-type parsedSpec struct {
-	Materializations map[string]struct {
-		Endpoint struct {
-			Local struct {
-				Config json.RawMessage
-			}
-		}
-		Bindings []struct {
-			Resource json.RawMessage
-			Source   string
-		}
-	}
-}
-
-func cleanupTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
-	t *testing.T,
-	tasks map[string]testTask[EC, FC, RC, MT],
-) {
-	t.Helper()
-
-	ctx := context.Background()
-	var group errgroup.Group
-
-	for taskName, task := range tasks {
-		// Cleanup actions for the task itself.
-		group.Go(func() error {
-			if err := task.materializer.CleanupTestTask(ctx, taskName); err != nil {
-				t.Log("failed to clean up task", taskName)
-			}
-
-			t.Log("cleaned up task", taskName)
-			return nil
-		})
-
-		// Cleanup actions for the task's resources.
-		group.Go(func() error {
-			var paths [][]string
-			for _, b := range task.bindings {
-				paths = append(paths, b.path)
-			}
-
-			cleanupTestResources(t, ctx, task.materializer, paths, task.suffix)
-
-			return nil
-		})
-	}
-
-	require.NoError(t, group.Wait())
 }
 
 func driveTask(t *testing.T, ctx context.Context, outputState bool, source, name, fixturePath string) string {
@@ -1083,7 +872,12 @@ func dumpSchema[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT 
 
 	var out strings.Builder
 	enc := json.NewEncoder(&out)
-	for _, f := range is.GetResource(path).AllFields() {
+	fields := slices.Clone(is.GetResource(path).AllFields())
+	slices.SortFunc(fields, func(a, b ExistingField) int {
+		return strings.Compare(a.Name, b.Name)
+	})
+
+	for _, f := range fields {
 		require.NoError(t, enc.Encode(field{
 			Name:     f.Name,
 			Nullable: f.Nullable,

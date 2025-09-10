@@ -438,7 +438,7 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Reso
 	source string,
 	makeResourceFn func(string, bool) RC,
 ) {
-	boilerplate.RunMaterializationTestV2(t, driver.newMaterialization, source, makeResourceFn)
+	boilerplate.RunMaterializationTest(t, driver.newMaterialization, source, makeResourceFn)
 }
 
 func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
