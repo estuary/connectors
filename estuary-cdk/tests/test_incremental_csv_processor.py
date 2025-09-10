@@ -400,3 +400,23 @@ Fran\xc3\xa7ois,Paris,France
         for result in results:
             assert len(result) == 3
             assert result[0].name == "John"
+
+    @pytest.mark.asyncio
+    async def test_explicit_fieldnames(self):
+        """Test CSV processing with explicit field names (no header row)."""
+        csv_data_no_headers = """John,25,New York
+Jane,30,Los Angeles
+Bob,35,Chicago"""
+
+        chunk_iterator = self.create_byte_chunk_iterator(csv_data_no_headers, chunk_size=10)
+        fieldnames = ['name', 'age', 'city']
+        processor = IncrementalCSVProcessor(chunk_iterator, BasicRecord, fieldnames=fieldnames)
+
+        rows: list[BasicRecord] = []
+        async for row in processor:
+            rows.append(row)
+
+        assert len(rows) == 3
+        assert rows[0].name == "John" and rows[0].age == "25" and rows[0].city == "New York"
+        assert rows[1].name == "Jane" and rows[1].age == "30" and rows[1].city == "Los Angeles"
+        assert rows[2].name == "Bob" and rows[2].age == "35" and rows[2].city == "Chicago"
