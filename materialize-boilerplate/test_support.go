@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -54,6 +55,14 @@ func loadSpec(t *testing.T, path string) *pf.MaterializationSpec {
 }
 
 const testItemIdentifier = "_flow_test_"
+
+func relativePath(t *testing.T, file string) string {
+	_, filename, _, ok := runtime.Caller(0)
+	require.True(t, ok)
+	dir := filepath.Dir(filename)
+
+	return filepath.Join(dir, file)
+}
 
 func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	t *testing.T,
@@ -139,7 +148,7 @@ func runMaterializationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Res
 		cleanupTestTasks(t, ctx, materializer, tsSuffix)
 	})
 
-	actionDescription := driveTask(t, ctx, true, source, workingTaskName, "../materialize-boilerplate/testdata/integration/fixture.json")
+	actionDescription := driveTask(t, ctx, true, source, workingTaskName, relativePath(t, "testdata/integration/fixture.materialize.json"))
 	for _, res := range snapshotResources {
 		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rngSuffix, true))
 	}
@@ -249,7 +258,7 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 	workingTableName := "migration_test" + rngSuffix
 	workingTaskName := taskName + rngSuffix
 
-	bundledMigratedCollection, err := exec.Command("flowctl", "raw", "bundle", "--source", "../materialize-boilerplate/testdata/integration/migration-migrated-collection.flow.yaml").CombinedOutput()
+	bundledMigratedCollection, err := exec.Command("flowctl", "raw", "bundle", "--source", relativePath(t, "testdata/integration/migration-migrated-collection.flow.yaml")).CombinedOutput()
 	require.NoError(t, err)
 
 	cfg := decryptConfig[EC](t, bundled, taskName)
@@ -299,8 +308,8 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 	})
 
 	for _, tc := range []struct{ source, fixture string }{
-		{source: initialSource, fixture: "../materialize-boilerplate/testdata/integration/fixture.migration-initial.json"},
-		{source: migratedSource, fixture: "../materialize-boilerplate/testdata/integration/fixture.migration-migrated.json"},
+		{source: initialSource, fixture: relativePath(t, "testdata/integration/fixture.migration-initial.json")},
+		{source: migratedSource, fixture: relativePath(t, "testdata/integration/fixture.migration-migrated.json")},
 	} {
 		actionDescription := driveTask(t, ctx, false, tc.source, workingTaskName, tc.fixture)
 		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rngSuffix, true))
