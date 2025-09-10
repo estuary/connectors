@@ -35,7 +35,7 @@ tracing-subscriber = { version = "0.3", features = [
 ] }
 reqwest = { version = "0.12", features = ["json"] }
 futures = "0.3"
-apache-avro = "0.17"
+apache-avro = "0.19"
 bigdecimal = "0.4"
 time = "0.3"
 
@@ -43,6 +43,7 @@ time = "0.3"
 [dev-dependencies]
 insta = { version = "1", features = ["json", "serde"] }
 schema_registry_converter = { version = "4.2.0", features = ["avro", "json"] }
+serial_test = "3"
 uuid = "1.11"
 async-trait = "0.1"
 

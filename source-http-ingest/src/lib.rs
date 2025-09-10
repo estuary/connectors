@@ -214,7 +214,7 @@ async fn do_pull(
         anyhow::bail!("open request is missing capture spec");
     };
 
-    let config = serde_json::from_str::<EndpointConfig>(&config_json)
+    let config = serde_json::from_slice::<EndpointConfig>(&config_json)
         .context("deserializing endpoint config")?;
     let mut typed_bindings = Vec::with_capacity(bindings.len());
     for ApplyBinding {
@@ -226,7 +226,7 @@ async fn do_pull(
         let Some(collection) = collection else {
             anyhow::bail!("binding is missing collection spec");
         };
-        let resource_config = serde_json::from_str::<ResourceConfig>(&resource_config_json)
+        let resource_config = serde_json::from_slice::<ResourceConfig>(&resource_config_json)
             .context("deserializing resource config")?;
         typed_bindings.push(Binding {
             collection: collection.clone(),
@@ -260,13 +260,13 @@ async fn do_apply(stdout: &mut io::Stdout) -> anyhow::Result<()> {
 }
 
 async fn do_spec(stdout: &mut io::Stdout) -> anyhow::Result<()> {
-    let config_schema_json = serde_json::to_string(&schema_for::<EndpointConfig>())?;
-    let resource_config_schema_json = serde_json::to_string(&schema_for::<ResourceConfig>())?;
+    let config_schema_json = serde_json::to_vec(&schema_for::<EndpointConfig>())?;
+    let resource_config_schema_json = serde_json::to_vec(&schema_for::<ResourceConfig>())?;
     let response = Response {
         spec: Some(Spec {
             protocol: 3032023,
-            config_schema_json,
-            resource_config_schema_json,
+            config_schema_json: config_schema_json.into(),
+            resource_config_schema_json: resource_config_schema_json.into(),
             documentation_url: "https://go.estuary.dev/http-ingest".to_string(),
             oauth2: None,
             resource_path_pointers: vec!["/stream".to_string()],
@@ -276,9 +276,9 @@ async fn do_spec(stdout: &mut io::Stdout) -> anyhow::Result<()> {
     write_capture_response(response, stdout).await
 }
 
-async fn do_discover(config: &str, stdout: &mut io::Stdout) -> anyhow::Result<()> {
+async fn do_discover(config: &[u8], stdout: &mut io::Stdout) -> anyhow::Result<()> {
     let config =
-        serde_json::from_str::<EndpointConfig>(config).context("parsing endpoint config")?;
+        serde_json::from_slice::<EndpointConfig>(config).context("parsing endpoint config")?;
     let discovered = generate_discover_response(config)?;
     let response = Response {
         discovered: Some(discovered),
@@ -299,12 +299,12 @@ fn generate_discover_response(endpoint_config: EndpointConfig) -> anyhow::Result
 }
 
 async fn do_validate(
-    config: &str,
+    config: &[u8],
     bindings: &[ValidateBinding],
     stdout: &mut io::Stdout,
 ) -> anyhow::Result<()> {
-    let config =
-        serde_json::from_str::<EndpointConfig>(config).context("deserializing endpoint config")?;
+    let config = serde_json::from_slice::<EndpointConfig>(config)
+        .context("deserializing endpoint config")?;
     // So that we can validate that they are all present in the bindings.
     let mut endpoint_paths = config
         .paths
@@ -323,7 +323,7 @@ async fn do_validate(
         let Some(collection) = collection else {
             anyhow::bail!("missing collection in binding");
         };
-        let resource_config = serde_json::from_str::<ResourceConfig>(&resource_config_json)
+        let resource_config = serde_json::from_slice::<ResourceConfig>(&resource_config_json)
             .context("deserializing resource config")?;
 
         if let Some(rp) = &resource_config.path {
@@ -435,8 +435,8 @@ fn discovered_webhook_collection(path: Option<&str>) -> DiscoveredBinding {
     DiscoveredBinding {
         disable: false,
         recommended_name: path.map(|p| p.trim_matches('/')).unwrap_or("webhook-data").to_string(),
-        resource_config_json: serde_json::to_string(&resource_config).unwrap(),
-        document_schema_json: serde_json::to_string(&serde_json::json!({
+        resource_config_json: serde_json::to_vec(&resource_config).unwrap().into(),
+        document_schema_json: serde_json::to_vec(&serde_json::json!({
             "type": "object",
             "x-infer-schema": true,
             "properties": {
@@ -474,7 +474,7 @@ fn discovered_webhook_collection(path: Option<&str>) -> DiscoveredBinding {
             },
             "required": ["_meta"]
         }))
-        .unwrap(),
+        .unwrap().into(),
         key: vec!["/_meta/webhookId".to_string()],
         is_fallback_key: true,
         resource_path: resource_config.resource_path(),

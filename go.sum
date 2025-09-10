@@ -391,8 +391,8 @@ github.com/envoyproxy/go-control-plane/ratelimit v0.1.0/go.mod h1:Wk+tMFAFbCXaJP
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
 github.com/envoyproxy/protoc-gen-validate v1.2.1 h1:DEo3O99U8j4hBFwbJfrz9VtgcDfUKS7KJ7spH3d86P8=
 github.com/envoyproxy/protoc-gen-validate v1.2.1/go.mod h1:d/C80l/jxXLdfEIhX1W2TmLfsJ31lvEjwamM4DxlWXU=
-github.com/estuary/flow v0.5.21-0.20250814144826-58a33cbfedc1 h1:+X41Bxm5B8ROjIm7rZCnIZZBg/P6wxI+y14aT1SwJpg=
-github.com/estuary/flow v0.5.21-0.20250814144826-58a33cbfedc1/go.mod h1:EWx42APqwnXBGQMgT6mxS9PnCTpkhnxTYOQ+EV8EH8E=
+github.com/estuary/flow v0.5.22-0.20250910150914-e7cfcdcc8f22 h1:nKEwyAGRAvNipu5Tev6WxjMoJI6lV9PSu4yw7AeafpI=
+github.com/estuary/flow v0.5.22-0.20250910150914-e7cfcdcc8f22/go.mod h1:/IP6GPHpCOur6cigBVXZg5HoIgAiuWPMoPJnqW9UDrg=
 github.com/estuary/vitess v0.15.10 h1:oXJgcG0HGZWuwjdvSp4pIFIAXtKLaR9Fl9VBynSszFA=
 github.com/estuary/vitess v0.15.10/go.mod h1:rSIE8UMfexjblBloleGw6BqQIKggGmU91TduCNIaJEA=
 github.com/evanphx/json-patch/v5 v5.9.0 h1:kcBlZQbplgElYIlo/n1hJbls2z/1awpXxpRi0/FOJfg=
@@ -1038,8 +1038,8 @@ go.etcd.io/etcd/client/pkg/v3 v3.5.17 h1:XxnDXAWq2pnxqx76ljWwiQ9jylbpC4rvkAeRVOU
 go.etcd.io/etcd/client/pkg/v3 v3.5.17/go.mod h1:4DqK1TKacp/86nJk4FLQqo6Mn2vvQFBmruW3pP14H/w=
 go.etcd.io/etcd/client/v3 v3.5.17 h1:o48sINNeWz5+pjy/Z0+HKpj/xSnBkuVhVvXkjEXbqZY=
 go.etcd.io/etcd/client/v3 v3.5.17/go.mod h1:j2d4eXTHWkT2ClBgnnEPm/Wuu7jsqku41v9DZ3OtjQo=
-go.gazette.dev/core v0.100.1-0.20250814040917-61d190beba35 h1:ipEN4HMdFx9WdYtdpvBci++m329mIH8OF8wiAPfCbZk=
-go.gazette.dev/core v0.100.1-0.20250814040917-61d190beba35/go.mod h1:lAkxbV1zmlrTDntHDz3oQJB+MnyBvki/Bic7k3xA8rc=
+go.gazette.dev/core v0.100.1-0.20250814150825-2580071332a6 h1:GifRuL6s9r0rPFIxypqZCuGd5nVLWi0zLrdhtnAaAkA=
+go.gazette.dev/core v0.100.1-0.20250814150825-2580071332a6/go.mod h1:lAkxbV1zmlrTDntHDz3oQJB+MnyBvki/Bic7k3xA8rc=
 go.mongodb.org/mongo-driver v1.17.4 h1:jUorfmVzljjr0FLzYQsGP8cgN/qzzxlY9Vh0C9KFXVw=
 go.mongodb.org/mongo-driver v1.17.4/go.mod h1:Hy04i7O2kC4RS06ZrhPRqj/u4DTYkFDAAccj+rVKqgQ=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=

@@ -79,10 +79,10 @@ pub async fn do_pull(req: Open, mut stdout: std::io::Stdout) -> Result<()> {
     let state = if req.state_json == "{}" {
         CaptureState::default()
     } else {
-        serde_json::from_str(&req.state_json)?
+        serde_json::from_slice(&req.state_json)?
     };
 
-    let config: EndpointConfig = serde_json::from_str(&spec.config_json)?;
+    let config: EndpointConfig = serde_json::from_slice(&spec.config_json)?;
     let mut consumer = config.to_consumer().await?;
     let schema_client = match config.schema_registry {
         SchemaRegistryConfig::ConfluentSchemaRegistry {
@@ -177,7 +177,7 @@ pub async fn do_pull(req: Open, mut stdout: std::io::Stdout) -> Result<()> {
 
         let message = response::Captured {
             binding: binding_info.binding_index,
-            doc_json: serde_json::to_string(&captured)?,
+            doc_json: serde_json::to_string(&captured)?.into(),
         };
 
         let checkpoint =
@@ -195,7 +195,7 @@ pub async fn do_pull(req: Open, mut stdout: std::io::Stdout) -> Result<()> {
             Response {
                 checkpoint: Some(Checkpoint {
                     state: Some(ConnectorState {
-                        updated_json: serde_json::to_string(&checkpoint)?,
+                        updated_json: serde_json::to_string(&checkpoint)?.into(),
                         merge_patch: true,
                     }),
                 }),
@@ -229,7 +229,7 @@ async fn setup_consumer(
     let mut topic_partition_list = TopicPartitionList::new();
 
     for (idx, binding) in bindings.iter().enumerate() {
-        let res: Resource = serde_json::from_str(&binding.resource_config_json)?;
+        let res: Resource = serde_json::from_slice(&binding.resource_config_json)?;
 
         let state_key = &binding.state_key;
         let topic = &res.topic;
