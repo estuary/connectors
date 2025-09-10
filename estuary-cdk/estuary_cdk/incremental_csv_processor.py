@@ -102,6 +102,15 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
     async for row in IncrementalCSVProcessor(byte_iterator, model, validation_context=context):
         do_something_with(row)
     ```
+
+    Example usage with explicit field names (for CSV without headers):
+    ```python
+    # For CSV files without header rows, provide explicit field names
+    fieldnames = ['name', 'age', 'city']
+    
+    async for row in IncrementalCSVProcessor(byte_iterator, model, fieldnames=fieldnames):
+        do_something_with(row)
+    ```
     """
 
     def __init__(
@@ -109,7 +118,8 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
             byte_iterator: AsyncGenerator[bytes, None],
             streamed_item_cls: type[StreamedItem],
             config: Optional[CSVConfig] = None,
-            validation_context: Optional[object] = None
+            validation_context: Optional[object] = None,
+            fieldnames: Optional[list[str]] = None,
         ):
         """
         Initialize the processor with byte iterator and optional CSV configuration or validation context.
@@ -119,11 +129,13 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
             streamed_item_cls: Pydantic model class for validation
             config: Optional CSV configuration options
             validation_context: Optional validation context object passed to pydantic model_validate
+            fieldnames: Optional list of field names to use for CSV columns. If None, uses first row as headers.
         """
         self.byte_iterator = byte_iterator
         self.config = config or CSVConfig()
         self.streamed_item_cls = streamed_item_cls
         self.validation_context = validation_context
+        self.fieldnames = fieldnames
         self._row_iterator: Optional[AsyncGenerator[dict[str, Any]]] = None
 
     def __aiter__(self):
@@ -195,6 +207,9 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
 
         if self.config.escapechar is not None:
             reader_kwargs['escapechar'] = self.config.escapechar
+
+        if self.fieldnames is not None:
+            reader_kwargs['fieldnames'] = self.fieldnames
 
         try:
             async for row in aiocsv.AsyncDictReader(async_reader, **reader_kwargs):
