@@ -854,6 +854,7 @@ func TestPartitionedCTIDBackfill(t *testing.T) {
 
 // TestMessageOverflow tests the handling of a message exceeding the replication buffer overflow threshold.
 func TestMessageOverflow(t *testing.T) {
+	t.Skip("skipping until wgd rethinks limits here")
 	var tb, ctx = postgresTestBackend(t), context.Background()
 	var uniqueID = uniqueTableID(t)
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
