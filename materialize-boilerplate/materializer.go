@@ -311,6 +311,8 @@ type Materializer[
 	// transactions lifecycle of the materialization.
 	NewMaterializerTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[EC, RC, MT], *m.BindingEvents) (MaterializerTransactor, error)
 
+	ListTestTasks(context.Context) ([]string, error)
+
 	// CleanupTestTask performs any task-level cleanup actions that should be
 	// run after completing an integration test.
 	CleanupTestTask(context.Context, string) error

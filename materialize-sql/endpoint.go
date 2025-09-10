@@ -40,6 +40,8 @@ type Client interface {
 	// materialized collection.
 	TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error)
 
+	ListTestTasks(ctx context.Context) ([]string, error)
+
 	CleanupTestTask(ctx context.Context, taskName string) error
 
 	SnapshotTestResource(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error)

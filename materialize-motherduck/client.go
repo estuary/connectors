@@ -165,6 +165,28 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 	return sql.StdInstallFence(ctx, c.db, checkpoints, fence)
 }
 
+func (c *client) ListTestTasks(ctx context.Context) ([]string, error) {
+	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(
+		"select materialization from %s;",
+		duckDialect.Identifier(c.ep.Config.Database, c.ep.Config.Schema, sql.DefaultFlowCheckpoints),
+	))
+	if err != nil {
+		return nil, fmt.Errorf("querying materializations from checkpoints table: %w", err)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var taskName string
+		if err := rows.Scan(&taskName); err != nil {
+			return nil, fmt.Errorf("scanning row: %w", err)
+		}
+		out = append(out, taskName)
+	}
+
+	return out, nil
+}
+
 func (c *client) CleanupTestTask(ctx context.Context, taskName string) error {
 	_, err := c.db.ExecContext(ctx, fmt.Sprintf(
 		"delete from %s where materialization='%s';",

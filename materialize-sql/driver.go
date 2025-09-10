@@ -410,6 +410,10 @@ func (c *checkpointRecoverer) RecoverCheckpoint(context.Context, pf.Materializat
 	return c.cp, nil
 }
 
+func (s *sqlMaterialization[EC, RC]) ListTestTasks(ctx context.Context) ([]string, error) {
+	return s.client.ListTestTasks(ctx)
+}
+
 func (s *sqlMaterialization[EC, RC]) CleanupTestTask(ctx context.Context, taskName string) error {
 	return s.client.CleanupTestTask(ctx, taskName)
 }

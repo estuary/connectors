@@ -222,7 +222,7 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 		require.NoError(t, err)
 
 		var testResourcePaths [][]string
-		t.Cleanup(func() { cleanupBySuffix(t, ctx, materializer, testResourcePaths, suffix) })
+		t.Cleanup(func() { cleanupTestResources(t, ctx, materializer, testResourcePaths, suffix) })
 
 		snap.WriteString("\n--- Materialization: " + key.String() + " ---\n\n")
 
@@ -326,8 +326,8 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		cleanupBySuffix(t, ctx, materializer, [][]string{path}, suffix)
-		// materializer.CleanupTestTask(ctx, workingTaskName)
+		cleanupTestResources(t, ctx, materializer, [][]string{path}, suffix)
+		cleanupTestTasks(t, ctx, materializer, suffix)
 	})
 
 	{
@@ -487,7 +487,7 @@ func cleanupTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 				paths = append(paths, b.path)
 			}
 
-			cleanupBySuffix(t, ctx, task.materializer, paths, task.suffix)
+			cleanupTestResources(t, ctx, task.materializer, paths, task.suffix)
 
 			return nil
 		})
@@ -848,7 +848,45 @@ func SnapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Cons
 	return out.String()
 }
 
-func cleanupBySuffix[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func cleanupTestTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	m Materializer[EC, FC, RC, MT],
+	suffix string,
+) {
+	t.Helper()
+
+	tasks, err := m.ListTestTasks(ctx)
+	require.NoError(t, err)
+	now := time.Now()
+	for _, task := range tasks {
+		if !strings.Contains(task, testTableIdentifer) {
+			// Not a test table.
+		} else if strings.HasSuffix(task, suffix) {
+			// This resource was created by this test run.
+			if err := m.CleanupTestTask(ctx, task); err != nil {
+				t.Log("failed to clean up test item", t, err)
+			} else {
+				t.Log("cleaned up test item", task)
+			}
+		} else if parts := strings.Split(task, "_"); len(parts) < 2 {
+			t.Log("malformed test item name", t)
+		} else if seconds, err := strconv.Atoi(parts[len(parts)-1]); err != nil {
+			t.Log("failed to parse timestamp from test item name", t, err)
+		} else if timestamp := time.Unix(int64(seconds), 0); now.Sub(timestamp) > 5*time.Minute {
+			t.Log("will cleanup old test item", task)
+			if err := m.CleanupTestTask(ctx, task); err != nil {
+				t.Log("failed to clean up test task", t, err)
+			} else {
+				t.Log("cleaned up test item", task)
+			}
+		}
+
+	}
+
+}
+
+func cleanupTestResources[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	t *testing.T,
 	ctx context.Context,
 	m Materializer[EC, FC, RC, MT],

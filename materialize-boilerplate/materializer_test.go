@@ -319,6 +319,10 @@ func (m *testMaterializer) NewMaterializerTransactor(ctx context.Context, req pm
 	return &testMaterializerTransactor{}, nil
 }
 
+func (m *testMaterializer) ListTestTasks(context.Context) ([]string, error) {
+	panic("unimplemented")
+}
+
 func (m *testMaterializer) CleanupTestTask(context.Context, string) error {
 	panic("unimplemented")
 }
