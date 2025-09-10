@@ -60,7 +60,7 @@ func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 	t *testing.T,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
-	finalResourchPathKey string,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) {
 	ctx := context.Background()
 
@@ -79,29 +79,26 @@ func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 		materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
 		require.NoError(t, err)
 
-		// A suffix is added to the resource final path component. It includes a
-		// random part to ensure that concurrent runs of the test don't
-		// interfere with each other, as well as a timestamp to facilitate
-		// cleaning up leftover resources that weren't cleanup by a prior run
-		// for some reason.
 		suffix := fmt.Sprintf("_%s%s%d", uuid.NewString()[:8], testTableIdentifer, ts)
 
 		var bindings []testBinding
 		for bIdx, binding := range spec.Bindings {
-			var resourceCfg RC
-			require.NoError(t, unmarshalStrict(binding.Resource, &resourceCfg))
-			path, _, err := resourceCfg.WithDefaults(cfg).Parameters()
+			var res RC
+			require.NoError(t, unmarshalStrict(binding.Resource, &res))
+			path, deltaUpdates, err := res.WithDefaults(cfg).Parameters()
+			require.NoError(t, err)
+			lastPathPart := path[len(path)-1] + suffix
+
+			res = makeResourceFn(lastPathPart, deltaUpdates).WithDefaults(cfg)
+			path, _, err = res.WithDefaults(cfg).Parameters()
+			require.NoError(t, err)
+			resCfgRaw, err := json.Marshal(res)
 			require.NoError(t, err)
 
-			// Swap out the reported final path component from the spec with one
-			// that has the suffix. This also needs to be added to the spec file
-			// read by `flowctl preview`, which will be written out from the
-			// working bundled spec.
-			path[len(path)-1] = path[len(path)-1] + suffix
 			bundled, err = sjson.SetBytes(
 				bundled,
-				fmt.Sprintf("materializations.%s.bindings.%d.resource.%s", taskName, bIdx, finalResourchPathKey),
-				path[len(path)-1],
+				fmt.Sprintf("materializations.%s.bindings.%d.resource", taskName, bIdx),
+				json.RawMessage(resCfgRaw),
 			)
 
 			bindings = append(bindings, testBinding{
@@ -201,7 +198,7 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 	driver Connector,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
-	makeResourceFn func(finalResourcePathPart string) RC,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) {
 	ctx := context.Background()
 	var snap strings.Builder
@@ -250,7 +247,7 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 			},
 		} {
 			tableName := tc.tableStartsWith + uuid.NewString()[:8] + suffix
-			res := makeResourceFn(tableName).WithDefaults(cfg)
+			res := makeResourceFn(tableName, false).WithDefaults(cfg)
 			resourcePath, _, err := res.Parameters()
 			require.NoError(t, err)
 			testResourcePaths = append(testResourcePaths, resourcePath)
@@ -267,7 +264,7 @@ func RunMigrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	t *testing.T,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
-	makeResourceFn func(finalResourcePathPart string) RC,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) {
 	ctx := context.Background()
 	var snap strings.Builder
@@ -295,7 +292,7 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 	taskName string,
 	bundled []byte,
 	suffix string,
-	makeResourceFn func(finalResourcePathPart string) RC,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) string {
 	var snap strings.Builder
 
@@ -317,7 +314,7 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 	bindings := gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.bindings", taskName)).Array()
 	require.Equal(t, 1, len(bindings))
 
-	res := makeResourceFn(workingTableName).WithDefaults(cfg)
+	res := makeResourceFn(workingTableName, false).WithDefaults(cfg)
 	resCfgRaw, err := json.Marshal(res)
 	require.NoError(t, err)
 

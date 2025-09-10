@@ -436,16 +436,16 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Reso
 	t *testing.T,
 	driver *Driver[EC, RC],
 	source string,
-	finalResourchPathKey string,
+	makeResourceFn func(string, bool) RC,
 ) {
-	boilerplate.RunMaterializationTest(t, driver.newMaterialization, source, finalResourchPathKey)
+	boilerplate.RunMaterializationTest(t, driver.newMaterialization, source, makeResourceFn)
 }
 
 func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
 	t *testing.T,
 	driver *Driver[EC, RC],
 	sourcePath string,
-	makeResourceFn func(string) RC,
+	makeResourceFn func(string, bool) RC,
 ) {
 	boilerplate.RunApplyTest(t, driver, driver.newMaterialization, sourcePath, makeResourceFn)
 }
@@ -454,7 +454,7 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[
 	t *testing.T,
 	driver *Driver[EC, RC],
 	sourcePath string,
-	makeResourceFn func(string) RC,
+	makeResourceFn func(string, bool) RC,
 ) {
 	boilerplate.RunMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn)
 }
