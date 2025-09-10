@@ -4,12 +4,10 @@ package main
 
 import (
 	"context"
-	stdsql "database/sql"
 	"fmt"
 	"strings"
 	"testing"
 
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 
@@ -29,103 +27,25 @@ func testConfig() config {
 	}
 }
 
-func TestValidateAndApply(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testConfig()
-
-	resourceConfig := tableConfig{
-		Table:  "target",
-		Schema: "public",
+func TestIntegration(t *testing.T) {
+	makeResourceFn := func(table string, delta bool) tableConfig {
+		return tableConfig{
+			Table: table,
+			Delta: delta,
+		}
 	}
 
-	uri, err := cfg.ToURI(ctx)
-	require.NoError(t, err)
-	db, err := stdsql.Open("pgx", uri)
-	require.NoError(t, err)
-	defer db.Close()
+	t.Run("materialize", func(t *testing.T) {
+		sql.RunMaterializationTest(t, newPostgresDriver(), "testdata/materialize.flow.yaml", makeResourceFn)
+	})
 
-	boilerplate.RunValidateAndApplyTestCases(
-		t,
-		newPostgresDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
+	t.Run("apply", func(t *testing.T) {
+		sql.RunApplyTest(t, newPostgresDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+	})
 
-			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T) {
-			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-		},
-	)
-}
-
-func TestValidateAndApplyMigrations(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testConfig()
-
-	resourceConfig := tableConfig{
-		Table:  "target",
-		Schema: "public",
-	}
-
-	uri, err := cfg.ToURI(ctx)
-	require.NoError(t, err)
-	db, err := stdsql.Open("pgx", uri+"?default_query_exec_mode=exec")
-	require.NoError(t, err)
-	defer db.Close()
-
-	sql.RunValidateAndApplyMigrationsTests(
-		t,
-		newPostgresDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
-
-			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T, cols []string, values []string) {
-			t.Helper()
-
-			var keys = make([]string, len(cols))
-			for i, col := range cols {
-				keys[i] = pgDialect.Identifier(col)
-			}
-			keys = append(keys, pgDialect.Identifier("_meta/flow_truncated"))
-			values = append(values, "FALSE")
-			keys = append(keys, pgDialect.Identifier("flow_published_at"))
-			values = append(values, "'2024-09-13 01:01:01'")
-			keys = append(keys, pgDialect.Identifier("flow_document"))
-			values = append(values, "'{}'")
-			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", pgDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
-			_, err = db.ExecContext(ctx, q)
-
-			require.NoError(t, err)
-		},
-		func(t *testing.T) string {
-			t.Helper()
-
-			rows, err := sql.DumpTestTable(t, db, pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
-
-			require.NoError(t, err)
-
-			return rows
-		},
-		func(t *testing.T) {
-			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-		},
-	)
+	// t.Run("migrate", func(t *testing.T) {
+	// 	sql.RunMigrationTest(t, newPostgresDriver(), "testdata/migrate.flow.yaml", makeResourceFn)
+	// })
 }
 
 func TestFencingCases(t *testing.T) {

@@ -54,7 +54,118 @@ func loadSpec(t *testing.T, path string) *pf.MaterializationSpec {
 	return &spec
 }
 
-const testTableIdentifer = "_flow_test_"
+const testItemIdentifier = "_flow_test_"
+
+func RunMaterializationTestV2[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	sourcePath string,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+) {
+	ctx := context.Background()
+	var snap strings.Builder
+
+	bundledSource, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
+	require.NoError(t, err)
+
+	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+
+	gjson.GetBytes(bundledSource, "materializations").ForEach(func(task, _ gjson.Result) bool {
+		taskName := task.String()
+		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
+		snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundledSource, suffix, makeResourceFn))
+
+		return true
+	})
+
+	cupaloy.SnapshotT(t, snap.String())
+}
+
+func runMaterializationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	ctx context.Context,
+	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	taskName string,
+	bundled []byte,
+	suffix string,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+) string {
+	var snap strings.Builder
+
+	nameTrailer := "_" + uuid.NewString()[:8] + suffix
+	workingTaskName := taskName + nameTrailer
+
+	var cfg EC
+	rawCfg := json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
+	decrypted := decryptConfig(t, rawCfg)
+	require.NoError(t, unmarshalStrict(decrypted, &cfg))
+
+	materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
+	require.NoError(t, err)
+
+	var snapshotResources []RC
+	var testResourcePaths [][]string
+	gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.bindings", taskName)).ForEach(func(bindingIdx, binding gjson.Result) bool {
+		var res RC
+		require.NoError(t, unmarshalStrict(json.RawMessage(gjson.Get(binding.Raw, "resource").Raw), &res))
+		path, deltaUpdates, err := res.WithDefaults(cfg).Parameters()
+		require.NoError(t, err)
+		lastPathPart := path[len(path)-1] + nameTrailer
+
+		res = makeResourceFn(lastPathPart, deltaUpdates).WithDefaults(cfg)
+		path, _, err = res.WithDefaults(cfg).Parameters()
+		require.NoError(t, err)
+		resCfgRaw, err := json.Marshal(res)
+		require.NoError(t, err)
+		snapshotResources = append(snapshotResources, res)
+		testResourcePaths = append(testResourcePaths, path)
+
+		bundled, err = sjson.SetBytes(
+			bundled,
+			fmt.Sprintf("materializations.%s.bindings.%d.resource", taskName, bindingIdx.Int()),
+			json.RawMessage(resCfgRaw),
+		)
+
+		return true
+	})
+
+	bundled, err = sjson.SetBytes(
+		bundled,
+		"materializations."+workingTaskName,
+		json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s", taskName)).Raw),
+	)
+	require.NoError(t, err)
+
+	source := filepath.Join(t.TempDir(), "test.flow.yaml")
+	require.NoError(t, os.WriteFile(source, bundled, 0o600))
+
+	t.Cleanup(func() {
+		cleanupTestResources(t, ctx, materializer, testResourcePaths, suffix)
+		cleanupTestTasks(t, ctx, materializer, suffix)
+	})
+
+	actionDescription := driveTask(t, ctx, true, source, workingTaskName, "../materialize-boilerplate/testdata/integration/fixture.json")
+	actionDescription = strings.ReplaceAll(actionDescription, nameTrailer, "")
+	for _, res := range snapshotResources {
+		path, _, err := res.Parameters()
+		require.NoError(t, err)
+		columnNames, rows, err := materializer.SnapshotTestResource(ctx, path)
+		require.NoError(t, err)
+		schema := dumpSchema(t, ctx, materializer, res)
+
+		snap.WriteString("Resource: " + strings.TrimSuffix(strings.Join(path, "."), nameTrailer))
+		snap.WriteString("\n")
+		snap.WriteString(actionDescription)
+		snap.WriteString("\n")
+		snap.WriteString(schema)
+		snap.WriteString("\n")
+		snap.WriteString(renderTestTableData(t, columnNames, rows))
+		snap.WriteString("\n")
+	}
+
+	return snap.String()
+
+}
 
 func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	t *testing.T,
@@ -79,7 +190,7 @@ func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 		materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
 		require.NoError(t, err)
 
-		suffix := fmt.Sprintf("_%s%s%d", uuid.NewString()[:8], testTableIdentifer, ts)
+		suffix := fmt.Sprintf("_%s%s%d", uuid.NewString()[:8], testItemIdentifier, ts)
 
 		var bindings []testBinding
 		for bIdx, binding := range spec.Bindings {
@@ -206,7 +317,7 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
 	require.NoError(t, err)
 
-	suffix := testTableIdentifer + fmt.Sprintf("%d", time.Now().Unix())
+	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	gjson.GetBytes(bundled, "materializations").ForEach(func(key, value gjson.Result) bool {
 		rawCfg := json.RawMessage(gjson.Get(value.Raw, "endpoint.local.config").Raw)
@@ -270,9 +381,9 @@ func RunMigrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	var snap strings.Builder
 
 	bundledSource, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
-	require.NoError(t, err)
+	require.NoError(t, err, string(bundledSource))
 
-	suffix := testTableIdentifer + fmt.Sprintf("%d", time.Now().Unix())
+	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	gjson.GetBytes(bundledSource, "materializations").ForEach(func(task, _ gjson.Result) bool {
 		taskName := task.String()
@@ -405,6 +516,19 @@ func renderTestTableData(t *testing.T, columnNames []string, rows [][]any) strin
 }
 
 func decryptConfig(t *testing.T, cfg json.RawMessage) json.RawMessage {
+	t.Helper()
+
+	// Check for sops metadata. If none, return the config as-is, assuming it is
+	// not encrypted, as would be the case for local test configs.
+	type skimCfg struct {
+		Sops json.RawMessage `json:"sops"`
+	}
+	var skim skimCfg
+	require.NoError(t, json.Unmarshal(cfg, &skim))
+	if len(skim.Sops) == 0 {
+		return cfg
+	}
+
 	sopsCmd := exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
 	jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
 	sopsCmd.Stdin = bytes.NewReader(cfg)
@@ -543,7 +667,7 @@ func driveTask(t *testing.T, ctx context.Context, outputState bool, source, name
 	}
 
 	require.NoError(t, stdoutOp.Err())
-	require.NoError(t, cmd.Wait())
+	require.NoError(t, cmd.Wait(), stdoutBuf.String())
 	wg.Wait()
 
 	return stdoutBuf.String()
@@ -856,7 +980,7 @@ func cleanupTestTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	require.NoError(t, err)
 	now := time.Now()
 	for _, task := range tasks {
-		if !strings.Contains(task, testTableIdentifer) {
+		if !strings.Contains(task, testItemIdentifier) {
 			// Not a test table.
 		} else if strings.HasSuffix(task, suffix) {
 			// This resource was created by this test run.
@@ -903,7 +1027,7 @@ func cleanupTestResources[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC
 	} else {
 		for _, r := range is.resources {
 			last := r.location[len(r.location)-1]
-			if !strings.Contains(last, testTableIdentifer) {
+			if !strings.Contains(last, testItemIdentifier) {
 				// Not a test table.
 			} else if strings.HasSuffix(last, suffix) {
 				// This resource was created by this test run.

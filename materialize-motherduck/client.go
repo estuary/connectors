@@ -198,40 +198,9 @@ func (c *client) CleanupTestTask(ctx context.Context, taskName string) error {
 }
 
 func (c *client) SnapshotTestResource(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
-	return dumpTable(ctx, c.db, duckDialect.Identifier(path...))
+	return sql.DumpTableRows(ctx, c.db, duckDialect.Identifier(path...))
 }
 
 func (c *client) Close() {
 	c.db.Close()
-}
-
-func dumpTable(ctx context.Context, db *stdsql.DB, table string) ([]string, [][]any, error) {
-	sql := fmt.Sprintf("select * from %s;", table)
-
-	rows, err := db.QueryContext(ctx, sql)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to query table %s: %w", table, err)
-	}
-	defer rows.Close()
-
-	cols, err := rows.Columns()
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to get columns for table %s: %w", table, err)
-	}
-
-	var out [][]any
-	for rows.Next() {
-		var data = make([]any, len(cols))
-		var ptrs = make([]any, len(cols))
-		for i := range data {
-			ptrs[i] = &data[i]
-		}
-		if err = rows.Scan(ptrs...); err != nil {
-			return nil, nil, err
-		}
-
-		out = append(out, data)
-	}
-
-	return cols, out, nil
 }

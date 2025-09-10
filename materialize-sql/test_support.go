@@ -438,7 +438,7 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Reso
 	source string,
 	makeResourceFn func(string, bool) RC,
 ) {
-	boilerplate.RunMaterializationTest(t, driver.newMaterialization, source, makeResourceFn)
+	boilerplate.RunMaterializationTestV2(t, driver.newMaterialization, source, makeResourceFn)
 }
 
 func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
@@ -457,4 +457,35 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[
 	makeResourceFn func(string, bool) RC,
 ) {
 	boilerplate.RunMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn)
+}
+
+func DumpTableRows(ctx context.Context, db *stdsql.DB, tableIdentifier string) ([]string, [][]any, error) {
+	sql := fmt.Sprintf("select * from %s;", tableIdentifier)
+
+	rows, err := db.QueryContext(ctx, sql)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to query table %s: %w", tableIdentifier, err)
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get columns for table %s: %w", tableIdentifier, err)
+	}
+
+	var out [][]any
+	for rows.Next() {
+		var data = make([]any, len(cols))
+		var ptrs = make([]any, len(cols))
+		for i := range data {
+			ptrs[i] = &data[i]
+		}
+		if err = rows.Scan(ptrs...); err != nil {
+			return nil, nil, err
+		}
+
+		out = append(out, data)
+	}
+
+	return cols, out, nil
 }
