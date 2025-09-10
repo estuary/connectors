@@ -752,5 +752,9 @@ PERMISSION_BLOCKED_STREAMS: list[tuple[list[StandardPermissions], list[type[Stre
     (
         [StandardPermissions.USER_PICKER],
         [Users, Groups]
+    ),
+    (
+        [StandardPermissions.SERVICEDESK_AGENT],
+        [ServiceDesks, RequestTypes]
     )
 ]
