@@ -2,7 +2,7 @@ Big Schema Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
 {"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
+{"Field":"flow_document","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Root document projection is optional when flow_document is disabled"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"intField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"key","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"All Locations that are part of the collections key are recommended"}
@@ -195,7 +195,7 @@ Big Schema Changed Types With Table Replacement Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
 {"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
+{"Field":"flow_document","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Root document projection is optional when flow_document is disabled"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"intField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"key","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"All Locations that are part of the collections key are recommended"}
@@ -340,7 +340,6 @@ Challenging Field Names Materialized Columns:
 {"Name":"123startsWithDigits","Nullable":"YES","Type":"varchar"}
 {"Name":"_id","Nullable":"YES","Type":"varchar"}
 {"Name":"a\"string`with`quote'characters","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_document","Nullable":"YES","Type":"varchar"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"datetime2"}
 {"Name":"value with separated words","Nullable":"YES","Type":"varchar"}
 {"Name":"value-with-separated-words","Nullable":"YES","Type":"varchar"}

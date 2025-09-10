@@ -155,3 +155,38 @@ func TestMergeBoundsBuilder(t *testing.T) {
 		})
 	}
 }
+
+func TestRootLevelColumns(t *testing.T) {
+	// Create test columns with different pointer paths
+	columns := []Column{
+		{Projection: Projection{Projection: pf.Projection{Field: "root_field", Ptr: "/root_field"}}},
+		{Projection: Projection{Projection: pf.Projection{Field: "nested_field", Ptr: "/nested/field"}}},
+		{Projection: Projection{Projection: pf.Projection{Field: "another_root", Ptr: "/another_root"}}},
+		{Projection: Projection{Projection: pf.Projection{Field: "deep_nested", Ptr: "/deep/nested/field"}}},
+		{Projection: Projection{Projection: pf.Projection{Field: "root_array", Ptr: "/root_array"}}},
+	}
+
+	// Create a table with these columns
+	table := Table{
+		Keys:   []Column{columns[0]}, // root_field as key
+		Values: columns[1:],          // rest as values
+	}
+
+	// Call RootLevelColumns method
+	rootLevelCols := table.RootLevelColumns()
+
+	// Verify only root-level columns are returned
+	expectedFields := []string{"root_field", "another_root", "root_array"}
+	actualFields := make([]string, len(rootLevelCols))
+	for i, col := range rootLevelCols {
+		actualFields[i] = col.Field
+	}
+
+	require.Equal(t, 3, len(rootLevelCols), "Expected 3 root-level columns")
+	require.ElementsMatch(t, expectedFields, actualFields, "Root-level columns should match expected fields")
+
+	// Verify each returned column is indeed root-level
+	for _, col := range rootLevelCols {
+		require.True(t, strings.Count(col.Ptr, "/") == 1, "Column %s should be root-level", col.Field)
+	}
+}

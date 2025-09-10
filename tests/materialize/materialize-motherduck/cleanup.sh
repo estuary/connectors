@@ -1,11 +1,10 @@
 #!/bin/bash
 
-set -o errexit
 set -o pipefail
 set -o nounset
 
 function dropTable() {
-    duckdb md: "drop table ${MOTHERDUCK_DATABASE}.${MOTHERDUCK_SCHEMA}."$1";"
+    duckdb md: "drop table ${MOTHERDUCK_DATABASE}.${MOTHERDUCK_SCHEMA}."$1";" || true
 }
 
 echo "--- Running Cleanup ---"

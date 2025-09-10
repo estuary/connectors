@@ -12,7 +12,7 @@ function exportToJsonl() {
     materialize-postgres-postgres-1 psql \
     --tuples-only \
     --command "select row_to_json(t) from \"$1\" as t;" |
-      jq -c -s "{ table: \"$1\", rows: map(del(.flow_document)) }"
+      jq -c -s "{ table: \"$1\", rows: . }"
 }
 
 exportToJsonl "Simple"

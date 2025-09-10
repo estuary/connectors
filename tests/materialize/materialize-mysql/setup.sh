@@ -26,7 +26,10 @@ config_json_template='{
    "database": "$MYSQL_DATABASE",
    "password": "$MYSQL_PASSWORD",
    "user":     "$MYSQL_USER",
-   "hardDelete": true
+   "hardDelete": true,
+   "advanced": {
+      "no_flow_document": true
+   }
 }'
 
 resources_json_template='[

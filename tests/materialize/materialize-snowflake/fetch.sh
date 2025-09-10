@@ -6,7 +6,7 @@ set -o nounset
 
 function exportToJsonl() {
   name=$(echo "$1" | tr -d '"')
-  go run ${TEST_DIR}/materialize-snowflake/fetch-data.go "$1" | jq "{ "_table": \"$name\", rows: map(del(.FLOW_DOCUMENT)) }"
+  go run ${TEST_DIR}/materialize-snowflake/fetch-data.go "$1" | jq "{ "_table": \"$name\", rows: . }"
 }
 
 exportToJsonl "simple"
