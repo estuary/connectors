@@ -40,7 +40,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 	}, nil
 }
 
-func preReqs(ctx context.Context, conf config, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, conf config) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	cfg := conf

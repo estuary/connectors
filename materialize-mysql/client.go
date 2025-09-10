@@ -36,7 +36,7 @@ func prepareNewClient(tzLocation *time.Location) func(ctx context.Context, ep *s
 	}
 }
 
-func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	db, err := stdsql.Open("mysql", cfg.ToURI())

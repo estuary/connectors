@@ -123,10 +123,10 @@ func generateJWTToken(key *rsa.PrivateKey, user string, accountName string) (str
 	return jwtToken, expiry, nil
 }
 
-func NewPipeClient(cfg *config, accountName string, tenant string) (*PipeClient, error) {
+func NewPipeClient(cfg *config, accountName string) (*PipeClient, error) {
 	httpClient := http.Client{}
 
-	var dsn, err = cfg.toURI(tenant, true)
+	var dsn, err = cfg.toURI(true)
 	if err != nil {
 		return nil, fmt.Errorf("building snowflake dsn: %w", err)
 	}

@@ -84,15 +84,14 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-snowflake",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
-		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
+		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
 				"host":     cfg.Host,
 				"database": cfg.Database,
 				"schema":   cfg.Schema,
-				"tenant":   tenant,
 			}).Info("opening Snowflake")
 
-			dsn, err := cfg.toURI(tenant, false)
+			dsn, err := cfg.toURI(false)
 			if err != nil {
 				return nil, fmt.Errorf("building snowflake dsn: %w", err)
 			}
@@ -132,7 +131,6 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
-				Tenant:              tenant,
 				ConcurrentApply:     true,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,
@@ -222,7 +220,7 @@ func newTransactor(
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 
-	dsn, err := cfg.toURI(ep.Tenant, true)
+	dsn, err := cfg.toURI(true)
 	if err != nil {
 		return nil, fmt.Errorf("building snowflake dsn: %w", err)
 	}
@@ -238,9 +236,9 @@ func newTransactor(
 		var accountName string
 		if err := db.QueryRowContext(ctx, "SELECT CURRENT_ACCOUNT()").Scan(&accountName); err != nil {
 			return nil, fmt.Errorf("fetching current account name: %w", err)
-		} else if sm, err = newStreamManager(&cfg, open.Materialization.TaskName(), ep.Tenant, accountName, open.Range.KeyBegin); err != nil {
+		} else if sm, err = newStreamManager(&cfg, open.Materialization.TaskName(), accountName, open.Range.KeyBegin); err != nil {
 			return nil, fmt.Errorf("newStreamManager: %w", err)
-		} else if pipeClient, err = NewPipeClient(&cfg, accountName, ep.Tenant); err != nil {
+		} else if pipeClient, err = NewPipeClient(&cfg, accountName); err != nil {
 			return nil, fmt.Errorf("NewPipeClient: %w", err)
 		}
 

@@ -155,7 +155,7 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-bigquery",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
-		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
+		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
 				"project_id":  cfg.ProjectID,
 				"dataset":     cfg.Dataset,
@@ -186,7 +186,6 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       prepareNewTransactor(templates),
-				Tenant:              tenant,
 				ConcurrentApply:     true,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,

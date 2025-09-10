@@ -56,7 +56,7 @@ type Driver struct {
     ResourceSpecType Resource
     StartTunnel      func(context.Context, any) error
     NewEndpoint      func(context.Context, json.RawMessage, string) (*Endpoint, error)
-    PreReqs          func(context.Context, any, string) *cerrors.PrereqErr
+    PreReqs          func(context.Context, any) *cerrors.PrereqErr
 }
 ```
 
