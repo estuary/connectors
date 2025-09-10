@@ -50,18 +50,20 @@ func mustGetCfg(t *testing.T) config {
 }
 
 func TestIntegration(t *testing.T) {
-	sql.RunIntegrationTest(t, newDuckDriver(), "testdata/test.flow.yaml", "table")
-}
-
-func TestApply(t *testing.T) {
-	sql.RunApplyTest(t, newDuckDriver(), "testdata/test-apply.flow.yaml", func(path string) tableConfig {
-		return tableConfig{Table: path}
+	t.Run("materialize", func(t *testing.T) {
+		sql.RunMaterializationTest(t, newDuckDriver(), "testdata/materialize.flow.yaml", "table")
 	})
-}
 
-func TestMigration(t *testing.T) {
-	sql.RunMigrationTest(t, newDuckDriver(), "testdata/test-migrate.flow.yaml", func(path string) tableConfig {
-		return tableConfig{Table: path}
+	t.Run("apply", func(t *testing.T) {
+		sql.RunApplyTest(t, newDuckDriver(), "testdata/apply.flow.yaml", func(path string) tableConfig {
+			return tableConfig{Table: path}
+		})
+	})
+
+	t.Run("migrate", func(t *testing.T) {
+		sql.RunMigrationTest(t, newDuckDriver(), "testdata/migrate.flow.yaml", func(path string) tableConfig {
+			return tableConfig{Table: path}
+		})
 	})
 }
 

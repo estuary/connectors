@@ -56,7 +56,7 @@ func loadSpec(t *testing.T, path string) *pf.MaterializationSpec {
 
 const testTableIdentifer = "_flow_test_"
 
-func RunIntegrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	t *testing.T,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
@@ -263,6 +263,31 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 	cupaloy.SnapshotT(t, snap.String())
 }
 
+func RunMigrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+	t *testing.T,
+	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	sourcePath string,
+	makeResourceFn func(finalResourcePathPart string) RC,
+) {
+	ctx := context.Background()
+	var snap strings.Builder
+
+	bundledSource, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
+	require.NoError(t, err)
+
+	suffix := testTableIdentifer + fmt.Sprintf("%d", time.Now().Unix())
+
+	gjson.GetBytes(bundledSource, "materializations").ForEach(func(task, _ gjson.Result) bool {
+		taskName := task.String()
+		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
+		snap.WriteString(runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundledSource, suffix, makeResourceFn))
+
+		return true
+	})
+
+	cupaloy.SnapshotT(t, snap.String())
+}
+
 func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	t *testing.T,
 	ctx context.Context,
@@ -363,32 +388,6 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 	}
 
 	return snap.String()
-}
-
-func RunMigrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
-	t *testing.T,
-	driver Connector, // TODO: Not used?
-	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
-	sourcePath string,
-	makeResourceFn func(finalResourcePathPart string) RC,
-) {
-	ctx := context.Background()
-	var snap strings.Builder
-
-	bundledSource, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
-	require.NoError(t, err)
-
-	suffix := testTableIdentifer + fmt.Sprintf("%d", time.Now().Unix())
-
-	gjson.GetBytes(bundledSource, "materializations").ForEach(func(task, _ gjson.Result) bool {
-		taskName := task.String()
-		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
-		snap.WriteString(runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundledSource, suffix, makeResourceFn))
-
-		return true
-	})
-
-	cupaloy.SnapshotT(t, snap.String())
 }
 
 func renderTestTableData(t *testing.T, columnNames []string, rows [][]any) string {
