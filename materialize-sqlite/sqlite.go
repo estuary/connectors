@@ -65,7 +65,7 @@ func NewSQLiteDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-sqlite",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
-		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
+		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			var path = databasePath
 
 			// SQLite / go-sqlite3 is a bit fickle about raced opens of a newly created database,
@@ -92,7 +92,7 @@ func NewSQLiteDriver() *sql.Driver[config, tableConfig] {
 				ConcurrentApply:     false,
 			}, nil
 		},
-		PreReqs: func(context.Context, config, string) *cerrors.PrereqErr { return &cerrors.PrereqErr{} },
+		PreReqs: func(context.Context, config) *cerrors.PrereqErr { return &cerrors.PrereqErr{} },
 	}
 }
 

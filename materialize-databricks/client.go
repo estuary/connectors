@@ -220,7 +220,7 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 	return fmt.Sprintf("CREATE SCHEMA %s;", schemaName), err
 }
 
-func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
 		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),

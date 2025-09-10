@@ -24,13 +24,13 @@ type Driver[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]] s
 	// any operations that require connectivity to the database.
 	StartTunnel func(ctx context.Context, cfg EC) error
 	// NewEndpoint returns an *Endpoint which will be used to handle interactions with the database.
-	NewEndpoint func(_ context.Context, cfg EC, tenant string, featureFlags map[string]bool) (*Endpoint[EC], error)
+	NewEndpoint func(_ context.Context, cfg EC, featureFlags map[string]bool) (*Endpoint[EC], error)
 	// PreReqs performs verification checks that the provided configuration can
 	// be used to interact with the endpoint to the degree required by the
 	// connector, to as much of an extent as possible. The returned PrereqErr
 	// can include multiple separate errors if it possible to determine that
 	// there is more than one issue that needs corrected.
-	PreReqs func(ctx context.Context, cfg EC, tenant string) *cerrors.PrereqErr
+	PreReqs func(ctx context.Context, cfg EC) *cerrors.PrereqErr
 }
 
 var _ boilerplate.Connector = &Driver[boilerplate.EndpointConfiger, Resource]{}
@@ -90,7 +90,7 @@ func (d *Driver[EC, RC]) newMaterialization(ctx context.Context, materialization
 		return nil, fmt.Errorf("starting network tunnel: %w", err)
 	}
 
-	endpoint, err := d.NewEndpoint(ctx, cfg, mustGetTenantNameFromTaskName(materializationName), featureFlags)
+	endpoint, err := d.NewEndpoint(ctx, cfg, featureFlags)
 	if err != nil {
 		return nil, fmt.Errorf("creating endpoint: %w", err)
 	}
@@ -117,7 +117,7 @@ var _ boilerplate.Materializer[
 ] = &sqlMaterialization[boilerplate.EndpointConfiger, Resource]{}
 
 func (s *sqlMaterialization[EC, RC]) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
-	return s.driver.PreReqs(ctx, s.endpoint.Config, s.endpoint.Tenant)
+	return s.driver.PreReqs(ctx, s.endpoint.Config)
 }
 
 func (s *sqlMaterialization[EC, RC]) Config() boilerplate.MaterializeCfg {
@@ -412,10 +412,6 @@ func (c *checkpointRecoverer) RecoverCheckpoint(context.Context, pf.Materializat
 
 func (s *sqlMaterialization[EC, RC]) Close(ctx context.Context) {
 	s.client.Close()
-}
-
-func mustGetTenantNameFromTaskName(taskName string) string {
-	return strings.Split(taskName, "/")[0]
 }
 
 func getTable[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](endpoint *Endpoint[EC], materializationName string, binding boilerplate.MappedBinding[EC, RC, MappedType]) (Table, error) {

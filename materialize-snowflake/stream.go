@@ -38,7 +38,6 @@ type tableStream struct {
 type streamManager struct {
 	c            *streamClient
 	tableStreams map[int]*tableStream
-	tenant       string // used for the `ingestclientname` metadata
 	keyBegin     uint32
 	channelName  string
 
@@ -57,7 +56,7 @@ type streamManager struct {
 	blobStats map[int][]*blobStatsTracker
 }
 
-func newStreamManager(cfg *config, materialization string, tenant string, account string, keyBegin uint32) (*streamManager, error) {
+func newStreamManager(cfg *config, materialization string, account string, keyBegin uint32) (*streamManager, error) {
 	c, err := newStreamClient(cfg, account)
 	if err != nil {
 		return nil, fmt.Errorf("newStreamClient: %w", err)
@@ -66,7 +65,6 @@ func newStreamManager(cfg *config, materialization string, tenant string, accoun
 	return &streamManager{
 		c:            c,
 		tableStreams: make(map[int]*tableStream),
-		tenant:       tenant,
 		keyBegin:     keyBegin,
 		channelName:  channelName(materialization, keyBegin),
 		lastBinding:  -1,
@@ -159,7 +157,7 @@ func (sm *streamManager) startNewBlob(ctx context.Context, binding int) error {
 
 func (sm *streamManager) objMetadata() blob.WriterOption {
 	return blob.WithObjectMetadata(map[string]string{
-		"ingestclientname": fmt.Sprintf("%s_EstuaryFlow", sm.tenant),
+		"ingestclientname": "EstuaryFlow",
 		"ingestclientkey":  sm.prefix,
 	})
 }

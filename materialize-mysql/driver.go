@@ -253,7 +253,7 @@ func newMysqlDriver() *sql.Driver[config, tableConfig] {
 
 			return nil
 		},
-		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
+		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
 				"database": cfg.Database,
 				"address":  cfg.Address,
@@ -323,7 +323,6 @@ func newMysqlDriver() *sql.Driver[config, tableConfig] {
 				NewClient:           prepareNewClient(tzLocation),
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       prepareNewTransactor(templates),
-				Tenant:              tenant,
 				ConcurrentApply:     false,
 				Options: m.MaterializeOptions{
 					DBTJobTrigger: &cfg.DBTJobTrigger,
