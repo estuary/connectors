@@ -9,24 +9,85 @@
         "description": "Bucket to store materialized objects.",
         "order": 0
       },
-      "awsAccessKeyId": {
-        "type": "string",
-        "title": "AWS Access Key ID",
-        "description": "Access Key ID for writing data to the bucket.",
-        "order": 1
-      },
-      "awsSecretAccessKey": {
-        "type": "string",
-        "title": "AWS Secret Access key",
-        "description": "Secret Access Key for writing data to the bucket.",
-        "order": 2,
-        "secret": true
-      },
-      "region": {
-        "type": "string",
-        "title": "Region",
-        "description": "Region of the bucket to write to.",
-        "order": 3
+      "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/filesink/access-key-credentials",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSAccessKey",
+                "default": "AWSAccessKey",
+                "order": 0
+              },
+              "awsAccessKeyId": {
+                "type": "string",
+                "title": "AWS Access Key ID",
+                "description": "Access Key ID for writing data to the bucket.",
+                "order": 1
+              },
+              "awsSecretAccessKey": {
+                "type": "string",
+                "title": "AWS Secret Access key",
+                "description": "Secret Access Key for writing data to the bucket.",
+                "order": 2,
+                "secret": true
+              },
+              "awsRegion": {
+                "type": "string",
+                "title": "Region",
+                "description": "Region of the bucket to write to.",
+                "order": 3
+              }
+            },
+            "type": "object",
+            "required": [
+              "awsAccessKeyId",
+              "awsSecretAccessKey",
+              "awsRegion"
+            ],
+            "title": "Access Key"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/aws-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSIAM",
+                "default": "AWSIAM",
+                "order": 0
+              },
+              "aws_region": {
+                "type": "string",
+                "title": "AWS Region",
+                "description": "AWS Region of your resource"
+              },
+              "aws_role_arn": {
+                "type": "string",
+                "title": "AWS Role ARN",
+                "description": "AWS Role which has access to the resource which will be assumed by Flow"
+              }
+            },
+            "type": "object",
+            "required": [
+              "aws_region",
+              "aws_role_arn"
+            ],
+            "title": "AWS IAM"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "default": {
+          "auth_type": "AWSAccessKey"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
+        "order": 3,
+        "x-iam-auth": true
       },
       "uploadInterval": {
         "type": "string",
@@ -96,9 +157,7 @@
     "type": "object",
     "required": [
       "bucket",
-      "awsAccessKeyId",
-      "awsSecretAccessKey",
-      "region",
+      "credentials",
       "uploadInterval"
     ],
     "title": "EndpointConfig"
