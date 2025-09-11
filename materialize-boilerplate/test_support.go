@@ -64,6 +64,24 @@ func relativePath(t *testing.T, file string) string {
 	return filepath.Join(dir, file)
 }
 
+func RunTestAllTasks[EC EndpointConfiger](
+	t *testing.T,
+	sourcePath string,
+	testFn func(t *testing.T, bundled []byte, taskName string, cfg EC),
+) {
+	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
+	require.NoError(t, err, string(bundled))
+
+	gjson.GetBytes(bundled, "materializations").ForEach(func(task, _ gjson.Result) bool {
+		taskName := task.String()
+		cfg := decryptConfig[EC](t, bundled, taskName)
+		testFn(t, bundled, taskName, cfg)
+
+		return true
+	})
+
+}
+
 func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	t *testing.T,
 	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
@@ -72,18 +90,11 @@ func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 ) {
 	ctx := context.Background()
 	var snap strings.Builder
-
-	bundledSource, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
-	require.NoError(t, err)
-
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
-	gjson.GetBytes(bundledSource, "materializations").ForEach(func(task, _ gjson.Result) bool {
-		taskName := task.String()
+	RunTestAllTasks(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) {
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
-		snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundledSource, tsSuffix, makeResourceFn))
-
-		return true
+		snap.WriteString(runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn))
 	})
 
 	cupaloy.SnapshotT(t, snap.String())
@@ -144,7 +155,7 @@ func runMaterializationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Res
 	require.NoError(t, os.WriteFile(source, bundled, 0o600))
 
 	t.Cleanup(func() {
-		cleanupTestResources(t, ctx, materializer, testResourcePaths, tsSuffix)
+		CleanupTestResources(t, ctx, materializer, testResourcePaths, tsSuffix)
 		cleanupTestTasks(t, ctx, materializer, tsSuffix)
 	})
 
@@ -177,7 +188,7 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 		require.NoError(t, err)
 
 		var testResourcePaths [][]string
-		t.Cleanup(func() { cleanupTestResources(t, ctx, materializer, testResourcePaths, tsSuffix) })
+		t.Cleanup(func() { CleanupTestResources(t, ctx, materializer, testResourcePaths, tsSuffix) })
 
 		snap.WriteString("Task: " + key.String() + "\n\n")
 
@@ -303,7 +314,7 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 	require.NoError(t, err)
 
 	t.Cleanup(func() {
-		cleanupTestResources(t, ctx, materializer, [][]string{path}, suffix)
+		CleanupTestResources(t, ctx, materializer, [][]string{path}, suffix)
 		cleanupTestTasks(t, ctx, materializer, suffix)
 	})
 
@@ -765,7 +776,7 @@ func cleanupTestTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	}
 }
 
-func cleanupTestResources[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func CleanupTestResources[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
 	t *testing.T,
 	ctx context.Context,
 	m Materializer[EC, FC, RC, MT],

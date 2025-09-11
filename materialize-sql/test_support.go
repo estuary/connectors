@@ -2,18 +2,24 @@ package sql
 
 import (
 	"bytes"
+	"cmp"
 	"context"
 	stdsql "database/sql"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 	"testing"
 	"text/template"
+	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/common"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,37 +29,105 @@ import (
 // that produce standard snapshots.
 var snapshotPath = "../materialize-sql/.snapshots"
 
-// RunFenceTestCases is a generalized form of test cases over fencing behavior,
-// which ought to function with any Client implementation.
-func RunFenceTestCases(
+func RunMaterializationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
 	t *testing.T,
-	client Client,
-	checkpointsPath []string,
-	dialect Dialect,
-	createTableTpl *template.Template,
-	updateFence func(Table, Fence) error,
-	dumpTable func(Table) (string, error),
+	driver *Driver[EC, RC],
+	source string,
+	makeResourceFn func(string, bool) RC,
 ) {
+	boilerplate.RunMaterializationTest(t, driver.newMaterialization, source, makeResourceFn)
+}
+
+func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	sourcePath string,
+	makeResourceFn func(string, bool) RC,
+) {
+	boilerplate.RunApplyTest(t, driver, driver.newMaterialization, sourcePath, makeResourceFn)
+}
+
+func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	sourcePath string,
+	makeResourceFn func(string, bool) RC,
+) {
+	boilerplate.RunMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn)
+}
+
+// RunFencingTest is a generalized form of test cases over fencing behavior,
+// which ought to function with any Client implementation.
+func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
+	t *testing.T,
+	driver *Driver[EC, RC],
+	sourcePath string,
+	makeResourceFn func(string, bool) RC,
+	createTableTpl *template.Template,
+	updateFence func(context.Context, Client, Fence) error,
+) {
+	dumpTable := func(
+		ctx context.Context,
+		m boilerplate.Materializer[EC, FieldConfig, RC, MappedType],
+		path []string,
+	) (string, error) {
+		columnNames, rows, err := m.SnapshotTestResource(ctx, path)
+		if err != nil {
+			return "", err
+		}
+
+		var out strings.Builder
+		enc := json.NewEncoder(&out)
+		for _, r := range rows {
+			doc := make(map[string]any, len(columnNames))
+			for i, col := range columnNames {
+				doc[col] = r[i]
+			}
+			require.NoError(t, enc.Encode(doc))
+		}
+
+		return out.String(), nil
+	}
 
 	// runTest takes zero or more key range fixtures, followed by a final pair
 	// which is the key range under test.
-	var runTest = func(t *testing.T, ranges ...uint32) {
+	var runTest = func(t *testing.T, taskName string, cfg EC, ranges ...uint32) {
 		var ctx = context.Background()
+		tsSuffix := fmt.Sprintf("_flow_test_%d", time.Now().Unix())
+		rngSuffix := "_" + uuid.NewString()[:8] + tsSuffix
+
+		checkpointsTable := "temp_test_fencing_checkpoints" + rngSuffix
+
+		rawFlags, defaultFlags := cfg.FeatureFlags()
+		parsedFlags := common.ParseFeatureFlags(rawFlags, defaultFlags)
+
+		ep, err := driver.NewEndpoint(ctx, cfg, "estuary/testing", parsedFlags)
+		require.NoError(t, err)
+
+		m, err := driver.newMaterialization(ctx, taskName, cfg, parsedFlags)
+		require.NoError(t, err)
+
+		dialect := ep.Dialect
+		checkpointsRes := makeResourceFn(checkpointsTable, false).WithDefaults(cfg)
+		checkpointsPath, _, err := checkpointsRes.Parameters()
+		require.NoError(t, err)
+
+		client, err := ep.NewClient(ctx, ep)
+		require.NoError(t, err)
 
 		var metaShape = FlowCheckpointsTable(checkpointsPath)
 		metaShape.Path = checkpointsPath
-		var metaTable, err = ResolveTable(*metaShape, dialect)
+		metaTable, err := ResolveTable(*metaShape, dialect)
 		require.NoError(t, err)
+
+		defer func() {
+			boilerplate.CleanupTestResources(t, ctx, m, [][]string{checkpointsPath}, tsSuffix)
+		}()
 
 		createSQL, err := RenderTableTemplate(metaTable, createTableTpl)
 		require.NoError(t, err)
 		err = client.ExecStatements(ctx, []string{createSQL})
 		require.NoError(t, err)
-
-		defer func() {
-			err = client.ExecStatements(ctx, []string{fmt.Sprintf("DROP TABLE %s;", metaTable.Identifier)})
-			require.NoError(t, err)
-		}()
 
 		var fixtures = ranges[:len(ranges)-2]
 		var testCase = ranges[len(ranges)-2:]
@@ -81,7 +155,7 @@ func RunFenceTestCases(
 		})
 		require.NoError(t, err)
 
-		dump1, err := dumpTable(metaTable)
+		dump1, err := dumpTable(ctx, m, checkpointsPath)
 		require.NoError(t, err)
 
 		// Install the fence under test
@@ -95,14 +169,14 @@ func RunFenceTestCases(
 		})
 		require.NoError(t, err)
 
-		dump2, err := dumpTable(metaTable)
+		dump2, err := dumpTable(ctx, m, checkpointsPath)
 		require.NoError(t, err)
 
 		// Update it once.
 		fence.Checkpoint = append(fence.Checkpoint, []byte{0, 0, 0, 0, 0, 0, 0, 0}...)
-		require.NoError(t, updateFence(metaTable, fence))
+		require.NoError(t, updateFence(ctx, client, fence))
 
-		dump3, err := dumpTable(metaTable)
+		dump3, err := dumpTable(ctx, m, checkpointsPath)
 		require.NoError(t, err)
 
 		snapshotter := cupaloy.New(cupaloy.SnapshotSubdirectory(snapshotPath))
@@ -113,42 +187,44 @@ func RunFenceTestCases(
 				"\nAfter update:\n"+dump3)
 	}
 
-	// If a fence exactly matches a checkpoint, we'll fence that checkpoint and its parent
-	// but not siblings. The used checkpoint is that of the exact match.
-	t.Run("exact match", func(t *testing.T) {
-		runTest(t,
-			0, 99, // Unrelated sibling.
-			100, 199, // Exactly matched.
-			200, 299, // Unrelated sibling.
-			0, 1000, // Old parent.
-			100, 199)
-	})
-	// If a fence sub-divides a parent, we'll fence the parent and grand parent
-	// but not siblings of the parent. The checkpoint is the younger parent.
-	t.Run("split from parent", func(t *testing.T) {
-		runTest(t,
-			0, 499, // Younger uncle.
-			500, 799, // Younger parent.
-			800, 1000, // Other uncle.
-			0, 1000, // Grand parent.
-			500, 599)
-	})
-	// If a new range straddles existing ranges (this shouldn't ever happen),
-	// we'll fence the straddled ranges while taking the checkpoint of the parent.
-	t.Run("straddle", func(t *testing.T) {
-		runTest(t,
-			0, 499,
-			500, 1000,
-			0, 1000,
-			400, 599)
-	})
-	// If a new range covers another (this also shouldn't ever happen),
-	// it takes the checkpoint of its parent while also fencing the covered sub-range.
-	t.Run("covered child", func(t *testing.T) {
-		runTest(t,
-			100, 199,
-			0, 1000,
-			100, 800)
+	boilerplate.RunTestAllTasks(t, sourcePath, func(t *testing.T, _ []byte, taskName string, cfg EC) {
+		// If a fence exactly matches a checkpoint, we'll fence that checkpoint and its parent
+		// but not siblings. The used checkpoint is that of the exact match.
+		t.Run("exact match", func(t *testing.T) {
+			runTest(t, taskName, cfg,
+				0, 99, // Unrelated sibling.
+				100, 199, // Exactly matched.
+				200, 299, // Unrelated sibling.
+				0, 1000, // Old parent.
+				100, 199)
+		})
+		// If a fence sub-divides a parent, we'll fence the parent and grand parent
+		// but not siblings of the parent. The checkpoint is the younger parent.
+		t.Run("split from parent", func(t *testing.T) {
+			runTest(t, taskName, cfg,
+				0, 499, // Younger uncle.
+				500, 799, // Younger parent.
+				800, 1000, // Other uncle.
+				0, 1000, // Grand parent.
+				500, 599)
+		})
+		// If a new range straddles existing ranges (this shouldn't ever happen),
+		// we'll fence the straddled ranges while taking the checkpoint of the parent.
+		t.Run("straddle", func(t *testing.T) {
+			runTest(t, taskName, cfg,
+				0, 499,
+				500, 1000,
+				0, 1000,
+				400, 599)
+		})
+		// If a new range covers another (this also shouldn't ever happen),
+		// it takes the checkpoint of its parent while also fencing the covered sub-range.
+		t.Run("covered child", func(t *testing.T) {
+			runTest(t, taskName, cfg,
+				100, 199,
+				0, 1000,
+				100, 800)
+		})
 	})
 }
 
@@ -298,84 +374,7 @@ func RunSqlGenTests(
 	return &snap, tables
 }
 
-func DumpTestTable(t *testing.T, db *stdsql.DB, qualifiedTableName string) (string, error) {
-	t.Helper()
-	var b strings.Builder
-
-	var sql = fmt.Sprintf("select * from %s;", qualifiedTableName)
-
-	rows, err := db.Query(sql)
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-
-	cols, err := rows.Columns()
-	if err != nil {
-		return "", err
-	}
-	colTypes, err := rows.ColumnTypes()
-	if err != nil {
-		return "", err
-	}
-
-	for i, col := range cols {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		b.WriteString(col)
-		b.WriteString(" (" + colTypes[i].DatabaseTypeName() + ")")
-	}
-
-	for rows.Next() {
-		var data = make([]anyColumn, len(cols))
-		var ptrs = make([]interface{}, len(cols))
-		for i := range data {
-			ptrs[i] = &data[i]
-		}
-		if err = rows.Scan(ptrs...); err != nil {
-			return "", err
-		}
-		b.WriteString("\n")
-		for i, v := range ptrs {
-			if i > 0 {
-				b.WriteString(", ")
-			}
-			var val = v.(*anyColumn)
-			b.WriteString(val.String())
-		}
-	}
-	return b.String(), nil
-}
-
-func RunMaterializationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
-	t *testing.T,
-	driver *Driver[EC, RC],
-	source string,
-	makeResourceFn func(string, bool) RC,
-) {
-	boilerplate.RunMaterializationTest(t, driver.newMaterialization, source, makeResourceFn)
-}
-
-func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
-	t *testing.T,
-	driver *Driver[EC, RC],
-	sourcePath string,
-	makeResourceFn func(string, bool) RC,
-) {
-	boilerplate.RunApplyTest(t, driver, driver.newMaterialization, sourcePath, makeResourceFn)
-}
-
-func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
-	t *testing.T,
-	driver *Driver[EC, RC],
-	sourcePath string,
-	makeResourceFn func(string, bool) RC,
-) {
-	boilerplate.RunMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn)
-}
-
-func DumpTableRows(ctx context.Context, db *stdsql.DB, tableIdentifier string) ([]string, [][]any, error) {
+func DumpTestTableRows(ctx context.Context, db *stdsql.DB, tableIdentifier string) ([]string, [][]any, error) {
 	sql := fmt.Sprintf("select * from %s;", tableIdentifier)
 
 	rows, err := db.QueryContext(ctx, sql)
@@ -403,5 +402,72 @@ func DumpTableRows(ctx context.Context, db *stdsql.DB, tableIdentifier string) (
 		out = append(out, data)
 	}
 
+	slices.SortFunc(out, func(a, b []any) int {
+		// Compare each column in order
+		for col := 0; col < len(a) && col < len(b); col++ {
+			cmp := compareValues(a[col], b[col])
+			if cmp == 0 {
+				continue
+			}
+
+			return cmp
+		}
+
+		return 0 // all columns equal
+	})
+
 	return cols, out, nil
+}
+
+func compareValues(a, b any) int {
+	if a == nil && b == nil {
+		return 0
+	} else if a == nil {
+		return -1
+	} else if b == nil {
+		return 1
+	}
+
+	aVal := normalizeValue(a)
+	bVal := normalizeValue(b)
+
+	switch av := aVal.(type) {
+	case int64:
+		if bv, ok := bVal.(int64); ok {
+			return cmp.Compare(av, bv)
+		}
+	case float64:
+		if bv, ok := bVal.(float64); ok {
+			return cmp.Compare(av, bv)
+		}
+	}
+
+	return compareAsStrings(a, b)
+}
+
+func normalizeValue(v any) any {
+	switch val := v.(type) {
+	case int:
+		return int64(val)
+	case int32:
+		return int64(val)
+	case int64:
+		return val
+	case float32:
+		return float64(val)
+	case float64:
+		return val
+	case string:
+		return val
+	case []byte:
+		return string(val)
+	default:
+		return fmt.Sprintf("%v", val)
+	}
+}
+
+func compareAsStrings(a, b any) int {
+	sa := fmt.Sprintf("%v", a)
+	sb := fmt.Sprintf("%v", b)
+	return cmp.Compare(sa, sb)
 }

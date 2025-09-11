@@ -52,31 +52,23 @@ func TestIntegration(t *testing.T) {
 	t.Run("migrate", func(t *testing.T) {
 		sql.RunMigrationTest(t, newPostgresDriver(), "testdata/migrate.flow.yaml", makeResourceFn)
 	})
-}
 
-func TestFencingCases(t *testing.T) {
-	var ctx = context.Background()
-
-	c, err := newClient(ctx, &sql.Endpoint[config]{Config: testConfig()})
-	require.NoError(t, err)
-	defer c.Close()
-
-	sql.RunFenceTestCases(t,
-		c,
-		[]string{"temp_test_fencing_checkpoints"},
-		pgDialect,
-		tplCreateTargetTable,
-		func(table sql.Table, fence sql.Fence) error {
-			var fenceUpdate strings.Builder
-			if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
-			}
-			return c.ExecStatements(ctx, []string{fenceUpdate.String()})
-		},
-		func(table sql.Table) (out string, err error) {
-			return sql.StdDumpTable(ctx, c.(*client).db, table)
-		},
-	)
+	t.Run("fence", func(t *testing.T) {
+		sql.RunFencingTest(
+			t,
+			newPostgresDriver(),
+			"testdata/fence.flow.yaml",
+			makeResourceFn,
+			tplCreateTargetTable,
+			func(ctx context.Context, client sql.Client, fence sql.Fence) error {
+				var fenceUpdate strings.Builder
+				if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
+					return fmt.Errorf("evaluating fence template: %w", err)
+				}
+				return client.ExecStatements(ctx, []string{fenceUpdate.String()})
+			},
+		)
+	})
 }
 
 func TestPrereqs(t *testing.T) {

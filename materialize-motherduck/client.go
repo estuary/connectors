@@ -198,7 +198,7 @@ func (c *client) CleanupTestTask(ctx context.Context, taskName string) error {
 }
 
 func (c *client) SnapshotTestResource(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
-	return sql.DumpTableRows(ctx, c.db, duckDialect.Identifier(path...))
+	return sql.DumpTestTableRows(ctx, c.db, duckDialect.Identifier(path...))
 }
 
 func (c *client) Close() {

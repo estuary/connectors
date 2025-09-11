@@ -241,7 +241,7 @@ func (c *client) SnapshotTestResource(ctx context.Context, path []string) (colum
 	}
 	defer db.Close()
 
-	return sql.DumpTableRows(ctx, db, pgDialect.Identifier(path...))
+	return sql.DumpTestTableRows(ctx, db, pgDialect.Identifier(path...))
 }
 
 func (c *client) Close() {

@@ -162,7 +162,7 @@ func TestFencingCases(t *testing.T) {
 	require.NoError(t, err)
 	defer c.Close()
 
-	sql.RunFenceTestCases(t,
+	sql.RunFencingTest(t,
 		c,
 		[]string{"temp_test_fencing_checkpoints"},
 		crateDialect,
