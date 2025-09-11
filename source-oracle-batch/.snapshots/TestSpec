@@ -56,6 +56,11 @@
             "title": "SSL Mode",
             "description": "Overrides SSL connection behavior by setting the 'sslmode' parameter."
           },
+          "source_tag": {
+            "type": "string",
+            "title": "Source Tag",
+            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document."
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
