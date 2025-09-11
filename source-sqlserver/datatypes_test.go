@@ -198,3 +198,33 @@ func TestBitNotNullDeletion(t *testing.T) {
 
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+// TestRowversionTypes exercises the TIMESTAMP / ROWVERSION column type using both names.
+// We test this separately from the main datatypes test because these IDs are usually
+// tracked implicitly by the database and aren't specified by the client.
+func TestRowversionTypes(t *testing.T) {
+	var tb, ctx = sqlserverTestBackend(t), context.Background()
+	for _, columnType := range []string{"timestamp", "rowversion"} {
+		t.Run(columnType, func(t *testing.T) {
+			var uniqueID = uniqueTableID(t)
+			var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR(32), rv "+columnType+")")
+
+			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+			setShutdownAfterCaughtUp(t, true)
+
+			t.Run("discovery", func(t *testing.T) {
+				cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+			})
+
+			t.Run("capture", func(t *testing.T) {
+				cs.Sanitizers[`"rv":"<REDACTED>"`] = regexp.MustCompile(`"rv":"[a-zA-Z0-9+/=]+"`)
+				tb.Query(ctx, t, fmt.Sprintf("INSERT INTO %s (id, data) VALUES (1, 'first'), (2, 'second')", tableName))
+				cs.Capture(ctx, t, nil)
+				tb.Query(ctx, t, fmt.Sprintf("INSERT INTO %s (id, data) VALUES (3, 'third'), (4, 'fourth')", tableName))
+				tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET data = 'updated' WHERE id = 2", tableName))
+				cs.Capture(ctx, t, nil)
+				cupaloy.SnapshotT(t, cs.Summary())
+			})
+		})
+	}
+}

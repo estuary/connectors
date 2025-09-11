@@ -541,4 +541,8 @@ var sqlserverTypeToJSON = map[string]columnSchema{
 	"smalldatetime": {jsonType: "string", format: "date-time"},
 
 	"hierarchyid": {jsonType: "string", contentEncoding: "base64"},
+
+	// A 'timestamp' in SQL Server is not a timestamp as it's usually meant, it's
+	// actually a monotonic integer ID and is also called 'rowversion'.
+	"timestamp": {jsonType: "string", contentEncoding: "base64"},
 }
