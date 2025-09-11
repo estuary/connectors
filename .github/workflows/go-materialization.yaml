@@ -1,4 +1,6 @@
 name: Go Materialization Connectors
+permissions:
+  contents: read
 
 on:
   push:
