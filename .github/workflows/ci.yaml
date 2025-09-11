@@ -111,7 +111,6 @@ jobs:
           - materialize-iceberg
           - materialize-kafka
           - materialize-mongodb
-          - materialize-motherduck
           - materialize-mysql
           - materialize-pinecone
           - materialize-postgres
@@ -277,7 +276,7 @@ jobs:
         run: CONNECTOR=${{ matrix.connector }} VERSION=local ./tests/run.sh;
 
       - name: Install duckdb
-        if: matrix.connector == 'materialize-motherduck' || matrix.connector == 'materialize-s3-iceberg'
+        if: matrix.connector == 'materialize-s3-iceberg'
         uses: opt-nc/setup-duckdb-action@v1.0.8
         with:
           version: v1.3.1
@@ -295,7 +294,6 @@ jobs:
               "materialize-sqlserver",
               "materialize-kafka",
               "materialize-mongodb",
-              "materialize-motherduck",
               "materialize-snowflake",
               "materialize-databricks",
               "materialize-azure-fabric-warehouse",
