@@ -12,13 +12,10 @@ import (
 
 	storage "cloud.google.com/go/storage"
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	"github.com/aws/aws-sdk-go-v2/credentials/stscreds"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/blob"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -49,7 +46,7 @@ type CredentialsConfig struct {
 	AuthType AuthType `json:"auth_type"`
 
 	AccessKeyCredentials
-	iam.AWSConfig
+	iam.IAMConfig
 }
 
 func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
@@ -76,11 +73,8 @@ func (c *CredentialsConfig) Validate() error {
 		}
 		return nil
 	case AWSIAM:
-		if c.AWSRole == "" {
-			return errors.New("missing 'aws_role_arn'")
-		}
-		if c.AWSConfig.AWSRegion == "" {
-			return errors.New("missing 'aws_region'")
+		if err := c.ValidateIAM(); err != nil {
+			return err
 		}
 		return nil
 	}
@@ -148,7 +142,7 @@ func (c S3StoreConfig) Validate() error {
 	return nil
 }
 
-func (c S3StoreConfig) CredentialsProvider(ctx context.Context, opts ...func(*awsConfig.LoadOptions) error) (aws.CredentialsProvider, error) {
+func (c S3StoreConfig) CredentialsProvider(ctx context.Context) (aws.CredentialsProvider, error) {
 	if c.Credentials == nil {
 		return credentials.NewStaticCredentialsProvider(c.AWSAccessKeyID, c.AWSSecretAccessKey, ""), nil
 	}
@@ -158,22 +152,22 @@ func (c S3StoreConfig) CredentialsProvider(ctx context.Context, opts ...func(*aw
 		return credentials.NewStaticCredentialsProvider(
 			c.Credentials.AWSAccessKeyID, c.Credentials.AWSSecretAccessKey, ""), nil
 	case AWSIAM:
-		awsCfg, err := config.LoadDefaultConfig(ctx, opts...)
-		if err != nil {
-			return nil, fmt.Errorf("creating aws config: %w", err)
-		}
-		stsClient := sts.NewFromConfig(awsCfg)
-		assumeRoleProvider := stscreds.NewAssumeRoleProvider(stsClient, c.Credentials.AWSRole, nil)
-		return aws.NewCredentialsCache(assumeRoleProvider), nil
+		return c.Credentials.IAMTokens.AWSCredentialsProvider(), nil
 	}
 	return nil, errors.New("unknown 'auth_type'")
 }
 
 func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
-	region := cfg.AWSRegion()
-	opts := []func(*awsConfig.LoadOptions) error{
-		awsConfig.WithRegion(region),
+	credProvider, err := cfg.CredentialsProvider(ctx)
+	if err != nil {
+		return nil, err
 	}
+
+	opts := []func(*awsConfig.LoadOptions) error{
+		awsConfig.WithCredentialsProvider(credProvider),
+		awsConfig.WithRegion(cfg.AWSRegion()),
+	}
+
 	if cfg.Endpoint != "" {
 		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
 			return aws.Endpoint{URL: cfg.Endpoint}, nil
@@ -181,14 +175,6 @@ func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
 
 		opts = append(opts, awsConfig.WithEndpointResolverWithOptions(customResolver))
 	}
-
-	credProvider, err := cfg.CredentialsProvider(ctx, opts...)
-	if err != nil {
-		return nil, err
-	}
-	opts = append(opts,
-		awsConfig.WithCredentialsProvider(credProvider),
-	)
 
 	awsCfg, err := awsConfig.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
