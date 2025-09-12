@@ -305,7 +305,7 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 	collections := gjson.GetBytes(bundledMigratedCollection, "collections")
 	require.Len(t, collections.Map(), 1)
 	collections.ForEach(func(collectionName, spec gjson.Result) bool {
-		bundled, err = sjson.SetBytes(bundled, fmt.Sprintf("collections.%s", collectionName.String()), spec.Value())
+		bundled, err = sjson.SetBytes(bundled, fmt.Sprintf("collections.%s", collectionName.String()), json.RawMessage(spec.Raw))
 		require.NoError(t, err)
 		return false
 	})
@@ -325,12 +325,13 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 		{source: initialSource, fixture: relativePath(t, "testdata/integration/fixture.migration-initial.json")},
 		{source: migratedSource, fixture: relativePath(t, "testdata/integration/fixture.migration-migrated.json")},
 	} {
+
 		actionDescription := runFlowctl(
 			t,
 			"preview",
 			"--name", workingTaskName,
 			"--source", tc.source,
-			"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
+			"--fixture", tc.fixture,
 			"--network", "flow-test",
 			"--output-apply",
 		)
@@ -367,6 +368,7 @@ func snapshotTestTable[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, E
 	if withTableData {
 		columnNames, rows, err := m.SnapshotTestResource(ctx, path)
 		require.NoError(t, err)
+		snap.WriteString("Table Data:\n")
 		snap.WriteString(renderTestTableData(t, columnNames, rows))
 		snap.WriteString("\n")
 	}

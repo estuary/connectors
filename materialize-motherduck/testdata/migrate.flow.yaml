@@ -19,5 +19,5 @@ materializations:
         recommended: true
         exclude:
           - durationToString # TODO(whb): Fix
-          - datetimeToString
+          # - datetimeToString
           - uuidToString

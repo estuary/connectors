@@ -4,20 +4,17 @@ collections:
       type: object
       properties:
         id: { type: integer }
-
         bigIntToNum: { type: number }
-        # bigIntToHugeInt: { type: integer, maximum: 18446744073709551615 }
+        bigIntToHugeInt: { type: integer, maximum: 18446744073709551615 }
         hugeIntToNum: { type: number }
-
         arrayToMulti: { type: [array, boolean] }
         binaryToMulti: { type: [string, boolean], contentEncoding: base64 }
         boolToMulti: { type: [boolean, string] }
         intToMulti: { type: [integer, boolean] }
-        # hugeIntToMulti: { type: [integer, boolean], maximum: 18446744073709551615 }
+        hugeIntToMulti: { type: [integer, boolean], maximum: 18446744073709551615 }
         numToMulti: { type: [number, boolean] }
         objectToMulti: { type: [object, boolean] }
         stringToMulti: { type: [string, boolean] }
-        
         binaryToString: { type: string }
         intToString: { type: string }
         hugeIntToString: { type: string }
