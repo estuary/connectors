@@ -140,7 +140,7 @@ func (c S3StoreConfig) CredentialsProvider(ctx context.Context) (aws.Credentials
 		return credentials.NewStaticCredentialsProvider(
 			c.Credentials.AWSAccessKeyID, c.Credentials.AWSSecretAccessKey, ""), nil
 	case AWSIAM:
-		return c.Credentials.IAMTokens.AWSCredentialsProvider(), nil
+		return c.Credentials.IAMTokens.AWSCredentialsProvider()
 	}
 	return nil, errors.New("unknown 'auth_type'")
 }
