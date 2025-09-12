@@ -82,7 +82,7 @@ func preReqs(ctx context.Context, conf config, tenant string) *cerrors.PrereqErr
 	return errs
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	catalog := c.cfg.Database
 	if catalog == "" {
 		// An endpoint-level database configuration is not required, so query for the active
@@ -193,6 +193,55 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	return sql.StdInstallFence(ctx, c.db, checkpoints, fence)
+}
+
+func (c *client) ListTestTasks(ctx context.Context) ([]string, error) {
+	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(
+		"select materialization from %s;",
+		pgDialect.Identifier(c.cfg.Database, c.cfg.Schema, sql.DefaultFlowCheckpoints),
+	))
+	if err != nil {
+		return nil, fmt.Errorf("querying materializations from checkpoints table: %w", err)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var taskName string
+		if err := rows.Scan(&taskName); err != nil {
+			return nil, fmt.Errorf("scanning row: %w", err)
+		}
+		out = append(out, taskName)
+	}
+
+	return out, nil
+}
+
+func (c *client) CleanupTestTask(ctx context.Context, taskName string) error {
+	_, err := c.db.ExecContext(ctx, fmt.Sprintf(
+		"delete from %s where materialization='%s';",
+		pgDialect.Identifier(c.cfg.Database, c.cfg.Schema, sql.DefaultFlowCheckpoints),
+		taskName,
+	))
+
+	return err
+}
+
+func (c *client) SnapshotTestResource(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	// Use a fresh connection for this operation to prevent problems with cached
+	// query plans for migration test cases.
+	uri, err := c.cfg.ToURI(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("building connection URI: %w", err)
+	}
+
+	db, err := stdsql.Open("pgx", uri)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer db.Close()
+
+	return sql.DumpTestTableRows(ctx, db, pgDialect.Identifier(path...))
 }
 
 func (c *client) Close() {

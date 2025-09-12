@@ -34,7 +34,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 	}, nil
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, c.ep.Config.Database, resourcePaths)
 }
 
@@ -163,6 +163,42 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	return sql.StdInstallFence(ctx, c.db, checkpoints, fence)
+}
+
+func (c *client) ListTestTasks(ctx context.Context) ([]string, error) {
+	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(
+		"select materialization from %s;",
+		duckDialect.Identifier(c.ep.Config.Database, c.ep.Config.Schema, sql.DefaultFlowCheckpoints),
+	))
+	if err != nil {
+		return nil, fmt.Errorf("querying materializations from checkpoints table: %w", err)
+	}
+	defer rows.Close()
+
+	var out []string
+	for rows.Next() {
+		var taskName string
+		if err := rows.Scan(&taskName); err != nil {
+			return nil, fmt.Errorf("scanning row: %w", err)
+		}
+		out = append(out, taskName)
+	}
+
+	return out, nil
+}
+
+func (c *client) CleanupTestTask(ctx context.Context, taskName string) error {
+	_, err := c.db.ExecContext(ctx, fmt.Sprintf(
+		"delete from %s where materialization='%s';",
+		duckDialect.Identifier(c.ep.Config.Database, c.ep.Config.Schema, sql.DefaultFlowCheckpoints),
+		taskName,
+	))
+
+	return err
+}
+
+func (c *client) SnapshotTestResource(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	return sql.DumpTestTableRows(ctx, c.db, duckDialect.Identifier(path...))
 }
 
 func (c *client) Close() {

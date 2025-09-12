@@ -76,7 +76,7 @@ func preReqs(ctx context.Context, conf config, tenant string) *cerrors.PrereqErr
 	return errs
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, resourcePaths [][]string, is *boilerplate.InfoSchema) error {
 	catalog := c.cfg.Database
 	if catalog == "" {
 		// An endpoint-level database configuration is not required, so query for the active

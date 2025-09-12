@@ -1,0 +1,11 @@
+materializations:
+  acmeCo/tests/materialize-postgres:
+    endpoint:
+      local:
+        command:
+          - go
+          - run
+          - .
+        protobuf: true
+        config: config.local.latest.yaml
+    bindings: []

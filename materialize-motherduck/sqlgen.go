@@ -46,12 +46,13 @@ var duckDialect = func() sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"double":  {sql.NewMigrationSpec([]string{"varchar"})},
-			"bigint":  {sql.NewMigrationSpec([]string{"double", "hugeint", "varchar"})},
-			"hugeint": {sql.NewMigrationSpec([]string{"double", "varchar"})},
-			"date":    {sql.NewMigrationSpec([]string{"varchar"})},
-			"time":    {sql.NewMigrationSpec([]string{"varchar"})},
-			"*":       {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			"double":                   {sql.NewMigrationSpec([]string{"varchar"})},
+			"bigint":                   {sql.NewMigrationSpec([]string{"double", "hugeint", "varchar"})},
+			"hugeint":                  {sql.NewMigrationSpec([]string{"double", "varchar"})},
+			"date":                     {sql.NewMigrationSpec([]string{"varchar"})},
+			"timestamp with time zone": {sql.NewMigrationSpec([]string{"varchar"}, sql.WithCastSQL(datetimeToStringCast))},
+			"time":                     {sql.NewMigrationSpec([]string{"varchar"})},
+			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
@@ -75,12 +76,9 @@ var duckDialect = func() sql.Dialect {
 	}
 }()
 
-/* TODO: Unfortunately I have not been able to get this working, I keep getting an error about this
-   function not existing... which is strange
-
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`strftime(timezone('UTC', %s), '%%Y-%%m-%%dT%%H:%%M:%%S.%%fZ')`, migration.Identifier)
-}*/
+}
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`to_json(%s)`, migration.Identifier)

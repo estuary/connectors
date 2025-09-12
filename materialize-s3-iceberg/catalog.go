@@ -19,7 +19,7 @@ func newCatalog(cfg config) *catalog {
 	return &catalog{cfg: &cfg}
 }
 
-func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *catalog) PopulateInfoSchema(ctx context.Context, resourcePaths [][]string, is *boilerplate.InfoSchema) error {
 	if len(resourcePaths) == 0 {
 		// No bindings so there are no tables that we care about; nothing to do.
 		return nil

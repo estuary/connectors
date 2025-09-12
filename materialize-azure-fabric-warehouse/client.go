@@ -40,7 +40,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 	}, nil
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, resourcePaths [][]string, is *boilerplate.InfoSchema) error {
 	// The body of this function is a copy of sql.StdPopulateInfoSchema, except the
 	// identifiers for the information schema views need to be in capital
 	// letters for Fabric Warehouse. I'd hope to replace this at some point with

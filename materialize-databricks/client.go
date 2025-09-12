@@ -58,7 +58,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 	}, nil
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, resourcePaths [][]string, is *boilerplate.InfoSchema) error {
 	rpSchemas := make(map[string]struct{})
 	for _, p := range resourcePaths {
 		rpSchemas[databricksDialect.TableLocator(p).TableSchema] = struct{}{}
