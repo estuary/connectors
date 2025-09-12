@@ -37,8 +37,8 @@ type S3Store struct {
 }
 
 type AccessKeyCredentials struct {
-	AWSAccessKeyID     string `json:"aws_access_key_id" jsonschema:"title=AWS Access Key ID,description=Access Key ID for writing data to the bucket." jsonschema_extras:"order=1"`
-	AWSSecretAccessKey string `json:"aws_secret_access_key" jsonschema:"title=AWS Secret Access key,description=Secret Access Key for writing data to the bucket." jsonschema_extras:"secret=true,order=2"`
+	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=AWS Access Key ID,description=Access Key ID for writing data to the bucket." jsonschema_extras:"order=1"`
+	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=AWS Secret Access key,description=Secret Access Key for writing data to the bucket." jsonschema_extras:"secret=true,order=2"`
 }
 
 type CredentialsConfig struct {
@@ -62,10 +62,10 @@ func (c *CredentialsConfig) Validate() error {
 	switch c.AuthType {
 	case AWSAccessKey:
 		if c.AWSAccessKeyID == "" {
-			return errors.New("missing 'aws_access_key_id'")
+			return errors.New("missing 'awsAccessKeyId'")
 		}
 		if c.AWSSecretAccessKey == "" {
-			return errors.New("missing 'aws_secret_access_key'")
+			return errors.New("missing 'awsSecretAccessKey'")
 		}
 		return nil
 	case AWSIAM:
