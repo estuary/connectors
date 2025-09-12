@@ -28,17 +28,15 @@ INCREMENTAL_RESOURCES: list[
 
 
 async def validate_credentials(log: Logger, http: HTTPSession, config: EndpointConfig):
-    url = f"{config.base_url}/rum/events/search"
+    url = f"{config.base_url}/logs/events/search"
     headers = config.common_headers
     body = {
         "filter": {
             "from": "now-1s",
-            "query": "*",
         },
         "page": {
             "limit": 1,
         },
-        "sort": "timestamp",
     }
 
     try:
