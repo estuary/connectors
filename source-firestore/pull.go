@@ -24,7 +24,9 @@ import (
 	"google.golang.org/api/option"
 	"google.golang.org/api/transport"
 	firestore_pb "google.golang.org/genproto/googleapis/firestore/v1"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -436,7 +438,11 @@ func (c *capture) Run(ctx context.Context) error {
 	// Connect to Firestore gRPC API
 	var credsOpt = option.WithCredentialsJSON([]byte(c.Config.CredentialsJSON))
 	var scopesOpt = option.WithScopes(firebaseScopes...)
-	rpcClient, err := firestore_v1.NewClient(ctx, credsOpt, scopesOpt)
+	var keepaliveOpt = option.WithGRPCDialOption(grpc.WithKeepaliveParams(keepalive.ClientParameters{
+		Time:                5 * time.Minute, // Ping the server after 5 minutes of inactivity
+		PermitWithoutStream: true,            // Send keepalives even if there are no active RPCs (this shouldn't be the case, but won't hurt)
+	}))
+	rpcClient, err := firestore_v1.NewClient(ctx, credsOpt, scopesOpt, keepaliveOpt)
 	if err != nil {
 		return err
 	}
