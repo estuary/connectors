@@ -25,6 +25,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -72,7 +73,7 @@ func RunTestAllTasks[EC EndpointConfiger](
 	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
 	require.NoError(t, err, string(bundled))
 
-	t.Log("bundled", string(bundled))
+	log.WithField("bundled", string(bundled)).Warn("bundled spec")
 
 	thing := len(gjson.GetBytes(bundled, "materializations").Map())
 	require.Greater(t, thing, 0, "no materializations found in %s", sourcePath)
