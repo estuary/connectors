@@ -69,7 +69,7 @@ func (c *IAMConfig) ValidateIAM() error {
 			return errors.New("missing 'aws_region'")
 		}
 		if c.AWSRole == "" {
-			return errors.New("missing 'aws_role'")
+			return errors.New("missing 'aws_role_arn'")
 		}
 	case GCPIAM:
 		if c.GCPServiceAccount == "" {
@@ -102,7 +102,16 @@ func (c IAMTokens) Provider() string {
 	}
 }
 
-func (c IAMTokens) AWSCredentialsProvider() aws.CredentialsProvider {
+func (c IAMTokens) AWSCredentialsProvider() (aws.CredentialsProvider, error) {
+	if c.AWSAccessKeyID == "" {
+		return nil, errors.New("missing iam session 'aws_access_key_id'")
+	}
+	if c.AWSSecretAccessKey == "" {
+		return nil, errors.New("missing iam session 'aws_secret_access_key'")
+	}
+	if c.AWSSessionToken == "" {
+		return nil, errors.New("missing iam session 'aws_session_token'")
+	}
 	return credentials.StaticCredentialsProvider{
 		Value: aws.Credentials{
 			AccessKeyID:     c.AWSAccessKeyID,
@@ -110,7 +119,7 @@ func (c IAMTokens) AWSCredentialsProvider() aws.CredentialsProvider {
 			SessionToken:    c.AWSSessionToken,
 			Source:          "flow-iam-generated",
 		},
-	}
+	}, nil
 }
 
 func (c IAMTokens) GoogleToken() string {
