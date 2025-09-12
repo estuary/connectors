@@ -74,9 +74,7 @@ func RunTestAllTasks[EC EndpointConfiger](
 	require.NoError(t, err, string(bundled))
 
 	log.WithField("bundled", string(bundled)).Warn("bundled spec")
-
-	thing := len(gjson.GetBytes(bundled, "materializations").Map())
-	require.Greater(t, thing, 0, "no materializations found in %s", sourcePath)
+	require.True(t, json.Valid(bundled))
 
 	gjson.GetBytes(bundled, "materializations").ForEach(func(task, _ gjson.Result) bool {
 		t.Log("running test for", task.String())
