@@ -171,6 +171,9 @@ async def fetch_incremental_resources(
     assert isinstance(log_cursor, datetime)
 
     now = datetime.now(tz=UTC)
+    lower_bound = log_cursor
+    upper_bound = now - horizon if horizon else now
+
     if log_cursor >= now - timedelta(seconds=5):
         # Klaviyo returns an error if we use a datetime that's too close to the present
         # in the filter query parameter. If the log_cursor is less than N seconds in the past,
@@ -183,7 +186,7 @@ async def fetch_incremental_resources(
         "filter": _construct_filter_param(
             cursor_field=model.cursor_field,
             lower_bound_operator=LowerBoundOperator.GREATER_THAN,
-            lower_bound=log_cursor,
+            lower_bound=lower_bound,
             additional_filters=model.additional_filters,
         )
     }
@@ -210,12 +213,13 @@ async def fetch_incremental_resources(
             })
             raise RuntimeError(msg)
 
-        # If this is a delayed stream, stop paginating if
-        # we see a document updated on or after the delay horizon.
-        if (
-            horizon and
-            doc_cursor >= now - horizon
-        ):
+        # If we see a document with a cursor field value on or after
+        # the upper bound datetime, stop paginating. This prevents 
+        # delayed streams from progressing too close to the present
+        # and also prevents real-time streams from moving far into
+        # the future when Klaviyo returns records that have a cursor
+        # field in the future.
+        if doc_cursor >= upper_bound:
             break
 
         # If we see a document updated more recently than the previous
