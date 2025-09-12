@@ -11,8 +11,8 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
-# Copy in the latest flowctl-go for usage by tests.
-COPY flow-bin/flowctl-go /usr/local/bin/flowctl-go
+# Copy in the latest flowctl for usage by tests.
+COPY flow-bin/flowctl /usr/local/bin/flowctl
 
 COPY go                      ./go
 COPY materialize-boilerplate ./materialize-boilerplate
@@ -39,3 +39,5 @@ USER nonroot:nonroot
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
 ENTRYPOINT ["/connector/materialize-motherduck"]
+
+
