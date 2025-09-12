@@ -210,6 +210,7 @@ func TestRowversionTypes(t *testing.T) {
 			var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR(32), rv "+columnType+")")
 
 			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+			cs.EndpointSpec.(*Config).Advanced.FeatureFlags = "discover_rowversion_as_bytes"
 			setShutdownAfterCaughtUp(t, true)
 
 			t.Run("discovery", func(t *testing.T) {

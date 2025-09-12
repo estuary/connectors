@@ -440,11 +440,11 @@ func getComputedColumns(ctx context.Context, conn *sql.DB) (map[sqlcapture.Strea
 func (db *sqlserverDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isPrimaryKey bool) (*jsonschema.Schema, error) {
 	var schema columnSchema
 	if typeInfo, ok := column.DataType.(*sqlserverTextColumnType); ok {
-		if schema, ok = sqlserverTypeToJSON[typeInfo.Type]; !ok {
+		if schema, ok = db.databaseTypeToJSON(typeInfo.Type); !ok {
 			return nil, fmt.Errorf("unhandled SQL Server type %q (found on column %q of table %q)", typeInfo.Type, column.Name, column.TableName)
 		}
 	} else if typeName, ok := column.DataType.(string); ok {
-		if schema, ok = sqlserverTypeToJSON[typeName]; !ok {
+		if schema, ok = db.databaseTypeToJSON(typeName); !ok {
 			return nil, fmt.Errorf("unhandled SQL Server type %q (found on column %q of table %q)", typeName, column.Name, column.TableName)
 		}
 	} else {
@@ -490,6 +490,20 @@ func (s columnSchema) toType() *jsonschema.Schema {
 		out.Type = s.jsonType
 	}
 	return out
+}
+
+func (db *sqlserverDatabase) databaseTypeToJSON(typeName string) (columnSchema, bool) {
+	// A 'timestamp' in SQL Server is not a timestamp as it's usually meant, it's
+	// actually a monotonic integer ID and is also called 'rowversion'. These are
+	// 8-byte binary values which we capture as base64-encoded strings, however we
+	// used to not have a discovery type mapping for these so to preserve backwards
+	// compatibility the appropriate discovery type is feature-flagged here.
+	if db.featureFlags["discover_rowversion_as_bytes"] && typeName == "timestamp" {
+		return columnSchema{jsonType: "string", contentEncoding: "base64"}, true
+	}
+
+	var columnType, ok = sqlserverTypeToJSON[typeName]
+	return columnType, ok
 }
 
 var sqlserverTypeToJSON = map[string]columnSchema{
@@ -541,8 +555,4 @@ var sqlserverTypeToJSON = map[string]columnSchema{
 	"smalldatetime": {jsonType: "string", format: "date-time"},
 
 	"hierarchyid": {jsonType: "string", contentEncoding: "base64"},
-
-	// A 'timestamp' in SQL Server is not a timestamp as it's usually meant, it's
-	// actually a monotonic integer ID and is also called 'rowversion'.
-	"timestamp": {jsonType: "string", contentEncoding: "base64"},
 }
