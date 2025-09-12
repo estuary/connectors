@@ -21,11 +21,9 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
-	m "github.com/estuary/connectors/go/materialize"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -70,12 +68,7 @@ func RunTestAllTasks[EC EndpointConfiger](
 	sourcePath string,
 	testFn func(t *testing.T, bundled []byte, taskName string, cfg EC),
 ) {
-	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
-	require.NoError(t, err, string(bundled))
-
-	log.WithField("bundled", string(bundled)).Warn("bundled spec")
-	require.True(t, json.Valid(bundled))
-
+	bundled := runFlowctl(t, "raw", "bundle", "--source", sourcePath)
 	gjson.GetBytes(bundled, "materializations").ForEach(func(task, _ gjson.Result) bool {
 		t.Log("running test for", task.String())
 
@@ -165,7 +158,16 @@ func runMaterializationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Res
 		cleanupTestTasks(t, ctx, materializer, tsSuffix)
 	})
 
-	actionDescription := driveTask(t, ctx, true, source, workingTaskName, relativePath(t, "testdata/integration/fixture.materialize.json"))
+	actionDescription := runFlowctl(
+		t,
+		"preview",
+		"--name", workingTaskName,
+		"--source", source,
+		"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
+		"--network", "flow-test",
+		"--output-apply",
+		"--output-state",
+	)
 	for _, res := range snapshotResources {
 		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rngSuffix, true))
 	}
@@ -183,9 +185,7 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 	ctx := context.Background()
 	var snap strings.Builder
 
-	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
-	require.NoError(t, err)
-
+	bundled := runFlowctl(t, "raw", "bundle", "--source", sourcePath)
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
 	gjson.GetBytes(bundled, "materializations").ForEach(func(key, value gjson.Result) bool {
@@ -244,15 +244,13 @@ func RunMigrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	ctx := context.Background()
 	var snap strings.Builder
 
-	bundledSource, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
-	require.NoError(t, err, string(bundledSource))
-
+	bundled := runFlowctl(t, "raw", "bundle", "--source", sourcePath)
 	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
-	gjson.GetBytes(bundledSource, "materializations").ForEach(func(task, _ gjson.Result) bool {
+	gjson.GetBytes(bundled, "materializations").ForEach(func(task, _ gjson.Result) bool {
 		taskName := task.String()
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
-		snap.WriteString(runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundledSource, suffix, makeResourceFn))
+		snap.WriteString(runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn))
 
 		return true
 	})
@@ -275,8 +273,7 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 	workingTableName := "migration_test" + rngSuffix
 	workingTaskName := taskName + rngSuffix
 
-	bundledMigratedCollection, err := exec.Command("flowctl", "raw", "bundle", "--source", relativePath(t, "testdata/integration/migration-migrated-collection.flow.yaml")).CombinedOutput()
-	require.NoError(t, err)
+	bundledMigratedCollection := runFlowctl(t, "raw", "bundle", "--source", relativePath(t, "testdata/integration/migration-migrated-collection.flow.yaml"))
 
 	cfg := decryptConfig[EC](t, bundled, taskName)
 	materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
@@ -328,7 +325,15 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 		{source: initialSource, fixture: relativePath(t, "testdata/integration/fixture.migration-initial.json")},
 		{source: migratedSource, fixture: relativePath(t, "testdata/integration/fixture.migration-migrated.json")},
 	} {
-		actionDescription := driveTask(t, ctx, false, tc.source, workingTaskName, tc.fixture)
+		actionDescription := runFlowctl(
+			t,
+			"preview",
+			"--name", workingTaskName,
+			"--source", tc.source,
+			"--fixture", relativePath(t, "testdata/integration/fixture.materialize.json"),
+			"--network", "flow-test",
+			"--output-apply",
+		)
 		snap.WriteString(snapshotTestTable(t, ctx, materializer, res, actionDescription, rngSuffix, true))
 	}
 
@@ -340,7 +345,7 @@ func snapshotTestTable[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, E
 	ctx context.Context,
 	m Materializer[EC, FC, RC, MT],
 	res RC,
-	actionDescription string,
+	actionDescription []byte,
 	rngSuffix string,
 	withTableData bool,
 ) string {
@@ -355,7 +360,7 @@ func snapshotTestTable[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, E
 
 	snap.WriteString("Resource: " + strings.TrimSuffix(strings.Join(path, "."), rngSuffix))
 	snap.WriteString("\n")
-	snap.WriteString(strings.ReplaceAll(actionDescription, rngSuffix, ""))
+	snap.WriteString(strings.ReplaceAll(string(actionDescription), rngSuffix, ""))
 	snap.WriteString("\n")
 	snap.WriteString(schema)
 	snap.WriteString("\n")
@@ -408,61 +413,6 @@ func decryptConfig[EC EndpointConfiger](t *testing.T, bundled []byte, taskName s
 	require.NoError(t, unmarshalStrict(raw, &out))
 
 	return out
-}
-
-func driveTask(t *testing.T, ctx context.Context, outputState bool, source, name, fixturePath string) string {
-	t.Helper()
-
-	args := []string{
-		"preview",
-		"--name", name,
-		"--source", source,
-		"--fixture", fixturePath,
-		"--network", "flow-test",
-		"--output-apply",
-	}
-
-	if outputState {
-		args = append(args, "--output-state")
-	}
-
-	cmd := exec.Command("flowctl", args...)
-	cmd.Env = append(cmd.Environ(), "RUST_LOG=info")
-
-	stdout, err := cmd.StdoutPipe()
-	require.NoError(t, err)
-	stderr, err := cmd.StderrPipe()
-	require.NoError(t, err)
-	require.NoError(t, cmd.Start())
-
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		scanner := bufio.NewScanner(stderr)
-		for scanner.Scan() {
-			t.Log(scanner.Text())
-		}
-	}()
-
-	var stdoutBuf bytes.Buffer
-	stdoutOp := m.RunAsyncOperation(func() error {
-		_, err = io.Copy(&stdoutBuf, stdout)
-		return err
-	})
-
-	select {
-	case <-ctx.Done():
-		t.Fatal(ctx.Err())
-	case <-stdoutOp.Done():
-	}
-
-	require.NoError(t, stdoutOp.Err())
-	require.NoError(t, cmd.Wait(), stdoutBuf.String())
-	wg.Wait()
-
-	return stdoutBuf.String()
 }
 
 // sortRows sorts rows by the "flow_published_at" column, which is expected to
@@ -824,6 +774,36 @@ func shouldCleanup(t *testing.T, now time.Time, item string, suffix string) bool
 	}
 
 	return false
+}
+
+func runFlowctl(t *testing.T, args ...string) []byte {
+	t.Helper()
+
+	cmd := exec.Command("flowctl", args...)
+	stdout, err := cmd.StdoutPipe()
+	require.NoError(t, err)
+	stderr, err := cmd.StderrPipe()
+	require.NoError(t, err)
+	require.NoError(t, cmd.Start())
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		scanner := bufio.NewScanner(stderr)
+		for scanner.Scan() {
+			t.Log(scanner.Text())
+		}
+	}()
+
+	var stdoutBuf bytes.Buffer
+	_, err = io.Copy(&stdoutBuf, stdout)
+	require.NoError(t, err)
+
+	require.NoError(t, cmd.Wait())
+	wg.Wait()
+
+	return stdoutBuf.Bytes()
 }
 
 func dumpSchema[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
