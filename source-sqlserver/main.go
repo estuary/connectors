@@ -65,6 +65,11 @@ var featureFlagDefaults = map[string]bool{
 	// Force use of the 'replica fence' mechanism, which is normally used automatically
 	// when the target database is detected as a replica.
 	"replica_fencing": false,
+
+	// Discover ROWVERSION / TIMESTAMP column types as {type: string, format: base64}.
+	// Captures without this setting will discover them as the catch-all type {} though
+	// the actual value will be a base64 string either way.
+	"discover_rowversion_as_bytes": false,
 }
 
 // Config tells the connector how to connect to and interact with the source database.
