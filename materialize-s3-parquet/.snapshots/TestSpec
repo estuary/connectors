@@ -9,6 +9,12 @@
         "description": "Bucket to store materialized objects.",
         "order": 0
       },
+      "region": {
+        "type": "string",
+        "title": "Region",
+        "description": "Region of the bucket to write to.",
+        "order": 3
+      },
       "credentials": {
         "oneOf": [
           {
@@ -33,19 +39,12 @@
                 "description": "Secret Access Key for writing data to the bucket.",
                 "order": 2,
                 "secret": true
-              },
-              "awsRegion": {
-                "type": "string",
-                "title": "Region",
-                "description": "Region of the bucket to write to.",
-                "order": 3
               }
             },
             "type": "object",
             "required": [
               "awsAccessKeyId",
-              "awsSecretAccessKey",
-              "awsRegion"
+              "awsSecretAccessKey"
             ],
             "title": "Access Key"
           },
@@ -86,7 +85,7 @@
         "discriminator": {
           "propertyName": "auth_type"
         },
-        "order": 3,
+        "order": 4,
         "x-iam-auth": true
       },
       "uploadInterval": {
@@ -100,25 +99,25 @@
         "title": "Upload Interval",
         "description": "Frequency at which files will be uploaded. Must be a valid Go duration string.",
         "default": "5m",
-        "order": 4
+        "order": 5
       },
       "prefix": {
         "type": "string",
         "title": "Prefix",
         "description": "Optional prefix that will be used to store objects.",
-        "order": 5
+        "order": 6
       },
       "fileSizeLimit": {
         "type": "integer",
         "title": "File Size Limit",
         "description": "Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank.",
-        "order": 6
+        "order": 7
       },
       "endpoint": {
         "type": "string",
         "title": "Custom S3 Endpoint",
         "description": "The S3 endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS. Should normally be left blank.",
-        "order": 7
+        "order": 8
       },
       "parquetConfig": {
         "properties": {
@@ -157,6 +156,7 @@
     "type": "object",
     "required": [
       "bucket",
+      "region",
       "credentials",
       "uploadInterval"
     ],
