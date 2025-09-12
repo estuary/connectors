@@ -129,9 +129,9 @@ type authType string
 
 const (
 	UserPassword authType = "UserPassword"
-	GCPIAM authType = "GCPIAM"
-	AWSIAM authType = "AWSIAM"
-	AzureIAM authType = "AzureIAM"
+	GCPIAM       authType = "GCPIAM"
+	AWSIAM       authType = "AWSIAM"
+	AzureIAM     authType = "AzureIAM"
 )
 
 type userPassword struct {
@@ -150,7 +150,7 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 		schemagen.OneOfSubSchema("Password", userPassword{}, string(UserPassword)),
 	}
 	subSchemas = append(subSchemas, (iam.IAMConfig{}).OneOfSubSchemas()...)
-	
+
 	schema := schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword), subSchemas...)
 
 	return schema
@@ -325,13 +325,16 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 		case UserPassword:
 			pass = c.Credentials.Password
 		case AWSIAM:
-			var err error
+			credProvider, err := c.Credentials.AWSCredentialsProvider()
+			if err != nil {
+				return "", err
+			}
 			pass, err = auth.BuildAuthToken(
 				ctx,
 				c.Address,
 				c.Credentials.AWSRegion,
 				user,
-				c.Credentials.AWSCredentialsProvider(),
+				credProvider,
 			)
 			if err != nil {
 				return "", fmt.Errorf("building AWS auth token: %w", err)

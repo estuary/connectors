@@ -9,24 +9,84 @@
         "description": "Bucket to store materialized objects.",
         "order": 0
       },
-      "awsAccessKeyId": {
-        "type": "string",
-        "title": "AWS Access Key ID",
-        "description": "Access Key ID for writing data to the bucket.",
-        "order": 1
-      },
-      "awsSecretAccessKey": {
-        "type": "string",
-        "title": "AWS Secret Access key",
-        "description": "Secret Access Key for writing data to the bucket.",
-        "order": 2,
-        "secret": true
-      },
       "region": {
         "type": "string",
         "title": "Region",
         "description": "Region of the bucket to write to.",
         "order": 3
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/filesink/access-key-credentials",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSAccessKey",
+                "default": "AWSAccessKey",
+                "order": 0
+              },
+              "awsAccessKeyId": {
+                "type": "string",
+                "title": "AWS Access Key ID",
+                "description": "Access Key ID for writing data to the bucket.",
+                "order": 1
+              },
+              "awsSecretAccessKey": {
+                "type": "string",
+                "title": "AWS Secret Access key",
+                "description": "Secret Access Key for writing data to the bucket.",
+                "order": 2,
+                "secret": true
+              }
+            },
+            "type": "object",
+            "required": [
+              "awsAccessKeyId",
+              "awsSecretAccessKey"
+            ],
+            "title": "Access Key"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/aws-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSIAM",
+                "default": "AWSIAM",
+                "order": 0
+              },
+              "aws_region": {
+                "type": "string",
+                "title": "AWS Region",
+                "description": "AWS Region of your resource"
+              },
+              "aws_role_arn": {
+                "type": "string",
+                "title": "AWS Role ARN",
+                "description": "AWS Role which has access to the resource which will be assumed by Flow"
+              }
+            },
+            "type": "object",
+            "required": [
+              "aws_region",
+              "aws_role_arn"
+            ],
+            "title": "AWS IAM"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "default": {
+          "auth_type": "AWSAccessKey"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
+        "order": 4,
+        "x-iam-auth": true
       },
       "uploadInterval": {
         "type": "string",
@@ -39,25 +99,25 @@
         "title": "Upload Interval",
         "description": "Frequency at which files will be uploaded. Must be a valid Go duration string.",
         "default": "5m",
-        "order": 4
+        "order": 5
       },
       "prefix": {
         "type": "string",
         "title": "Prefix",
         "description": "Optional prefix that will be used to store objects.",
-        "order": 5
+        "order": 6
       },
       "fileSizeLimit": {
         "type": "integer",
         "title": "File Size Limit",
         "description": "Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank.",
-        "order": 6
+        "order": 7
       },
       "endpoint": {
         "type": "string",
         "title": "Custom S3 Endpoint",
         "description": "The S3 endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS. Should normally be left blank.",
-        "order": 7
+        "order": 8
       },
       "parquetConfig": {
         "properties": {
@@ -96,9 +156,8 @@
     "type": "object",
     "required": [
       "bucket",
-      "awsAccessKeyId",
-      "awsSecretAccessKey",
       "region",
+      "credentials",
       "uploadInterval"
     ],
     "title": "EndpointConfig"
