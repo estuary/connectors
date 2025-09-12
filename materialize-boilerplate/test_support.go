@@ -72,7 +72,11 @@ func RunTestAllTasks[EC EndpointConfiger](
 	bundled, err := exec.Command("flowctl", "raw", "bundle", "--source", sourcePath).CombinedOutput()
 	require.NoError(t, err, string(bundled))
 
+	t.Log("bundled", string(bundled))
+
 	gjson.GetBytes(bundled, "materializations").ForEach(func(task, _ gjson.Result) bool {
+		t.Log("running test for", task.String())
+
 		taskName := task.String()
 		cfg := decryptConfig[EC](t, bundled, taskName)
 		testFn(t, bundled, taskName, cfg)
