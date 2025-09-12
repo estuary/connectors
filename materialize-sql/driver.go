@@ -30,7 +30,7 @@ type Driver[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]] s
 	// connector, to as much of an extent as possible. The returned PrereqErr
 	// can include multiple separate errors if it possible to determine that
 	// there is more than one issue that needs corrected.
-	PreReqs func(ctx context.Context, cfg EC, tenant string) *cerrors.PrereqErr
+	PreReqs func(ctx context.Context, cfg EC) *cerrors.PrereqErr
 }
 
 var _ boilerplate.Connector = &Driver[boilerplate.EndpointConfiger, Resource]{}
@@ -117,7 +117,7 @@ var _ boilerplate.Materializer[
 ] = &sqlMaterialization[boilerplate.EndpointConfiger, Resource]{}
 
 func (s *sqlMaterialization[EC, RC]) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
-	return s.driver.PreReqs(ctx, s.endpoint.Config, s.endpoint.Tenant)
+	return s.driver.PreReqs(ctx, s.endpoint.Config)
 }
 
 func (s *sqlMaterialization[EC, RC]) Config() boilerplate.MaterializeCfg {
