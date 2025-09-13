@@ -99,6 +99,7 @@ func (c *config) ToURI() (string, error) {
 	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
 	// Without this, the authentication token will expire after 4 hours of inactivity.
 	queryParams.Add("client_session_keep_alive", trueString)
+	queryParams.Add("application", "EstuaryFlow")
 	queryParams.Add("database", c.Database)
 	// GO_QUERY_RESULT_FORMAT returns query results as individual JSON documents
 	// representing rows rather than as *batches* of Arrow records.

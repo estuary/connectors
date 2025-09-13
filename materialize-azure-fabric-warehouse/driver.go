@@ -122,7 +122,7 @@ func newDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-azure-fabric-warehouse",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
-		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
+		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
@@ -130,7 +130,6 @@ func newDriver() *sql.Driver[config, tableConfig] {
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
 				NewTransactor:       newTransactor,
-				Tenant:              tenant,
 				ConcurrentApply:     true,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,

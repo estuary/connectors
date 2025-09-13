@@ -122,8 +122,6 @@ type Endpoint[EC boilerplate.EndpointConfiger] struct {
 		is *boilerplate.InfoSchema,
 		be *m.BindingEvents,
 	) (m.Transactor, error)
-	// Tenant owning this task, as determined from the task name.
-	Tenant string
 	// ConcurrentApply of Apply actions, for system that may benefit from a scatter/gather strategy
 	// for changing many tables in a single apply.
 	ConcurrentApply bool

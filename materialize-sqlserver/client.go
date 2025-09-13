@@ -37,7 +37,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 	}, nil
 }
 
-func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	db, err := stdsql.Open("sqlserver", cfg.ToURI())

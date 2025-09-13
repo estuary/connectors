@@ -68,7 +68,7 @@ func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-databricks",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
-		NewEndpoint: func(ctx context.Context, cfg config, tenant string, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
+		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
 				"address": cfg.Address,
 				"path":    cfg.HTTPPath,
@@ -85,7 +85,6 @@ func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,
 				NewTransactor:       newTransactor,
-				Tenant:              tenant,
 				ConcurrentApply:     true,
 				Options: m.MaterializeOptions{
 					ExtendedLogging: true,

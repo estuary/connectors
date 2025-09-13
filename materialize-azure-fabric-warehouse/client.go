@@ -274,7 +274,7 @@ type badRequestResponseBody struct {
 	ErrorCodes       []int  `json:"error_codes"`
 }
 
-func preReqs(ctx context.Context, cfg config, tenant string) *cerrors.PrereqErr {
+func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
 	db, err := cfg.db()
