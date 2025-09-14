@@ -176,13 +176,13 @@ TO_JSON(STRUCT(
 	l.integerWithUserDDL AS integerWithUserDDL, 
 	l.multiple AS multiple, 
 	l.number AS number, 
-	l.numberCastToString AS numberCastToString, 
+	CAST(l.numberCastToString AS STRING) AS numberCastToString, 
 	l.object AS object, 
 	l.string AS string, 
-	l.stringInteger AS stringInteger, 
-	l.stringInteger39Chars AS stringInteger39Chars, 
-	l.stringInteger66Chars AS stringInteger66Chars, 
-	l.stringNumber AS stringNumber
+	CAST(l.stringInteger AS STRING) AS stringInteger, 
+	CAST(l.stringInteger39Chars AS STRING) AS stringInteger39Chars, 
+	CAST(l.stringInteger66Chars AS STRING) AS stringInteger66Chars, 
+	CAST(l.stringNumber AS STRING) AS stringNumber
 )) as flow_document
 FROM projectID.dataset.key_value AS l
 JOIN flow_temp_table_0 AS r

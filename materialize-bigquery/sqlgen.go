@@ -239,12 +239,27 @@ SELECT -1, NULL LIMIT 0
 
 -- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
 
+{{ define "uncast" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if eq $.AsFlatType "string_integer" -}}
+	CAST({{ $ident }} AS STRING)
+{{- else if eq $.AsFlatType "string_number" -}}
+	CAST({{ $ident }} AS STRING)
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+	CAST({{ $ident }} AS STRING)
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+	FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E*SZ', {{ $ident }}, 'UTC')
+{{- else -}}
+	{{ $ident }}
+{{- end -}}
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" -}}
 SELECT {{ $.Binding }}, 
 TO_JSON(STRUCT(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}}, {{end}}
-	l.{{ $col.Identifier }} AS {{ $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ $col.Field }}
 {{- end}}
 )) as flow_document
 FROM {{ $.Identifier }} AS l

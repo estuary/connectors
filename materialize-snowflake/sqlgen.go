@@ -237,12 +237,27 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 
 -- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
 
+{{ define "uncast" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if eq $.AsFlatType "string_integer" -}}
+	TO_VARCHAR({{ $ident }})
+{{- else if eq $.AsFlatType "string_number" -}}
+	TO_VARCHAR({{ $ident }})
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+	TO_VARCHAR({{ $ident }}, 'YYYY-MM-DD')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+	TO_VARCHAR(CONVERT_TIMEZONE('UTC', {{ $ident }}), 'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')
+{{- else -}}
+	{{ $ident }}
+{{- end -}}
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" }}
 SELECT {{ $.Table.Binding }}, 
 OBJECT_CONSTRUCT(
 {{- range $i, $col := $.Table.RootLevelColumns}}
 	{{- if $i}},{{end}}
-	{{Literal $col.Field}}, {{ $.Table.Identifier }}.{{ $col.Identifier }}
+	{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }}
 {{- end}}
 ) as flow_document
 FROM {{ $.Table.Identifier }}

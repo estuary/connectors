@@ -79,13 +79,13 @@ to_json(struct(
 	`a-schema`.key_value.`integerWithUserDDL` AS integerWithUserDDL,
 	`a-schema`.key_value.multiple AS multiple,
 	`a-schema`.key_value.number AS number,
-	`a-schema`.key_value.`numberCastToString` AS numberCastToString,
+	CAST(`a-schema`.key_value.`numberCastToString` AS STRING) AS numberCastToString,
 	`a-schema`.key_value.object AS object,
 	`a-schema`.key_value.string AS string,
-	`a-schema`.key_value.`stringInteger` AS stringInteger,
-	`a-schema`.key_value.`stringInteger39Chars` AS stringInteger39Chars,
-	`a-schema`.key_value.`stringInteger66Chars` AS stringInteger66Chars,
-	`a-schema`.key_value.`stringNumber` AS stringNumber
+	CAST(`a-schema`.key_value.`stringInteger` AS STRING) AS stringInteger,
+	CAST(`a-schema`.key_value.`stringInteger39Chars` AS STRING) AS stringInteger39Chars,
+	CAST(`a-schema`.key_value.`stringInteger66Chars` AS STRING) AS stringInteger66Chars,
+	CAST(`a-schema`.key_value.`stringNumber` AS STRING) AS stringNumber
 )) as flow_document
 FROM `a-schema`.key_value
 JOIN (

@@ -127,13 +127,13 @@ JSON_BUILD_OBJECT(
     'integerWithUserDDL', r."integerWithUserDDL",
     'multiple', r.multiple,
     'number', r.number,
-    'numberCastToString', r."numberCastToString",
+    'numberCastToString', CAST(r."numberCastToString" AS TEXT),
     'object', r.object,
     'string', r.string,
-    'stringInteger', r."stringInteger",
-    'stringInteger39Chars', r."stringInteger39Chars",
-    'stringInteger66Chars', r."stringInteger66Chars",
-    'stringNumber', r."stringNumber"
+    'stringInteger', CAST(r."stringInteger" AS TEXT),
+    'stringInteger39Chars', CAST(r."stringInteger39Chars" AS TEXT),
+    'stringInteger66Chars', CAST(r."stringInteger66Chars" AS TEXT),
+    'stringNumber', CAST(r."stringNumber" AS TEXT)
 ) as flow_document
 FROM key_value AS r
 JOIN flow_temp_table_0 AS l

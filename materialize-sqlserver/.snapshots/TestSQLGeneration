@@ -217,13 +217,13 @@ SELECT 0,
 		'integerWithUserDDL' = r."integerWithUserDDL",
 		'multiple' = r.multiple,
 		'number' = r.number,
-		'numberCastToString' = r."numberCastToString",
+		'numberCastToString' = CAST(r."numberCastToString" AS NVARCHAR(MAX)),
 		'object' = r."object",
 		'string' = r.string,
-		'stringInteger' = r."stringInteger",
-		'stringInteger39Chars' = r."stringInteger39Chars",
-		'stringInteger66Chars' = r."stringInteger66Chars",
-		'stringNumber' = r."stringNumber"
+		'stringInteger' = CAST(r."stringInteger" AS NVARCHAR(MAX)),
+		'stringInteger39Chars' = CAST(r."stringInteger39Chars" AS NVARCHAR(MAX)),
+		'stringInteger66Chars' = CAST(r."stringInteger66Chars" AS NVARCHAR(MAX)),
+		'stringNumber' = CAST(r."stringNumber" AS NVARCHAR(MAX))
 	FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
 ) as flow_document
 FROM key_value AS r

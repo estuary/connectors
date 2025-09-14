@@ -133,13 +133,13 @@ OBJECT(
 	'integerWithUserDDL', r."integerWithUserDDL",
 	'multiple', r.multiple,
 	'number', r.number,
-	'numberCastToString', r."numberCastToString",
+	'numberCastToString', CAST(r."numberCastToString" AS VARCHAR),
 	'object', r.object,
 	'string', r.string,
-	'stringInteger', r."stringInteger",
-	'stringInteger39Chars', r."stringInteger39Chars",
-	'stringInteger66Chars', r."stringInteger66Chars",
-	'stringNumber', r."stringNumber"
+	'stringInteger', CAST(r."stringInteger" AS VARCHAR),
+	'stringInteger39Chars', CAST(r."stringInteger39Chars" AS VARCHAR),
+	'stringInteger66Chars', CAST(r."stringInteger66Chars" AS VARCHAR),
+	'stringNumber', CAST(r."stringNumber" AS VARCHAR)
 ) as flow_document
 FROM flow_temp_table_0 AS l
 JOIN "a-schema".key_value AS r

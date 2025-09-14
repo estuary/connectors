@@ -305,13 +305,30 @@ SELECT TOP 0 -1, NULL
 
 -- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
 
+{{ define "uncast" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if eq $.AsFlatType "string_integer" -}}
+	CAST({{ $ident }} AS NVARCHAR(MAX))
+{{- else if eq $.AsFlatType "string_number" -}}
+	CAST({{ $ident }} AS NVARCHAR(MAX))
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+	FORMAT({{ $ident }}, 'yyyy-MM-dd')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+	FORMAT({{ $ident }} AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.FFFFFFF') + 'Z'
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") -}}
+	FORMAT({{ $ident }}, 'HH:mm:ss.FFFFFFF')
+{{- else -}}
+	{{ $ident }}
+{{- end -}}
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" }}
 SELECT {{ $.Binding }}, 
 (
 	SELECT 
 		{{- range $i, $col := $.RootLevelColumns}}
 			{{- if $i}},{{end}}
-		{{Literal $col.Field}} = r.{{$col.Identifier}}
+		{{Literal $col.Field}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
 		{{- end}}
 	FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
 ) as flow_document

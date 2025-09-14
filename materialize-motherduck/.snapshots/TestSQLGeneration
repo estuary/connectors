@@ -74,13 +74,13 @@ json_object(
        'integerWithUserDDL', l."integerWithUserDDL",                                                                                                                                         
        'multiple', l.multiple,                                                                                                                                         
        'number', l.number,                                                                                                                                         
-       'numberCastToString', l."numberCastToString",                                                                                                                                         
+       'numberCastToString', CAST(l."numberCastToString" AS VARCHAR),                                                                                                                                         
        'object', l."object",                                                                                                                                         
        'string', l.string,                                                                                                                                         
-       'stringInteger', l."stringInteger",                                                                                                                                         
-       'stringInteger39Chars', l."stringInteger39Chars",                                                                                                                                         
-       'stringInteger66Chars', l."stringInteger66Chars",                                                                                                                                         
-       'stringNumber', l."stringNumber"                                                                                                                                                          
+       'stringInteger', CAST(l."stringInteger" AS VARCHAR),                                                                                                                                         
+       'stringInteger39Chars', CAST(l."stringInteger39Chars" AS VARCHAR),                                                                                                                                         
+       'stringInteger66Chars', CAST(l."stringInteger66Chars" AS VARCHAR),                                                                                                                                         
+       'stringNumber', CAST(l."stringNumber" AS VARCHAR)                                                                                                                                                          
 ) as doc                                                                                                                                                           
 FROM db."a-schema".key_value AS l                                                                                                                                       
 JOIN read_json(                                                                                                                                                    

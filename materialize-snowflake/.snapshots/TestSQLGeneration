@@ -120,13 +120,13 @@ OBJECT_CONSTRUCT(
 	'integerWithUserDDL', "a-schema".key_value.integerWithUserDDL,
 	'multiple', "a-schema".key_value.multiple,
 	'number', "a-schema".key_value.number,
-	'numberCastToString', "a-schema".key_value.numberCastToString,
+	'numberCastToString', TO_VARCHAR("a-schema".key_value.numberCastToString),
 	'object', "a-schema".key_value.object,
 	'string', "a-schema".key_value.string,
-	'stringInteger', "a-schema".key_value.stringInteger,
-	'stringInteger39Chars', "a-schema".key_value.stringInteger39Chars,
-	'stringInteger66Chars', "a-schema".key_value.stringInteger66Chars,
-	'stringNumber', "a-schema".key_value.stringNumber
+	'stringInteger', TO_VARCHAR("a-schema".key_value.stringInteger),
+	'stringInteger39Chars', TO_VARCHAR("a-schema".key_value.stringInteger39Chars),
+	'stringInteger66Chars', TO_VARCHAR("a-schema".key_value.stringInteger66Chars),
+	'stringNumber', TO_VARCHAR("a-schema".key_value.stringNumber)
 ) as flow_document
 FROM "a-schema".key_value
 JOIN (
