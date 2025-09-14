@@ -343,12 +343,11 @@ SELECT {{ $.Binding }},
 OBJECT(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}},{{end}}
-	{{Literal $col.Field}}, 
-	{{- if eq $col.DDL "DATE" }}
+	{{Literal $col.Field}}, {{ if eq $col.DDL "DATE" -}}
 		TO_CHAR(r.{{$col.Identifier}}, 'YYYY-MM-DD')
-	{{- else if eq $col.DDL "TIMESTAMPTZ" }}
+	{{- else if eq $col.DDL "TIMESTAMPTZ" -}}
 		TO_CHAR(r.{{$col.Identifier}} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-	{{- else }}
+	{{- else -}}
 		r.{{$col.Identifier}}
 	{{- end}}
 {{- end}}
