@@ -230,6 +230,12 @@
             "title": "Disable Field Truncation",
             "description": "Disables truncation of materialized fields. May result in errors for documents with extremely large values or complex nested structures."
           },
+          "no_flow_document": {
+            "type": "boolean",
+            "title": "Exclude Flow Document",
+            "description": "When enabled the root document will not be required for standard updates.",
+            "default": false
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
