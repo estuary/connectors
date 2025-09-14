@@ -133,6 +133,12 @@
             "multiline": true,
             "secret": true
           },
+          "no_flow_document": {
+            "type": "boolean",
+            "title": "Exclude Flow Document",
+            "description": "When enabled the root document will not be required for standard updates.",
+            "default": false
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
