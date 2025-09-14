@@ -4,7 +4,7 @@ import (
 	"embed"
 	"encoding/json"
 	"path/filepath"
-	"slices"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -62,7 +62,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 		{
 			name:               "same binding again - standard updates",
@@ -72,7 +71,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 		{
 			name:               "new materialization - delta updates",
@@ -82,7 +80,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 		{
 			name:               "same binding again - delta updates",
@@ -92,7 +89,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 		{
 			name:               "binding update with incompatible changes",
@@ -102,7 +98,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "incompatible-changes.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 		{
 			name:               "fields exist in destination but not in collection",
@@ -112,7 +107,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "fewer-fields.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 		{
 			name:               "change root document projection for standard updates",
@@ -122,7 +116,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "alternate-root.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 		{
 			name:               "change root document projection for delta updates",
@@ -132,7 +125,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "alternate-root.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 		{
 			name:               "increment backfill counter",
@@ -142,7 +134,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "increment-backfill.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 		{
 			name:               "increment backfill counter for disabled -> enabled binding",
@@ -152,7 +143,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "increment-backfill.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 		{
 			name:               "table already exists with identical spec",
@@ -162,7 +152,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true, "flow_document": true},
+			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true},
 		},
 		{
 			name:               "table already exists with incompatible proposed spec",
@@ -172,7 +162,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "incompatible-changes.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true, "flow_document": true},
+			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true},
 		},
 		{
 			name:               "field names over the length limit are forbidden",
@@ -182,7 +172,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "long-fields.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     20,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 		{
 			name:               "can materialize a subset of key fields",
@@ -192,7 +181,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "key-subset.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 		{
 			name:               "cannot add or remove selected key fields for standard updates",
@@ -202,7 +190,6 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "key-subset.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
 		},
 	}
 
@@ -210,7 +197,7 @@ func TestValidate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := testInfoSchemaFromSpec(t, tt.specForInfoSchema, tt.fieldNameTransform)
-			validator := NewValidator(testConstrainter{featureFlags: tt.featureFlags}, is, tt.maxFieldLength, true, tt.featureFlags)
+			validator := NewValidator(testConstrainter{}, is, tt.maxFieldLength, true, tt.featureFlags)
 
 			cs, err := validator.ValidateBinding(
 				[]string{"key_value"},
@@ -232,8 +219,7 @@ func TestValidate(t *testing.T) {
 	t.Run("new binding with existing table - feature flag disabled (default)", func(t *testing.T) {
 		// Table exists but no lastBinding (new binding) - should error
 		is := testInfoSchemaFromSpec(t, loadValidateSpec(t, "base.flow.proto"), simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil) // No feature flags
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil) // No feature flags
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -252,7 +238,7 @@ func TestValidate(t *testing.T) {
 		// Table exists but no lastBinding (new binding) - should succeed with feature flag
 		is := testInfoSchemaFromSpec(t, loadValidateSpec(t, "base.flow.proto"), simpleTestTransform)
 		featureFlags := map[string]bool{"allow_existing_tables_for_new_bindings": true}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
+		validator := NewValidator(testConstrainter{}, is, 0, true, featureFlags)
 
 		cs, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -271,8 +257,7 @@ func TestValidate(t *testing.T) {
 
 		// Use the simpleTestTransform which appends "_transformed" to field names
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
 
 		cs, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -299,8 +284,7 @@ func TestValidate(t *testing.T) {
 		// Use identity transform (no change to field names)
 		identityTransform := func(s string) string { return s }
 		is := testInfoSchemaFromSpec(t, nil, identityTransform)
-		featureFlags := map[string]bool{"flow_document": true}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
 
 		cs, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -326,8 +310,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].Collection.Projections[3].Field = "keyRenamedToSomethingThatIsReallyLong"
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 20, true, nil)
+		validator := NewValidator(testConstrainter{}, is, 20, true, nil)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -349,7 +332,7 @@ func TestValidate(t *testing.T) {
 		// collection key.
 		is := testInfoSchemaFromSpec(t, proposed, simpleTestTransform)
 		featureFlags := map[string]bool{"allow_existing_tables_for_new_bindings": true}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 20, true, featureFlags)
+		validator := NewValidator(testConstrainter{}, is, 20, true, featureFlags)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -370,8 +353,7 @@ func TestValidate(t *testing.T) {
 		existing.Bindings[0].DeltaUpdates = true
 
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
 
 		// Enabled binding.
 		_, err := validator.ValidateBinding(
@@ -405,8 +387,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].DeltaUpdates = true
 
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -427,8 +408,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].Collection.Projections[3].Inference.DefaultJson = nil
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -446,8 +426,7 @@ func TestValidate(t *testing.T) {
 		proposed := loadValidateSpec(t, "nullable-key.flow.proto")
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
+		validator := NewValidator(testConstrainter{}, is, 0, true, nil)
 
 		_, err := validator.ValidateBinding(
 			[]string{"key_value"},
@@ -462,9 +441,7 @@ func TestValidate(t *testing.T) {
 	})
 }
 
-type testConstrainter struct {
-	featureFlags map[string]bool
-}
+type testConstrainter struct{}
 
 func (testConstrainter) Compatible(existing ExistingField, proposed *pf.Projection, _ json.RawMessage) (bool, error) {
 	return existing.Type == strings.Join(proposed.Inference.Types, ","), nil
@@ -474,7 +451,7 @@ func (testConstrainter) DescriptionForType(p *pf.Projection, _ json.RawMessage) 
 	return strings.Join(p.Inference.Types, ", "), nil
 }
 
-func (tc testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, _ json.RawMessage) (*pm.Response_Validated_Constraint, error) {
+func (testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, _ json.RawMessage) (*pm.Response_Validated_Constraint, error) {
 	_, numericString := m.AsFormattedNumeric(p)
 
 	var constraint = new(pm.Response_Validated_Constraint)
@@ -482,29 +459,21 @@ func (tc testConstrainter) NewConstraints(p *pf.Projection, deltaUpdates bool, _
 	case p.IsPrimaryKey:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "All Locations that are part of the collections key are recommended"
-	case p.IsRootDocumentProjection() && !tc.featureFlags["flow_document"] && !deltaUpdates:
-		// When flow_document is disabled, root document projection becomes optional
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
-		constraint.Reason = "Root document projection is optional when flow_document is disabled"
 	case p.IsRootDocumentProjection() && deltaUpdates:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The root document should usually be materialized"
 	case p.IsRootDocumentProjection():
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "The root document is required for a standard updates materialization"
-	case slices.Equal(p.Inference.Types, []string{"null"}):
-		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
-		constraint.Reason = "Cannot materialize this field"
-	case !deltaUpdates && !tc.featureFlags["flow_document"] && strings.Count(p.Ptr, "/") == 1:
-		// When flow_document is disabled, all root-level properties become LOCATION_REQUIRED
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "All root-level properties are required when flow_document is disabled"
 	case p.Field == "locRequiredVal":
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "This location is required to be materialized"
 	case p.Inference.IsSingleScalarType() || numericString:
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
 		constraint.Reason = "The projection has a single scalar type"
+	case reflect.DeepEqual(p.Inference.Types, []string{"null"}):
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
+		constraint.Reason = "Cannot materialize this field"
 
 	default:
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
@@ -520,70 +489,4 @@ func specWithBindingsDisabled(spec *pf.MaterializationSpec) *pf.MaterializationS
 	spec.Bindings = nil
 	spec.InactiveBindings = bindings
 	return spec
-}
-
-func TestFlowDocumentFeatureFlag(t *testing.T) {
-	var collection = loadValidateSpec(t, "base.flow.proto").Bindings[0].Collection
-
-	t.Run("flow_document enabled (default behavior)", func(t *testing.T) {
-		existing := loadValidateSpec(t, "base.flow.proto")
-		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-
-		featureFlags := map[string]bool{"flow_document": true}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
-		constraints, err := validator.validateNewBinding(collection, false, map[string]json.RawMessage{})
-		require.NoError(t, err)
-
-		// Root document should be LOCATION_REQUIRED (default behavior)
-		require.Equal(t, pm.Response_Validated_Constraint_LOCATION_REQUIRED, constraints["flow_document"].Type)
-		require.Contains(t, constraints["flow_document"].Reason, "root document is required")
-
-		// Key fields should be FIELD_REQUIRED (default behavior)
-		require.Equal(t, pm.Response_Validated_Constraint_LOCATION_REQUIRED, constraints["key"].Type)
-		// Root-level fields should be LOCATION_RECOMMENDED (default behavior)
-		require.Equal(t, pm.Response_Validated_Constraint_LOCATION_RECOMMENDED, constraints["scalarValue"].Type)
-
-		// Optional type field should be FIELD_OPTIONAL (default behavior)
-		require.Equal(t, pm.Response_Validated_Constraint_FIELD_OPTIONAL, constraints["optional"].Type)
-	})
-
-	t.Run("flow_document disabled", func(t *testing.T) {
-		existing := loadValidateSpec(t, "base.flow.proto")
-		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-
-		featureFlags := map[string]bool{"flow_document": false}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
-		constraints, err := validator.validateNewBinding(collection, false, map[string]json.RawMessage{})
-		require.NoError(t, err)
-
-		// Root document should be FIELD_OPTIONAL when feature flag is enabled
-		require.Equal(t, pm.Response_Validated_Constraint_FIELD_OPTIONAL, constraints["flow_document"].Type)
-		require.Contains(t, constraints["flow_document"].Reason, "optional when flow_document is disabled")
-
-		// Root-level fields should be LOCATION_REQUIRED when feature flag is enabled
-		require.Equal(t, pm.Response_Validated_Constraint_LOCATION_REQUIRED, constraints["scalarValue"].Type)
-		require.Contains(t, constraints["scalarValue"].Reason, "required when flow_document is disabled")
-		require.Equal(t, pm.Response_Validated_Constraint_LOCATION_REQUIRED, constraints["key"].Type)
-		require.Equal(t, pm.Response_Validated_Constraint_LOCATION_REQUIRED, constraints["optional"].Type)
-		require.Contains(t, constraints["optional"].Reason, "required when flow_document is disabled")
-	})
-
-	t.Run("flow_document disabled with delta updates (should not affect delta updates)", func(t *testing.T) {
-		existing := loadValidateSpec(t, "base.flow.proto")
-		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-
-		featureFlags := map[string]bool{"flow_document": false}
-		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
-		constraints, err := validator.validateNewBinding(collection, true, map[string]json.RawMessage{}) // Delta updates = true
-		require.NoError(t, err)
-
-		// For delta updates, the feature flag should not change behavior
-		// Root document should be LOCATION_RECOMMENDED (testConstrainter behavior for delta updates)
-		require.Equal(t, pm.Response_Validated_Constraint_LOCATION_RECOMMENDED, constraints["flow_document"].Type)
-		require.Contains(t, constraints["flow_document"].Reason, "root document should usually be materialized")
-
-		// Root-level fields should NOT be LOCATION_REQUIRED for delta updates
-		require.NotEqual(t, pm.Response_Validated_Constraint_LOCATION_REQUIRED, constraints["scalarValue"].Type)
-		require.NotEqual(t, pm.Response_Validated_Constraint_LOCATION_REQUIRED, constraints["key"].Type)
-	})
 }

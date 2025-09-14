@@ -23,7 +23,6 @@ func TestValidateMigrations(t *testing.T) {
 		proposedSpec       *pf.MaterializationSpec
 		fieldNameTransform func(string) string
 		maxFieldLength     int
-		featureFlags       map[string]bool
 	}
 
 	tests := []testCase{
@@ -60,7 +59,7 @@ func TestValidateMigrations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := testInfoSchemaFromSpec(t, tt.specForInfoSchema, tt.fieldNameTransform)
-			validator := boilerplate.NewValidator(testConstrainter{}, is, tt.maxFieldLength, true, tt.featureFlags)
+			validator := boilerplate.NewValidator(testConstrainter{}, is, tt.maxFieldLength, true, nil)
 
 			cs, err := validator.ValidateBinding(
 				[]string{"key_value"},
@@ -88,7 +87,6 @@ func TestValidateNoFlowDocument(t *testing.T) {
 		proposedSpec       *pf.MaterializationSpec
 		fieldNameTransform func(string) string
 		maxFieldLength     int
-		featureFlags       map[string]bool
 		noFlowDocument     bool
 	}
 
@@ -119,7 +117,7 @@ func TestValidateNoFlowDocument(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			is := testInfoSchemaFromSpec(t, tt.specForInfoSchema, tt.fieldNameTransform)
-			validator := boilerplate.NewValidator(testConstrainter{noFlowDocument: tt.noFlowDocument}, is, tt.maxFieldLength, true, tt.featureFlags)
+			validator := boilerplate.NewValidator(testConstrainter{noFlowDocument: tt.noFlowDocument}, is, tt.maxFieldLength, true, nil)
 
 			cs, err := validator.ValidateBinding(
 				[]string{"key_value"},
