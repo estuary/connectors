@@ -162,4 +162,33 @@ SELECT 0, l.flow_document
 
 --- End projectID.dataset.key_value loadQuery ---
 
+--- Begin projectID.dataset.key_value loadQueryNoFlowDocument ---
+SELECT 0, 
+TO_JSON(STRUCT(
+	l.key1 AS key1, 
+	l.key2 AS key2, 
+	l.key_binary AS key!binary, 
+	l.`array` AS array, 
+	l.binary AS binary, 
+	l.boolean AS boolean, 
+	l.integer AS integer, 
+	l.integerGt64Bit AS integerGt64Bit, 
+	l.integerWithUserDDL AS integerWithUserDDL, 
+	l.multiple AS multiple, 
+	l.number AS number, 
+	CAST(l.numberCastToString AS STRING) AS numberCastToString, 
+	l.object AS object, 
+	l.string AS string, 
+	CAST(l.stringInteger AS STRING) AS stringInteger, 
+	CAST(l.stringInteger39Chars AS STRING) AS stringInteger39Chars, 
+	CAST(l.stringInteger66Chars AS STRING) AS stringInteger66Chars, 
+	CAST(l.stringNumber AS STRING) AS stringNumber
+)) as flow_document
+FROM projectID.dataset.key_value AS l
+JOIN flow_temp_table_0 AS r
+	 ON l.key1 = r.c0 AND l.key1 >= 10 AND l.key1 <= 100
+	 AND l.key2 = r.c1
+	 AND l.key_binary = r.c2 AND l.key_binary >= 'aGVsbG8K' AND l.key_binary <= 'Z29vZGJ5ZQo='
+--- End projectID.dataset.key_value loadQueryNoFlowDocument ---
+
 

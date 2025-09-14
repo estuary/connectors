@@ -200,7 +200,7 @@ SELECT {{ $.Table.Binding }},
 to_json(struct(
 {{- range $i, $col := $.Table.RootLevelColumns}}
 	{{- if $i}},{{end}}
-	{{ $.Table.Identifier }}.{{ $col.Identifier }} AS {{ $col.Field }}
+	{{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }} AS {{ $col.Field }}
 {{- end}}
 )) as flow_document
 FROM {{ $.Table.Identifier }}
@@ -233,6 +233,21 @@ JOIN (
 	unbase64({{ $.Identifier }})::BINARY as {{ $.Identifier }}
 {{- else -}}
 	{{ $.Identifier }}::{{- $DDL -}}
+{{- end -}}
+{{- end }}
+
+{{ define "uncast" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if eq $.AsFlatType "string_integer" -}}
+	CAST({{ $ident }} AS STRING)
+{{- else if eq $.AsFlatType "string_number" -}}
+	CAST({{ $ident }} AS STRING)
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+	DATE_FORMAT({{ $ident }}, 'yyyy-MM-dd')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+	date_format(from_utc_timestamp({{ $ident }}, 'UTC'), "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
+{{- else -}}
+	{{ $ident }}
 {{- end -}}
 {{- end }}
 

@@ -65,6 +65,46 @@ SELECT 0, `a-schema`.key_value.flow_document
 	AND `a-schema`.key_value.`key!binary` = r.`key!binary` AND `a-schema`.key_value.`key!binary` >= 'aGVsbG8K' AND `a-schema`.key_value.`key!binary` <= 'Z29vZGJ5ZQo='
 --- End `a-schema`.key_value loadQuery ---
 
+--- Begin `a-schema`.key_value loadQueryNoFlowDocument ---
+SELECT 0, 
+to_json(struct(
+	`a-schema`.key_value.key1 AS key1,
+	`a-schema`.key_value.key2 AS key2,
+	`a-schema`.key_value.`key!binary` AS key!binary,
+	`a-schema`.key_value.array AS array,
+	`a-schema`.key_value.binary AS binary,
+	`a-schema`.key_value.boolean AS boolean,
+	`a-schema`.key_value.integer AS integer,
+	`a-schema`.key_value.`integerGt64Bit` AS integerGt64Bit,
+	`a-schema`.key_value.`integerWithUserDDL` AS integerWithUserDDL,
+	`a-schema`.key_value.multiple AS multiple,
+	`a-schema`.key_value.number AS number,
+	CAST(`a-schema`.key_value.`numberCastToString` AS STRING) AS numberCastToString,
+	`a-schema`.key_value.object AS object,
+	`a-schema`.key_value.string AS string,
+	CAST(`a-schema`.key_value.`stringInteger` AS STRING) AS stringInteger,
+	CAST(`a-schema`.key_value.`stringInteger39Chars` AS STRING) AS stringInteger39Chars,
+	CAST(`a-schema`.key_value.`stringInteger66Chars` AS STRING) AS stringInteger66Chars,
+	CAST(`a-schema`.key_value.`stringNumber` AS STRING) AS stringNumber
+)) as flow_document
+FROM `a-schema`.key_value
+JOIN (
+	(
+		SELECT
+		key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+		FROM json.`file1`
+	)
+	 UNION ALL (
+		SELECT
+		key1::LONG, key2::BOOLEAN, unbase64(`key!binary`)::BINARY as `key!binary`
+		FROM json.`file2`
+	)
+) AS r
+ON `a-schema`.key_value.key1 = r.key1 AND `a-schema`.key_value.key1 >= 10 AND `a-schema`.key_value.key1 <= 100
+AND `a-schema`.key_value.key2 = r.key2
+AND `a-schema`.key_value.`key!binary` = r.`key!binary` AND `a-schema`.key_value.`key!binary` >= 'aGVsbG8K' AND `a-schema`.key_value.`key!binary` <= 'Z29vZGJ5ZQo='
+--- End `a-schema`.key_value loadQueryNoFlowDocument ---
+
 --- Begin `a-schema`.key_value mergeInto ---
 	MERGE INTO `a-schema`.key_value AS l
 	USING (
