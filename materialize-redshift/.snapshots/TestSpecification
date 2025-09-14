@@ -217,7 +217,7 @@
           "no_flow_document": {
             "type": "boolean",
             "title": "Exclude Flow Document",
-            "description": "When enabled the flow_document column will not be materialized in destination tables.",
+            "description": "When enabled the root document will not be required for standard updates.",
             "default": false
           },
           "feature_flags": {
