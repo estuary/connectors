@@ -213,6 +213,23 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 ) WHERE NOT _flow_delete;
 {{ end }}
 
+{{ define "uncast" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if eq $.AsFlatType "string_integer" -}}
+	CAST({{ $ident }} AS VARCHAR)
+{{- else if eq $.AsFlatType "string_number" -}}
+	CAST({{ $ident }} AS VARCHAR)
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+	strftime({{ $ident }}, '%Y-%m-%d')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+	strftime(timezone('UTC', {{ $ident }}), '%Y-%m-%dT%H:%M:%S.%fZ')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") -}}
+	CAST({{ $ident }} AS VARCHAR)
+{{- else -}}
+	{{ $ident }}
+{{- end -}}
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" }}                                                                                                                             
 {{ if $.DeltaUpdates -}}                                                                                                                                           
 SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc                                                                                                     
@@ -221,7 +238,7 @@ SELECT {{ $.Binding }} AS binding,
 json_object(                                                                                                                                                       
 {{- range $i, $col := $.RootLevelColumns}}                                                                                                                         
        {{- if $i}}, {{end}}                                                                                                                                        
-       '{{$col.Field}}', l.{{$col.Identifier}}                                                                                                                     
+       '{{$col.Field}}', {{ template "uncast" (ColumnWithAlias $col "l") }}                                                                                                                     
 {{- end}}                                                                                                                                                          
 ) as doc                                                                                                                                                           
 FROM {{ $.Identifier }} AS l                                                                                                                                       

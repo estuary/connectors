@@ -60,6 +60,44 @@ JOIN read_json(
 	 AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='
 --- End db."a-schema".key_value loadQuery ---
 
+--- Begin db."a-schema".key_value loadQueryNoFlowDocument ---                                                                                                                             
+SELECT 0 AS binding,                                                                                                                                 
+json_object(                                                                                                                                        
+       'key1', l.key1,                                                                                                                                         
+       'key2', l.key2,                                                                                                                                         
+       'key!binary', l."key!binary",                                                                                                                                         
+       'array', l."array",                                                                                                                                         
+       'binary', l."binary",                                                                                                                                         
+       'boolean', l."boolean",                                                                                                                                         
+       'integer', l."integer",                                                                                                                                         
+       'integerGt64Bit', l."integerGt64Bit",                                                                                                                                         
+       'integerWithUserDDL', l."integerWithUserDDL",                                                                                                                                         
+       'multiple', l.multiple,                                                                                                                                         
+       'number', l.number,                                                                                                                                         
+       'numberCastToString', CAST(l."numberCastToString" AS VARCHAR),                                                                                                                                         
+       'object', l."object",                                                                                                                                         
+       'string', l.string,                                                                                                                                         
+       'stringInteger', CAST(l."stringInteger" AS VARCHAR),                                                                                                                                         
+       'stringInteger39Chars', CAST(l."stringInteger39Chars" AS VARCHAR),                                                                                                                                         
+       'stringInteger66Chars', CAST(l."stringInteger66Chars" AS VARCHAR),                                                                                                                                         
+       'stringNumber', CAST(l."stringNumber" AS VARCHAR)                                                                                                                                                          
+) as doc                                                                                                                                                           
+FROM db."a-schema".key_value AS l                                                                                                                                       
+JOIN read_json(                                                                                                                                                    
+       ['s3://bucket/file1', 's3://bucket/file2'],                                                                                                                                                          
+       format='newline_delimited',                                                                                                                                 
+       compression='gzip',                                                                                                                                         
+       columns={                                                                                                                            
+               key1: 'BIGINT NOT NULL',                                                                                                                            
+               key2: 'BOOLEAN NOT NULL',                                                                                                                            
+               "key!binary": 'VARCHAR NOT NULL'                                                                                                                                                  
+       }                                                                                                                                                           
+) AS r                                                                                                                              
+        ON  l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100                                                                                                                              
+        AND l.key2 = r.key2                                                                                                                              
+        AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='                                                                                                                                                         
+--- End db."a-schema".key_value loadQueryNoFlowDocument ---
+
 --- Begin db."a-schema".key_value storeDeleteQuery ---
 DELETE FROM db."a-schema".key_value AS l
 USING read_json(

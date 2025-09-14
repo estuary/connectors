@@ -338,18 +338,27 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 
 -- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
 
+{{ define "uncast" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if eq $.AsFlatType "string_integer" -}}
+	CAST({{ $ident }} AS VARCHAR)
+{{- else if eq $.AsFlatType "string_number" -}}
+	CAST({{ $ident }} AS VARCHAR)
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+	TO_CHAR({{ $ident }}, 'YYYY-MM-DD')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+	TO_CHAR({{ $ident }} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+{{- else -}}
+	{{ $ident }}
+{{- end -}}
+{{- end }}
+
 {{ define "loadQueryNoFlowDocument" }}
 SELECT {{ $.Binding }}, 
 OBJECT(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}},{{end}}
-	{{Literal $col.Field}}, {{ if eq $col.DDL "DATE" -}}
-		TO_CHAR(r.{{$col.Identifier}}, 'YYYY-MM-DD')
-	{{- else if eq $col.DDL "TIMESTAMPTZ" -}}
-		TO_CHAR(r.{{$col.Identifier}} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-	{{- else -}}
-		r.{{$col.Identifier}}
-	{{- end}}
+	{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
 {{- end}}
 ) as flow_document
 FROM {{ template "temp_name" . }} AS l
