@@ -1,8 +1,10 @@
+// This file contains helpers for building common Store implementations.
 package filesink
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"strings"
@@ -14,11 +16,19 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/blob"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
+	"github.com/invopop/jsonschema"
 	"google.golang.org/api/option"
 )
 
-// This file contains helpers for building common Store implementations.
+type AuthType string
+
+const (
+	AWSAccessKey AuthType = "AWSAccessKey"
+	AWSIAM       AuthType = "AWSIAM"
+)
 
 type S3Store struct {
 	client   *s3.Client
@@ -26,24 +36,65 @@ type S3Store struct {
 	bucket   string
 }
 
-type S3StoreConfig struct {
-	Bucket             string `json:"bucket" jsonschema:"title=Bucket,description=Bucket to store materialized objects." jsonschema_extras:"order=0"`
+type AccessKeyCredentials struct {
 	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=AWS Access Key ID,description=Access Key ID for writing data to the bucket." jsonschema_extras:"order=1"`
 	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=AWS Secret Access key,description=Secret Access Key for writing data to the bucket." jsonschema_extras:"secret=true,order=2"`
+}
+
+type CredentialsConfig struct {
+	AuthType AuthType `json:"auth_type"`
+
+	AccessKeyCredentials
+	iam.IAMConfig
+}
+
+func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
+	subSchemas := []schemagen.OneOfSubSchemaT{
+		schemagen.OneOfSubSchema("Access Key", AccessKeyCredentials{}, string(AWSAccessKey)),
+	}
+	subSchemas = append(subSchemas,
+		schemagen.OneOfSubSchema("AWS IAM", iam.AWSConfig{}, string(AWSIAM)))
+
+	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(AWSAccessKey), subSchemas...)
+}
+
+func (c *CredentialsConfig) Validate() error {
+	switch c.AuthType {
+	case AWSAccessKey:
+		if c.AWSAccessKeyID == "" {
+			return errors.New("missing 'awsAccessKeyId'")
+		}
+		if c.AWSSecretAccessKey == "" {
+			return errors.New("missing 'awsSecretAccessKey'")
+		}
+		return nil
+	case AWSIAM:
+		if err := c.ValidateIAM(); err != nil {
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("unknown 'auth_type'")
+}
+
+type S3StoreConfig struct {
+	Bucket             string `json:"bucket" jsonschema:"title=Bucket,description=Bucket to store materialized objects." jsonschema_extras:"order=0"`
+	AWSAccessKeyID     string `json:"awsAccessKeyId,omitempty" jsonschema:"-"`
+	AWSSecretAccessKey string `json:"awsSecretAccessKey,omitempty" jsonschema:"-"`
 	Region             string `json:"region" jsonschema:"title=Region,description=Region of the bucket to write to." jsonschema_extras:"order=3"`
 
-	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=4"`
-	Prefix         string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects." jsonschema_extras:"order=5"`
-	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=6"`
+	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=4"`
 
-	Endpoint string `json:"endpoint,omitempty" jsonschema:"title=Custom S3 Endpoint,description=The S3 endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS. Should normally be left blank." jsonschema_extras:"order=7"`
+	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=5"`
+	Prefix         string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects." jsonschema_extras:"order=6"`
+	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=7"`
+
+	Endpoint string `json:"endpoint,omitempty" jsonschema:"title=Custom S3 Endpoint,description=The S3 endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS. Should normally be left blank." jsonschema_extras:"order=8"`
 }
 
 func (c S3StoreConfig) Validate() error {
 	var requiredProperties = [][]string{
 		{"bucket", c.Bucket},
-		{"awsAccessKeyId", c.AWSAccessKeyID},
-		{"awsSecretAccessKey", c.AWSSecretAccessKey},
 		{"region", c.Region},
 		{"uploadInterval", c.UploadInterval},
 	}
@@ -51,6 +102,17 @@ func (c S3StoreConfig) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if c.Credentials == nil {
+		if c.AWSAccessKeyID == "" {
+			return errors.New("missing 'awsAccessKeyId'")
+		}
+		if c.AWSSecretAccessKey == "" {
+			return errors.New("missing 'awsSecretAccessKey'")
+		}
+	} else if err := c.Credentials.Validate(); err != nil {
+		return err
 	}
 
 	if _, err := time.ParseDuration(c.UploadInterval); err != nil {
@@ -66,11 +128,29 @@ func (c S3StoreConfig) Validate() error {
 	return nil
 }
 
+func (c S3StoreConfig) CredentialsProvider(ctx context.Context) (aws.CredentialsProvider, error) {
+	if c.Credentials == nil {
+		return credentials.NewStaticCredentialsProvider(c.AWSAccessKeyID, c.AWSSecretAccessKey, ""), nil
+	}
+
+	switch c.Credentials.AuthType {
+	case AWSAccessKey:
+		return credentials.NewStaticCredentialsProvider(
+			c.Credentials.AWSAccessKeyID, c.Credentials.AWSSecretAccessKey, ""), nil
+	case AWSIAM:
+		return c.Credentials.IAMTokens.AWSCredentialsProvider()
+	}
+	return nil, errors.New("unknown 'auth_type'")
+}
+
 func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
+	credProvider, err := cfg.CredentialsProvider(ctx)
+	if err != nil {
+		return nil, err
+	}
+
 	opts := []func(*awsConfig.LoadOptions) error{
-		awsConfig.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, ""),
-		),
+		awsConfig.WithCredentialsProvider(credProvider),
 		awsConfig.WithRegion(cfg.Region),
 	}
 

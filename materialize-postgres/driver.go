@@ -191,13 +191,16 @@ func (c config) ToURI(ctx context.Context) (string, error) {
 		case UserPassword:
 			pass = c.Credentials.Password
 		case AWSIAM:
-			var err error
+			credProvider, err := c.Credentials.AWSCredentialsProvider()
+			if err != nil {
+				return "", err
+			}
 			pass, err = auth.BuildAuthToken(
 				ctx,
 				ensurePort(c.Address),
 				c.Credentials.AWSRegion,
 				user,
-				c.Credentials.AWSCredentialsProvider(),
+				credProvider,
 			)
 			if err != nil {
 				return "", fmt.Errorf("building AWS auth token: %w", err)
