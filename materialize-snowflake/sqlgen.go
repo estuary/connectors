@@ -65,11 +65,11 @@ var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeM
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("TEXT"),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date": sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic(
+					"date": sql.MapPrimaryKey(sql.MapStatic("TEXT"), sql.MapStatic("DATE")),
+					"date-time": sql.MapPrimaryKey(sql.MapStatic("TEXT"), sql.MapStatic(
 						string(timestampMapping),
 						sql.AlsoCompatibleWith("timestamp_ntz", "timestamp_tz", "timestamp_ltz"),
-					),
+					)),
 				},
 			}),
 		},

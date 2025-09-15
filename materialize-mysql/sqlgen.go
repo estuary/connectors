@@ -49,6 +49,8 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		jsonType = "LONGTEXT"
 		jsonMapper = sql.MapStatic("LONGTEXT", sql.UsingConverter(sql.ToJsonString))
 	}
+	primaryKeyTextType := sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar"))
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -71,13 +73,13 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double"), sql.UsingConverter(sql.StrToFloat("NaN", "+inf", "-inf"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapPrimaryKey(
-					sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar")),
+					primaryKeyTextType,
 					sql.MapStatic("LONGTEXT"),
 				),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic("DATETIME(6)", sql.AlsoCompatibleWith("datetime"), sql.UsingConverter(rfc3339ToTZ(tzLocation))),
-					"time":      sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("time"), sql.UsingConverter(rfc3339TimeToTZ(tzLocation))),
+					"date":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE")),
+					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATETIME(6)", sql.AlsoCompatibleWith("datetime"), sql.UsingConverter(rfc3339ToTZ(tzLocation)))),
+					"time":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("time"), sql.UsingConverter(rfc3339TimeToTZ(tzLocation)))),
 				},
 				WithContentType: map[string]sql.MapProjectionFn{
 					// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and

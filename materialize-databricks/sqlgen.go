@@ -51,8 +51,8 @@ var databricksDialect = func() sql.Dialect {
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("STRING"),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic("TIMESTAMP"),
+					"date":      sql.MapPrimaryKey(sql.MapStatic("STRING"), sql.MapStatic("DATE")),
+					"date-time": sql.MapPrimaryKey(sql.MapStatic("STRING"), sql.MapStatic("TIMESTAMP")),
 				},
 			}),
 		},

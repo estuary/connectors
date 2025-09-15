@@ -29,6 +29,8 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 		return te, nil
 	}
 
+	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(textConverter))
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -51,10 +53,10 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 			// https://stitch-docs.netlify.app/docs/data-structure/redshift-data-loading-behavior#new-table-scenarios
 			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", sql.UsingConverter(sql.StrToFloat(nil, nil, nil))),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(textConverter)), // Note: Actually a VARCHAR(256)
+				Fallback: primaryKeyTextType, // Note: Actually a VARCHAR(256)
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date": sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.StringCastConverter(func(s string) (any, error) {
+					"date": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE")),
+					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.StringCastConverter(func(s string) (any, error) {
 						// Redshift supports timestamps with microsecond precision. It will reject
 						// timestamps with higher precision than that, so we truncate anything
 						// beyond microseconds.
@@ -64,7 +66,7 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 						}
 
 						return parsed.Truncate(time.Microsecond).Format(time.RFC3339Nano), nil
-					}))),
+					})))),
 					// "time" is not currently support due to limitations with loading time values from
 					// staged JSON.
 					// "time": sql.NewStaticMapper("TIMETZ"),

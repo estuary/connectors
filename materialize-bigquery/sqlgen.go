@@ -66,6 +66,8 @@ func bqDialect(objAndArrayAsJson bool) sql.Dialect {
 		objAndArrayCol = sql.MapStatic("STRING", sql.UsingConverter(jsonConverter))
 	}
 
+	primaryKeyTextType := sql.MapStatic("STRING")
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:   objAndArrayCol,
@@ -95,10 +97,10 @@ func bqDialect(objAndArrayAsJson bool) sql.Dialect {
 			// https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_floating_point
 			sql.STRING_NUMBER: sql.MapStatic("FLOAT64", sql.AlsoCompatibleWith("float"), sql.UsingConverter(sql.StrToFloat("NaN", "Infinity", "-Infinity"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: sql.MapStatic("STRING"),
+				Fallback: primaryKeyTextType,
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate)),
-					"date-time": sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime)),
+					"date":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))),
+					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime))),
 				},
 			}),
 		},

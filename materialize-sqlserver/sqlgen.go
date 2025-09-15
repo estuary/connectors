@@ -78,9 +78,9 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 					sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
 				),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic("DATETIME2", sql.UsingConverter(rfc3339ToUTC())),
-					"time":      sql.MapStatic("TIME", sql.UsingConverter(rfc3339TimeToUTC())),
+					"date":      sql.MapPrimaryKey(sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)), sql.MapStatic("DATE")),
+					"date-time": sql.MapPrimaryKey(sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)), sql.MapStatic("DATETIME2", sql.UsingConverter(rfc3339ToUTC()))),
+					"time":      sql.MapPrimaryKey(sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)), sql.MapStatic("TIME", sql.UsingConverter(rfc3339TimeToUTC()))),
 				},
 			}),
 		},
