@@ -116,8 +116,6 @@ func TestPartitionedTable(t *testing.T) {
 }
 
 func TestDatetimeNormalization(t *testing.T) {
-	// Create a table with some 'difficult' column names (a reserved word, a capitalized
-	// name, and one containing special characters which also happens to be the primary key).
 	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var uniqueID = "24528211"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, x DATETIME)")
