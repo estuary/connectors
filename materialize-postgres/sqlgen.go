@@ -10,6 +10,8 @@ import (
 )
 
 var pgDialect = func() sql.Dialect {
+	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(sql.StringCastConverter(func(in string) (any, error) { return strings.ReplaceAll(in, "\u0000", ""), nil })))
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -25,24 +27,16 @@ var pgDialect = func() sql.Dialect {
 			sql.STRING_INTEGER: sql.MapStatic("NUMERIC"),
 			sql.STRING_NUMBER:  sql.MapStatic("DECIMAL", sql.AlsoCompatibleWith("numeric")),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: sql.MapStatic(
-					"TEXT",
-					sql.AlsoCompatibleWith("character varying"),
-					sql.UsingConverter(sql.StringCastConverter(func(in string) (any, error) {
-						// Postgres doesn't allow fields with null bytes, so they must be stripped out if
-						// present.
-						return strings.ReplaceAll(in, "\u0000", ""), nil
-					})),
-				),
+				Fallback: primaryKeyTextType,
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate)),
-					"date-time": sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.ClampDatetime)),
+					"date":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))),
+					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.ClampDatetime))),
 					"duration":  sql.MapStatic("INTERVAL"),
 					"ipv4":      sql.MapStatic("CIDR"),
 					"ipv6":      sql.MapStatic("CIDR"),
 					"macaddr":   sql.MapStatic("MACADDR"),
 					"macaddr8":  sql.MapStatic("MACADDR8"),
-					"time":      sql.MapStatic("TIME", sql.AlsoCompatibleWith("time without time zone")),
+					"time":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIME", sql.AlsoCompatibleWith("time without time zone"))),
 					// UUID format was added on 30-Sept-2024, and pre-existing
 					// text type of columns are allowed to validate for
 					// compatibility with pre-existing columns.

@@ -20,6 +20,8 @@ function query() {
 
 query "GRANT ALL PRIVILEGES ON *.* TO 'flow'@'%' WITH GRANT OPTION"
 query "SET @@GLOBAL.time_zone='UTC'"
+query "SET GLOBAL innodb_large_prefix = ON;"
+query "SET GLOBAL innodb_file_format = Barracuda;"
 
 config_json_template='{
    "address":  "$MYSQL_HOST:$MYSQL_PORT",
@@ -102,6 +104,24 @@ resources_json_template='[
       "table": "deletions"
     },
     "source": "${TEST_COLLECTION_DELETIONS}"
+  },
+  {
+    "resource": {
+      "table": "all_key_types_part_one"
+    },
+    "source": "${TEST_COLLECTION_ALL_KEY_TYPES_PART_ONE}"
+  },
+  {
+    "resource": {
+      "table": "all_key_types_part_two"
+    },
+    "source": "${TEST_COLLECTION_ALL_KEY_TYPES_PART_TWO}"
+  },
+  {
+    "resource": {
+      "table": "all_key_types_part_three"
+    },
+    "source": "${TEST_COLLECTION_ALL_KEY_TYPES_PART_THREE}"
   }
 ]'
 

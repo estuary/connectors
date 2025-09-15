@@ -77,7 +77,7 @@ func TestDateTimePKColumn(t *testing.T) {
 			IsPrimaryKey: true,
 		},
 	}, sql.FieldConfig{})
-	require.Equal(t, "DATETIME(6) NOT NULL", mapped.DDL)
+	require.Equal(t, "VARCHAR(256) NOT NULL", mapped.DDL)
 }
 
 func TestTimeColumn(t *testing.T) {

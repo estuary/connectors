@@ -34,6 +34,8 @@ var dialect = func() sql.Dialect {
 		}
 	}
 
+	primaryKeyTextType := sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(checkedStringLength(nil)))
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -55,11 +57,11 @@ var dialect = func() sql.Dialect {
 			),
 			sql.STRING_NUMBER: sql.MapStatic("FLOAT", sql.UsingConverter(sql.StrToFloat(nil, nil, nil))),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(checkedStringLength(nil))),
+				Fallback: primaryKeyTextType,
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate)),
-					"date-time": sql.MapStatic("DATETIME2(6)", sql.AlsoCompatibleWith("DATETIME2"), sql.UsingConverter(sql.ClampDatetime)),
-					"time":      sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("TIME")),
+					"date":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))),
+					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATETIME2(6)", sql.AlsoCompatibleWith("DATETIME2"), sql.UsingConverter(sql.ClampDatetime))),
+					"time":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("TIME"))),
 				},
 			}),
 		},
