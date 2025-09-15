@@ -260,11 +260,11 @@ JOIN {{ $.Identifier}} AS r
 	CAST({{ $ident }} AS VARCHAR(MAX))
 {{- else if eq $.AsFlatType "string_number" -}}
 	CAST({{ $ident }} AS VARCHAR(MAX))
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
 	FORMAT({{ $ident }}, 'yyyy-MM-dd')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	FORMAT({{ $ident }} AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.FFFFFF') + 'Z'
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	FORMAT({{ $ident }}, 'HH:mm:ss.FFFFFF')
 {{- else -}}
 	{{ $ident }}

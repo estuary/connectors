@@ -344,9 +344,9 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 	CAST({{ $ident }} AS VARCHAR)
 {{- else if eq $.AsFlatType "string_number" -}}
 	CAST({{ $ident }} AS VARCHAR)
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
 	TO_CHAR({{ $ident }}, 'YYYY-MM-DD')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	TO_CHAR({{ $ident }} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
 {{- else -}}
 	{{ $ident }}

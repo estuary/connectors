@@ -258,9 +258,9 @@ SELECT -1, NULL LIMIT 0
 	CAST({{ $ident }} AS STRING)
 {{- else if eq $.AsFlatType "string_number" -}}
 	CAST({{ $ident }} AS STRING)
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
 	CAST({{ $ident }} AS STRING)
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E*SZ', {{ $ident }}, 'UTC')
 {{- else -}}
 	{{ $ident }}
