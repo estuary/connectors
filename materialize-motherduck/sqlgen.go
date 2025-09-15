@@ -219,11 +219,11 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	CAST({{ $ident }} AS VARCHAR)
 {{- else if eq $.AsFlatType "string_number" -}}
 	CAST({{ $ident }} AS VARCHAR)
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
 	strftime({{ $ident }}, '%Y-%m-%d')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	strftime(timezone('UTC', {{ $ident }}), '%Y-%m-%dT%H:%M:%S.%fZ')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	CAST({{ $ident }} AS VARCHAR)
 {{- else -}}
 	{{ $ident }}

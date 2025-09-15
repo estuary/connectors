@@ -235,12 +235,12 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 	CAST({{ $ident }} AS TEXT)
 {{- else if eq $.AsFlatType "string_number" -}}
 	CAST({{ $ident }} AS TEXT)
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
 	TO_CHAR({{ $ident }}, 'YYYY-MM-DD')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	to_char({{ $ident }} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") -}}
-	TO_CHAR({{ $ident }}, 'HH24:MI:SS.US')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
+	TO_CHAR({{ $ident }}, 'HH24:MI:SS.US"Z"')
 {{- else -}}
 	{{ $ident }}
 {{- end -}}

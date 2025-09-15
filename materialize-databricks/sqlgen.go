@@ -132,6 +132,7 @@ type templates struct {
 	createTargetTable *template.Template
 	alterTableColumns *template.Template
 	loadQuery         *template.Template
+	loadQueryNoFlowDocument         *template.Template
 	copyIntoDirect    *template.Template
 	mergeInto         *template.Template
 }
@@ -242,9 +243,9 @@ JOIN (
 	CAST({{ $ident }} AS STRING)
 {{- else if eq $.AsFlatType "string_number" -}}
 	CAST({{ $ident }} AS STRING)
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
 	DATE_FORMAT({{ $ident }}, 'yyyy-MM-dd')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	date_format(from_utc_timestamp({{ $ident }}, 'UTC'), "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
 {{- else -}}
 	{{ $ident }}

@@ -367,12 +367,12 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 	CAST({{ $ident }} AS CHAR)
 {{- else if eq $.AsFlatType "string_number" -}}
 	CAST({{ $ident }} AS CHAR)
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
 	DATE_FORMAT({{ $ident }}, '%Y-%m-%d')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	DATE_FORMAT({{ $ident }}, '%Y-%m-%dT%H:%i:%s.%fZ')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") -}}
-	TIME_FORMAT({{ $ident }}, '%H:%i:%s.%f')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
+	TIME_FORMAT({{ $ident }}, '%H:%i:%s.%fZ')
 {{- else -}}
 	{{ $ident }}
 {{- end -}}
