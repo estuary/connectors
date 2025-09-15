@@ -6,6 +6,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"regexp"
 	"slices"
@@ -14,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/mysql"
@@ -123,7 +125,7 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 		ReadTimeout:     5 * time.Minute,
 
 		// Output replication log messages with Logrus the same as our own connector messages.
-		Logger: logrus.StandardLogger(),
+		Logger: slog.New(common.NewLogrusHandler(logrus.StandardLogger())),
 
 		// Allow the binlog syncer to buffer a few events internally for speed, but not too many.
 		EventCacheCount: binlogEventCacheCount,
