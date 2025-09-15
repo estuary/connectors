@@ -54,6 +54,7 @@ impl std::fmt::Display for SaslMechanism {
 #[serde(rename_all = "snake_case")]
 pub enum TlsSettings {
     SystemCertificates,
+    Disabled,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -191,7 +192,8 @@ impl JsonSchema for EndpointConfig {
                     "default": "system_certificates",
                     "description": "Controls how should TLS certificates be found or used.",
                     "enum": [
-                        "system_certificates"
+                        "system_certificates",
+                        "disabled"
                     ],
                     "title": "TLS Settings",
                     "type": "string",
@@ -352,8 +354,10 @@ impl EndpointConfig {
     fn security_protocol(&self) -> &'static str {
         match (&self.credentials, &self.tls) {
             (None, Some(TlsSettings::SystemCertificates)) => "SSL",
+            (None, Some(TlsSettings::Disabled)) => "PLAINTEXT",
             (None, None) => "PLAINTEXT",
             (Some(_), Some(TlsSettings::SystemCertificates)) => "SASL_SSL",
+            (Some(_), Some(TlsSettings::Disabled)) => "SASL_PLAINTEXT",
             (Some(_), None) => "SASL_PLAINTEXT",
         }
     }

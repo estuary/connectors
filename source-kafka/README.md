@@ -42,11 +42,41 @@ To connect to the cluster, you'll need to craft a `config.json` file that matche
 
 The Kafka cluster will need to be configured to allow client to connect. See the [`librdkafka` documentation on `bootstrap_servers`](https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md#global-configuration-properties) for more information.
 
-Example:
+### Basic PLAINTEXT Configuration (No Authentication)
 
 ```json
 {
   "bootstrap_servers": "localhost:9092"
+}
+```
+
+### SASL_SSL Configuration (Secure with TLS)
+
+```json
+{
+  "bootstrap_servers": "localhost:9093",
+  "credentials": {
+    "auth_type": "user_password",
+    "mechanism": "PLAIN",
+    "username": "your_username",
+    "password": "your_password"
+  },
+  "tls": "system_certificates"
+}
+```
+
+### SASL_PLAINTEXT Configuration (SASL without TLS)
+
+```json
+{
+  "bootstrap_servers": "localhost:9094",
+  "credentials": {
+    "auth_type": "user_password",
+    "mechanism": "PLAIN",
+    "username": "your_username",
+    "password": "your_password"
+  },
+  "tls": "disabled"
 }
 ```
 
