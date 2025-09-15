@@ -111,10 +111,8 @@ func (c S3StoreConfig) Validate() error {
 		if c.AWSSecretAccessKey == "" {
 			return errors.New("missing 'awsSecretAccessKey'")
 		}
-	} else {
-		if err := c.Credentials.Validate(); err != nil {
-			return err
-		}
+	} else if err := c.Credentials.Validate(); err != nil {
+		return err
 	}
 
 	if _, err := time.ParseDuration(c.UploadInterval); err != nil {
