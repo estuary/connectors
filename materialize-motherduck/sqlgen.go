@@ -52,6 +52,7 @@ var duckDialect = func() sql.Dialect {
 			"date":                     {sql.NewMigrationSpec([]string{"varchar"})},
 			"timestamp with time zone": {sql.NewMigrationSpec([]string{"varchar"}, sql.WithCastSQL(datetimeToStringCast))},
 			"time":                     {sql.NewMigrationSpec([]string{"varchar"})},
+			"uuid":                     {sql.NewMigrationSpec([]string{"varchar"})},
 			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
