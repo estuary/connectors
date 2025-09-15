@@ -33,9 +33,10 @@ var duckDialect = func() sql.Dialect {
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("VARCHAR"),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic("TIMESTAMP WITH TIME ZONE"),
-					"time":      sql.MapStatic("TIME"),
+					"date":      sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), sql.MapStatic("DATE")),
+					"date-time": sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), sql.MapStatic("TIMESTAMP WITH TIME ZONE")),
+					"duration":  sql.MapStatic("INTERVAL"),
+					"time":      sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), sql.MapStatic("TIME")),
 					"uuid":      sql.MapStatic("UUID"),
 				},
 			}),
@@ -190,11 +191,11 @@ SELECT
 	CAST({{ $ident }} AS VARCHAR)
 {{- else if eq $.AsFlatType "string_number" -}}
 	CAST({{ $ident }} AS VARCHAR)
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
 	strftime({{ $ident }}, '%Y-%m-%d')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	strftime(timezone('UTC', {{ $ident }}), '%Y-%m-%dT%H:%M:%S.%fZ')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	CAST({{ $ident }} AS VARCHAR)
 {{- else -}}
 	{{ $ident }}

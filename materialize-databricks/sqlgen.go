@@ -51,8 +51,8 @@ var databricksDialect = func() sql.Dialect {
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("STRING"),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic("TIMESTAMP"),
+					"date":      sql.MapPrimaryKey(sql.MapStatic("STRING"), sql.MapStatic("DATE")),
+					"date-time": sql.MapPrimaryKey(sql.MapStatic("STRING"), sql.MapStatic("TIMESTAMP")),
 				},
 			}),
 		},
@@ -223,9 +223,9 @@ JOIN (
 	CAST({{ $ident }} AS STRING)
 {{- else if eq $.AsFlatType "string_number" -}}
 	CAST({{ $ident }} AS STRING)
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
 	DATE_FORMAT({{ $ident }}, 'yyyy-MM-dd')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	date_format(from_utc_timestamp({{ $ident }}, 'UTC'), "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")
 {{- else -}}
 	{{ $ident }}

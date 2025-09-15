@@ -65,11 +65,11 @@ var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeM
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("TEXT"),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date": sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic(
+					"date": sql.MapPrimaryKey(sql.MapStatic("TEXT"), sql.MapStatic("DATE")),
+					"date-time": sql.MapPrimaryKey(sql.MapStatic("TEXT"), sql.MapStatic(
 						string(timestampMapping),
 						sql.AlsoCompatibleWith("timestamp_ntz", "timestamp_tz", "timestamp_ltz"),
-					),
+					)),
 				},
 			}),
 		},
@@ -243,9 +243,9 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 	TO_VARCHAR({{ $ident }})
 {{- else if eq $.AsFlatType "string_number" -}}
 	TO_VARCHAR({{ $ident }})
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
 	TO_VARCHAR({{ $ident }}, 'YYYY-MM-DD')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	TO_VARCHAR(CONVERT_TIMEZONE('UTC', {{ $ident }}), 'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')
 {{- else -}}
 	{{ $ident }}

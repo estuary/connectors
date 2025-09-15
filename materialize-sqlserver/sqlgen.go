@@ -78,9 +78,9 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 					sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
 				),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic("DATETIME2", sql.UsingConverter(rfc3339ToUTC())),
-					"time":      sql.MapStatic("TIME", sql.UsingConverter(rfc3339TimeToUTC())),
+					"date":      sql.MapPrimaryKey(sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)), sql.MapStatic("DATE")),
+					"date-time": sql.MapPrimaryKey(sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)), sql.MapStatic("DATETIME2", sql.UsingConverter(rfc3339ToUTC()))),
+					"time":      sql.MapPrimaryKey(sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)), sql.MapStatic("TIME", sql.UsingConverter(rfc3339TimeToUTC()))),
 				},
 			}),
 		},
@@ -311,11 +311,11 @@ SELECT TOP 0 -1, NULL
 	CAST({{ $ident }} AS NVARCHAR(MAX))
 {{- else if eq $.AsFlatType "string_number" -}}
 	CAST({{ $ident }} AS NVARCHAR(MAX))
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
 	FORMAT({{ $ident }}, 'yyyy-MM-dd')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	FORMAT({{ $ident }} AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.FFFFFFF') + 'Z'
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") -}}
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	FORMAT({{ $ident }}, 'HH:mm:ss.FFFFFFF')
 {{- else -}}
 	{{ $ident }}
