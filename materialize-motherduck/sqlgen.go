@@ -35,7 +35,6 @@ var duckDialect = func() sql.Dialect {
 				WithFormat: map[string]sql.MapProjectionFn{
 					"date":      sql.MapStatic("DATE"),
 					"date-time": sql.MapStatic("TIMESTAMP WITH TIME ZONE"),
-					"duration":  sql.MapStatic("INTERVAL"),
 					"time":      sql.MapStatic("TIME"),
 					"uuid":      sql.MapStatic("UUID"),
 				},
