@@ -66,6 +66,7 @@ func (c config) toURI(includeSchema bool) (string, error) {
 	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
 	// Without this, the authentication token will expire after 4 hours of inactivity.
 	queryParams.Add("client_session_keep_alive", "true")
+	queryParams.Add("maxRetryCount", "10")
 
 	// Optional params
 	if c.Warehouse != "" {
