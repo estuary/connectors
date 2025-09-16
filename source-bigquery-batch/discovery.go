@@ -331,12 +331,18 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 		var fullType = row[5].(string)
 
 		// For parameterized types like STRING(50) we want to chop off the parameters
-		// and concern ourselves solely with the base type name for now. Eventually
-		// we might want to turn this into a proper parser which can handle various
-		// composite types in full.
+		// and concern ourselves solely with the base type name for now. Likewise for
+		// composite types like ARRAY<...> or STRUCT<...> it's useful to just deal with
+		// the "main" type name ARRAY or STRUCT.
+		//
+		// Eventually we might want to turn this into a proper parser which can handle
+		// various composite types in full.
 		var typeName = fullType
 		if strings.ContainsRune(typeName, '(') {
 			typeName = strings.Split(typeName, "(")[0]
+		}
+		if strings.ContainsRune(typeName, '<') {
+			typeName = strings.Split(typeName, "<")[0]
 		}
 
 		var dataType, ok = databaseTypeToJSON[typeName]
@@ -447,6 +453,9 @@ var databaseTypeToJSON = map[string]basicColumnType{
 	"TIMESTAMP": {jsonTypes: []string{"string"}, format: "date-time"},
 
 	"JSON": {},
+
+	"STRUCT": {jsonTypes: []string{"object"}},
+	"ARRAY":  {jsonTypes: []string{"array"}},
 }
 
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)

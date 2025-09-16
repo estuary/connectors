@@ -85,7 +85,8 @@ Binding 0:
             ]
           },
           "array_struct": {
-            "description": "using catch-all schema (source type: non-nullable ARRAY\u003cSTRUCT\u003cid INT64, label STRING\u003e\u003e)"
+            "type": "array",
+            "description": "(source type: non-nullable ARRAY\u003cSTRUCT\u003cid INT64, label STRING\u003e\u003e)"
           },
           "id": {
             "description": "(source type: INT64)",
@@ -95,13 +96,19 @@ Binding 0:
             ]
           },
           "int_array": {
-            "description": "using catch-all schema (source type: non-nullable ARRAY\u003cINT64\u003e)"
+            "type": "array",
+            "description": "(source type: non-nullable ARRAY\u003cINT64\u003e)"
           },
           "string_array": {
-            "description": "using catch-all schema (source type: non-nullable ARRAY\u003cSTRING\u003e)"
+            "type": "array",
+            "description": "(source type: non-nullable ARRAY\u003cSTRING\u003e)"
           },
           "struct_val": {
-            "description": "using catch-all schema (source type: STRUCT\u003cname STRING, age INT64, scores ARRAY\u003cFLOAT64\u003e\u003e)"
+            "description": "(source type: STRUCT\u003cname STRING, age INT64, scores ARRAY\u003cFLOAT64\u003e\u003e)",
+            "type": [
+              "object",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true
