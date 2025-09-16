@@ -580,7 +580,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 		rowValues[0] = metadata
 
 		for idx, val := range row {
-			var translatedValue, err = translateBigQueryValue(val, rows.Schema[idx].Type)
+			var translatedValue, err = translateBigQueryValue(val, rows.Schema[idx])
 			if err != nil {
 				return fmt.Errorf("error translating column %q value: %w", string(rows.Schema[idx].Name), err)
 			}

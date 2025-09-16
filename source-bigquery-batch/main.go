@@ -92,7 +92,51 @@ const (
 	datetimeFormatMicros = "2006-01-02T15:04:05.000000"
 )
 
-func translateBigQueryValue(val any, fieldType bigquery.FieldType) (any, error) {
+func translateBigQueryValue(val any, fieldSchema *bigquery.FieldSchema) (any, error) {
+	// Arrays are represented as their element schema with `Repeated = true` set, so
+	// to translate them we need to check `Repeated` before anything else.
+	if fieldSchema.Repeated {
+		if vals, ok := val.([]bigquery.Value); ok {
+			// Construct the non-repeated element schema
+			var elementSchema = *fieldSchema
+			elementSchema.Repeated = false
+
+			// Translate array elements with the element schema
+			var translated = make([]any, len(vals))
+			for idx, val := range vals {
+				var tval, err = translateBigQueryValue(val, &elementSchema)
+				if err != nil {
+					return nil, fmt.Errorf("error translating array index %d: %w", idx, err)
+				}
+				translated[idx] = tval
+			}
+			return translated, nil
+		} else {
+			return val, nil
+		}
+	}
+
+	switch fieldSchema.Type {
+	case "RECORD":
+		if vals, ok := val.([]bigquery.Value); ok {
+			if len(vals) > len(fieldSchema.Schema) {
+				return nil, fmt.Errorf("more values than record fields (%d > %d)", len(vals), len(fieldSchema.Schema))
+			}
+			var translated = make(map[string]any)
+			for idx, val := range vals {
+				var fieldName = fieldSchema.Schema[idx].Name
+				var tval, err = translateBigQueryValue(val, fieldSchema.Schema[idx])
+				if err != nil {
+					return nil, fmt.Errorf("error translating record field %q: %w", fieldName, err)
+				}
+				translated[fieldName] = tval
+			}
+			return translated, nil
+		} else {
+			return val, nil
+		}
+	}
+
 	switch val := val.(type) {
 	case *big.Rat:
 		n, exact := val.FloatPrec()
@@ -107,7 +151,7 @@ func translateBigQueryValue(val any, fieldType bigquery.FieldType) (any, error) 
 	case civil.DateTime:
 		return val.In(time.UTC).Format(datetimeFormatMicros), nil
 	case string:
-		if fieldType == "JSON" && json.Valid([]byte(val)) {
+		if fieldSchema.Type == "JSON" && json.Valid([]byte(val)) {
 			return json.RawMessage([]byte(val)), nil
 		}
 	case float64:
