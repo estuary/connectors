@@ -10,6 +10,7 @@ from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
 
 from .models import (
     BoardChildStream,
+    ConnectorState,
     EndpointConfig,
     Epics,
     FilterSharing,
@@ -64,11 +65,13 @@ from .api import (
     snapshot_statuses,
     snapshot_system_avatars,
     url_base,
-    ISSUE_JQL_SEARCH_LAG,
+    ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON,
 )
 
 
 TEST_CONFIG_DOMAIN = "dontchangethisdomain.notareal.jira.domain"
+REALTIME = "realtime"
+LOOKBACK = "lookback"
 
 
 async def validate_projects(
@@ -324,18 +327,44 @@ def issues(
         task: Task,
         all_bindings,
     ):
+        # issues previously used a single incremental cursor, however the stream has since moved to use
+        # two subtasks with their own cursors. The below migrates captures with the old single cursor
+        # state over to state for the two separate subtasks.
+        if isinstance(state.inc, ResourceState.Incremental) and isinstance(state.inc.cursor, datetime):
+            migrated_inc_state: dict[str, ResourceState.Incremental | None] = {
+                REALTIME: ResourceState.Incremental(cursor=state.inc.cursor),
+                LOOKBACK: ResourceState.Incremental(cursor=state.inc.cursor - ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON),
+            }
+            state.inc = migrated_inc_state
+
+            task.checkpoint(
+                ConnectorState(
+                    bindingStateV1={binding.stateKey: state}
+                ),
+                # Merging in the new incremental state leaves the non-subtask state in the connector's state. Pydantic
+                # raises a validation error since there should never be _both_ non-subtask and subtask state for a binding's
+                # incremental state. To ensure the non-subtask state is cleared after the migration, merge_patch is set to
+                # False when checkpointing the migrated state.
+                merge_patch=False,
+            )
+
         common.open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(
-                fetch_issues,
-                http,
-                config.domain,
-                timezone,
-                config.advanced.projects,
-            ),
+            fetch_changes={
+                # Jira's Issue Search API is eventually consistent; Jira mentions this in their docs and
+                # community forum: https://community.developer.atlassian.com/t/rfc-61-evolving-search-capabilities-addressing-scalability-with-a-new-enhanced-search-api/83027/58.
+                # To capture any records missed by the REALTIME subtask, the LOOKBACK subtask trails behind
+                # by some amount of time and yields any records it sees were missed by the REALTIME subtask.
+                REALTIME: functools.partial(
+                    fetch_issues, http, config.domain, timezone, config.advanced.projects, None,
+                ),
+                LOOKBACK: functools.partial(
+                    fetch_issues, http, config.domain, timezone, config.advanced.projects, ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON,
+                ),
+            },
             fetch_page=functools.partial(
                 backfill_issues,
                 http,
@@ -347,7 +376,7 @@ def issues(
 
     # Shift the cutoff back ISSUE_JQL_SEARCH_LAG duration to ensure backfills
     # always cover ranges where Jira's API returns consistent results.
-    cutoff = datetime.now(tz=timezone) - ISSUE_JQL_SEARCH_LAG
+    cutoff = datetime.now(tz=timezone) - ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON
     start = config.start_date.astimezone(timezone)
 
     return common.Resource(
@@ -356,7 +385,10 @@ def issues(
         model=JiraResource,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=cutoff),
+            inc={
+                REALTIME: ResourceState.Incremental(cursor=cutoff),
+                LOOKBACK: ResourceState.Incremental(cursor=cutoff - ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON),
+            },
             backfill=ResourceState.Backfill(cutoff=cutoff, next_page=dt_to_str(start))
         ),
         initial_config=ResourceConfig(
@@ -379,19 +411,44 @@ def issue_child_resources(
         task: Task,
         all_bindings,
     ):
+        # issue child streams previously used a single incremental cursor, however these streams have
+        # since moved to use two subtasks with their own cursors. The below migrates captures with the
+        # old single cursor state over to state for the two separate subtasks.
+        if isinstance(state.inc, ResourceState.Incremental) and isinstance(state.inc.cursor, datetime):
+            migrated_inc_state: dict[str, ResourceState.Incremental | None] = {
+                REALTIME: ResourceState.Incremental(cursor=state.inc.cursor),
+                LOOKBACK: ResourceState.Incremental(cursor=state.inc.cursor - ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON),
+            }
+            state.inc = migrated_inc_state
+
+            task.checkpoint(
+                ConnectorState(
+                    bindingStateV1={binding.stateKey: state}
+                ),
+                # Merging in the new incremental state leaves the non-subtask state in the connector's state. Pydantic
+                # raises a validation error since there should never be _both_ non-subtask and subtask state for a binding's
+                # incremental state. To ensure the non-subtask state is cleared after the migration, merge_patch is set to
+                # False when checkpointing the migrated state.
+                merge_patch=False,
+            )
+
         common.open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(
-                fetch_issues_child_resources,
-                http,
-                config.domain,
-                timezone,
-                config.advanced.projects,
-                stream,
-            ),
+            fetch_changes={
+                # Jira's Issue Search API is eventually consistent; Jira mentions this in their docs and
+                # community forum: https://community.developer.atlassian.com/t/rfc-61-evolving-search-capabilities-addressing-scalability-with-a-new-enhanced-search-api/83027/58.
+                # To capture any records missed by the REALTIME subtask, the LOOKBACK subtask trails behind
+                # by some amount of time and yields any records it sees were missed by the REALTIME subtask.
+                REALTIME: functools.partial(
+                    fetch_issues_child_resources, http, config.domain, timezone, config.advanced.projects, None, stream,
+                ),
+                LOOKBACK: functools.partial(
+                    fetch_issues_child_resources, http, config.domain, timezone, config.advanced.projects, ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON, stream,
+                ),
+            },
             fetch_page=functools.partial(
                 backfill_issues_child_resources,
                 http,
@@ -404,7 +461,7 @@ def issue_child_resources(
 
     # Shift the cutoff back ISSUE_JQL_SEARCH_LAG duration to ensure backfills
     # always cover ranges where Jira's API returns consistent results.
-    cutoff = datetime.now(tz=timezone) - ISSUE_JQL_SEARCH_LAG
+    cutoff = datetime.now(tz=timezone) - ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON
     start = config.start_date.astimezone(timezone)
 
     resources: list[common.Resource] = []
@@ -417,7 +474,10 @@ def issue_child_resources(
                 model=IssueChildResource,
                 open=functools.partial(open, stream),
                 initial_state=ResourceState(
-                    inc=ResourceState.Incremental(cursor=cutoff),
+                    inc={
+                        REALTIME: ResourceState.Incremental(cursor=cutoff),
+                        LOOKBACK: ResourceState.Incremental(cursor=cutoff - ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON),
+                    },
                     backfill=ResourceState.Backfill(cutoff=cutoff, next_page=dt_to_str(start))
                 ),
                 initial_config=ResourceConfig(

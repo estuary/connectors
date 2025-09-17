@@ -4,6 +4,7 @@ from typing import Any, AsyncGenerator
 from zoneinfo import ZoneInfo
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
+import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.http import HTTPError, HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import TypeAdapter
@@ -55,14 +56,8 @@ from .models import (
     EPOCH,
 )
 
-# Jira has documentation stating that its API doesn't provide read-after-write consistency by default.
-# https://developer.atlassian.com/cloud/jira/platform/search-and-reconcile/
-# They have a specific `reconcileIssues` param that can be used to address that & ensure at max 50 requested
-# issues are consistent. However, that has its own drawbacks - we'd likely need to make one request to fetch
-# a list of ids, then make 1+ requests to fetch the full issue for those ids. That's a lot more HTTP requests
-# & roundtrip latency. For now, we take a simpler approach to avoid eventual consistency - don't request
-# issues updated in the most recent 5 minutes.
-ISSUE_JQL_SEARCH_LAG = timedelta(minutes=5)
+
+ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON = timedelta(hours=2)
 MIN_CHECKPOINT_INTERVAL = 200
 
 MISSING_RESOURCE_TITLE = r"Oops, you&#39;ve found a dead link"
@@ -850,9 +845,6 @@ async def _fetch_issues_between(
     if end is None:
         end = now
 
-    # Reduce end due to eventual consistency.
-    end = min(end, now - ISSUE_JQL_SEARCH_LAG)
-
     if end <= start:
         return
 
@@ -916,10 +908,15 @@ async def fetch_issues(
     domain: str,
     timezone: ZoneInfo,
     projects: str | None,
+    horizon: timedelta | None,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Issue | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
+
+    now = datetime.now(tz=timezone)
+    lower_bound = log_cursor
+    upper_bound = now - horizon if horizon else now
 
     last_seen = log_cursor
 
@@ -927,10 +924,11 @@ async def fetch_issues(
     async for issue in _fetch_issues_between(
         http,
         domain,
-        log,
+        log, 
         timezone,
         projects,
-        log_cursor,
+        lower_bound,
+        upper_bound,
         fields=ALL_ISSUE_FIELDS,
         expand="renderedFields,transitions,operations,changelog",
         should_yield_incrementally=True,
@@ -947,7 +945,8 @@ async def fetch_issues(
 
         if issue.fields.updated > log_cursor:
             count += 1
-            yield issue
+            if cache.should_yield("issue", issue.id, issue.fields.updated):
+                yield issue
 
         if issue.fields.updated > last_seen:
             last_seen = issue.fields.updated
@@ -1116,11 +1115,16 @@ async def fetch_issues_child_resources(
     domain: str,
     timezone: ZoneInfo,
     projects: str | None,
+    horizon: timedelta | None,
     stream: type[IssueChildStream],
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[IssueChildResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
+
+    now = datetime.now(tz=timezone)
+    lower_bound = log_cursor
+    upper_bound = now - horizon if horizon else now
 
     last_seen = log_cursor
 
@@ -1131,7 +1135,8 @@ async def fetch_issues_child_resources(
         log,
         timezone,
         projects,
-        log_cursor,
+        lower_bound,
+        upper_bound,
         fields=stream.fields,
         expand=stream.expand,
     ):
@@ -1147,8 +1152,9 @@ async def fetch_issues_child_resources(
 
         if issue.fields.updated > log_cursor:
             count += 1
-            async for child_resource in _fetch_child_resources_for_issue(http, domain, stream, issue, log):
-                yield child_resource
+            if cache.should_yield(stream.name, issue.id, issue.fields.updated):
+                async for child_resource in _fetch_child_resources_for_issue(http, domain, stream, issue, log):
+                    yield child_resource
 
         if issue.fields.updated > last_seen:
             last_seen = issue.fields.updated
