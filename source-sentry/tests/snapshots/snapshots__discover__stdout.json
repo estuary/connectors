@@ -1,0 +1,278 @@
+[
+  {
+    "recommendedName": "Environments",
+    "resourceConfig": {
+      "name": "Environments",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "Environment",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "Issues",
+    "resourceConfig": {
+      "name": "Issues",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "lastSeen": {
+          "format": "date-time",
+          "title": "Lastseen",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "lastSeen"
+      ],
+      "title": "Issue",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Projects",
+    "resourceConfig": {
+      "name": "Projects",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "access": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Access",
+          "type": "array"
+        },
+        "features": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Features",
+          "type": "array"
+        }
+      },
+      "required": [
+        "access",
+        "features"
+      ],
+      "title": "Project",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "Releases",
+    "resourceConfig": {
+      "name": "Releases",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "Release",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "Teams",
+    "resourceConfig": {
+      "name": "Teams",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "access": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Access",
+          "type": "array"
+        }
+      },
+      "required": [
+        "access"
+      ],
+      "title": "Team",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  }
+]
