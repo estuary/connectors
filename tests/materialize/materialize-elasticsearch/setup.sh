@@ -35,10 +35,16 @@ resources_json_template='[
   {
     "resource": {
       "index": "index-duplicated-keys-standard",
-      "number_of_shards": 1,
+      "number_of_shards": 5,
       "delta_updates": false
     },
-    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
+    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}",
+    "fields": {
+      "recommended": true,
+      "include": {
+        "id": {"routing": true}
+      }
+    }
   },
   {
     "resource": {
@@ -90,6 +96,19 @@ resources_json_template='[
       "number_of_shards": 1
     },
     "source": "${TEST_COLLECTION_DELETIONS}"
+  },
+  {
+    "resource": {
+      "index": "index-compound-key",
+      "number_of_shards": 5
+    },
+    "source": "${TEST_COLLECTION_COMPOUND_KEY}",
+    "fields": {
+      "recommended": true,
+      "include": {
+        "yan": {"routing": true}
+      }
+    }
   }
 ]'
 

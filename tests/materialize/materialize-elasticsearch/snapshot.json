@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "create index \"index-simple\"\ncreate index \"index-duplicated-keys-standard\"\ncreate index \"index-duplicated-keys-delta\"\ncreate index \"index-duplicated-keys-delta-exclude-flow-doc\"\ncreate index \"index-multiple-data-types\"\ncreate index \"index-formatted-strings\"\ncreate index \"index-deletions\""
+  "create index \"index-simple\"\ncreate index \"index-duplicated-keys-standard\"\ncreate index \"index-duplicated-keys-delta\"\ncreate index \"index-duplicated-keys-delta-exclude-flow-doc\"\ncreate index \"index-multiple-data-types\"\ncreate index \"index-formatted-strings\"\ncreate index \"index-deletions\"\ncreate index \"index-compound-key\""
 ]
 [
   "connectorState",
@@ -1076,6 +1076,67 @@
       },
       "flow_published_at": "1970-01-01T02:00:27.000000000Z",
       "id": 3
+    }
+  ]
+}
+{
+  "index": "index-compound-key",
+  "rows": [
+    {
+      "flow_document": {
+        "_meta": {
+          "uuid": "dc675a80-1de2-11b2-8000-071353030311"
+        },
+        "num": 1,
+        "yan": "b",
+        "yin": "a"
+      },
+      "flow_published_at": "1970-01-01T02:00:09.000000000Z",
+      "num": 1,
+      "yan": "b",
+      "yin": "a"
+    },
+    {
+      "flow_document": {
+        "_meta": {
+          "uuid": "dcfff100-1de2-11b2-8000-071353030311"
+        },
+        "num": 2,
+        "yan": "a",
+        "yin": "b"
+      },
+      "flow_published_at": "1970-01-01T02:00:10.000000000Z",
+      "num": 2,
+      "yan": "a",
+      "yin": "b"
+    },
+    {
+      "flow_document": {
+        "_meta": {
+          "uuid": "dd988780-1de2-11b2-8000-071353030311"
+        },
+        "num": 3,
+        "yan": "",
+        "yin": "ab"
+      },
+      "flow_published_at": "1970-01-01T02:00:11.000000000Z",
+      "num": 3,
+      "yan": "",
+      "yin": "ab"
+    },
+    {
+      "flow_document": {
+        "_meta": {
+          "uuid": "de311e00-1de2-11b2-8000-071353030311"
+        },
+        "num": 4,
+        "yan": "ab",
+        "yin": ""
+      },
+      "flow_published_at": "1970-01-01T02:00:12.000000000Z",
+      "num": 4,
+      "yan": "ab",
+      "yin": ""
     }
   ]
 }
