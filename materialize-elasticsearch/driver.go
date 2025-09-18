@@ -385,6 +385,32 @@ func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 }
 
 func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
+	// Basic verification of any routing field configuration. The requirements
+	// are that it be part of the collection key, and that there is only one
+	// routing field. This is a fairly advanced feature, so we don't do anything
+	// more sophisticated like requiring a backfill if the routing field
+	// changes, although that would technically be necessary for correctness.
+	for _, b := range req.Bindings {
+		var routingField string
+		for _, p := range b.Collection.Projections {
+			var fc fieldConfig
+			if raw := b.FieldConfigJsonMap[p.Field]; raw != nil {
+				if err := pf.UnmarshalStrict(b.FieldConfigJsonMap[p.Field], &fc); err != nil {
+					return nil, fmt.Errorf("parsing field config for %q: %w", p.Field, err)
+				}
+			}
+
+			if fc.Routing {
+				if !p.IsPrimaryKey {
+					return nil, fmt.Errorf("routing field %q must be part of the key", p.Field)
+				} else if routingField != "" {
+					return nil, fmt.Errorf("only one field can be configured for routing, found: %q and %q", routingField, p.Field)
+				}
+				routingField = p.Field
+			}
+		}
+	}
+
 	return boilerplate.RunValidate(ctx, req, newMaterialization)
 }
 
@@ -599,6 +625,22 @@ func (d *materialization) NewMaterializerTransactor(
 			}
 		}
 
+		var routingField *int
+		for idx, p := range b.Keys {
+			var fc fieldConfig
+			if raw := b.FieldSelection.FieldConfigJsonMap[p.Field]; raw != nil {
+				if err := pf.UnmarshalStrict(raw, &fc); err != nil {
+					return nil, fmt.Errorf("unmarshalling field config json: %w", err)
+				}
+			}
+
+			if fc.Routing {
+				routingField = &idx
+				break
+			}
+
+		}
+
 		indexToBinding[b.ResourcePath[0]] = idx
 		bindings = append(bindings, binding{
 			index:        b.ResourcePath[0],
@@ -607,6 +649,7 @@ func (d *materialization) NewMaterializerTransactor(
 			floatFields:  floatFields,
 			wrapFields:   wrapFields,
 			docField:     b.FieldSelection.Document,
+			routingField: routingField,
 		})
 	}
 

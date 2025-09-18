@@ -47,6 +47,10 @@ type binding struct {
 	// Present if the binding includes the root document, empty if not. This is usually the default
 	// "flow_document" but may have an alternate user-defined projection name.
 	docField string
+
+	// Index within the collection key to use for the routing parameter. nil if no routing field
+	// is configured.
+	routingField *int
 }
 
 type transactor struct {
@@ -111,10 +115,18 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	batchSize := 0
 	for it.Next() {
 		id := base64.RawStdEncoding.EncodeToString(it.PackedKey)
+		binding := t.bindings[it.Binding]
+
+		var routing any
+		if binding.routingField != nil {
+			routing = it.Key[*binding.routingField]
+		}
+
 		batch = append(batch, getDoc{
-			Id:     id,
-			Index:  t.bindings[it.Binding].index,
-			Source: t.bindings[it.Binding].docField,
+			Id:      id,
+			Index:   binding.index,
+			Source:  binding.docField,
+			Routing: routing,
 		})
 		batchSize += len(id)
 
@@ -187,10 +199,25 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		lastIndex = b.index
 
 		id := base64.RawStdEncoding.EncodeToString(it.PackedKey)
+
+		var routingVal []byte
+		if b.routingField != nil {
+			routing := it.Key[*b.routingField]
+			var err error
+			routingVal, err = json.Marshal(routing)
+			if err != nil {
+				return nil, fmt.Errorf("marshaling routing value %v: %w", routing, err)
+			}
+		}
+
 		if it.Delete && t.cfg.HardDelete {
 			// Ignore items which do not exist and are already deleted.
 			if it.Exists {
-				batch = append(batch, []byte(`{"delete":{"_id":"`+id+`"}}`)...)
+				batch = append(batch, []byte(`{"delete":{"_id":"`+id+`"`)...)
+				if routingVal != nil {
+					batch = append(batch, []byte(`,"routing":`+string(routingVal))...)
+				}
+				batch = append(batch, []byte(`}}`)...)
 				batch = append(batch, '\n')
 			}
 			continue
@@ -201,13 +228,25 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// but using "create" when we believe the item does not already exist provides a bit of
 		// extra consistency checking.
 		if it.Exists {
-			batch = append(batch, []byte(`{"index":{"_id":"`+id+`"}}`)...)
+			batch = append(batch, []byte(`{"index":{"_id":"`+id+`"`)...)
+			if routingVal != nil {
+				batch = append(batch, []byte(`,"routing":`+string(routingVal))...)
+			}
+			batch = append(batch, []byte(`}}`)...)
 		} else if !b.deltaUpdates {
-			batch = append(batch, []byte(`{"create":{"_id":"`+id+`"}}`)...)
+			batch = append(batch, []byte(`{"create":{"_id":"`+id+`"`)...)
+			if routingVal != nil {
+				batch = append(batch, []byte(`,"routing":`+string(routingVal))...)
+			}
+			batch = append(batch, []byte(`}}`)...)
 		} else {
 			// Leaving the ID blank will cause Elasticsearch to generate one automatically for
 			// delta updates, where we otherwise could not insert multiple rows with the same ID.
-			batch = append(batch, []byte(`{"create":{}}`)...)
+			batch = append(batch, []byte(`{"create":{`)...)
+			if routingVal != nil {
+				batch = append(batch, []byte(`"routing":`+string(routingVal))...)
+			}
+			batch = append(batch, []byte(`}}`)...)
 		}
 		batch = append(batch, '\n')
 
@@ -255,9 +294,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 func (t *transactor) Destroy() {}
 
 type getDoc struct {
-	Id     string `json:"_id"`
-	Index  string `json:"_index"`
-	Source string `json:"_source"`
+	Id      string `json:"_id"`
+	Index   string `json:"_index"`
+	Source  string `json:"_source"`
+	Routing any    `json:"routing,omitempty"`
 }
 
 type gotDoc struct {
@@ -265,8 +305,8 @@ type gotDoc struct {
 	Index   string                     `json:"_index"`
 	Found   bool                       `json:"found"`
 	Source  map[string]json.RawMessage `json:"_source"`
-	Error   *docError                  `json:"error,omitempty"`
-	Timeout bool                       `json:"timed_out,omitempty"`
+	Error   *docError                  `json:"error"`
+	Timeout bool                       `json:"timed_out"`
 }
 
 type docError struct {

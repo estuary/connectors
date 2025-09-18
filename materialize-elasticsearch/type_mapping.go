@@ -50,6 +50,7 @@ var numericStringTypes = map[m.StringWithNumericFormat]elasticPropertyType{
 
 type fieldConfig struct {
 	Keyword bool `json:"keyword"`
+	Routing bool `json:"routing"`
 }
 
 func (fc fieldConfig) Validate() error {
