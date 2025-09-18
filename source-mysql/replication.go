@@ -24,6 +24,7 @@ import (
 	"github.com/mitchellh/mapstructure"
 	"github.com/segmentio/encoding/json"
 	"github.com/sirupsen/logrus"
+	"github.com/tidwall/sjson"
 	"vitess.io/vitess/go/vt/sqlparser"
 )
 
@@ -609,7 +610,7 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 			event.Meta.Source.Cursor.RowIndex = rowIdx
 			events = append(events, event)
 		}
-	case replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2:
+	case replication.UPDATE_ROWS_EVENTv1, replication.UPDATE_ROWS_EVENTv2, replication.PARTIAL_UPDATE_ROWS_EVENT:
 		for rowIdx := range data.Rows {
 			// Update events contain alternating (before, after) pairs of rows
 			if rowIdx%2 == 1 {
@@ -729,13 +730,93 @@ func decodeRow(streamID sqlcapture.StreamID, expectedArity int, row []any, skips
 	for _, idx := range skips {
 		fields[idx] = rowValueOmitted
 	}
-	for idx, val := range before {
-		if fields[idx] == rowValueOmitted {
-			fields[idx] = val
+	for idx, val := range fields {
+		if val == rowValueOmitted && idx < len(before) {
+			fields[idx] = before[idx]
+		} else if jsonDiffs, ok := val.([]replication.JsonDiff); ok {
+			if idx >= len(before) {
+				return nil, fmt.Errorf("JsonDiff found but no before-state available for column index %d", idx)
+			}
+
+			var applied = before[idx]
+			for i := range jsonDiffs {
+				var err error
+				applied, err = applyJsonDiff(applied, &jsonDiffs[i])
+				if err != nil {
+					return nil, fmt.Errorf("error applying JsonDiff to column %d: %w", idx, err)
+				}
+			}
+			fields[idx] = applied
 		}
 	}
 	return fields, nil
 }
+
+// applyJsonDiff applies a JsonDiff to a base JSON value and returns the result
+func applyJsonDiff(baseValue any, jsonDiff *replication.JsonDiff) (any, error) {
+	// Convert base value to JSON string - should only be string or []byte
+	var baseJSON string
+	switch v := baseValue.(type) {
+	case string:
+		baseJSON = v
+	case []byte:
+		baseJSON = string(v)
+	default:
+		return nil, fmt.Errorf("unexpected base value type %T, expected string or []byte", baseValue)
+	}
+
+	// Convert MySQL JSONPath to sjson path
+	var sjsonPath, err = mysqlPathToSjsonPath(jsonDiff.Path)
+	if err != nil {
+		return nil, fmt.Errorf("failed to convert MySQL path %q to sjson path: %w", jsonDiff.Path, err)
+	}
+
+	// Apply the operation using sjson
+	var result string
+	switch jsonDiff.Op {
+	case 0: // Replace operation
+		result, err = sjson.SetRaw(baseJSON, sjsonPath, jsonDiff.Value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply Replace operation on path %q: %w", jsonDiff.Path, err)
+		}
+	case 1: // Insert operation
+		result, err = sjson.SetRaw(baseJSON, sjsonPath, jsonDiff.Value)
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply Insert operation on path %q: %w", jsonDiff.Path, err)
+		}
+	case 2: // Remove operation
+		result, err = sjson.Delete(baseJSON, sjsonPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to apply Remove operation on path %q: %w", jsonDiff.Path, err)
+		}
+	default:
+		return nil, fmt.Errorf("unknown JsonDiff operation: %d", jsonDiff.Op)
+	}
+
+	return result, nil
+}
+
+// mysqlPathToSjsonPath converts MySQL JSONPath format to sjson path format
+// MySQL uses: $.age, $.address.street, $.hobbies[1]
+// sjson uses: age, address.street, hobbies.1
+func mysqlPathToSjsonPath(mysqlPath string) (string, error) {
+	if mysqlPath == "" {
+		return "", fmt.Errorf("empty MySQL path")
+	}
+
+	// Remove the leading "$." from MySQL JSONPath
+	if !strings.HasPrefix(mysqlPath, "$.") {
+		return "", fmt.Errorf("invalid MySQL JSONPath: %q, expected to start with '$.'", mysqlPath)
+	}
+	var path = strings.TrimPrefix(mysqlPath, "$.")
+
+	// Convert array notation from [index] to .index
+	// This regex finds patterns like "[123]" and converts them to ".123"
+	path = jsonPathIndexRe.ReplaceAllString(path, ".$1")
+	return path, nil
+}
+
+var jsonPathIndexRe = regexp.MustCompile(`\[(\d+)\]`)
 
 func encodeRowKey(columnNames []string, rowKeyIndices []int, rowKeyTranscoders []fdbTranscoder, values []any) ([]byte, error) {
 	var err error

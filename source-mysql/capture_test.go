@@ -706,3 +706,42 @@ func TestSourceTag(t *testing.T) {
 	cs.Capture(ctx, t, nil)
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+func TestPartialUpdateRowsEvent(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = uniqueTableID(t)
+	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, doc JSON)")
+
+	// Enable partial JSON updates for this session
+	tb.Query(ctx, t, "SET SESSION binlog_row_value_options = 'PARTIAL_JSON'")
+	t.Cleanup(func() { tb.Query(ctx, t, "SET SESSION binlog_row_value_options = ''") })
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	setShutdownAfterCaughtUp(t, true)
+
+	// Initial backfill with JSON documents
+	tb.Insert(ctx, t, tableName, [][]any{
+		{1, `{"name": "Alice", "age": 30, "address": {"street": "123 Main St", "city": "Boston"}}`},
+		{2, `{"name": "Bob", "age": 25, "hobbies": ["reading", "gaming"], "active": true}`},
+		{3, `{"name": "Carol", "age": 35, "metadata": {"created": "2023-01-01", "updated": "2023-01-01"}}`},
+	})
+	cs.Capture(ctx, t, nil)
+
+	// Perform JSON partial updates that should generate a variety of PARTIAL_UPDATE_ROWS_EVENTs
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_SET(doc, '$.age', 31, '$.email', 'alice@example.com') WHERE id = 1", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_SET(doc, '$.address.zip', '02101') WHERE id = 1", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_REPLACE(doc, '$.hobbies[0]', 'writing') WHERE id = 2", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_REPLACE(doc, '$.active', false) WHERE id = 2", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_REMOVE(doc, '$.metadata.created') WHERE id = 3", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_REMOVE(doc, '$.hobbies[1]') WHERE id = 2", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_SET(JSON_REPLACE(doc, '$.name', 'Alice Smith'), '$.phone', '555-0123') WHERE id = 1", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_SET(doc, '$.preferences', JSON_OBJECT('theme', 'dark', 'notifications', true)) WHERE id = 2", tableName))
+
+	// Test array appends - one element and two elements
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_ARRAY_APPEND(doc, '$.hobbies', 'cooking') WHERE id = 2", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_ARRAY_APPEND(JSON_ARRAY_APPEND(doc, '$.hobbies', 'traveling'), '$.hobbies', 'photography') WHERE id = 2", tableName))
+
+	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}
