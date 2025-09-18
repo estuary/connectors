@@ -742,6 +742,10 @@ func TestPartialUpdateRowsEvent(t *testing.T) {
 	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_ARRAY_APPEND(doc, '$.hobbies', 'cooking') WHERE id = 2", tableName))
 	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_ARRAY_APPEND(JSON_ARRAY_APPEND(doc, '$.hobbies', 'traveling'), '$.hobbies', 'photography') WHERE id = 2", tableName))
 
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_SET(doc, '$.\"foo[123]bar\"', 'test') WHERE id = 2", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_SET(doc, '$.$test', 'test') WHERE id = 2", tableName))
+	tb.Query(ctx, t, fmt.Sprintf("UPDATE %s SET doc = JSON_SET(doc, '$.\"dot.dot\"', 'test') WHERE id = 2", tableName))
+
 	cs.Capture(ctx, t, nil)
 	cupaloy.SnapshotT(t, cs.Summary())
 }
