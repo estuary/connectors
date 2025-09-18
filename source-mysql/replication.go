@@ -17,6 +17,7 @@ import (
 
 	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/encrow"
+	"github.com/estuary/connectors/go/mysql/jsonpath"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
@@ -800,23 +801,30 @@ func applyJsonDiff(baseValue any, jsonDiff *replication.JsonDiff) (any, error) {
 // MySQL uses: $.age, $.address.street, $.hobbies[1]
 // sjson uses: age, address.street, hobbies.1
 func mysqlPathToSjsonPath(mysqlPath string) (string, error) {
-	if mysqlPath == "" {
-		return "", fmt.Errorf("empty MySQL path")
+	var path, err = jsonpath.Parse(mysqlPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to parse edit path %q: %w", mysqlPath, err)
 	}
 
-	// Remove the leading "$." from MySQL JSONPath
-	if !strings.HasPrefix(mysqlPath, "$.") {
-		return "", fmt.Errorf("invalid MySQL JSONPath: %q, expected to start with '$.'", mysqlPath)
+	var out = new(strings.Builder)
+	for i, e := range path {
+		if i > 0 {
+			fmt.Fprintf(out, ".")
+		}
+		switch v := e.(type) {
+		case jsonpath.PathElemProperty:
+			var name = v.Name
+			name = strings.ReplaceAll(name, `\`, `\\`)
+			name = strings.ReplaceAll(name, `.`, `\.`)
+			fmt.Fprintf(out, "%s", name)
+		case jsonpath.PathElemIndex:
+			fmt.Fprintf(out, "%d", v.Index)
+		default:
+			return "", fmt.Errorf("unhandled path element %#v", e)
+		}
 	}
-	var path = strings.TrimPrefix(mysqlPath, "$.")
-
-	// Convert array notation from [index] to .index
-	// This regex finds patterns like "[123]" and converts them to ".123"
-	path = jsonPathIndexRe.ReplaceAllString(path, ".$1")
-	return path, nil
+	return out.String(), nil
 }
-
-var jsonPathIndexRe = regexp.MustCompile(`\[(\d+)\]`)
 
 func encodeRowKey(columnNames []string, rowKeyIndices []int, rowKeyTranscoders []fdbTranscoder, values []any) ([]byte, error) {
 	var err error
