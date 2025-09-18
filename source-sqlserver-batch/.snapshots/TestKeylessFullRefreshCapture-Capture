@@ -39,7 +39,7 @@
 {"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6,"op":"u","source":{"resource":"keylessfullrefreshcapture_941246","schema":"dbo","table":"keylessfullrefreshcapture_941246"}},"data":"Additional row 7 (updated)","value":7}
 {"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7,"op":"u","source":{"resource":"keylessfullrefreshcapture_941246","schema":"dbo","table":"keylessfullrefreshcapture_941246"}},"data":"Additional row 8","value":8}
 {"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8,"op":"u","source":{"resource":"keylessfullrefreshcapture_941246","schema":"dbo","table":"keylessfullrefreshcapture_941246"}},"data":"Additional row 9","value":9}
-{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9,"op":"d"}}
+{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9,"op":"d","source":{"resource":"keylessfullrefreshcapture_941246","schema":"dbo","table":"keylessfullrefreshcapture_941246"}}}
 # ================================
 # Final State Checkpoint
 # ================================
