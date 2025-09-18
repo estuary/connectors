@@ -68,6 +68,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.16.0
 	github.com/stretchr/testify v1.10.0
 	github.com/tidwall/gjson v1.17.3
+	github.com/tidwall/sjson v1.2.5
 	github.com/trinodb/trino-go-client v0.313.0
 	github.com/wk8/go-ordered-map/v2 v2.1.8
 	github.com/xitongsys/parquet-go v1.6.2
@@ -93,7 +94,6 @@ require (
 	cloud.google.com/go/auth v0.16.2 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
-	github.com/Masterminds/semver v1.5.0 // indirect
 	github.com/andybalholm/brotli v1.1.1 // indirect
 	github.com/go-jose/go-jose/v4 v4.0.5 // indirect
 	github.com/jackc/pgproto3/v2 v2.3.3 // indirect
@@ -237,8 +237,6 @@ require (
 	github.com/rs/zerolog v1.31.0 // indirect
 	github.com/segmentio/asm v1.1.3 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
-	github.com/siddontang/go v0.0.0-20180604090527-bdc77568d726 // indirect
-	github.com/siddontang/go-log v0.0.0-20190221022429-1e957dd83bed // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.5.0 // indirect
@@ -290,4 +288,4 @@ require (
 	nhooyr.io/websocket v1.8.7 // indirect
 )
 
-replace github.com/go-mysql-org/go-mysql => github.com/estuary/go-mysql v0.0.0-20250907131429-558ed11751bc
+replace github.com/go-mysql-org/go-mysql => github.com/estuary/go-mysql v0.0.0-20250918155720-90d473fd1a3e
