@@ -21,13 +21,24 @@ func translateFlowField(f string) string {
 
 // databricksDialect returns a representation of the Databricks SQL dialect.
 // https://docs.databricks.com/en/sql/language-manual/index.html
-var databricksDialect = func() sql.Dialect {
+func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 	// Although databricks does support ARRAY and MAP types, they are statically
 	// typed and the MAP type is not comparable.
 	// Databricks supports JSON extraction using the : operator, this seems like
 	// a simpler method for persisting JSON values:
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-json-path-expression.html
 	var jsonMapper = sql.MapStatic("STRING", sql.UsingConverter(sql.ToJsonString))
+
+	// Define base date/time mappings without primary key wrapper
+	primaryKeyTextType := sql.MapStatic("STRING")
+	dateMapping := sql.MapStatic("DATE")
+	datetimeMapping := sql.MapStatic("TIMESTAMP")
+
+	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
+	if featureFlags["datetime_keys_as_string"] {
+		dateMapping = sql.MapPrimaryKey(primaryKeyTextType, dateMapping)
+		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
+	}
 
 	// https://docs.databricks.com/en/sql/language-manual/sql-ref-datatypes.html
 	mapper := sql.NewDDLMapper(
@@ -51,8 +62,8 @@ var databricksDialect = func() sql.Dialect {
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("STRING"),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapPrimaryKey(sql.MapStatic("STRING"), sql.MapStatic("DATE")),
-					"date-time": sql.MapPrimaryKey(sql.MapStatic("STRING"), sql.MapStatic("TIMESTAMP")),
+					"date":      dateMapping,
+					"date-time": datetimeMapping,
 				},
 			}),
 		},
@@ -111,7 +122,10 @@ var databricksDialect = func() sql.Dialect {
 		MaxColumnCharLength:    255,
 		CaseInsensitiveColumns: true,
 	}
-}()
+}
+
+// Default dialect instance with feature flags enabled by default
+var databricksDialect = createDatabricksDialect(map[string]bool{"datetime_keys_as_string": true})
 
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`date_format(from_utc_timestamp(%s, 'UTC'), "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")`, migration.Identifier)

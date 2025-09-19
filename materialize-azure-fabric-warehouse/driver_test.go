@@ -17,6 +17,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var dialect = createDialect(map[string]bool{"datetime_keys_as_string": true})
+var testTemplates = renderTemplates(dialect)
+var tplCreateTargetTable = testTemplates.createTargetTable
+var tplUpdateFence = testTemplates.updateFence
+var tplCreateMigrationTable = testTemplates.createMigrationTable
+
 func mustGetCfg(t *testing.T) config {
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())

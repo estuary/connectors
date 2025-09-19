@@ -17,6 +17,14 @@ import (
 	_ "github.com/marcboeker/go-duckdb/v2"
 )
 
+var duckDialect = createDuckDialect(map[string]bool{"datetime_keys_as_string": true})
+var testTemplates = renderTemplates(duckDialect)
+var tplCreateTargetTable = testTemplates.createTargetTable
+var tplUpdateFence = testTemplates.updateFence
+var tplLoadQuery = testTemplates.loadQuery
+var tplStoreQuery = testTemplates.storeQuery
+var tplStoreDeleteQuery = testTemplates.storeDeleteQuery
+
 func mustGetCfg(t *testing.T) config {
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())

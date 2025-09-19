@@ -12,7 +12,7 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
-var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
+func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[string]bool) sql.Dialect {
 	textConverter := func(te tuple.TupleElement) (interface{}, error) {
 		if s, ok := te.(string); ok {
 			// Redshift will terminate values going into VARCHAR columns where the null
@@ -30,6 +30,26 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 	}
 
 	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(textConverter))
+
+	// Define base date/time mappings without primary key wrapper
+	dateMapping := sql.MapStatic("DATE")
+	datetimeMapping := sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.StringCastConverter(func(s string) (any, error) {
+		// Redshift supports timestamps with microsecond precision. It will reject
+		// timestamps with higher precision than that, so we truncate anything
+		// beyond microseconds.
+		parsed, err := time.Parse(time.RFC3339Nano, s)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse date-time value %q as time: %w", s, err)
+		}
+
+		return parsed.Truncate(time.Microsecond).Format(time.RFC3339Nano), nil
+	})))
+
+	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
+	if featureFlags["datetime_keys_as_string"] {
+		dateMapping = sql.MapPrimaryKey(primaryKeyTextType, dateMapping)
+		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
+	}
 
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
@@ -55,18 +75,8 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: primaryKeyTextType, // Note: Actually a VARCHAR(256)
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE")),
-					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.StringCastConverter(func(s string) (any, error) {
-						// Redshift supports timestamps with microsecond precision. It will reject
-						// timestamps with higher precision than that, so we truncate anything
-						// beyond microseconds.
-						parsed, err := time.Parse(time.RFC3339Nano, s)
-						if err != nil {
-							return nil, fmt.Errorf("could not parse date-time value %q as time: %w", s, err)
-						}
-
-						return parsed.Truncate(time.Microsecond).Format(time.RFC3339Nano), nil
-					})))),
+					"date":      dateMapping,
+					"date-time": datetimeMapping,
 					// "time" is not currently support due to limitations with loading time values from
 					// staged JSON.
 					// "time": sql.NewStaticMapper("TIMETZ"),

@@ -11,7 +11,9 @@ import (
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	"datetime_keys_as_string": true,
+}
 
 // config represents the endpoint configuration for sql server.
 type config struct {

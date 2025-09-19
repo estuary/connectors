@@ -22,7 +22,9 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	"datetime_keys_as_string": true,
+}
 
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
@@ -207,7 +209,7 @@ func newSqlServerDriver() *sql.Driver[config, tableConfig] {
 				}
 			}
 
-			var dialect = sqlServerDialect(collation, schema)
+			var dialect = createSqlServerDialect(collation, schema, featureFlags)
 			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint[config]{

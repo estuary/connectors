@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"text/template"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
-var duckDialect = func() sql.Dialect {
+func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -33,11 +34,29 @@ var duckDialect = func() sql.Dialect {
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("VARCHAR"),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), sql.MapStatic("DATE")),
-					"date-time": sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), sql.MapStatic("TIMESTAMP WITH TIME ZONE")),
-					"duration":  sql.MapStatic("INTERVAL"),
-					"time":      sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), sql.MapStatic("TIME")),
-					"uuid":      sql.MapStatic("UUID"),
+					"date": func() sql.MapProjectionFn {
+						dateMapping := sql.MapStatic("DATE")
+						if featureFlags["datetime_keys_as_string"] {
+							return sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), dateMapping)
+						}
+						return dateMapping
+					}(),
+					"date-time": func() sql.MapProjectionFn {
+						datetimeMapping := sql.MapStatic("TIMESTAMP WITH TIME ZONE")
+						if featureFlags["datetime_keys_as_string"] {
+							return sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), datetimeMapping)
+						}
+						return datetimeMapping
+					}(),
+					"duration": sql.MapStatic("INTERVAL"),
+					"time": func() sql.MapProjectionFn {
+						timeMapping := sql.MapStatic("TIME")
+						if featureFlags["datetime_keys_as_string"] {
+							return sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), timeMapping)
+						}
+						return timeMapping
+					}(),
+					"uuid": sql.MapStatic("UUID"),
 				},
 			}),
 		},
@@ -75,7 +94,26 @@ var duckDialect = func() sql.Dialect {
 		MaxColumnCharLength:    0, // Duckdb has no apparent limit on how long column names can be
 		CaseInsensitiveColumns: true,
 	}
-}()
+}
+
+type templates struct {
+	createTargetTable *template.Template
+	storeQuery        *template.Template
+	storeDeleteQuery  *template.Template
+	loadQuery         *template.Template
+	updateFence       *template.Template
+}
+
+func renderTemplates(dialect sql.Dialect) *templates {
+	tplAll := sql.MustParseTemplate(dialect, "root", tplRoot)
+	return &templates{
+		createTargetTable: tplAll.Lookup("createTargetTable"),
+		storeQuery:        tplAll.Lookup("storeQuery"),
+		storeDeleteQuery:  tplAll.Lookup("storeDeleteQuery"),
+		loadQuery:         tplAll.Lookup("loadQuery"),
+		updateFence:       tplAll.Lookup("updateFence"),
+	}
+}
 
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`strftime(timezone('UTC', %s), '%%Y-%%m-%%dT%%H:%%M:%%S.%%fZ')`, migration.Identifier)
@@ -91,8 +129,7 @@ type queryParams struct {
 	Files  []string
 }
 
-var (
-	tplAll = sql.MustParseTemplate(duckDialect, "root", `
+const tplRoot = `
 -- Templated creation of a materialized table definition.
 
 {{ define "createTargetTable" }}
@@ -189,10 +226,4 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   key_end   = {{ $.KeyEnd }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
-`)
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplStoreQuery        = tplAll.Lookup("storeQuery")
-	tplStoreDeleteQuery  = tplAll.Lookup("storeDeleteQuery")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
-)
+`

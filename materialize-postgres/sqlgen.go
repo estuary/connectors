@@ -4,13 +4,26 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"text/template"
 	"unicode/utf8"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
-var pgDialect = func() sql.Dialect {
+func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(sql.StringCastConverter(func(in string) (any, error) { return strings.ReplaceAll(in, "\u0000", ""), nil })))
+
+	// Define base date/time mappings without primary key wrapper
+	dateMapping := sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
+	datetimeMapping := sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.ClampDatetime))
+	timeMapping := sql.MapStatic("TIME", sql.AlsoCompatibleWith("time without time zone"))
+
+	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
+	if featureFlags["datetime_keys_as_string"] {
+		dateMapping = sql.MapPrimaryKey(primaryKeyTextType, dateMapping)
+		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
+		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
+	}
 
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
@@ -29,14 +42,14 @@ var pgDialect = func() sql.Dialect {
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: primaryKeyTextType,
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))),
-					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.ClampDatetime))),
+					"date":      dateMapping,
+					"date-time": datetimeMapping,
 					"duration":  sql.MapStatic("INTERVAL"),
 					"ipv4":      sql.MapStatic("CIDR"),
 					"ipv6":      sql.MapStatic("CIDR"),
 					"macaddr":   sql.MapStatic("MACADDR"),
 					"macaddr8":  sql.MapStatic("MACADDR8"),
-					"time":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIME", sql.AlsoCompatibleWith("time without time zone"))),
+					"time":      timeMapping,
 					// UUID format was added on 30-Sept-2024, and pre-existing
 					// text type of columns are allowed to validate for
 					// compatibility with pre-existing columns.
@@ -84,7 +97,7 @@ var pgDialect = func() sql.Dialect {
 		MaxColumnCharLength:    0, // Postgres automatically truncates column names that are too long
 		CaseInsensitiveColumns: false,
 	}
-}()
+}
 
 type loadTableKey struct {
 	Identifier string
@@ -104,8 +117,21 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`to_json(%s)`, migration.Identifier)
 }
 
-var (
-	tplAll = sql.MustParseTemplate(pgDialect, "root", `
+type templates struct {
+	createLoadTable   *template.Template
+	createTargetTable *template.Template
+	alterTableColumns *template.Template
+	loadInsert        *template.Template
+	storeInsert       *template.Template
+	storeUpdate       *template.Template
+	deleteQuery       *template.Template
+	loadQuery         *template.Template
+	installFence      *template.Template
+	updateFence       *template.Template
+}
+
+func renderTemplates(dialect sql.Dialect) templates {
+	var tplAll = sql.MustParseTemplate(dialect, "root", `
 {{ define "temp_name" -}}
 flow_temp_table_{{ $.Binding }}
 {{- end }}
@@ -296,17 +322,20 @@ BEGIN
 END $$;
 {{ end }}
 `)
-	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
-	tplLoadInsert        = tplAll.Lookup("loadInsert")
-	tplStoreInsert       = tplAll.Lookup("storeInsert")
-	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
-	tplDeleteQuery       = tplAll.Lookup("deleteQuery")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplInstallFence      = tplAll.Lookup("installFence")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
-)
+
+	return templates{
+		createLoadTable:   tplAll.Lookup("createLoadTable"),
+		createTargetTable: tplAll.Lookup("createTargetTable"),
+		alterTableColumns: tplAll.Lookup("alterTableColumns"),
+		loadInsert:        tplAll.Lookup("loadInsert"),
+		storeInsert:       tplAll.Lookup("storeInsert"),
+		storeUpdate:       tplAll.Lookup("storeUpdate"),
+		deleteQuery:       tplAll.Lookup("deleteQuery"),
+		loadQuery:         tplAll.Lookup("loadQuery"),
+		installFence:      tplAll.Lookup("installFence"),
+		updateFence:       tplAll.Lookup("updateFence"),
+	}
+}
 
 // truncatedIdentifier produces a truncated form of an identifier, in accordance with Postgres'
 // automatic truncation of identifiers that are over 63 bytes in length. For example, if a Flow

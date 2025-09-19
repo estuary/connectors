@@ -36,12 +36,15 @@ func newDuckDriver() *sql.Driver[config, tableConfig] {
 				"database": cfg.Database,
 			}).Info("opening database")
 
+			dialect := createDuckDialect(featureFlags)
+			templates := renderTemplates(dialect)
+
 			return &sql.Endpoint[config]{
 				Config:              cfg,
-				Dialect:             duckDialect,
+				Dialect:             dialect,
 				MetaCheckpoints:     sql.FlowCheckpointsTable([]string{cfg.Database, cfg.Schema}),
 				NewClient:           newClient,
-				CreateTableTemplate: tplCreateTargetTable,
+				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     false,
 				Options: m.MaterializeOptions{
@@ -69,6 +72,7 @@ type transactor struct {
 	loadFiles  *boilerplate.StagedFiles
 	bindings   []*binding
 	be         *m.BindingEvents
+	templates  *templates
 }
 
 func newTransactor(
@@ -107,6 +111,7 @@ func newTransactor(
 		be:         be,
 		loadFiles:  boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, bucketPath, false, false),
 		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, bucketPath, true, false),
+		templates:  renderTemplates(ep.Dialect),
 	}
 
 	for idx, target := range bindings {
@@ -114,8 +119,8 @@ func newTransactor(
 		t.storeFiles.AddBinding(idx, target.ColumnNames())
 		t.bindings = append(t.bindings, &binding{
 			target:           target,
-			loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, duckDialect.Literal),
-			storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, duckDialect.Literal),
+			loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal),
+			storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal),
 		})
 	}
 
@@ -160,7 +165,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		} else if uris, err := d.loadFiles.Flush(idx); err != nil {
 			return fmt.Errorf("flushing load file: %w", err)
-		} else if err := tplLoadQuery.Execute(&loadQuery, &queryParams{
+		} else if err := d.templates.loadQuery.Execute(&loadQuery, &queryParams{
 			Table:  b.target,
 			Bounds: b.loadMergeBounds.Build(),
 			Files:  uris,
@@ -304,7 +309,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		var fenceUpdate strings.Builder
-		if err := tplUpdateFence.Execute(&fenceUpdate, d.fence); err != nil {
+		if err := d.templates.updateFence.Execute(&fenceUpdate, d.fence); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
 		}
 
@@ -344,14 +349,14 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
 			// In-place updates are accomplished by deleting the
 			// existing row and inserting the updated row.
 			var storeDeleteQuery strings.Builder
-			if err := tplStoreDeleteQuery.Execute(&storeDeleteQuery, params); err != nil {
+			if err := d.templates.storeDeleteQuery.Execute(&storeDeleteQuery, params); err != nil {
 				return err
 			}
 			queries = append(queries, storeDeleteQuery.String())
 		}
 
 		var storeQuery strings.Builder
-		if err := tplStoreQuery.Execute(&storeQuery, params); err != nil {
+		if err := d.templates.storeQuery.Execute(&storeQuery, params); err != nil {
 			return err
 		}
 		commits = append(commits, bindingCommit{

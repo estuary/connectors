@@ -49,7 +49,9 @@ const (
 	queryTimeout = 1 * time.Hour
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	"datetime_keys_as_string": true,
+}
 
 func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
 	return context.WithTimeoutCause(ctx, queryTimeout, errors.New("1 hour query timeout exceeded (is the database disk full?)"))
@@ -320,12 +322,16 @@ func newPostgresDriver() *sql.Driver[config, tableConfig] {
 				metaBase = append(metaBase, cfg.Schema)
 			}
 
+			// Create dialect with feature flags
+			dialect := createPgDialect(featureFlags)
+			templates := renderTemplates(dialect)
+
 			return &sql.Endpoint[config]{
 				Config:              cfg,
-				Dialect:             pgDialect,
+				Dialect:             dialect,
 				MetaCheckpoints:     sql.FlowCheckpointsTable(metaBase),
 				NewClient:           newClient,
-				CreateTableTemplate: tplCreateTargetTable,
+				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     false,
 				Options: m.MaterializeOptions{
@@ -338,7 +344,8 @@ func newPostgresDriver() *sql.Driver[config, tableConfig] {
 }
 
 type transactor struct {
-	cfg config
+	cfg       config
+	templates templates
 
 	// Variables exclusively used by Load.
 	load struct {
@@ -366,7 +373,10 @@ func newTransactor(
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 
-	var d = &transactor{cfg: cfg, be: be}
+	// Create templates using the dialect from the endpoint (which already has feature flags)
+	templates := renderTemplates(ep.Dialect)
+
+	var d = &transactor{cfg: cfg, templates: templates, be: be}
 	d.store.fence = fence
 
 	// Establish connections.
@@ -422,11 +432,11 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 		sql *string
 		tpl *template.Template
 	}{
-		{&b.loadInsertSQL, tplLoadInsert},
-		{&b.storeInsertSQL, tplStoreInsert},
-		{&b.storeUpdateSQL, tplStoreUpdate},
-		{&b.deleteQuerySQL, tplDeleteQuery},
-		{&b.loadQuerySQL, tplLoadQuery},
+		{&b.loadInsertSQL, t.templates.loadInsert},
+		{&b.storeInsertSQL, t.templates.storeInsert},
+		{&b.storeUpdateSQL, t.templates.storeUpdate},
+		{&b.deleteQuerySQL, t.templates.deleteQuery},
+		{&b.loadQuerySQL, t.templates.loadQuery},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
@@ -447,7 +457,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	}
 
 	var w strings.Builder
-	if err := tplCreateLoadTable.Execute(&w, &input); err != nil {
+	if err := t.templates.createLoadTable.Execute(&w, &input); err != nil {
 		return fmt.Errorf("executing createLoadTable template: %w", err)
 	} else if _, err := t.load.conn.Exec(ctx, w.String()); err != nil {
 		return fmt.Errorf("Exec(%s): %w", w.String(), err)
@@ -605,7 +615,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 
 			var fenceUpdate strings.Builder
-			if err := tplUpdateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
+			if err := d.templates.updateFence.Execute(&fenceUpdate, d.store.fence); err != nil {
 				return fmt.Errorf("evaluating fence template: %w", err)
 			}
 

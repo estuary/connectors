@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"text/template"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
-var dialect = func() sql.Dialect {
+func createDialect(featureFlags map[string]bool) sql.Dialect {
 	// Although the documentation states this limit as 1MB, via empirical
 	// testing I have determined it to actually be 1 MiB.
 	const maxFabricStringLength = 1024 * 1024
@@ -36,6 +37,18 @@ var dialect = func() sql.Dialect {
 
 	primaryKeyTextType := sql.MapStatic("VARCHAR(MAX)", sql.AlsoCompatibleWith("VARCHAR"), sql.UsingConverter(checkedStringLength(nil)))
 
+	// Define base date/time mappings without primary key wrapper
+	dateMapping := sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
+	datetimeMapping := sql.MapStatic("DATETIME2(6)", sql.AlsoCompatibleWith("DATETIME2"), sql.UsingConverter(sql.ClampDatetime))
+	timeMapping := sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("TIME"))
+
+	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
+	if featureFlags["datetime_keys_as_string"] {
+		dateMapping = sql.MapPrimaryKey(primaryKeyTextType, dateMapping)
+		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
+		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -59,9 +72,9 @@ var dialect = func() sql.Dialect {
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: primaryKeyTextType,
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))),
-					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATETIME2(6)", sql.AlsoCompatibleWith("DATETIME2"), sql.UsingConverter(sql.ClampDatetime))),
-					"time":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("TIME"))),
+					"date":      dateMapping,
+					"date-time": datetimeMapping,
+					"time":      timeMapping,
 				},
 			}),
 		},
@@ -104,7 +117,7 @@ var dialect = func() sql.Dialect {
 		MaxColumnCharLength:    0,
 		CaseInsensitiveColumns: true,
 	}
-}()
+}
 
 func bitToStringCast(m sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(
@@ -131,8 +144,36 @@ type migrateColumn struct {
 	CastSQL    string
 }
 
-var (
-	tplAll = sql.MustParseTemplate(dialect, "root", `
+type templates struct {
+	createTargetTable            *template.Template
+	alterTableColumns            *template.Template
+	createMigrationTable         *template.Template
+	createLoadTable              *template.Template
+	loadQuery                    *template.Template
+	dropLoadTable                *template.Template
+	storeMergeQuery              *template.Template
+	storeCopyIntoFromStagedQuery *template.Template
+	storeCopyIntoDirectQuery     *template.Template
+	updateFence                  *template.Template
+}
+
+func renderTemplates(dialect sql.Dialect) *templates {
+	tplAll := sql.MustParseTemplate(dialect, "root", tplRoot)
+	return &templates{
+		createTargetTable:            tplAll.Lookup("createTargetTable"),
+		alterTableColumns:            tplAll.Lookup("alterTableColumns"),
+		createMigrationTable:         tplAll.Lookup("createMigrationTable"),
+		createLoadTable:              tplAll.Lookup("createLoadTable"),
+		loadQuery:                    tplAll.Lookup("loadQuery"),
+		dropLoadTable:                tplAll.Lookup("dropLoadTable"),
+		storeMergeQuery:              tplAll.Lookup("storeMergeQuery"),
+		storeCopyIntoFromStagedQuery: tplAll.Lookup("storeCopyIntoFromStagedQuery"),
+		storeCopyIntoDirectQuery:     tplAll.Lookup("storeCopyIntoDirectQuery"),
+		updateFence:                  tplAll.Lookup("updateFence"),
+	}
+}
+
+const tplRoot = `
 {{ define "temp_name_load" -}}
 flow_temp_table_load_{{ $.Binding }}
 {{- end }}
@@ -291,15 +332,4 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   key_end   = {{ $.KeyEnd }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
-`)
-	tplCreateTargetTable            = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns            = tplAll.Lookup("alterTableColumns")
-	tplCreateMigrationTable         = tplAll.Lookup("createMigrationTable")
-	tplCreateLoadTable              = tplAll.Lookup("createLoadTable")
-	tplLoadQuery                    = tplAll.Lookup("loadQuery")
-	tplDropLoadTable                = tplAll.Lookup("dropLoadTable")
-	tplStoreMergeQuery              = tplAll.Lookup("storeMergeQuery")
-	tplStoreCopyIntoFromStagedQuery = tplAll.Lookup("storeCopyIntoFromStagedQuery")
-	tplStoreCopyIntoDirectQuery     = tplAll.Lookup("storeCopyIntoDirectQuery")
-	tplUpdateFence                  = tplAll.Lookup("updateFence")
-)
+`
