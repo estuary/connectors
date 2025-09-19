@@ -20,7 +20,7 @@ type Client interface {
 	// resourcePaths. It doesn't necessarily need to include all tables in the
 	// entire destination system, but must include all tables in the relevant
 	// schemas.
-	PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error
+	PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error
 
 	// CreateTable creates a table in the destination system.
 	CreateTable(ctx context.Context, tc TableCreate) error
@@ -39,6 +39,19 @@ type Client interface {
 	// but all existing materialized columns are still compatible with the
 	// materialized collection.
 	TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error)
+
+	// ListCheckpointsEntries returns a list of materialization names from the
+	// checkpoints metadata table, if a checkpoints metadata table is used. Used
+	// for testing.
+	ListCheckpointsEntries(ctx context.Context) ([]string, error)
+
+	// DeleteCheckpointsEntry deletes a materialization's entry from the
+	// checkpoints metadata table. Used for testing.
+	DeleteCheckpointsEntry(ctx context.Context, taskName string) error
+
+	// SnapshotTestTable produces a list of rows for a test table. Used for
+	// testing.
+	SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error)
 
 	// Close is called to free up any resources held by the Client.
 	Close()
