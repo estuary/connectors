@@ -257,7 +257,7 @@ func TestValidate(t *testing.T) {
 			require.NoError(t, err)
 
 			snap.WriteString(tt.name + ":\n")
-			snap.WriteString(SnapshotConstraints(t, cs) + "\n")
+			snap.WriteString(snapshotConstraints(t, cs) + "\n")
 		})
 	}
 	cupaloy.SnapshotT(t, snap.String())
