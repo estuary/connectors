@@ -1,0 +1,46 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        id: { type: integer }
+        bigIntToNum: { type: number }
+        bigIntToHugeInt: { type: integer, maximum: 18446744073709551615 }
+        hugeIntToNum: { type: number }
+        arrayToMulti: { type: [array, boolean] }
+        binaryToMulti: { type: [string, boolean], contentEncoding: base64 }
+        boolToMulti: { type: [boolean, string] }
+        intToMulti: { type: [integer, boolean] }
+        hugeIntToMulti: { type: [integer, boolean], maximum: 18446744073709551615 }
+        intAndStringToMulti: { type: [integer, string] }
+        numToMulti: { type: [number, boolean] }
+        numAndStringToMulti: { type: [number, string] }
+        objectToMulti: { type: [object, boolean] }
+        stringToMulti: { type: [string, boolean] }
+        binaryToString: { type: string }
+        intToString: { type: string }
+        hugeIntToString: { type: string }
+        numToString: { type: string }
+        dateToString: { type: string }
+        datetimeToString: { type: string }
+        timeToString: { type: string }
+        durationToString: { type: string }
+        ipv4ToString: { type: string }
+        ipv6ToString: { type: string }
+        macaddrToString: { type: string }
+        macaddr8ToString: { type: string }
+        uuidToString: { type: string }
+        emailToString: { type: string }
+        hostnameToString: { type: string }
+        uriToString: { type: string }
+        uriReferenceToString: { type: string }
+        uriTemplateToString: { type: string } 
+        jsonPointerToString: { type: string }
+        relativeJsonPointerToString: { type: string }
+        regexToString: { type: string }
+        uint32ToString: { type: string }
+        uint64ToString: { type: string }
+        iriToString: { type: string }
+        iriReferenceToString: { type: string }
+      required: [id]
+    key: [/id]
