@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"slices"
@@ -258,62 +257,6 @@ func (col *anyColumn) Scan(i interface{}) error {
 }
 func (col anyColumn) String() string {
 	return string(col)
-}
-
-// StdGetSchema is a convenience function for getting a formatted schema for a table for Client
-// implementations which use Go's standard `sql.DB` type and systems with an information_schema
-// schema.
-func StdGetSchema(ctx context.Context, db *sql.DB, catalog string, schema string, name string) (string, error) {
-	q := fmt.Sprintf(`
-	select column_name, is_nullable, data_type
-	from information_schema.columns
-	where 
-		table_catalog = '%s' 
-		and table_schema = '%s'
-		and table_name = '%s';
-`,
-		catalog,
-		schema,
-		name,
-	)
-
-	rows, err := db.QueryContext(ctx, q)
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-
-	type foundColumn struct {
-		Name     string
-		Nullable string // string "YES" or "NO"
-		Type     string
-	}
-
-	cols := []foundColumn{}
-	for rows.Next() {
-		var c foundColumn
-		if err := rows.Scan(&c.Name, &c.Nullable, &c.Type); err != nil {
-			return "", err
-		}
-		cols = append(cols, c)
-	}
-	if err := rows.Err(); err != nil {
-		return "", err
-	}
-
-	slices.SortFunc(cols, func(a, b foundColumn) int {
-		return strings.Compare(a.Name, b.Name)
-	})
-
-	var out strings.Builder
-	enc := json.NewEncoder(&out)
-	for _, c := range cols {
-		if err := enc.Encode(c); err != nil {
-			return "", err
-		}
-	}
-
-	return out.String(), nil
 }
 
 // StdPopulateInfoSchema returns the existing columns for implementations that use a standard *sql.DB
