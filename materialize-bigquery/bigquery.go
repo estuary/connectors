@@ -20,6 +20,7 @@ var featureFlagDefaults = map[string]bool{
 	// When set, object and array field types will be materialized as JSON
 	// columns, instead of the historical behavior of strings.
 	"objects_and_arrays_as_json": true,
+	"datetime_keys_as_string":    true,
 }
 
 type config struct {
@@ -164,7 +165,7 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				"bucket_path": cfg.effectiveBucketPath(),
 			}).Info("creating bigquery endpoint")
 
-			dialect := bqDialect(featureFlags["objects_and_arrays_as_json"])
+			dialect := bqDialect(featureFlags["objects_and_arrays_as_json"], featureFlags)
 			templates := renderTemplates(dialect)
 
 			// BigQuery's default SerPolicy has historically had limits of 1500

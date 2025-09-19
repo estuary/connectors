@@ -32,7 +32,7 @@ var strToInt sql.ElementConverter = sql.StringCastConverter(func(str string) (in
 	return out, nil
 })
 
-var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect {
+func createSqlServerDialect(collation string, defaultSchema string, featureFlags map[string]bool) sql.Dialect {
 	var stringType = "varchar"
 	// If the collation does not support UTF8, we fallback to using nvarchar
 	// for string columns
@@ -42,6 +42,19 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 
 	var textType = fmt.Sprintf("%s(MAX) COLLATE %s", stringType, collation)
 	var textPKType = fmt.Sprintf("%s(900) COLLATE %s", stringType, collation)
+
+	// Define base date/time mappings without primary key wrapper
+	primaryKeyTextType := sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType))
+	dateMapping := sql.MapStatic("DATE")
+	datetimeMapping := sql.MapStatic("DATETIME2", sql.UsingConverter(rfc3339ToUTC()))
+	timeMapping := sql.MapStatic("TIME", sql.UsingConverter(rfc3339TimeToUTC()))
+
+	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
+	if featureFlags["datetime_keys_as_string"] {
+		dateMapping = sql.MapPrimaryKey(primaryKeyTextType, dateMapping)
+		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
+		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
+	}
 
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
@@ -78,9 +91,9 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 					sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
 				),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapPrimaryKey(sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)), sql.MapStatic("DATE")),
-					"date-time": sql.MapPrimaryKey(sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)), sql.MapStatic("DATETIME2", sql.UsingConverter(rfc3339ToUTC()))),
-					"time":      sql.MapPrimaryKey(sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)), sql.MapStatic("TIME", sql.UsingConverter(rfc3339TimeToUTC()))),
+					"date":      dateMapping,
+					"date-time": datetimeMapping,
+					"time":      timeMapping,
 				},
 			}),
 		},

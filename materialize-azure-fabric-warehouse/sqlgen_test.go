@@ -10,25 +10,28 @@ import (
 )
 
 func TestSQLGeneration(t *testing.T) {
+	testDialect := createDialect(map[string]bool{"datetime_keys_as_string": true})
+	templates := renderTemplates(testDialect)
+
 	snap, tables := sql.RunSqlGenTests(
 		t,
-		dialect,
+		testDialect,
 		func(table string) []string {
 			return []string{"a-warehouse", "a-schema", table}
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				tplCreateTargetTable,
+				templates.createTargetTable,
 			},
-			TplAddColumns:  tplAlterTableColumns,
-			TplUpdateFence: tplUpdateFence,
+			TplAddColumns:  templates.alterTableColumns,
+			TplUpdateFence: templates.updateFence,
 		},
 	)
 
 	for _, tbl := range tables {
 		for _, tpl := range []*template.Template{
-			tplStoreCopyIntoFromStagedQuery,
-			tplStoreCopyIntoDirectQuery,
+			templates.storeCopyIntoFromStagedQuery,
+			templates.storeCopyIntoDirectQuery,
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
@@ -43,10 +46,10 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	for _, tpl := range []*template.Template{
-		tplCreateLoadTable,
-		tplLoadQuery,
-		tplDropLoadTable,
-		tplStoreMergeQuery,
+		templates.createLoadTable,
+		templates.loadQuery,
+		templates.dropLoadTable,
+		templates.storeMergeQuery,
 	} {
 		tbl := tables[0] // these queries are never run for delta updates mode
 		var testcase = tbl.Identifier + " " + tpl.Name()
@@ -59,8 +62,8 @@ func TestSQLGeneration(t *testing.T) {
 			Bounds: []sql.MergeBound{
 				{
 					Column:       tbl.Keys[0],
-					LiteralLower: dialect.Literal(int64(10)),
-					LiteralUpper: dialect.Literal(int64(100)),
+					LiteralLower: testDialect.Literal(int64(10)),
+					LiteralUpper: testDialect.Literal(int64(100)),
 				},
 				{
 					Column: tbl.Keys[1], // boolean key

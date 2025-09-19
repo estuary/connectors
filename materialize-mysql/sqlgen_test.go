@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = mysqlDialect(time.FixedZone("UTC", 0), "db", "mysql")
+var testDialect = mysqlDialect(time.FixedZone("UTC", 0), "db", "mysql", map[string]bool{"datetime_keys_as_string": true})
 
 func TestSQLGeneration(t *testing.T) {
 	var templates = renderTemplates(testDialect)

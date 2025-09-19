@@ -60,13 +60,23 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	}
 }
 
-func bqDialect(objAndArrayAsJson bool) sql.Dialect {
+func bqDialect(objAndArrayAsJson bool, featureFlags map[string]bool) sql.Dialect {
 	objAndArrayCol := sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
 	if !objAndArrayAsJson {
 		objAndArrayCol = sql.MapStatic("STRING", sql.UsingConverter(jsonConverter))
 	}
 
 	primaryKeyTextType := sql.MapStatic("STRING")
+
+	// Define base date/time mappings without primary key wrapper
+	dateMapping := sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
+	datetimeMapping := sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime))
+
+	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
+	if featureFlags["datetime_keys_as_string"] {
+		dateMapping = sql.MapPrimaryKey(primaryKeyTextType, dateMapping)
+		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
+	}
 
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
@@ -99,8 +109,8 @@ func bqDialect(objAndArrayAsJson bool) sql.Dialect {
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: primaryKeyTextType,
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))),
-					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime))),
+					"date":      dateMapping,
+					"date-time": datetimeMapping,
 				},
 			}),
 		},

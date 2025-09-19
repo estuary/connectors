@@ -44,7 +44,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", duckDialect.Identifier(path...))
+	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
 		_, err := c.db.ExecContext(ctx, stmt)
@@ -104,7 +104,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 	// StdListSchemasFn won't work if there are schemas with the same name in other databases.
 	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(
 		"select schema_name from information_schema.schemata where catalog_name = %s",
-		duckDialect.Literal(c.ep.Config.Database),
+		c.ep.Dialect.Literal(c.ep.Config.Database),
 	))
 	if err != nil {
 		return nil, fmt.Errorf("querying schemata: %w", err)
@@ -125,7 +125,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 }
 
 func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
-	return sql.StdCreateSchema(ctx, c.db, duckDialect, schemaName)
+	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
 func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {

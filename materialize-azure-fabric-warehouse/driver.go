@@ -12,7 +12,9 @@ import (
 	"github.com/microsoft/go-mssqldb/azuread"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	"datetime_keys_as_string": true,
+}
 
 type advancedConfig struct {
 	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
@@ -123,12 +125,14 @@ func newDriver() *sql.Driver[config, tableConfig] {
 		DocumentationURL: "https://go.estuary.dev/materialize-azure-fabric-warehouse",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
 		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
+			dialect := createDialect(featureFlags)
+			templates := renderTemplates(dialect)
 			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
 				MetaCheckpoints:     sql.FlowCheckpointsTable([]string{cfg.Warehouse, cfg.Schema}),
 				NewClient:           newClient,
-				CreateTableTemplate: tplCreateTargetTable,
+				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     true,
 				Options: m.MaterializeOptions{

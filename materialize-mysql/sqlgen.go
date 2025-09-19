@@ -42,7 +42,7 @@ func identifierSanitizer(delegate func(string) string) func(string) string {
 	}
 }
 
-var mysqlDialect = func(tzLocation *time.Location, database string, product string) sql.Dialect {
+var mysqlDialect = func(tzLocation *time.Location, database string, product string, featureFlags map[string]bool) sql.Dialect {
 	var jsonType = "JSON"
 	var jsonMapper = sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
 	if product == "mariadb" {
@@ -50,6 +50,18 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		jsonMapper = sql.MapStatic("LONGTEXT", sql.UsingConverter(sql.ToJsonString))
 	}
 	primaryKeyTextType := sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar"))
+
+	// Define base date/time mappings without primary key wrapper
+	dateMapping := sql.MapStatic("DATE")
+	datetimeMapping := sql.MapStatic("DATETIME(6)", sql.AlsoCompatibleWith("datetime"), sql.UsingConverter(rfc3339ToTZ(tzLocation)))
+	timeMapping := sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("time"), sql.UsingConverter(rfc3339TimeToTZ(tzLocation)))
+
+	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
+	if featureFlags["datetime_keys_as_string"] {
+		dateMapping = sql.MapPrimaryKey(primaryKeyTextType, dateMapping)
+		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
+		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
+	}
 
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
@@ -77,9 +89,9 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 					sql.MapStatic("LONGTEXT"),
 				),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE")),
-					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATETIME(6)", sql.AlsoCompatibleWith("datetime"), sql.UsingConverter(rfc3339ToTZ(tzLocation)))),
-					"time":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("time"), sql.UsingConverter(rfc3339TimeToTZ(tzLocation)))),
+					"date":      dateMapping,
+					"date-time": datetimeMapping,
+					"time":      timeMapping,
 				},
 				WithContentType: map[string]sql.MapProjectionFn{
 					// The largest allowable size for a LONGBLOB is 2^32 bytes (4GB). Our stored specs and

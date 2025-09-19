@@ -107,7 +107,7 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 				return nil, fmt.Errorf("querying TIMESTAMP_TYPE_MAPPING: %w", err)
 			}
 
-			var dialect = snowflakeDialect(cfg.Schema, timestampTypeMapping)
+			var dialect = snowflakeDialect(cfg.Schema, timestampTypeMapping, featureFlags)
 			var templates = renderTemplates(dialect)
 
 			// Snowflake allows for 128 MiB VARIANT columns so we don't need to

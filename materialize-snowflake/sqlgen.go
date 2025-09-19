@@ -46,7 +46,21 @@ func (m timestampTypeMapping) valid() bool {
 	return m == timestampNTZ || m == timestampLTZ || m == timestampTZ
 }
 
-var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeMapping) sql.Dialect {
+var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeMapping, featureFlags map[string]bool) sql.Dialect {
+	// Define base date/time mappings without primary key wrapper
+	primaryKeyTextType := sql.MapStatic("TEXT")
+	dateMapping := sql.MapStatic("DATE")
+	datetimeMapping := sql.MapStatic(
+		string(timestampMapping),
+		sql.AlsoCompatibleWith("timestamp_ntz", "timestamp_tz", "timestamp_ltz"),
+	)
+
+	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
+	if featureFlags["datetime_keys_as_string"] {
+		dateMapping = sql.MapPrimaryKey(primaryKeyTextType, dateMapping)
+		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:    sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
@@ -65,11 +79,8 @@ var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeM
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("TEXT"),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date": sql.MapPrimaryKey(sql.MapStatic("TEXT"), sql.MapStatic("DATE")),
-					"date-time": sql.MapPrimaryKey(sql.MapStatic("TEXT"), sql.MapStatic(
-						string(timestampMapping),
-						sql.AlsoCompatibleWith("timestamp_ntz", "timestamp_tz", "timestamp_ltz"),
-					)),
+					"date":      dateMapping,
+					"date-time": datetimeMapping,
 				},
 			}),
 		},
