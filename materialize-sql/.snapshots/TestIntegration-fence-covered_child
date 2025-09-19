@@ -1,0 +1,17 @@
+After installing fixtures:
+{"checkpoint":"b3RoZXItY2hlY2twb2ludA==","fence":99,"key_begin":0,"key_end":4294967295,"materialization":"other/one"}
+{"checkpoint":"AgICAgICAgICAg==","fence":5,"key_begin":0,"key_end":1000,"materialization":"the/materialization"}
+{"checkpoint":"AQEBAQEBAQEBAQ==","fence":6,"key_begin":100,"key_end":199,"materialization":"the/materialization"}
+
+After install fence under test:
+{"checkpoint":"b3RoZXItY2hlY2twb2ludA==","fence":99,"key_begin":0,"key_end":4294967295,"materialization":"other/one"}
+{"checkpoint":"AgICAgICAgICAg==","fence":6,"key_begin":0,"key_end":1000,"materialization":"the/materialization"}
+{"checkpoint":"AQEBAQEBAQEBAQ==","fence":7,"key_begin":100,"key_end":199,"materialization":"the/materialization"}
+{"checkpoint":"AgICAgICAgICAg==","fence":6,"key_begin":100,"key_end":800,"materialization":"the/materialization"}
+
+After update:
+{"checkpoint":"b3RoZXItY2hlY2twb2ludA==","fence":99,"key_begin":0,"key_end":4294967295,"materialization":"other/one"}
+{"checkpoint":"AgICAgICAgICAg==","fence":6,"key_begin":0,"key_end":1000,"materialization":"the/materialization"}
+{"checkpoint":"AQEBAQEBAQEBAQ==","fence":7,"key_begin":100,"key_end":199,"materialization":"the/materialization"}
+{"checkpoint":"AgICAgICAgICAgAAAAAAAAAA","fence":6,"key_begin":100,"key_end":800,"materialization":"the/materialization"}
+

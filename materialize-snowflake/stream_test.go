@@ -553,6 +553,7 @@ func TestStreamDatatypes(t *testing.T) {
 			snap.WriteString("--- Column Statistics ---\n")
 			snap.Write(eps)
 
+			// TODO(whb): This is the only place where sql.StdDumpTable is used.
 			got, err := sql.StdDumpTable(ctx, db, tbl)
 			require.NoError(t, err)
 			snap.WriteString("\n\n--- Column Values ---\n")
