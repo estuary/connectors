@@ -82,7 +82,7 @@ func preReqs(ctx context.Context, conf config) *cerrors.PrereqErr {
 	return errs
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	catalog := c.cfg.Database
 	if catalog == "" {
 		// An endpoint-level database configuration is not required, so query for the active
@@ -193,6 +193,31 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	return sql.StdInstallFence(ctx, c.db, checkpoints, fence)
+}
+
+func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
+	return sql.ListCheckpointsEntries(ctx, c.db, pgDialect.Identifier(c.cfg.Database, c.cfg.Schema, sql.DefaultFlowCheckpoints))
+}
+
+func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
+	return sql.DeleteCheckpointsEntry(ctx, c.db, pgDialect.Identifier(c.cfg.Database, c.cfg.Schema, sql.DefaultFlowCheckpoints), taskName)
+}
+
+func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	// Use a fresh connection for this operation to prevent problems with cached
+	// query plans for migration test cases.
+	uri, err := c.cfg.ToURI(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("building connection URI: %w", err)
+	}
+
+	db, err := stdsql.Open("pgx", uri)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer db.Close()
+
+	return sql.SnapshotTestTable(ctx, db, pgDialect.Identifier(path...))
 }
 
 func (c *client) Close() {
