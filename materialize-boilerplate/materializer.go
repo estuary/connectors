@@ -248,8 +248,10 @@ type Materializer[
 	Config() MaterializeCfg
 
 	// PopulateInfoSchema adds existing resources and fields to the initialized
-	// InfoSchema.
-	PopulateInfoSchema(context.Context, [][]string, *InfoSchema) error
+	// InfoSchema. The boolean parameter indicates if the result should include
+	// all tables in all namespaces present in the list of paths, and is
+	// currently used for tests.
+	PopulateInfoSchema(context.Context, *InfoSchema, [][]string, bool) error
 
 	// CheckPrerequisites generally performs user input validation in terms of
 	// making sure the configured endpoint is reachable by pinging it, verifying
@@ -308,6 +310,20 @@ type Materializer[
 	// NewMaterializerTransactor builds a new transactor for handling the
 	// transactions lifecycle of the materialization.
 	NewMaterializerTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[EC, RC, MT], *m.BindingEvents) (MaterializerTransactor, error)
+
+	// ListTestTasks produces a list of identifiers for test task metadata that
+	// might need to be cleaned up after an integration test. For example, the
+	// list of strings might be a list of materialization names that are present
+	// in a checkpoints table.
+	ListTestTasks(context.Context) ([]string, error)
+
+	// CleanupTestTask performs any task-level cleanup actions that should be
+	// run after completing an integration test.
+	CleanupTestTask(context.Context, string) error
+
+	// SnapshotTestResource retrieves all rows of data contained in the
+	// materialized resource.
+	SnapshotTestResource(context.Context, []string) (columnNames []string, rows [][]any, _ error)
 
 	// Close performs any cleanup actions that should be done when gracefully
 	// exiting.
@@ -377,7 +393,7 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 	}
 
 	is := initInfoSchema(mCfg)
-	if err := materializer.PopulateInfoSchema(ctx, paths, is); err != nil {
+	if err := materializer.PopulateInfoSchema(ctx, is, paths, false); err != nil {
 		return nil, err
 	}
 
@@ -437,7 +453,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	}
 
 	is := initInfoSchema(mCfg)
-	if err := materializer.PopulateInfoSchema(ctx, paths, is); err != nil {
+	if err := materializer.PopulateInfoSchema(ctx, is, paths, false); err != nil {
 		return nil, err
 	}
 
@@ -692,7 +708,7 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	}
 
 	is := initInfoSchema(mCfg)
-	if err := materializer.PopulateInfoSchema(ctx, paths, is); err != nil {
+	if err := materializer.PopulateInfoSchema(ctx, is, paths, false); err != nil {
 		return nil, nil, nil, err
 	}
 

@@ -1,0 +1,60 @@
+[
+  [
+    [
+      "key/value",
+      {
+        "id": 1,
+        "bigIntToNum": 123,
+        "bigIntToHugeInt": 456,
+        "hugeIntToNum": 9223372036854775808,
+        "arrayToMulti": [
+          1,
+          2,
+          3
+        ],
+        "binaryToMulti": "SGVsbG8gV29ybGQ=",
+        "boolToMulti": true,
+        "intToMulti": 42,
+        "hugeIntToMulti": 9223372036854775808,
+        "intAndStringToMulti": 100,
+        "numToMulti": 3.14,
+        "numAndStringToMulti": "2.5",
+        "objectToMulti": {
+          "name": "test"
+        },
+        "stringToMulti": "hello",
+        "binaryToString": "SGVsbG8=",
+        "intToString": "100",
+        "hugeIntToString": "9223372036854775808",
+        "numToString": "2.5",
+        "dateToString": "2024-01-01",
+        "datetimeToString": "2024-01-01T12:00:00Z",
+        "timeToString": "12:00:00Z",
+        "durationToString": "P1D",
+        "ipv4ToString": "192.168.1.1",
+        "ipv6ToString": "2001:db8::1",
+        "macaddrToString": "aa:bb:cc:dd:ee:ff",
+        "macaddr8ToString": "aa:bb:cc:dd:ee:ff:00:11",
+        "uuidToString": "550e8400-e29b-41d4-a716-446655440000",
+        "emailToString": "test@example.com",
+        "hostnameToString": "example.com",
+        "uriToString": "https://example.com/path",
+        "uriReferenceToString": "/path/to/resource",
+        "uriTemplateToString": "https://example.com/{id}",
+        "jsonPointerToString": "/users/0/name",
+        "relativeJsonPointerToString": "1/name",
+        "regexToString": "^[a-z]+$",
+        "uint32ToString": "4294967295",
+        "uint64ToString": "18446744073709551615",
+        "iriToString": "https://example.org",
+        "iriReferenceToString": "/resource"
+      }
+    ],
+    [
+      "key/value",
+      {
+        "id": 2
+      }
+    ]
+  ]
+]

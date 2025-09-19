@@ -1,0 +1,46 @@
+collections:
+  key/value:
+    schema:
+      type: object
+      properties:
+        id: { type: integer }
+        bigIntToNum: { type: integer }
+        bigIntToHugeInt: { type: integer }
+        hugeIntToNum: { type: integer, maximum: 18446744073709551615 }
+        arrayToMulti: { type: array }
+        binaryToMulti: { type: string, contentEncoding: base64 }
+        boolToMulti: { type: boolean }
+        intToMulti: { type: integer }
+        hugeIntToMulti: { type: integer, maximum: 18446744073709551615 }
+        intAndStringToMulti: { type: [integer, string], format: integer }
+        numToMulti: { type: number }
+        numAndStringToMulti: { type: [number, string], format: number }
+        objectToMulti: { type: object }
+        stringToMulti: { type: string }
+        binaryToString: { type: string, contentEncoding: base64 }
+        intToString: { type: string, format: integer }
+        hugeIntToString: { type: string, format: integer, maximum: 18446744073709551615 }
+        numToString: { type: string, format: number }
+        dateToString: { type: string, format: date }
+        datetimeToString: { type: string, format: date-time }
+        timeToString: { type: string, format: time }
+        durationToString: { type: string, format: duration }
+        ipv4ToString: { type: string, format: ipv4 }
+        ipv6ToString: { type: string, format: ipv6 }
+        macaddrToString: { type: string, format: macaddr }
+        macaddr8ToString: { type: string, format: macaddr8 }
+        uuidToString: { type: string, format: uuid }
+        emailToString: { type: string, format: email }
+        hostnameToString: { type: string, format: hostname }
+        uriToString: { type: string, format: uri }
+        uriReferenceToString: { type: string, format: uri-reference }
+        uriTemplateToString: { type: string, format: uri-template } 
+        jsonPointerToString: { type: string, format: json-pointer }
+        relativeJsonPointerToString: { type: string, format: relative-json-pointer }
+        regexToString: { type: string, format: regex }
+        uint32ToString: { type: string, format: uint32 }
+        uint64ToString: { type: string, format: uint64 }
+        iriToString: { type: string, format: iri }
+        iriReferenceToString: { type: string, format: iri-reference }
+      required: [id]
+    key: [/id]
