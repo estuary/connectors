@@ -1,0 +1,20 @@
+After installing fixtures:
+{"checkpoint":"b3RoZXItY2hlY2twb2ludA==","fence":99,"key_begin":0,"key_end":4294967295,"materialization":"other/one"}
+{"checkpoint":"AQEBAQEBAQEBAQ==","fence":6,"key_begin":0,"key_end":499,"materialization":"the/materialization"}
+{"checkpoint":"AwMDAwMDAwMDAw==","fence":5,"key_begin":0,"key_end":1000,"materialization":"the/materialization"}
+{"checkpoint":"AgICAgICAgICAg==","fence":6,"key_begin":500,"key_end":1000,"materialization":"the/materialization"}
+
+After install fence under test:
+{"checkpoint":"b3RoZXItY2hlY2twb2ludA==","fence":99,"key_begin":0,"key_end":4294967295,"materialization":"other/one"}
+{"checkpoint":"AQEBAQEBAQEBAQ==","fence":7,"key_begin":0,"key_end":499,"materialization":"the/materialization"}
+{"checkpoint":"AwMDAwMDAwMDAw==","fence":6,"key_begin":0,"key_end":1000,"materialization":"the/materialization"}
+{"checkpoint":"AwMDAwMDAwMDAw==","fence":6,"key_begin":400,"key_end":599,"materialization":"the/materialization"}
+{"checkpoint":"AgICAgICAgICAg==","fence":7,"key_begin":500,"key_end":1000,"materialization":"the/materialization"}
+
+After update:
+{"checkpoint":"b3RoZXItY2hlY2twb2ludA==","fence":99,"key_begin":0,"key_end":4294967295,"materialization":"other/one"}
+{"checkpoint":"AQEBAQEBAQEBAQ==","fence":7,"key_begin":0,"key_end":499,"materialization":"the/materialization"}
+{"checkpoint":"AwMDAwMDAwMDAw==","fence":6,"key_begin":0,"key_end":1000,"materialization":"the/materialization"}
+{"checkpoint":"AwMDAwMDAwMDAwAAAAAAAAAA","fence":6,"key_begin":400,"key_end":599,"materialization":"the/materialization"}
+{"checkpoint":"AgICAgICAgICAg==","fence":7,"key_begin":500,"key_end":1000,"materialization":"the/materialization"}
+
