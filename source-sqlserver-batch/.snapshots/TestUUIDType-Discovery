@@ -85,10 +85,12 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
           },
           "uuid_col": {
             "format": "uuid",
+            "description": "(source type: uniqueidentifier)",
             "type": [
               "string",
               "null"

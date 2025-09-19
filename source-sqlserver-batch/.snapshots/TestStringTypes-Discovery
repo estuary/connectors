@@ -85,39 +85,46 @@ Binding 0:
             ]
           },
           "char_col": {
+            "description": "(source type: char)",
             "type": [
               "string",
               "null"
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
           },
           "nchar_col": {
+            "description": "(source type: nchar)",
             "type": [
               "string",
               "null"
             ]
           },
           "ntext_col": {
+            "description": "(source type: ntext)",
             "type": [
               "string",
               "null"
             ]
           },
           "nvarchar_col": {
+            "description": "(source type: nvarchar)",
             "type": [
               "string",
               "null"
             ]
           },
           "text_col": {
+            "description": "(source type: text)",
             "type": [
               "string",
               "null"
             ]
           },
           "varchar_col": {
+            "description": "(source type: varchar)",
             "type": [
               "string",
               "null"
