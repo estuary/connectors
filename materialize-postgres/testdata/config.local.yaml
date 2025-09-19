@@ -1,0 +1,8 @@
+address: localhost:5435
+user: flow
+password: flow
+database: flow
+schema: public
+hardDelete: true
+advanced:
+    feature_flags: allow_existing_tables_for_new_bindings
