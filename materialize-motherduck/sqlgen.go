@@ -160,28 +160,23 @@ USING read_json(
 
 {{ define "storeQuery" }}
 INSERT INTO {{$.Identifier}} BY NAME
-SELECT 
-	{{- range $ind, $col := $.Columns }}
-		{{- if $ind }},{{ end }} {{ $col.Identifier -}}
-	{{- end }} FROM (
-		SELECT * FROM read_json(
-			[
-			{{- range $ind, $f := $.Files }}
-			{{- if $ind }}, {{ end }}'{{ $f }}'
-			{{- end -}}
-			],
-			format='newline_delimited',
-			compression='gzip',
-			maximum_object_size=1073741824,
-			columns={
-			{{- range $ind, $col := $.Columns }}
-				{{- if $ind }},{{ end }}
-				{{$col.Identifier}}: '{{$col.DDL}}'
-			{{- end -}}
-			, _flow_delete: 'BOOLEAN'
-			}
-		) WHERE NOT _flow_delete
-	);
+	SELECT * EXCLUDE (_flow_delete) FROM read_json(
+		[
+		{{- range $ind, $f := $.Files }}
+		{{- if $ind }}, {{ end }}'{{ $f }}'
+		{{- end -}}
+		],
+		format='newline_delimited',
+		compression='gzip',
+		maximum_object_size=1073741824,
+		columns={
+		{{- range $ind, $col := $.Columns }}
+			{{- if $ind }},{{ end }}
+			{{$col.Identifier}}: '{{$col.DDL}}'
+		{{- end -}}
+		, _flow_delete: 'BOOLEAN'
+		}
+	) WHERE NOT _flow_delete;
 {{ end }}
 
 {{ define "uncast" -}}
