@@ -82,9 +82,11 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
           },
           "name": {
+            "description": "(source type: nvarchar)",
             "type": [
               "string",
               "null"
@@ -92,12 +94,14 @@ Binding 0:
           },
           "updated_at": {
             "format": "date-time",
+            "description": "(source type: datetime2)",
             "type": [
               "string",
               "null"
             ]
           },
           "visible": {
+            "description": "(source type: bit)",
             "type": [
               "boolean",
               "null"

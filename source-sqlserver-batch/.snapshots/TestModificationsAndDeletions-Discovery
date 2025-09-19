@@ -85,22 +85,26 @@ Binding 0:
             ]
           },
           "description": {
+            "description": "(source type: nvarchar)",
             "type": [
               "string",
               "null"
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
           },
           "updated_at": {
             "format": "date-time",
+            "description": "(source type: datetime2)",
             "type": [
               "string",
               "null"
             ]
           },
           "version": {
+            "description": "(source type: int)",
             "type": [
               "integer",
               "null"

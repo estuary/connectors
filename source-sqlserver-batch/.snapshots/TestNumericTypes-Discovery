@@ -86,22 +86,26 @@ Binding 0:
           },
           "decimal_col": {
             "format": "number",
+            "description": "(source type: decimal)",
             "type": [
               "string",
               "null"
             ]
           },
           "float_col": {
+            "description": "(source type: float)",
             "type": [
               "number",
               "null"
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
           },
           "money_col": {
             "format": "number",
+            "description": "(source type: money)",
             "type": [
               "string",
               "null"
@@ -109,12 +113,14 @@ Binding 0:
           },
           "numeric_col": {
             "format": "number",
+            "description": "(source type: numeric)",
             "type": [
               "string",
               "null"
             ]
           },
           "real_col": {
+            "description": "(source type: real)",
             "type": [
               "number",
               "null"
@@ -122,6 +128,7 @@ Binding 0:
           },
           "smallmoney_col": {
             "format": "number",
+            "description": "(source type: smallmoney)",
             "type": [
               "string",
               "null"

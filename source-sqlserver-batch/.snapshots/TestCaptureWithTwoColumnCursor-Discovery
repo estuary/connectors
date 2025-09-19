@@ -86,21 +86,25 @@ Binding 0:
             ]
           },
           "data": {
+            "description": "(source type: nvarchar)",
             "type": [
               "string",
               "null"
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
           },
           "major": {
+            "description": "(source type: int)",
             "type": [
               "integer",
               "null"
             ]
           },
           "minor": {
+            "description": "(source type: int)",
             "type": [
               "integer",
               "null"

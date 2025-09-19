@@ -86,6 +86,7 @@ Binding 0:
           },
           "date_col": {
             "format": "date",
+            "description": "(source type: date)",
             "type": [
               "string",
               "null"
@@ -93,6 +94,7 @@ Binding 0:
           },
           "datetime2_col": {
             "format": "date-time",
+            "description": "(source type: datetime2)",
             "type": [
               "string",
               "null"
@@ -100,6 +102,7 @@ Binding 0:
           },
           "datetime_col": {
             "format": "date-time",
+            "description": "(source type: datetime)",
             "type": [
               "string",
               "null"
@@ -107,16 +110,19 @@ Binding 0:
           },
           "datetimeoffset_col": {
             "format": "date-time",
+            "description": "(source type: datetimeoffset)",
             "type": [
               "string",
               "null"
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
           },
           "smalldatetime_col": {
             "format": "date-time",
+            "description": "(source type: smalldatetime)",
             "type": [
               "string",
               "null"
@@ -124,6 +130,7 @@ Binding 0:
           },
           "time_col": {
             "format": "time",
+            "description": "(source type: time)",
             "type": [
               "string",
               "null"
