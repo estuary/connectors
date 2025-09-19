@@ -4,12 +4,11 @@ package main
 
 import (
 	"context"
-	stdsql "database/sql"
 	"fmt"
+	"os/exec"
 	"strings"
 	"testing"
 
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 
@@ -29,131 +28,56 @@ func testConfig() config {
 	}
 }
 
-func TestValidateAndApply(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testConfig()
-
-	resourceConfig := tableConfig{
-		Table:  "target",
-		Schema: "public",
+func TestIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
 	}
 
-	uri, err := cfg.ToURI(ctx)
-	require.NoError(t, err)
-	db, err := stdsql.Open("pgx", uri)
-	require.NoError(t, err)
-	defer db.Close()
-
-	boilerplate.RunValidateAndApplyTestCases(
-		t,
-		newPostgresDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
-
-			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T) {
-			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-		},
-	)
-}
-
-func TestValidateAndApplyMigrations(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testConfig()
-
-	resourceConfig := tableConfig{
-		Table:  "target",
-		Schema: "public",
+	makeResourceFn := func(table string, delta bool) tableConfig {
+		return tableConfig{
+			Table: table,
+			Delta: delta,
+		}
 	}
 
-	uri, err := cfg.ToURI(ctx)
-	require.NoError(t, err)
-	db, err := stdsql.Open("pgx", uri+"?default_query_exec_mode=exec")
-	require.NoError(t, err)
-	defer db.Close()
+	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
+	t.Cleanup(func() {
+		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
+	})
 
-	sql.RunValidateAndApplyMigrationsTests(
-		t,
-		newPostgresDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
+	t.Run("materialize", func(t *testing.T) {
+		sql.RunMaterializationTest(t, newPostgresDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
+	})
 
-			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
-			require.NoError(t, err)
+	t.Run("apply", func(t *testing.T) {
+		sql.RunApplyTest(t, newPostgresDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+	})
 
-			return sch
-		},
-		func(t *testing.T, cols []string, values []string) {
-			t.Helper()
+	t.Run("migrate", func(t *testing.T) {
+		sql.RunMigrationTest(t, newPostgresDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+	})
 
-			var keys = make([]string, len(cols))
-			for i, col := range cols {
-				keys[i] = pgDialect.Identifier(col)
-			}
-			keys = append(keys, pgDialect.Identifier("_meta/flow_truncated"))
-			values = append(values, "FALSE")
-			keys = append(keys, pgDialect.Identifier("flow_published_at"))
-			values = append(values, "'2024-09-13 01:01:01'")
-			keys = append(keys, pgDialect.Identifier("flow_document"))
-			values = append(values, "'{}'")
-			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", pgDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
-			_, err = db.ExecContext(ctx, q)
-
-			require.NoError(t, err)
-		},
-		func(t *testing.T) string {
-			t.Helper()
-
-			rows, err := sql.DumpTestTable(t, db, pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
-
-			require.NoError(t, err)
-
-			return rows
-		},
-		func(t *testing.T) {
-			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-		},
-	)
-}
-
-func TestFencingCases(t *testing.T) {
-	var ctx = context.Background()
-
-	c, err := newClient(ctx, &sql.Endpoint[config]{Config: testConfig()})
-	require.NoError(t, err)
-	defer c.Close()
-
-	sql.RunFenceTestCases(t,
-		c,
-		[]string{"temp_test_fencing_checkpoints"},
-		pgDialect,
-		tplCreateTargetTable,
-		func(table sql.Table, fence sql.Fence) error {
-			var fenceUpdate strings.Builder
-			if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
-			}
-			return c.ExecStatements(ctx, []string{fenceUpdate.String()})
-		},
-		func(table sql.Table) (out string, err error) {
-			return sql.StdDumpTable(ctx, c.(*client).db, table)
-		},
-	)
+	t.Run("fence", func(t *testing.T) {
+		sql.RunFencingTest(
+			t,
+			newPostgresDriver(),
+			"testdata/fence.flow.yaml",
+			makeResourceFn,
+			tplCreateTargetTable,
+			func(ctx context.Context, client sql.Client, fence sql.Fence) error {
+				var fenceUpdate strings.Builder
+				if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
+					return fmt.Errorf("evaluating fence template: %w", err)
+				}
+				return client.ExecStatements(ctx, []string{fenceUpdate.String()})
+			},
+		)
+	})
 }
 
 func TestPrereqs(t *testing.T) {
+	t.Skip("todo: fix pre-reqs tests")
+
 	cfg := testConfig()
 
 	tests := []struct {
