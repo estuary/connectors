@@ -274,7 +274,7 @@ func (m *testMaterializer) Config() MaterializeCfg {
 	return MaterializeCfg{}
 }
 
-func (m *testMaterializer) PopulateInfoSchema(ctx context.Context, paths [][]string, is *InfoSchema) error {
+func (m *testMaterializer) PopulateInfoSchema(ctx context.Context, is *InfoSchema, paths [][]string, allTables bool) error {
 	*is = *m.is
 	return nil
 }
@@ -399,6 +399,18 @@ func (t testMappedTyper) CanMigrate(e ExistingField) bool {
 
 func (m *testMaterializer) NewMaterializerTransactor(ctx context.Context, req pm.Request_Open, is InfoSchema, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *m.BindingEvents) (MaterializerTransactor, error) {
 	return &testMaterializerTransactor{}, nil
+}
+
+func (m *testMaterializer) ListTestTasks(context.Context) ([]string, error) {
+	panic("unimplemented")
+}
+
+func (m *testMaterializer) CleanupTestTask(context.Context, string) error {
+	panic("unimplemented")
+}
+
+func (m *testMaterializer) SnapshotTestResource(context.Context, []string) (columnNames []string, rows [][]any, _ error) {
+	panic("unimplemented")
 }
 
 func (m *testMaterializer) Close(ctx context.Context) {}
