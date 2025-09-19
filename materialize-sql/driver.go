@@ -231,7 +231,7 @@ func (s *sqlMaterialization[EC, RC]) NewConstraint(p pf.Projection, deltaUpdates
 	return constraint
 }
 
-func (s *sqlMaterialization[EC, RC]) PopulateInfoSchema(ctx context.Context, paths [][]string, is *boilerplate.InfoSchema) error {
+func (s *sqlMaterialization[EC, RC]) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, paths [][]string, allTables bool) error {
 	if s.endpoint.MetaCheckpoints != nil {
 		paths = append(paths, s.endpoint.MetaCheckpoints.Path)
 	}
@@ -246,7 +246,7 @@ func (s *sqlMaterialization[EC, RC]) PopulateInfoSchema(ctx context.Context, pat
 		}
 	}
 
-	return s.client.PopulateInfoSchema(ctx, is, paths)
+	return s.client.PopulateInfoSchema(ctx, is, paths, allTables)
 }
 
 func (s *sqlMaterialization[EC, RC]) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
@@ -408,6 +408,18 @@ type checkpointRecoverer struct {
 
 func (c *checkpointRecoverer) RecoverCheckpoint(context.Context, pf.MaterializationSpec, pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
 	return c.cp, nil
+}
+
+func (s *sqlMaterialization[EC, RC]) ListTestTasks(ctx context.Context) ([]string, error) {
+	return s.client.ListCheckpointsEntries(ctx)
+}
+
+func (s *sqlMaterialization[EC, RC]) CleanupTestTask(ctx context.Context, taskName string) error {
+	return s.client.DeleteCheckpointsEntry(ctx, taskName)
+}
+
+func (s *sqlMaterialization[EC, RC]) SnapshotTestResource(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	return s.client.SnapshotTestTable(ctx, path)
 }
 
 func (s *sqlMaterialization[EC, RC]) Close(ctx context.Context) {
