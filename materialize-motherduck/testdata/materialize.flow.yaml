@@ -1,0 +1,43 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-motherduck/s3:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.s3.yaml
+    bindings: &bindings
+    - resource:
+        table: simple_standard
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: simple_delta
+        delta_updates: true
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: not_simple
+      source: tests/not-simple
+      fields:
+        recommended: true
+    - resource:
+        table: data_types
+      source: tests/data-types
+      fields:
+        recommended: 1
+
+  acmeCo/tests/materialize-motherduck/gcs:
+    endpoint:
+      local:
+        command:
+          - go
+          - run
+          - .
+        protobuf: true
+        config: config.gcs.yaml
+    bindings: *bindings

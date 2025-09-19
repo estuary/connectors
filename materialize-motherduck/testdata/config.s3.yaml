@@ -1,0 +1,28 @@
+database: ci_testing
+schema: main
+token_sops: ENC[AES256_GCM,data:zJKezW9wWrmo5uZHt3BK/P5AWm6dIWnskg3KTh38q9v5O/w/LsVaSH+WVP+hT92zBF8wl83Q02reRcz3VUK1ma0bNkONkj9u2VPQb16TdlRp0f2lG1SOPcDP/1VhSpnoeRo9DFxsejg3+AwfMbkkTX2iCIZL59+yzFEX6PwRNsih1rtxR66MsjuPyFfspIKaxN1MXDpAUi1ESi1CvSB2N7bUtghLQ6n+87fIJ04FcVFwRUfuOPkdxC9ONNoJi/evha5cvfncZ8jOap8fwC1AjNY/5b13E5kEixmIAryWcnhydg5sgufFGsi6WMTMhMzb+4qkZGcuTd953KF3jGtf5qo6vcku8lYN8KUtTlTZb3WldILNO6Lu0/10s718BxR3n71qKGYmThFWwaeguFHbT79fS+/ffFeenx4ReoffAM+GS4DrWH5B/h7VmjqyHtvU3lOi,iv:u2LmumgY2AOqDd57vagcSbRPc13R6UfQyopX+kK/QHI=,tag:PHuliexX5UNKzcOCVvsuJg==,type:str]
+hardDelete: true
+stagingBucket:
+    stagingBucketType: S3
+    awsAccessKeyId_sops: ENC[AES256_GCM,data:UkQeDRAVhzojI2/blFxS6aNINDA=,iv:PsrPfCVyvJedgqKTAr0S3AN2+CeY4Agk92AWq7Qjz54=,tag:ICYef/sIl41l8YHjNXFLDw==,type:str]
+    awsSecretAccessKey_sops: ENC[AES256_GCM,data:jedDyrGXmwXprqeaTmMmM99mtPut7cYVm/+yX+agKPw0YOMZWyq7oA==,iv:P8gLYwp78emfOGI7Ly48IGQjFVXiuQLnkB7/EygdbF0=,tag:vIA9rhFW3Dyhn2qnxxVZ3w==,type:str]
+    bucketS3: estuary-connector-test-bucket
+    region: us-east-2
+syncSchedule:
+    syncFrequency: 0s
+advanced:
+    feature_flags: allow_existing_tables_for_new_bindings
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-05-23T21:25:19Z"
+          enc: CiQAdmEdwuYd5dgBmZKmE/v2/ebAF9rqZVtWs48HNDf1NOr11gQSSQCSobQjWx53iByTq/afJbpWDsWW4U67+LzfXRO15Ui1vpC2UaJKz58rMXUjoTy/umt1ftuZxKhaa9BzrLWfwLUvKCuBivYAwwA=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-09-03T20:22:20Z"
+    mac: ENC[AES256_GCM,data:HV1nS9/BAxioJNKTjGSI/vCu9D9eS3EDfx4qIE1u0SWH38PGTTxm0fbWXbVg6806jvHSqxiH7BhJAaUFWpGPAKxwsQD0oJ1ygUzrkRxMjTdb7EU0DVFx0QMN3hMBAdYNiXNNRNf1aNWwtut0fTYQqfVk5pS9xYSx9ifNUNGQAHw=,iv:7QQieLRjo+ridaeIfZXcS7KHmgEBEam7zBGUrOPba1A=,tag:lQlUVt1UdgzqDlsEPUYFTg==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.9.4
