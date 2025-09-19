@@ -86,25 +86,31 @@ Binding 0:
             ]
           },
           "data": {
+            "description": "(source type: nvarchar)",
             "type": [
               "string",
               "null"
             ]
           },
           "k_bigint": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable bigint)"
           },
           "k_bool": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "(source type: non-nullable bit)"
           },
           "k_int": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
           },
           "k_smallint": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable smallint)"
           },
           "k_str": {
-            "type": "string"
+            "type": "string",
+            "description": "(source type: non-nullable varchar)"
           }
         },
         "x-infer-schema": true

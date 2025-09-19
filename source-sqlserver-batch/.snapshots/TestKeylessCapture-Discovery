@@ -84,6 +84,7 @@ Binding 0:
             ]
           },
           "data": {
+            "description": "(source type: nvarchar)",
             "type": [
               "string",
               "null"
@@ -91,12 +92,14 @@ Binding 0:
           },
           "updated_at": {
             "format": "date-time",
+            "description": "(source type: datetime2)",
             "type": [
               "string",
               "null"
             ]
           },
           "value": {
+            "description": "(source type: int)",
             "type": [
               "integer",
               "null"

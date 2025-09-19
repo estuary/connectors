@@ -380,6 +380,35 @@ func (c *capture) emitSourcedSchemas(ctx context.Context) error {
 		if !ok {
 			continue // Skip bindings for which we don't have any corresponding discovery information
 		}
+
+		// When debugging, log complete discovery results for enabled bindings whenever discovery is run
+		if log.IsLevelEnabled(log.DebugLevel) {
+			for tableID, table := range tableInfo {
+				var logEntry = log.WithFields(log.Fields{
+					"tableID": tableID,
+					"schema":  table.Schema,
+					"name":    table.Name,
+					"type":    table.Type,
+				})
+				if table.key != nil {
+					logEntry = logEntry.WithField("key", fmt.Sprintf("%v", table.key.Columns))
+				}
+				logEntry.Debug("discovered table")
+				for _, column := range table.columns {
+					var logEntry = log.WithFields(log.Fields{
+						"tableID": tableID,
+						"index":   column.Index,
+						"name":    column.Name,
+						"type":    fmt.Sprintf("%#v", column.DataType),
+					})
+					if column.Description != nil {
+						logEntry = logEntry.WithField("description", *column.Description)
+					}
+					logEntry.Debug("discovered column")
+				}
+			}
+		}
+
 		if schema, _, err := generateCollectionSchema(c.Config, table, false); err != nil {
 			return fmt.Errorf("error generating schema for table %q: %w", tableID, err)
 		} else if err := c.Output.SourcedSchema(binding.index, schema); err != nil {

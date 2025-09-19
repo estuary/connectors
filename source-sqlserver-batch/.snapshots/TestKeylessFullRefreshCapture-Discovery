@@ -81,12 +81,14 @@ Binding 0:
             ]
           },
           "data": {
+            "description": "(source type: nvarchar)",
             "type": [
               "string",
               "null"
             ]
           },
           "value": {
+            "description": "(source type: int)",
             "type": [
               "integer",
               "null"

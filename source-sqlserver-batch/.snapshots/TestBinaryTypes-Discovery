@@ -85,6 +85,7 @@ Binding 0:
             ]
           },
           "binary_col": {
+            "description": "(source type: binary)",
             "contentEncoding": "base64",
             "type": [
               "string",
@@ -92,9 +93,11 @@ Binding 0:
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
           },
           "image_col": {
+            "description": "(source type: image)",
             "contentEncoding": "base64",
             "type": [
               "string",
@@ -102,6 +105,7 @@ Binding 0:
             ]
           },
           "varbinary_col": {
+            "description": "(source type: varbinary)",
             "contentEncoding": "base64",
             "type": [
               "string",

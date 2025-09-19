@@ -85,33 +85,39 @@ Binding 0:
             ]
           },
           "bigint_col": {
+            "description": "(source type: bigint)",
             "type": [
               "integer",
               "null"
             ]
           },
           "bit_col": {
+            "description": "(source type: bit)",
             "type": [
               "boolean",
               "null"
             ]
           },
           "id": {
-            "type": "integer"
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
           },
           "int_col": {
+            "description": "(source type: int)",
             "type": [
               "integer",
               "null"
             ]
           },
           "smallint_col": {
+            "description": "(source type: smallint)",
             "type": [
               "integer",
               "null"
             ]
           },
           "tinyint_col": {
+            "description": "(source type: tinyint)",
             "type": [
               "integer",
               "null"
