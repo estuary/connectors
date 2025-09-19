@@ -1,0 +1,38 @@
+# The user's worked example: three transactions of 10 GB / 30 GB / 10 GB
+# at 1 KB per document, with overlap to drive updates and deletes.
+collections:
+  - name: bench/wide
+    schema:
+      type: object
+      if:
+        properties:
+          _meta:
+            properties: { op: { const: d } }
+      then:
+        reduce: { delete: true, strategy: lastWriteWins }
+      properties:
+        id:      { type: integer }
+        val:     { type: integer }
+        payload: { type: string }
+        _meta:
+          type: object
+          properties: { op: { type: string } }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+
+transactions:
+  - total_size: 10GB
+    doc_size:   1KB
+    op: c
+
+  - total_size: 30GB
+    doc_size:   1KB
+    overlaps:
+      - { with: 0, fraction: 0.20, op: u }
+      - { with: 0, fraction: 0.10, op: d }
+
+  - total_size: 10GB
+    doc_size:   1KB
+    overlaps:
+      - { with: 1, fraction: 0.30, op: d }

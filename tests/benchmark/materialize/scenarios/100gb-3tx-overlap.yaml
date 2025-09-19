@@ -1,0 +1,38 @@
+# 100 GB across three equal transactions (~33.3 GB each) with increasing
+# update overlap: tx1 is pure inserts, tx2 updates 25% of tx1's keys,
+# tx3 updates 50% of tx2's keys.
+collections:
+  - name: bench/wide
+    schema:
+      type: object
+      if:
+        properties:
+          _meta:
+            properties: { op: { const: d } }
+      then:
+        reduce: { delete: true, strategy: lastWriteWins }
+      properties:
+        id:      { type: integer }
+        val:     { type: integer }
+        payload: { type: string }
+        _meta:
+          type: object
+          properties: { op: { type: string } }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+
+transactions:
+  - total_size: 33GB
+    doc_size:   1KB
+    op: c
+
+  - total_size: 33GB
+    doc_size:   1KB
+    overlaps:
+      - { with: 0, fraction: 0.25, op: u }
+
+  - total_size: 34GB
+    doc_size:   1KB
+    overlaps:
+      - { with: 1, fraction: 0.50, op: u }

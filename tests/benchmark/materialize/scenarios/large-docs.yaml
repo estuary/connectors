@@ -1,0 +1,32 @@
+# Few large documents -- exercises the connector's large-payload path
+# (e.g., row-size limits, varchar/text handling, network framing).
+# 5_000 docs at 1MB each = ~5 GB.
+collections:
+  - name: bench/big
+    schema:
+      type: object
+      if:
+        properties:
+          _meta:
+            properties: { op: { const: d } }
+      then:
+        reduce: { delete: true, strategy: lastWriteWins }
+      properties:
+        id:      { type: integer }
+        payload: { type: string }
+        _meta:
+          type: object
+          properties: { op: { type: string } }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+
+transactions:
+  - doc_count: 5_000
+    doc_size:  1MB
+    op: c
+
+  - doc_count: 5_000
+    doc_size:  1MB
+    overlaps:
+      - { with: 0, fraction: 0.40, op: u }

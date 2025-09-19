@@ -1,0 +1,43 @@
+# A tiny scenario (~10 MB total) used to verify the framework end-to-end.
+# Intended for quick correctness checks, not throughput measurement.
+#
+# The `if/then: reduce.delete` annotation on the schema is how Flow learns
+# that a doc with `_meta.op == "d"` is a tombstone -- without it, the
+# runtime ships such docs to the materialization as regular upserts and
+# `hardDelete: true` on the connector has nothing to act on.
+collections:
+  - name: bench/items
+    schema:
+      type: object
+      if:
+        properties:
+          _meta:
+            properties: { op: { const: d } }
+      then:
+        reduce: { delete: true, strategy: lastWriteWins }
+      properties:
+        id:      { type: integer }
+        val:     { type: integer }
+        payload: { type: string }
+        _meta:
+          type: object
+          properties: { op: { type: string } }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+
+transactions:
+  - doc_count: 10000
+    doc_size: 256
+    op: c
+
+  - doc_count: 10000
+    doc_size: 256
+    overlaps:
+      - { with: 0, fraction: 0.20, op: u }
+      - { with: 0, fraction: 0.10, op: d }
+
+  - doc_count: 10000
+    doc_size: 256
+    overlaps:
+      - { with: 1, fraction: 0.30, op: d }
