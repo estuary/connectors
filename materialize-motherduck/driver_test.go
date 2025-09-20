@@ -29,6 +29,7 @@ func mustGetCfg(t *testing.T) config {
 		},
 	}
 	out.Advanced.FeatureFlags = "allow_existing_tables_for_new_bindings"
+	out.Advanced.NoFlowDocument = true
 
 	for _, prop := range []struct {
 		key  string

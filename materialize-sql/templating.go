@@ -9,6 +9,20 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+type ColumnWithAlias struct {
+	Column
+	Alias string
+}
+
+func (c ColumnWithAlias) AsFlatType() FlatType {
+    t, _ := c.Column.AsFlatType()
+	return t
+}
+
+func (c ColumnWithAlias) Format() string {
+	return c.Inference.String_.Format
+}
+
 // MustParseTemplate is a convenience which parses the template `body` and
 // installs common functions for accessing Dialect behavior.
 func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
@@ -27,6 +41,9 @@ func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
 		"Last":       func(s []string) string { return s[len(s)-1] },
 		"First":      func(s []string) string { return s[0] },
 		"Backtick":   func() string { return "`" }, // Go string literals don't allow a ` character
+		"ColumnWithAlias": func (c Column, alias string) ColumnWithAlias {
+			return ColumnWithAlias{Column: c, Alias: alias}
+		},
 	})
 	return template.Must(tpl.Parse(body))
 }

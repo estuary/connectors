@@ -82,6 +82,11 @@ func main() {
 		log.Fatal(fmt.Errorf("reading columns: %w", err))
 	}
 
+	colTypes, err := rows.ColumnTypes()
+	if err != nil {
+		log.Fatal(fmt.Errorf("reading column types: %w", err))
+	}
+
 	data := make([]interface{}, len(cols))
 	ptrs := make([]interface{}, len(cols))
 	for i := range data {
@@ -100,6 +105,12 @@ func main() {
 			if t, ok := d.(time.Time); ok {
 				// Go JSON encoding apparently doesn't like timestamps with years 9999.
 				d = t.UTC().String()
+			} else if bytes, ok := d.([]byte); ok {
+				// Check the database type name
+				typeName := colTypes[idx].DatabaseTypeName()
+				if typeName == "DECIMAL" || typeName == "NUMERIC" {
+					d = string(bytes)
+				}
 			}
 			row[cols[idx]] = d
 		}

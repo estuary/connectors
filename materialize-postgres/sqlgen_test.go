@@ -24,6 +24,7 @@ func TestSQLGeneration(t *testing.T) {
 				tplCreateLoadTable,
 				tplLoadInsert,
 				tplLoadQuery,
+				tplLoadQueryNoFlowDocument,
 				tplStoreInsert,
 				tplStoreUpdate,
 				tplDeleteQuery,

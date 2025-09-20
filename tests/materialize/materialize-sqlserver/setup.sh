@@ -27,7 +27,10 @@ config_json_template='{
    "database": "$SQLSERVER_DATABASE",
    "password": "$SQLSERVER_PASSWORD",
    "user":     "$SQLSERVER_USER",
-   "hardDelete": true
+   "hardDelete": true,
+   "advanced": {
+      "no_flow_document": true
+   }
 }'
 
 resources_json_template='[
@@ -110,6 +113,24 @@ resources_json_template='[
       "table": "deletions"
     },
     "source": "${TEST_COLLECTION_DELETIONS}"
+  },
+  {
+    "resource": {
+      "table": "all_key_types_part_one"
+    },
+    "source": "${TEST_COLLECTION_ALL_KEY_TYPES_PART_ONE}"
+  },
+  {
+    "resource": {
+      "table": "all_key_types_part_two"
+    },
+    "source": "${TEST_COLLECTION_ALL_KEY_TYPES_PART_TWO}"
+  },
+  {
+    "resource": {
+      "table": "all_key_types_part_three"
+    },
+    "source": "${TEST_COLLECTION_ALL_KEY_TYPES_PART_THREE}"
   }
 ]'
 

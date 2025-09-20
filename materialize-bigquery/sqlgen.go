@@ -66,6 +66,8 @@ func bqDialect(objAndArrayAsJson bool) sql.Dialect {
 		objAndArrayCol = sql.MapStatic("STRING", sql.UsingConverter(jsonConverter))
 	}
 
+	primaryKeyTextType := sql.MapStatic("STRING")
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:   objAndArrayCol,
@@ -95,10 +97,10 @@ func bqDialect(objAndArrayAsJson bool) sql.Dialect {
 			// https://cloud.google.com/bigquery/docs/reference/standard-sql/conversion_functions#cast_as_floating_point
 			sql.STRING_NUMBER: sql.MapStatic("FLOAT64", sql.AlsoCompatibleWith("float"), sql.UsingConverter(sql.StrToFloat("NaN", "Infinity", "-Infinity"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: sql.MapStatic("STRING"),
+				Fallback: primaryKeyTextType,
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate)),
-					"date-time": sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime)),
+					"date":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))),
+					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime))),
 				},
 			}),
 		},
@@ -157,14 +159,15 @@ func toBigNumericCast(m sql.ColumnTypeMigration) string {
 }
 
 type templates struct {
-	tempTableName     *template.Template
-	createTargetTable *template.Template
-	alterTableColumns *template.Template
-	installFence      *template.Template
-	updateFence       *template.Template
-	loadQuery         *template.Template
-	storeInsert       *template.Template
-	storeUpdate       *template.Template
+	tempTableName           *template.Template
+	createTargetTable       *template.Template
+	alterTableColumns       *template.Template
+	installFence            *template.Template
+	updateFence             *template.Template
+	loadQuery               *template.Template
+	loadQueryNoFlowDocument *template.Template
+	storeInsert             *template.Template
+	storeUpdate             *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -236,6 +239,40 @@ SELECT -1, NULL LIMIT 0
 {{ end }}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "uncast" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if eq $.AsFlatType "string_integer" -}}
+	CAST({{ $ident }} AS STRING)
+{{- else if eq $.AsFlatType "string_number" -}}
+	CAST({{ $ident }} AS STRING)
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
+	CAST({{ $ident }} AS STRING)
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
+	FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E*SZ', {{ $ident }}, 'UTC')
+{{- else -}}
+	{{ $ident }}
+{{- end -}}
+{{- end }}
+
+{{ define "loadQueryNoFlowDocument" -}}
+SELECT {{ $.Binding }}, 
+TO_JSON(STRUCT(
+{{- range $i, $col := $.RootLevelColumns}}
+	{{- if $i}}, {{end}}
+	{{ template "uncast" (ColumnWithAlias $col "l") }} AS {{ $col.Field }}
+{{- end}}
+)) as flow_document
+FROM {{ $.Identifier }} AS l
+JOIN {{ template "tempTableName" . }} AS r
+{{- range $ind, $bound := $.Bounds }}
+	{{ if $ind }} AND {{ else }} ON {{ end -}}
+	l.{{ $bound.Identifier }} = r.c{{$ind}}
+	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+{{ end }}
+
 -- Templated query which bulk inserts rows from a source bucket into a target table.
 
 {{ define "storeInsert" -}}
@@ -261,14 +298,8 @@ ON {{ range $ind, $bound := $.Bounds }}
 	l.{{$bound.Identifier}} = r.c{{$ind}}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end}}
-{{- if $.Document }}
-WHEN MATCHED AND {{ if $.ObjAndArrayAsJson -}}
-	TO_JSON_STRING(r.c{{ Add (len $.Columns) -1 }})
-{{- else -}}
-	r.c{{ Add (len $.Columns) -1 }}
-{{- end }}='"delete"' THEN
+WHEN MATCHED AND r._flow_delete THEN
 	DELETE
-{{- end }}
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{end -}}
@@ -277,7 +308,7 @@ WHEN MATCHED THEN
 	{{- if $.Document -}}
 		{{ if $.Values  }}, {{ end }}l.{{$.Document.Identifier}} = r.c{{ Add (len $.Columns) -1 }}
 	{{- end }}
-WHEN NOT MATCHED THEN
+WHEN NOT MATCHED AND NOT r._flow_delete THEN
 	INSERT (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
@@ -291,6 +322,7 @@ WHEN NOT MATCHED THEN
 	{{- end -}}
 	);
 {{ end }}
+
 
 {{ define "installFence" }}
 -- Our desired fence
@@ -364,14 +396,15 @@ UPDATE {{ Identifier $.TablePath }}
 `)
 
 	return templates{
-		tempTableName:     tplAll.Lookup("tempTableName"),
-		createTargetTable: tplAll.Lookup("createTargetTable"),
-		alterTableColumns: tplAll.Lookup("alterTableColumns"),
-		installFence:      tplAll.Lookup("installFence"),
-		updateFence:       tplAll.Lookup("updateFence"),
-		loadQuery:         tplAll.Lookup("loadQuery"),
-		storeInsert:       tplAll.Lookup("storeInsert"),
-		storeUpdate:       tplAll.Lookup("storeUpdate"),
+		tempTableName:           tplAll.Lookup("tempTableName"),
+		createTargetTable:       tplAll.Lookup("createTargetTable"),
+		alterTableColumns:       tplAll.Lookup("alterTableColumns"),
+		installFence:            tplAll.Lookup("installFence"),
+		updateFence:             tplAll.Lookup("updateFence"),
+		loadQuery:               tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
+		storeInsert:             tplAll.Lookup("storeInsert"),
+		storeUpdate:             tplAll.Lookup("storeUpdate"),
 	}
 }
 

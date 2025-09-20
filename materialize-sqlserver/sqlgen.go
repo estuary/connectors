@@ -78,9 +78,9 @@ var sqlServerDialect = func(collation string, defaultSchema string) sql.Dialect 
 					sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
 				),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic("DATETIME2", sql.UsingConverter(rfc3339ToUTC())),
-					"time":      sql.MapStatic("TIME", sql.UsingConverter(rfc3339TimeToUTC())),
+					"date":      sql.MapPrimaryKey(sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)), sql.MapStatic("DATE")),
+					"date-time": sql.MapPrimaryKey(sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)), sql.MapStatic("DATETIME2", sql.UsingConverter(rfc3339ToUTC()))),
+					"time":      sql.MapPrimaryKey(sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)), sql.MapStatic("TIME", sql.UsingConverter(rfc3339TimeToUTC()))),
 				},
 			}),
 		},
@@ -157,19 +157,20 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 }
 
 type templates struct {
-	tempLoadTableName  *template.Template
-	tempStoreTableName *template.Template
-	tempLoadTruncate   *template.Template
-	tempStoreTruncate  *template.Template
-	createLoadTable    *template.Template
-	createStoreTable   *template.Template
-	alterTableColumns  *template.Template
-	createTargetTable  *template.Template
-	directCopy         *template.Template
-	mergeInto          *template.Template
-	loadInsert         *template.Template
-	loadQuery          *template.Template
-	updateFence        *template.Template
+	tempLoadTableName       *template.Template
+	tempStoreTableName      *template.Template
+	tempLoadTruncate        *template.Template
+	tempStoreTruncate       *template.Template
+	createLoadTable         *template.Template
+	createStoreTable        *template.Template
+	alterTableColumns       *template.Template
+	createTargetTable       *template.Template
+	directCopy              *template.Template
+	mergeInto               *template.Template
+	loadInsert              *template.Template
+	loadQuery               *template.Template
+	loadQueryNoFlowDocument *template.Template
+	updateFence             *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -259,7 +260,8 @@ CREATE TABLE {{ template "temp_store_name" . }} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
 		{{$col.Identifier}} {{$col.DDL}}
-	{{- end }}
+	{{- end }},
+	_flow_delete BIT
 	{{- if not $.DeltaUpdates }},
 
 		PRIMARY KEY (
@@ -301,6 +303,43 @@ SELECT TOP 0 -1, NULL
 {{ end }}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "uncast" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if eq $.AsFlatType "string_integer" -}}
+	CAST({{ $ident }} AS NVARCHAR(MAX))
+{{- else if eq $.AsFlatType "string_number" -}}
+	CAST({{ $ident }} AS NVARCHAR(MAX))
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
+	FORMAT({{ $ident }}, 'yyyy-MM-dd')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
+	FORMAT({{ $ident }} AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.FFFFFFF') + 'Z'
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
+	FORMAT({{ $ident }}, 'HH:mm:ss.FFFFFFF')
+{{- else -}}
+	{{ $ident }}
+{{- end -}}
+{{- end }}
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Binding }}, 
+(
+	SELECT 
+		{{- range $i, $col := $.RootLevelColumns}}
+			{{- if $i}},{{end}}
+		{{Literal $col.Field}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
+		{{- end}}
+	FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+) as flow_document
+FROM {{ $.Identifier}} AS r
+JOIN {{ template "temp_load_name" . }} AS l
+{{- range $ind, $key := $.Keys }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end }}
+{{ end }}
+
 -- If there are no updates to a table, we can just do a direct copy from temporary table into target table
 
 {{ define "directCopy" }}
@@ -325,17 +364,15 @@ SELECT TOP 0 -1, NULL
 		SELECT {{ range $ind, $key := $.Columns }}
 			{{- if $ind }}, {{ end -}}
 			{{ $key.Identifier -}}
-		{{- end }}
+		{{- end }}, _flow_delete
 		FROM {{ template "temp_store_name" . }}
 	) AS r
 	ON {{ range $ind, $key := $.Keys }}
 		{{- if $ind }} AND {{ end -}}
 		{{ $.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
-	{{- if $.Document }}
-	WHEN MATCHED AND r.{{ $.Document.Identifier }}='"delete"' THEN
+	WHEN MATCHED AND r._flow_delete = 1 THEN
 		DELETE
-	{{- end }}
 	WHEN MATCHED THEN
 		UPDATE SET {{ range $ind, $key := $.Values }}
 		{{- if $ind }}, {{ end -}}
@@ -344,7 +381,7 @@ SELECT TOP 0 -1, NULL
 	{{- if $.Document -}}
 	{{ if $.Values }}, {{ end }}{{ $.Identifier }}.{{ $.Document.Identifier}} = r.{{ $.Document.Identifier }}
 	{{- end }}
-	WHEN NOT MATCHED THEN
+	WHEN NOT MATCHED AND r._flow_delete = 0 THEN
 		INSERT (
 		{{- range $ind, $key := $.Columns }}
 			{{- if $ind }}, {{ end -}}
@@ -359,6 +396,7 @@ SELECT TOP 0 -1, NULL
 	);
 {{ end }}
 
+
 {{ define "updateFence" }}
 UPDATE {{ Identifier $.TablePath }}
 	SET   "checkpoint" = {{ Literal (Base64Std $.Checkpoint) }}
@@ -370,18 +408,19 @@ UPDATE {{ Identifier $.TablePath }}
 	`)
 
 	return templates{
-		tempLoadTableName:  tplAll.Lookup("temp_load_name"),
-		tempStoreTableName: tplAll.Lookup("temp_store_name"),
-		tempLoadTruncate:   tplAll.Lookup("truncateTempLoadTable"),
-		tempStoreTruncate:  tplAll.Lookup("truncateTempStoreTable"),
-		createLoadTable:    tplAll.Lookup("createLoadTable"),
-		createStoreTable:   tplAll.Lookup("createStoreTable"),
-		alterTableColumns:  tplAll.Lookup("alterTableColumns"),
-		createTargetTable:  tplAll.Lookup("createTargetTable"),
-		directCopy:         tplAll.Lookup("directCopy"),
-		mergeInto:          tplAll.Lookup("mergeInto"),
-		loadInsert:         tplAll.Lookup("loadInsert"),
-		loadQuery:          tplAll.Lookup("loadQuery"),
-		updateFence:        tplAll.Lookup("updateFence"),
+		tempLoadTableName:       tplAll.Lookup("temp_load_name"),
+		tempStoreTableName:      tplAll.Lookup("temp_store_name"),
+		tempLoadTruncate:        tplAll.Lookup("truncateTempLoadTable"),
+		tempStoreTruncate:       tplAll.Lookup("truncateTempStoreTable"),
+		createLoadTable:         tplAll.Lookup("createLoadTable"),
+		createStoreTable:        tplAll.Lookup("createStoreTable"),
+		alterTableColumns:       tplAll.Lookup("alterTableColumns"),
+		createTargetTable:       tplAll.Lookup("createTargetTable"),
+		directCopy:              tplAll.Lookup("directCopy"),
+		mergeInto:               tplAll.Lookup("mergeInto"),
+		loadInsert:              tplAll.Lookup("loadInsert"),
+		loadQuery:               tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
+		updateFence:             tplAll.Lookup("updateFence"),
 	}
 }

@@ -29,6 +29,8 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 		return te, nil
 	}
 
+	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(textConverter))
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -51,10 +53,10 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 			// https://stitch-docs.netlify.app/docs/data-structure/redshift-data-loading-behavior#new-table-scenarios
 			sql.STRING_NUMBER: sql.MapStatic("DOUBLE PRECISION", sql.UsingConverter(sql.StrToFloat(nil, nil, nil))),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(textConverter)), // Note: Actually a VARCHAR(256)
+				Fallback: primaryKeyTextType, // Note: Actually a VARCHAR(256)
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date": sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.StringCastConverter(func(s string) (any, error) {
+					"date": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE")),
+					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.StringCastConverter(func(s string) (any, error) {
 						// Redshift supports timestamps with microsecond precision. It will reject
 						// timestamps with higher precision than that, so we truncate anything
 						// beyond microseconds.
@@ -64,7 +66,7 @@ var rsDialect = func(caseSensitiveIdentifierEnabled bool) sql.Dialect {
 						}
 
 						return parsed.Truncate(time.Microsecond).Format(time.RFC3339Nano), nil
-					}))),
+					})))),
 					// "time" is not currently support due to limitations with loading time values from
 					// staged JSON.
 					// "time": sql.NewStaticMapper("TIMETZ"),
@@ -190,14 +192,16 @@ type loadTableParams struct {
 }
 
 type templates struct {
-	createTargetTable *template.Template
-	createLoadTable   *template.Template
-	createStoreTable  *template.Template
-	createDeleteTable *template.Template
-	mergeInto         *template.Template
-	deleteQuery       *template.Template
-	loadQuery         *template.Template
-	copyFromS3        *template.Template
+	createTargetTable         *template.Template
+	createLoadTable           *template.Template
+	createStoreTable          *template.Template
+	createDeleteTable         *template.Template
+	mergeInto                 *template.Template
+	deleteQuery               *template.Template
+	deleteQueryNoFlowDocument *template.Template
+	loadQuery                 *template.Template
+	loadQueryNoFlowDocument   *template.Template
+	copyFromS3                *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -295,7 +299,7 @@ WHEN NOT MATCHED THEN
 {{ end }}
 
 {{ define "deleteQuery" }}
-{{ if $.Document -}}
+{{ if not $.DeltaUpdates -}}
 DELETE FROM {{ $.Identifier }}
 USING {{ template "temp_name_deleted" . }} AS r
 WHERE {{ range $ind, $key := $.Keys }}
@@ -319,6 +323,39 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 	{{- end }}
 {{- else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
+{{- end }}
+{{ end }}
+
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "uncast" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if eq $.AsFlatType "string_integer" -}}
+	CAST({{ $ident }} AS VARCHAR)
+{{- else if eq $.AsFlatType "string_number" -}}
+	CAST({{ $ident }} AS VARCHAR)
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
+	TO_CHAR({{ $ident }}, 'YYYY-MM-DD')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
+	TO_CHAR({{ $ident }} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+{{- else -}}
+	{{ $ident }}
+{{- end -}}
+{{- end }}
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Binding }}, 
+OBJECT(
+{{- range $i, $col := $.RootLevelColumns}}
+	{{- if $i}},{{end}}
+	{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
+{{- end}}
+) as flow_document
+FROM {{ template "temp_name" . }} AS l
+JOIN {{ $.Identifier}} AS r
+{{- range $ind, $key := $.Keys }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ end }}
 
@@ -347,14 +384,16 @@ TRUNCATECOLUMNS;
 {{ end }}
 	`)
 	return templates{
-		createTargetTable: tplAll.Lookup("createTargetTable"),
-		createLoadTable:   tplAll.Lookup("createLoadTable"),
-		createStoreTable:  tplAll.Lookup("createStoreTable"),
-		createDeleteTable: tplAll.Lookup("createDeleteTable"),
-		mergeInto:         tplAll.Lookup("mergeInto"),
-		deleteQuery:       tplAll.Lookup("deleteQuery"),
-		loadQuery:         tplAll.Lookup("loadQuery"),
-		copyFromS3:        tplAll.Lookup("copyFromS3"),
+		createTargetTable:         tplAll.Lookup("createTargetTable"),
+		createLoadTable:           tplAll.Lookup("createLoadTable"),
+		createStoreTable:          tplAll.Lookup("createStoreTable"),
+		createDeleteTable:         tplAll.Lookup("createDeleteTable"),
+		mergeInto:                 tplAll.Lookup("mergeInto"),
+		deleteQuery:               tplAll.Lookup("deleteQuery"),
+		deleteQueryNoFlowDocument: tplAll.Lookup("deleteQueryNoFlowDocument"),
+		loadQuery:                 tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument:   tplAll.Lookup("loadQueryNoFlowDocument"),
+		copyFromS3:                tplAll.Lookup("copyFromS3"),
 	}
 }
 

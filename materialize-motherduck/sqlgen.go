@@ -33,9 +33,9 @@ var duckDialect = func() sql.Dialect {
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("VARCHAR"),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE"),
-					"date-time": sql.MapStatic("TIMESTAMP WITH TIME ZONE"),
-					"time":      sql.MapStatic("TIME"),
+					"date":      sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), sql.MapStatic("DATE")),
+					"date-time": sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), sql.MapStatic("TIMESTAMP WITH TIME ZONE")),
+					"time":      sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), sql.MapStatic("TIME")),
 					"uuid":      sql.MapStatic("UUID"),
 				},
 			}),
@@ -160,23 +160,76 @@ USING read_json(
 
 {{ define "storeQuery" }}
 INSERT INTO {{$.Identifier}} BY NAME
-SELECT * FROM read_json(
-	[
-	{{- range $ind, $f := $.Files }}
-	{{- if $ind }}, {{ end }}'{{ $f }}'
-	{{- end -}}
-	],
-	format='newline_delimited',
-	compression='gzip',
-	maximum_object_size=1073741824,
-	columns={
-	{{- range $ind, $col := $.Columns }}
-		{{- if $ind }},{{ end }}
-		{{$col.Identifier}}: '{{$col.DDL}}'
-	{{- end }}
-	}
-){{ if $.Document }} WHERE {{ $.Document.Identifier }} != '"delete"'{{- end }};
+	SELECT * EXCLUDE (_flow_delete) FROM read_json(
+		[
+		{{- range $ind, $f := $.Files }}
+		{{- if $ind }}, {{ end }}'{{ $f }}'
+		{{- end -}}
+		],
+		format='newline_delimited',
+		compression='gzip',
+		maximum_object_size=1073741824,
+		columns={
+		{{- range $ind, $col := $.Columns }}
+			{{- if $ind }},{{ end }}
+			{{$col.Identifier}}: '{{$col.DDL}}'
+		{{- end -}}
+		, _flow_delete: 'BOOLEAN'
+		}
+	) WHERE NOT _flow_delete;
 {{ end }}
+
+{{ define "uncast" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if eq $.AsFlatType "string_integer" -}}
+	CAST({{ $ident }} AS VARCHAR)
+{{- else if eq $.AsFlatType "string_number" -}}
+	CAST({{ $ident }} AS VARCHAR)
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
+	strftime({{ $ident }}, '%Y-%m-%d')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
+	strftime(timezone('UTC', {{ $ident }}), '%Y-%m-%dT%H:%M:%S.%fZ')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
+	CAST({{ $ident }} AS VARCHAR)
+{{- else -}}
+	{{ $ident }}
+{{- end -}}
+{{- end }}
+
+{{ define "loadQueryNoFlowDocument" }}                                                                                                                             
+{{ if $.DeltaUpdates -}}                                                                                                                                           
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc                                                                                                     
+{{ else -}}                                                                                                                                                        
+SELECT {{ $.Binding }} AS binding,                                                                                                                                 
+json_object(                                                                                                                                                       
+{{- range $i, $col := $.RootLevelColumns}}                                                                                                                         
+       {{- if $i}}, {{end}}                                                                                                                                        
+       '{{$col.Field}}', {{ template "uncast" (ColumnWithAlias $col "l") }}                                                                                                                     
+{{- end}}                                                                                                                                                          
+) as doc                                                                                                                                                           
+FROM {{ $.Identifier }} AS l                                                                                                                                       
+JOIN read_json(                                                                                                                                                    
+       [                                                                                                                                                           
+       {{- range $ind, $f := $.Files }}                                                                                                                            
+       {{- if $ind }}, {{ end }}'{{ $f }}'                                                                                                                         
+       {{- end -}}                                                                                                                                                 
+       ],                                                                                                                                                          
+       format='newline_delimited',                                                                                                                                 
+       compression='gzip',                                                                                                                                         
+       columns={                                                                                                                                                   
+       {{- range $ind, $bound := $.Bounds }}                                                                                                                       
+               {{- if $ind }},{{ end }}                                                                                                                            
+               {{$bound.Identifier}}: '{{$bound.DDL}}'                                                                                                             
+       {{- end }}                                                                                                                                                  
+       }                                                                                                                                                           
+) AS r                                                                                                                                                             
+{{- range $ind, $bound := $.Bounds }}                                                                                                                              
+       {{ if $ind }} AND {{ else }} ON  {{ end -}}                                                                                                                 
+       l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}                                                                                                       
+       {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end -}}                                                                                                                                                        
+{{- end }}                                                                                                                                                         
+{{ end }} 
 
 -- Templated update of a fence checkpoint.
 
@@ -189,9 +242,10 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
 `)
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplStoreQuery        = tplAll.Lookup("storeQuery")
-	tplStoreDeleteQuery  = tplAll.Lookup("storeDeleteQuery")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
+	tplCreateTargetTable       = tplAll.Lookup("createTargetTable")
+	tplStoreQuery              = tplAll.Lookup("storeQuery")
+	tplStoreDeleteQuery        = tplAll.Lookup("storeDeleteQuery")
+	tplLoadQuery               = tplAll.Lookup("loadQuery")
+	tplLoadQueryNoFlowDocument = tplAll.Lookup("loadQueryNoFlowDocument")
+	tplUpdateFence             = tplAll.Lookup("updateFence")
 )
