@@ -17,7 +17,8 @@ import (
 var featureFlagDefaults = map[string]bool{
 	// Use Snowpipe streaming for delta-updates bindings that use JWT
 	// authentication.
-	"snowpipe_streaming": true,
+	"snowpipe_streaming":         true,
+	"datetime_keys_as_string":    true,
 }
 
 type config struct {

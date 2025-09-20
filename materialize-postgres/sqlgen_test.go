@@ -12,27 +12,31 @@ import (
 )
 
 func TestSQLGeneration(t *testing.T) {
+	// Create test dialect with default feature flags
+	testDialect := createPgDialect(map[string]bool{"datetime_keys_as_string": true})
+	testTemplates := renderTemplates(testDialect)
+
 	snap, _ := sql.RunSqlGenTests(
 		t,
-		pgDialect,
+		testDialect,
 		func(table string) []string {
 			return []string{table}
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				tplCreateTargetTable,
-				tplCreateLoadTable,
-				tplLoadInsert,
-				tplLoadQuery,
-				tplStoreInsert,
-				tplStoreUpdate,
-				tplDeleteQuery,
+				testTemplates.createTargetTable,
+				testTemplates.createLoadTable,
+				testTemplates.loadInsert,
+				testTemplates.loadQuery,
+				testTemplates.storeInsert,
+				testTemplates.storeUpdate,
+				testTemplates.deleteQuery,
 			},
-			TplAddColumns:    tplAlterTableColumns,
-			TplDropNotNulls:  tplAlterTableColumns,
-			TplCombinedAlter: tplAlterTableColumns,
-			TplInstallFence:  tplInstallFence,
-			TplUpdateFence:   tplUpdateFence,
+			TplAddColumns:    testTemplates.alterTableColumns,
+			TplDropNotNulls:  testTemplates.alterTableColumns,
+			TplCombinedAlter: testTemplates.alterTableColumns,
+			TplInstallFence:  testTemplates.installFence,
+			TplUpdateFence:   testTemplates.updateFence,
 		},
 	)
 
@@ -40,7 +44,10 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	var mapped = pgDialect.MapType(&sql.Projection{
+	// Create test dialect with default feature flags
+	testDialect := createPgDialect(map[string]bool{"datetime_keys_as_string": true})
+
+	var mapped = testDialect.MapType(&sql.Projection{
 		Projection: pf.Projection{
 			Inference: pf.Inference{
 				Types:   []string{"string"},

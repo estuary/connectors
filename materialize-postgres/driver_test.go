@@ -45,6 +45,9 @@ func TestValidateAndApply(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
+	// Create test dialect with default feature flags
+	testDialect := createPgDialect(map[string]bool{"datetime_keys_as_string": true})
+
 	boilerplate.RunValidateAndApplyTestCases(
 		t,
 		newPostgresDriver(),
@@ -60,7 +63,7 @@ func TestValidateAndApply(t *testing.T) {
 		},
 		func(t *testing.T) {
 			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
 		},
 	)
 }
@@ -99,15 +102,15 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			var keys = make([]string, len(cols))
 			for i, col := range cols {
-				keys[i] = pgDialect.Identifier(col)
+				keys[i] = testDialect.Identifier(col)
 			}
-			keys = append(keys, pgDialect.Identifier("_meta/flow_truncated"))
+			keys = append(keys, testDialect.Identifier("_meta/flow_truncated"))
 			values = append(values, "FALSE")
-			keys = append(keys, pgDialect.Identifier("flow_published_at"))
+			keys = append(keys, testDialect.Identifier("flow_published_at"))
 			values = append(values, "'2024-09-13 01:01:01'")
-			keys = append(keys, pgDialect.Identifier("flow_document"))
+			keys = append(keys, testDialect.Identifier("flow_document"))
 			values = append(values, "'{}'")
-			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", pgDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
+			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", testDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
 			_, err = db.ExecContext(ctx, q)
 
 			require.NoError(t, err)
@@ -115,7 +118,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		func(t *testing.T) string {
 			t.Helper()
 
-			rows, err := sql.DumpTestTable(t, db, pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
+			rows, err := sql.DumpTestTable(t, db, testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
 
 			require.NoError(t, err)
 
@@ -123,7 +126,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		},
 		func(t *testing.T) {
 			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", pgDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
 		},
 	)
 }
@@ -135,14 +138,18 @@ func TestFencingCases(t *testing.T) {
 	require.NoError(t, err)
 	defer c.Close()
 
+	// Create test dialect and templates with default feature flags
+	testDialect := createPgDialect(map[string]bool{"datetime_keys_as_string": true})
+	testTemplates := renderTemplates(testDialect)
+
 	sql.RunFenceTestCases(t,
 		c,
 		[]string{"temp_test_fencing_checkpoints"},
-		pgDialect,
-		tplCreateTargetTable,
+		testDialect,
+		testTemplates.createTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
 			var fenceUpdate strings.Builder
-			if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
+			if err := testTemplates.updateFence.Execute(&fenceUpdate, fence); err != nil {
 				return fmt.Errorf("evaluating fence template: %w", err)
 			}
 			return c.ExecStatements(ctx, []string{fenceUpdate.String()})

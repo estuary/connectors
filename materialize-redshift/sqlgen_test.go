@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = rsDialect(false)
+var testDialect = createRsDialect(false, map[string]bool{"datetime_keys_as_string": true})
 
 func TestSQLGeneration(t *testing.T) {
 	var templates = renderTemplates(testDialect)

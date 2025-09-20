@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = mysqlDialect(time.FixedZone("UTC", 0), "db", "mysql")
+var testDialect = mysqlDialect(time.FixedZone("UTC", 0), "db", "mysql", map[string]bool{"datetime_keys_as_string": true})
 
 func TestSQLGeneration(t *testing.T) {
 	var templates = renderTemplates(testDialect)
@@ -77,7 +77,7 @@ func TestDateTimePKColumn(t *testing.T) {
 			IsPrimaryKey: true,
 		},
 	}, sql.FieldConfig{})
-	require.Equal(t, "DATETIME(6) NOT NULL", mapped.DDL)
+	require.Equal(t, "VARCHAR(256) NOT NULL", mapped.DDL)
 }
 
 func TestTimeColumn(t *testing.T) {

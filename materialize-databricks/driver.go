@@ -78,9 +78,11 @@ func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 			var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
 			var warehouseId = httpPathSplit[len(httpPathSplit)-1]
 
+			dialect := createDatabricksDialect(featureFlags)
+
 			return &sql.Endpoint[config]{
 				Config:              cfg,
-				Dialect:             databricksDialect,
+				Dialect:             dialect,
 				MetaCheckpoints:     nil,
 				NewClient:           newClient,
 				CreateTableTemplate: tplCreateTargetTable,

@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = sqlServerDialect("Latin1_General_100_BIN2_UTF8", "dbo")
+var testDialect = createSqlServerDialect("Latin1_General_100_BIN2_UTF8", "dbo", map[string]bool{"datetime_keys_as_string": true})
 
 func TestSQLGeneration(t *testing.T) {
 	var templates = renderTemplates(testDialect)
@@ -74,7 +74,7 @@ func TestDateTimePKColumn(t *testing.T) {
 			IsPrimaryKey: true,
 		},
 	}, sql.FieldConfig{})
-	require.Equal(t, "DATETIME2 NOT NULL", mapped.DDL)
+	require.Equal(t, "varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL", mapped.DDL)
 }
 
 func TestTimeColumn(t *testing.T) {

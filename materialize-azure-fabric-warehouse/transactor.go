@@ -31,7 +31,8 @@ type binding struct {
 }
 
 type transactor struct {
-	cfg config
+	cfg       config
+	templates *templates
 
 	fence sql.Fence
 
@@ -62,8 +63,11 @@ func newTransactor(
 		return nil, fmt.Errorf("creating azure blob bucket: %w", err)
 	}
 
+	templates := renderTemplates(ep.Dialect)
+
 	t := &transactor{
 		cfg:        cfg,
+		templates:  templates,
 		fence:      fence,
 		be:         be,
 		loadFiles:  boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, false, false),
@@ -155,7 +159,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 
 		var createQuery strings.Builder
-		if err := tplCreateLoadTable.Execute(&createQuery, params); err != nil {
+		if err := t.templates.createLoadTable.Execute(&createQuery, params); err != nil {
 			return fmt.Errorf("rendering create load table: %w", err)
 		} else if _, err := txn.ExecContext(ctx, createQuery.String()); err != nil {
 			log.WithField(
@@ -165,12 +169,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 
 		var loadQuery strings.Builder
-		if err := tplLoadQuery.Execute(&loadQuery, params); err != nil {
+		if err := t.templates.loadQuery.Execute(&loadQuery, params); err != nil {
 			return fmt.Errorf("rendering load query: %w", err)
 		}
 		unionQueries = append(unionQueries, loadQuery.String())
 
-		dropQuery, err := sql.RenderTableTemplate(b.target, tplDropLoadTable)
+		dropQuery, err := sql.RenderTableTemplate(b.target, t.templates.dropLoadTable)
 		if err != nil {
 			return fmt.Errorf("rendering drop load table: %w", err)
 		}
@@ -255,7 +259,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		var fenceUpdate strings.Builder
-		if err := tplUpdateFence.Execute(&fenceUpdate, t.fence); err != nil {
+		if err := t.templates.updateFence.Execute(&fenceUpdate, t.fence); err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("evaluating fence template: %w", err))
 		}
 
@@ -294,7 +298,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				t.be.StartedResourceCommit(b.target.Path)
 				if b.store.mustMerge {
 					var mergeQuery strings.Builder
-					if err := tplStoreMergeQuery.Execute(&mergeQuery, params); err != nil {
+					if err := t.templates.storeMergeQuery.Execute(&mergeQuery, params); err != nil {
 						return err
 					} else if _, err := txn.ExecContext(ctx, mergeQuery.String()); err != nil {
 						log.WithField(
@@ -304,9 +308,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 					}
 				} else {
 					var copyIntoQuery strings.Builder
-					tpl := tplStoreCopyIntoDirectQuery
+					tpl := t.templates.storeCopyIntoDirectQuery
 					if b.hasBinaryColumns {
-						tpl = tplStoreCopyIntoFromStagedQuery
+						tpl = t.templates.storeCopyIntoFromStagedQuery
 					}
 
 					if err := tpl.Execute(&copyIntoQuery, params); err != nil {

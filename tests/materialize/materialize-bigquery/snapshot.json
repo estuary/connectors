@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INTEGER NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INTEGER,\n\t\tstr STRING NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INTEGER NOT NULL,\n\t\tarray_int JSON,\n\t\tbinary_field STRING,\n\t\tbool_field BOOLEAN,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested JSON,\n\t\tnullable_int INTEGER,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INTEGER NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str BIGNUMERIC(38,0),\n\t\tint_str BIGNUMERIC(38,0),\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.unsigned_bigint (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tunsigned_bigint BIGNUMERIC(38,0),\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.deletions (\n\t\tid INTEGER NOT NULL,\n\t\t_meta_op STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.string_escaped_key (\n\t\tid STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n"
+  "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INTEGER NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INTEGER,\n\t\tstr STRING NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INTEGER NOT NULL,\n\t\tarray_int JSON,\n\t\tbinary_field STRING,\n\t\tbool_field BOOLEAN,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested JSON,\n\t\tnullable_int INTEGER,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INTEGER NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str BIGNUMERIC(38,0),\n\t\tint_str BIGNUMERIC(38,0),\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.unsigned_bigint (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tunsigned_bigint BIGNUMERIC(38,0),\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.deletions (\n\t\tid INTEGER NOT NULL,\n\t\t_meta_op STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.string_escaped_key (\n\t\tid STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_one (\n\t\tid INTEGER NOT NULL,\n\t\tstrintkey STRING NOT NULL,\n\t\tstrnumkey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tstrint BIGNUMERIC(38,0),\n\t\tstrnum FLOAT64,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id, strintkey, strnumkey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_two (\n\t\tid INTEGER NOT NULL,\n\t\tdatekey STRING NOT NULL,\n\t\ttimekey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tdate DATE,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\ttime STRING,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id, datekey, timekey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_three (\n\t\tid INTEGER NOT NULL,\n\t\tdatetimekey STRING NOT NULL,\n\t\tuuidkey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tuuid STRING,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id, datetimekey, uuidkey;\n"
 ]
 [
   "connectorState",
@@ -12,6 +12,30 @@
   "connectorState",
   {
     "updated": {
+      "estuary-theatre%2Ftesting%2Fall_key_types_part_one": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.all_key_types_part_one (id, strintkey, strnumkey, counter, flow_published_at, strint, strnum, flow_document)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7 FROM flow_temp_table_7;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_7"
+      },
+      "estuary-theatre%2Ftesting%2Fall_key_types_part_three": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.all_key_types_part_three (id, datetimekey, uuidkey, counter, datetime, flow_published_at, uuid, flow_document)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7 FROM flow_temp_table_9;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_9"
+      },
+      "estuary-theatre%2Ftesting%2Fall_key_types_part_two": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.all_key_types_part_two (id, datekey, timekey, counter, date, flow_published_at, time, flow_document)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7 FROM flow_temp_table_8;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_8"
+      },
       "estuary-theatre%2Ftesting%2Fdeletions": {
         "Query": "INSERT INTO `estuary-theatre`.testing.deletions (id, _meta_op, flow_published_at, flow_document)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_5;\n",
         "SourceURIs": [
@@ -75,6 +99,30 @@
   "connectorState",
   {
     "updated": {
+      "estuary-theatre%2Ftesting%2Fall_key_types_part_one": {
+        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_one AS l\nUSING flow_temp_table_7 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.strintkey = r.c1 AND l.strintkey >= '10' AND l.strintkey <= '10'\n\tAND l.strnumkey = r.c2 AND l.strnumkey >= '10.1' AND l.strnumkey <= '10.1'\nWHEN MATCHED AND TO_JSON_STRING(r.c7)='\"delete\"' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.flow_published_at = r.c4, l.strint = r.c5, l.strnum = r.c6, l.flow_document = r.c7\nWHEN NOT MATCHED THEN\n\tINSERT (id, strintkey, strnumkey, counter, flow_published_at, strint, strnum, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7);\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_7"
+      },
+      "estuary-theatre%2Ftesting%2Fall_key_types_part_three": {
+        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_three AS l\nUSING flow_temp_table_9 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.datetimekey = r.c1\n\tAND l.uuidkey = r.c2 AND l.uuidkey >= '550e8400-e29b-41d4-a716-446655440000' AND l.uuidkey <= '550e8400-e29b-41d4-a716-446655440000'\nWHEN MATCHED AND TO_JSON_STRING(r.c7)='\"delete\"' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.datetime = r.c4, l.flow_published_at = r.c5, l.uuid = r.c6, l.flow_document = r.c7\nWHEN NOT MATCHED THEN\n\tINSERT (id, datetimekey, uuidkey, counter, datetime, flow_published_at, uuid, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7);\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_9"
+      },
+      "estuary-theatre%2Ftesting%2Fall_key_types_part_two": {
+        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_two AS l\nUSING flow_temp_table_8 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.datekey = r.c1 AND l.datekey >= '2023-08-30' AND l.datekey <= '2023-08-30'\n\tAND l.timekey = r.c2 AND l.timekey >= '12:34:56Z' AND l.timekey <= '12:34:56Z'\nWHEN MATCHED AND TO_JSON_STRING(r.c7)='\"delete\"' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.date = r.c4, l.flow_published_at = r.c5, l.time = r.c6, l.flow_document = r.c7\nWHEN NOT MATCHED THEN\n\tINSERT (id, datekey, timekey, counter, date, flow_published_at, time, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7);\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_8"
+      },
       "estuary-theatre%2Ftesting%2Fdeletions": {
         "Query": "MERGE INTO `estuary-theatre`.testing.deletions AS l\nUSING flow_temp_table_5 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 3\nWHEN MATCHED AND TO_JSON_STRING(r.c3)='\"delete\"' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l._meta_op = r.c1, l.flow_published_at = r.c2, l.flow_document = r.c3\nWHEN NOT MATCHED THEN\n\tINSERT (id, _meta_op, flow_published_at, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3);\n",
         "SourceURIs": [
@@ -534,6 +582,51 @@
     }
   ],
   "table": "string_escaped_key"
+}
+{
+  "rows": [
+    {
+      "counter": 2,
+      "flow_document": "{\"_meta\":{\"uuid\":\"ea1ce000-1de2-11b2-8000-071353030311\"},\"counter\":2,\"id\":1,\"strint\":\"1\",\"strintkey\":\"10\",\"strnum\":\"1.1\",\"strnumkey\":\"10.1\"}",
+      "flow_published_at": "1970-01-01T02:00:32Z",
+      "id": 1,
+      "strint": "1",
+      "strintkey": "10",
+      "strnum": 1.1,
+      "strnumkey": "10.1"
+    }
+  ],
+  "table": "all_key_types_part_one"
+}
+{
+  "rows": [
+    {
+      "counter": 2,
+      "date": "2023-08-30",
+      "datekey": "2023-08-30",
+      "flow_document": "{\"_meta\":{\"uuid\":\"eab57680-1de2-11b2-8000-071353030311\"},\"counter\":2,\"date\":\"2023-08-30\",\"datekey\":\"2023-08-30\",\"id\":1,\"time\":\"12:34:56Z\",\"timekey\":\"12:34:56Z\"}",
+      "flow_published_at": "1970-01-01T02:00:33Z",
+      "id": 1,
+      "time": "12:34:56Z",
+      "timekey": "12:34:56Z"
+    }
+  ],
+  "table": "all_key_types_part_two"
+}
+{
+  "rows": [
+    {
+      "counter": 2,
+      "datetime": "2023-08-30T12:34:56Z",
+      "datetimekey": "2023-08-30T12:34:56Z",
+      "flow_document": "{\"_meta\":{\"uuid\":\"eb4e0d00-1de2-11b2-8000-071353030311\"},\"counter\":2,\"datetime\":\"2023-08-30T12:34:56Z\",\"datetimekey\":\"2023-08-30T12:34:56Z\",\"id\":1,\"uuid\":\"550e8400-e29b-41d4-a716-446655440000\",\"uuidkey\":\"550e8400-e29b-41d4-a716-446655440000\"}",
+      "flow_published_at": "1970-01-01T02:00:34Z",
+      "id": 1,
+      "uuid": "550e8400-e29b-41d4-a716-446655440000",
+      "uuidkey": "550e8400-e29b-41d4-a716-446655440000"
+    }
+  ],
+  "table": "all_key_types_part_three"
 }
 [
   "applied.actionDescription",

@@ -78,6 +78,24 @@ resources_json_template='[
       "table": "binary_key"
     },
     "source": "${TEST_COLLECTION_BINARY_KEY}"
+  },
+  {
+    "resource": {
+      "table": "all_key_types_part_one"
+    },
+    "source": "${TEST_COLLECTION_ALL_KEY_TYPES_PART_ONE}"
+  },
+  {
+    "resource": {
+      "table": "all_key_types_part_two"
+    },
+    "source": "${TEST_COLLECTION_ALL_KEY_TYPES_PART_TWO}"
+  },
+  {
+    "resource": {
+      "table": "all_key_types_part_three"
+    },
+    "source": "${TEST_COLLECTION_ALL_KEY_TYPES_PART_THREE}"
   }
 ]'
 

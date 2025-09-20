@@ -24,8 +24,9 @@ import (
 var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
-	db *stdsql.DB
-	ep *sql.Endpoint[config]
+	db        *stdsql.DB
+	ep        *sql.Endpoint[config]
+	templates *templates
 }
 
 func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
@@ -34,9 +35,12 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 		return nil, err
 	}
 
+	templates := renderTemplates(ep.Dialect)
+
 	return &client{
-		db: db,
-		ep: ep,
+		db:        db,
+		ep:        ep,
+		templates: templates,
 	}, nil
 }
 
@@ -53,8 +57,8 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 
 	schemas := make([]string, 0, len(resourcePaths))
 	for _, p := range resourcePaths {
-		loc := dialect.TableLocator(p)
-		schemas = append(schemas, dialect.Literal(loc.TableSchema))
+		loc := c.ep.Dialect.TableLocator(p)
+		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
 	}
 
 	slices.Sort(schemas)
@@ -66,7 +70,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		where table_catalog = %s
 		and table_schema in (%s);
 		`,
-		dialect.Literal(c.ep.Config.Warehouse),
+		c.ep.Dialect.Literal(c.ep.Config.Warehouse),
 		strings.Join(schemas, ","),
 	))
 	if err != nil {
@@ -94,7 +98,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		where table_catalog = %s
 		and table_schema in (%s);
 		`,
-		dialect.Literal(c.ep.Config.Warehouse),
+		c.ep.Dialect.Literal(c.ep.Config.Warehouse),
 		strings.Join(schemas, ","),
 	))
 	if err != nil {
@@ -138,7 +142,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", dialect.Identifier(path...))
+	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
 		_, err := c.db.ExecContext(ctx, stmt)
@@ -163,7 +167,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	var addColumnsQuery []string
 	if len(ta.AddColumns) > 0 {
 		var addColumnsStmt strings.Builder
-		if err := tplAlterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
+		if err := c.templates.alterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
 
@@ -173,7 +177,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	var migrateQueries []string
 	if len(ta.ColumnTypeChanges) > 0 {
 		sourceTable := ta.Table.Identifier
-		tmpTable := dialect.Identifier(ta.InfoLocation.TableSchema, uuid.NewString())
+		tmpTable := c.ep.Dialect.Identifier(ta.InfoLocation.TableSchema, uuid.NewString())
 
 		params := migrateParams{
 			SourceTable: sourceTable,
@@ -194,7 +198,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 
 		var migrateTableQuery strings.Builder
-		if err := tplCreateMigrationTable.Execute(&migrateTableQuery, params); err != nil {
+		if err := c.templates.createMigrationTable.Execute(&migrateTableQuery, params); err != nil {
 			return "", nil, fmt.Errorf("rendering create migration table statement: %w", err)
 		}
 
@@ -203,8 +207,8 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 			fmt.Sprintf("DROP TABLE %s;", sourceTable),
 			fmt.Sprintf(
 				"EXEC sp_rename %s, %s;",
-				dialect.Literal(tmpTable),
-				dialect.Literal(dialect.Identifier(ta.InfoLocation.TableName))),
+				c.ep.Dialect.Literal(tmpTable),
+				c.ep.Dialect.Literal(c.ep.Dialect.Identifier(ta.InfoLocation.TableName))),
 		}
 	}
 
@@ -265,7 +269,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 }
 
 func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
-	return sql.StdCreateSchema(ctx, c.db, dialect, schemaName)
+	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
 type badRequestResponseBody struct {
@@ -286,6 +290,9 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
+	// Get feature flags and create dialect for preReqs function
+	_, featureFlags := cfg.FeatureFlags()
+	dialect := createDialect(featureFlags)
 	var wh int
 	if err := db.QueryRowContext(pingCtx, fmt.Sprintf("SELECT 1 from sys.databases WHERE name = %s;", dialect.Literal(cfg.Warehouse))).Scan(&wh); err != nil {
 		var authErr *azidentity.AuthenticationFailedError
