@@ -66,7 +66,10 @@ func (c config) toURI(includeSchema bool) (string, error) {
 	// client_session_keep_alive causes the driver to issue a periodic keepalive request.
 	// Without this, the authentication token will expire after 4 hours of inactivity.
 	queryParams.Add("client_session_keep_alive", "true")
-	queryParams.Add("maxRetryCount", "10")
+	// The default maxRetryCount is 7, and the backoff time is 16 seconds. This
+	// bumps that up quite a bit, to continue attempting retryable errors for
+	// about 10 minutes before crashing.
+	queryParams.Add("maxRetryCount", "35")
 
 	// Optional params
 	if c.Warehouse != "" {

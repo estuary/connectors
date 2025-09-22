@@ -1,1 +1,1 @@
-alex:mysecret@orgname-accountname.snowflakecomputing.com:443?GO_QUERY_RESULT_FORMAT=json&MULTI_STATEMENT_COUNT=0&account=myaccount&application=EstuaryFlow&client_session_keep_alive=true&database=mydb&maxRetryCount=10&role=myrole&schema=myschema&warehouse=mywarehouse
+alex:mysecret@orgname-accountname.snowflakecomputing.com:443?GO_QUERY_RESULT_FORMAT=json&MULTI_STATEMENT_COUNT=0&account=myaccount&application=EstuaryFlow&client_session_keep_alive=true&database=mydb&maxRetryCount=35&role=myrole&schema=myschema&warehouse=mywarehouse

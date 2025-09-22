@@ -219,14 +219,16 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 			// NB: Not using QueryRowContext here since the Go Snowflake driver
 			// retains contexts internally, and this worker is called with a context
 			// that is cancelled after group.Wait() returns.
+			ts := time.Now()
 			err := db.QueryRow(query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message)
 			if err != nil && attempt > 3 {
 				return fmt.Errorf("putWorker PUT to stage: %w", err)
 			} else if err != nil {
 				delay := time.Duration(attempt) * time.Second
 				log.WithFields(log.Fields{
-					"attempt": attempt,
-					"delay":   delay,
+					"attempt":         attempt,
+					"delay":           delay,
+					"requestDuration": time.Since(ts).String(),
 				}).WithError(err).Info("putWorker retrying PUT to stage")
 				time.Sleep(delay)
 				continue
