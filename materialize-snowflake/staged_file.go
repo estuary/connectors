@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/estuary/connectors/go/writer"
 	"github.com/google/uuid"
@@ -211,12 +212,30 @@ func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-c
 			file, f.uuid,
 		)
 		var source, target, sourceSize, targetSize, sourceCompression, targetCompression, status, message string
-		// NB: Not using QueryRowContext here since the Go Snowflake driver
-		// retains contexts internally, and this worker is called with a context
-		// that is cancelled after group.Wait() returns.
-		if err := db.QueryRow(query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message); err != nil {
-			return fmt.Errorf("putWorker PUT to stage: %w", err)
-		} else if !strings.EqualFold("uploaded", status) {
+		var attempt int
+		// Retry a few times on errors since there are occasionally transient
+		// network errors when running PUT queries.
+		for attempt = 1; ; attempt++ {
+			// NB: Not using QueryRowContext here since the Go Snowflake driver
+			// retains contexts internally, and this worker is called with a context
+			// that is cancelled after group.Wait() returns.
+			err := db.QueryRow(query).Scan(&source, &target, &sourceSize, &targetSize, &sourceCompression, &targetCompression, &status, &message)
+			if err != nil && attempt > 3 {
+				return fmt.Errorf("putWorker PUT to stage: %w", err)
+			} else if err != nil {
+				delay := time.Duration(attempt) * time.Second
+				log.WithFields(log.Fields{
+					"attempt": attempt,
+					"delay":   delay,
+				}).WithError(err).Info("putWorker retrying PUT to stage")
+				time.Sleep(delay)
+				continue
+			}
+
+			break
+		}
+
+		if !strings.EqualFold("uploaded", status) {
 			return fmt.Errorf("putWorker PUT to stage unexpected upload status: %s", status)
 		}
 
