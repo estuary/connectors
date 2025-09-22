@@ -209,12 +209,34 @@ async def export_survey_responses(
             url=download_url,
         )
 
-        async def unzip_stream() -> AsyncGenerator[bytes, None]:
+        async def unzip_and_filter_lines() -> AsyncGenerator[bytes, None]:
+            """
+            Unzips the compressed response and filters out empty survey responses.
+
+            We need to buffer chunks because UnzipStream yields arbitrary byte chunks
+            that may not align with NDJSON line boundaries. We reconstruct complete
+            lines by buffering until we find newline characters, then filter out
+            empty JSON objects ({}) that would cause Pydantic validation failures.
+            """
+            buffer = b""
             async for chunk in UnzipStream(body()):
-                yield chunk
+                buffer += chunk
+
+                # Process complete lines from the buffer
+                while b'\n' in buffer:
+                    line, buffer = buffer.split(b'\n', 1)
+                    line = line.strip()
+
+                    # Skip empty lines and empty JSON objects that appear in Qualtrics exports
+                    if line and line != b'{}':
+                        yield line + b'\n'
+
+            # Handle any remaining data in the buffer
+            if buffer.strip() and buffer.strip() != b'{}':
+                yield buffer
 
         async for response in IncrementalJsonProcessor(
-            input=unzip_stream(),
+            input=unzip_and_filter_lines(),
             prefix="",
             streamed_item_cls=SurveyResponse,
         ):
