@@ -3,7 +3,7 @@
 CREATE TABLE IF NOT EXISTS key_value (
 		key1 BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /key1 with inferred types: [integer]',
 		key2 BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]',
-		`key!binary` LONGTEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /key!binary with inferred types: [string]',
+		`key!binary` VARCHAR(256) NOT NULL COMMENT 'auto-generated projection of JSON at: /key!binary with inferred types: [string]',
 		`array` JSON COMMENT 'auto-generated projection of JSON at: /array with inferred types: [array]',
 		`binary` LONGTEXT COMMENT 'auto-generated projection of JSON at: /binary with inferred types: [string]',
 		`boolean` BOOLEAN COMMENT 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]',
@@ -45,7 +45,7 @@ auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
 CREATE TEMPORARY TABLE flow_temp_load_table_0 (
 		key1 BIGINT NOT NULL,
 		key2 BOOLEAN NOT NULL,
-		`key!binary` LONGTEXT NOT NULL
+		`key!binary` VARCHAR(256) NOT NULL
 	,
 		PRIMARY KEY (key1, key2, `key!binary`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
@@ -65,7 +65,7 @@ CREATE TEMPORARY TABLE flow_temp_load_table_1 (
 CREATE TEMPORARY TABLE flow_temp_update_table_0 (
 		key1 BIGINT NOT NULL,
 		key2 BOOLEAN NOT NULL,
-		`key!binary` LONGTEXT NOT NULL,
+		`key!binary` VARCHAR(256) NOT NULL,
 		`array` JSON,
 		`binary` LONGTEXT,
 		`boolean` BOOLEAN,
@@ -152,7 +152,7 @@ SELECT 0, r.flow_document
 
 --- Begin delta_updates loadQuery ---
 
-SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 
 --- End delta_updates loadQuery ---
 
