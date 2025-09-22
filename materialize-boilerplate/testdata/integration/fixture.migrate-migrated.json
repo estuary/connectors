@@ -1,0 +1,56 @@
+[
+  [],
+  [],
+  [
+    [
+      "key/value",
+      {
+        "id": 3,
+        "bigIntToNum": 123.456,
+        "bigIntToHugeInt": 9223372036854775808,
+        "hugeIntToNum": 123.4567,
+        "arrayToMulti": true,
+        "binaryToMulti": true,
+        "boolToMulti": "strVal",
+        "intToMulti": true,
+        "hugeIntToMulti": true,
+        "intAndStringToMulti": "strVal",
+        "numToMulti": true,
+        "numAndStringToMulti": "strVal",
+        "objectToMulti": true,
+        "stringToMulti": true,
+        "binaryToString": "strVal",
+        "intToString": "strVal",
+        "hugeIntToString": "strVal",
+        "numToString": "strVal",
+        "dateToString": "strVal",
+        "datetimeToString": "strVal",
+        "timeToString": "strVal",
+        "durationToString": "strVal",
+        "ipv4ToString": "strVal",
+        "ipv6ToString": "strVal",
+        "macaddrToString": "strVal",
+        "macaddr8ToString": "strVal",
+        "uuidToString": "strVal",
+        "emailToString": "strVal",
+        "hostnameToString": "strVal",
+        "uriToString": "strVal",
+        "uriReferenceToString": "strVal",
+        "uriTemplateToString": "strVal",
+        "jsonPointerToString": "strVal",
+        "relativeJsonPointerToString": "strVal",
+        "regexToString": "strVal",
+        "uint32ToString": "strVal",
+        "uint64ToString": "strVal",
+        "iriToString": "strVal",
+        "iriReferenceToString": "strVal"
+      }
+    ],
+    [
+      "key/value",
+      {
+        "id": 4
+      }
+    ]
+  ]
+]

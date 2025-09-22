@@ -1,0 +1,8 @@
+materializations:
+  acmeCo/tests/materialize-motherduck/s3:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.s3.yaml
+    bindings: []

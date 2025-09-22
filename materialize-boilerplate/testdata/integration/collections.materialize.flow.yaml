@@ -1,0 +1,106 @@
+collections:
+  tests/simple:
+    schema:
+      if:
+        properties:
+          _meta:
+            properties:
+              op:
+                const: d
+      then:
+        reduce:
+          delete: true
+          strategy: lastWriteWins
+      properties:
+        id: {type: integer}
+        canary: {type: string}
+        val: {type: integer}
+        _meta:
+          properties:
+            op: {type: string}
+          required: [op]
+          type: object
+      required: [id, canary, _meta]
+      type: object
+    key: [/id]
+
+  tests/not-simple:
+    schema:
+      type: object
+      properties:
+        # A particularly problematic field:
+        #   - Leading and trailing spaces
+        #   - A few common characters that often cause problems
+        #   - � (U+FFFD) is near the "end" of the Unicode Basic Multilingual Plane
+        #   - 𐀀 (U+10000) is at the start of the UTF-8 supplementary characters
+        #   - 嶲 (U+2F9F4) is a character toward the end of the UTF-8 supplementary range
+        " ,;{}().- problematicKey � 𐀀 嶲 ": { type: string }
+        # Reserved column name on some systems (MongoDB, Elasticsearch)
+        _id: { type: string }
+        binaryKey: { type: string, contentEncoding: base64 }
+        field with separated words: { type: string }
+        field.with.separated.words: { type: string }
+        field-with-separated-words: { type: string }
+        field_with_separated_words: { type: string }
+        field.with-separated_words: { type: string }
+        fieldWithDifferentCaps: { type: string }
+        fieldwithdifferentcaps: { type: string }
+        FIELDWITHDIFFERENTCAPS: { type: string }
+        " ,;{}().- problematicField � 𐀀 嶲 ": { type: string }
+        123startsWithDigits: { type: string }
+        123: { type: string } # Only digits
+        'a"string`with`quote''characters': { type: string }
+        $dollar$signs: { type: string }
+        testing (%s): { type: string }
+        unsignedBigint: { type: integer, maximum: 18446744073709551615 }
+        longString: { type: string }
+      required:
+        - " ,;{}().- problematicKey � 𐀀 嶲 "
+        - _id
+        - binaryKey
+    key:
+      - "/ ,;{}().- problematicKey � 𐀀 嶲 "
+      - /_id
+      - /binaryKey
+
+  
+  tests/data-types:
+    schema:
+      properties:
+        id: {type: integer}
+        intField: { type: integer }
+        boolField: { type: boolean }
+        stringField: { type: string }
+        numField: { type: number }
+        objField: { type: object }
+        arrayField: { type: array }
+        nullField: { type: "null" }
+        multipleField: { type: [string, integer, object] }
+        stringDateField: { type: string, format: date }
+        stringDateTimeField: { type: string, format: date-time }
+        stringTimeField: { type: string, format: time }
+        stringNumberField: { type: string, format: number }
+        stringAndNumberField: { type: [string, number], format: number }
+        stringIntegerField: { type: string, format: integer }
+        stringAndIntegerField: { type: [string, integer], format: integer }
+        stringDurationField: { type: string, format: duration }
+        stringIpv4Field: { type: string, format: ipv4 }
+        stringIpv6Field: { type: string, format: ipv6 }
+        stringMacAddrField: { type: string, format: macaddr }
+        stringMacAddr8Field: { type: string, format: macaddr8 }
+        stringUuidField: { type: string, format: uuid }
+        stringEmailField: { type: string, format: email }
+        stringHostnameField: { type: string, format: hostname }
+        stringUriField: { type: string, format: uri }
+        stringUriReferenceField: { type: string, format: uri-reference }
+        stringUriTemplateField: { type: string, format: uri-template }
+        stringJsonPointerField: { type: string, format: json-pointer }
+        stringRelativeJsonPointerField: { type: string, format: relative-json-pointer }
+        stringRegexField: { type: string, format: regex }
+        stringUint32Field: { type: string, format: uint32 }
+        stringUint64Field: { type: string, format: uint64 }
+        stringIriField: { type: string, format: iri }
+        stringIriReferenceField: { type: string, format: iri-reference }
+      required: [id]
+      type: object
+    key: [/id]

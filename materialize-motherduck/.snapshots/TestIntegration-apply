@@ -1,3 +1,5 @@
+Task: acmeCo/tests/materialize-motherduck/s3
+
 Big Schema Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
 {"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
@@ -86,24 +88,24 @@ Big Schema Changed Types Constraints:
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multipleField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
-{"Field":"numField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'numField' is already being materialized as endpoint type 'DOUBLE PRECISION' but endpoint type 'BOOLEAN' is required by its schema '{ type: [boolean] }'"}
-{"Field":"objField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'objField' is already being materialized as endpoint type 'JSON' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"numField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'numField' is already being materialized as endpoint type 'DOUBLE' but endpoint type 'BOOLEAN' is required by its schema '{ type: [boolean] }'"}
+{"Field":"objField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'objField' is already being materialized as endpoint type 'JSON' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
 {"Field":"stringDateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringDateTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringDurationField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringDurationField' is already being materialized as endpoint type 'INTERVAL' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'TEXT' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
+{"Field":"stringField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'VARCHAR' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
 {"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIntegerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringIpv4Field","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringIpv4Field' is already being materialized as endpoint type 'CIDR' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
-{"Field":"stringIpv6Field","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringIpv6Field' is already being materialized as endpoint type 'CIDR' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringIpv4Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIpv6Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringMacAddr8Field","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringMacAddr8Field' is already being materialized as endpoint type 'MACADDR8' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
-{"Field":"stringMacAddrField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringMacAddrField' is already being materialized as endpoint type 'MACADDR' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringMacAddr8Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringMacAddrField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringNumberField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringRegexField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringRelativeJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -113,85 +115,85 @@ Big Schema Changed Types Constraints:
 {"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringUuidField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringUuidField' is already being materialized as endpoint type 'UUID' but endpoint type 'TEXT' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Big Schema Materialized Resource Schema With All Fields Required:
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"boolean"}
-{"Name":"arrayField","Nullable":"NO","Type":"json"}
-{"Name":"boolField","Nullable":"NO","Type":"boolean"}
-{"Name":"flow_document","Nullable":"NO","Type":"json"}
-{"Name":"flow_published_at","Nullable":"NO","Type":"timestamp with time zone"}
-{"Name":"intField","Nullable":"NO","Type":"bigint"}
-{"Name":"key","Nullable":"NO","Type":"text"}
-{"Name":"multipleField","Nullable":"NO","Type":"json"}
-{"Name":"numField","Nullable":"NO","Type":"double precision"}
-{"Name":"objField","Nullable":"NO","Type":"json"}
-{"Name":"stringDateField","Nullable":"NO","Type":"date"}
-{"Name":"stringDateTimeField","Nullable":"NO","Type":"timestamp with time zone"}
-{"Name":"stringDurationField","Nullable":"NO","Type":"interval"}
-{"Name":"stringEmailField","Nullable":"NO","Type":"text"}
-{"Name":"stringField","Nullable":"NO","Type":"text"}
-{"Name":"stringHostnameField","Nullable":"NO","Type":"text"}
-{"Name":"stringIdnEmailField","Nullable":"NO","Type":"text"}
-{"Name":"stringIdnHostnameField","Nullable":"NO","Type":"text"}
-{"Name":"stringIntegerField","Nullable":"NO","Type":"numeric"}
-{"Name":"stringIpv4Field","Nullable":"NO","Type":"cidr"}
-{"Name":"stringIpv6Field","Nullable":"NO","Type":"cidr"}
-{"Name":"stringIriField","Nullable":"NO","Type":"text"}
-{"Name":"stringIriReferenceField","Nullable":"NO","Type":"text"}
-{"Name":"stringJsonPointerField","Nullable":"NO","Type":"text"}
-{"Name":"stringMacAddr8Field","Nullable":"NO","Type":"macaddr8"}
-{"Name":"stringMacAddrField","Nullable":"NO","Type":"macaddr"}
-{"Name":"stringNumberField","Nullable":"NO","Type":"numeric"}
-{"Name":"stringRegexField","Nullable":"NO","Type":"text"}
-{"Name":"stringRelativeJsonPointerField","Nullable":"NO","Type":"text"}
-{"Name":"stringTimeField","Nullable":"NO","Type":"time without time zone"}
-{"Name":"stringUint32Field","Nullable":"NO","Type":"numeric"}
-{"Name":"stringUint64Field","Nullable":"NO","Type":"numeric"}
-{"Name":"stringUriField","Nullable":"NO","Type":"text"}
-{"Name":"stringUriReferenceField","Nullable":"NO","Type":"text"}
-{"Name":"stringUriTemplateField","Nullable":"NO","Type":"text"}
-{"Name":"stringUuidField","Nullable":"NO","Type":"uuid"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"arrayField","Nullable":false,"Type":"JSON"}
+{"Name":"boolField","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"intField","Nullable":false,"Type":"BIGINT"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
+{"Name":"multipleField","Nullable":false,"Type":"JSON"}
+{"Name":"numField","Nullable":false,"Type":"DOUBLE"}
+{"Name":"objField","Nullable":false,"Type":"JSON"}
+{"Name":"stringDateField","Nullable":false,"Type":"DATE"}
+{"Name":"stringDateTimeField","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"stringDurationField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringEmailField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringHostnameField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIdnEmailField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIdnHostnameField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIntegerField","Nullable":false,"Type":"HUGEINT"}
+{"Name":"stringIpv4Field","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIpv6Field","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIriField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIriReferenceField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringJsonPointerField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringMacAddr8Field","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringMacAddrField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringNumberField","Nullable":false,"Type":"DOUBLE"}
+{"Name":"stringRegexField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringRelativeJsonPointerField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringTimeField","Nullable":false,"Type":"TIME"}
+{"Name":"stringUint32Field","Nullable":false,"Type":"HUGEINT"}
+{"Name":"stringUint64Field","Nullable":false,"Type":"HUGEINT"}
+{"Name":"stringUriField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringUriReferenceField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringUriTemplateField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringUuidField","Nullable":false,"Type":"UUID"}
 
 Big Schema Materialized Resource Schema With No Fields Required:
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"boolean"}
-{"Name":"arrayField","Nullable":"YES","Type":"json"}
-{"Name":"boolField","Nullable":"YES","Type":"boolean"}
-{"Name":"flow_document","Nullable":"NO","Type":"json"}
-{"Name":"flow_published_at","Nullable":"NO","Type":"timestamp with time zone"}
-{"Name":"intField","Nullable":"YES","Type":"bigint"}
-{"Name":"key","Nullable":"NO","Type":"text"}
-{"Name":"multipleField","Nullable":"YES","Type":"json"}
-{"Name":"numField","Nullable":"YES","Type":"double precision"}
-{"Name":"objField","Nullable":"YES","Type":"json"}
-{"Name":"stringDateField","Nullable":"YES","Type":"date"}
-{"Name":"stringDateTimeField","Nullable":"YES","Type":"timestamp with time zone"}
-{"Name":"stringDurationField","Nullable":"YES","Type":"interval"}
-{"Name":"stringEmailField","Nullable":"YES","Type":"text"}
-{"Name":"stringField","Nullable":"YES","Type":"text"}
-{"Name":"stringHostnameField","Nullable":"YES","Type":"text"}
-{"Name":"stringIdnEmailField","Nullable":"YES","Type":"text"}
-{"Name":"stringIdnHostnameField","Nullable":"YES","Type":"text"}
-{"Name":"stringIntegerField","Nullable":"YES","Type":"numeric"}
-{"Name":"stringIpv4Field","Nullable":"YES","Type":"cidr"}
-{"Name":"stringIpv6Field","Nullable":"YES","Type":"cidr"}
-{"Name":"stringIriField","Nullable":"YES","Type":"text"}
-{"Name":"stringIriReferenceField","Nullable":"YES","Type":"text"}
-{"Name":"stringJsonPointerField","Nullable":"YES","Type":"text"}
-{"Name":"stringMacAddr8Field","Nullable":"YES","Type":"macaddr8"}
-{"Name":"stringMacAddrField","Nullable":"YES","Type":"macaddr"}
-{"Name":"stringNumberField","Nullable":"YES","Type":"numeric"}
-{"Name":"stringRegexField","Nullable":"YES","Type":"text"}
-{"Name":"stringRelativeJsonPointerField","Nullable":"YES","Type":"text"}
-{"Name":"stringTimeField","Nullable":"YES","Type":"time without time zone"}
-{"Name":"stringUint32Field","Nullable":"YES","Type":"numeric"}
-{"Name":"stringUint64Field","Nullable":"YES","Type":"numeric"}
-{"Name":"stringUriField","Nullable":"YES","Type":"text"}
-{"Name":"stringUriReferenceField","Nullable":"YES","Type":"text"}
-{"Name":"stringUriTemplateField","Nullable":"YES","Type":"text"}
-{"Name":"stringUuidField","Nullable":"YES","Type":"uuid"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"arrayField","Nullable":true,"Type":"JSON"}
+{"Name":"boolField","Nullable":true,"Type":"BOOLEAN"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"intField","Nullable":true,"Type":"BIGINT"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
+{"Name":"multipleField","Nullable":true,"Type":"JSON"}
+{"Name":"numField","Nullable":true,"Type":"DOUBLE"}
+{"Name":"objField","Nullable":true,"Type":"JSON"}
+{"Name":"stringDateField","Nullable":true,"Type":"DATE"}
+{"Name":"stringDateTimeField","Nullable":true,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"stringDurationField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringEmailField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringHostnameField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringIdnEmailField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringIdnHostnameField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringIntegerField","Nullable":true,"Type":"HUGEINT"}
+{"Name":"stringIpv4Field","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringIpv6Field","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringIriField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringIriReferenceField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringJsonPointerField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringMacAddr8Field","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringMacAddrField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringNumberField","Nullable":true,"Type":"DOUBLE"}
+{"Name":"stringRegexField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringTimeField","Nullable":true,"Type":"TIME"}
+{"Name":"stringUint32Field","Nullable":true,"Type":"HUGEINT"}
+{"Name":"stringUint64Field","Nullable":true,"Type":"HUGEINT"}
+{"Name":"stringUriField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringUriReferenceField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringUriTemplateField","Nullable":true,"Type":"VARCHAR"}
+{"Name":"stringUuidField","Nullable":true,"Type":"UUID"}
 
-Big Schema Changed Types With Table Replacement Constraints:
+Big Schema Changed Types With Backfill Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
 {"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
@@ -230,120 +232,117 @@ Big Schema Changed Types With Table Replacement Constraints:
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
-Big Schema Materialized Resource Schema Changed Types With Table Replacement:
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"boolean"}
-{"Name":"arrayField","Nullable":"NO","Type":"json"}
-{"Name":"boolField","Nullable":"NO","Type":"bigint"}
-{"Name":"flow_document","Nullable":"NO","Type":"json"}
-{"Name":"flow_published_at","Nullable":"NO","Type":"timestamp with time zone"}
-{"Name":"intField","Nullable":"NO","Type":"text"}
-{"Name":"key","Nullable":"NO","Type":"text"}
-{"Name":"multipleField","Nullable":"NO","Type":"json"}
-{"Name":"nullField","Nullable":"YES","Type":"json"}
-{"Name":"numField","Nullable":"NO","Type":"boolean"}
-{"Name":"objField","Nullable":"NO","Type":"text"}
-{"Name":"stringDateField","Nullable":"NO","Type":"text"}
-{"Name":"stringDateTimeField","Nullable":"NO","Type":"text"}
-{"Name":"stringDurationField","Nullable":"NO","Type":"text"}
-{"Name":"stringEmailField","Nullable":"NO","Type":"text"}
-{"Name":"stringField","Nullable":"NO","Type":"bigint"}
-{"Name":"stringHostnameField","Nullable":"NO","Type":"text"}
-{"Name":"stringIdnEmailField","Nullable":"NO","Type":"text"}
-{"Name":"stringIdnHostnameField","Nullable":"NO","Type":"text"}
-{"Name":"stringIntegerField","Nullable":"NO","Type":"text"}
-{"Name":"stringIpv4Field","Nullable":"NO","Type":"text"}
-{"Name":"stringIpv6Field","Nullable":"NO","Type":"text"}
-{"Name":"stringIriField","Nullable":"NO","Type":"text"}
-{"Name":"stringIriReferenceField","Nullable":"NO","Type":"text"}
-{"Name":"stringJsonPointerField","Nullable":"NO","Type":"text"}
-{"Name":"stringMacAddr8Field","Nullable":"NO","Type":"text"}
-{"Name":"stringMacAddrField","Nullable":"NO","Type":"text"}
-{"Name":"stringNumberField","Nullable":"NO","Type":"text"}
-{"Name":"stringRegexField","Nullable":"NO","Type":"text"}
-{"Name":"stringRelativeJsonPointerField","Nullable":"NO","Type":"text"}
-{"Name":"stringTimeField","Nullable":"NO","Type":"text"}
-{"Name":"stringUint32Field","Nullable":"NO","Type":"text"}
-{"Name":"stringUint64Field","Nullable":"NO","Type":"text"}
-{"Name":"stringUriField","Nullable":"NO","Type":"text"}
-{"Name":"stringUriReferenceField","Nullable":"NO","Type":"text"}
-{"Name":"stringUriTemplateField","Nullable":"NO","Type":"text"}
-{"Name":"stringUuidField","Nullable":"NO","Type":"text"}
+Big Schema Materialized Resource Schema Changed Types With Backfill:
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"arrayField","Nullable":false,"Type":"JSON"}
+{"Name":"boolField","Nullable":false,"Type":"BIGINT"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"intField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
+{"Name":"multipleField","Nullable":false,"Type":"JSON"}
+{"Name":"nullField","Nullable":true,"Type":"JSON"}
+{"Name":"numField","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"objField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringDateField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringDateTimeField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringDurationField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringEmailField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringField","Nullable":false,"Type":"BIGINT"}
+{"Name":"stringHostnameField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIdnEmailField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIdnHostnameField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIntegerField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIpv4Field","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIpv6Field","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIriField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringIriReferenceField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringJsonPointerField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringMacAddr8Field","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringMacAddrField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringNumberField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringRegexField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringRelativeJsonPointerField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringTimeField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringUint32Field","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringUint64Field","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringUriField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringUriReferenceField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringUriTemplateField","Nullable":false,"Type":"VARCHAR"}
+{"Name":"stringUuidField","Nullable":false,"Type":"VARCHAR"}
 
 add a single field:
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"boolean"}
-{"Name":"addedOptionalString","Nullable":"YES","Type":"text"}
-{"Name":"flow_document","Nullable":"NO","Type":"json"}
-{"Name":"flow_published_at","Nullable":"NO","Type":"timestamp with time zone"}
-{"Name":"key","Nullable":"NO","Type":"text"}
-{"Name":"optionalBoolean","Nullable":"YES","Type":"boolean"}
-{"Name":"optionalInteger","Nullable":"YES","Type":"bigint"}
-{"Name":"optionalObject","Nullable":"YES","Type":"json"}
-{"Name":"optionalString","Nullable":"YES","Type":"text"}
-{"Name":"requiredBoolean","Nullable":"NO","Type":"boolean"}
-{"Name":"requiredInteger","Nullable":"NO","Type":"bigint"}
-{"Name":"requiredObject","Nullable":"NO","Type":"json"}
-{"Name":"requiredString","Nullable":"NO","Type":"text"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"addedOptionalString","Nullable":true,"Type":"VARCHAR"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
+{"Name":"optionalBoolean","Nullable":true,"Type":"BOOLEAN"}
+{"Name":"optionalInteger","Nullable":true,"Type":"BIGINT"}
+{"Name":"optionalObject","Nullable":true,"Type":"JSON"}
+{"Name":"optionalString","Nullable":true,"Type":"VARCHAR"}
+{"Name":"requiredBoolean","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"requiredInteger","Nullable":false,"Type":"BIGINT"}
+{"Name":"requiredObject","Nullable":false,"Type":"JSON"}
+{"Name":"requiredString","Nullable":false,"Type":"VARCHAR"}
 
 remove a single optional field:
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"boolean"}
-{"Name":"flow_document","Nullable":"NO","Type":"json"}
-{"Name":"flow_published_at","Nullable":"NO","Type":"timestamp with time zone"}
-{"Name":"key","Nullable":"NO","Type":"text"}
-{"Name":"optionalBoolean","Nullable":"YES","Type":"boolean"}
-{"Name":"optionalInteger","Nullable":"YES","Type":"bigint"}
-{"Name":"optionalObject","Nullable":"YES","Type":"json"}
-{"Name":"optionalString","Nullable":"YES","Type":"text"}
-{"Name":"requiredBoolean","Nullable":"NO","Type":"boolean"}
-{"Name":"requiredInteger","Nullable":"NO","Type":"bigint"}
-{"Name":"requiredObject","Nullable":"NO","Type":"json"}
-{"Name":"requiredString","Nullable":"NO","Type":"text"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
+{"Name":"optionalBoolean","Nullable":true,"Type":"BOOLEAN"}
+{"Name":"optionalInteger","Nullable":true,"Type":"BIGINT"}
+{"Name":"optionalObject","Nullable":true,"Type":"JSON"}
+{"Name":"optionalString","Nullable":true,"Type":"VARCHAR"}
+{"Name":"requiredBoolean","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"requiredInteger","Nullable":false,"Type":"BIGINT"}
+{"Name":"requiredObject","Nullable":false,"Type":"JSON"}
+{"Name":"requiredString","Nullable":false,"Type":"VARCHAR"}
 
 remove a single required field:
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"boolean"}
-{"Name":"flow_document","Nullable":"NO","Type":"json"}
-{"Name":"flow_published_at","Nullable":"NO","Type":"timestamp with time zone"}
-{"Name":"key","Nullable":"NO","Type":"text"}
-{"Name":"optionalBoolean","Nullable":"YES","Type":"boolean"}
-{"Name":"optionalInteger","Nullable":"YES","Type":"bigint"}
-{"Name":"optionalObject","Nullable":"YES","Type":"json"}
-{"Name":"optionalString","Nullable":"YES","Type":"text"}
-{"Name":"requiredBoolean","Nullable":"NO","Type":"boolean"}
-{"Name":"requiredInteger","Nullable":"NO","Type":"bigint"}
-{"Name":"requiredObject","Nullable":"NO","Type":"json"}
-{"Name":"requiredString","Nullable":"YES","Type":"text"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
+{"Name":"optionalBoolean","Nullable":true,"Type":"BOOLEAN"}
+{"Name":"optionalInteger","Nullable":true,"Type":"BIGINT"}
+{"Name":"optionalObject","Nullable":true,"Type":"JSON"}
+{"Name":"optionalString","Nullable":true,"Type":"VARCHAR"}
+{"Name":"requiredBoolean","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"requiredInteger","Nullable":false,"Type":"BIGINT"}
+{"Name":"requiredObject","Nullable":false,"Type":"JSON"}
+{"Name":"requiredString","Nullable":true,"Type":"VARCHAR"}
 
 add and remove many fields:
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"boolean"}
-{"Name":"addedOptionalString","Nullable":"YES","Type":"text"}
-{"Name":"addedRequiredString","Nullable":"YES","Type":"text"}
-{"Name":"flow_document","Nullable":"NO","Type":"json"}
-{"Name":"flow_published_at","Nullable":"NO","Type":"timestamp with time zone"}
-{"Name":"key","Nullable":"NO","Type":"text"}
-{"Name":"optionalBoolean","Nullable":"YES","Type":"boolean"}
-{"Name":"optionalInteger","Nullable":"YES","Type":"bigint"}
-{"Name":"optionalObject","Nullable":"YES","Type":"json"}
-{"Name":"optionalString","Nullable":"YES","Type":"text"}
-{"Name":"requiredBoolean","Nullable":"NO","Type":"boolean"}
-{"Name":"requiredInteger","Nullable":"NO","Type":"bigint"}
-{"Name":"requiredObject","Nullable":"YES","Type":"json"}
-{"Name":"requiredString","Nullable":"YES","Type":"text"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"addedOptionalString","Nullable":true,"Type":"VARCHAR"}
+{"Name":"addedRequiredString","Nullable":true,"Type":"VARCHAR"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"key","Nullable":false,"Type":"VARCHAR"}
+{"Name":"optionalBoolean","Nullable":true,"Type":"BOOLEAN"}
+{"Name":"optionalInteger","Nullable":true,"Type":"BIGINT"}
+{"Name":"optionalObject","Nullable":true,"Type":"JSON"}
+{"Name":"optionalString","Nullable":true,"Type":"VARCHAR"}
+{"Name":"requiredBoolean","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"requiredInteger","Nullable":false,"Type":"BIGINT"}
+{"Name":"requiredObject","Nullable":true,"Type":"JSON"}
+{"Name":"requiredString","Nullable":true,"Type":"VARCHAR"}
 
 Challenging Field Names Materialized Columns:
-{"Name":" ,;{}().- problematicKey � 𐀀 嶲 ","Nullable":"NO","Type":"text"}
-{"Name":" ,;{}().- problematicValue � 𐀀 嶲 ","Nullable":"YES","Type":"text"}
-{"Name":"$dollar$signs","Nullable":"YES","Type":"text"}
-{"Name":"123","Nullable":"YES","Type":"text"}
-{"Name":"123startsWithDigits","Nullable":"YES","Type":"text"}
-{"Name":"VALUEWITHDIFFERENTCAPS","Nullable":"YES","Type":"text"}
-{"Name":"_id","Nullable":"NO","Type":"text"}
-{"Name":"a\"string`with`quote'characters","Nullable":"YES","Type":"text"}
-{"Name":"flow_document","Nullable":"NO","Type":"json"}
-{"Name":"flow_published_at","Nullable":"NO","Type":"timestamp with time zone"}
-{"Name":"value with separated words","Nullable":"YES","Type":"text"}
-{"Name":"value-with-separated-words","Nullable":"YES","Type":"text"}
-{"Name":"value.with-separated_words","Nullable":"YES","Type":"text"}
-{"Name":"value.with.separated.words","Nullable":"YES","Type":"text"}
-{"Name":"valueWithDifferentCaps","Nullable":"YES","Type":"text"}
-{"Name":"value_with_separated_words","Nullable":"YES","Type":"text"}
-{"Name":"valuewithdifferentcaps","Nullable":"YES","Type":"text"}
+{"Name":" ,;{}().- problematicKey � 𐀀 嶲 ","Nullable":false,"Type":"VARCHAR"}
+{"Name":" ,;{}().- problematicValue � 𐀀 嶲 ","Nullable":true,"Type":"VARCHAR"}
+{"Name":"$dollar$signs","Nullable":true,"Type":"VARCHAR"}
+{"Name":"123","Nullable":true,"Type":"VARCHAR"}
+{"Name":"123startsWithDigits","Nullable":true,"Type":"VARCHAR"}
+{"Name":"_id","Nullable":false,"Type":"VARCHAR"}
+{"Name":"a\"string`with`quote'characters","Nullable":true,"Type":"VARCHAR"}
+{"Name":"flow_document","Nullable":false,"Type":"JSON"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"value with separated words","Nullable":true,"Type":"VARCHAR"}
+{"Name":"value-with-separated-words","Nullable":true,"Type":"VARCHAR"}
+{"Name":"value.with-separated_words","Nullable":true,"Type":"VARCHAR"}
+{"Name":"value.with.separated.words","Nullable":true,"Type":"VARCHAR"}
+{"Name":"value_with_separated_words","Nullable":true,"Type":"VARCHAR"}
 

@@ -1,0 +1,24 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.migrate-base.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-postgres:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
+        exclude:
+          # TODO: Support these migration cases.
+          - durationToString
+          - ipv4ToString
+          - ipv6ToString
+          - macaddr8ToString
+          - macaddrToString
+          - uuidToString
