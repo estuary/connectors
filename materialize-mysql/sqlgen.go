@@ -69,11 +69,14 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 				sql.MapStatic("BIGINT"),
 				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal")),
 			),
-			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double")),
-			sql.BOOLEAN:  sql.MapStatic("BOOLEAN", sql.AlsoCompatibleWith("tinyint")),
-			sql.OBJECT:   sql.MapStatic(jsonType),
-			sql.ARRAY:    sql.MapStatic(jsonType),
-			sql.BINARY:   sql.MapStatic("LONGTEXT"),
+			sql.NUMBER:  sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double")),
+			sql.BOOLEAN: sql.MapStatic("BOOLEAN", sql.AlsoCompatibleWith("tinyint")),
+			sql.OBJECT:  sql.MapStatic(jsonType),
+			sql.ARRAY:   sql.MapStatic(jsonType),
+			sql.BINARY: sql.MapPrimaryKey(
+				sql.MapStatic("VARCHAR(256)"),
+				sql.MapStatic("LONGTEXT"),
+			),
 			sql.MULTIPLE: jsonMapper,
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal"), sql.UsingConverter(sql.StrToInt)),
@@ -196,17 +199,31 @@ func rfc3339ToTZ(loc *time.Location) sql.ElementConverter {
 }
 
 func rfc3339TimeToTZ(loc *time.Location) sql.ElementConverter {
-	return sql.StringCastConverter(func(str string) (interface{}, error) {
+	return sql.StringCastConverter(func(str string) (any, error) {
 		// sanity check, this should not happen
 		if loc == nil {
 			return nil, fmt.Errorf("no timezone has been specified either in server or in connector configuration, cannot materialize time field: Consider setting a timezone in your database or in the connector configuration to continue")
 		}
 
-		if t, err := time.Parse("15:04:05.999999999Z07:00", str); err != nil {
-			return nil, fmt.Errorf("could not parse %q as RFC3339 time: %w", str, err)
-		} else {
-			return t.In(loc).Format("15:04:05.999999999"), nil
+		normalized := strings.ReplaceAll(str, "z", "Z")
+		formats := []string{
+			"15:04:05.999999999Z07:00",
+			"15:04:05.999999999Z",
+			"15:04:05Z",
 		}
+
+		var t time.Time
+		var err error
+		for _, format := range formats {
+			if t, err = time.Parse(format, normalized); err == nil {
+				break
+			}
+		}
+		if err != nil {
+			return nil, fmt.Errorf("could not parse %q as time: %w", str, err)
+		}
+
+		return t.In(loc).Format("15:04:05.999999999"), nil
 	})
 }
 
@@ -337,7 +354,7 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 {{ else -}}
-SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
+SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 
