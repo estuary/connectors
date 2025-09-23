@@ -526,15 +526,21 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 	defer diagnosticsTimeout.Stop()
 
 	// When streaming completes (because we've either reached the fence or encountered an error),
-	// log the number of events which have been processed.
-	var flushCount int  // Flush events
-	var changeCount int // Change events
-	var otherCount int  // All other events
+	// log the number of events which have been processed and some other statistics.
+	var streamingStarted = time.Now() // Time at which the current streaming cycle began
+	var flushCount int                // Flush events
+	var changeCount int               // Change events
+	var otherCount int                // All other events
+	var changeBytes int               // Count of change document bytes emitted
 	defer func() {
+		var streamingTime = time.Since(streamingStarted)
+		var throughputMBps = float64(changeBytes) / (1000000 * streamingTime.Seconds())
 		log.WithFields(log.Fields{
 			"change": changeCount,
 			"flush":  flushCount,
 			"other":  otherCount,
+			"time":   streamingTime.String(),
+			"rate":   fmt.Sprintf("%.02f MBps", throughputMBps),
 		}).Info("processed replication events")
 	}()
 
@@ -640,7 +646,12 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 			otherCount++
 		}
 
-		return c.handleReplicationEvent(event)
+		if size, err := c.handleReplicationEvent(event); err != nil {
+			return err
+		} else {
+			changeBytes += size
+		}
+		return nil
 	}); err != nil {
 		return err
 	}
@@ -664,17 +675,17 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 	return nil
 }
 
-func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
+func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
 	// Keepalive events do nothing.
 	if _, ok := event.(*KeepaliveEvent); ok {
-		return nil
+		return 0, nil
 	}
 
 	// Table drop events indicate that the table has disappeared during replication.
 	if event, ok := event.(*TableDropEvent); ok {
 		var binding = c.Bindings[event.StreamID]
 		if binding == nil {
-			return nil // Should be impossible, but safe to ignore
+			return 0, nil // Should be impossible, but safe to ignore
 		}
 		log.WithFields(log.Fields{"stream": event.StreamID, "cause": event.Cause}).Info("marking table as missing")
 		c.State.Streams[binding.StateKey] = &TableState{
@@ -682,7 +693,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 			Metadata: json.RawMessage("null"), // Explicit null to clear out old metadata
 			dirty:    true,
 		}
-		return nil
+		return 0, nil
 	}
 
 	// Metadata events update the per-table metadata and dirty flag.
@@ -692,7 +703,7 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 		var binding = c.Bindings[event.StreamID]
 		if binding == nil {
 			// Metadata event for a table that we don't have a binding for, which can be ignored.
-			return nil
+			return 0, nil
 		}
 
 		var stateKey = binding.StateKey
@@ -702,46 +713,48 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) error {
 			state.dirty = true
 			c.State.Streams[stateKey] = state
 		}
-		return nil
+		return 0, nil
 	}
 
 	// Any other events processed here must be ChangeEvents.
 	if _, ok := event.(ChangeEvent); !ok {
-		return fmt.Errorf("unhandled replication event %q", event.String())
+		return 0, fmt.Errorf("unhandled replication event %q", event.String())
 	}
 	var change = event.(ChangeEvent)
 	var streamID = change.StreamID()
 	var binding = c.Bindings[streamID]
 	if binding == nil {
 		log.WithField("event", event).Debug("no binding for stream, ignoring")
-		return nil
+		return 0, nil
 	}
 	var tableState = c.State.Streams[binding.StateKey]
 
 	// Decide what to do with the change event based on the state of the table.
 	if tableState == nil || tableState.Mode == "" || tableState.Mode == TableStateIgnore {
 		log.WithField("event", event).Debug("inactive table, ignoring")
-		return nil
+		return 0, nil
 	}
 	if tableState.Mode == TableStateActive || tableState.Mode == TableStateKeylessBackfill || tableState.Mode == TableStateUnfilteredBackfill {
-		if err := c.emitChange(binding, change); err != nil {
-			return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
+		if size, err := c.emitChange(binding, change); err != nil {
+			return 0, fmt.Errorf("error handling replication event for %q: %w", streamID, err)
+		} else {
+			return size, nil
 		}
-		return nil
 	}
 	if tableState.Mode == TableStatePreciseBackfill {
 		// When a table is being backfilled precisely, replication events lying within the
 		// already-backfilled portion of the table should be emitted, while replication events
 		// beyond that point should be ignored (since we'll reach that row later in the backfill).
-		if compareTuples(change.GetRowKey(), tableState.Scanned) <= 0 {
-			if err := c.emitChange(binding, change); err != nil {
-				return fmt.Errorf("error handling replication event for %q: %w", streamID, err)
-			}
+		if compareTuples(change.GetRowKey(), tableState.Scanned) > 0 {
+			return 0, nil
+		} else if size, err := c.emitChange(binding, change); err != nil {
+			return 0, fmt.Errorf("error handling replication event for %q: %w", streamID, err)
+		} else {
+			return size, nil
 		}
-		return nil
 	}
 
-	return fmt.Errorf("table %q in invalid mode %q", streamID, tableState.Mode)
+	return 0, fmt.Errorf("table %q in invalid mode %q", streamID, tableState.Mode)
 }
 
 func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*DiscoveryInfo) error {
@@ -779,6 +792,8 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 	var prevRowKey = make([]byte, 0, 64)                        // Only used for ordering sanity check in precise backfills.
 	prevRowKey = append(prevRowKey[:0], streamState.Scanned...) // Start with the resume key.
 	var eventCount int
+	var backfillDocumentBytes = 0
+	var backfillChunkStarted = time.Now()
 	backfillComplete, resumeCursor, err := c.Database.ScanTableChunk(ctx, discoveryInfo, streamState, func(event ChangeEvent) error {
 		if streamState.Mode == TableStatePreciseBackfill {
 			// Sanity check that when performing a "precise" backfill the DB's ordering of
@@ -802,20 +817,28 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 			prevRowKey = append(prevRowKey[:0], rowKey...) // Update the previous row key for the next iteration.
 		}
 
-		if err := c.emitChange(binding, event); err != nil {
+		if size, err := c.emitChange(binding, event); err != nil {
 			return fmt.Errorf("error emitting %q backfill row: %w", streamID, err)
+		} else {
+			backfillDocumentBytes += size
+			eventCount++
 		}
-		eventCount++
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("error scanning table %q: %w", streamID, err)
 	}
 
+	// Calculate overall throughput for the current backfill chunk
+	var backfillChunkTime = time.Since(backfillChunkStarted)
+	var throughputMBps = float64(backfillDocumentBytes) / (1000000 * backfillChunkTime.Seconds())
+
 	// Update stream state to reflect backfill results
 	log.WithFields(log.Fields{
 		"stream": streamID,
 		"rows":   eventCount,
+		"time":   backfillChunkTime.String(),
+		"rate":   fmt.Sprintf("%.02f MBps", throughputMBps),
 	}).Info("processed backfill rows")
 	var state = c.State.Streams[stateKey]
 	state.BackfilledCount += eventCount
@@ -831,20 +854,20 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 	return nil
 }
 
-func (c *Capture) emitChange(binding *Binding, event ChangeEvent) error {
+func (c *Capture) emitChange(binding *Binding, event ChangeEvent) (int, error) {
 	var err error
 	var buf = c.reused.emitChangeBuf[:0]
 	buf, err = event.AppendJSON(buf)
 	if err != nil {
 		log.WithField("event", event).WithField("err", err).Error("error serializing change event")
-		return fmt.Errorf("error serializing change event %q: %w", event.String(), err)
+		return 0, fmt.Errorf("error serializing change event %q: %w", event.String(), err)
 	}
 	c.reused.emitChangeBuf = buf
 
 	c.reused.emitChangeDoc.Binding = binding.Index
 	c.reused.emitChangeDoc.DocJson = buf
 	c.reused.emitChangeMsg.Captured = &c.reused.emitChangeDoc
-	return c.Output.Send(&c.reused.emitChangeMsg)
+	return len(buf), c.Output.Send(&c.reused.emitChangeMsg)
 }
 
 func (c *Capture) emitState() error {
