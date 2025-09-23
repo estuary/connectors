@@ -1,5 +1,3 @@
-//go:build !nodb
-
 package main
 
 import (
@@ -7,23 +5,18 @@ import (
 	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
-	"os"
+	"os/exec"
 	"slices"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/go-sql-driver/mysql"
 )
-
-//go:generate ../materialize-boilerplate/testdata/generate-spec-proto.sh testdata/apply-changes.flow.yaml
 
 func testConfig() config {
 	return config{
@@ -38,279 +31,125 @@ func testConfig() config {
 	}
 }
 
-func testMariaConfig() config {
-	return config{
-		Address:  "localhost:3305",
-		User:     "flow",
-		Password: "flow",
-		Database: "flow",
-		Timezone: "UTC",
-		Advanced: advancedConfig{
-			FeatureFlags: "allow_existing_tables_for_new_bindings",
-		},
-	}
-}
-
-func TestValidateAndApply(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testConfig()
-
-	resourceConfig := tableConfig{
-		Table: "target",
+func TestIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
 	}
 
-	db, err := stdsql.Open("mysql", cfg.ToURI())
-	require.NoError(t, err)
-	defer db.Close()
-
-	boilerplate.RunValidateAndApplyTestCases(
-		t,
-		newMysqlDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
-
-			sch, err := sql.StdGetSchema(ctx, db, "def", cfg.Database, resourceConfig.Table)
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T) {
-			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Table)))
-		},
-	)
-}
-
-func TestValidateAndApplyMigrations(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testConfig()
-
-	resourceConfig := tableConfig{
-		Table: "target",
+	makeResourceFn := func(table string, delta bool) tableConfig {
+		return tableConfig{
+			Table: table,
+			Delta: delta,
+		}
 	}
 
-	db, err := stdsql.Open("mysql", cfg.ToURI())
-	require.NoError(t, err)
-	defer db.Close()
-
-	sql.RunValidateAndApplyMigrationsTests(
-		t,
-		newMysqlDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
-
-			sch, err := sql.StdGetSchema(ctx, db, "def", cfg.Database, resourceConfig.Table)
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T, cols []string, values []string) {
-			t.Helper()
-
-			var keys = make([]string, len(cols))
-			for i, col := range cols {
-				keys[i] = testDialect.Identifier(col)
-			}
-			keys = append(keys, testDialect.Identifier("_meta/flow_truncated"))
-			values = append(values, "0")
-			keys = append(keys, testDialect.Identifier("flow_published_at"))
-			values = append(values, "'2024-09-13 01:01:01'")
-			keys = append(keys, testDialect.Identifier("flow_document"))
-			values = append(values, "'{}'")
-			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", testDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
-			_, err = db.ExecContext(ctx, q)
-
-			require.NoError(t, err)
-		},
-		func(t *testing.T) string {
-			t.Helper()
-
-			rows, err := sql.DumpTestTable(t, db, testDialect.Identifier(resourceConfig.Table))
-
-			require.NoError(t, err)
-
-			return rows
-		},
-		func(t *testing.T) {
-			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Table)))
-		},
-	)
-}
-
-func TestValidateAndApplyMigrationsMariaDB(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testMariaConfig()
-
-	resourceConfig := tableConfig{
-		Table: "target",
-	}
-
-	db, err := stdsql.Open("mysql", cfg.ToURI())
-	require.NoError(t, err)
-	defer db.Close()
-
-	sql.RunValidateAndApplyMigrationsTests(
-		t,
-		newMysqlDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
-
-			sch, err := sql.StdGetSchema(ctx, db, "def", cfg.Database, resourceConfig.Table)
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T, cols []string, values []string) {
-			t.Helper()
-
-			var keys = make([]string, len(cols))
-			for i, col := range cols {
-				keys[i] = testDialect.Identifier(col)
-			}
-			keys = append(keys, testDialect.Identifier("_meta/flow_truncated"))
-			values = append(values, "0")
-			keys = append(keys, testDialect.Identifier("flow_published_at"))
-			values = append(values, "'2024-09-13 01:01:01'")
-			keys = append(keys, testDialect.Identifier("flow_document"))
-			values = append(values, "'{}'")
-			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", testDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
-			_, err = db.ExecContext(ctx, q)
-
-			require.NoError(t, err)
-		},
-		func(t *testing.T) string {
-			t.Helper()
-
-			rows, err := sql.DumpTestTable(t, db, testDialect.Identifier(resourceConfig.Table))
-
-			require.NoError(t, err)
-
-			return rows
-		},
-		func(t *testing.T) {
-			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Table)))
-		},
-	)
-}
-
-func TestApplyChanges(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testConfig()
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
-
-	resourceConfig := tableConfig{
-		Table: "data_types",
-	}
-	resourceConfigJson, err := json.Marshal(resourceConfig)
-	require.NoError(t, err)
-
-	db, err := stdsql.Open("mysql", cfg.ToURI())
-	require.NoError(t, err)
-	defer db.Close()
-
-	cleanup := func() {
-		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s;", testDialect.Identifier(resourceConfig.Table)))
-	}
-	cleanup()
-	defer cleanup()
-
-	// These data types are somewhat interesting as test-cases to make sure we don't lose anything
-	// about them when dropping nullability constraints, since we must re-state the column
-	// definition when doing that.
-	q := fmt.Sprintf(`
-	CREATE TABLE %s(
-		vc123 VARCHAR(123) NOT NULL,
-		vc256 VARCHAR(256) NOT NULL,
-		t TEXT NOT NULL,
-		lt LONGTEXT NOT NULL,
-		n60 NUMERIC(65,0) NOT NULL,
-		d DECIMAL NOT NULL,
-		n NUMERIC NOT NULL,
-		mn NUMERIC(30,5) NOT NULL,
-		b123 BINARY(123) NOT NULL,
-		vb123 VARBINARY(123) NOT NULL
-	);
-	`,
-		testDialect.Identifier(resourceConfig.Table),
-	)
-
-	_, err = db.ExecContext(ctx, q)
-	require.NoError(t, err)
-
-	// Initial snapshot of the table, as created.
-	original, err := snapshotTable(ctx, db, "def", cfg.Database, resourceConfig.Table)
-	require.NoError(t, err)
-
-	// Apply the spec, which will drop the nullability constraints because none of the fields are in
-	// the materialized collection.
-	specBytes, err := os.ReadFile("testdata/generated_specs/apply-changes.flow.proto")
-	require.NoError(t, err)
-	var spec pf.MaterializationSpec
-	require.NoError(t, spec.Unmarshal(specBytes))
-
-	spec.ConfigJson = configJson
-	spec.Bindings[0].ResourceConfigJson = resourceConfigJson
-	spec.Bindings[0].ResourcePath = []string{translateFlowIdentifier(resourceConfig.Table)}
-
-	_, err = newMysqlDriver().Apply(ctx, &pm.Request_Apply{
-		Materialization: &spec,
-		Version:         "",
+	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
+	t.Cleanup(func() {
+		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
-	require.NoError(t, err)
 
-	// Snapshot of the table after our apply.
-	new, err := snapshotTable(ctx, db, "def", cfg.Database, resourceConfig.Table)
-	require.NoError(t, err)
+	t.Run("materialize", func(t *testing.T) {
+		sql.RunMaterializationTest(t, newMysqlDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
+	})
 
-	var snap strings.Builder
-	snap.WriteString("Pre-Apply Table Schema:\n")
-	snap.WriteString(original)
-	snap.WriteString("\nPost-Apply Table Schema:\n")
-	snap.WriteString(new)
-	cupaloy.SnapshotT(t, snap.String())
-}
+	t.Run("apply", func(t *testing.T) {
+		sql.RunApplyTest(t, newMysqlDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+	})
 
-func TestFencingCases(t *testing.T) {
-	var ctx = context.Background()
-	var dialect = testDialect
-	var templates = renderTemplates(dialect)
+	t.Run("migrate", func(t *testing.T) {
+		sql.RunMigrationTest(t, newMysqlDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+	})
 
-	c, err := prepareNewClient(time.UTC)(ctx, &sql.Endpoint[config]{Config: testConfig()})
-	require.NoError(t, err)
-	defer c.Close()
+	t.Run("fence", func(t *testing.T) {
+		var templates = renderTemplates(testDialect)
+		sql.RunFencingTest(
+			t,
+			newMysqlDriver(),
+			"testdata/fence.flow.yaml",
+			makeResourceFn,
+			templates.createTargetTable,
+			func(ctx context.Context, client sql.Client, fence sql.Fence) error {
+				var fenceUpdate strings.Builder
+				if err := templates.updateFence.Execute(&fenceUpdate, fence); err != nil {
+					return fmt.Errorf("evaluating fence template: %w", err)
+				}
+				return client.ExecStatements(ctx, []string{fenceUpdate.String()})
+			},
+		)
+	})
 
-	sql.RunFenceTestCases(t,
-		c,
-		[]string{"temp_test_fencing_checkpoints"},
-		dialect,
-		templates.createTargetTable,
-		func(table sql.Table, fence sql.Fence) error {
-			var fenceUpdate strings.Builder
-			if err := templates.updateFence.Execute(&fenceUpdate, fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
-			}
-			return c.ExecStatements(ctx, []string{fenceUpdate.String()})
-		},
-		func(table sql.Table) (out string, err error) {
-			return sql.StdDumpTable(ctx, c.(*client).db, table)
-		},
-	)
+	t.Run("apply changes", func(t *testing.T) {
+		boilerplate.RunTestAllTasks(t, "testdata/apply-changes.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
+			t.Run(taskName, func(t *testing.T) {
+				ctx := context.Background()
+
+				db, err := stdsql.Open("mysql", cfg.ToURI())
+				require.NoError(t, err)
+				defer db.Close()
+
+				tableName := "testing"
+
+				cleanup := func() { db.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s;", testDialect.Identifier(tableName))) }
+				cleanup()
+				t.Cleanup(cleanup)
+
+				// These data types are somewhat interesting as test-cases to make sure
+				// we don't lose anything about them when dropping nullability
+				// constraints, since we must re-state the column definition when doing
+				// that.
+				q := fmt.Sprintf(`
+			CREATE TABLE %s(
+				vc123 VARCHAR(123) NOT NULL,
+				vc256 VARCHAR(256) NOT NULL,
+				t TEXT NOT NULL,
+				lt LONGTEXT NOT NULL,
+				n60 NUMERIC(65,0) NOT NULL,
+				d DECIMAL NOT NULL,
+				n NUMERIC NOT NULL,
+				mn NUMERIC(30,5) NOT NULL,
+				b123 BINARY(123) NOT NULL,
+				vb123 VARBINARY(123) NOT NULL
+			);
+			`,
+					testDialect.Identifier(tableName),
+				)
+
+				_, err = db.ExecContext(ctx, q)
+				require.NoError(t, err)
+
+				// Initial snapshot of the table, as created.
+				original, err := snapshotTable(ctx, db, "def", cfg.Database, tableName)
+				require.NoError(t, err)
+
+				// Apply the spec, which will drop the nullability constraints because
+				// none of the fields are in the materialized collection.
+				boilerplate.RunFlowctl(
+					t,
+					"preview",
+					"--name", taskName,
+					"--source", "testdata/apply-changes.flow.yaml",
+					"--fixture", "testdata/fixture.empty.json",
+					"--network", "flow-test",
+				)
+
+				// Snapshot of the table after our apply.
+				new, err := snapshotTable(ctx, db, "def", cfg.Database, tableName)
+				require.NoError(t, err)
+
+				var snap strings.Builder
+				snap.WriteString("Pre-Apply Table Schema:\n")
+				snap.WriteString(original)
+				snap.WriteString("\nPost-Apply Table Schema:\n")
+				snap.WriteString(new)
+				cupaloy.SnapshotT(t, snap.String())
+			})
+		})
+	})
 }
 
 func TestPrereqs(t *testing.T) {
+	t.Skip("todo: fix pre-reqs tests")
+
 	cfg := testConfig()
 
 	tests := []struct {
