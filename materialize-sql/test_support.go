@@ -53,8 +53,9 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[
 	driver *Driver[EC, RC],
 	sourcePath string,
 	makeResourceFn func(string, bool) RC,
+	actionDescSanitizers []func(string) string,
 ) {
-	boilerplate.RunMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn)
+	boilerplate.RunMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn, actionDescSanitizers)
 }
 
 // RunFencingTest is a generalized form of test cases over fencing behavior,
