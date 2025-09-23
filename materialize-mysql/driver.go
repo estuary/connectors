@@ -656,7 +656,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		// See if we need to increase any VARCHAR column lengths
 		for idx, c := range converted {
 			varcharMeta := b.tempVarcharMetas[idx]
-			if varcharMeta.identifier != "" {
+			if varcharMeta.identifier != "" && c != nil {
 				l := len(c.(string))
 
 				if l > varcharMeta.maxLength {
