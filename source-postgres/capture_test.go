@@ -986,3 +986,57 @@ func TestSourceTag(t *testing.T) {
 	cs.Capture(ctx, t, nil)
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+// TestBackfillPriority checks that tables with higher priority values are
+// backfilled completely before tables with lower priority values.
+func TestBackfillPriority(t *testing.T) {
+	var tb, ctx = postgresTestBackend(t), context.Background()
+	var uniqueID = uniqueTableID(t)
+
+	// Create five tables with 20 rows each
+	var tableHi1 = tb.CreateTable(ctx, t, uniqueID+"_hi1", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableHi2 = tb.CreateTable(ctx, t, uniqueID+"_hi2", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableDef = tb.CreateTable(ctx, t, uniqueID+"_def", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableLo1 = tb.CreateTable(ctx, t, uniqueID+"_lo1", "(id INTEGER PRIMARY KEY, data TEXT)")
+	var tableLo2 = tb.CreateTable(ctx, t, uniqueID+"_lo2", "(id INTEGER PRIMARY KEY, data TEXT)")
+	for _, table := range []string{tableHi1, tableHi2, tableDef, tableLo1, tableLo2} {
+		var rows [][]any
+		for i := range 20 {
+			rows = append(rows, []any{i, fmt.Sprintf("Row %d in %s", i, table)})
+		}
+		tb.Insert(ctx, t, table, rows)
+	}
+
+	// Create capture spec with small backfill chunk size
+	var cs = tb.CaptureSpec(ctx, t)
+	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 5
+
+	// Discover bindings for all five tables
+	var discoveredBindings = cs.Discover(ctx, t, regexp.MustCompile(uniqueID))
+	var bindings = tests.ConvertBindings(t, discoveredBindings)
+	require.Len(t, bindings, 5)
+
+	// Assign priorities to the bindings:
+	// - Two tables with priority 10 (high priority)
+	// - One table with default priority (0)
+	// - Two tables with priority -10 (low priority)
+	for _, b := range bindings {
+		var resource = sqlcapture.Resource{}
+		require.NoError(t, json.Unmarshal(b.ResourceConfigJson, &resource))
+
+		if strings.Contains(b.ResourcePath[1], "_hi") {
+			resource.Priority = 10
+		} else if strings.Contains(b.ResourcePath[1], "_lo") {
+			resource.Priority = -10
+		}
+
+		var resourceJSON, err = json.Marshal(resource)
+		require.NoError(t, err)
+		b.ResourceConfigJson = resourceJSON
+	}
+	cs.Bindings = bindings
+
+	setShutdownAfterCaughtUp(t, true)
+	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}

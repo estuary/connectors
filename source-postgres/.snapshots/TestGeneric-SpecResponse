@@ -307,6 +307,11 @@
         "title": "Table Name",
         "description": "The name of the table to be captured.",
         "readOnly": true
+      },
+      "priority": {
+        "type": "integer",
+        "title": "Backfill Priority",
+        "description": "An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others."
       }
     },
     "type": "object",
