@@ -11,7 +11,11 @@ import (
 )
 
 func createPgDialect(featureFlags map[string]bool) sql.Dialect {
-	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(sql.StringCastConverter(func(in string) (any, error) { return strings.ReplaceAll(in, "\u0000", ""), nil })))
+	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), 
+		sql.UsingConverter(sql.StringCastConverter(func(in string) (any, error) {
+			return strings.ReplaceAll(in, "\u0000", ""), nil
+		})),
+	)
 
 	// Define base date/time mappings without primary key wrapper
 	dateMapping := sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))

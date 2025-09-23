@@ -135,8 +135,6 @@ func TestFencingCases(t *testing.T) {
 	require.NoError(t, err)
 	defer c.Close()
 
-	// Use global test dialect and templates
-
 	sql.RunFenceTestCases(t,
 		c,
 		[]string{"temp_test_fencing_checkpoints"},
