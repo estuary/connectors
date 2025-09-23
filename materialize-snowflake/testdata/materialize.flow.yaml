@@ -1,0 +1,36 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-snowflake:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.yaml
+    bindings:
+    - resource:
+        table: simple_standard
+        schema: PUBLIC
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: simple_delta
+        schema: PUBLIC
+        delta_updates: true
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: not_simple
+        schema: PUBLIC
+      source: tests/not-simple
+      fields:
+        recommended: true
+    - resource:
+        table: data_types
+        schema: PUBLIC
+      source: tests/data-types
+      fields:
+        recommended: true
