@@ -9,9 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testDialect = createDialect(featureFlagDefaults)
+var testTemplates = renderTemplates(testDialect)
+
 func TestSQLGeneration(t *testing.T) {
 	testDialect := createDialect(map[string]bool{"datetime_keys_as_string": true})
-	templates := renderTemplates(testDialect)
 
 	snap, tables := sql.RunSqlGenTests(
 		t,
@@ -21,17 +23,17 @@ func TestSQLGeneration(t *testing.T) {
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				templates.createTargetTable,
+				testTemplates.createTargetTable,
 			},
-			TplAddColumns:  templates.alterTableColumns,
-			TplUpdateFence: templates.updateFence,
+			TplAddColumns:  testTemplates.alterTableColumns,
+			TplUpdateFence: testTemplates.updateFence,
 		},
 	)
 
 	for _, tbl := range tables {
 		for _, tpl := range []*template.Template{
-			templates.storeCopyIntoFromStagedQuery,
-			templates.storeCopyIntoDirectQuery,
+			testTemplates.storeCopyIntoFromStagedQuery,
+			testTemplates.storeCopyIntoDirectQuery,
 		} {
 			var testcase = tbl.Identifier + " " + tpl.Name()
 
@@ -46,10 +48,10 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	for _, tpl := range []*template.Template{
-		templates.createLoadTable,
-		templates.loadQuery,
-		templates.dropLoadTable,
-		templates.storeMergeQuery,
+		testTemplates.createLoadTable,
+		testTemplates.loadQuery,
+		testTemplates.dropLoadTable,
+		testTemplates.storeMergeQuery,
 	} {
 		tbl := tables[0] // these queries are never run for delta updates mode
 		var testcase = tbl.Identifier + " " + tpl.Name()
@@ -95,7 +97,7 @@ func TestSQLGeneration(t *testing.T) {
 		}
 
 		snap.WriteString("--- Begin createMigrationTable")
-		require.NoError(t, tplCreateMigrationTable.Execute(snap, params))
+		require.NoError(t, testTemplates.createMigrationTable.Execute(snap, params))
 		snap.WriteString("--- End createMigrationTable ---\n\n")
 	}
 

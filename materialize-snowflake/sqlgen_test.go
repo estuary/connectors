@@ -9,10 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = snowflakeDialect("public", timestampLTZ, map[string]bool{"datetime_keys_as_string": true})
-
 func TestSQLGeneration(t *testing.T) {
-	var templates = renderTemplates(testDialect)
 
 	snap, tables := sql.RunSqlGenTests(
 		t,
@@ -22,17 +19,17 @@ func TestSQLGeneration(t *testing.T) {
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				templates.createTargetTable,
+				testTemplates.createTargetTable,
 			},
-			TplAddColumns:    templates.alterTableColumns,
-			TplDropNotNulls:  templates.alterTableColumns,
-			TplCombinedAlter: templates.alterTableColumns,
+			TplAddColumns:    testTemplates.alterTableColumns,
+			TplDropNotNulls:  testTemplates.alterTableColumns,
+			TplCombinedAlter: testTemplates.alterTableColumns,
 		},
 	)
 
 	for _, tpl := range []*template.Template{
-		templates.loadQuery,
-		templates.mergeInto,
+		testTemplates.loadQuery,
+		testTemplates.mergeInto,
 	} {
 		tbl := tables[0]
 		require.False(t, tbl.DeltaUpdates)
@@ -68,7 +65,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	for _, tpl := range []*template.Template{
-		templates.copyInto,
+		testTemplates.copyInto,
 	} {
 		tbl := tables[0]
 		require.False(t, tbl.DeltaUpdates)
@@ -85,7 +82,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	for _, tpl := range []*template.Template{
-		templates.copyInto,
+		testTemplates.copyInto,
 	} {
 		tbl := tables[1]
 		require.True(t, tbl.DeltaUpdates)
@@ -103,7 +100,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	for _, tpl := range []*template.Template{
-		templates.createPipe,
+		testTemplates.createPipe,
 	} {
 		tbl := tables[0]
 		require.False(t, tbl.DeltaUpdates)

@@ -1260,15 +1260,15 @@
       "counter": 2,
       "id": 1,
       "strint": "1",
-      "strintkey": "10",
-      "strnum": "1.1",
+      "strintkey": "1",
+      "strnum": "10.1",
       "strnumkey": "10.1"
     },
     "flow_published_at": "1970-01-01 02:00:32+00",
     "id": 1,
     "strint": 1,
-    "strintkey": "10",
-    "strnum": 1.1,
+    "strintkey": "1",
+    "strnum": 10.1,
     "strnumkey": "10.1"
   }
 }
@@ -1276,15 +1276,15 @@
   "_table": "all_key_types_part_two",
   "rows": {
     "counter": 2,
-    "date": "2023-08-30",
-    "datekey": "2023-08-30",
+    "date": "0001-01-01",
+    "datekey": "0000-01-01",
     "flow_document": {
       "_meta": {
         "uuid": "eab57680-1de2-11b2-8000-071353030311"
       },
       "counter": 2,
-      "date": "2023-08-30",
-      "datekey": "2023-08-30",
+      "date": "0001-01-01",
+      "datekey": "0000-01-01",
       "id": 1,
       "time": "12:34:56Z",
       "timekey": "12:34:56Z"
@@ -1299,15 +1299,15 @@
   "_table": "all_key_types_part_three",
   "rows": {
     "counter": 2,
-    "datetime": "2023-08-30 12:34:56+00",
-    "datetimekey": "2023-08-30T12:34:56Z",
+    "datetime": "0001-01-01 (BC) 12:34:56+00",
+    "datetimekey": "0000-01-01T12:34:56Z",
     "flow_document": {
       "_meta": {
         "uuid": "eb4e0d00-1de2-11b2-8000-071353030311"
       },
       "counter": 2,
-      "datetime": "2023-08-30T12:34:56Z",
-      "datetimekey": "2023-08-30T12:34:56Z",
+      "datetime": "0000-01-01T12:34:56Z",
+      "datetimekey": "0000-01-01T12:34:56Z",
       "id": 1,
       "uuid": "550e8400-e29b-41d4-a716-446655440000",
       "uuidkey": "550e8400-e29b-41d4-a716-446655440000"

@@ -45,9 +45,6 @@ func TestValidateAndApply(t *testing.T) {
 	require.NoError(t, err)
 	defer db.Close()
 
-	// Create test dialect with default feature flags
-	testDialect := createPgDialect(map[string]bool{"datetime_keys_as_string": true})
-
 	boilerplate.RunValidateAndApplyTestCases(
 		t,
 		newPostgresDriver(),
@@ -138,9 +135,7 @@ func TestFencingCases(t *testing.T) {
 	require.NoError(t, err)
 	defer c.Close()
 
-	// Create test dialect and templates with default feature flags
-	testDialect := createPgDialect(map[string]bool{"datetime_keys_as_string": true})
-	testTemplates := renderTemplates(testDialect)
+	// Use global test dialect and templates
 
 	sql.RunFenceTestCases(t,
 		c,

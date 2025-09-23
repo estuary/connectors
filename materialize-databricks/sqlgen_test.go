@@ -9,24 +9,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testDialect = createDatabricksDialect(featureFlagDefaults)
+var testTemplates = renderTemplates(testDialect)
+
 func TestSQLGeneration(t *testing.T) {
 	snap, tables := sql.RunSqlGenTests(
 		t,
-		databricksDialect,
+		testDialect,
 		func(table string) []string {
 			return []string{"a-schema", table}
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				tplCreateTargetTable,
+				testTemplates.createTargetTable,
 			},
-			TplAddColumns: tplAlterTableColumns,
+			TplAddColumns: testTemplates.alterTableColumns,
 		},
 	)
 
 	for _, tpl := range []*template.Template{
-		tplLoadQuery,
-		tplMergeInto,
+		testTemplates.loadQuery,
+		testTemplates.mergeInto,
 	} {
 		tbl := tables[0]
 		require.False(t, tbl.DeltaUpdates)
@@ -35,8 +38,8 @@ func TestSQLGeneration(t *testing.T) {
 		bounds := []sql.MergeBound{
 			{
 				Column:       tbl.Keys[0],
-				LiteralLower: databricksDialect.Literal(int64(10)),
-				LiteralUpper: databricksDialect.Literal(int64(100)),
+				LiteralLower: testDialect.Literal(int64(10)),
+				LiteralUpper: testDialect.Literal(int64(100)),
 			},
 			{
 				Column: tbl.Keys[1],
@@ -45,8 +48,8 @@ func TestSQLGeneration(t *testing.T) {
 			},
 			{
 				Column:       tbl.Keys[2],
-				LiteralLower: databricksDialect.Literal("aGVsbG8K"),
-				LiteralUpper: databricksDialect.Literal("Z29vZGJ5ZQo="),
+				LiteralLower: testDialect.Literal("aGVsbG8K"),
+				LiteralUpper: testDialect.Literal("Z29vZGJ5ZQo="),
 			},
 		}
 
@@ -63,7 +66,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	for _, tpl := range []*template.Template{
-		tplCopyIntoDirect,
+		testTemplates.copyIntoDirect,
 	} {
 		tbl := tables[0]
 		require.False(t, tbl.DeltaUpdates)
@@ -77,7 +80,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	for _, tpl := range []*template.Template{
-		tplCopyIntoDirect,
+		testTemplates.copyIntoDirect,
 	} {
 		tbl := tables[1]
 		require.True(t, tbl.DeltaUpdates)

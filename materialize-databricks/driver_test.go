@@ -80,7 +80,7 @@ func TestValidateAndApply(t *testing.T) {
 		},
 		func(t *testing.T) {
 			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", databricksDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
 		},
 	)
 }
@@ -117,15 +117,15 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			var keys = make([]string, len(cols))
 			for i, col := range cols {
-				keys[i] = databricksDialect.Identifier(col)
+				keys[i] = testDialect.Identifier(col)
 			}
-			keys = append(keys, databricksDialect.Identifier("_meta/flow_truncated"))
+			keys = append(keys, testDialect.Identifier("_meta/flow_truncated"))
 			values = append(values, "0")
-			keys = append(keys, databricksDialect.Identifier("flow_published_at"))
+			keys = append(keys, testDialect.Identifier("flow_published_at"))
 			values = append(values, "'2024-09-13 01:01:01'")
-			keys = append(keys, databricksDialect.Identifier("flow_document"))
+			keys = append(keys, testDialect.Identifier("flow_document"))
 			values = append(values, "'{}'")
-			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", databricksDialect.Identifier(resourceConfig.Schema, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
+			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
 			_, err = db.ExecContext(ctx, q)
 
 			require.NoError(t, err)
@@ -133,7 +133,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		func(t *testing.T) string {
 			t.Helper()
 
-			rows, err := sql.DumpTestTable(t, db, databricksDialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
+			rows, err := sql.DumpTestTable(t, db, testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
 
 			require.NoError(t, err)
 
@@ -141,7 +141,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		},
 		func(t *testing.T) {
 			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", databricksDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
 		},
 	)
 }

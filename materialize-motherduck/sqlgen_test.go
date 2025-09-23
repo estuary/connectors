@@ -9,25 +9,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testDialect = createDuckDialect(featureFlagDefaults)
+var testTemplates = renderTemplates(testDialect)
+
 func TestSQLGeneration(t *testing.T) {
 	snap, tables := sql.RunSqlGenTests(
 		t,
-		duckDialect,
+		testDialect,
 		func(table string) []string {
 			return []string{"db", "a-schema", table}
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				tplCreateTargetTable,
+				testTemplates.createTargetTable,
 			},
-			TplUpdateFence: tplUpdateFence,
+			TplUpdateFence: testTemplates.updateFence,
 		},
 	)
 
 	for _, tpl := range []*template.Template{
-		tplLoadQuery,
-		tplStoreDeleteQuery,
-		tplStoreQuery,
+		testTemplates.loadQuery,
+		testTemplates.storeDeleteQuery,
+		testTemplates.storeQuery,
 	} {
 		// Standard updates cases, which use merge bounds for load and merge
 		// queries.
@@ -38,8 +41,8 @@ func TestSQLGeneration(t *testing.T) {
 		bounds := []sql.MergeBound{
 			{
 				Column:       tbl.Keys[0],
-				LiteralLower: duckDialect.Literal(int64(10)),
-				LiteralUpper: duckDialect.Literal(int64(100)),
+				LiteralLower: testDialect.Literal(int64(10)),
+				LiteralUpper: testDialect.Literal(int64(100)),
 			},
 			{
 				Column: tbl.Keys[1],
@@ -48,8 +51,8 @@ func TestSQLGeneration(t *testing.T) {
 			},
 			{
 				Column:       tbl.Keys[2],
-				LiteralLower: duckDialect.Literal("aGVsbG8K"),
-				LiteralUpper: duckDialect.Literal("Z29vZGJ5ZQo="),
+				LiteralLower: testDialect.Literal("aGVsbG8K"),
+				LiteralUpper: testDialect.Literal("Z29vZGJ5ZQo="),
 			},
 		}
 
@@ -64,7 +67,7 @@ func TestSQLGeneration(t *testing.T) {
 
 	{
 		// Delta updates only run stores, never loads or merges.
-		tpl := tplStoreQuery
+		tpl := testTemplates.storeQuery
 		tbl := tables[1]
 		require.True(t, tbl.DeltaUpdates)
 		var testcase = tbl.Identifier + " " + tpl.Name()

@@ -157,7 +157,6 @@ func TestFencingCases(t *testing.T) {
 	cfg := mustGetCfg(t)
 
 	ctx := context.Background()
-	templates := renderTemplates(testDialect)
 
 	c, err := newClient(ctx, &sql.Endpoint[config]{Config: cfg})
 	require.NoError(t, err)
@@ -167,7 +166,7 @@ func TestFencingCases(t *testing.T) {
 		c,
 		[]string{"temp_test_fencing_checkpoints"},
 		testDialect,
-		templates.createTargetTable,
+		testTemplates.createTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
 			conn, err := pgx.Connect(ctx, cfg.toURI())
 			if err != nil {

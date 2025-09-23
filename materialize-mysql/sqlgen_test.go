@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = mysqlDialect(time.FixedZone("UTC", 0), "db", "mysql", map[string]bool{"datetime_keys_as_string": true})
+var testDialect = mysqlDialect(time.UTC, "flow", "mysql", featureFlagDefaults)
+var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
-	var templates = renderTemplates(testDialect)
 
 	snap, _ := sql.RunSqlGenTests(
 		t,
@@ -24,25 +24,25 @@ func TestSQLGeneration(t *testing.T) {
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				templates.createTargetTable,
-				templates.createLoadTable,
-				templates.createUpdateTable,
-				templates.tempTruncate,
-				templates.loadLoad,
-				templates.loadQuery,
-				templates.insertLoad,
-				templates.updateLoad,
-				templates.updateReplace,
-				templates.updateTruncate,
-				templates.deleteQuery,
-				templates.deleteLoad,
-				templates.deleteTruncate,
+				testTemplates.createTargetTable,
+				testTemplates.createLoadTable,
+				testTemplates.createUpdateTable,
+				testTemplates.tempTruncate,
+				testTemplates.loadLoad,
+				testTemplates.loadQuery,
+				testTemplates.insertLoad,
+				testTemplates.updateLoad,
+				testTemplates.updateReplace,
+				testTemplates.updateTruncate,
+				testTemplates.deleteQuery,
+				testTemplates.deleteLoad,
+				testTemplates.deleteTruncate,
 			},
-			TplAddColumns:    templates.alterTableColumns,
-			TplDropNotNulls:  templates.alterTableColumns,
-			TplCombinedAlter: templates.alterTableColumns,
-			TplInstallFence:  templates.installFence,
-			TplUpdateFence:   templates.updateFence,
+			TplAddColumns:    testTemplates.alterTableColumns,
+			TplDropNotNulls:  testTemplates.alterTableColumns,
+			TplCombinedAlter: testTemplates.alterTableColumns,
+			TplInstallFence:  testTemplates.installFence,
+			TplUpdateFence:   testTemplates.updateFence,
 		},
 	)
 

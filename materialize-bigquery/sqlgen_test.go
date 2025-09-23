@@ -9,10 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = bqDialect(true, map[string]bool{"datetime_keys_as_string": true})
-
 func TestSQLGeneration(t *testing.T) {
-	var templates = renderTemplates(testDialect)
 
 	snap, tables := sql.RunSqlGenTests(
 		t,
@@ -22,20 +19,20 @@ func TestSQLGeneration(t *testing.T) {
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				templates.createTargetTable,
-				templates.storeInsert,
+				testTemplates.createTargetTable,
+				testTemplates.storeInsert,
 			},
-			TplAddColumns:    templates.alterTableColumns,
-			TplDropNotNulls:  templates.alterTableColumns,
-			TplCombinedAlter: templates.alterTableColumns,
-			TplInstallFence:  templates.installFence,
-			TplUpdateFence:   templates.updateFence,
+			TplAddColumns:    testTemplates.alterTableColumns,
+			TplDropNotNulls:  testTemplates.alterTableColumns,
+			TplCombinedAlter: testTemplates.alterTableColumns,
+			TplInstallFence:  testTemplates.installFence,
+			TplUpdateFence:   testTemplates.updateFence,
 		},
 	)
 
 	for _, tpl := range []*template.Template{
-		templates.storeUpdate,
-		templates.loadQuery,
+		testTemplates.storeUpdate,
+		testTemplates.loadQuery,
 	} {
 		tbl := tables[0]
 		require.False(t, tbl.DeltaUpdates)

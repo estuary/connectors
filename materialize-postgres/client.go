@@ -22,7 +22,7 @@ var _ sql.SchemaManager = (*client)(nil)
 type client struct {
 	db        *stdsql.DB
 	cfg       config
-	dialect   sql.Dialect
+	ep        *sql.Endpoint[config]
 	templates templates
 }
 
@@ -41,7 +41,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 	return &client{
 		db:        db,
 		cfg:       ep.Config,
-		dialect:   ep.Dialect,
+		ep:        ep,
 		templates: templates,
 	}, nil
 }
@@ -98,7 +98,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		}
 	}
 
-	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.dialect, catalog, resourcePaths)
+	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, catalog, resourcePaths)
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -136,7 +136,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", c.dialect.Identifier(path...))
+	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
 		_, err := c.db.ExecContext(ctx, stmt)
@@ -145,7 +145,7 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 }
 
 func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.dialect.Identifier(path...))
+	stmt := fmt.Sprintf("TRUNCATE TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
 		_, err := c.db.ExecContext(ctx, stmt)
@@ -167,7 +167,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		if steps, err := sql.StdColumnTypeMigrations(ctx, c.dialect, ta.Table, ta.ColumnTypeChanges); err != nil {
+		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges); err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		} else {
 			stmts = append(stmts, steps...)
@@ -190,7 +190,7 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 }
 
 func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
-	return sql.StdCreateSchema(ctx, c.db, c.dialect, schemaName)
+	return sql.StdCreateSchema(ctx, c.db, c.ep.Dialect, schemaName)
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {

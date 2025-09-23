@@ -226,7 +226,6 @@ func TestApplyChanges(t *testing.T) {
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 	var dialect = testDialect
-	var templates = renderTemplates(dialect)
 
 	c, err := newClient(ctx, &sql.Endpoint[config]{Config: testConfig(), Dialect: dialect})
 	require.NoError(t, err)
@@ -236,10 +235,10 @@ func TestFencingCases(t *testing.T) {
 		c,
 		[]string{"temp_test_fencing_checkpoints"},
 		dialect,
-		templates.createTargetTable,
+		testTemplates.createTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
 			var fenceUpdate strings.Builder
-			if err := templates.updateFence.Execute(&fenceUpdate, fence); err != nil {
+			if err := testTemplates.updateFence.Execute(&fenceUpdate, fence); err != nil {
 				return fmt.Errorf("evaluating fence template: %w", err)
 			}
 			return c.ExecStatements(ctx, []string{fenceUpdate.String()})

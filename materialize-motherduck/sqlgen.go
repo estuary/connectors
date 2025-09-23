@@ -10,6 +10,19 @@ import (
 )
 
 func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
+	// Define base date/time mappings without primary key wrapper
+	primaryKeyTextType := sql.MapStatic("VARCHAR")
+	dateMapping := sql.MapStatic("DATE")
+	datetimeMapping := sql.MapStatic("TIMESTAMP WITH TIME ZONE")
+	timeMapping := sql.MapStatic("TIME")
+
+	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
+	if featureFlags["datetime_keys_as_string"] {
+		dateMapping = sql.MapPrimaryKey(primaryKeyTextType, dateMapping)
+		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
+		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -34,29 +47,10 @@ func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("VARCHAR"),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date": func() sql.MapProjectionFn {
-						dateMapping := sql.MapStatic("DATE")
-						if featureFlags["datetime_keys_as_string"] {
-							return sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), dateMapping)
-						}
-						return dateMapping
-					}(),
-					"date-time": func() sql.MapProjectionFn {
-						datetimeMapping := sql.MapStatic("TIMESTAMP WITH TIME ZONE")
-						if featureFlags["datetime_keys_as_string"] {
-							return sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), datetimeMapping)
-						}
-						return datetimeMapping
-					}(),
-					"duration": sql.MapStatic("INTERVAL"),
-					"time": func() sql.MapProjectionFn {
-						timeMapping := sql.MapStatic("TIME")
-						if featureFlags["datetime_keys_as_string"] {
-							return sql.MapPrimaryKey(sql.MapStatic("VARCHAR"), timeMapping)
-						}
-						return timeMapping
-					}(),
-					"uuid": sql.MapStatic("UUID"),
+					"date":      dateMapping,
+					"date-time": datetimeMapping,
+					"time":      timeMapping,
+					"uuid":      sql.MapStatic("UUID"),
 				},
 			}),
 		},

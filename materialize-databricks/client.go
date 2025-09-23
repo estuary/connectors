@@ -27,10 +27,11 @@ import (
 var _ sql.SchemaManager = (*client)(nil)
 
 type client struct {
-	db       *stdsql.DB
-	cfg      config
-	ep       *sql.Endpoint[config]
-	wsClient *databricks.WorkspaceClient
+	db        *stdsql.DB
+	cfg       config
+	ep        *sql.Endpoint[config]
+	wsClient  *databricks.WorkspaceClient
+	templates templates
 }
 
 func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
@@ -51,17 +52,18 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 	}
 
 	return &client{
-		db:       db,
-		cfg:      cfg,
-		ep:       ep,
-		wsClient: wsClient,
+		db:        db,
+		cfg:       cfg,
+		ep:        ep,
+		wsClient:  wsClient,
+		templates: renderTemplates(ep.Dialect),
 	}, nil
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	rpSchemas := make(map[string]struct{})
 	for _, p := range resourcePaths {
-		rpSchemas[databricksDialect.TableLocator(p).TableSchema] = struct{}{}
+		rpSchemas[c.ep.Dialect.TableLocator(p).TableSchema] = struct{}{}
 	}
 
 	// Databricks' Tables API provides a free-form "metadata" field that is a JSON object containing
@@ -139,7 +141,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	stmt := fmt.Sprintf("DROP TABLE %s;", databricksDialect.Identifier(path...))
+	stmt := fmt.Sprintf("DROP TABLE %s;", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
 		_, err := c.db.ExecContext(ctx, stmt)
@@ -164,7 +166,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	// columns can be added in a single statement though.
 	if len(ta.AddColumns) > 0 {
 		var addColumnsStmt strings.Builder
-		if err := tplAlterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
+		if err := c.templates.alterTableColumns.Execute(&addColumnsStmt, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
 		stmts = append(stmts, addColumnsStmt.String())

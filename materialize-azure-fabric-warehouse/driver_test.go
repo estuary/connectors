@@ -17,11 +17,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var dialect = createDialect(map[string]bool{"datetime_keys_as_string": true})
-var testTemplates = renderTemplates(dialect)
-var tplCreateTargetTable = testTemplates.createTargetTable
-var tplUpdateFence = testTemplates.updateFence
-var tplCreateMigrationTable = testTemplates.createMigrationTable
 
 func mustGetCfg(t *testing.T) config {
 	if os.Getenv("TEST_DATABASE") != "yes" {
@@ -92,7 +87,7 @@ func TestValidateAndApply(t *testing.T) {
 			require.NoError(t, err)
 			defer db.Close()
 
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", dialect.Identifier(cfg.Warehouse, resourceConfig.Schema, resourceConfig.Table)))
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(cfg.Warehouse, resourceConfig.Schema, resourceConfig.Table)))
 		},
 	)
 }
@@ -130,7 +125,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 			var keys = make([]string, len(cols))
 			for i, col := range cols {
-				keys[i] = dialect.Identifier(col)
+				keys[i] = testDialect.Identifier(col)
 			}
 			for i := range values {
 				if values[i] == "true" {
@@ -140,13 +135,13 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 				}
 			}
 
-			keys = append(keys, dialect.Identifier("_meta/flow_truncated"))
+			keys = append(keys, testDialect.Identifier("_meta/flow_truncated"))
 			values = append(values, "0")
-			keys = append(keys, dialect.Identifier("flow_published_at"))
+			keys = append(keys, testDialect.Identifier("flow_published_at"))
 			values = append(values, "'2024-09-13 01:01:01'")
-			keys = append(keys, dialect.Identifier("flow_document"))
+			keys = append(keys, testDialect.Identifier("flow_document"))
 			values = append(values, "'{}'")
-			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", dialect.Identifier(resourceConfig.Schema, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
+			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
 			_, err = db.ExecContext(ctx, q)
 
 			require.NoError(t, err)
@@ -154,7 +149,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		func(t *testing.T) string {
 			t.Helper()
 
-			rows, err := sql.DumpTestTable(t, db, dialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
+			rows, err := sql.DumpTestTable(t, db, testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
 
 			require.NoError(t, err)
 
@@ -162,7 +157,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		},
 		func(t *testing.T) {
 			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", dialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
 		},
 	)
 }
@@ -179,11 +174,11 @@ func TestFencingCases(t *testing.T) {
 	sql.RunFenceTestCases(t,
 		c,
 		[]string{cfg.Warehouse, cfg.Schema, "temp_test_fencing_checkpoints"},
-		dialect,
-		tplCreateTargetTable,
+		testDialect,
+		testTemplates.createTargetTable,
 		func(table sql.Table, fence sql.Fence) error {
 			var fenceUpdate strings.Builder
-			if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
+			if err := testTemplates.updateFence.Execute(&fenceUpdate, fence); err != nil {
 				return fmt.Errorf("evaluating fence template: %w", err)
 			}
 			return c.ExecStatements(ctx, []string{fenceUpdate.String()})

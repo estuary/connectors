@@ -19,7 +19,7 @@ func translateFlowField(f string) string {
 	return columnSanitizerRegexp.ReplaceAllString(f, "_")
 }
 
-// databricksDialect returns a representation of the Databricks SQL dialect.
+// createDatabricksDialect returns a representation of the Databricks SQL dialect.
 // https://docs.databricks.com/en/sql/language-manual/index.html
 func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 	// Although databricks does support ARRAY and MAP types, they are statically
@@ -124,15 +124,20 @@ func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 	}
 }
 
-// Default dialect instance with feature flags enabled by default
-var databricksDialect = createDatabricksDialect(map[string]bool{"datetime_keys_as_string": true})
-
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`date_format(from_utc_timestamp(%s, 'UTC'), "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")`, migration.Identifier)
 }
 
-var (
-	tplAll = sql.MustParseTemplate(databricksDialect, "root", `
+type templates struct {
+	createTargetTable *template.Template
+	alterTableColumns *template.Template
+	loadQuery         *template.Template
+	copyIntoDirect    *template.Template
+	mergeInto         *template.Template
+}
+
+func renderTemplates(dialect sql.Dialect) templates {
+	tplAll := sql.MustParseTemplate(dialect, "root", `
 -- Templated creation of a materialized table definition and comments:
 -- delta.columnMapping.mode enables column renaming in Databricks. Column renaming was introduced in Databricks Runtime 10.4 LTS which was released in March 2022.
 -- See https://docs.databricks.com/en/release-notes/runtime/10.4lts.html
@@ -264,12 +269,15 @@ SELECT -1, ""
 	);
 {{ end }}
   `)
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplCopyIntoDirect    = tplAll.Lookup("copyIntoDirect")
-	tplMergeInto         = tplAll.Lookup("mergeInto")
-)
+
+	return templates{
+		createTargetTable: tplAll.Lookup("createTargetTable"),
+		alterTableColumns: tplAll.Lookup("alterTableColumns"),
+		loadQuery:         tplAll.Lookup("loadQuery"),
+		copyIntoDirect:    tplAll.Lookup("copyIntoDirect"),
+		mergeInto:         tplAll.Lookup("mergeInto"),
+	}
+}
 
 type tableWithFiles struct {
 	Files       []string

@@ -60,7 +60,8 @@ var jsonConverter sql.ElementConverter = func(te tuple.TupleElement) (interface{
 	}
 }
 
-func bqDialect(objAndArrayAsJson bool, featureFlags map[string]bool) sql.Dialect {
+func bqDialect(featureFlags map[string]bool) sql.Dialect {
+	objAndArrayAsJson := featureFlags["objects_and_arrays_as_json"]
 	objAndArrayCol := sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
 	if !objAndArrayAsJson {
 		objAndArrayCol = sql.MapStatic("STRING", sql.UsingConverter(jsonConverter))
