@@ -919,13 +919,13 @@
         {
           "active": true,
           "createdAt": 0,
-          "displayOrder": 5,
-          "label": "Closed Won",
+          "displayOrder": 4,
+          "label": "Contract Sent",
           "metadata": {
-            "isClosed": "true",
-            "probability": "1.0"
+            "isClosed": "false",
+            "probability": "0.9"
           },
-          "stageId": "closedwon",
+          "stageId": "contractsent",
           "updatedAt": null
         },
         {
@@ -943,18 +943,6 @@
         {
           "active": true,
           "createdAt": 0,
-          "displayOrder": 0,
-          "label": "Appointment Scheduled",
-          "metadata": {
-            "isClosed": "false",
-            "probability": "0.2"
-          },
-          "stageId": "appointmentscheduled",
-          "updatedAt": null
-        },
-        {
-          "active": true,
-          "createdAt": 0,
           "displayOrder": 2,
           "label": "Presentation Scheduled",
           "metadata": {
@@ -967,13 +955,13 @@
         {
           "active": true,
           "createdAt": 0,
-          "displayOrder": 4,
-          "label": "Contract Sent",
+          "displayOrder": 0,
+          "label": "Appointment Scheduled",
           "metadata": {
             "isClosed": "false",
-            "probability": "0.9"
+            "probability": "0.2"
           },
-          "stageId": "contractsent",
+          "stageId": "appointmentscheduled",
           "updatedAt": null
         },
         {
@@ -998,6 +986,18 @@
             "probability": "0.8"
           },
           "stageId": "decisionmakerboughtin",
+          "updatedAt": null
+        },
+        {
+          "active": true,
+          "createdAt": 0,
+          "displayOrder": 5,
+          "label": "Closed Won",
+          "metadata": {
+            "isClosed": "true",
+            "probability": "1.0"
+          },
+          "stageId": "closedwon",
           "updatedAt": null
         }
       ],

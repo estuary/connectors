@@ -577,6 +577,24 @@
                 "string"
               ]
             },
+            "hs_count_intent_signals_created_last_14_days": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_count_intent_signals_created_last_30_days": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_count_intent_signals_created_last_7_days": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_country_code": {
               "type": [
                 "null",
@@ -726,6 +744,19 @@
                 "string"
               ]
             },
+            "hs_intent_paid_up_to_date": {
+              "format": "date",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_intent_signals_enabled": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_is_enriched": {
               "type": [
                 "null",
@@ -811,6 +842,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_latest_intent_signal_timestamp": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_latest_meeting_activity": {
@@ -2402,6 +2439,19 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_intent_paid_up_to_date": {
+              "format": "date",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_intent_signals_enabled": {
+              "type": [
+                "null",
+                "boolean"
               ]
             },
             "hs_ip_timezone": {
@@ -4455,6 +4505,12 @@
                 "boolean"
               ]
             },
+            "hs_weighted_pipeline_in_company_currency": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hubspot_owner_assigneddate": {
               "format": "date-time",
               "type": [
@@ -5398,6 +5454,12 @@
               "type": [
                 "null",
                 "boolean"
+              ]
+            },
+            "hs_weighted_pipeline_in_company_currency": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hubspot_owner_assigneddate": {
@@ -8668,6 +8730,12 @@
                 "string"
               ]
             },
+            "hs_video_conference_platform": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_video_conference_url": {
               "type": [
                 "null",
@@ -9509,6 +9577,18 @@
               ]
             },
             "hs_owning_teams": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_partner_map_category": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_partner_map_year": {
               "type": [
                 "null",
                 "string"
@@ -10832,6 +10912,12 @@
                 "number"
               ]
             },
+            "hs_effective_unit_price": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_external_id": {
               "type": [
                 "null",
@@ -10989,6 +11075,12 @@
                 "number"
               ]
             },
+            "hs_pricing_model": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_product_id": {
               "type": [
                 "null",
@@ -11097,6 +11189,24 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_tier_amount": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_tier_prices": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_tier_ranges": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_total_discount": {
@@ -12344,6 +12454,12 @@
                 "string"
               ]
             },
+            "hs_pricing_model": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_product_type": {
               "type": [
                 "null",
@@ -12382,6 +12498,24 @@
               ]
             },
             "hs_sku": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_status": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_tier_prices": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_tier_ranges": {
               "type": [
                 "null",
                 "string"
@@ -13257,6 +13391,19 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_intent_paid_up_to_date": {
+              "format": "date",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_intent_signals_enabled": {
+              "type": [
+                "null",
+                "boolean"
               ]
             },
             "hs_ip_timezone": {
@@ -14728,6 +14875,12 @@
                 "string"
               ]
             },
+            "hs_first_assignee_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_form_id": {
               "type": [
                 "null",
@@ -15112,6 +15265,12 @@
                 "string"
               ]
             },
+            "hs_sla_pause_status": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_source_url": {
               "type": [
                 "null",
@@ -15167,6 +15326,18 @@
               ]
             },
             "hs_time_to_close_in_operating_hours": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_time_to_first_assign": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_time_to_first_rep_assignment": {
               "type": [
                 "null",
                 "number"
