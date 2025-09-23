@@ -116,7 +116,7 @@ func newTransactor(
 
 	for idx, target := range bindings {
 		t.loadFiles.AddBinding(idx, target.KeyNames())
-		t.storeFiles.AddBinding(idx, target.ColumnNames())
+		t.storeFiles.AddBinding(idx, append(target.ColumnNames(), "_flow_delete"))
 		t.bindings = append(t.bindings, &binding{
 			target:           target,
 			loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal),
@@ -275,7 +275,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	for it.Next() {
-		if d.cfg.HardDelete && it.Delete && !it.Exists {
+		flowDelete := d.cfg.HardDelete && it.Delete
+		if flowDelete && !it.Exists {
 			// Ignore documents which do not exist and are being deleted.
 			continue
 		}
@@ -285,14 +286,9 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			b.mustMerge = true
 		}
 
-		flowDocument := it.RawJSON
-		if d.cfg.HardDelete && it.Delete {
-			flowDocument = json.RawMessage(`"delete"`)
-		}
-
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
+		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err := d.storeFiles.WriteRow(ctx, it.Binding, converted); err != nil {
+		} else if err := d.storeFiles.WriteRow(ctx, it.Binding, append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing row for store: %w", err)
 		} else {
 			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])

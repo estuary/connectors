@@ -192,7 +192,7 @@ USING read_json(
 
 {{ define "storeQuery" }}
 INSERT INTO {{$.Identifier}} BY NAME
-SELECT * FROM read_json(
+SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	[
 	{{- range $ind, $f := $.Files }}
 	{{- if $ind }}, {{ end }}'{{ $f }}'
@@ -206,8 +206,9 @@ SELECT * FROM read_json(
 		{{- if $ind }},{{ end }}
 		{{$col.Identifier}}: '{{$col.DDL}}'
 	{{- end }}
+	, _flow_delete: 'BOOLEAN'
 	}
-){{ if $.Document }} WHERE {{ $.Document.Identifier }} != '"delete"'{{- end }};
+) WHERE NOT _flow_delete;
 {{ end }}
 
 -- Templated update of a fence checkpoint.
