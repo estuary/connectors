@@ -55,6 +55,11 @@ class Query:
         else:
             url += f'/{self.query_locator}'
 
+        self.log.debug("Fetching single page of REST API query.", {
+            "url": url,
+            "params": params,
+        })
+
         response = QueryResponse.model_validate_json(
             await self.http.request(self.log, url, params=params)
         )
@@ -64,6 +69,12 @@ class Query:
         for record in response.records:
             yield record
             count += 1
+
+        self.log.debug("Processing page of REST API query.", {
+            "url": url,
+            "params": params,
+            "count": count,
+        })
 
         self.records_yielded += count
         self.done = response.done
@@ -133,6 +144,14 @@ class RestQueryManager:
             queries.append(q)
 
         records: dict[str, RecordAndChunksCompleted] = {}
+
+        self.log.debug("Executing REST API queries.", {
+            "object_name": object_name,
+            "start": start,
+            "end": end,
+            "len(queries)": len(queries),
+        })
+
         while True:
             # next_query is the query that's yielded the fewest records so far. Since Salesforce dynamically reduces the page size of queries
             # depending on how much data is returned for each query, the page size for each query can be different.
@@ -190,4 +209,11 @@ class RestQueryManager:
                 # These are ignored since they should be captured on a future incremental sweep.
                 if len(records) > 0:
                     self.log.debug(f"There were {len(records)} records that were not yielded when all queries completed. These updated records will be picked up on the next incremental sweep.")
+                
+                self.log.debug("Finished executing REST API queries.", {
+                    "object_name": object_name,
+                    "start": start,
+                    "end": end,
+                    "len(queries)": len(queries),
+                })
                 return

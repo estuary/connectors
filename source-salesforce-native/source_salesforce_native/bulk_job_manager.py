@@ -54,12 +54,21 @@ class BulkJobManager:
             start: datetime | None = None,
             end: datetime | None = None,
         ) -> str:
+        query = build_query(object_name, field_names, cursor_field, start, end)
+
         body = {
             "operation": "queryAll",
-            "query" : build_query(object_name, field_names, cursor_field, start, end),
+            "query" : query,
         }
 
         try:
+            self.log.debug("Submitting bulk job.", {
+                "object_name": object_name,
+                "start": start,
+                "end": end,
+                "query": query,
+            })
+
             response = BulkJobSubmitResponse.model_validate_json(
                 await self.http.request(self.log, self.base_url, method="POST", json=body)
             )
@@ -76,15 +85,32 @@ class BulkJobManager:
             else:
                 raise
 
+        self.log.debug("Submitted bulk job.", {
+            "job_id": response.id,
+            "object_name": object_name,
+            "start": start,
+            "end": end,
+            "query": query,
+        })
+
         return response.id
 
 
     async def _check_job(self, job_id: str) -> BulkJobCheckStatusResponse:
         url = f"{self.base_url}/{job_id}"
 
+        self.log.debug("Checking bulk job status.", {
+            "job_id": job_id,
+        })
+
         response = BulkJobCheckStatusResponse.model_validate_json(
             await self.http.request(self.log, url)
         )
+
+        self.log.debug("Received bulk job status.", {
+            "job_id": job_id,
+            "response": response
+        })
 
         return response
 
@@ -97,6 +123,12 @@ class BulkJobManager:
         }
 
         while True:
+            self.log.debug("Fetching page of results for bulk job.", {
+                "job_id": job_id,
+                "url": url,
+                "params": params,
+            })
+
             headers, body = await self.http.request_stream(self.log, url, params=params, headers=request_headers)
             count: str | None = headers.get(COUNT_HEADER)
 
@@ -149,6 +181,12 @@ class BulkJobManager:
             match job_details.state:
                 case BulkJobStates.JOB_COMPLETE:
                     if job_details.numberRecordsProcessed == 0:
+                        self.log.debug("Bulk job returned no results.", {
+                            "job_id": job_id,
+                            "object_name": object_name,
+                            "start": start,
+                            "end": end,
+                        })
                         return
                     break
                 case BulkJobStates.UPLOAD_COMPLETE | BulkJobStates.IN_PROGRESS:
@@ -173,6 +211,14 @@ class BulkJobManager:
         assert isinstance(job_details.numberRecordsProcessed, int)
         received = 0
 
+        self.log.debug("Bulk job completed. Fetching results.", {
+            "job_id": job_id,
+            "job_details": job_details,
+            "object_name": object_name,
+            "start": start,
+            "end": end,
+        })
+
         async for result in self._fetch_results(job_id, model_cls):
             yield result
             received += 1
@@ -180,3 +226,11 @@ class BulkJobManager:
         if received != job_details.numberRecordsProcessed:
             msg = f"Record count mismatch for job {job_id}. Expected {job_details.numberRecordsProcessed} total records but received {received}."
             raise BulkJobError(msg)
+
+        self.log.debug("Finished fetching results for bulk job.", {
+            "job_id": job_id,
+            "object_name": object_name,
+            "start": start,
+            "end": end,
+            "count": received,
+        })
