@@ -33,6 +33,7 @@ func TestSQLGeneration(t *testing.T) {
 				templates.mergeInto,
 				templates.loadInsert,
 				templates.loadQuery,
+				templates.loadQueryNoFlowDocument,
 			},
 			TplAddColumns:  templates.alterTableColumns,
 			TplUpdateFence: templates.updateFence,
@@ -74,7 +75,7 @@ func TestDateTimePKColumn(t *testing.T) {
 			IsPrimaryKey: true,
 		},
 	}, sql.FieldConfig{})
-	require.Equal(t, "DATETIME2 NOT NULL", mapped.DDL)
+	require.Equal(t, "varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL", mapped.DDL)
 }
 
 func TestTimeColumn(t *testing.T) {

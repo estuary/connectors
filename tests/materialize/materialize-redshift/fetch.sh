@@ -5,7 +5,7 @@ set -o pipefail
 set -o nounset
 
 function exportToJsonl() {
-  go run "${TEST_DIR}"/materialize-redshift/fetch-data.go "$1" | jq "{ "_table": \"$1\", rows: map(del(.flow_document)) }"
+  go run "${TEST_DIR}"/materialize-redshift/fetch-data.go "$1" | jq "{ "_table": \"$1\", rows: . }"
 }
 
 exportToJsonl "simple"
@@ -16,3 +16,6 @@ exportToJsonl "multiple_types"
 exportToJsonl "formatted_strings"
 exportToJsonl "long_string"
 exportToJsonl "deletions"
+exportToJsonl "all_key_types_part_one"
+exportToJsonl "all_key_types_part_two"
+exportToJsonl "all_key_types_part_three"

@@ -51,6 +51,9 @@ export TEST_COLLECTION_DELETIONS="tests/deletions"
 export TEST_COLLECTION_BINARY_KEY="tests/binary-key"
 export TEST_COLLECTION_STRING_ESCAPED_KEY="tests/string-escaped-key"
 export TEST_COLLECTION_UNDERSCORE_COLUMN="tests/underscore-column"
+export TEST_COLLECTION_ALL_KEY_TYPES_PART_ONE="tests/all-key-types-part-one"
+export TEST_COLLECTION_ALL_KEY_TYPES_PART_TWO="tests/all-key-types-part-two"
+export TEST_COLLECTION_ALL_KEY_TYPES_PART_THREE="tests/all-key-types-part-three"
 
 function decrypt_config {
   sops --output-type json --decrypt $1 | jq 'walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)' 

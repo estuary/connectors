@@ -31,7 +31,8 @@ func testConfig() config {
 		Password: "!Flow1234",
 		Database: "master",
 		Advanced: advancedConfig{
-			FeatureFlags: "allow_existing_tables_for_new_bindings",
+			NoFlowDocument: true,
+			FeatureFlags:   "allow_existing_tables_for_new_bindings",
 		},
 	}
 }

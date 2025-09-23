@@ -35,10 +35,10 @@ type transactor struct {
 
 	fence sql.Fence
 
-	storeFiles *boilerplate.StagedFiles
-	loadFiles  *boilerplate.StagedFiles
-	bindings   []*binding
-	be         *m.BindingEvents
+	storeFiles   *boilerplate.StagedFiles
+	loadFiles    *boilerplate.StagedFiles
+	bindings     []*binding
+	be           *m.BindingEvents
 }
 
 func newTransactor(
@@ -63,16 +63,16 @@ func newTransactor(
 	}
 
 	t := &transactor{
-		cfg:        cfg,
-		fence:      fence,
-		be:         be,
-		loadFiles:  boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, false, false),
-		storeFiles: boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, true, false),
+		cfg:          cfg,
+		fence:        fence,
+		be:           be,
+		loadFiles:    boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, false, false),
+		storeFiles:   boilerplate.NewStagedFiles(stagedFileClient{}, bucket, fileSizeLimit, cfg.Directory, true, false),
 	}
 
 	for idx, target := range bindings {
 		t.loadFiles.AddBinding(idx, target.KeyNames())
-		t.storeFiles.AddBinding(idx, target.ColumnNames())
+		t.storeFiles.AddBinding(idx, append(target.ColumnNames(), "_flow_delete"))
 
 		hasBinaryColumns := false
 		for _, col := range target.Columns() {
@@ -164,8 +164,14 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("creating load table: %w", err)
 		}
 
+		// Choose appropriate load query template based on configuration
+		var loadTemplate = tplLoadQuery
+		if t.cfg.Advanced.NoFlowDocument {
+			loadTemplate = tplLoadQueryNoFlowDocument
+		}
+
 		var loadQuery strings.Builder
-		if err := tplLoadQuery.Execute(&loadQuery, params); err != nil {
+		if err := loadTemplate.Execute(&loadQuery, params); err != nil {
 			return fmt.Errorf("rendering load query: %w", err)
 		}
 		unionQueries = append(unionQueries, loadQuery.String())
@@ -222,23 +228,21 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	for it.Next() {
-		if t.cfg.HardDelete && it.Delete && !it.Exists {
+		var b = t.bindings[it.Binding]
+
+		var flowDelete = t.cfg.HardDelete && it.Delete
+		if flowDelete && !it.Exists {
+			// Ignore items which do not exist and are already deleted
 			continue
 		}
 
-		b := t.bindings[it.Binding]
 		if it.Exists {
 			b.store.mustMerge = true
 		}
 
-		flowDocument := it.RawJSON
-		if t.cfg.HardDelete && it.Delete {
-			flowDocument = json.RawMessage(`"delete"`)
-		}
-
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
+		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err := t.storeFiles.WriteRow(ctx, it.Binding, converted); err != nil {
+		} else if err := t.storeFiles.WriteRow(ctx, it.Binding, append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing row for store: %w", err)
 		} else {
 			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])

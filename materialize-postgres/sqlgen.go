@@ -10,6 +10,8 @@ import (
 )
 
 var pgDialect = func() sql.Dialect {
+	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(sql.StringCastConverter(func(in string) (any, error) { return strings.ReplaceAll(in, "\u0000", ""), nil })))
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -25,24 +27,16 @@ var pgDialect = func() sql.Dialect {
 			sql.STRING_INTEGER: sql.MapStatic("NUMERIC"),
 			sql.STRING_NUMBER:  sql.MapStatic("DECIMAL", sql.AlsoCompatibleWith("numeric")),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: sql.MapStatic(
-					"TEXT",
-					sql.AlsoCompatibleWith("character varying"),
-					sql.UsingConverter(sql.StringCastConverter(func(in string) (any, error) {
-						// Postgres doesn't allow fields with null bytes, so they must be stripped out if
-						// present.
-						return strings.ReplaceAll(in, "\u0000", ""), nil
-					})),
-				),
+				Fallback: primaryKeyTextType,
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate)),
-					"date-time": sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.ClampDatetime)),
+					"date":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))),
+					"date-time": sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.ClampDatetime))),
 					"duration":  sql.MapStatic("INTERVAL"),
 					"ipv4":      sql.MapStatic("CIDR"),
 					"ipv6":      sql.MapStatic("CIDR"),
 					"macaddr":   sql.MapStatic("MACADDR"),
 					"macaddr8":  sql.MapStatic("MACADDR8"),
-					"time":      sql.MapStatic("TIME", sql.AlsoCompatibleWith("time without time zone")),
+					"time":      sql.MapPrimaryKey(primaryKeyTextType, sql.MapStatic("TIME", sql.AlsoCompatibleWith("time without time zone"))),
 					// UUID format was added on 30-Sept-2024, and pre-existing
 					// text type of columns are allowed to validate for
 					// compatibility with pre-existing columns.
@@ -203,6 +197,41 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ end }}
 {{ end }}
 
+-- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
+
+{{ define "uncast" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if eq $.AsFlatType "string_integer" -}}
+	CAST({{ $ident }} AS TEXT)
+{{- else if eq $.AsFlatType "string_number" -}}
+	CAST({{ $ident }} AS TEXT)
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
+	TO_CHAR({{ $ident }}, 'YYYY-MM-DD')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
+	to_char({{ $ident }} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
+	TO_CHAR({{ $ident }}, 'HH24:MI:SS.US"Z"')
+{{- else -}}
+	{{ $ident }}
+{{- end -}}
+{{- end }}
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Binding }}, 
+JSON_BUILD_OBJECT(
+{{- range $i, $col := $.RootLevelColumns}}
+	{{- if $i}},{{end}}
+    {{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
+{{- end}}
+) as flow_document
+FROM {{ $.Identifier}} AS r
+JOIN {{ template "temp_name" . }} AS l
+{{- range $ind, $key := $.Keys }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end }}
+{{ end }}
+
 -- Templated query which inserts a new, complete row to the target table:
 
 {{ define "storeInsert" }}
@@ -302,16 +331,17 @@ BEGIN
 END $$;
 {{ end }}
 `)
-	tplCreateLoadTable   = tplAll.Lookup("createLoadTable")
-	tplCreateTargetTable = tplAll.Lookup("createTargetTable")
-	tplAlterTableColumns = tplAll.Lookup("alterTableColumns")
-	tplLoadInsert        = tplAll.Lookup("loadInsert")
-	tplStoreInsert       = tplAll.Lookup("storeInsert")
-	tplStoreUpdate       = tplAll.Lookup("storeUpdate")
-	tplDeleteQuery       = tplAll.Lookup("deleteQuery")
-	tplLoadQuery         = tplAll.Lookup("loadQuery")
-	tplInstallFence      = tplAll.Lookup("installFence")
-	tplUpdateFence       = tplAll.Lookup("updateFence")
+	tplCreateLoadTable         = tplAll.Lookup("createLoadTable")
+	tplCreateTargetTable       = tplAll.Lookup("createTargetTable")
+	tplAlterTableColumns       = tplAll.Lookup("alterTableColumns")
+	tplLoadInsert              = tplAll.Lookup("loadInsert")
+	tplStoreInsert             = tplAll.Lookup("storeInsert")
+	tplStoreUpdate             = tplAll.Lookup("storeUpdate")
+	tplDeleteQuery             = tplAll.Lookup("deleteQuery")
+	tplLoadQuery               = tplAll.Lookup("loadQuery")
+	tplLoadQueryNoFlowDocument = tplAll.Lookup("loadQueryNoFlowDocument")
+	tplInstallFence            = tplAll.Lookup("installFence")
+	tplUpdateFence             = tplAll.Lookup("updateFence")
 )
 
 // truncatedIdentifier produces a truncated form of an identifier, in accordance with Postgres'

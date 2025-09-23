@@ -5,7 +5,7 @@ set -o pipefail
 set -o nounset
 
 function exportToJsonl() {
-  query "select * from \"$1\";" | jq -c "{ table: \"$1\", rows: map(del(.flow_document)) }"
+  query "select * from \"$1\";" | jq -c "{ table: \"$1\", rows: . }"
 }
 
 exportToJsonl "Simple"
@@ -17,3 +17,6 @@ exportToJsonl "Formatted Strings"
 exportToJsonl "compound_key"
 exportToJsonl "unsigned_bigint"
 exportToJsonl "deletions"
+exportToJsonl "all_key_types_part_one"
+exportToJsonl "all_key_types_part_two"
+exportToJsonl "all_key_types_part_three"

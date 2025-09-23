@@ -8,6 +8,8 @@ syncSchedule:
 credentials:
     auth_type: PAT
     personal_access_token_sops: ENC[AES256_GCM,data:XIk56zlHUY/JOcXcJHEjn1lwBPkHrnEeelbwlluZpJLsxO5F,iv:5wFjIu/MRFf9NSGZJ7NVYql8n6v46DZ1+NjpKlBBaek=,tag:+zjtRfAA4ak/krR78PQyMA==,type:str]
+advanced:
+    no_flow_document: true
 sops:
     kms: []
     gcp_kms:
@@ -17,8 +19,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2024-08-12T16:51:23Z"
-    mac: ENC[AES256_GCM,data:KwymtIUa8+JtaFOf3EE6RI93WP03Ho41xFjzW1lNAHQQBjEkvPcqor3+zbZWsbIdBRmxjr9Yw71QbX0mZTRdyDhQl9HhZKVZrHxsav69BhKmpruKNP1X7eX9sR/axO+TbfYjAkyZw7Fmo76lnUXn6J0wAN1cIkuUQyPecv/iqHs=,iv:ZSXsvS7gYGlI3HU4BXwPwk3f1XvLVkwU/91Pmz3lOo0=,tag:0KGzElp/6wNvq/CIu+wXrg==,type:str]
+    lastmodified: "2025-09-05T13:20:35Z"
+    mac: ENC[AES256_GCM,data:c9PJZT2gqp0KLSC29MxVw0e0oduxjPl52cpGlbBSS+xOtym5W2TYxk6jTYVbTXn1RnlTKs42v12Gtw7J4c3g8Gol86AmvjuagYK6suaTkrmTAIuMtETrfsrO503BFARAv7W5iDHn5nPt6OdKPylQZrp6zxuAp9YYvORp9zkFr7U=,iv:0gUdgNcH04YL9UFH57eoFgF0baUYkI0EdsDVVtxjDZY=,tag:l7UXLhnmcLRd0lLouHyNvQ==,type:str]
     pgp: []
     encrypted_suffix: _sops
-    version: 3.8.1
+    version: 3.9.4
