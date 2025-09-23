@@ -500,19 +500,16 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		var b = d.bindings[it.Binding]
 
-		var flowDocument = it.RawJSON
-		if d.cfg.HardDelete && it.Delete {
-			if it.Exists {
-				flowDocument = json.RawMessage(`"delete"`)
-			} else {
-				// Ignore items which do not exist and are already deleted
-				continue
-			}
+		var flowDelete = d.cfg.HardDelete && it.Delete
+		if flowDelete && !it.Exists {
+			// Ignore items which do not exist and are already deleted
+			continue
 		}
-		converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument)
+		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
+		
 
 		if _, ok := batches[it.Binding]; !ok {
 			var colNames = []string{}
@@ -521,6 +518,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				// of Identifier
 				colNames = append(colNames, col.Field)
 			}
+			colNames = append(colNames, "_flow_delete")
 
 			var err error
 			batches[it.Binding], err = txn.PrepareContext(ctx, mssqldb.CopyIn(b.tempStoreTableName, mssqldb.BulkOptions{}, colNames...))
@@ -528,6 +526,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				return nil, fmt.Errorf("load: preparing bulk insert statement on %q: %w", b.tempStoreTableName, err)
 			}
 		}
+		converted = append(converted, flowDelete)
 
 		if _, err := batches[it.Binding].ExecContext(ctx, converted...); err != nil {
 			return nil, fmt.Errorf("store writing data to batch on %q: %w", b.tempStoreTableName, err)

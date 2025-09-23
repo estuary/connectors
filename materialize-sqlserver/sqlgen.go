@@ -272,7 +272,8 @@ CREATE TABLE {{ template "temp_store_name" . }} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
 		{{$col.Identifier}} {{$col.DDL}}
-	{{- end }}
+	{{- end }},
+	_flow_delete BIT
 	{{- if not $.DeltaUpdates }},
 
 		PRIMARY KEY (
@@ -338,7 +339,7 @@ SELECT TOP 0 -1, NULL
 		SELECT {{ range $ind, $key := $.Columns }}
 			{{- if $ind }}, {{ end -}}
 			{{ $key.Identifier -}}
-		{{- end }}
+		{{- end }}, _flow_delete
 		FROM {{ template "temp_store_name" . }}
 	) AS r
 	ON {{ range $ind, $key := $.Keys }}
@@ -346,7 +347,7 @@ SELECT TOP 0 -1, NULL
 		{{ $.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 	{{- if $.Document }}
-	WHEN MATCHED AND r.{{ $.Document.Identifier }}='"delete"' THEN
+	WHEN MATCHED AND r._flow_delete = 1 THEN
 		DELETE
 	{{- end }}
 	WHEN MATCHED THEN
@@ -357,7 +358,7 @@ SELECT TOP 0 -1, NULL
 	{{- if $.Document -}}
 	{{ if $.Values }}, {{ end }}{{ $.Identifier }}.{{ $.Document.Identifier}} = r.{{ $.Document.Identifier }}
 	{{- end }}
-	WHEN NOT MATCHED THEN
+	WHEN NOT MATCHED AND r._flow_delete = 0 THEN
 		INSERT (
 		{{- range $ind, $key := $.Columns }}
 			{{- if $ind }}, {{ end -}}
