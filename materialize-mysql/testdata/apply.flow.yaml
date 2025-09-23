@@ -1,12 +1,3 @@
-collections:
-  key/value:
-    schema:
-      type: object
-      properties:
-        key: { type: string }
-      required: [key]
-    key: [/key]
-
 materializations:
   acmeCo/tests/materialize-mysql/mysql:
     endpoint:
@@ -14,11 +5,7 @@ materializations:
         command: ["go", "run", "."]
         protobuf: true
         config: config.local.mysql.yaml
-    bindings: &bindings
-      - source: key/value
-        resource: { table: testing }
-        fields:
-          recommended: true
+    bindings: []
 
   acmeCo/tests/materialize-mysql/mariadb:
     endpoint:
@@ -26,4 +13,4 @@ materializations:
         command: ["go", "run", "."]
         protobuf: true
         config: config.local.mariadb.yaml
-    bindings: *bindings
+    bindings: []
