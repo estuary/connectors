@@ -67,6 +67,9 @@
         "hs_analytics_source_data_2": "sample-contact",
         "hs_annual_revenue_currency_code": null,
         "hs_avatar_filemanager_key": null,
+        "hs_count_intent_signals_created_last_14_days": null,
+        "hs_count_intent_signals_created_last_30_days": null,
+        "hs_count_intent_signals_created_last_7_days": null,
         "hs_country_code": null,
         "hs_created_by_user_id": null,
         "hs_createdate": null,
@@ -89,6 +92,8 @@
         "hs_employee_range": null,
         "hs_ideal_customer_profile": null,
         "hs_industry_group": null,
+        "hs_intent_paid_up_to_date": null,
+        "hs_intent_signals_enabled": null,
         "hs_is_enriched": null,
         "hs_is_target_account": null,
         "hs_keywords": null,
@@ -102,6 +107,7 @@
         "hs_last_sales_activity_type": null,
         "hs_lastmodifieddate": "2025-01-18T21:49:41.259000+00:00",
         "hs_latest_createdate_of_active_subscriptions": null,
+        "hs_latest_intent_signal_timestamp": null,
         "hs_latest_meeting_activity": null,
         "hs_lead_status": null,
         "hs_linkedin_handle": null,
@@ -332,6 +338,8 @@
         "hs_google_click_id": null,
         "hs_has_active_subscription": null,
         "hs_inferred_language_codes": null,
+        "hs_intent_paid_up_to_date": null,
+        "hs_intent_signals_enabled": null,
         "hs_ip_timezone": null,
         "hs_is_contact": true,
         "hs_is_enriched": null,
@@ -507,13 +515,13 @@
         {
           "active": true,
           "createdAt": 1743685132529,
-          "displayOrder": 6,
-          "label": "Closed Lost",
+          "displayOrder": 0,
+          "label": "Appointment Scheduled",
           "metadata": {
-            "isClosed": "true",
-            "probability": "0.0"
+            "isClosed": "false",
+            "probability": "0.2"
           },
-          "stageId": "closedlost",
+          "stageId": "appointmentscheduled",
           "updatedAt": 1743685150749
         },
         {
@@ -555,6 +563,18 @@
         {
           "active": true,
           "createdAt": 1743685132529,
+          "displayOrder": 6,
+          "label": "Closed Lost",
+          "metadata": {
+            "isClosed": "true",
+            "probability": "0.0"
+          },
+          "stageId": "closedlost",
+          "updatedAt": 1743685150749
+        },
+        {
+          "active": true,
+          "createdAt": 1743685132529,
           "displayOrder": 5,
           "label": "Closed Won",
           "metadata": {
@@ -562,18 +582,6 @@
             "probability": "1.0"
           },
           "stageId": "closedwon",
-          "updatedAt": 1743685150749
-        },
-        {
-          "active": true,
-          "createdAt": 1743685132529,
-          "displayOrder": 0,
-          "label": "Appointment Scheduled",
-          "metadata": {
-            "isClosed": "false",
-            "probability": "0.2"
-          },
-          "stageId": "appointmentscheduled",
           "updatedAt": 1743685150749
         },
         {
@@ -730,6 +738,7 @@
         "hs_user_ids_of_all_notification_unfollowers": null,
         "hs_user_ids_of_all_owners": "73074756",
         "hs_was_imported": null,
+        "hs_weighted_pipeline_in_company_currency": null,
         "hubspot_owner_assigneddate": "2025-04-03T12:59:10.726000+00:00",
         "hubspot_owner_id": "904875188",
         "hubspot_team_id": null,

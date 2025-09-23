@@ -132,9 +132,13 @@
         "end_user_profile_access": "readonly",
         "explore_access": "readonly",
         "explore_reports": {
+          "brands_ticket_access": "all",
+          "groups_ticket_access": "all",
           "ticket_access": "all",
+          "ticket_access_selected_brands": [],
           "ticket_access_selected_groups": []
         },
+        "export_views": false,
         "forum_access": "readonly",
         "forum_access_restricted_content": false,
         "group_access": false,

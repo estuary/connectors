@@ -74,6 +74,7 @@
         {
           "name": "value",
           "value": {
+            "description": null,
             "id": "Mw%3F_",
             "name": "value",
             "number": {
@@ -85,6 +86,7 @@
         {
           "name": "Tags",
           "value": {
+            "description": null,
             "id": "g%5C%3Fo",
             "multi_select": {
               "options": [
@@ -103,6 +105,7 @@
         {
           "name": "Name",
           "value": {
+            "description": null,
             "id": "title",
             "name": "Name",
             "title": {},
@@ -151,6 +154,7 @@
       "icon": null,
       "id": "044986df-d173-437c-9bf9-014296e5d4d2",
       "in_trash": false,
+      "is_locked": false,
       "last_edited_by": {
         "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
         "object": "user"
@@ -209,6 +213,7 @@
       "icon": null,
       "id": "45c1fbd9-2cc9-4160-93a4-3ebb94f77914",
       "in_trash": false,
+      "is_locked": false,
       "last_edited_by": {
         "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
         "object": "user"
@@ -269,6 +274,7 @@
       "icon": null,
       "id": "9291c59d-f8dd-4af8-a37a-a6646988c5d2",
       "in_trash": false,
+      "is_locked": false,
       "last_edited_by": {
         "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
         "object": "user"
@@ -345,6 +351,7 @@
       "icon": null,
       "id": "a5417102-7101-4972-aa35-eda60453e20c",
       "in_trash": false,
+      "is_locked": false,
       "last_edited_by": {
         "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
         "object": "user"
@@ -405,6 +412,7 @@
       "icon": null,
       "id": "cc5f4018-24ed-4300-9e1d-440d9bd43676",
       "in_trash": false,
+      "is_locked": false,
       "last_edited_by": {
         "id": "2ab751df-b6a3-40ba-a547-44c5306c0248",
         "object": "user"

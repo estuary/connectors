@@ -530,18 +530,21 @@
       "status": "lost",
       "status_history": [
         {
+          "auto_accepted_reason": null,
           "disbursement_date": null,
           "effective_date": "2025-01-31",
           "status": "lost",
           "timestamp": "2025-01-31T06:18:52Z"
         },
         {
+          "auto_accepted_reason": null,
           "disbursement_date": null,
           "effective_date": "2024-11-26",
           "status": "disputed",
           "timestamp": "2024-11-26T14:25:31Z"
         },
         {
+          "auto_accepted_reason": null,
           "disbursement_date": "2024-11-26",
           "effective_date": "2024-11-26",
           "status": "open",
