@@ -1,11 +1,5 @@
-collections:
-  key/value:
-    schema:
-      type: object
-      properties:
-        key: { type: string }
-      required: [key]
-    key: [/key]
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.migrate-base.flow.yaml
 
 materializations:
   acmeCo/tests/materialize-mysql/mysql:
@@ -15,10 +9,11 @@ materializations:
         protobuf: true
         config: config.local.mysql.yaml
     bindings: &bindings
-      - source: key/value
-        resource: { table: testing }
-        fields:
-          recommended: true
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
 
   acmeCo/tests/materialize-mysql/mariadb:
     endpoint:

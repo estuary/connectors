@@ -92,7 +92,7 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	return errs
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, "def", resourcePaths)
 }
 
@@ -239,6 +239,18 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
 	return sql.StdSQLExecStatements(ctx, c.db, statements)
+}
+
+func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
+	return sql.ListCheckpointsEntries(ctx, c.db, c.ep.Dialect.Identifier(c.ep.Config.Database, sql.DefaultFlowCheckpoints))
+}
+
+func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
+	return sql.DeleteCheckpointsEntry(ctx, c.db, c.ep.Dialect.Identifier(c.ep.Config.Database, sql.DefaultFlowCheckpoints), taskName)
+}
+
+func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	return sql.SnapshotTestTable(ctx, c.db, c.ep.Dialect.Identifier(path...))
 }
 
 func (c *client) Close() {
