@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"slices"
 	"strings"
@@ -429,7 +430,11 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 		}
 
 		// Select the appropriate state transition depending on the backfill mode in the resource config.
-		log.WithFields(log.Fields{"stream": streamID, "mode": binding.Resource.Mode}).Info("activating replication for stream")
+		log.WithFields(log.Fields{
+			"stream":   streamID,
+			"mode":     binding.Resource.Mode,
+			"priority": binding.Resource.Priority,
+		}).Info("activating replication for stream")
 		switch binding.Resource.Mode {
 		case BackfillModeAutomatic:
 			if discoveryInfo.UnpredictableKeyOrdering {
@@ -759,28 +764,39 @@ func (c *Capture) handleReplicationEvent(event DatabaseEvent) (int, error) {
 
 func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*DiscoveryInfo) error {
 	var bindings = c.BindingsCurrentlyBackfilling()
-	var streams = make([]StreamID, 0, len(bindings))
-	for _, b := range bindings {
-		streams = append(streams, b.StreamID)
+	if len(bindings) == 0 {
+		return nil
 	}
 
-	// Select one binding at random to backfill at a time. On average this works
-	// as well as any other policy, and just doing one at a time means that we
-	// can size the relevant constants without worrying about how many tables
-	// might be concurrently backfilling.
-	if len(streams) != 0 {
-		var streamID = streams[rand.Intn(len(streams))]
-		log.WithFields(log.Fields{
-			"count":    len(streams),
-			"selected": streamID,
-		}).Info("backfilling streams")
-		if discoveryInfo, ok := discovery[streamID]; !ok {
-			return fmt.Errorf("table %q missing from latest autodiscovery", streamID)
-		} else if err := c.backfillStream(ctx, streamID, discoveryInfo); err != nil {
-			return err
+	// Make a list of stream IDs for the highest-priority active bindings.
+	var streams = make([]StreamID, 0, len(bindings))
+	var priority = math.MinInt
+	for _, b := range bindings {
+		if b.Resource.Priority > priority {
+			priority = b.Resource.Priority
+			streams = streams[:0]
+		}
+		if b.Resource.Priority == priority {
+			streams = append(streams, b.StreamID)
 		}
 	}
-	return nil
+
+	// Within the highest active priority level, select one binding at random to
+	// backfill at a time.
+	var streamID = streams[rand.Intn(len(streams))]
+
+	log.WithFields(log.Fields{
+		"total":      len(bindings), // Total number of active bindings
+		"atPriority": len(streams),  // Number of active bindings in the current priority band
+		"priority":   priority,      // Current priority band
+		"selected":   streamID,
+	}).Info("backfilling streams")
+
+	var discoveryInfo, ok = discovery[streamID]
+	if !ok {
+		return fmt.Errorf("table %q missing from latest autodiscovery", streamID)
+	}
+	return c.backfillStream(ctx, streamID, discoveryInfo)
 }
 
 func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discoveryInfo *DiscoveryInfo) error {

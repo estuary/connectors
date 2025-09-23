@@ -25,6 +25,8 @@ type Resource struct {
 	Namespace string `json:"namespace" jsonschema:"title=Schema,description=The schema (namespace) in which the table resides.,readOnly=true"`
 	Stream    string `json:"stream" jsonschema:"title=Table Name,description=The name of the table to be captured.,readOnly=true"`
 
+	Priority int `json:"priority,omitempty" jsonschema:"title=Backfill Priority,description=An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others."`
+
 	// PrimaryKey allows the user to override the "scan key" columns which will be used
 	// to perform backfill queries and merge replicated changes. If left unset we default
 	// to the collection's key, which is basically always what the user wants, so we omit
