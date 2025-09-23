@@ -100,7 +100,7 @@
   {
     "updated": {
       "estuary-theatre%2Ftesting%2Fall_key_types_part_one": {
-        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_one AS l\nUSING flow_temp_table_7 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.strintkey = r.c1 AND l.strintkey >= '10' AND l.strintkey <= '10'\n\tAND l.strnumkey = r.c2 AND l.strnumkey >= '10.1' AND l.strnumkey <= '10.1'\nWHEN MATCHED AND TO_JSON_STRING(r.c7)='\"delete\"' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.flow_published_at = r.c4, l.strint = r.c5, l.strnum = r.c6, l.flow_document = r.c7\nWHEN NOT MATCHED THEN\n\tINSERT (id, strintkey, strnumkey, counter, flow_published_at, strint, strnum, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7);\n",
+        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_one AS l\nUSING flow_temp_table_7 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.strintkey = r.c1 AND l.strintkey >= '1' AND l.strintkey <= '1'\n\tAND l.strnumkey = r.c2 AND l.strnumkey >= '10.1' AND l.strnumkey <= '10.1'\nWHEN MATCHED AND TO_JSON_STRING(r.c7)='\"delete\"' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.flow_published_at = r.c4, l.strint = r.c5, l.strnum = r.c6, l.flow_document = r.c7\nWHEN NOT MATCHED THEN\n\tINSERT (id, strintkey, strnumkey, counter, flow_published_at, strint, strnum, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7);\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -116,7 +116,7 @@
         "TempTableName": "flow_temp_table_9"
       },
       "estuary-theatre%2Ftesting%2Fall_key_types_part_two": {
-        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_two AS l\nUSING flow_temp_table_8 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.datekey = r.c1 AND l.datekey >= '2023-08-30' AND l.datekey <= '2023-08-30'\n\tAND l.timekey = r.c2 AND l.timekey >= '12:34:56Z' AND l.timekey <= '12:34:56Z'\nWHEN MATCHED AND TO_JSON_STRING(r.c7)='\"delete\"' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.date = r.c4, l.flow_published_at = r.c5, l.time = r.c6, l.flow_document = r.c7\nWHEN NOT MATCHED THEN\n\tINSERT (id, datekey, timekey, counter, date, flow_published_at, time, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7);\n",
+        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_two AS l\nUSING flow_temp_table_8 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.datekey = r.c1 AND l.datekey >= '0000-01-01' AND l.datekey <= '0000-01-01'\n\tAND l.timekey = r.c2 AND l.timekey >= '12:34:56Z' AND l.timekey <= '12:34:56Z'\nWHEN MATCHED AND TO_JSON_STRING(r.c7)='\"delete\"' THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.date = r.c4, l.flow_published_at = r.c5, l.time = r.c6, l.flow_document = r.c7\nWHEN NOT MATCHED THEN\n\tINSERT (id, datekey, timekey, counter, date, flow_published_at, time, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7);\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -587,12 +587,12 @@
   "rows": [
     {
       "counter": 2,
-      "flow_document": "{\"_meta\":{\"uuid\":\"ea1ce000-1de2-11b2-8000-071353030311\"},\"counter\":2,\"id\":1,\"strint\":\"1\",\"strintkey\":\"10\",\"strnum\":\"1.1\",\"strnumkey\":\"10.1\"}",
+      "flow_document": "{\"_meta\":{\"uuid\":\"ea1ce000-1de2-11b2-8000-071353030311\"},\"counter\":2,\"id\":1,\"strint\":\"1\",\"strintkey\":\"1\",\"strnum\":\"10.1\",\"strnumkey\":\"10.1\"}",
       "flow_published_at": "1970-01-01T02:00:32Z",
       "id": 1,
       "strint": "1",
-      "strintkey": "10",
-      "strnum": 1.1,
+      "strintkey": "1",
+      "strnum": 10.1,
       "strnumkey": "10.1"
     }
   ],
@@ -602,9 +602,9 @@
   "rows": [
     {
       "counter": 2,
-      "date": "2023-08-30",
-      "datekey": "2023-08-30",
-      "flow_document": "{\"_meta\":{\"uuid\":\"eab57680-1de2-11b2-8000-071353030311\"},\"counter\":2,\"date\":\"2023-08-30\",\"datekey\":\"2023-08-30\",\"id\":1,\"time\":\"12:34:56Z\",\"timekey\":\"12:34:56Z\"}",
+      "date": "0001-01-01",
+      "datekey": "0000-01-01",
+      "flow_document": "{\"_meta\":{\"uuid\":\"eab57680-1de2-11b2-8000-071353030311\"},\"counter\":2,\"date\":\"0001-01-01\",\"datekey\":\"0000-01-01\",\"id\":1,\"time\":\"12:34:56Z\",\"timekey\":\"12:34:56Z\"}",
       "flow_published_at": "1970-01-01T02:00:33Z",
       "id": 1,
       "time": "12:34:56Z",
@@ -617,9 +617,9 @@
   "rows": [
     {
       "counter": 2,
-      "datetime": "2023-08-30T12:34:56Z",
-      "datetimekey": "2023-08-30T12:34:56Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"eb4e0d00-1de2-11b2-8000-071353030311\"},\"counter\":2,\"datetime\":\"2023-08-30T12:34:56Z\",\"datetimekey\":\"2023-08-30T12:34:56Z\",\"id\":1,\"uuid\":\"550e8400-e29b-41d4-a716-446655440000\",\"uuidkey\":\"550e8400-e29b-41d4-a716-446655440000\"}",
+      "datetime": "0001-01-01T00:00:00Z",
+      "datetimekey": "0000-01-01T12:34:56Z",
+      "flow_document": "{\"_meta\":{\"uuid\":\"eb4e0d00-1de2-11b2-8000-071353030311\"},\"counter\":2,\"datetime\":\"0000-01-01T12:34:56Z\",\"datetimekey\":\"0000-01-01T12:34:56Z\",\"id\":1,\"uuid\":\"550e8400-e29b-41d4-a716-446655440000\",\"uuidkey\":\"550e8400-e29b-41d4-a716-446655440000\"}",
       "flow_published_at": "1970-01-01T02:00:34Z",
       "id": 1,
       "uuid": "550e8400-e29b-41d4-a716-446655440000",

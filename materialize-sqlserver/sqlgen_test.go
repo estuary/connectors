@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = createSqlServerDialect("Latin1_General_100_BIN2_UTF8", "dbo", map[string]bool{"datetime_keys_as_string": true})
+var testDialect = createSqlServerDialect("Latin1_General_100_BIN2_UTF8", "dbo", featureFlagDefaults)
+var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
-	var templates = renderTemplates(testDialect)
 
 	snap, _ := sql.RunSqlGenTests(
 		t,
@@ -24,18 +24,18 @@ func TestSQLGeneration(t *testing.T) {
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				templates.tempLoadTruncate,
-				templates.tempStoreTruncate,
-				templates.createLoadTable,
-				templates.createStoreTable,
-				templates.createTargetTable,
-				templates.directCopy,
-				templates.mergeInto,
-				templates.loadInsert,
-				templates.loadQuery,
+				testTemplates.tempLoadTruncate,
+				testTemplates.tempStoreTruncate,
+				testTemplates.createLoadTable,
+				testTemplates.createStoreTable,
+				testTemplates.createTargetTable,
+				testTemplates.directCopy,
+				testTemplates.mergeInto,
+				testTemplates.loadInsert,
+				testTemplates.loadQuery,
 			},
-			TplAddColumns:  templates.alterTableColumns,
-			TplUpdateFence: templates.updateFence,
+			TplAddColumns:  testTemplates.alterTableColumns,
+			TplUpdateFence: testTemplates.updateFence,
 		},
 	)
 

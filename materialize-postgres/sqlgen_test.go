@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testDialect = createPgDialect(featureFlagDefaults)
+var testTemplates = renderTemplates(testDialect)
+
 func TestSQLGeneration(t *testing.T) {
-	// Create test dialect with default feature flags
-	testDialect := createPgDialect(map[string]bool{"datetime_keys_as_string": true})
-	testTemplates := renderTemplates(testDialect)
 
 	snap, _ := sql.RunSqlGenTests(
 		t,
@@ -44,8 +44,6 @@ func TestSQLGeneration(t *testing.T) {
 }
 
 func TestDateTimeColumn(t *testing.T) {
-	// Create test dialect with default feature flags
-	testDialect := createPgDialect(map[string]bool{"datetime_keys_as_string": true})
 
 	var mapped = testDialect.MapType(&sql.Projection{
 		Projection: pf.Projection{

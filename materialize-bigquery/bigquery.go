@@ -165,7 +165,7 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 				"bucket_path": cfg.effectiveBucketPath(),
 			}).Info("creating bigquery endpoint")
 
-			dialect := bqDialect(featureFlags["objects_and_arrays_as_json"], featureFlags)
+			dialect := bqDialect(featureFlags)
 			templates := renderTemplates(dialect)
 
 			// BigQuery's default SerPolicy has historically had limits of 1500

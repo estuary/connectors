@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = createRsDialect(false, map[string]bool{"datetime_keys_as_string": true})
+var testDialect = createRsDialect(false, featureFlagDefaults)
+var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
-	var templates = renderTemplates(testDialect)
 
 	snap, tables := sql.RunSqlGenTests(
 		t,
@@ -24,18 +24,18 @@ func TestSQLGeneration(t *testing.T) {
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				templates.createTargetTable,
-				templates.createStoreTable,
-				templates.mergeInto,
-				templates.loadQuery,
-				templates.createDeleteTable,
-				templates.deleteQuery,
+				testTemplates.createTargetTable,
+				testTemplates.createStoreTable,
+				testTemplates.mergeInto,
+				testTemplates.loadQuery,
+				testTemplates.createDeleteTable,
+				testTemplates.deleteQuery,
 			},
 		},
 	)
 
 	for _, tbl := range tables {
-		tpl := templates.createLoadTable
+		tpl := testTemplates.createLoadTable
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
 		data := loadTableParams{
@@ -48,7 +48,7 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	for _, tbl := range tables {
-		tpl := templates.createLoadTable
+		tpl := testTemplates.createLoadTable
 		var testcase = tbl.Identifier + " " + tpl.Name()
 
 		data := loadTableParams{
@@ -81,14 +81,14 @@ func TestSQLGeneration(t *testing.T) {
 	}
 
 	snap.WriteString("--- Begin Copy From S3 Without Case Sensitive Identifiers or Truncation ---")
-	require.NoError(t, templates.copyFromS3.Execute(snap, copyParams))
+	require.NoError(t, testTemplates.copyFromS3.Execute(snap, copyParams))
 	snap.WriteString("--- End Copy From S3 Without Case Sensitive Identifier or Truncation ---\n\n")
 
 	copyParams.CaseSensitiveIdentifierEnabled = true
 	copyParams.TruncateColumns = true
 
 	snap.WriteString("--- Begin Copy From S3 With Case Sensitive Identifiers and Truncation ---")
-	require.NoError(t, templates.copyFromS3.Execute(snap, copyParams))
+	require.NoError(t, testTemplates.copyFromS3.Execute(snap, copyParams))
 	snap.WriteString("--- End Copy From S3 With Case Sensitive Identifiers and Truncation ---")
 
 	cupaloy.SnapshotT(t, snap.String())

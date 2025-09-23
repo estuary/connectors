@@ -85,7 +85,7 @@ func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 				Dialect:             dialect,
 				MetaCheckpoints:     nil,
 				NewClient:           newClient,
-				CreateTableTemplate: tplCreateTargetTable,
+				CreateTableTemplate: renderTemplates(dialect).createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     true,
 				Options: m.MaterializeOptions{
@@ -110,6 +110,8 @@ type transactor struct {
 	localStagingPath string
 	bindings         []*binding
 	be               *m.BindingEvents
+	ep               *sql.Endpoint[config]
+	templates        templates
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -143,7 +145,7 @@ func newTransactor(
 		return nil, fmt.Errorf("initialising workspace client: %w", err)
 	}
 
-	var d = &transactor{cfg: cfg, wsClient: wsClient, be: be}
+	var d = &transactor{cfg: cfg, wsClient: wsClient, be: be, ep: ep, templates: renderTemplates(ep.Dialect)}
 
 	db, err := stdsql.Open("databricks", d.cfg.ToURI())
 	if err != nil {
@@ -214,8 +216,8 @@ func (t *transactor) addBinding(target sql.Table) error {
 
 	b.loadFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.KeyNames()))
 	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.ColumnNames()))
-	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, databricksDialect.Literal)
-	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, databricksDialect.Literal)
+	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
+	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
 
 	t.bindings = append(t.bindings, b)
 
@@ -255,7 +257,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 		var fullPaths = pathsWithRoot(b.rootStagingPath, toLoad)
 
-		if loadQuery, err := RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, tplLoadQuery, b.loadMergeBounds.Build()); err != nil {
+		if loadQuery, err := RenderTableWithFiles(b.target, fullPaths, b.rootStagingPath, d.templates.loadQuery, b.loadMergeBounds.Build()); err != nil {
 			return fmt.Errorf("loadQuery template: %w", err)
 		} else {
 			queries = append(queries, loadQuery)
@@ -402,7 +404,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 					end = len(toCopy)
 				}
 
-				if query, err := RenderTableWithFiles(b.target, toCopy[i:end], b.rootStagingPath, tplCopyIntoDirect, bounds); err != nil {
+				if query, err := RenderTableWithFiles(b.target, toCopy[i:end], b.rootStagingPath, d.templates.copyIntoDirect, bounds); err != nil {
 					return nil, fmt.Errorf("copyIntoDirect template: %w", err)
 				} else {
 					queries = append(queries, query)
@@ -414,7 +416,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				if end > len(toCopy) {
 					end = len(toCopy)
 				}
-				if query, err := RenderTableWithFiles(b.target, fullPaths[i:end], b.rootStagingPath, tplMergeInto, bounds); err != nil {
+				if query, err := RenderTableWithFiles(b.target, fullPaths[i:end], b.rootStagingPath, d.templates.mergeInto, bounds); err != nil {
 					return nil, fmt.Errorf("mergeInto template: %w", err)
 				} else {
 					queries = append(queries, query)
