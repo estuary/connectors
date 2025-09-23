@@ -1,7 +1,8 @@
-package connector
+package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -31,7 +32,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 	return ep.Config.client(ctx, ep)
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	rpDatasets := make(map[string]struct{})
 	for _, p := range resourcePaths {
 		rpDatasets[c.ep.TableLocator(p).TableSchema] = struct{}{}
@@ -223,6 +224,55 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 func (c *client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence) (sql.Fence, error) {
 	return sql.Fence{}, errors.New("internal error: InstallFence not implemented")
 
+}
+
+func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
+	return nil
+}
+
+func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	query := fmt.Sprintf("SELECT * FROM %s", c.ep.Dialect.Identifier(path...))
+
+	job, err := c.query(ctx, query)
+	if err != nil {
+		return nil, nil, fmt.Errorf("querying table: %w", err)
+	}
+
+	it, err := job.Read(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("reading query results: %w", err)
+	}
+
+	var colNames []string
+	for _, col := range it.Schema {
+		colNames = append(colNames, col.Name)
+	}
+
+	var allRows [][]any
+	var values []bigquery.Value
+	for {
+		if err = it.Next(&values); err == iterator.Done {
+			break
+		} else if err != nil {
+			return nil, nil, fmt.Errorf("reading row: %w", err)
+		}
+
+		row := make([]any, len(values))
+		for i, v := range values {
+			if s, ok := v.(string); ok && json.Valid([]byte(s)) {
+				v = json.RawMessage(s)
+			}
+			row[i] = v
+		}
+		allRows = append(allRows, row)
+	}
+	sql.SortRows(allRows)
+
+	return colNames, allRows, nil
 }
 
 func (c *client) Close() {

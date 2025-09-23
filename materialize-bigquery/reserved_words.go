@@ -1,4 +1,4 @@
-package connector
+package main
 
 // Ref: https://cloud.google.com/bigquery/docs/reference/standard-sql/lexical#reserved_keywords
 

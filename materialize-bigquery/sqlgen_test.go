@@ -1,4 +1,4 @@
-package connector
+package main
 
 import (
 	"testing"
