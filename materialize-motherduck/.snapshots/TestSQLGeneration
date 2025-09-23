@@ -96,7 +96,7 @@ USING read_json(
 
 --- Begin db."a-schema".key_value storeQuery ---
 INSERT INTO db."a-schema".key_value BY NAME
-SELECT * FROM read_json(
+SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
 	compression='gzip',
@@ -122,13 +122,14 @@ SELECT * FROM read_json(
 		"stringInteger66Chars": 'VARCHAR',
 		"stringNumber": 'DOUBLE',
 		flow_document: 'JSON NOT NULL'
+	, _flow_delete: 'BOOLEAN'
 	}
-) WHERE flow_document != '"delete"';
+) WHERE NOT _flow_delete;
 --- End db."a-schema".key_value storeQuery ---
 
 --- Begin db."a-schema".delta_updates storeQuery ---
 INSERT INTO db."a-schema".delta_updates BY NAME
-SELECT * FROM read_json(
+SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
 	compression='gzip',
@@ -137,8 +138,9 @@ SELECT * FROM read_json(
 		"theKey": 'VARCHAR NOT NULL',
 		"aValue": 'BIGINT',
 		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL'
+	, _flow_delete: 'BOOLEAN'
 	}
-);
+) WHERE NOT _flow_delete;
 --- End db."a-schema".delta_updates storeQuery ---
 
 
