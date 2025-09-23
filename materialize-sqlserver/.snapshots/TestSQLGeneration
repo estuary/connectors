@@ -59,6 +59,7 @@ CREATE TABLE #flow_temp_store_0 (
 		"stringInteger66Chars" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		"stringNumber" DOUBLE PRECISION,
 		flow_document varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+	_flow_delete BIT,
 
 		PRIMARY KEY (key1, key2, "key!binary")
 );
@@ -69,7 +70,8 @@ CREATE TABLE #flow_temp_store_0 (
 CREATE TABLE #flow_temp_store_1 (
 		"theKey" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
 		"aValue" BIGINT,
-		flow_published_at DATETIME2 NOT NULL
+		flow_published_at DATETIME2 NOT NULL,
+	_flow_delete BIT
 );
 --- End delta_updates createStoreTable ---
 
@@ -140,15 +142,15 @@ END;
 
 	MERGE INTO key_value
 	USING (
-		SELECT key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
+		SELECT key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document, _flow_delete
 		FROM #flow_temp_store_0
 	) AS r
 	ON key_value.key1 = r.key1 AND key_value.key2 = r.key2 AND key_value."key!binary" = r."key!binary"
-	WHEN MATCHED AND r.flow_document='"delete"' THEN
+	WHEN MATCHED AND r._flow_delete = 1 THEN
 		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET key_value."array" = r."array", key_value."binary" = r."binary", key_value."boolean" = r."boolean", key_value.flow_published_at = r.flow_published_at, key_value."integer" = r."integer", key_value."integerGt64Bit" = r."integerGt64Bit", key_value."integerWithUserDDL" = r."integerWithUserDDL", key_value.multiple = r.multiple, key_value.number = r.number, key_value."numberCastToString" = r."numberCastToString", key_value."object" = r."object", key_value.string = r.string, key_value."stringInteger" = r."stringInteger", key_value."stringInteger39Chars" = r."stringInteger39Chars", key_value."stringInteger66Chars" = r."stringInteger66Chars", key_value."stringNumber" = r."stringNumber", key_value.flow_document = r.flow_document
-	WHEN NOT MATCHED THEN
+	WHEN NOT MATCHED AND r._flow_delete = 0 THEN
 		INSERT (key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
 		VALUES (r.key1, r.key2, r."key!binary", r."array", r."binary", r."boolean", r.flow_published_at, r."integer", r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r.number, r."numberCastToString", r."object", r.string, r."stringInteger", r."stringInteger39Chars", r."stringInteger66Chars", r."stringNumber", r.flow_document);
 --- End key_value mergeInto ---
@@ -157,13 +159,13 @@ END;
 
 	MERGE INTO delta_updates
 	USING (
-		SELECT "theKey", "aValue", flow_published_at
+		SELECT "theKey", "aValue", flow_published_at, _flow_delete
 		FROM #flow_temp_store_1
 	) AS r
 	ON delta_updates."theKey" = r."theKey"
 	WHEN MATCHED THEN
 		UPDATE SET delta_updates."aValue" = r."aValue", delta_updates.flow_published_at = r.flow_published_at
-	WHEN NOT MATCHED THEN
+	WHEN NOT MATCHED AND r._flow_delete = 0 THEN
 		INSERT ("theKey", "aValue", flow_published_at)
 		VALUES (r."theKey", r."aValue", r.flow_published_at);
 --- End delta_updates mergeInto ---
