@@ -1,0 +1,36 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-bigquery:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.yaml
+    bindings:
+    - resource:
+        table: simple_standard
+        dataset: testing
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: simple_delta
+        dataset: testing
+        delta_updates: true
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: not_simple
+        dataset: testing
+      source: tests/not-simple
+      fields:
+        recommended: true
+    - resource:
+        table: data_types
+        dataset: testing
+      source: tests/data-types
+      fields:
+        recommended: true
