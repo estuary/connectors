@@ -2,16 +2,14 @@ package main
 
 import (
 	"context"
-	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
-	"strings"
+	"regexp"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
@@ -58,105 +56,78 @@ func mustGetCfg(t *testing.T) config {
 	return out
 }
 
-func TestValidateAndApply(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := mustGetCfg(t)
-
-	resourceConfig := tableConfig{
-		Table:  "TARGET",
-		Schema: "PUBLIC",
+func TestIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
 	}
 
-	dsn, err := cfg.toURI(true)
-	require.NoError(t, err)
-
-	db, err := stdsql.Open("snowflake", dsn)
-	require.NoError(t, err)
-	defer db.Close()
-
-	boilerplate.RunValidateAndApplyTestCases(
-		t,
-		newSnowflakeDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
-
-			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T) {
-			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-		},
-	)
-}
-
-func TestValidateAndApplyMigrations(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := mustGetCfg(t)
-
-	resourceConfig := tableConfig{
-		Table:  "TARGET",
-		Schema: "PUBLIC",
+	makeResourceFn := func(table string, delta bool) tableConfig {
+		return tableConfig{
+			Table:  table,
+			Schema: "ESTUARY_SCHEMA",
+			Delta:  delta,
+		}
 	}
 
-	dsn, err := cfg.toURI(true)
-	require.NoError(t, err)
-
-	db, err := stdsql.Open("snowflake", dsn)
-	require.NoError(t, err)
-	defer db.Close()
-
-	sql.RunValidateAndApplyMigrationsTests(
-		t,
-		newSnowflakeDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
-
-			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, resourceConfig.Schema, resourceConfig.Table)
-			require.NoError(t, err)
-
-			return sch
+	actionDescSanitizers := []func(string) string{
+		func(s string) string {
+			return regexp.MustCompile(`@flow_v1/[a-fA-F0-9\-]{36}`).ReplaceAllString(s, `<uuid>`)
 		},
-		func(t *testing.T, cols []string, values []string) {
-			t.Helper()
-
-			var keys = make([]string, len(cols))
-			for i, col := range cols {
-				keys[i] = testDialect.Identifier(col)
-			}
-			keys = append(keys, testDialect.Identifier("_meta/flow_truncated"))
-			values = append(values, "0")
-			keys = append(keys, testDialect.Identifier("flow_published_at"))
-			values = append(values, "'2024-09-13 01:01:01'")
-			keys = append(keys, testDialect.Identifier("flow_document"))
-			values = append(values, "PARSE_JSON('{}')")
-			q := fmt.Sprintf("insert into %s (%s) SELECT %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
-			_, err = db.ExecContext(ctx, q)
-
-			require.NoError(t, err)
+		func(s string) string {
+			return regexp.MustCompile(`"Path":\s*"[^"]*"`).ReplaceAllString(s, `"Path": "<uuid>"`)
 		},
-		func(t *testing.T) string {
-			t.Helper()
-
-			rows, err := sql.DumpTestTable(t, db, testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table))
-
-			require.NoError(t, err)
-
-			return rows
+		func(s string) string {
+			return regexp.MustCompile(`"PipeStartTime":\s*"[^"]+"`).ReplaceAllString(s, `"PipeStartTime": "<timestamp>"`)
 		},
-		func(t *testing.T) {
-			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
+		func(s string) string {
+			return regexp.MustCompile(`"channel_name":\s*"([^_]+_[^_]+_[^_]+_[^_]+_)[A-F0-9]+(_[^"]+)"`).ReplaceAllString(s, `"channel_name":"${1}<channel_id>${2}"`)
 		},
-	)
+		func(s string) string {
+			return regexp.MustCompile(`"path":\s*"[^"]*"`).ReplaceAllString(s, `"path": "<path>"`)
+		},
+		func(s string) string {
+			return regexp.MustCompile(`"md5":\s*"[^"]*"`).ReplaceAllString(s, `"md5": "<md5>"`)
+		},
+		func(s string) string {
+			return regexp.MustCompile(`"chunk_length":\s*\d+`).ReplaceAllString(s, `"chunk_length": "<chunk_length>"`)
+		},
+		func(s string) string {
+			return regexp.MustCompile(`"chunk_length_uncompressed":\s*\d+`).ReplaceAllString(s, `"chunk_length_uncompressed": "<chunk_length_uncompressed>"`)
+		},
+		func(s string) string {
+			return regexp.MustCompile(`"chunk_md5":\s*"[^"]*"`).ReplaceAllString(s, `"chunk_md5": "<chunk_md5>"`)
+		},
+		func(s string) string {
+			return regexp.MustCompile(`"encryption_key_id":\s*\d+`).ReplaceAllString(s, `"encryption_key_id": "<encryption_key_id>"`)
+		},
+		func(s string) string {
+			return regexp.MustCompile(`"first_insert_time_in_ms":\s*\d+`).ReplaceAllString(s, `"first_insert_time_in_ms": "<first_insert_time_in_ms>"`)
+		},
+		func(s string) string {
+			return regexp.MustCompile(`"last_insert_time_in_ms":\s*\d+`).ReplaceAllString(s, `"last_insert_time_in_ms": "<last_insert_time_in_ms>"`)
+		},
+		func(s string) string {
+			return regexp.MustCompile(`"flush_start_ms":\s*\d+`).ReplaceAllString(s, `"flush_start_ms": "<flush_start_ms>"`)
+		},
+		func(s string) string {
+			return regexp.MustCompile(`"build_duration_ms":\s*\d+`).ReplaceAllString(s, `"build_duration_ms": "<build_duration_ms>"`)
+		},
+		func(s string) string {
+			return regexp.MustCompile(`"upload_duration_ms":\s*\d+`).ReplaceAllString(s, `"upload_duration_ms": "<upload_duration_ms>"`)
+		},
+	}
+
+	t.Run("materialize", func(t *testing.T) {
+		sql.RunMaterializationTest(t, newSnowflakeDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers)
+	})
+
+	t.Run("apply", func(t *testing.T) {
+		sql.RunApplyTest(t, newSnowflakeDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+	})
+
+	t.Run("migrate", func(t *testing.T) {
+		sql.RunMigrationTest(t, newSnowflakeDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+	})
 }
 
 func TestSpecification(t *testing.T) {

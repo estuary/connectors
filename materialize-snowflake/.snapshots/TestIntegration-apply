@@ -1,3 +1,5 @@
+Task: acmeCo/tests/materialize-snowflake
+
 Big Schema Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
 {"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
@@ -116,82 +118,82 @@ Big Schema Changed Types Constraints:
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Big Schema Materialized Resource Schema With All Fields Required:
-{"Name":"ARRAYFIELD","Nullable":"NO","Type":"VARIANT"}
-{"Name":"BOOLFIELD","Nullable":"NO","Type":"BOOLEAN"}
-{"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
-{"Name":"INTFIELD","Nullable":"NO","Type":"NUMBER"}
-{"Name":"KEY","Nullable":"NO","Type":"TEXT"}
-{"Name":"MULTIPLEFIELD","Nullable":"NO","Type":"VARIANT"}
-{"Name":"NUMFIELD","Nullable":"NO","Type":"FLOAT"}
-{"Name":"OBJFIELD","Nullable":"NO","Type":"VARIANT"}
-{"Name":"STRINGDATEFIELD","Nullable":"NO","Type":"DATE"}
-{"Name":"STRINGDATETIMEFIELD","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
-{"Name":"STRINGDURATIONFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGEMAILFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGHOSTNAMEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGIDNEMAILFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGIDNHOSTNAMEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGINTEGERFIELD","Nullable":"NO","Type":"NUMBER"}
-{"Name":"STRINGIPV4FIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGIPV6FIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGIRIFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGIRIREFERENCEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGJSONPOINTERFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGMACADDR8FIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGMACADDRFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGNUMBERFIELD","Nullable":"NO","Type":"FLOAT"}
-{"Name":"STRINGREGEXFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGRELATIVEJSONPOINTERFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGTIMEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGUINT32FIELD","Nullable":"NO","Type":"NUMBER"}
-{"Name":"STRINGUINT64FIELD","Nullable":"NO","Type":"NUMBER"}
-{"Name":"STRINGURIFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGURIREFERENCEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGURITEMPLATEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGUUIDFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+{"Name":"ARRAYFIELD","Nullable":false,"Type":"VARIANT"}
+{"Name":"BOOLFIELD","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
+{"Name":"INTFIELD","Nullable":false,"Type":"FIXED"}
+{"Name":"KEY","Nullable":false,"Type":"TEXT"}
+{"Name":"MULTIPLEFIELD","Nullable":false,"Type":"VARIANT"}
+{"Name":"NUMFIELD","Nullable":false,"Type":"REAL"}
+{"Name":"OBJFIELD","Nullable":false,"Type":"VARIANT"}
+{"Name":"STRINGDATEFIELD","Nullable":false,"Type":"DATE"}
+{"Name":"STRINGDATETIMEFIELD","Nullable":false,"Type":"TIMESTAMP_LTZ"}
+{"Name":"STRINGDURATIONFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGEMAILFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGHOSTNAMEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGIDNEMAILFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGIDNHOSTNAMEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGINTEGERFIELD","Nullable":false,"Type":"FIXED"}
+{"Name":"STRINGIPV4FIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGIPV6FIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGIRIFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGIRIREFERENCEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGJSONPOINTERFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGMACADDR8FIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGMACADDRFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGNUMBERFIELD","Nullable":false,"Type":"REAL"}
+{"Name":"STRINGREGEXFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGRELATIVEJSONPOINTERFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGTIMEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGUINT32FIELD","Nullable":false,"Type":"FIXED"}
+{"Name":"STRINGUINT64FIELD","Nullable":false,"Type":"FIXED"}
+{"Name":"STRINGURIFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGURIREFERENCEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGURITEMPLATEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGUUIDFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
 Big Schema Materialized Resource Schema With No Fields Required:
-{"Name":"ARRAYFIELD","Nullable":"YES","Type":"VARIANT"}
-{"Name":"BOOLFIELD","Nullable":"YES","Type":"BOOLEAN"}
-{"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
-{"Name":"INTFIELD","Nullable":"YES","Type":"NUMBER"}
-{"Name":"KEY","Nullable":"NO","Type":"TEXT"}
-{"Name":"MULTIPLEFIELD","Nullable":"YES","Type":"VARIANT"}
-{"Name":"NUMFIELD","Nullable":"YES","Type":"FLOAT"}
-{"Name":"OBJFIELD","Nullable":"YES","Type":"VARIANT"}
-{"Name":"STRINGDATEFIELD","Nullable":"YES","Type":"DATE"}
-{"Name":"STRINGDATETIMEFIELD","Nullable":"YES","Type":"TIMESTAMP_LTZ"}
-{"Name":"STRINGDURATIONFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGEMAILFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGHOSTNAMEFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGIDNEMAILFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGIDNHOSTNAMEFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGINTEGERFIELD","Nullable":"YES","Type":"NUMBER"}
-{"Name":"STRINGIPV4FIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGIPV6FIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGIRIFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGIRIREFERENCEFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGJSONPOINTERFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGMACADDR8FIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGMACADDRFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGNUMBERFIELD","Nullable":"YES","Type":"FLOAT"}
-{"Name":"STRINGREGEXFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGRELATIVEJSONPOINTERFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGTIMEFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGUINT32FIELD","Nullable":"YES","Type":"NUMBER"}
-{"Name":"STRINGUINT64FIELD","Nullable":"YES","Type":"NUMBER"}
-{"Name":"STRINGURIFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGURIREFERENCEFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGURITEMPLATEFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"STRINGUUIDFIELD","Nullable":"YES","Type":"TEXT"}
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+{"Name":"ARRAYFIELD","Nullable":true,"Type":"VARIANT"}
+{"Name":"BOOLFIELD","Nullable":true,"Type":"BOOLEAN"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
+{"Name":"INTFIELD","Nullable":true,"Type":"FIXED"}
+{"Name":"KEY","Nullable":false,"Type":"TEXT"}
+{"Name":"MULTIPLEFIELD","Nullable":true,"Type":"VARIANT"}
+{"Name":"NUMFIELD","Nullable":true,"Type":"REAL"}
+{"Name":"OBJFIELD","Nullable":true,"Type":"VARIANT"}
+{"Name":"STRINGDATEFIELD","Nullable":true,"Type":"DATE"}
+{"Name":"STRINGDATETIMEFIELD","Nullable":true,"Type":"TIMESTAMP_LTZ"}
+{"Name":"STRINGDURATIONFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGEMAILFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGHOSTNAMEFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGIDNEMAILFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGIDNHOSTNAMEFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGINTEGERFIELD","Nullable":true,"Type":"FIXED"}
+{"Name":"STRINGIPV4FIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGIPV6FIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGIRIFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGIRIREFERENCEFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGJSONPOINTERFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGMACADDR8FIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGMACADDRFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGNUMBERFIELD","Nullable":true,"Type":"REAL"}
+{"Name":"STRINGREGEXFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGRELATIVEJSONPOINTERFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGTIMEFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGUINT32FIELD","Nullable":true,"Type":"FIXED"}
+{"Name":"STRINGUINT64FIELD","Nullable":true,"Type":"FIXED"}
+{"Name":"STRINGURIFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGURIREFERENCEFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGURITEMPLATEFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"STRINGUUIDFIELD","Nullable":true,"Type":"TEXT"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
-Big Schema Changed Types With Table Replacement Constraints:
+Big Schema Changed Types With Backfill Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
 {"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
@@ -230,117 +232,117 @@ Big Schema Changed Types With Table Replacement Constraints:
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
-Big Schema Materialized Resource Schema Changed Types With Table Replacement:
-{"Name":"ARRAYFIELD","Nullable":"NO","Type":"VARIANT"}
-{"Name":"BOOLFIELD","Nullable":"NO","Type":"NUMBER"}
-{"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
-{"Name":"INTFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"KEY","Nullable":"NO","Type":"TEXT"}
-{"Name":"MULTIPLEFIELD","Nullable":"NO","Type":"VARIANT"}
-{"Name":"NULLFIELD","Nullable":"YES","Type":"VARIANT"}
-{"Name":"NUMFIELD","Nullable":"NO","Type":"BOOLEAN"}
-{"Name":"OBJFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGDATEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGDATETIMEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGDURATIONFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGEMAILFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGFIELD","Nullable":"NO","Type":"NUMBER"}
-{"Name":"STRINGHOSTNAMEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGIDNEMAILFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGIDNHOSTNAMEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGINTEGERFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGIPV4FIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGIPV6FIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGIRIFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGIRIREFERENCEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGJSONPOINTERFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGMACADDR8FIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGMACADDRFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGNUMBERFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGREGEXFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGRELATIVEJSONPOINTERFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGTIMEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGUINT32FIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGUINT64FIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGURIFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGURIREFERENCEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGURITEMPLATEFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"STRINGUUIDFIELD","Nullable":"NO","Type":"TEXT"}
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+Big Schema Materialized Resource Schema Changed Types With Backfill:
+{"Name":"ARRAYFIELD","Nullable":false,"Type":"VARIANT"}
+{"Name":"BOOLFIELD","Nullable":false,"Type":"FIXED"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
+{"Name":"INTFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"KEY","Nullable":false,"Type":"TEXT"}
+{"Name":"MULTIPLEFIELD","Nullable":false,"Type":"VARIANT"}
+{"Name":"NULLFIELD","Nullable":true,"Type":"VARIANT"}
+{"Name":"NUMFIELD","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"OBJFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGDATEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGDATETIMEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGDURATIONFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGEMAILFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGFIELD","Nullable":false,"Type":"FIXED"}
+{"Name":"STRINGHOSTNAMEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGIDNEMAILFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGIDNHOSTNAMEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGINTEGERFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGIPV4FIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGIPV6FIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGIRIFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGIRIREFERENCEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGJSONPOINTERFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGMACADDR8FIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGMACADDRFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGNUMBERFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGREGEXFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGRELATIVEJSONPOINTERFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGTIMEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGUINT32FIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGUINT64FIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGURIFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGURIREFERENCEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGURITEMPLATEFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"STRINGUUIDFIELD","Nullable":false,"Type":"TEXT"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
 add a single field:
-{"Name":"ADDEDOPTIONALSTRING","Nullable":"YES","Type":"TEXT"}
-{"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
-{"Name":"KEY","Nullable":"NO","Type":"TEXT"}
-{"Name":"OPTIONALBOOLEAN","Nullable":"YES","Type":"BOOLEAN"}
-{"Name":"OPTIONALINTEGER","Nullable":"YES","Type":"NUMBER"}
-{"Name":"OPTIONALOBJECT","Nullable":"YES","Type":"VARIANT"}
-{"Name":"OPTIONALSTRING","Nullable":"YES","Type":"TEXT"}
-{"Name":"REQUIREDBOOLEAN","Nullable":"NO","Type":"BOOLEAN"}
-{"Name":"REQUIREDINTEGER","Nullable":"NO","Type":"NUMBER"}
-{"Name":"REQUIREDOBJECT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"REQUIREDSTRING","Nullable":"NO","Type":"TEXT"}
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+{"Name":"ADDEDOPTIONALSTRING","Nullable":true,"Type":"TEXT"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
+{"Name":"KEY","Nullable":false,"Type":"TEXT"}
+{"Name":"OPTIONALBOOLEAN","Nullable":true,"Type":"BOOLEAN"}
+{"Name":"OPTIONALINTEGER","Nullable":true,"Type":"FIXED"}
+{"Name":"OPTIONALOBJECT","Nullable":true,"Type":"VARIANT"}
+{"Name":"OPTIONALSTRING","Nullable":true,"Type":"TEXT"}
+{"Name":"REQUIREDBOOLEAN","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"REQUIREDINTEGER","Nullable":false,"Type":"FIXED"}
+{"Name":"REQUIREDOBJECT","Nullable":false,"Type":"VARIANT"}
+{"Name":"REQUIREDSTRING","Nullable":false,"Type":"TEXT"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
 remove a single optional field:
-{"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
-{"Name":"KEY","Nullable":"NO","Type":"TEXT"}
-{"Name":"OPTIONALBOOLEAN","Nullable":"YES","Type":"BOOLEAN"}
-{"Name":"OPTIONALINTEGER","Nullable":"YES","Type":"NUMBER"}
-{"Name":"OPTIONALOBJECT","Nullable":"YES","Type":"VARIANT"}
-{"Name":"OPTIONALSTRING","Nullable":"YES","Type":"TEXT"}
-{"Name":"REQUIREDBOOLEAN","Nullable":"NO","Type":"BOOLEAN"}
-{"Name":"REQUIREDINTEGER","Nullable":"NO","Type":"NUMBER"}
-{"Name":"REQUIREDOBJECT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"REQUIREDSTRING","Nullable":"NO","Type":"TEXT"}
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
+{"Name":"KEY","Nullable":false,"Type":"TEXT"}
+{"Name":"OPTIONALBOOLEAN","Nullable":true,"Type":"BOOLEAN"}
+{"Name":"OPTIONALINTEGER","Nullable":true,"Type":"FIXED"}
+{"Name":"OPTIONALOBJECT","Nullable":true,"Type":"VARIANT"}
+{"Name":"OPTIONALSTRING","Nullable":true,"Type":"TEXT"}
+{"Name":"REQUIREDBOOLEAN","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"REQUIREDINTEGER","Nullable":false,"Type":"FIXED"}
+{"Name":"REQUIREDOBJECT","Nullable":false,"Type":"VARIANT"}
+{"Name":"REQUIREDSTRING","Nullable":false,"Type":"TEXT"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
 remove a single required field:
-{"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
-{"Name":"KEY","Nullable":"NO","Type":"TEXT"}
-{"Name":"OPTIONALBOOLEAN","Nullable":"YES","Type":"BOOLEAN"}
-{"Name":"OPTIONALINTEGER","Nullable":"YES","Type":"NUMBER"}
-{"Name":"OPTIONALOBJECT","Nullable":"YES","Type":"VARIANT"}
-{"Name":"OPTIONALSTRING","Nullable":"YES","Type":"TEXT"}
-{"Name":"REQUIREDBOOLEAN","Nullable":"NO","Type":"BOOLEAN"}
-{"Name":"REQUIREDINTEGER","Nullable":"NO","Type":"NUMBER"}
-{"Name":"REQUIREDOBJECT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"REQUIREDSTRING","Nullable":"YES","Type":"TEXT"}
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
+{"Name":"KEY","Nullable":false,"Type":"TEXT"}
+{"Name":"OPTIONALBOOLEAN","Nullable":true,"Type":"BOOLEAN"}
+{"Name":"OPTIONALINTEGER","Nullable":true,"Type":"FIXED"}
+{"Name":"OPTIONALOBJECT","Nullable":true,"Type":"VARIANT"}
+{"Name":"OPTIONALSTRING","Nullable":true,"Type":"TEXT"}
+{"Name":"REQUIREDBOOLEAN","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"REQUIREDINTEGER","Nullable":false,"Type":"FIXED"}
+{"Name":"REQUIREDOBJECT","Nullable":false,"Type":"VARIANT"}
+{"Name":"REQUIREDSTRING","Nullable":true,"Type":"TEXT"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
 add and remove many fields:
-{"Name":"ADDEDOPTIONALSTRING","Nullable":"YES","Type":"TEXT"}
-{"Name":"ADDEDREQUIREDSTRING","Nullable":"YES","Type":"TEXT"}
-{"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
-{"Name":"KEY","Nullable":"NO","Type":"TEXT"}
-{"Name":"OPTIONALBOOLEAN","Nullable":"YES","Type":"BOOLEAN"}
-{"Name":"OPTIONALINTEGER","Nullable":"YES","Type":"NUMBER"}
-{"Name":"OPTIONALOBJECT","Nullable":"YES","Type":"VARIANT"}
-{"Name":"OPTIONALSTRING","Nullable":"YES","Type":"TEXT"}
-{"Name":"REQUIREDBOOLEAN","Nullable":"NO","Type":"BOOLEAN"}
-{"Name":"REQUIREDINTEGER","Nullable":"NO","Type":"NUMBER"}
-{"Name":"REQUIREDOBJECT","Nullable":"YES","Type":"VARIANT"}
-{"Name":"REQUIREDSTRING","Nullable":"YES","Type":"TEXT"}
-{"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
+{"Name":"ADDEDOPTIONALSTRING","Nullable":true,"Type":"TEXT"}
+{"Name":"ADDEDREQUIREDSTRING","Nullable":true,"Type":"TEXT"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
+{"Name":"KEY","Nullable":false,"Type":"TEXT"}
+{"Name":"OPTIONALBOOLEAN","Nullable":true,"Type":"BOOLEAN"}
+{"Name":"OPTIONALINTEGER","Nullable":true,"Type":"FIXED"}
+{"Name":"OPTIONALOBJECT","Nullable":true,"Type":"VARIANT"}
+{"Name":"OPTIONALSTRING","Nullable":true,"Type":"TEXT"}
+{"Name":"REQUIREDBOOLEAN","Nullable":false,"Type":"BOOLEAN"}
+{"Name":"REQUIREDINTEGER","Nullable":false,"Type":"FIXED"}
+{"Name":"REQUIREDOBJECT","Nullable":true,"Type":"VARIANT"}
+{"Name":"REQUIREDSTRING","Nullable":true,"Type":"TEXT"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"BOOLEAN"}
 
 Challenging Field Names Materialized Columns:
-{"Name":" ,;{}().- problematicKey � 𐀀 嶲 ","Nullable":"NO","Type":"TEXT"}
-{"Name":" ,;{}().- problematicValue � 𐀀 嶲 ","Nullable":"YES","Type":"TEXT"}
-{"Name":"$dollar$signs","Nullable":"YES","Type":"TEXT"}
-{"Name":"123","Nullable":"YES","Type":"TEXT"}
-{"Name":"123startsWithDigits","Nullable":"YES","Type":"TEXT"}
-{"Name":"FLOW_DOCUMENT","Nullable":"NO","Type":"VARIANT"}
-{"Name":"FLOW_PUBLISHED_AT","Nullable":"NO","Type":"TIMESTAMP_LTZ"}
-{"Name":"VALUE_WITH_SEPARATED_WORDS","Nullable":"YES","Type":"TEXT"}
-{"Name":"_ID","Nullable":"NO","Type":"TEXT"}
-{"Name":"a\"string`with`quote'characters","Nullable":"YES","Type":"TEXT"}
-{"Name":"value with separated words","Nullable":"YES","Type":"TEXT"}
-{"Name":"value-with-separated-words","Nullable":"YES","Type":"TEXT"}
-{"Name":"value.with-separated_words","Nullable":"YES","Type":"TEXT"}
-{"Name":"value.with.separated.words","Nullable":"YES","Type":"TEXT"}
+{"Name":" ,;{}().- problematicKey � 𐀀 嶲 ","Nullable":false,"Type":"TEXT"}
+{"Name":" ,;{}().- problematicValue � 𐀀 嶲 ","Nullable":true,"Type":"TEXT"}
+{"Name":"$dollar$signs","Nullable":true,"Type":"TEXT"}
+{"Name":"123","Nullable":true,"Type":"TEXT"}
+{"Name":"123startsWithDigits","Nullable":true,"Type":"TEXT"}
+{"Name":"FLOW_DOCUMENT","Nullable":false,"Type":"VARIANT"}
+{"Name":"FLOW_PUBLISHED_AT","Nullable":false,"Type":"TIMESTAMP_LTZ"}
+{"Name":"VALUE_WITH_SEPARATED_WORDS","Nullable":true,"Type":"TEXT"}
+{"Name":"_ID","Nullable":false,"Type":"TEXT"}
+{"Name":"a\"string`with`quote'characters","Nullable":true,"Type":"TEXT"}
+{"Name":"value with separated words","Nullable":true,"Type":"TEXT"}
+{"Name":"value-with-separated-words","Nullable":true,"Type":"TEXT"}
+{"Name":"value.with-separated_words","Nullable":true,"Type":"TEXT"}
+{"Name":"value.with.separated.words","Nullable":true,"Type":"TEXT"}
 

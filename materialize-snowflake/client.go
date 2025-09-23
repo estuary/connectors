@@ -74,7 +74,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 // is used for a SHOW COLUMNS IN TABLE <table> - it may be more efficient to do
 // SHOW COLUMNS IN SCHEMA, but there is a documented limit of 10,000 results
 // from SHOW COLUMNS and it can't be paginated.
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, includeIndexes bool) error {
 	existingSchemas, err := c.ListSchemas(ctx)
 	if err != nil {
 		return fmt.Errorf("listing schemas: %w", err)
@@ -313,6 +313,18 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
 	return sql.Fence{}, nil
+}
+
+func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
+	return nil
+}
+
+func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	return sql.SnapshotTestTable(ctx, c.db, c.ep.Dialect.Identifier(path...))
 }
 
 func (c *client) Close() {
