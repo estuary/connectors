@@ -143,6 +143,10 @@ async def backfill_incremental_resources(
     start = str_to_dt(page)
 
     if start >= cutoff:
+        log.debug("Page cursor is after cutoff, indicating backfill is complete.", {
+            "start": start,
+            "cutoff": cutoff,
+        })
         return
 
     max_window_size = min(timedelta(days=window_size), cutoff - start)
@@ -182,6 +186,12 @@ async def backfill_incremental_resources(
                 yield dt_to_str(record_or_dt)
             else:
                 yield record_or_dt
+
+    log.debug("Executing backfill.", {
+        "start": start,
+        "end": end,
+        "is_support_by_bulk_api": is_supported_by_bulk_api,
+    })
 
     try:
         gen = _execute(bulk_job_manager, BULK_CHECKPOINT_INTERVAL) if is_supported_by_bulk_api else _execute(rest_query_manager, REST_CHECKPOINT_INTERVAL)
@@ -231,6 +241,12 @@ async def fetch_incremental_resources(
 
     cursor_field = _determine_cursor_field(fields)
 
+    log.debug("Fetching incremental changes.", {
+        "start": log_cursor,
+        "end": end,
+        "is_support_by_bulk_api": is_supported_by_bulk_api,
+    })
+
     gen = rest_query_manager.execute(
         name,
         fields,
@@ -242,3 +258,8 @@ async def fetch_incremental_resources(
 
     async for record_or_dt in _execution_wrapper(gen, cursor_field, log_cursor, end, max_window_size, REST_CHECKPOINT_INTERVAL):
         yield record_or_dt
+
+    log.debug("Finished fetching incremental changes.", {
+        "start": log_cursor,
+        "end": end,
+    })
