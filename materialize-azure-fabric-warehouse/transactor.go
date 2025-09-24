@@ -76,7 +76,7 @@ func newTransactor(
 
 	for idx, target := range bindings {
 		t.loadFiles.AddBinding(idx, target.KeyNames())
-		t.storeFiles.AddBinding(idx, target.ColumnNames())
+		t.storeFiles.AddBinding(idx, append(target.ColumnNames(), "_flow_delete"))
 
 		hasBinaryColumns := false
 		for _, col := range target.Columns() {
@@ -226,7 +226,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	for it.Next() {
-		if t.cfg.HardDelete && it.Delete && !it.Exists {
+		flowDelete := t.cfg.HardDelete && it.Delete
+		if flowDelete && !it.Exists {
 			continue
 		}
 
@@ -235,14 +236,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			b.store.mustMerge = true
 		}
 
-		flowDocument := it.RawJSON
-		if t.cfg.HardDelete && it.Delete {
-			flowDocument = json.RawMessage(`"delete"`)
-		}
-
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
+		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err := t.storeFiles.WriteRow(ctx, it.Binding, converted); err != nil {
+		} else if err := t.storeFiles.WriteRow(ctx, it.Binding, append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing row for store: %w", err)
 		} else {
 			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
