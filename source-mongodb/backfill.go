@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/segmentio/encoding/json"
@@ -303,7 +304,9 @@ func (c *capture) pullCursor(
 	binding bindingInfo,
 ) (int, error) {
 	var sk = binding.stateKey
-	var cursorField = binding.resource.getCursorField()
+	// LookupErr expects individual field components, unlike collection.Find filters
+	// which use dot notation, so we split the cursor field path here.
+	var cursorField = strings.Split(binding.resource.getCursorField(), ".")
 	// TODO(whb): Revisit this batching strategy as part of a more holistic
 	// memory optimization effort.
 	var docBatch []json.RawMessage
@@ -356,8 +359,8 @@ func (c *capture) pullCursor(
 	for cursor.Next(ctx) {
 		var doc bson.M
 		var err error
-		if lastCursor, err = cursor.Current.LookupErr(cursorField); err != nil {
-			return 0, fmt.Errorf("looking up cursor field '%s': %w", cursorField, err)
+		if lastCursor, err = cursor.Current.LookupErr(cursorField...); err != nil {
+			return 0, fmt.Errorf("looking up cursor field '%s': %w", strings.Join(cursorField, "."), err)
 		} else if err = cursor.Decode(&doc); err != nil {
 			return 0, fmt.Errorf("backfill decoding document: %w", err)
 		}
