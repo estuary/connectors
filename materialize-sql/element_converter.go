@@ -166,6 +166,7 @@ const (
 // ClampDatetime provides handling for endpoints that do not accept "0000" as a year by replacing
 // these datetimes with minimumTimestamp.
 var ClampDatetime ElementConverter = StringCastConverter(func(str string) (interface{}, error) {
+	str = strings.Replace(str, "z", "Z", 1)
 	if parsed, err := time.Parse(time.RFC3339Nano, str); err != nil {
 		return nil, err
 	} else if parsed.Year() == 0 {
