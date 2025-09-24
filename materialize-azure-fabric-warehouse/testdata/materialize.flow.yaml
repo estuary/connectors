@@ -1,0 +1,32 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-azure-fabric-warehouse:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.yaml
+    bindings:
+    - resource:
+        table: simple_standard
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: simple_delta
+        delta_updates: true
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: not_simple
+      source: tests/not-simple
+      fields:
+        recommended: true
+    - resource:
+        table: data_types
+      source: tests/data-types
+      fields:
+        recommended: true
