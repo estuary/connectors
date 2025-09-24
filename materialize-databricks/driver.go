@@ -215,7 +215,7 @@ func (t *transactor) addBinding(target sql.Table) error {
 	}
 
 	b.loadFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.KeyNames()))
-	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, translatedFieldNames(target.ColumnNames()))
+	b.storeFile = newStagedFile(t.cfg, b.rootStagingPath, append(translatedFieldNames(target.ColumnNames()), "_flow_delete"))
 	b.loadMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
 	b.storeMergeBounds = sql.NewMergeBoundsBuilder(target.Keys, t.ep.Dialect.Literal)
 
@@ -340,21 +340,17 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		var flowDocument = it.RawJSON
-		if d.cfg.HardDelete && it.Delete {
-			if it.Exists {
-				flowDocument = json.RawMessage(`"delete"`)
-			} else {
-				// Ignore items which do not exist and are already deleted
-				continue
-			}
+		flowDelete := d.cfg.HardDelete && it.Delete
+		if flowDelete && !it.Exists {
+			// Ignore items which do not exist and are already deleted
+			continue
 		}
 
 		if err := b.storeFile.start(ctx); err != nil {
 			return nil, err
-		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
+		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
-		} else if err := b.storeFile.writeRow(converted); err != nil {
+		} else if err := b.storeFile.writeRow(append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing row for store: %w", err)
 		} else {
 			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
