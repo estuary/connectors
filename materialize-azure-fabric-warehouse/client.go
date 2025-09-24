@@ -40,7 +40,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 	}, nil
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	// The body of this function is a copy of sql.StdPopulateInfoSchema, except the
 	// identifiers for the information schema views need to be in capital
 	// letters for Fabric Warehouse. I'd hope to replace this at some point with
@@ -427,6 +427,18 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 		return sql.Fence{}, fmt.Errorf("txn.Commit: %w", err)
 	}
 	return fence, nil
+}
+
+func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
+	return sql.ListCheckpointsEntries(ctx, c.db, dialect.Identifier(c.ep.Config.Warehouse, c.ep.Config.Schema, "flow_checkpoints_v1"))
+}
+
+func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
+	return sql.DeleteCheckpointsEntry(ctx, c.db, dialect.Identifier(c.ep.Config.Warehouse, c.ep.Config.Schema, "flow_checkpoints_v1"), taskName)
+}
+
+func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	return sql.SnapshotTestTable(ctx, c.db, dialect.Identifier(path...))
 }
 
 func (c *client) Close() {

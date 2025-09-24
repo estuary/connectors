@@ -1,0 +1,8 @@
+materializations:
+  acmeCo/tests/materialize-azure-fabric-warehouse:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.yaml
+    bindings: []
