@@ -274,14 +274,8 @@ ON {{ range $ind, $bound := $.Bounds }}
 	l.{{$bound.Identifier}} = r.c{{$ind}}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end}}
-{{- if $.Document }}
-WHEN MATCHED AND {{ if $.ObjAndArrayAsJson -}}
-	TO_JSON_STRING(r.c{{ Add (len $.Columns) -1 }})
-{{- else -}}
-	r.c{{ Add (len $.Columns) -1 }}
-{{- end }}='"delete"' THEN
+WHEN MATCHED AND r._flow_delete THEN
 	DELETE
-{{- end }}
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{end -}}
@@ -290,7 +284,7 @@ WHEN MATCHED THEN
 	{{- if $.Document -}}
 		{{ if $.Values  }}, {{ end }}l.{{$.Document.Identifier}} = r.c{{ Add (len $.Columns) -1 }}
 	{{- end }}
-WHEN NOT MATCHED THEN
+WHEN NOT MATCHED AND NOT r._flow_delete THEN
 	INSERT (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
