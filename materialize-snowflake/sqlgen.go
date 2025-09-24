@@ -284,7 +284,7 @@ USING (
 	SELECT {{ range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
 		{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
-	{{- end }}
+	{{- end }}, $1[{{ len $.Table.Columns }}] AS _flow_delete
 	FROM {{ $.File }}
 ) AS r
 ON {{ range $ind, $bound := $.Bounds }}
@@ -293,7 +293,7 @@ ON {{ range $ind, $bound := $.Bounds }}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
 {{- if $.Table.Document }}
-WHEN MATCHED AND r.{{ $.Table.Document.Identifier }}='delete' THEN
+WHEN MATCHED AND r._flow_delete=true THEN
 	DELETE
 {{- end }}
 WHEN MATCHED THEN
@@ -304,7 +304,7 @@ WHEN MATCHED THEN
 {{- if $.Table.Document -}}
 {{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
 {{- end }}
-WHEN NOT MATCHED and r.{{ $.Table.Document.Identifier }}!='delete' THEN
+WHEN NOT MATCHED AND r._flow_delete=false THEN
 	INSERT (
 	{{- range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
