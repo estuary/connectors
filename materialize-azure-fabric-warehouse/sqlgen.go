@@ -255,11 +255,12 @@ CREATE TABLE {{ template "temp_name_store" $ }} (
 {{- range $ind, $col := $.Columns }}
 	{{- if $ind }},{{ end }}
 	{{$col.Identifier}} {{- if eq $col.DDL "VARBINARY(MAX)" }} VARCHAR(MAX) {{- else }} {{$col.DDL}} {{- end }}
-{{- end }}
+{{- end }},
+	_flow_delete BIT
 );
 
 COPY INTO {{ template "temp_name_store" $ }}
-({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
+({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }}, _flow_delete)
 FROM {{ range $ind, $uri := $.URIs }}{{- if $ind }}, {{ end }}'{{$uri}}'{{- end }}
 WITH (
 	FILE_TYPE = 'CSV',
@@ -289,7 +290,7 @@ INNER JOIN {{ template "temp_name_store" $ }} AS l
 INSERT INTO {{$.Identifier}} ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})
 SELECT {{ range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{ template "maybe_unbase64" $col }}{{- end }}
 FROM {{ template "temp_name_store" $ }}
-WHERE {{$.Document.Identifier}} <> '"delete"';
+WHERE _flow_delete = 0;
 
 DROP TABLE {{ template "temp_name_store" $ }};
 {{ end }}
