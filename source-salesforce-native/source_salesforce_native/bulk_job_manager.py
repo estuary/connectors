@@ -27,6 +27,7 @@ COUNT_HEADER = "Sforce-NumberOfRecords"
 CANNOT_FETCH_COMPOUND_DATA = r"Selecting compound data not supported in Bulk Query"
 NOT_SUPPORTED_BY_BULK_API = r"is not supported by the Bulk API"
 DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED = r"Max bulk v2 query result size stored (1000000000) kb per 24 hrs has been exceeded"
+DAILY_MAX_BULK_API_QUERY_LIMIT_EXCEEDED = r"Max bulk v2 query jobs (10000) per 24 hrs has been reached"
 
 
 CSV_CONFIG = CSVConfig(
@@ -82,6 +83,9 @@ class BulkJobManager:
             elif err.code == 400 and DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED in err.message:
                 msg = "Maximum size of bulk results per rolling 24 hour period (1 TB) has been exceeded."
                 raise BulkJobError(msg, body['query'], err.message)
+            elif err.code == 400 and DAILY_MAX_BULK_API_QUERY_LIMIT_EXCEEDED in err.message:
+                msg = "Maximum number of bulk jobs per rolling 24 hour period (10,000) has been exceeded."
+                raise BulkJobError(msg, body["query"], err.message)
             else:
                 raise
 

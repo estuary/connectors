@@ -9,6 +9,7 @@ from .bulk_job_manager import (
     BulkJobError,
     BulkJobManager,
     CANNOT_FETCH_COMPOUND_DATA,
+    DAILY_MAX_BULK_API_QUERY_LIMIT_EXCEEDED,
     DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED,
     NOT_SUPPORTED_BY_BULK_API,
     MAX_BULK_QUERY_SET_SIZE,
@@ -204,7 +205,7 @@ async def backfill_incremental_resources(
             if CANNOT_FETCH_COMPOUND_DATA in err.errors or NOT_SUPPORTED_BY_BULK_API in err.errors:
                 log.info(f"{name} cannot be queried via the Bulk API. Attempting to use the REST API instead.", {"errors": err.errors})
                 should_fallback_to_rest_api = True
-            elif DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED in err.errors:
+            elif DAILY_MAX_BULK_API_QUERY_VOLUME_EXCEEDED in err.errors or DAILY_MAX_BULK_API_QUERY_LIMIT_EXCEEDED in err.errors:
                 log.info(f"{err.message}. Attempting to use the REST API instead.", {"errors": err.errors})
                 should_fallback_to_rest_api = True
 
