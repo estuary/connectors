@@ -40,7 +40,7 @@ func createDialect(featureFlags map[string]bool) sql.Dialect {
 	// Define base date/time mappings without primary key wrapper
 	dateMapping := sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
 	datetimeMapping := sql.MapStatic("DATETIME2(6)", sql.AlsoCompatibleWith("DATETIME2"), sql.UsingConverter(sql.ClampDatetime))
-	timeMapping := sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("TIME"))
+	timeMapping := sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("TIME"), sql.UsingConverter(sql.StringCastConverter(normalizeTime)))
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
 	if featureFlags["datetime_keys_as_string"] {
@@ -117,6 +117,10 @@ func createDialect(featureFlags map[string]bool) sql.Dialect {
 		MaxColumnCharLength:    0,
 		CaseInsensitiveColumns: true,
 	}
+}
+
+func normalizeTime(str string) (any, error) {
+	return strings.Replace(str, "z", "Z", 1), nil
 }
 
 func bitToStringCast(m sql.ColumnTypeMigration) string {
