@@ -59,7 +59,7 @@ var dialect = func() sql.Dialect {
 				WithFormat: map[string]sql.MapProjectionFn{
 					"date":      sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate)),
 					"date-time": sql.MapStatic("DATETIME2(6)", sql.AlsoCompatibleWith("DATETIME2"), sql.UsingConverter(sql.ClampDatetime)),
-					"time":      sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("TIME")),
+					"time":      sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("TIME"), sql.UsingConverter(sql.StringCastConverter(normalizeTime))),
 				},
 			}),
 		},
@@ -103,6 +103,10 @@ var dialect = func() sql.Dialect {
 		CaseInsensitiveColumns: true,
 	}
 }()
+
+func normalizeTime(str string) (any, error) {
+	return strings.Replace(str, "z", "Z", 1), nil
+}
 
 func bitToStringCast(m sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(
