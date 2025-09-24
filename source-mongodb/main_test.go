@@ -806,3 +806,65 @@ func (v *correctnessInvariantsCaptureValidator) Summarize(w io.Writer) error {
 func (v *correctnessInvariantsCaptureValidator) bindingIdentifier(database, collection string) string {
 	return database + "." + collection
 }
+
+// TestNestedCursorFields tests nested cursor field lookups like "a.b".
+func TestNestedCursorFields(t *testing.T) {
+	const (
+		database   = "testDb"
+		collection = "nestedCursorCollection"
+	)
+	ctx := context.Background()
+	client, cfg := testClient(t)
+
+	cleanup := func() {
+		require.NoError(t, client.Database(database).Drop(ctx))
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	binding := makeBinding(t, database, collection, captureModeIncremental, "a.b")
+	cs := &st.CaptureSpec{
+		Driver:       &driver{},
+		EndpointSpec: &cfg,
+		Checkpoint:   []byte("{}"),
+		Validator:    &st.OrderedCaptureValidator{},
+		Sanitizers:   commonSanitizers(),
+		Bindings:     []*flow.CaptureSpec_Binding{binding},
+	}
+
+	col := client.Database(database).Collection(collection)
+
+	advanceCapture(ctx, t, cs)
+
+	for idx := 0; idx < 5; idx++ {
+		doc := map[string]any{
+			"_id": fmt.Sprintf("%d", idx),
+			"a": map[string]any{
+				"b": idx,
+			},
+			"data": fmt.Sprintf("test data %d", idx),
+		}
+		_, err := col.InsertOne(ctx, doc)
+		require.NoError(t, err)
+	}
+
+	backdateState(t, cs, boilerplate.StateKey(binding.StateKey))
+	advanceCapture(ctx, t, cs)
+
+	for idx := 5; idx < 10; idx++ {
+		doc := map[string]any{
+			"_id": fmt.Sprintf("%d", idx),
+			"a": map[string]any{
+				"b": idx,
+			},
+			"data": fmt.Sprintf("test data %d", idx),
+		}
+		_, err := col.InsertOne(ctx, doc)
+		require.NoError(t, err)
+	}
+
+	backdateState(t, cs, boilerplate.StateKey(binding.StateKey))
+	advanceCapture(ctx, t, cs)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
