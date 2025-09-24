@@ -232,7 +232,7 @@ SELECT -1, ""
 			{{ range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
 			{{ template "cast" $key -}}
-			{{- end }}
+			{{- end }}, _flow_delete::BOOLEAN
 			FROM json.`+"`{{ $file }}`"+`
 		)
 		{{- end }}
@@ -242,10 +242,8 @@ SELECT -1, ""
     l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
     {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
   {{- end }}
-	{{- if $.Table.Document }}
-	WHEN MATCHED AND r.{{ $.Table.Document.Identifier }}='"delete"' THEN
+	WHEN MATCHED AND r._flow_delete THEN
 		DELETE
-	{{- end }}
 	WHEN MATCHED THEN
 		UPDATE SET {{ range $ind, $key := $.Table.Values }}
 		{{- if $ind }}, {{ end -}}
@@ -254,7 +252,7 @@ SELECT -1, ""
 	{{- if $.Table.Document -}}
 	{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
 	{{- end }}
-	WHEN NOT MATCHED AND r.{{ $.Table.Document.Identifier }}!='"delete"' THEN
+	WHEN NOT MATCHED AND NOT r._flow_delete THEN
 		INSERT (
 		{{- range $ind, $key := $.Table.Columns }}
 			{{- if $ind }}, {{ end -}}
