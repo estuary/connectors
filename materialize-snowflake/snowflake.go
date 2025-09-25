@@ -488,14 +488,10 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			b.store.mustMerge = true
 		}
 
-		var flowDocument = it.RawJSON
-		if d.cfg.HardDelete && it.Delete {
-			if it.Exists {
-				flowDocument = json.RawMessage(`"delete"`)
-			} else {
-				// Ignore items which do not exist and are already deleted
-				continue
-			}
+		flowDelete := d.cfg.HardDelete && it.Delete
+		if flowDelete && !it.Exists {
+			// Ignore items which do not exist and are already deleted
+			continue
 		}
 
 		if !b.streaming {
@@ -503,13 +499,13 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				return nil, err
 			}
 		}
-		if converted, err := b.target.ConvertAll(it.Key, it.Values, flowDocument); err != nil {
+		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting Store: %w", err)
 		} else if b.streaming {
 			if err := d.streamManager.writeRow(ctx, it.Binding, converted); err != nil {
 				return nil, fmt.Errorf("encoding Store to stream for resource %s: %w", b.target.Path, err)
 			}
-		} else if err = b.store.stage.writeRow(converted); err != nil {
+		} else if err = b.store.stage.writeRow(append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
 		} else {
 			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
