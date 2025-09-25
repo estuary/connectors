@@ -1,0 +1,211 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "fieldlengthdiscovery_847554",
+      "schema": "dbo",
+      "table": "fieldlengthdiscovery_847554"
+    },
+    "resource_path": [
+      "fieldlengthdiscovery_847554"
+    ],
+    "collection": {
+      "name": "acmeCo/test/dbo/fieldlengthdiscovery_847554",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "_meta",
+          "id"
+        ],
+        "properties": {
+          "_meta": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-sqlserver-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document as executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              },
+              "row_id": {
+                "type": "integer",
+                "title": "Row ID",
+                "description": "Row ID of the Document"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Change Operation",
+                "description": "Operation type (c: Create / u: Update / d: Delete)",
+                "default": "u"
+              },
+              "source": {
+                "properties": {
+                  "resource": {
+                    "type": "string",
+                    "description": "Resource name of the binding from which this document was captured."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema from which the document was read."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table from which the document was read."
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "resource"
+                ]
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index",
+              "row_id",
+              "source"
+            ]
+          },
+          "binary_8": {
+            "maxLength": 8,
+            "minLength": 8,
+            "description": "(source type: binary)",
+            "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "char_5": {
+            "maxLength": 5,
+            "minLength": 5,
+            "description": "(source type: char)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decimal_10_2": {
+            "format": "number",
+            "description": "(source type: decimal)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decimal_38_10": {
+            "format": "number",
+            "description": "(source type: decimal)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "float_24": {
+            "description": "(source type: real)",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "float_53": {
+            "description": "(source type: float)",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
+          },
+          "nchar_15": {
+            "maxLength": 15,
+            "minLength": 15,
+            "description": "(source type: nchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "numeric_18_4": {
+            "format": "number",
+            "description": "(source type: numeric)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "numeric_5_0": {
+            "format": "number",
+            "description": "(source type: numeric)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nvarchar_max": {
+            "description": "(source type: nvarchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varbinary_16": {
+            "maxLength": 16,
+            "description": "(source type: varbinary)",
+            "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varbinary_max": {
+            "description": "(source type: varbinary)",
+            "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varchar_100": {
+            "maxLength": 100,
+            "description": "(source type: varchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varchar_max": {
+            "description": "(source type: varchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/id"
+      ],
+      "projections": null
+    },
+    "state_key": "fieldlengthdiscovery_847554"
+  }
+
