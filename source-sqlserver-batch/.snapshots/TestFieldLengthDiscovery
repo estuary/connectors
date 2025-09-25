@@ -1,18 +1,15 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "binarytypes_537491",
+      "name": "fieldlengthdiscovery_847554",
       "schema": "dbo",
-      "table": "binarytypes_537491",
-      "cursor": [
-        "id"
-      ]
+      "table": "fieldlengthdiscovery_847554"
     },
     "resource_path": [
-      "binarytypes_537491"
+      "fieldlengthdiscovery_847554"
     ],
     "collection": {
-      "name": "acmeCo/test/dbo/binarytypes_537491",
+      "name": "acmeCo/test/dbo/fieldlengthdiscovery_847554",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -84,9 +81,9 @@ Binding 0:
               "source"
             ]
           },
-          "binary_col": {
-            "maxLength": 8,
-            "minLength": 8,
+          "binary_8": {
+            "maxLength": 12,
+            "minLength": 12,
             "description": "(source type: binary)",
             "contentEncoding": "base64",
             "type": [
@@ -94,22 +91,108 @@ Binding 0:
               "null"
             ]
           },
+          "char_5": {
+            "maxLength": 5,
+            "minLength": 5,
+            "description": "(source type: char)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decimal_10_2": {
+            "format": "number",
+            "description": "(source type: decimal)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decimal_38_10": {
+            "format": "number",
+            "description": "(source type: decimal)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "float_24": {
+            "description": "(source type: real)",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "float_53": {
+            "description": "(source type: float)",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
           "id": {
             "type": "integer",
             "description": "(source type: non-nullable int)"
           },
-          "image_col": {
-            "description": "(source type: image)",
+          "nchar_15": {
+            "maxLength": 15,
+            "minLength": 15,
+            "description": "(source type: nchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "numeric_18_4": {
+            "format": "number",
+            "description": "(source type: numeric)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "numeric_5_0": {
+            "format": "number",
+            "description": "(source type: numeric)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nvarchar_max": {
+            "description": "(source type: nvarchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varbinary_16": {
+            "maxLength": 24,
+            "description": "(source type: varbinary)",
             "contentEncoding": "base64",
             "type": [
               "string",
               "null"
             ]
           },
-          "varbinary_col": {
-            "maxLength": 16,
+          "varbinary_max": {
             "description": "(source type: varbinary)",
             "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varchar_100": {
+            "maxLength": 100,
+            "description": "(source type: varchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varchar_max": {
+            "description": "(source type: varchar)",
             "type": [
               "string",
               "null"
@@ -123,6 +206,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "binarytypes_537491"
+    "state_key": "fieldlengthdiscovery_847554"
   }
 
