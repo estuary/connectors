@@ -3,6 +3,7 @@ import functools
 import itertools
 from datetime import UTC, datetime, timedelta
 from logging import Logger
+import time
 from typing import (
     Any,
     AsyncGenerator,
@@ -38,6 +39,7 @@ from .models import (
     FormSubmission,
     FormSubmissionContext,
     LineItem,
+    MarketingEmail,
     Names,
     OldRecentCompanies,
     OldRecentContacts,
@@ -55,7 +57,10 @@ from .models import (
 import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.buffer_ordered import buffer_ordered
 
+# Hubspot returns a 500 internal server error if querying for data 
+EPOCH_PLUS_ONE_SECOND = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=1)
 HUB = "https://api.hubapi.com"
+MARKETING_EMAILS_PAGE_SIZE = 300
 
 properties_cache: dict[str, Properties]= {}
 
@@ -1229,11 +1234,111 @@ def fetch_delayed_email_events(
     return _fetch_email_events(log, http, since, until)
 
 
+async def _fetch_marketing_emails_updated_between(
+    log: Logger,
+    http: HTTPSession,
+    start: datetime,
+    end: datetime | None,
+) -> AsyncGenerator[tuple[datetime, str, MarketingEmail], None]:
+    url = f"{HUB}/marketing/v3/emails"
+
+    input = {
+        "limit": MARKETING_EMAILS_PAGE_SIZE,
+        "sort": "updatedAt",
+        "includeStats": "true",
+        # updatedAfter is an exclusive lower bound filter on the updatedAt field.
+        "updatedAfter": _dt_to_str(start)
+    }
+
+    if end:
+        assert start < end
+        # updatedBefore is an exclusive upper bound filter on the updatedAt field.
+        input["updatedBefore"] = _dt_to_str(end)
+
+    while True:
+        response = PageResult[MarketingEmail].model_validate_json(
+            await http.request(log, url, params=input)
+        )
+
+        for email in response.results:
+            yield (email.updatedAt, email.id, email)
+
+        if not response.paging:
+            break
+
+        input["after"] = response.paging.next.after
+
+
+async def fetch_marketing_emails_page(
+    http: HTTPSession,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[MarketingEmail | PageCursor, None]:
+    assert isinstance(cutoff, datetime)
+
+    if page:
+        assert isinstance(page, str)
+        start = _str_to_dt(page)
+    else:
+        start = EPOCH_PLUS_ONE_SECOND
+
+    if start >= cutoff:
+        return
+
+    count = 0
+    last_seen_dt = start
+
+    start_time = time.time()
+
+    async for (updatedAt, _, email) in _fetch_marketing_emails_updated_between(
+        log,
+        http,
+        start=start,
+        end=cutoff
+    ):
+        # If we see a document updated more recently than the previous
+        # document we emitted, checkpoint the previous documents.
+        if (
+            count >= MARKETING_EMAILS_PAGE_SIZE and
+            updatedAt > last_seen_dt
+        ):
+            yield _dt_to_str(last_seen_dt)
+            count = 0
+
+            # If fetch_marketing_emails_page has been running for more than 5 minutes,
+            # yield control back to the CDK after a checkpoint. This forces the backfill
+            # to check the stopping event every so often & gracefully exit if it's set.
+            if time.time() - start_time >= timedelta(minutes=5).total_seconds():
+                return
+
+        yield email
+        count += 1
+        last_seen_dt = max(last_seen_dt, updatedAt)
+
+
+def fetch_recent_marketing_emails(
+    log: Logger, http: HTTPSession, _: bool, since: datetime, until: datetime | None,
+) -> AsyncGenerator[tuple[datetime, str, MarketingEmail], None]:
+
+    return _fetch_marketing_emails_updated_between(log, http, since, until)
+
+
+def fetch_delayed_marketing_emails(
+    log: Logger, http: HTTPSession, _: bool, since: datetime, until: datetime,
+) -> AsyncGenerator[tuple[datetime, str, MarketingEmail], None]:
+
+    return _fetch_marketing_emails_updated_between(log, http, since, until)
+
+
 def _ms_to_dt(ms: int) -> datetime:
     return datetime.fromtimestamp(ms / 1000.0, tz=UTC)
 
 def _dt_to_ms(dt: datetime) -> int:
     return int(dt.timestamp() * 1000)
+
+def _str_to_dt(s: str) -> datetime:
+    return datetime.fromisoformat(s.replace('Z', '+00:00'))
 
 def _dt_to_str(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")

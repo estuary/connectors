@@ -147,6 +147,7 @@ class Names(StrEnum):
     carts = auto()
     partner_clients = auto()
     marketing_event = auto()
+    marketing_emails = auto()
 
 
 # A Property is a HubSpot or HubSpot-user defined attribute that's
@@ -198,6 +199,11 @@ class FormSubmission(BaseDocument, extra="allow"):
         assert "formId" not in values
         values["formId"] = info.context.form_id
         return values
+
+
+class MarketingEmail(BaseDocument, extra="allow"):
+    id: str
+    updatedAt: AwareDatetime
 
 
 # Base Struct for all CRM Objects within HubSpot.

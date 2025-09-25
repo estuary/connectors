@@ -21,11 +21,13 @@ from .api import (
     fetch_delayed_email_events,
     fetch_delayed_engagements,
     fetch_delayed_line_items,
+    fetch_delayed_marketing_emails,
     fetch_delayed_products,
     fetch_delayed_tickets,
     fetch_email_events_page,
     fetch_form_submissions,
     fetch_forms,
+    fetch_marketing_emails_page,
     fetch_owners,
     fetch_page_with_associations,
     fetch_properties,
@@ -36,6 +38,7 @@ from .api import (
     fetch_recent_email_events,
     fetch_recent_engagements,
     fetch_recent_line_items,
+    fetch_recent_marketing_emails,
     fetch_recent_products,
     fetch_recent_tickets,
     list_custom_objects,
@@ -55,6 +58,7 @@ from .models import (
     Form,
     FormSubmission,
     LineItem,
+    MarketingEmail,
     Names,
     Owner,
     Product,
@@ -93,6 +97,7 @@ async def _remove_permission_blocked_resources(
     # Attempt to access resources' endpoints. If a resource's endpoint is
     # inaccessible, remove that resource from the list of discovered resources.
     PERMISSION_BLOCKED_RESOURCES: list[tuple[Names, AsyncGenerator]] = [
+        (Names.marketing_emails, fetch_recent_marketing_emails(log, http, False, datetime.now(tz=UTC), None)),
         (Names.email_events, fetch_recent_email_events(log, http, False, datetime.now(tz=UTC), None)),
         (Names.forms, fetch_forms(http, log)),
         (Names.form_submissions, fetch_form_submissions(http, log, 0)),
@@ -158,6 +163,7 @@ async def all_resources(
         email_events(http),
         forms(http),
         form_submissions(http),
+        marketing_emails(http),
     ]
 
     if should_check_permissions:
@@ -416,5 +422,44 @@ def form_submissions(http: HTTPSession) -> Resource:
             name=Names.form_submissions,
             interval=timedelta(minutes=5)
         ),
+        schema_inference=True,
+    )
+
+def marketing_emails(http: HTTPSession) -> Resource:
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                process_changes,
+                Names.marketing_emails,
+                fetch_recent_marketing_emails,
+                fetch_delayed_marketing_emails,
+                http,
+                False, # marketing emails do not include property history
+            ),
+            fetch_page=functools.partial(fetch_marketing_emails_page, http),
+        )
+
+    started_at = datetime.now(tz=UTC)
+
+    return Resource(
+        name=Names.marketing_emails,
+        key=["/id"],
+        model=MarketingEmail,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfig(name=Names.marketing_emails),
         schema_inference=True,
     )
