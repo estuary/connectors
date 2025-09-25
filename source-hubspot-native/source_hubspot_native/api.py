@@ -666,12 +666,12 @@ async def fetch_search_objects(
         filter = {
             "propertyName": last_modified_property_name,
             "operator": "BETWEEN",
-            "value": since.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-            "highValue": until.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            "value": _dt_to_str(since),
+            "highValue": _dt_to_str(until),
         } if until else {
             "propertyName": last_modified_property_name,
             "operator": "GTE",
-            "value": since.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
+            "value": _dt_to_str(since),
         }
 
         input = {
@@ -811,7 +811,7 @@ async def fetch_search_objects_modified_at(
         filters: list[dict[str, Any]] = [{
             "propertyName": last_modified_property_name,
             "operator": "EQ",
-            "value": modified.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+            "value": _dt_to_str(modified),
         }]
 
         if id_cursor:
@@ -1234,6 +1234,9 @@ def _ms_to_dt(ms: int) -> datetime:
 
 def _dt_to_ms(dt: datetime) -> int:
     return int(dt.timestamp() * 1000)
+
+def _dt_to_str(dt: datetime) -> str:
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
 
 def _chunk_props(props: list[str], max_bytes: int) -> list[list[str]]:
     result: list[list[str]] = []
