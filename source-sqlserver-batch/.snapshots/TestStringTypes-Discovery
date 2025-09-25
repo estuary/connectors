@@ -85,6 +85,8 @@ Binding 0:
             ]
           },
           "char_col": {
+            "maxLength": 16,
+            "minLength": 16,
             "description": "(source type: char)",
             "type": [
               "string",
@@ -96,6 +98,8 @@ Binding 0:
             "description": "(source type: non-nullable int)"
           },
           "nchar_col": {
+            "maxLength": 16,
+            "minLength": 16,
             "description": "(source type: nchar)",
             "type": [
               "string",
@@ -110,6 +114,7 @@ Binding 0:
             ]
           },
           "nvarchar_col": {
+            "maxLength": 16,
             "description": "(source type: nvarchar)",
             "type": [
               "string",
@@ -124,6 +129,7 @@ Binding 0:
             ]
           },
           "varchar_col": {
+            "maxLength": 16,
             "description": "(source type: varchar)",
             "type": [
               "string",

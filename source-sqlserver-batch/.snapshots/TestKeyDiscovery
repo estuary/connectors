@@ -110,6 +110,7 @@ Binding 0:
           },
           "k_str": {
             "type": "string",
+            "maxLength": 8,
             "description": "(source type: non-nullable varchar)"
           }
         },
