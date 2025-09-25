@@ -143,11 +143,11 @@ ON
 	l.key1 = r.c0 AND l.key1 >= 10 AND l.key1 <= 100
 	AND l.key2 = r.c1
 	AND l.key_binary = r.c2 AND l.key_binary >= 'aGVsbG8K' AND l.key_binary <= 'Z29vZGJ5ZQo='
-WHEN MATCHED AND r.c19='"delete"' THEN
+WHEN MATCHED AND r._flow_delete THEN
 	DELETE
 WHEN MATCHED THEN
 	UPDATE SET l.`array` = r.c3, l.binary = r.c4, l.boolean = r.c5, l.flow_published_at = r.c6, l.integer = r.c7, l.integerGt64Bit = r.c8, l.integerWithUserDDL = r.c9, l.multiple = r.c10, l.number = r.c11, l.numberCastToString = r.c12, l.object = r.c13, l.string = r.c14, l.stringInteger = r.c15, l.stringInteger39Chars = r.c16, l.stringInteger66Chars = r.c17, l.stringNumber = r.c18, l.flow_document = r.c19
-WHEN NOT MATCHED THEN
+WHEN NOT MATCHED AND NOT r._flow_delete THEN
 	INSERT (key1, key2, key_binary, `array`, binary, boolean, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
 	VALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10, r.c11, r.c12, r.c13, r.c14, r.c15, r.c16, r.c17, r.c18, r.c19);
 --- End projectID.dataset.key_value storeUpdate ---
