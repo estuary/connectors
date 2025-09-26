@@ -280,6 +280,8 @@ type basicColumnType struct {
 	format          string
 	nullable        bool
 	description     string
+	minLength       *uint64
+	maxLength       *uint64
 }
 
 func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
@@ -292,6 +294,10 @@ func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
 	if ct.contentEncoding != "" {
 		sch.Extras["contentEncoding"] = ct.contentEncoding // New in 2019-09.
 	}
+
+	// Copy the min/max lengths if present
+	sch.MinLength = ct.minLength
+	sch.MaxLength = ct.maxLength
 
 	if ct.jsonTypes != nil {
 		var types = append([]string(nil), ct.jsonTypes...)
@@ -313,7 +319,7 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 
 	fmt.Fprintf(query, "SELECT TABLE_SCHEMA, TABLE_NAME, COLUMN_NAME, ORDINAL_POSITION,")
 	fmt.Fprintf(query, " CASE WHEN IS_NULLABLE = 'YES' THEN 1 ELSE 0 END,")
-	fmt.Fprintf(query, " DATA_TYPE")
+	fmt.Fprintf(query, " DATA_TYPE, CHARACTER_MAXIMUM_LENGTH")
 	fmt.Fprintf(query, " FROM INFORMATION_SCHEMA.COLUMNS")
 	fmt.Fprintf(query, " WHERE TABLE_NAME != 'SYSTRANSCHEMAS'")
 	if len(discoverSchemas) > 0 {
@@ -346,7 +352,8 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 		var columnIndex int
 		var isNullable bool
 		var typeName string
-		if err := rows.Scan(&tableSchema, &tableName, &columnName, &columnIndex, &isNullable, &typeName); err != nil {
+		var charMaxLength sql.NullInt64
+		if err := rows.Scan(&tableSchema, &tableName, &columnName, &columnIndex, &isNullable, &typeName, &charMaxLength); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 
@@ -355,6 +362,21 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 			dataType = basicColumnType{description: fmt.Sprintf("using catch-all schema for unknown type %q", typeName)}
 		}
 		dataType.nullable = isNullable
+
+		// Add length constraints for char/binary columns with defined lengths. A
+		// value of -1 is used for certain large-object types such as XML.
+		if charMaxLength.Valid && charMaxLength.Int64 > 0 {
+			var length = uint64(charMaxLength.Int64)
+			switch typeName {
+			case "char", "nchar", "binary":
+				// For fixed-length types, set both minLength and maxLength
+				dataType.minLength = &length
+				dataType.maxLength = &length
+			case "varchar", "nvarchar", "varbinary":
+				// For variable-length types, only set maxLength
+				dataType.maxLength = &length
+			}
+		}
 
 		// Append source type information to the description
 		if dataType.description != "" {
