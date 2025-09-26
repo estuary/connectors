@@ -1234,26 +1234,15 @@ def fetch_delayed_email_events(
     return _fetch_email_events(log, http, since, until)
 
 
-async def _fetch_marketing_emails_updated_between(
+async def _paginate_through_marketing_emails(
     log: Logger,
     http: HTTPSession,
-    start: datetime,
-    end: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, MarketingEmail], None]:
+    params: dict[str, str | int],
+) -> AsyncGenerator[MarketingEmail, None]:
     url = f"{HUB}/marketing/v3/emails"
 
-    input = {
-        "limit": MARKETING_EMAILS_PAGE_SIZE,
-        "sort": "updatedAt",
-        "includeStats": "true",
-        # updatedAfter is an exclusive lower bound filter on the updatedAt field.
-        "updatedAfter": _dt_to_str(start)
-    }
-
-    if end:
-        assert start < end
-        # updatedBefore is an exclusive upper bound filter on the updatedAt field.
-        input["updatedBefore"] = _dt_to_str(end)
+    input: dict[str, str | int] = {}
+    input.update(params)
 
     while True:
         response = PageResult[MarketingEmail].model_validate_json(
@@ -1261,12 +1250,52 @@ async def _fetch_marketing_emails_updated_between(
         )
 
         for email in response.results:
-            yield (email.updatedAt, email.id, email)
+            yield email
 
         if not response.paging:
             break
 
         input["after"] = response.paging.next.after
+
+
+async def _fetch_marketing_emails_updated_between(
+    log: Logger,
+    http: HTTPSession,
+    start: datetime,
+    end: datetime | None,
+) -> AsyncGenerator[tuple[datetime, str, MarketingEmail], None]:
+    if not end:
+        end = datetime.now(tz=UTC)
+
+    assert start < end
+
+    params = {
+        "limit": MARKETING_EMAILS_PAGE_SIZE,
+        "sort": "updatedAt",
+        # updatedAfter is an exclusive lower bound filter on the updatedAt field.
+        "updatedAfter": _dt_to_str(start),
+        # updatedBefore is an exclusive upper bound filter on the updatedAt field.
+        "updatedBefore": _dt_to_str(end),
+    }
+
+    # The /marketing/v3/emails API has a bug: when "includeStats=true", HubSpot returns 
+    # an incomplete subset of emails, omitting some records entirely. When "includeStats=false", 
+    # all emails are returned but without statistics. To work around this API limitation and 
+    # ensure we capture all records, we use a two-pass approach: 1) fetch emails with stats 
+    # enabled and yield all returned records, 2) fetch all emails without stats and yield 
+    # only those records that were missing from the first pass.
+    # Additionally, we have to make separate queries for archived and non-archived records.
+    # NOTE: This means yielded documents are *not* ordered by the updatedAt field.
+
+    seen_ids: set[str] = set()
+    for archived_query_param in ["false", "true"]:
+        for include_stats_query_param in ["true", "false"]:
+            params["archived"] = archived_query_param
+            params["includeStats"] = include_stats_query_param
+            async for email in _paginate_through_marketing_emails(log, http, params):
+                if email.id not in seen_ids:
+                    seen_ids.add(email.id)
+                    yield (email.updatedAt, email.id, email)
 
 
 async def fetch_marketing_emails_page(
@@ -1277,44 +1306,20 @@ async def fetch_marketing_emails_page(
 ) -> AsyncGenerator[MarketingEmail | PageCursor, None]:
     assert isinstance(cutoff, datetime)
 
-    if page:
-        assert isinstance(page, str)
-        start = _str_to_dt(page)
-    else:
-        start = EPOCH_PLUS_ONE_SECOND
+    start = EPOCH_PLUS_ONE_SECOND
 
-    if start >= cutoff:
-        return
-
-    count = 0
-    last_seen_dt = start
-
-    start_time = time.time()
-
-    async for (updatedAt, _, email) in _fetch_marketing_emails_updated_between(
+    # Since we must make multiple separate queries to fetch all marketing emails updated in a
+    # certain date window, results are unordered and we cannot emit a checkpoint until all
+    # results in the date window from start to end are yielded. For now, fetch_marketing_emails_page
+    # is simple and tries to fetch all marketing emails in a single sweep. Typically, most accounts don't
+    # have tons of marketing emails, so this backfill doesn't take very long to complete.
+    async for (_, _, email) in _fetch_marketing_emails_updated_between(
         log,
         http,
         start=start,
         end=cutoff
     ):
-        # If we see a document updated more recently than the previous
-        # document we emitted, checkpoint the previous documents.
-        if (
-            count >= MARKETING_EMAILS_PAGE_SIZE and
-            updatedAt > last_seen_dt
-        ):
-            yield _dt_to_str(last_seen_dt)
-            count = 0
-
-            # If fetch_marketing_emails_page has been running for more than 5 minutes,
-            # yield control back to the CDK after a checkpoint. This forces the backfill
-            # to check the stopping event every so often & gracefully exit if it's set.
-            if time.time() - start_time >= timedelta(minutes=5).total_seconds():
-                return
-
         yield email
-        count += 1
-        last_seen_dt = max(last_seen_dt, updatedAt)
 
 
 def fetch_recent_marketing_emails(
