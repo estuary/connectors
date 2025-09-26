@@ -738,7 +738,7 @@
         "hs_user_ids_of_all_notification_unfollowers": null,
         "hs_user_ids_of_all_owners": "73074756",
         "hs_was_imported": null,
-        "hs_weighted_pipeline_in_company_currency": null,
+        "hs_weighted_pipeline_in_company_currency": 8.6,
         "hubspot_owner_assigneddate": "2025-04-03T12:59:10.726000+00:00",
         "hubspot_owner_id": "904875188",
         "hubspot_team_id": null,
