@@ -1,0 +1,411 @@
+[
+  [
+    "acmeCo/Environments",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "7000936",
+      "name": "production"
+    }
+  ],
+  [
+    "acmeCo/Projects",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "access": [
+        "alerts:read",
+        "alerts:write",
+        "event:admin",
+        "event:read",
+        "event:write",
+        "member:read",
+        "org:integrations",
+        "org:read",
+        "project:admin",
+        "project:read",
+        "project:releases",
+        "project:write",
+        "team:admin",
+        "team:read",
+        "team:write"
+      ],
+      "dateCreated": "2025-09-18T14:09:00.473777Z",
+      "environments": [
+        "production"
+      ],
+      "features": [
+        "alert-filters",
+        "continuous-profiling-vroomrs-processing",
+        "project-detail-apple-app-hang-rate",
+        "similarity-embeddings",
+        "similarity-indexing",
+        "similarity-view",
+        "transaction-profiling-vroomrs-processing"
+      ],
+      "firstEvent": "2025-09-18T14:12:28.557000Z",
+      "firstTransactionEvent": true,
+      "hasAccess": true,
+      "hasFeedbacks": false,
+      "hasFlags": false,
+      "hasInsightsAgentMonitoring": false,
+      "hasInsightsAppStart": false,
+      "hasInsightsAssets": false,
+      "hasInsightsCaches": false,
+      "hasInsightsDb": false,
+      "hasInsightsHttp": false,
+      "hasInsightsLlmMonitoring": false,
+      "hasInsightsMCP": false,
+      "hasInsightsQueues": false,
+      "hasInsightsScreenLoad": false,
+      "hasInsightsVitals": false,
+      "hasLogs": false,
+      "hasMinifiedStackTrace": true,
+      "hasMonitors": false,
+      "hasNewFeedbacks": false,
+      "hasProfiles": true,
+      "hasReplays": false,
+      "hasSessions": false,
+      "hasUserReports": false,
+      "id": "4510041012699136",
+      "isBookmarked": false,
+      "isMember": true,
+      "latestDeploys": null,
+      "latestRelease": null,
+      "name": "test-nicolas-backend",
+      "platform": "node",
+      "platforms": [],
+      "slug": "test-nicolas-backend",
+      "team": {
+        "id": "4509990432866304",
+        "name": "Estuary",
+        "slug": "estuary"
+      },
+      "teams": [
+        {
+          "id": "4509990432866304",
+          "name": "Estuary",
+          "slug": "estuary"
+        }
+      ]
+    }
+  ],
+  [
+    "acmeCo/Projects",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 1,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "access": [
+        "alerts:read",
+        "alerts:write",
+        "event:admin",
+        "event:read",
+        "event:write",
+        "member:read",
+        "org:integrations",
+        "org:read",
+        "project:admin",
+        "project:read",
+        "project:releases",
+        "project:write",
+        "team:admin",
+        "team:read",
+        "team:write"
+      ],
+      "dateCreated": "2025-09-18T14:22:33.172710Z",
+      "environments": [],
+      "features": [
+        "alert-filters",
+        "continuous-profiling-vroomrs-processing",
+        "project-detail-apple-app-hang-rate",
+        "similarity-embeddings",
+        "similarity-indexing",
+        "similarity-view",
+        "transaction-profiling-vroomrs-processing"
+      ],
+      "firstEvent": null,
+      "firstTransactionEvent": false,
+      "hasAccess": true,
+      "hasFeedbacks": false,
+      "hasFlags": false,
+      "hasInsightsAgentMonitoring": false,
+      "hasInsightsAppStart": false,
+      "hasInsightsAssets": false,
+      "hasInsightsCaches": false,
+      "hasInsightsDb": false,
+      "hasInsightsHttp": false,
+      "hasInsightsLlmMonitoring": false,
+      "hasInsightsMCP": false,
+      "hasInsightsQueues": false,
+      "hasInsightsScreenLoad": false,
+      "hasInsightsVitals": false,
+      "hasLogs": false,
+      "hasMinifiedStackTrace": false,
+      "hasMonitors": false,
+      "hasNewFeedbacks": false,
+      "hasProfiles": false,
+      "hasReplays": false,
+      "hasSessions": false,
+      "hasUserReports": false,
+      "id": "4510041065979904",
+      "isBookmarked": false,
+      "isMember": true,
+      "latestDeploys": null,
+      "latestRelease": null,
+      "name": "test-nicolas-frontend",
+      "platform": "javascript-react",
+      "platforms": [],
+      "slug": "test-nicolas-frontend",
+      "team": {
+        "id": "4509990432866304",
+        "name": "Estuary",
+        "slug": "estuary"
+      },
+      "teams": [
+        {
+          "id": "4509990432866304",
+          "name": "Estuary",
+          "slug": "estuary"
+        }
+      ]
+    }
+  ],
+  [
+    "acmeCo/Projects",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 2,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "access": [
+        "alerts:read",
+        "alerts:write",
+        "event:admin",
+        "event:read",
+        "event:write",
+        "member:read",
+        "org:integrations",
+        "org:read",
+        "project:admin",
+        "project:read",
+        "project:releases",
+        "project:write",
+        "team:admin",
+        "team:read",
+        "team:write"
+      ],
+      "dateCreated": "2025-09-09T16:16:08.051867Z",
+      "environments": [
+        "production"
+      ],
+      "features": [
+        "alert-filters",
+        "continuous-profiling-vroomrs-processing",
+        "project-detail-apple-app-hang-rate",
+        "releases",
+        "similarity-embeddings",
+        "similarity-indexing",
+        "similarity-view",
+        "transaction-profiling-vroomrs-processing"
+      ],
+      "firstEvent": "2025-09-09T16:48:59.193424Z",
+      "firstTransactionEvent": false,
+      "hasAccess": true,
+      "hasFeedbacks": false,
+      "hasFlags": false,
+      "hasInsightsAgentMonitoring": false,
+      "hasInsightsAppStart": false,
+      "hasInsightsAssets": false,
+      "hasInsightsCaches": false,
+      "hasInsightsDb": false,
+      "hasInsightsHttp": false,
+      "hasInsightsLlmMonitoring": false,
+      "hasInsightsMCP": false,
+      "hasInsightsQueues": false,
+      "hasInsightsScreenLoad": false,
+      "hasInsightsVitals": false,
+      "hasLogs": false,
+      "hasMinifiedStackTrace": false,
+      "hasMonitors": false,
+      "hasNewFeedbacks": false,
+      "hasProfiles": false,
+      "hasReplays": false,
+      "hasSessions": false,
+      "hasUserReports": false,
+      "id": "4509990551814144",
+      "isBookmarked": false,
+      "isMember": true,
+      "latestDeploys": null,
+      "latestRelease": {
+        "version": "v0.2"
+      },
+      "name": "test-project",
+      "platform": "python",
+      "platforms": [],
+      "slug": "test-project",
+      "team": {
+        "id": "4509990432866304",
+        "name": "Estuary",
+        "slug": "estuary"
+      },
+      "teams": [
+        {
+          "id": "4509990432866304",
+          "name": "Estuary",
+          "slug": "estuary"
+        }
+      ]
+    }
+  ],
+  [
+    "acmeCo/Teams",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "access": [
+        "alerts:read",
+        "alerts:write",
+        "event:admin",
+        "event:read",
+        "event:write",
+        "member:read",
+        "org:integrations",
+        "org:read",
+        "project:admin",
+        "project:read",
+        "project:releases",
+        "project:write",
+        "team:admin",
+        "team:read",
+        "team:write"
+      ],
+      "avatar": {
+        "avatarType": "letter_avatar",
+        "avatarUuid": null
+      },
+      "dateCreated": "2025-09-09T15:45:53.671857Z",
+      "flags": {
+        "idp:provisioned": false
+      },
+      "hasAccess": true,
+      "id": "4509990432866304",
+      "isMember": true,
+      "isPending": false,
+      "memberCount": 1,
+      "name": "Estuary",
+      "slug": "estuary",
+      "teamRole": "admin"
+    }
+  ],
+  [
+    "acmeCo/Releases",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "authors": [],
+      "commitCount": 0,
+      "currentProjectMeta": {},
+      "data": {},
+      "dateCreated": "2025-09-09T16:37:43.954027Z",
+      "dateReleased": null,
+      "deployCount": 0,
+      "firstEvent": null,
+      "id": 1527699765,
+      "lastCommit": null,
+      "lastDeploy": null,
+      "lastEvent": null,
+      "newGroups": 0,
+      "owner": null,
+      "projects": [
+        {
+          "hasHealthData": false,
+          "id": 4509990551814144,
+          "name": "test-project",
+          "newGroups": 0,
+          "platform": "python",
+          "platforms": [],
+          "slug": "test-project"
+        }
+      ],
+      "ref": "1234565",
+      "shortVersion": "v0.2",
+      "status": "open",
+      "url": null,
+      "userAgent": "bruno-runtime/1.34.2",
+      "version": "v0.2",
+      "versionInfo": {
+        "buildHash": null,
+        "description": "v0.2",
+        "package": null,
+        "version": {
+          "raw": "v0.2"
+        }
+      }
+    }
+  ],
+  [
+    "acmeCo/Releases",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 1,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "authors": [],
+      "commitCount": 0,
+      "currentProjectMeta": {},
+      "data": {},
+      "dateCreated": "2025-09-09T16:36:39.479935Z",
+      "dateReleased": null,
+      "deployCount": 0,
+      "firstEvent": null,
+      "id": 1527698679,
+      "lastCommit": null,
+      "lastDeploy": null,
+      "lastEvent": null,
+      "newGroups": 0,
+      "owner": null,
+      "projects": [
+        {
+          "hasHealthData": false,
+          "id": 4509990551814144,
+          "name": "test-project",
+          "newGroups": 0,
+          "platform": "python",
+          "platforms": [],
+          "slug": "test-project"
+        }
+      ],
+      "ref": null,
+      "shortVersion": "v0.1",
+      "status": "open",
+      "url": null,
+      "userAgent": "bruno-runtime/1.34.2",
+      "version": "v0.1",
+      "versionInfo": {
+        "buildHash": null,
+        "description": "v0.1",
+        "package": null,
+        "version": {
+          "raw": "v0.1"
+        }
+      }
+    }
+  ]
+]
