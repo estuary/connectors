@@ -465,6 +465,7 @@ class HTTPMixin(Mixin, HTTPSession):
                 ConnectionResetError,                # TCP connection reset
                 aiohttp.ClientOSError,               # OS errors (like BrokenPipeError) during request sending
                 aiohttp.ClientConnectionResetError,  # Connection reset errors
+                aiohttp.ServerDisconnectedError,     # Server disconnections
             ) as e:
                 if attempt <= max_attempts:
                     log.warning(
