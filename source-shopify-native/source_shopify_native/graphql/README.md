@@ -4,7 +4,7 @@ This subpackage provides the `BulkJobManager` for [executing bulk query jobs](ht
 
 ## `BulkJobManager`
 
-The `BulkJobManager` is responsible for submitting queries, checking the status of those queries, and retrieving the URL containing query results. Parsing the query results is the handled elsewhere. The `BulkJobManager` can also cancel queries, although that functionality is currently only used upon connector start up to clean up ongoing queries between connector restarts.
+The `BulkJobManager` is responsible for submitting queries, checking the status of those queries, and retrieving the URL containing query results. Parsing query results is handled by the `process_result` static method defined on each stream's Pydantic model. The `BulkJobManager` can also cancel queries, although that functionality is currently only used upon connector start up to clean up ongoing queries between connector restarts.
 
 
 ## `{stream_name}.py`
