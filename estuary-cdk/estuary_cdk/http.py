@@ -84,7 +84,7 @@ class HTTPSession(abc.ABC):
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
         _with_token: bool = True,  # Unstable internal API.
-        headers: dict[str, Any] = {},
+        headers: dict[str, Any] | None = None,
     ) -> bytes:
         """Request a url and return its body as bytes"""
 
@@ -112,7 +112,7 @@ class HTTPSession(abc.ABC):
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
         delim: bytes = b"\n",
-        headers: dict[str, Any] = {}
+        headers: dict[str, Any] | None = None,
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and return its response as streaming lines, as they arrive"""
 
@@ -142,7 +142,7 @@ class HTTPSession(abc.ABC):
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
         _with_token: bool = True,  # Unstable internal API.
-        headers: dict[str, Any] = {},
+        headers: dict[str, Any] | None = None,
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and and return the raw response as a stream of bytes"""
 
@@ -159,7 +159,7 @@ class HTTPSession(abc.ABC):
         json: dict[str, Any] | None,
         form: dict[str, Any] | None,
         _with_token: bool,
-        headers: dict[str, Any] = {},
+        headers: dict[str, Any] | None = None,
     ) -> HeadersAndBodyGenerator: ...
 
     # TODO(johnny): This is an unstable API.
@@ -484,8 +484,11 @@ class HTTPMixin(Mixin, HTTPSession):
         json: dict[str, Any] | None,
         form: dict[str, Any] | None,
         _with_token: bool,
-        headers: dict[str, Any] = {},
+        headers: dict[str, Any] | None = None,
     ) -> HeadersAndBodyGenerator:
+        if headers is None:
+            headers = {}
+
         while True:
             cur_delay = self.rate_limiter.delay
             await asyncio.sleep(cur_delay)
