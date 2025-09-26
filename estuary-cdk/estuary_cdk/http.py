@@ -88,23 +88,20 @@ class HTTPSession(abc.ABC):
     ) -> bytes:
         """Request a url and return its body as bytes"""
 
-        async def _do_request() -> bytes:
-            chunks: list[bytes] = []
-            _, body_generator = await self._request_stream(
-                log, url, method, params, json, form, _with_token, headers
-            )
+        chunks: list[bytes] = []
+        _, body_generator = await self._request_stream(
+            log, url, method, params, json, form, _with_token, headers
+        )
 
-            async for chunk in body_generator():
-                chunks.append(chunk)
+        async for chunk in body_generator():
+            chunks.append(chunk)
 
-            if len(chunks) == 0:
-                return b""
-            elif len(chunks) == 1:
-                return chunks[0]
-            else:
-                return b"".join(chunks)
-
-        return await self._retry_on_timeout(log, url, method, _do_request)
+        if len(chunks) == 0:
+            return b""
+        elif len(chunks) == 1:
+            return chunks[0]
+        else:
+            return b"".join(chunks)
 
     async def request_lines(
         self,
@@ -119,12 +116,9 @@ class HTTPSession(abc.ABC):
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and return its response as streaming lines, as they arrive"""
 
-        async def _do_request() -> tuple[Headers, BodyGeneratorFunction]:
-            return await self._request_stream(
-                log, url, method, params, json, form, True, headers
-            )
-
-        resp_headers, body = await self._retry_on_timeout(log, url, method, _do_request)
+        resp_headers, body = await self._request_stream(
+            log, url, method, params, json, form, True, headers
+        )
 
         async def gen() -> AsyncGenerator[bytes, None]:
             buffer = b""
@@ -152,33 +146,8 @@ class HTTPSession(abc.ABC):
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and and return the raw response as a stream of bytes"""
 
-        async def _do_request() -> tuple[Headers, BodyGeneratorFunction]:
-            return await self._request_stream(log, url, method, params, json, form, _with_token, headers)
+        return await self._request_stream(log, url, method, params, json, form, _with_token, headers)
 
-        return await self._retry_on_timeout(log, url, method, _do_request)
-
-    async def _retry_on_timeout(
-        self,
-        log: Logger,
-        url: str,
-        method: str,
-        operation: Callable[[], Awaitable[T]],
-    ) -> T:
-        max_attempts = 3
-        attempt = 1
-
-        while True:
-            try:
-                return await operation()
-            except asyncio.TimeoutError as e:
-                if attempt <= max_attempts:
-                    log.warning(
-                        f"Connection timeout error (will retry)",
-                        {"url": url, "method": method, "attempt": attempt, "error": format_error_message(e)}
-                    )
-                    attempt += 1
-                else:
-                    raise
 
     @abc.abstractmethod
     async def _request_stream(
@@ -443,6 +412,69 @@ class HTTPMixin(Mixin, HTTPSession):
         await self.inner.close()
         return self
 
+    async def _establish_connection_and_get_response(
+        self,
+        log: Logger,
+        url: str,
+        method: str,
+        params: dict[str, Any] | None,
+        json: dict[str, Any] | None,
+        form: dict[str, Any] | None,
+        _with_token: bool,
+        headers: dict[str, Any],
+    ):
+        if _with_token and self.token_source is not None:
+            token_type, token = await self.token_source.fetch_token(log, self)
+            header_value = (
+                f"{token_type} {token}"
+                if self.token_source.authorization_header
+                == DEFAULT_AUTHORIZATION_HEADER
+                else f"{token}"
+            )
+            headers[self.token_source.authorization_header] = header_value
+
+        resp = await self.inner.request(
+            headers=headers,
+            json=json,
+            data=form,
+            method=method,
+            params=params,
+            url=url,
+        )
+
+        return resp
+
+    async def _retry_on_connection_error(
+        self,
+        log: Logger,
+        url: str,
+        method: str,
+        operation: Callable[[], Awaitable[T]],
+    ) -> T:
+        max_attempts = 3
+        attempt = 1
+
+        while True:
+            try:
+                return await operation()
+            except (
+                asyncio.TimeoutError,                # Connection timeouts
+                aiohttp.ClientConnectorError,        # DNS, SSL handshake, connection refused errors
+                aiohttp.ClientConnectorDNSError,     # DNS resolution failures
+                aiohttp.ConnectionTimeoutError,      # aiohttp connection timeouts (sock_connect, connect)
+                ConnectionResetError,                # TCP connection reset
+                aiohttp.ClientOSError,               # OS errors (like BrokenPipeError) during request sending
+                aiohttp.ClientConnectionResetError,  # Connection reset errors
+            ) as e:
+                if attempt <= max_attempts:
+                    log.warning(
+                        f"Connection error occurred while establishing connection (will retry)",
+                        {"url": url, "method": method, "attempt": attempt, "error": format_error_message(e)}
+                    )
+                    attempt += 1
+                else:
+                    raise
+
     async def _request_stream(
         self,
         log: Logger,
@@ -458,23 +490,11 @@ class HTTPMixin(Mixin, HTTPSession):
             cur_delay = self.rate_limiter.delay
             await asyncio.sleep(cur_delay)
 
-            if _with_token and self.token_source is not None:
-                token_type, token = await self.token_source.fetch_token(log, self)
-                header_value = (
-                    f"{token_type} {token}"
-                    if self.token_source.authorization_header
-                    == DEFAULT_AUTHORIZATION_HEADER
-                    else f"{token}"
+            resp = await self._retry_on_connection_error(
+                log, url, method,
+                lambda: self._establish_connection_and_get_response(
+                    log, url, method, params, json, form, _with_token, headers,
                 )
-                headers[self.token_source.authorization_header] = header_value
-
-            resp = await self.inner.request(
-                headers=headers,
-                json=json,
-                data=form,
-                method=method,
-                params=params,
-                url=url,
             )
 
             should_release_response = True
@@ -514,10 +534,12 @@ class HTTPMixin(Mixin, HTTPSession):
                         finally:
                             await resp.release()
 
-                    headers = Headers({k: v for k, v in resp.headers.items()})
+                    response_headers = Headers({k: v for k, v in resp.headers.items()})
                     should_release_response = False
-                    return (headers, body_generator)
+                    return (response_headers, body_generator)
 
             finally:
                 if should_release_response:
                     await resp.release()
+
+
