@@ -167,10 +167,6 @@ collections:
     schema: line_items.schema.yaml
     key:
       - /id
-  acmeCo/marketing_emails:
-    schema: marketing_emails.schema.yaml
-    key:
-      - /id
   acmeCo/owners:
     schema: owners.schema.yaml
     key:
