@@ -84,7 +84,7 @@ async def list_time_ranged_entity(
         }  # WARN: Matching the start timestamp will cause an HTTP 400 error
     )
 
-    async for item in list_entity(model, http, organization, log, extra_params):
+    async for item in list_entity(model, http, organization, log, params):
         yield item
 
 

@@ -20,6 +20,9 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
+    for line in lines:
+        line[1]["stats"] = "redacted-object"
+
     assert snapshot("stdout.json") == lines
 
 
