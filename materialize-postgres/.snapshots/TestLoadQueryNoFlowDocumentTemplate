@@ -1,0 +1,11 @@
+
+SELECT 0, 
+JSON_BUILD_OBJECT(
+    'id', r."id",
+    'name', r."name",
+    'age', r."age"
+) as flow_document
+FROM "test_schema"."test_table" AS r
+JOIN flow_temp_table_0 AS l
+	 ON  l."id" = r."id"
+

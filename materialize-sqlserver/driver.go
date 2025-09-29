@@ -540,7 +540,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 		converted = append(converted, flowDelete)
 
-		if _, err := batches[it.Binding].ExecContext(ctx, append(converted, flowDelete)...); err != nil {
+		if _, err := batches[it.Binding].ExecContext(ctx, converted...); err != nil {
 			return nil, fmt.Errorf("store writing data to batch on %q: %w", b.tempStoreTableName, err)
 		}
 
