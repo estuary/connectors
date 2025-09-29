@@ -2,7 +2,7 @@ Big Schema Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
 {"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
+{"Field":"flow_document","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Root document projection is optional when flow_document is disabled"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"intField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"key","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"All Locations that are part of the collections key are recommended"}
@@ -89,8 +89,8 @@ Big Schema Changed Types Constraints:
 {"Field":"numField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'numField' is already being materialized as endpoint type 'DOUBLE' but endpoint type 'BOOLEAN' is required by its schema '{ type: [boolean] }'"}
 {"Field":"objField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'objField' is already being materialized as endpoint type 'JSON' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
 {"Field":"stringDateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringDateTimeField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringDateTimeField' is already being materialized as endpoint type 'TIMESTAMP WITH TIME ZONE' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
-{"Field":"stringDurationField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringDurationField' is already being materialized as endpoint type 'INTERVAL' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
+{"Field":"stringDateTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'VARCHAR' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
 {"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -113,7 +113,7 @@ Big Schema Changed Types Constraints:
 {"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringUuidField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringUuidField' is already being materialized as endpoint type 'UUID' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"_meta/flow_truncated","Nullable":"NO","Type":"BOOLEAN"}
@@ -128,7 +128,7 @@ Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"objField","Nullable":"NO","Type":"JSON"}
 {"Name":"stringDateField","Nullable":"NO","Type":"DATE"}
 {"Name":"stringDateTimeField","Nullable":"NO","Type":"TIMESTAMP WITH TIME ZONE"}
-{"Name":"stringDurationField","Nullable":"NO","Type":"INTERVAL"}
+{"Name":"stringDurationField","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"stringEmailField","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"stringField","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"stringHostnameField","Nullable":"NO","Type":"VARCHAR"}
@@ -166,7 +166,7 @@ Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"objField","Nullable":"YES","Type":"JSON"}
 {"Name":"stringDateField","Nullable":"YES","Type":"DATE"}
 {"Name":"stringDateTimeField","Nullable":"YES","Type":"TIMESTAMP WITH TIME ZONE"}
-{"Name":"stringDurationField","Nullable":"YES","Type":"INTERVAL"}
+{"Name":"stringDurationField","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"stringEmailField","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"stringField","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"stringHostnameField","Nullable":"YES","Type":"VARCHAR"}
@@ -195,7 +195,7 @@ Big Schema Changed Types With Table Replacement Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
 {"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The root document should usually be materialized"}
+{"Field":"flow_document","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Root document projection is optional when flow_document is disabled"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"intField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"key","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"All Locations that are part of the collections key are recommended"}
@@ -340,7 +340,6 @@ Challenging Field Names Materialized Columns:
 {"Name":"123startsWithDigits","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"_id","Nullable":"NO","Type":"VARCHAR"}
 {"Name":"a\"string`with`quote'characters","Nullable":"YES","Type":"VARCHAR"}
-{"Name":"flow_document","Nullable":"NO","Type":"JSON"}
 {"Name":"flow_published_at","Nullable":"NO","Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"value with separated words","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"value-with-separated-words","Nullable":"YES","Type":"VARCHAR"}

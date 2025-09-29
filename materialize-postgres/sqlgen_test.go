@@ -28,7 +28,7 @@ func TestSQLGeneration(t *testing.T) {
 				testTemplates.createLoadTable,
 				testTemplates.loadInsert,
 				testTemplates.loadQuery,
-				testTemplates.loadQueryNoFlowDocumen,
+				testTemplates.loadQueryNoFlowDocument,
 				testTemplates.storeInsert,
 				testTemplates.storeUpdate,
 				testTemplates.deleteQuery,
@@ -136,7 +136,7 @@ func TestLoadQueryNoFlowDocumentTemplate(t *testing.T) {
 	}
 
 	// Test the loadQueryNoFlowDocument template
-	result, err := sql.RenderTableTemplate(table, tplLoadQueryNoFlowDocument)
+	result, err := sql.RenderTableTemplate(table, testTemplates.loadQueryNoFlowDocument)
 	require.NoError(t, err)
 
 	cupaloy.SnapshotT(t, result)

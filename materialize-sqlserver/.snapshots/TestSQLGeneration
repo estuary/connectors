@@ -163,6 +163,8 @@ END;
 		FROM #flow_temp_store_1
 	) AS r
 	ON delta_updates."theKey" = r."theKey"
+	WHEN MATCHED AND r._flow_delete = 1 THEN
+		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET delta_updates."aValue" = r."aValue", delta_updates.flow_published_at = r.flow_published_at
 	WHEN NOT MATCHED AND r._flow_delete = 0 THEN

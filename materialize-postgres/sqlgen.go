@@ -130,6 +130,7 @@ type templates struct {
 	storeUpdate       *template.Template
 	deleteQuery       *template.Template
 	loadQuery         *template.Template
+	loadQueryNoFlowDocument         *template.Template
 	installFence      *template.Template
 	updateFence       *template.Template
 }
@@ -371,7 +372,7 @@ END $$;
 		storeUpdate:       tplAll.Lookup("storeUpdate"),
 		deleteQuery:       tplAll.Lookup("deleteQuery"),
 		loadQuery:         tplAll.Lookup("loadQuery"),
-		loadQueryNoFlowDocumen:         tplAll.Lookup("loadQueryNoFlowDocument"),
+		loadQueryNoFlowDocument:         tplAll.Lookup("loadQueryNoFlowDocument"),
 		installFence:      tplAll.Lookup("installFence"),
 		updateFence:       tplAll.Lookup("updateFence"),
 	}
