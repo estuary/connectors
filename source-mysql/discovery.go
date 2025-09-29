@@ -135,6 +135,7 @@ func (db *mysqlDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.Str
 				"index": selectedIndex,
 			}).Debug("selected secondary index as table key")
 			info.PrimaryKey = indexColumns[selectedIndex]
+			info.FallbackKey = true
 		} else {
 			logrus.WithField("table", streamID).Debug("no secondary index is suitable")
 		}

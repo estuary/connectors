@@ -128,6 +128,7 @@ Binding 0:
     },
     "key": [
       "/id"
-    ]
+    ],
+    "is_fallback_key": true
   }
 
