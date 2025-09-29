@@ -14,7 +14,7 @@ from airbyte_cdk.models import ConfiguredAirbyteCatalog, SyncMode, Type
 from source_hubspot.errors import HubspotRateLimited, InvalidStartDateConfigError
 from source_hubspot.helpers import APIv3Property
 from source_hubspot.source import SourceHubspot
-from source_hubspot.streams import API, Companies, Deals, Engagements, MarketingEmails, Products, Stream
+from source_hubspot.streams import API, Companies, Deals, Engagements, Products, Stream
 
 from .utils import read_full_refresh, read_incremental
 
@@ -74,7 +74,7 @@ def test_streams(requests_mock, config):
 
     streams = SourceHubspot().streams(config)
 
-    assert len(streams) == 28
+    assert len(streams) == 27
 
 
 def test_check_credential_title_exception(config):
@@ -556,48 +556,3 @@ def test_incremental_engagements_stream_stops_at_10K_records(requests_mock, comm
     # The stream should not attempt to get more than 10K records.
     assert len(records) == 10000
     assert test_stream.state["lastUpdated"] == int(test_stream._init_sync.timestamp() * 1000)
-
-
-def test_pagination_marketing_emails_stream(requests_mock, common_params):
-    """
-    Test pagination for Marketing Emails stream
-    """
-
-    requests_mock.register_uri(
-        "GET",
-        "/marketing-emails/v1/emails/with-statistics?limit=250",
-        [
-            {
-                "json": {
-                    "objects": [{"id": f"{y}", "updated": 1641234593251} for y in range(250)],
-                    "limit": 250,
-                    "offset": 0,
-                    "total": 600,
-                },
-                "status_code": 200,
-            },
-            {
-                "json": {
-                    "objects": [{"id": f"{y}", "updated": 1641234593251} for y in range(250, 500)],
-                    "limit": 250,
-                    "offset": 250,
-                    "total": 600,
-                },
-                "status_code": 200,
-            },
-            {
-                "json": {
-                    "objects": [{"id": f"{y}", "updated": 1641234595251} for y in range(500, 600)],
-                    "limit": 250,
-                    "offset": 500,
-                    "total": 600,
-                },
-                "status_code": 200,
-            },
-        ],
-    )
-    test_stream = MarketingEmails(**common_params)
-
-    records = read_full_refresh(test_stream)
-    # The stream should handle pagination correctly and output 600 records.
-    assert len(records) == 600

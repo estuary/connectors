@@ -134,12 +134,6 @@ captures:
             - updatedAt
         target: acmeCo/line_items
       - resource:
-          stream: marketing_emails
-          syncMode: full_refresh
-          cursorField:
-            - id
-        target: acmeCo/marketing_emails
-      - resource:
           stream: owners
           syncMode: incremental
           cursorField:
