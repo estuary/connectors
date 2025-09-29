@@ -134,6 +134,7 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 				"index": selectedIndex,
 			}).Debug("selected secondary index as table key")
 			info.PrimaryKey = indexColumns[selectedIndex]
+			info.FallbackKey = true
 		} else {
 			log.WithField("table", streamID).Debug("no secondary index is suitable")
 		}

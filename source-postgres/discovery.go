@@ -174,6 +174,7 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.
 				"index": selectedIndex,
 			}).Debug("selected secondary index as table key")
 			info.PrimaryKey = indexColumns[selectedIndex]
+			info.FallbackKey = true
 		} else {
 			logrus.WithField("table", streamID).Debug("no secondary index is suitable")
 		}

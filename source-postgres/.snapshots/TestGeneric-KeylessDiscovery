@@ -151,6 +151,7 @@ Binding 0:
       "/_meta/source/loc/0",
       "/_meta/source/loc/1",
       "/_meta/source/loc/2"
-    ]
+    ],
+    "is_fallback_key": true
   }
 
