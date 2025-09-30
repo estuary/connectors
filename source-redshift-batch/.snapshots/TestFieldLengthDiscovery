@@ -1,17 +1,15 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "query_template_override",
-      "cursor": [
-        "updated_at"
-      ],
-      "template": "SELECT * FROM public.querytemplateoverride_638679 {{if not .IsFirstQuery}} WHERE updated_at \u003e $1 {{end}} ORDER BY updated_at"
+      "name": "fieldlengthdiscovery_847554",
+      "schema": "public",
+      "table": "fieldlengthdiscovery_847554"
     },
     "resource_path": [
-      "querytemplateoverride_638679"
+      "fieldlengthdiscovery_847554"
     ],
     "collection": {
-      "name": "acmeCo/test/public/querytemplateoverride_638679",
+      "name": "acmeCo/test/public/fieldlengthdiscovery_847554",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -83,9 +81,19 @@ Binding 0:
               "source"
             ]
           },
-          "data": {
-            "maxLength": 256,
-            "description": "(source type: varchar)",
+          "char_15": {
+            "maxLength": 15,
+            "minLength": 15,
+            "description": "(source type: bpchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "char_5": {
+            "maxLength": 5,
+            "minLength": 5,
+            "description": "(source type: bpchar)",
             "type": [
               "string",
               "null"
@@ -95,9 +103,57 @@ Binding 0:
             "type": "integer",
             "description": "(source type: non-nullable int4)"
           },
-          "updated_at": {
-            "format": "date-time",
-            "description": "(source type: timestamp)",
+          "numeric_10_2": {
+            "format": "number",
+            "description": "(source type: numeric)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "numeric_18_4": {
+            "format": "number",
+            "description": "(source type: numeric)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text_col": {
+            "maxLength": 256,
+            "description": "(source type: varchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varbyte_16": {
+            "description": "(source type: varbyte)",
+            "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varbyte_unlimited": {
+            "description": "(source type: varbyte)",
+            "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varchar_100": {
+            "maxLength": 100,
+            "description": "(source type: varchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varchar_unlimited": {
+            "maxLength": 256,
+            "description": "(source type: varchar)",
             "type": [
               "string",
               "null"
@@ -111,6 +167,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "querytemplateoverride_638679"
+    "state_key": "fieldlengthdiscovery_847554"
   }
 

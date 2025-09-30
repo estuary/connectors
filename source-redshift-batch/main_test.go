@@ -354,6 +354,28 @@ func TestFloatNaNs(t *testing.T) {
 	})
 }
 
+// TestFieldLengthDiscovery verifies that char/binary columns with declared field lengths
+// have those lengths reflected in the discovered JSON schema as maxLength/minLength constraints.
+func TestFieldLengthDiscovery(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        char_5 CHAR(5),
+        char_15 CHAR(15),
+        varchar_100 VARCHAR(100),
+        varchar_unlimited VARCHAR,
+        text_col TEXT,
+        varbyte_16 VARBYTE(16),
+        varbyte_unlimited VARBYTE,
+        numeric_10_2 NUMERIC(10, 2),
+        numeric_18_4 NUMERIC(18, 4)
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings))
+}
+
 func TestSchemaFilter(t *testing.T) {
 	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
 	var tableName, uniqueID = testTableName(t, uniqueTableID(t))

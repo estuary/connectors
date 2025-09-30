@@ -84,6 +84,7 @@ Binding 0:
             ]
           },
           "data": {
+            "maxLength": 256,
             "description": "(source type: varchar)",
             "type": [
               "string",
