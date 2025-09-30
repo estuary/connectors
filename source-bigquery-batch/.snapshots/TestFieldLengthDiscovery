@@ -1,18 +1,15 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "stringtypes_339419",
+      "name": "fieldlengthdiscovery_847554",
       "schema": "testdata",
-      "table": "stringtypes_339419",
-      "cursor": [
-        "id"
-      ]
+      "table": "fieldlengthdiscovery_847554"
     },
     "resource_path": [
-      "stringtypes_339419"
+      "fieldlengthdiscovery_847554"
     ],
     "collection": {
-      "name": "acmeCo/test/stringtypes_339419",
+      "name": "acmeCo/test/fieldlengthdiscovery_847554",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -84,6 +81,40 @@ Binding 0:
               "source"
             ]
           },
+          "bignumeric_col": {
+            "format": "number",
+            "description": "(source type: BIGNUMERIC)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bytes_16": {
+            "maxLength": 24,
+            "description": "(source type: BYTES(16))",
+            "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bytes_255": {
+            "maxLength": 340,
+            "description": "(source type: BYTES(255))",
+            "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bytes_unlimited": {
+            "description": "(source type: BYTES)",
+            "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "id": {
             "description": "(source type: INT64)",
             "type": [
@@ -91,15 +122,39 @@ Binding 0:
               "null"
             ]
           },
-          "string_len_val": {
-            "maxLength": 50,
-            "description": "(source type: STRING(50))",
+          "numeric_10_2": {
+            "format": "number",
+            "description": "(source type: NUMERIC(10, 2))",
             "type": [
               "string",
               "null"
             ]
           },
-          "string_val": {
+          "numeric_col": {
+            "format": "number",
+            "description": "(source type: NUMERIC)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "string_10": {
+            "maxLength": 10,
+            "description": "(source type: STRING(10))",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "string_100": {
+            "maxLength": 100,
+            "description": "(source type: STRING(100))",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "string_unlimited": {
             "description": "(source type: STRING)",
             "type": [
               "string",
@@ -114,6 +169,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "stringtypes_339419"
+    "state_key": "fieldlengthdiscovery_847554"
   }
 
