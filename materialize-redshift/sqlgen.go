@@ -354,6 +354,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 {{- end }}
 
 {{ define "loadQueryNoFlowDocument" }}
+{{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }}, 
 OBJECT(
 {{- range $i, $col := $.RootLevelColumns}}
@@ -367,6 +368,9 @@ JOIN {{ $.Identifier}} AS r
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
 		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
+{{ else -}}
+SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
+{{ end }}
 {{ end }}
 
 -- Templated command to copy data from an S3 file into the destination table. Note the 'ignorecase'

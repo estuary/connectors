@@ -336,6 +336,7 @@ SELECT TOP 0 -1, NULL
 {{- end }}
 
 {{ define "loadQueryNoFlowDocument" }}
+{{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }}, 
 (
 	SELECT 
@@ -351,6 +352,9 @@ JOIN {{ template "temp_load_name" . }} AS l
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
+{{ else -}}
+SELECT TOP 0 -1, NULL
+{{ end }}
 {{ end }}
 
 -- If there are no updates to a table, we can just do a direct copy from temporary table into target table
@@ -384,8 +388,10 @@ JOIN {{ template "temp_load_name" . }} AS l
 		{{- if $ind }} AND {{ end -}}
 		{{ $.Identifier }}.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
+	{{- if not $.DeltaUpdates }}
 	WHEN MATCHED AND r._flow_delete = 1 THEN
 		DELETE
+	{{- end }}
 	WHEN MATCHED THEN
 		UPDATE SET {{ range $ind, $key := $.Values }}
 		{{- if $ind }}, {{ end -}}
@@ -394,7 +400,7 @@ JOIN {{ template "temp_load_name" . }} AS l
 	{{- if $.Document -}}
 	{{ if $.Values }}, {{ end }}{{ $.Identifier }}.{{ $.Document.Identifier}} = r.{{ $.Document.Identifier }}
 	{{- end }}
-	WHEN NOT MATCHED AND r._flow_delete = 0 THEN
+	WHEN NOT MATCHED {{ if not $.DeltaUpdates }}AND r._flow_delete = 0{{ end }} THEN
 		INSERT (
 		{{- range $ind, $key := $.Columns }}
 			{{- if $ind }}, {{ end -}}

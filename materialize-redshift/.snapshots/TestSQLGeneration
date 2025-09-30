@@ -146,18 +146,13 @@ JOIN "a-schema".key_value AS r
 	 ON  l.key1 = r.key1
 	 AND l.key2 = r.key2
 	 AND l."key!binary" = r."key!binary"
+
 --- End "a-schema".key_value loadQueryNoFlowDocument ---
 
 --- Begin "a-schema".delta_updates loadQueryNoFlowDocument ---
 
-SELECT 1, 
-OBJECT(
-	'theKey', r."theKey",
-	'aValue', r."aValue"
-) as flow_document
-FROM flow_temp_table_1 AS l
-JOIN "a-schema".delta_updates AS r
-	 ON  l."theKey" = r."theKey"
+SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
+
 --- End "a-schema".delta_updates loadQueryNoFlowDocument ---
 
 --- Begin "a-schema".key_value createDeleteTable ---

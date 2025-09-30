@@ -379,6 +379,7 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 {{- end }}
 
 {{ define "loadQueryNoFlowDocument" }}
+{{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }}, 
 JSON_OBJECT(
 {{- range $i, $col := $.RootLevelColumns}}
@@ -392,6 +393,9 @@ JOIN {{ template "temp_load_name" . }} AS l
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
+{{ else -}}
+SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
+{{ end }}
 {{ end }}
 
 -- Template to load data into target table

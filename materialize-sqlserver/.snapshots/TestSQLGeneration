@@ -163,11 +163,9 @@ END;
 		FROM #flow_temp_store_1
 	) AS r
 	ON delta_updates."theKey" = r."theKey"
-	WHEN MATCHED AND r._flow_delete = 1 THEN
-		DELETE
 	WHEN MATCHED THEN
 		UPDATE SET delta_updates."aValue" = r."aValue", delta_updates.flow_published_at = r.flow_published_at
-	WHEN NOT MATCHED AND r._flow_delete = 0 THEN
+	WHEN NOT MATCHED  THEN
 		INSERT ("theKey", "aValue", flow_published_at)
 		VALUES (r."theKey", r."aValue", r.flow_published_at);
 --- End delta_updates mergeInto ---
@@ -231,20 +229,13 @@ JOIN #flow_temp_load_0 AS l
 	 ON  l.key1 = r.key1
 	 AND l.key2 = r.key2
 	 AND l."key!binary" = r."key!binary"
+
 --- End key_value loadQueryNoFlowDocument ---
 
 --- Begin delta_updates loadQueryNoFlowDocument ---
 
-SELECT 1, 
-(
-	SELECT
-		'theKey' = r."theKey",
-		'aValue' = r."aValue"
-	FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
-) as flow_document
-FROM delta_updates AS r
-JOIN #flow_temp_load_1 AS l
-	 ON  l."theKey" = r."theKey"
+SELECT TOP 0 -1, NULL
+
 --- End delta_updates loadQueryNoFlowDocument ---
 
 --- Begin alter table add columns ---

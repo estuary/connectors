@@ -248,6 +248,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{- end }}
 
 {{ define "loadQueryNoFlowDocument" }}
+{{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }}, 
 JSON_BUILD_OBJECT(
 {{- range $i, $col := $.RootLevelColumns}}
@@ -261,6 +262,9 @@ JOIN {{ template "temp_name" . }} AS l
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
 	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
+{{ else -}}
+SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
+{{ end }}
 {{ end }}
 
 -- Templated query which inserts a new, complete row to the target table:

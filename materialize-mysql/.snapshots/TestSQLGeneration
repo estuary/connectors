@@ -184,18 +184,13 @@ JOIN flow_temp_load_table_0 AS l
 	 ON  l.key1 = r.key1
 	 AND l.key2 = r.key2
 	 AND l.`key!binary` = r.`key!binary`
+
 --- End key_value loadQueryNoFlowDocument ---
 
 --- Begin delta_updates loadQueryNoFlowDocument ---
 
-SELECT 1, 
-JSON_OBJECT(
-    'theKey', r.`theKey`,
-    'aValue', r.`aValue`
-) as flow_document
-FROM delta_updates AS r
-JOIN flow_temp_load_table_1 AS l
-	 ON  l.`theKey` = r.`theKey`
+SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
+
 --- End delta_updates loadQueryNoFlowDocument ---
 
 --- Begin key_value insertLoad ---
