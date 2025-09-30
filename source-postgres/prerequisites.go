@@ -176,25 +176,7 @@ func (db *postgresDatabase) prerequisitePublication(ctx context.Context) error {
 		return nil
 	}
 
-	logEntry.Info("attempting to create publication")
-	if _, err := db.conn.Exec(ctx, fmt.Sprintf(`CREATE PUBLICATION "%s";`, pubName)); err != nil {
-		return fmt.Errorf("publication %q doesn't exist and couldn't be created", pubName)
-	}
-
-	// We attempt to set the `publish_via_partition_root` flag when creating the publication ourselves,
-	// unless the user has enabled CaptureAsPartitions mode.
-	// If the user already created the publication we won't try and set the flag, that's their job.
-	// The main reason this might fail is if we're running against a pre-v13 database, which doesn't
-	// have this flag, so we log but ignore any errors here.
-	if !db.config.Advanced.CaptureAsPartitions {
-		if _, err := db.conn.Exec(ctx, fmt.Sprintf(`ALTER PUBLICATION "%s" SET (publish_via_partition_root = true)`, pubName)); err != nil {
-			logEntry.WithField("err", err).Warn("unable to set publish_via_partition_root flag (this is normal for versions < 13)")
-		}
-	} else {
-		logEntry.Info("skipping publish_via_partition_root flag for partition-level capture")
-	}
-
-	return nil
+	return fmt.Errorf("publication %q does not exist", pubName)
 }
 
 func (db *postgresDatabase) prerequisiteWatermarksTable(ctx context.Context) error {
