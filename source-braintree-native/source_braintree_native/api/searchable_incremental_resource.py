@@ -41,7 +41,7 @@ async def fetch_searchable_resource_ids_by_field_between(
     url = f"{base_url}/{path}/advanced_search_ids"
     body = {
         "search": {
-            "created_at": {
+            field_name.lower(): {
                 "min": start.isoformat(),
                 "max": end.isoformat(),
             }
