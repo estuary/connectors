@@ -1,27 +1,23 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_keydiscovery_608585",
+      "name": "test_fieldlengthdiscovery_847554",
       "schema": "test",
-      "table": "keydiscovery_608585",
+      "table": "fieldlengthdiscovery_847554",
       "cursor": [
         "txid"
       ]
     },
     "resource_path": [
-      "test_keydiscovery_608585"
+      "test_fieldlengthdiscovery_847554"
     ],
     "collection": {
-      "name": "acmeCo/test/test/keydiscovery_608585",
+      "name": "acmeCo/test/test/fieldlengthdiscovery_847554",
       "read_schema_json": {
         "type": "object",
         "required": [
           "_meta",
-          "k_bigint",
-          "k_bool",
-          "k_int",
-          "k_smallint",
-          "k_str"
+          "id"
         ],
         "properties": {
           "_meta": {
@@ -88,46 +84,82 @@ Binding 0:
               "source"
             ]
           },
-          "data": {
+          "bpchar_15": {
+            "maxLength": 15,
+            "minLength": 15,
+            "description": "(source type: bpchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bytea_col": {
+            "description": "(source type: bytea)",
+            "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "char_5": {
+            "maxLength": 5,
+            "minLength": 5,
+            "description": "(source type: bpchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
+          },
+          "numeric_10_2": {
+            "format": "number",
+            "description": "(source type: numeric)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "numeric_18_4": {
+            "format": "number",
+            "description": "(source type: numeric)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text_col": {
             "description": "(source type: text)",
             "type": [
               "string",
               "null"
             ]
           },
-          "k_bigint": {
-            "type": "integer",
-            "description": "(source type: non-nullable int8)"
+          "varchar_100": {
+            "maxLength": 100,
+            "description": "(source type: varchar)",
+            "type": [
+              "string",
+              "null"
+            ]
           },
-          "k_bool": {
-            "type": "boolean",
-            "description": "(source type: non-nullable bool)"
-          },
-          "k_int": {
-            "type": "integer",
-            "description": "(source type: non-nullable int4)"
-          },
-          "k_smallint": {
-            "type": "integer",
-            "description": "(source type: non-nullable int2)"
-          },
-          "k_str": {
-            "type": "string",
-            "maxLength": 8,
-            "description": "(source type: non-nullable varchar)"
+          "varchar_unlimited": {
+            "description": "(source type: varchar)",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true
       },
       "key": [
-        "/k_smallint",
-        "/k_int",
-        "/k_bigint",
-        "/k_bool",
-        "/k_str"
+        "/id"
       ],
       "projections": null
     },
-    "state_key": "test_keydiscovery_608585"
+    "state_key": "test_fieldlengthdiscovery_847554"
   }
 

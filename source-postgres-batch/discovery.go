@@ -287,6 +287,8 @@ type basicColumnType struct {
 	format          string
 	nullable        bool
 	description     string
+	minLength       *uint64
+	maxLength       *uint64
 }
 
 func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
@@ -299,6 +301,10 @@ func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
 	if ct.contentEncoding != "" {
 		sch.Extras["contentEncoding"] = ct.contentEncoding // New in 2019-09.
 	}
+
+	// Copy the min/max lengths if present
+	sch.MinLength = ct.minLength
+	sch.MaxLength = ct.maxLength
 
 	if ct.jsonTypes != nil {
 		var types = append([]string(nil), ct.jsonTypes...)
@@ -323,7 +329,8 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 	fmt.Fprintf(query, "       a.attnum as column_index,")
 	fmt.Fprintf(query, "       NOT (a.attnotnull OR (t.typtype = 'd' AND t.typnotnull)) AS is_nullable,")
 	fmt.Fprintf(query, "       COALESCE(bt.typname, t.typname) AS udt_name,")
-	fmt.Fprintf(query, "       t.typtype::text AS typtype")
+	fmt.Fprintf(query, "       t.typtype::text AS typtype,")
+	fmt.Fprintf(query, "       information_schema._pg_char_max_length(a.atttypid, a.atttypmod) AS char_max_length")
 	fmt.Fprintf(query, "  FROM pg_catalog.pg_attribute a")
 	fmt.Fprintf(query, "  JOIN pg_catalog.pg_type t ON a.atttypid = t.oid")
 	fmt.Fprintf(query, "  JOIN pg_catalog.pg_class c ON a.attrelid = c.oid")
@@ -353,7 +360,8 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 		var columnIndex int
 		var isNullable bool
 		var typeName, typeType string
-		if err := rows.Scan(&tableSchema, &tableName, &columnName, &columnIndex, &isNullable, &typeName, &typeType); err != nil {
+		var charMaxLength sql.NullInt64
+		if err := rows.Scan(&tableSchema, &tableName, &columnName, &columnIndex, &isNullable, &typeName, &typeType, &charMaxLength); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 
@@ -372,6 +380,25 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 			}
 		}
 		dataType.nullable = isNullable
+
+		// Add length constraints for char/varchar columns with defined lengths
+		if charMaxLength.Valid && charMaxLength.Int64 > 0 {
+			switch typeName {
+			case "bpchar": // CHAR(n) - fixed-length, blank-padded
+				// For fixed-length character types, set both minLength and maxLength
+				var length = uint64(charMaxLength.Int64)
+				dataType.minLength = &length
+				dataType.maxLength = &length
+			case "varchar": // VARCHAR(n) - variable-length with limit
+				// For variable-length character types, only set maxLength
+				var length = uint64(charMaxLength.Int64)
+				dataType.maxLength = &length
+			case "bytea":
+				// PostgreSQL BYTEA doesn't take a fixed length constraint so we don't
+				// have to worry about binary types with explicit lengths, this case
+				// is just for documentation.
+			}
+		}
 
 		// Append source type information to the description
 		if dataType.description != "" {
