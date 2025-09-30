@@ -92,6 +92,8 @@ Binding 0:
             ]
           },
           "char_col": {
+            "maxLength": 16,
+            "minLength": 16,
             "description": "(source type: bpchar)",
             "type": [
               "string",
@@ -110,6 +112,7 @@ Binding 0:
             ]
           },
           "varchar_col": {
+            "maxLength": 16,
             "description": "(source type: varchar)",
             "type": [
               "string",
