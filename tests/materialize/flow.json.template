@@ -218,6 +218,22 @@
         "required": ["id", "datetimekey", "uuidkey"]
       },
       "key": ["/id", "/datetimekey", "/uuidkey"]
+    },
+    "tests/fields-with-projections": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "original_field": {"type": "string"},
+          "another_field": {"type": "string"}
+        },
+        "required": ["id"]
+      },
+      "key": ["/id"],
+      "projections": {
+        "projected_field": "/original_field",
+        "projected_another": "/another_field"
+      }
     }
   },
 

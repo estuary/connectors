@@ -45,6 +45,7 @@ CREATE TABLE #flow_temp_store_0 (
 		"array" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		"binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		"boolean" BIT,
+		field_with_projection varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		flow_published_at DATETIME2 NOT NULL,
 		"integer" BIGINT,
 		"integerGt64Bit" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
@@ -85,6 +86,7 @@ CREATE TABLE key_value (
 		"array" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		"binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		"boolean" BIT,
+		field_with_projection varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		flow_published_at DATETIME2 NOT NULL,
 		"integer" BIGINT,
 		"integerGt64Bit" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
@@ -120,10 +122,10 @@ END;
 
 	INSERT INTO key_value 
 		(
-			key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
+			key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
 		)
 	SELECT
-			key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
+			key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
 	FROM #flow_temp_store_0
 --- End key_value directCopy ---
 
@@ -142,17 +144,17 @@ END;
 
 	MERGE INTO key_value
 	USING (
-		SELECT key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document, _flow_delete
+		SELECT key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document, _flow_delete
 		FROM #flow_temp_store_0
 	) AS r
 	ON key_value.key1 = r.key1 AND key_value.key2 = r.key2 AND key_value."key!binary" = r."key!binary"
 	WHEN MATCHED AND r._flow_delete = 1 THEN
 		DELETE
 	WHEN MATCHED THEN
-		UPDATE SET key_value."array" = r."array", key_value."binary" = r."binary", key_value."boolean" = r."boolean", key_value.flow_published_at = r.flow_published_at, key_value."integer" = r."integer", key_value."integerGt64Bit" = r."integerGt64Bit", key_value."integerWithUserDDL" = r."integerWithUserDDL", key_value.multiple = r.multiple, key_value.number = r.number, key_value."numberCastToString" = r."numberCastToString", key_value."object" = r."object", key_value.string = r.string, key_value."stringInteger" = r."stringInteger", key_value."stringInteger39Chars" = r."stringInteger39Chars", key_value."stringInteger66Chars" = r."stringInteger66Chars", key_value."stringNumber" = r."stringNumber", key_value.flow_document = r.flow_document
+		UPDATE SET key_value."array" = r."array", key_value."binary" = r."binary", key_value."boolean" = r."boolean", key_value.field_with_projection = r.field_with_projection, key_value.flow_published_at = r.flow_published_at, key_value."integer" = r."integer", key_value."integerGt64Bit" = r."integerGt64Bit", key_value."integerWithUserDDL" = r."integerWithUserDDL", key_value.multiple = r.multiple, key_value.number = r.number, key_value."numberCastToString" = r."numberCastToString", key_value."object" = r."object", key_value.string = r.string, key_value."stringInteger" = r."stringInteger", key_value."stringInteger39Chars" = r."stringInteger39Chars", key_value."stringInteger66Chars" = r."stringInteger66Chars", key_value."stringNumber" = r."stringNumber", key_value.flow_document = r.flow_document
 	WHEN NOT MATCHED AND r._flow_delete = 0 THEN
-		INSERT (key1, key2, "key!binary", "array", "binary", "boolean", flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
-		VALUES (r.key1, r.key2, r."key!binary", r."array", r."binary", r."boolean", r.flow_published_at, r."integer", r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r.number, r."numberCastToString", r."object", r.string, r."stringInteger", r."stringInteger39Chars", r."stringInteger66Chars", r."stringNumber", r.flow_document);
+		INSERT (key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
+		VALUES (r.key1, r.key2, r."key!binary", r."array", r."binary", r."boolean", r.field_with_projection, r.flow_published_at, r."integer", r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r.number, r."numberCastToString", r."object", r.string, r."stringInteger", r."stringInteger39Chars", r."stringInteger66Chars", r."stringNumber", r.flow_document);
 --- End key_value mergeInto ---
 
 --- Begin delta_updates mergeInto ---
@@ -210,6 +212,7 @@ SELECT 0,
 		'array' = r."array",
 		'binary' = r."binary",
 		'boolean' = r."boolean",
+		'field_with_projection' = r.field_with_projection,
 		'integer' = r."integer",
 		'integerGt64Bit' = r."integerGt64Bit",
 		'integerWithUserDDL' = r."integerWithUserDDL",

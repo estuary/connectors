@@ -7,6 +7,7 @@ CREATE TABLE IF NOT EXISTS key_value (
 		"array" JSON,
 		"binary" TEXT,
 		"boolean" BOOLEAN,
+		field_with_projection TEXT,
 		flow_published_at TIMESTAMPTZ NOT NULL,
 		"integer" BIGINT,
 		"integerGt64Bit" NUMERIC,
@@ -32,6 +33,7 @@ COMMENT ON COLUMN key_value."key!binary" IS 'auto-generated projection of JSON a
 COMMENT ON COLUMN key_value."array" IS 'auto-generated projection of JSON at: /array with inferred types: [array]';
 COMMENT ON COLUMN key_value."binary" IS 'auto-generated projection of JSON at: /binary with inferred types: [string]';
 COMMENT ON COLUMN key_value."boolean" IS 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]';
+COMMENT ON COLUMN key_value.field_with_projection IS 'user-provided projection of JSON at: /fieldWithProjection with inferred types: [string]';
 COMMENT ON COLUMN key_value.flow_published_at IS 'Flow Publication Time
 Flow publication date-time of this document
 auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
@@ -122,6 +124,7 @@ JSON_BUILD_OBJECT(
     'array', r."array",
     'binary', r."binary",
     'boolean', r."boolean",
+    'field_with_projection', r.field_with_projection,
     'integer', r."integer",
     'integerGt64Bit', r."integerGt64Bit",
     'integerWithUserDDL', r."integerWithUserDDL",
@@ -158,6 +161,7 @@ INSERT INTO key_value (
 		"array",
 		"binary",
 		"boolean",
+		field_with_projection,
 		flow_published_at,
 		"integer",
 		"integerGt64Bit",
@@ -172,7 +176,7 @@ INSERT INTO key_value (
 		"stringInteger66Chars",
 		"stringNumber",
 		flow_document
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20);
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21);
 --- End key_value storeInsert ---
 
 --- Begin delta_updates storeInsert ---
@@ -190,20 +194,21 @@ UPDATE key_value SET
 		"array" = $4,
 		"binary" = $5,
 		"boolean" = $6,
-		flow_published_at = $7,
-		"integer" = $8,
-		"integerGt64Bit" = $9,
-		"integerWithUserDDL" = $10,
-		multiple = $11,
-		number = $12,
-		"numberCastToString" = $13,
-		object = $14,
-		string = $15,
-		"stringInteger" = $16,
-		"stringInteger39Chars" = $17,
-		"stringInteger66Chars" = $18,
-		"stringNumber" = $19,
-		flow_document = $20
+		field_with_projection = $7,
+		flow_published_at = $8,
+		"integer" = $9,
+		"integerGt64Bit" = $10,
+		"integerWithUserDDL" = $11,
+		multiple = $12,
+		number = $13,
+		"numberCastToString" = $14,
+		object = $15,
+		string = $16,
+		"stringInteger" = $17,
+		"stringInteger39Chars" = $18,
+		"stringInteger66Chars" = $19,
+		"stringNumber" = $20,
+		flow_document = $21
 	 WHERE key1 = $1
 	 AND   key2 = $2
 	 AND   "key!binary" = $3;
