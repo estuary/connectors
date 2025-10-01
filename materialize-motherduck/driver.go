@@ -64,10 +64,10 @@ func newDuckDriver() *sql.Driver[config, tableConfig] {
 type transactor struct {
 	cfg config
 
-	fence        sql.Fence
-	conn         *stdsql.Conn
-	bucket       blob.Bucket
-	bucketPath   string
+	fence      sql.Fence
+	conn       *stdsql.Conn
+	bucket     blob.Bucket
+	bucketPath string
 
 	storeFiles *boilerplate.StagedFiles
 	loadFiles  *boilerplate.StagedFiles

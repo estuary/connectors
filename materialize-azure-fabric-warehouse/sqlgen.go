@@ -154,7 +154,7 @@ type templates struct {
 	createMigrationTable         *template.Template
 	createLoadTable              *template.Template
 	loadQuery                    *template.Template
-	loadQueryNoFlowDocument 	 *template.Template
+	loadQueryNoFlowDocument      *template.Template
 	dropLoadTable                *template.Template
 	storeMergeQuery              *template.Template
 	storeCopyIntoFromStagedQuery *template.Template

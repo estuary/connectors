@@ -91,23 +91,23 @@ func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
 }
 
 type templates struct {
-	createTargetTable *template.Template
-	storeQuery        *template.Template
-	storeDeleteQuery  *template.Template
-	loadQuery         *template.Template
-	loadQueryNoFlowDocument         *template.Template
-	updateFence       *template.Template
+	createTargetTable       *template.Template
+	storeQuery              *template.Template
+	storeDeleteQuery        *template.Template
+	loadQuery               *template.Template
+	loadQueryNoFlowDocument *template.Template
+	updateFence             *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) *templates {
 	tplAll := sql.MustParseTemplate(dialect, "root", tplRoot)
 	return &templates{
-		createTargetTable: tplAll.Lookup("createTargetTable"),
-		storeQuery:        tplAll.Lookup("storeQuery"),
-		storeDeleteQuery:  tplAll.Lookup("storeDeleteQuery"),
-		loadQuery:         tplAll.Lookup("loadQuery"),
-		loadQueryNoFlowDocument:         tplAll.Lookup("loadQueryNoFlowDocument"),
-		updateFence:       tplAll.Lookup("updateFence"),
+		createTargetTable:       tplAll.Lookup("createTargetTable"),
+		storeQuery:              tplAll.Lookup("storeQuery"),
+		storeDeleteQuery:        tplAll.Lookup("storeDeleteQuery"),
+		loadQuery:               tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
+		updateFence:             tplAll.Lookup("updateFence"),
 	}
 }
 

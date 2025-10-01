@@ -191,10 +191,10 @@ type transactor struct {
 	store struct {
 		conn *stdsql.Conn
 	}
-	templates    templates
-	bindings     []*binding
-	be           *m.BindingEvents
-	cp           checkpoint
+	templates templates
+	bindings  []*binding
+	be        *m.BindingEvents
+	cp        checkpoint
 
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec

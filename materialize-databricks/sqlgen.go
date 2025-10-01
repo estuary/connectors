@@ -129,12 +129,12 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 }
 
 type templates struct {
-	createTargetTable *template.Template
-	alterTableColumns *template.Template
-	loadQuery         *template.Template
-	loadQueryNoFlowDocument         *template.Template
-	copyIntoDirect    *template.Template
-	mergeInto         *template.Template
+	createTargetTable       *template.Template
+	alterTableColumns       *template.Template
+	loadQuery               *template.Template
+	loadQueryNoFlowDocument *template.Template
+	copyIntoDirect          *template.Template
+	mergeInto               *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -316,12 +316,12 @@ JOIN (
   `)
 
 	return templates{
-		createTargetTable: tplAll.Lookup("createTargetTable"),
-		alterTableColumns: tplAll.Lookup("alterTableColumns"),
-		loadQuery:         tplAll.Lookup("loadQuery"),
+		createTargetTable:       tplAll.Lookup("createTargetTable"),
+		alterTableColumns:       tplAll.Lookup("alterTableColumns"),
+		loadQuery:               tplAll.Lookup("loadQuery"),
 		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
-		copyIntoDirect:    tplAll.Lookup("copyIntoDirect"),
-		mergeInto:         tplAll.Lookup("mergeInto"),
+		copyIntoDirect:          tplAll.Lookup("copyIntoDirect"),
+		mergeInto:               tplAll.Lookup("mergeInto"),
 	}
 }
 
