@@ -11,7 +11,7 @@ import (
 )
 
 func createPgDialect(featureFlags map[string]bool) sql.Dialect {
-	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), 
+	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"),
 		sql.UsingConverter(sql.StringCastConverter(func(in string) (any, error) {
 			return strings.ReplaceAll(in, "\u0000", ""), nil
 		})),
@@ -122,17 +122,17 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 }
 
 type templates struct {
-	createLoadTable   *template.Template
-	createTargetTable *template.Template
-	alterTableColumns *template.Template
-	loadInsert        *template.Template
-	storeInsert       *template.Template
-	storeUpdate       *template.Template
-	deleteQuery       *template.Template
-	loadQuery         *template.Template
-	loadQueryNoFlowDocument         *template.Template
-	installFence      *template.Template
-	updateFence       *template.Template
+	createLoadTable         *template.Template
+	createTargetTable       *template.Template
+	alterTableColumns       *template.Template
+	loadInsert              *template.Template
+	storeInsert             *template.Template
+	storeUpdate             *template.Template
+	deleteQuery             *template.Template
+	loadQuery               *template.Template
+	loadQueryNoFlowDocument *template.Template
+	installFence            *template.Template
+	updateFence             *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -368,17 +368,17 @@ END $$;
 `)
 
 	return templates{
-		createLoadTable:   tplAll.Lookup("createLoadTable"),
-		createTargetTable: tplAll.Lookup("createTargetTable"),
-		alterTableColumns: tplAll.Lookup("alterTableColumns"),
-		loadInsert:        tplAll.Lookup("loadInsert"),
-		storeInsert:       tplAll.Lookup("storeInsert"),
-		storeUpdate:       tplAll.Lookup("storeUpdate"),
-		deleteQuery:       tplAll.Lookup("deleteQuery"),
-		loadQuery:         tplAll.Lookup("loadQuery"),
-		loadQueryNoFlowDocument:         tplAll.Lookup("loadQueryNoFlowDocument"),
-		installFence:      tplAll.Lookup("installFence"),
-		updateFence:       tplAll.Lookup("updateFence"),
+		createLoadTable:         tplAll.Lookup("createLoadTable"),
+		createTargetTable:       tplAll.Lookup("createTargetTable"),
+		alterTableColumns:       tplAll.Lookup("alterTableColumns"),
+		loadInsert:              tplAll.Lookup("loadInsert"),
+		storeInsert:             tplAll.Lookup("storeInsert"),
+		storeUpdate:             tplAll.Lookup("storeUpdate"),
+		deleteQuery:             tplAll.Lookup("deleteQuery"),
+		loadQuery:               tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
+		installFence:            tplAll.Lookup("installFence"),
+		updateFence:             tplAll.Lookup("updateFence"),
 	}
 }
 

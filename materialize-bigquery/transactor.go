@@ -43,9 +43,9 @@ type transactor struct {
 	storeFiles *boilerplate.StagedFiles
 	loadFiles  *boilerplate.StagedFiles
 
-	bindings     []*binding
-	be           *m.BindingEvents
-	cp           checkpoint
+	bindings []*binding
+	be       *m.BindingEvents
+	cp       checkpoint
 
 	objAndArrayAsJson       bool
 	loggedStorageApiMessage bool

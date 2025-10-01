@@ -288,12 +288,12 @@ func newRedshiftDriver() *sql.Driver[config, tableConfig] {
 }
 
 type transactor struct {
-	templates    templates
-	dialect      sql.Dialect
-	fence        sql.Fence
-	bindings     []*binding
-	be           *m.BindingEvents
-	cfg          config
+	templates templates
+	dialect   sql.Dialect
+	fence     sql.Fence
+	bindings  []*binding
+	be        *m.BindingEvents
+	cfg       config
 }
 
 func prepareNewTransactor(
@@ -313,11 +313,11 @@ func prepareNewTransactor(
 		var cfg = ep.Config
 
 		var d = &transactor{
-			templates:    templates,
-			dialect:      ep.Dialect,
-			fence:        fence,
-			cfg:          cfg,
-			be:           be,
+			templates: templates,
+			dialect:   ep.Dialect,
+			fence:     fence,
+			cfg:       cfg,
+			be:        be,
 		}
 
 		s3client, err := d.cfg.toS3Client(ctx)

@@ -36,10 +36,10 @@ type transactor struct {
 
 	fence sql.Fence
 
-	storeFiles   *boilerplate.StagedFiles
-	loadFiles    *boilerplate.StagedFiles
-	bindings     []*binding
-	be           *m.BindingEvents
+	storeFiles *boilerplate.StagedFiles
+	loadFiles  *boilerplate.StagedFiles
+	bindings   []*binding
+	be         *m.BindingEvents
 }
 
 func newTransactor(

@@ -521,7 +521,6 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
-		
 
 		if _, ok := batches[it.Binding]; !ok {
 			var colNames = []string{}
