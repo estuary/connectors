@@ -133,8 +133,9 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 
 func (d *materialization) Config() boilerplate.MaterializeCfg {
 	return boilerplate.MaterializeCfg{
-		ConcurrentApply:    true,
-		NoCreateNamespaces: true,
+		ConcurrentApply:     true,
+		NoCreateNamespaces:  true,
+		NoTruncateResources: true,
 	}
 }
 
