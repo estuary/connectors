@@ -580,11 +580,24 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			} else if createDesc, createAction, err := materializer.CreateResource(ctx, *mapped); err != nil {
 				return nil, fmt.Errorf("getting CreateResource action to replace resource: %w", err)
 			} else {
-				addResourceAction(deleteDesc+"\n"+createDesc, func(ctx context.Context) error {
-					if err := deleteAction(ctx); err != nil {
-						return err
-					} else if err := createAction(ctx); err != nil {
-						return err
+				descs := make([]string, 2)
+				if deleteAction != nil {
+					descs = append(descs, deleteDesc)
+				}
+				if createAction != nil {
+					descs = append(descs, createDesc)
+				}
+				desc := strings.Join(descs, "\n")
+				addResourceAction(desc, func(ctx context.Context) error {
+					if deleteAction != nil {
+						if err := deleteAction(ctx); err != nil {
+							return err
+						}
+					}
+					if createAction != nil {
+						if err := createAction(ctx); err != nil {
+							return err
+						}
 					}
 					return nil
 				})
