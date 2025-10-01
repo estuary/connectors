@@ -46,7 +46,9 @@
 
     ["tests/all-key-types-part-one", {"id": 1, "strnum": "10.1", "strint": "1", "strintkey": "1", "strnumkey": "10.1", "counter": 1}],
     ["tests/all-key-types-part-two", {"id": 1, "timekey": "12:34:56Z", "datekey": "0000-01-01", "date": "0001-01-01", "time": "12:34:56Z", "counter": 1}],
-    ["tests/all-key-types-part-three", {"id": 1, "datetimekey": "0000-01-01T12:34:56Z", "uuidkey": "550e8400-e29b-41d4-a716-446655440000", "datetime": "0000-01-01T12:34:56Z", "uuid": "550e8400-e29b-41d4-a716-446655440000", "counter": 1}]
+    ["tests/all-key-types-part-three", {"id": 1, "datetimekey": "0000-01-01T12:34:56Z", "uuidkey": "550e8400-e29b-41d4-a716-446655440000", "datetime": "0000-01-01T12:34:56Z", "uuid": "550e8400-e29b-41d4-a716-446655440000", "counter": 1}],
+
+    ["tests/fields-with-projections", {"id": 1, "original_field": "value1", "another_field": "another1"}]
   ],
   [
     ["tests/simple", { "id": 7, "canary": "pieced"}],
@@ -93,7 +95,9 @@
 
     ["tests/all-key-types-part-one", {"id": 1, "strnum": "10.1", "strint": "1", "strintkey": "1", "strnumkey": "10.1", "counter": 2}],
     ["tests/all-key-types-part-two", {"id": 1, "timekey": "12:34:56Z", "datekey": "0000-01-01", "date": "0001-01-01", "time": "12:34:56Z", "counter": 2}],
-    ["tests/all-key-types-part-three", {"id": 1, "datetimekey": "0000-01-01T12:34:56Z", "uuidkey": "550e8400-e29b-41d4-a716-446655440000", "datetime": "0000-01-01T12:34:56Z", "uuid": "550e8400-e29b-41d4-a716-446655440000", "counter": 2}]
+    ["tests/all-key-types-part-three", {"id": 1, "datetimekey": "0000-01-01T12:34:56Z", "uuidkey": "550e8400-e29b-41d4-a716-446655440000", "datetime": "0000-01-01T12:34:56Z", "uuid": "550e8400-e29b-41d4-a716-446655440000", "counter": 2}],
+
+    ["tests/fields-with-projections", {"id": 1, "original_field": "updated_value", "another_field": "another_updated"}]
   ],
   [
     ["tests/duplicated-keys", { "id": 6, "int": 11, "str": "str 11"}],

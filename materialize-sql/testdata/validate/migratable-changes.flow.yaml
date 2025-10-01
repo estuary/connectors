@@ -20,11 +20,13 @@ collections:
         boolWidenedToJson: { type: [boolean, string] }
         intToNumber: { type: number }
         int64ToNumber: { type: number, maximum: 10000000000000000000}
+        fieldWithProjection: { type: string }
       required: [key, scalarValue, requiredNumeric]
     key: [/key]
     projections:
       flow_document: ""
       second_root: ""
+      field_with_projection: /fieldWithProjection
 
 materializations:
   test/sqlite:

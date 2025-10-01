@@ -83,6 +83,20 @@ resources_json_template='[
       "table": "all_key_types_part_three"
     },
     "source": "${TEST_COLLECTION_ALL_KEY_TYPES_PART_THREE}"
+  },
+  {
+    "resource": {
+      "table": "fields_with_projections"
+    },
+    "source": "${TEST_COLLECTION_FIELDS_WITH_PROJECTIONS}",
+    "fields": {
+      "recommended": true,
+      "exclude": ["original_field"],
+      "include": {
+        "another_field": {},
+        "projected_another": {}
+      }
+    }
   }
 ]'
 

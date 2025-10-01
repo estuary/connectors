@@ -3,6 +3,8 @@ Base Initial Constraints:
 {"Field":"boolWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"fieldWithProjection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"field_with_projection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Root document projection is optional when flow_document is disabled"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"int64","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
@@ -26,6 +28,8 @@ Migratable Changes Before Apply Schema:
 {"Name":"boolWidenedToJson","Nullable":"YES","Type":"BOOLEAN"}
 {"Name":"dateValue","Nullable":"YES","Type":"DATE"}
 {"Name":"datetimeValue","Nullable":"YES","Type":"TIMESTAMP WITH TIME ZONE"}
+{"Name":"fieldWithProjection","Nullable":"YES","Type":"VARCHAR"}
+{"Name":"field_with_projection","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"flow_document","Nullable":"NO","Type":"JSON"}
 {"Name":"flow_published_at","Nullable":"NO","Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"int64","Nullable":"YES","Type":"BIGINT"}
@@ -45,14 +49,16 @@ Migratable Changes Before Apply Schema:
 
 
 Migratable Changes Before Apply Data:
-key (VARCHAR), _meta/flow_truncated (BOOLEAN), boolWidenedToJson (BOOLEAN), dateValue (DATE), datetimeValue (TIMESTAMPTZ), flow_document (JSON), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), int64ToNumber (HUGEINT), intToNumber (BIGINT), intWidenedToJson (BIGINT), multiple (JSON), nonScalarValue (JSON), numericString (HUGEINT), optional (JSON), requiredNumeric (HUGEINT), scalarValue (VARCHAR), stringWidenedToJson (VARCHAR), timeValue (TIME), second_root (JSON)
-1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T00:01:01.111111Z, map[], 2024-09-12T23:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, hello, 0001-01-01T01:01:01Z, map[]
+key (VARCHAR), _meta/flow_truncated (BOOLEAN), boolWidenedToJson (BOOLEAN), dateValue (DATE), datetimeValue (TIMESTAMPTZ), fieldWithProjection (VARCHAR), field_with_projection (VARCHAR), flow_published_at (TIMESTAMPTZ), int64 (BIGINT), int64ToNumber (HUGEINT), intToNumber (BIGINT), intWidenedToJson (BIGINT), multiple (JSON), nonScalarValue (JSON), numericString (HUGEINT), optional (JSON), requiredNumeric (HUGEINT), scalarValue (VARCHAR), second_root (JSON), stringWidenedToJson (VARCHAR), timeValue (TIME), flow_document (JSON)
+1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T00:01:01.111111Z, <nil>, <nil>, 2024-09-12T23:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, map[], hello, 0001-01-01T01:01:01Z, map[]
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"boolWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"fieldWithProjection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"field_with_projection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_document","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"int64","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -76,6 +82,8 @@ Migratable Changes Applied Schema:
 {"Name":"boolWidenedToJson","Nullable":"YES","Type":"JSON"}
 {"Name":"dateValue","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"datetimeValue","Nullable":"YES","Type":"VARCHAR"}
+{"Name":"fieldWithProjection","Nullable":"YES","Type":"VARCHAR"}
+{"Name":"field_with_projection","Nullable":"YES","Type":"VARCHAR"}
 {"Name":"flow_document","Nullable":"NO","Type":"JSON"}
 {"Name":"flow_published_at","Nullable":"NO","Type":"TIMESTAMP WITH TIME ZONE"}
 {"Name":"int64","Nullable":"YES","Type":"HUGEINT"}
@@ -95,6 +103,6 @@ Migratable Changes Applied Schema:
 
 
 Migratable Changes Applied Data:
-key (VARCHAR), _meta/flow_truncated (BOOLEAN), flow_document (JSON), flow_published_at (TIMESTAMPTZ), multiple (JSON), nonScalarValue (JSON), optional (JSON), scalarValue (VARCHAR), second_root (JSON), boolWidenedToJson (JSON), dateValue (VARCHAR), datetimeValue (VARCHAR), int64 (HUGEINT), int64ToNumber (DOUBLE), intToNumber (DOUBLE), intWidenedToJson (JSON), numericString (VARCHAR), requiredNumeric (VARCHAR), stringWidenedToJson (JSON), timeValue (VARCHAR)
-1, false, map[], 2024-09-12T23:01:01Z, <nil>, <nil>, <nil>, test, map[], true, 2024-01-01, 2024-01-01T00:01:01.111111Z, 1, 1e+19, 9.223372036854776e+18, 999, 123, 456, hello, 01:01:01
+key (VARCHAR), _meta/flow_truncated (BOOLEAN), fieldWithProjection (VARCHAR), field_with_projection (VARCHAR), flow_published_at (TIMESTAMPTZ), multiple (JSON), nonScalarValue (JSON), optional (JSON), scalarValue (VARCHAR), second_root (JSON), flow_document (JSON), boolWidenedToJson (JSON), dateValue (VARCHAR), datetimeValue (VARCHAR), int64 (HUGEINT), int64ToNumber (DOUBLE), intToNumber (DOUBLE), intWidenedToJson (JSON), numericString (VARCHAR), requiredNumeric (VARCHAR), stringWidenedToJson (JSON), timeValue (VARCHAR)
+1, false, <nil>, <nil>, 2024-09-12T23:01:01Z, <nil>, <nil>, <nil>, test, map[], map[], true, 2024-01-01, 2024-01-01T00:01:01.111111Z, 1, 1e+19, 9.223372036854776e+18, 999, 123, 456, hello, 01:01:01
 

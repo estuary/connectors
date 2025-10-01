@@ -21,8 +21,11 @@ collections:
         stringNumber: { type: [number, string], format: number }
         numberCastToString: { type: [number, string], format: number }
         integerWithUserDDL: { type: integer }
+        fieldWithProjection: { type: string }
       required: [key1, key2, key!binary]
     key: [/key1, /key2, /key!binary]
+    projections:
+      field_with_projection: /fieldWithProjection
 
   delta/updates:
     schema:

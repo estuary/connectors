@@ -3,6 +3,8 @@ Base Initial Constraints:
 {"Field":"boolWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"fieldWithProjection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"field_with_projection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Root document projection is optional when flow_document is disabled"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"int64","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
@@ -26,6 +28,8 @@ Migratable Changes Before Apply Schema:
 {"Name":"boolWidenedToJson","Nullable":"YES","Type":"bit"}
 {"Name":"dateValue","Nullable":"YES","Type":"date"}
 {"Name":"datetimeValue","Nullable":"YES","Type":"datetime2"}
+{"Name":"fieldWithProjection","Nullable":"YES","Type":"varchar"}
+{"Name":"field_with_projection","Nullable":"YES","Type":"varchar"}
 {"Name":"flow_document","Nullable":"YES","Type":"varchar"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"datetime2"}
 {"Name":"int64","Nullable":"YES","Type":"bigint"}
@@ -44,8 +48,8 @@ Migratable Changes Before Apply Schema:
 
 
 Migratable Changes Before Apply Data:
-key (NVARCHAR), _meta/flow_truncated (BIT), boolWidenedToJson (BIT), dateValue (DATE), datetimeValue (DATETIME2), flow_published_at (DATETIME2), int64 (BIGINT), int64ToNumber (DECIMAL), intToNumber (BIGINT), intWidenedToJson (BIGINT), multiple (NVARCHAR), nonScalarValue (NVARCHAR), numericString (DECIMAL), optional (NVARCHAR), requiredNumeric (DECIMAL), scalarValue (NVARCHAR), stringWidenedToJson (NVARCHAR), timeValue (TIME), flow_document (NVARCHAR)
-1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T01:01:01.111111Z, 2024-09-13T01:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, hello, 0001-01-01T01:01:01Z, {}
+key (NVARCHAR), _meta/flow_truncated (BIT), boolWidenedToJson (BIT), dateValue (DATE), datetimeValue (DATETIME2), fieldWithProjection (NVARCHAR), field_with_projection (NVARCHAR), flow_published_at (DATETIME2), int64 (BIGINT), int64ToNumber (DECIMAL), intToNumber (BIGINT), intWidenedToJson (BIGINT), multiple (NVARCHAR), nonScalarValue (NVARCHAR), numericString (DECIMAL), optional (NVARCHAR), requiredNumeric (DECIMAL), scalarValue (NVARCHAR), stringWidenedToJson (NVARCHAR), timeValue (TIME), flow_document (NVARCHAR)
+1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T01:01:01.111111Z, <nil>, <nil>, 2024-09-13T01:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, hello, 0001-01-01T01:01:01Z, {}
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
