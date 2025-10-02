@@ -492,6 +492,27 @@ func TestStringTypes(t *testing.T) {
 	})
 }
 
+// TestFieldLengthDiscovery verifies that char/binary columns with declared field lengths
+// have those lengths reflected in the discovered JSON schema as maxLength/minLength constraints.
+func TestFieldLengthDiscovery(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        char_5 CHAR(5),
+        varchar_100 VARCHAR(100),
+        varchar_unlimited VARCHAR,
+        bpchar_15 BPCHAR(15),
+        text_col TEXT,
+        bytea_col BYTEA,
+        numeric_10_2 NUMERIC(10, 2),
+        numeric_18_4 NUMERIC(18, 4)
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings))
+}
+
 // TestDateAndTimeTypes exercises discovery and capture of the date and time types
 // DATE, TIMESTAMP, TIMESTAMP WITH TIME ZONE, TIME, TIME WITH TIME ZONE, and INTERVAL.
 func TestDateAndTimeTypes(t *testing.T) {

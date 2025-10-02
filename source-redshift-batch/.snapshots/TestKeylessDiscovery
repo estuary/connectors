@@ -113,6 +113,7 @@ Binding 0:
             ]
           },
           "v_str": {
+            "maxLength": 8,
             "description": "(source type: varchar)",
             "type": [
               "string",
@@ -120,6 +121,7 @@ Binding 0:
             ]
           },
           "v_text": {
+            "maxLength": 256,
             "description": "(source type: varchar)",
             "type": [
               "string",
@@ -128,6 +130,7 @@ Binding 0:
           },
           "v_text_notnull": {
             "type": "string",
+            "maxLength": 256,
             "description": "(source type: non-nullable varchar)"
           },
           "v_ts": {

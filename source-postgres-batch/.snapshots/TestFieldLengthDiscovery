@@ -1,18 +1,18 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_stringtypes_339419",
+      "name": "test_fieldlengthdiscovery_847554",
       "schema": "test",
-      "table": "stringtypes_339419",
+      "table": "fieldlengthdiscovery_847554",
       "cursor": [
-        "id"
+        "txid"
       ]
     },
     "resource_path": [
-      "test_stringtypes_339419"
+      "test_fieldlengthdiscovery_847554"
     ],
     "collection": {
-      "name": "acmeCo/test/test/stringtypes_339419",
+      "name": "acmeCo/test/test/fieldlengthdiscovery_847554",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -22,7 +22,7 @@ Binding 0:
         "properties": {
           "_meta": {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "$id": "https://github.com/estuary/connectors/source-mysql-batch/document-metadata",
+            "$id": "https://github.com/estuary/connectors/source-postgres-batch/document-metadata",
             "properties": {
               "polled": {
                 "type": "string",
@@ -84,10 +84,27 @@ Binding 0:
               "source"
             ]
           },
-          "char_col": {
-            "maxLength": 10,
-            "minLength": 10,
-            "description": "(source type: char)",
+          "bpchar_15": {
+            "maxLength": 15,
+            "minLength": 15,
+            "description": "(source type: bpchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bytea_col": {
+            "description": "(source type: bytea)",
+            "contentEncoding": "base64",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "char_5": {
+            "maxLength": 5,
+            "minLength": 5,
+            "description": "(source type: bpchar)",
             "type": [
               "string",
               "null"
@@ -95,17 +112,19 @@ Binding 0:
           },
           "id": {
             "type": "integer",
-            "description": "(source type: non-nullable int)"
+            "description": "(source type: non-nullable int4)"
           },
-          "longtext_col": {
-            "description": "(source type: longtext)",
+          "numeric_10_2": {
+            "format": "number",
+            "description": "(source type: numeric)",
             "type": [
               "string",
               "null"
             ]
           },
-          "mediumtext_col": {
-            "description": "(source type: mediumtext)",
+          "numeric_18_4": {
+            "format": "number",
+            "description": "(source type: numeric)",
             "type": [
               "string",
               "null"
@@ -118,15 +137,15 @@ Binding 0:
               "null"
             ]
           },
-          "tinytext_col": {
-            "description": "(source type: tinytext)",
+          "varchar_100": {
+            "maxLength": 100,
+            "description": "(source type: varchar)",
             "type": [
               "string",
               "null"
             ]
           },
-          "varchar_col": {
-            "maxLength": 255,
+          "varchar_unlimited": {
             "description": "(source type: varchar)",
             "type": [
               "string",
@@ -141,6 +160,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_stringtypes_339419"
+    "state_key": "test_fieldlengthdiscovery_847554"
   }
 

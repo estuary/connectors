@@ -85,6 +85,8 @@ Binding 0:
             ]
           },
           "binary_col": {
+            "maxLength": 24,
+            "minLength": 24,
             "description": "(source type: binary)",
             "type": [
               "string",
@@ -124,6 +126,7 @@ Binding 0:
             ]
           },
           "varbinary_col": {
+            "maxLength": 340,
             "description": "(source type: varbinary)",
             "type": [
               "string",

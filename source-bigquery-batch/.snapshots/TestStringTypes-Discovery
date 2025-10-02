@@ -92,6 +92,7 @@ Binding 0:
             ]
           },
           "string_len_val": {
+            "maxLength": 50,
             "description": "(source type: STRING(50))",
             "type": [
               "string",

@@ -1,18 +1,15 @@
 Binding 0:
 {
     "resource_config_json": {
-      "name": "test_stringtypes_339419",
+      "name": "test_fieldlengthdiscovery_847554",
       "schema": "test",
-      "table": "stringtypes_339419",
-      "cursor": [
-        "id"
-      ]
+      "table": "fieldlengthdiscovery_847554"
     },
     "resource_path": [
-      "test_stringtypes_339419"
+      "test_fieldlengthdiscovery_847554"
     ],
     "collection": {
-      "name": "acmeCo/test/test/stringtypes_339419",
+      "name": "acmeCo/test/test/fieldlengthdiscovery_847554",
       "read_schema_json": {
         "type": "object",
         "required": [
@@ -84,10 +81,51 @@ Binding 0:
               "source"
             ]
           },
-          "char_col": {
-            "maxLength": 10,
-            "minLength": 10,
+          "binary_16": {
+            "maxLength": 24,
+            "minLength": 24,
+            "description": "(source type: binary)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "blob_col": {
+            "description": "(source type: blob)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "char_15": {
+            "maxLength": 15,
+            "minLength": 15,
             "description": "(source type: char)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "char_5": {
+            "maxLength": 5,
+            "minLength": 5,
+            "description": "(source type: char)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decimal_10_2": {
+            "format": "number",
+            "description": "(source type: decimal)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "decimal_18_4": {
+            "format": "number",
+            "description": "(source type: decimal)",
             "type": [
               "string",
               "null"
@@ -97,20 +135,6 @@ Binding 0:
             "type": "integer",
             "description": "(source type: non-nullable int)"
           },
-          "longtext_col": {
-            "description": "(source type: longtext)",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "mediumtext_col": {
-            "description": "(source type: mediumtext)",
-            "type": [
-              "string",
-              "null"
-            ]
-          },
           "text_col": {
             "description": "(source type: text)",
             "type": [
@@ -118,14 +142,23 @@ Binding 0:
               "null"
             ]
           },
-          "tinytext_col": {
-            "description": "(source type: tinytext)",
+          "varbinary_255": {
+            "maxLength": 340,
+            "description": "(source type: varbinary)",
             "type": [
               "string",
               "null"
             ]
           },
-          "varchar_col": {
+          "varchar_100": {
+            "maxLength": 100,
+            "description": "(source type: varchar)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "varchar_255": {
             "maxLength": 255,
             "description": "(source type: varchar)",
             "type": [
@@ -141,6 +174,6 @@ Binding 0:
       ],
       "projections": null
     },
-    "state_key": "test_stringtypes_339419"
+    "state_key": "test_fieldlengthdiscovery_847554"
   }
 

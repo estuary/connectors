@@ -86,6 +86,7 @@ Binding 0:
             ]
           },
           "data": {
+            "maxLength": 256,
             "description": "(source type: varchar)",
             "type": [
               "string",
@@ -110,6 +111,7 @@ Binding 0:
           },
           "k_str": {
             "type": "string",
+            "maxLength": 8,
             "description": "(source type: non-nullable varchar)"
           }
         },

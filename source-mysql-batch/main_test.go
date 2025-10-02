@@ -1094,3 +1094,25 @@ func TestSourceTag(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+// TestFieldLengthDiscovery verifies that CHAR/VARCHAR/BINARY/VARBINARY length constraints are discovered correctly.
+func TestFieldLengthDiscovery(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+		id INTEGER PRIMARY KEY,
+		char_5 CHAR(5),
+		char_15 CHAR(15),
+		varchar_100 VARCHAR(100),
+		varchar_255 VARCHAR(255),
+		text_col TEXT,
+		binary_16 BINARY(16),
+		varbinary_255 VARBINARY(255),
+		blob_col BLOB,
+		decimal_10_2 DECIMAL(10, 2),
+		decimal_18_4 DECIMAL(18, 4)
+	)`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings))
+}

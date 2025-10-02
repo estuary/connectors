@@ -1375,3 +1375,24 @@ func TestSourceTag(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+// TestFieldLengthDiscovery verifies that STRING and BYTES length constraints are discovered correctly.
+func TestFieldLengthDiscovery(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testBigQueryClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(ctx, t, control, tableName, `(
+		id INTEGER PRIMARY KEY NOT ENFORCED,
+		string_10 STRING(10),
+		string_100 STRING(100),
+		string_unlimited STRING,
+		bytes_16 BYTES(16),
+		bytes_255 BYTES(255),
+		bytes_unlimited BYTES,
+		numeric_col NUMERIC,
+		numeric_10_2 NUMERIC(10, 2),
+		bignumeric_col BIGNUMERIC
+	)`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings))
+}

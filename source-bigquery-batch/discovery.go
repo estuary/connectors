@@ -272,6 +272,8 @@ type basicColumnType struct {
 	format          string
 	nullable        bool
 	description     string
+	minLength       *uint64
+	maxLength       *uint64
 }
 
 func (ct *basicColumnType) IsNullable() bool {
@@ -300,6 +302,11 @@ func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
 			sch.Extras["type"] = types
 		}
 	}
+
+	// Copy the min/max lengths if present
+	sch.MinLength = ct.minLength
+	sch.MaxLength = ct.maxLength
+
 	return sch
 }
 
@@ -338,8 +345,15 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 		// Eventually we might want to turn this into a proper parser which can handle
 		// various composite types in full.
 		var typeName = fullType
+		var typeIntParam int64 = 0
 		if strings.ContainsRune(typeName, '(') {
-			typeName = strings.Split(typeName, "(")[0]
+			var parts = strings.Split(typeName, "(")
+			typeName = parts[0]
+			// Extract the length parameter if present (e.g., STRING(50) -> 50)
+			if len(parts) > 1 {
+				var paramStr = strings.TrimSuffix(parts[1], ")")
+				fmt.Sscanf(paramStr, "%d", &typeIntParam)
+			}
 		}
 		if strings.ContainsRune(typeName, '<') {
 			typeName = strings.Split(typeName, "<")[0]
@@ -350,6 +364,21 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 			dataType = basicColumnType{description: "using catch-all schema"}
 		}
 		dataType.nullable = isNullable
+
+		// Add length constraints for STRING and BYTES types with defined lengths
+		if typeIntParam > 0 {
+			switch typeName {
+			case "STRING":
+				// STRING(n) has a maximum character length
+				var length = uint64(typeIntParam)
+				dataType.maxLength = &length
+			case "BYTES":
+				// BYTES(n) has a maximum byte length, base64 encoded
+				// Binary data is base64 encoded: every 3 bytes becomes 4 characters
+				var base64Length = uint64((typeIntParam + 2) / 3 * 4)
+				dataType.maxLength = &base64Length
+			}
+		}
 
 		// Append source type information to the description
 		if dataType.description != "" {

@@ -276,6 +276,8 @@ type basicColumnType struct {
 	format          string
 	nullable        bool
 	description     string
+	minLength       *uint64
+	maxLength       *uint64
 }
 
 func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
@@ -300,11 +302,16 @@ func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
 			sch.Extras["type"] = types
 		}
 	}
+
+	// Copy the min/max lengths if present
+	sch.MinLength = ct.minLength
+	sch.MaxLength = ct.maxLength
+
 	return sch
 }
 
 const queryDiscoverColumns = `
-SELECT table_schema, table_name, column_name, ordinal_position, is_nullable, data_type, column_type
+SELECT table_schema, table_name, column_name, ordinal_position, is_nullable, data_type, column_type, character_maximum_length
   FROM information_schema.columns
   ORDER BY table_schema, table_name, ordinal_position;`
 
@@ -324,12 +331,38 @@ func discoverColumns(ctx context.Context, db *client.Conn) ([]*discoveredColumn,
 		var isNullable = string(row[4].AsString()) != "NO"
 		var typeName = string(row[5].AsString())
 		// var fullColumnType = string(row[6].AsString())
+		var characterMaximumLength int64
+		if row[7].Value() != nil {
+			characterMaximumLength = row[7].AsInt64()
+		}
 
 		var dataType, ok = databaseTypeToJSON[typeName]
 		if !ok {
 			dataType = basicColumnType{description: "using catch-all schema"}
 		}
 		dataType.nullable = isNullable
+
+		// Add length constraints for char/varchar/binary/varbinary columns with defined lengths
+		if characterMaximumLength > 0 {
+			switch typeName {
+			case "char": // CHAR(n) - fixed-length, blank-padded
+				var length = uint64(characterMaximumLength)
+				dataType.minLength = &length
+				dataType.maxLength = &length
+			case "varchar": // VARCHAR(n) - variable-length with limit
+				var length = uint64(characterMaximumLength)
+				dataType.maxLength = &length
+			case "binary": // BINARY(n) - fixed-length binary, base64 encoded
+				// Binary data is base64 encoded: every 3 bytes becomes 4 characters
+				var base64Length = uint64((characterMaximumLength + 2) / 3 * 4)
+				dataType.minLength = &base64Length
+				dataType.maxLength = &base64Length
+			case "varbinary": // VARBINARY(n) - variable-length binary, base64 encoded
+				// Binary data is base64 encoded: every 3 bytes becomes 4 characters
+				var base64Length = uint64((characterMaximumLength + 2) / 3 * 4)
+				dataType.maxLength = &base64Length
+			}
+		}
 
 		// Append source type information to the description
 		if dataType.description != "" {
