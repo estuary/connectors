@@ -37,6 +37,7 @@ scopes = [
     "read_fulfillments",
     "read_customers",
     "read_publications",
+    "read_own_subscription_contracts",
 ]
 
 OAUTH2_SPEC = OAuth2Spec(
