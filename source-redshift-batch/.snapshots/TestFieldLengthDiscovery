@@ -128,6 +128,7 @@ Binding 0:
             ]
           },
           "varbyte_16": {
+            "maxLength": 24,
             "description": "(source type: varbyte)",
             "contentEncoding": "base64",
             "type": [
@@ -135,7 +136,8 @@ Binding 0:
               "null"
             ]
           },
-          "varbyte_unlimited": {
+          "varbyte_unspec": {
+            "maxLength": 85336,
             "description": "(source type: varbyte)",
             "contentEncoding": "base64",
             "type": [

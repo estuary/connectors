@@ -367,7 +367,7 @@ func TestFieldLengthDiscovery(t *testing.T) {
         varchar_unlimited VARCHAR,
         text_col TEXT,
         varbyte_16 VARBYTE(16),
-        varbyte_unlimited VARBYTE,
+        varbyte_unspec VARBYTE,
         numeric_10_2 NUMERIC(10, 2),
         numeric_18_4 NUMERIC(18, 4)
     )`)
