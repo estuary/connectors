@@ -223,11 +223,11 @@ func predictableColumnOrder(colType any) bool {
 	// Currently all textual primary key columns are considered to be 'unpredictable' so that backfills
 	// will default to using the 'imprecise' ordering semantics which avoids full-table sorts. Refer to
 	// https://github.com/estuary/connectors/issues/1343 for more details.
-	if t, ok := colType.(postgresSizedTextType); ok {
-		colType = t.Type // Unwrap sized text and just look at the type name
-	}
-	if colType == "varchar" || colType == "bpchar" || colType == "text" || colType == "citext" {
-		return false
+	if t, ok := colType.(postgresTypeDescription); ok {
+		switch t.TypeName() {
+		case "varchar", "bpchar", "text", "citext":
+			return false
+		}
 	}
 
 	if _, ok := colType.(postgresEnumType); ok {
@@ -257,102 +257,22 @@ func (db *postgresDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, 
 		postgresTypeToJSON["time"] = columnSchema{jsonTypes: []string{"integer"}}
 	}
 
-	var arrayColumn = false
-	var colSchema columnSchema
-
-	if columnType, ok := column.DataType.(string); ok {
-		// If the column type looks like `_foo` then it's an array of elements of type `foo`.
-		if strings.HasPrefix(columnType, "_") {
-			columnType = strings.TrimPrefix(columnType, "_")
-			arrayColumn = true
-		}
-
-		// Translate the basic value/element type into a JSON Schema type
-		colSchema, ok = postgresTypeToJSON[columnType]
-		if !ok {
-			return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", columnType)
-		}
-
-		// If the column is a primary key and there's a special-case for this type as a primary
-		// key (as in the case of floatN columns which always get stringified when used as keys),
-		// then we use that instead of the normal-value type mapping above.
-		if s, ok := postgresPrimaryKeyTypes[columnType]; isPrimaryKey && ok {
-			colSchema = s
-		}
-	} else if dataType, ok := column.DataType.(postgresComplexType); ok {
-		var schema, err = dataType.toColumnSchema(column)
+	var jsonSchema *jsonschema.Schema
+	if dataType, ok := column.DataType.(postgresTypeDescription); ok {
+		var err error
+		jsonSchema, err = dataType.JSONSchema(column.IsNullable, isPrimaryKey, db.featureFlags)
 		if err != nil {
 			return nil, err
 		}
-		colSchema = schema
 	} else {
 		return nil, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", column.DataType)
 	}
 
-	var jsonType *jsonschema.Schema
-	if arrayColumn && db.featureFlags["multidimensional_arrays"] {
-		// When 'multidimensional_arrays' is enabled, we don't specify an element type
-		// in order to avoid the mess of trying to describe the recursive scalar-or-self
-		// nature of the array elements. It's just an array of unspecified values.
-		jsonType = &jsonschema.Schema{
-			Extras: map[string]any{"type": "array"},
-		}
-		if column.IsNullable {
-			// The column value itself may be null if the column is nullable.
-			jsonType.Extras["type"] = []string{"array", "null"}
-		}
-	} else if arrayColumn && db.featureFlags["flatten_arrays"] {
-		colSchema.nullable = true // Array elements might be null
-
-		// New behavior: If the column is an array, turn the element type into a JSON array.
-		jsonType = &jsonschema.Schema{
-			Items:  colSchema.toType(),
-			Extras: map[string]any{"type": "array"},
-		}
-		if column.IsNullable {
-			// The column value itself may be null if the column is nullable.
-			jsonType.Extras["type"] = []string{"array", "null"}
-		}
-	} else if arrayColumn && !db.featureFlags["flatten_arrays"] {
-		// Nullability applies to the array itself, not the items. Items are always allowed to be
-		// null unless additional checks are imposed on the column which we currently can't look
-		// for.
-		colSchema.nullable = true
-
-		// Old behavior: If the column is an array, wrap the element type in a multidimensional array structure.
-		jsonType = &jsonschema.Schema{
-			Extras: map[string]interface{}{
-				"properties": map[string]*jsonschema.Schema{
-					"dimensions": {
-						Type:  "array",
-						Items: &jsonschema.Schema{Type: "integer"},
-					},
-					"elements": {
-						Type:  "array",
-						Items: colSchema.toType(),
-					},
-				},
-				"additionalProperties": false,
-			},
-			Required: []string{"dimensions", "elements"},
-		}
-
-		// The column value itself may be null if the column is nullable.
-		if column.IsNullable {
-			jsonType.Extras["type"] = []string{"object", "null"}
-		} else {
-			jsonType.Type = "object"
-		}
-	} else {
-		colSchema.nullable = column.IsNullable
-		jsonType = colSchema.toType()
-	}
-
 	// Pass-through a postgres column description.
 	if column.Description != nil {
-		jsonType.Description = *column.Description
+		jsonSchema.Description = *column.Description
 	}
-	return jsonType, nil
+	return jsonSchema, nil
 }
 
 type columnSchema struct {
@@ -360,16 +280,12 @@ type columnSchema struct {
 	format          string
 	nullable        bool
 	jsonTypes       []string
-	minLength       *uint64
-	maxLength       *uint64
 }
 
 func (s columnSchema) toType() *jsonschema.Schema {
 	var out = &jsonschema.Schema{
-		Format:    s.format,
-		Extras:    make(map[string]interface{}),
-		MinLength: s.minLength,
-		MaxLength: s.maxLength,
+		Format: s.format,
+		Extras: make(map[string]any),
 	}
 
 	if s.contentEncoding != "" {
@@ -388,6 +304,21 @@ func (s columnSchema) toType() *jsonschema.Schema {
 		}
 	}
 	return out
+}
+
+func lookupColumnSchema(isPrimaryKey bool, typeName string) (columnSchema, error) {
+	// If the column is a primary key and there's a special-case for this type as a primary
+	// key (as in the case of floatN columns which always get stringified when used as keys),
+	// then we use that instead of the normal-value type mapping.
+	if s, ok := postgresPrimaryKeyTypes[typeName]; ok && isPrimaryKey {
+		return s, nil
+	}
+
+	if s, ok := postgresTypeToJSON[typeName]; ok {
+		return s, nil
+	}
+
+	return columnSchema{}, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", typeName)
 }
 
 var postgresPrimaryKeyTypes = map[string]columnSchema{
@@ -506,7 +437,7 @@ const queryDiscoverColumns = `
 		 NOT (a.attnotnull OR (t.typtype = 'd' AND t.typnotnull)) AS is_nullable,
 		 COALESCE(bt.typname, t.typname) AS udt_name,
 		 t.typtype::text AS typtype,
-		 information_schema._pg_char_max_length(a.atttypid, a.atttypmod) AS char_max_length
+		 a.atttypmod-4 as char_max_length
 	FROM pg_catalog.pg_attribute a
 	JOIN pg_catalog.pg_type t ON a.atttypid = t.oid
 	JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
@@ -529,29 +460,15 @@ func getColumns(ctx context.Context, conn *pgxpool.Pool) ([]sqlcapture.ColumnInf
 	defer rows.Close()
 	for rows.Next() {
 		var col sqlcapture.ColumnInfo
+		var columnType string
 		var typtype string
 		var charMaxLength *int64
-		if err := rows.Scan(&col.TableSchema, &col.TableName, &col.Index, &col.Name, &col.IsNullable, &col.DataType, &typtype, &charMaxLength); err != nil {
+		if err := rows.Scan(&col.TableSchema, &col.TableName, &col.Index, &col.Name, &col.IsNullable, &columnType, &typtype, &charMaxLength); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 
-		// Add length constraints for char/varchar columns with defined lengths
-		if charMaxLength != nil && *charMaxLength > 0 {
-			if typeName, ok := col.DataType.(string); ok {
-				switch typeName {
-				case "bpchar": // CHAR(n) - fixed-length, blank-padded
-					// For fixed-length character types, set both minLength and maxLength
-					var length = uint64(*charMaxLength)
-					col.DataType = postgresSizedTextType{Type: typeName, MinLength: &length, MaxLength: &length}
-				case "varchar": // VARCHAR(n) - variable-length with limit
-					// For variable-length character types, only set maxLength
-					var length = uint64(*charMaxLength)
-					col.DataType = postgresSizedTextType{Type: typeName, MaxLength: &length}
-				}
-			}
-		}
-
-		// Special cases for user-defined types where we must resolve the columnSchema directly.
+		// Decode the column type information into useful structs
+		var typeDescription postgresTypeDescription
 		switch typtype {
 		case "c": // composite
 			// TODO(whb): We don't currently do any kind of special handling for composite
@@ -560,32 +477,172 @@ func getColumns(ctx context.Context, conn *pgxpool.Pool) ([]sqlcapture.ColumnInf
 			// improve this by discovering composite types, building decoders for them, and
 			// registering the decoders with the pgx connection. pgx v5 has new utility methods
 			// specifically for doing this.
-			col.DataType = postgresCompositeType{}
+			typeDescription = postgresCompositeType{}
 		case "e": // enum
 			// Enum values are always strings corresponding to an enum label.
-			col.DataType = postgresEnumType{}
+			typeDescription = postgresEnumType{}
 		case "r", "m": // range, multirange
 			// Capture ranges in their text form to retain inclusive (like `[`) & exclusive
 			// (like `(`) bounds information. For example, the text form of a range representing
 			// "integers greater than or equal to 1 but less than 5" is '[1,5)'
-			col.DataType = postgresRangeType{multirange: typtype == "m"}
+			typeDescription = postgresRangeType{multirange: typtype == "m"}
+		default: // All others
+			// Strip array prefix so we can decode the element type, then wrap it in an array type later
+			var isArrayType bool
+			columnType, isArrayType = strings.CutPrefix(columnType, "_")
+
+			typeDescription = postgresBasicType{Name: columnType}
+
+			if charMaxLength != nil && *charMaxLength > 0 {
+				switch columnType {
+				case "bpchar": // CHAR(n) - fixed-length, blank-padded
+					// For fixed-length character types, set both minLength and maxLength
+					var length = uint64(*charMaxLength)
+					typeDescription = postgresSizedTextType{Inner: typeDescription, MinLength: &length, MaxLength: &length}
+				case "varchar": // VARCHAR(n) - variable-length with limit
+					// For variable-length character types, only set maxLength
+					var length = uint64(*charMaxLength)
+					typeDescription = postgresSizedTextType{Inner: typeDescription, MaxLength: &length}
+				}
+			}
+
+			if isArrayType {
+				typeDescription = postgresArrayType{Items: typeDescription}
+			}
 		}
 
+		col.DataType = typeDescription
 		columns = append(columns, col)
 	}
 	return columns, rows.Err()
 }
 
-type postgresComplexType interface {
+type postgresTypeDescription interface {
+	TypeName() string
 	String() string
-	toColumnSchema(info sqlcapture.ColumnInfo) (columnSchema, error)
+	JSONSchema(isColumnNullable, isPrimaryKey bool, featureFlags map[string]bool) (*jsonschema.Schema, error)
+}
+
+type postgresBasicType struct {
+	Name string
+}
+
+func (t postgresBasicType) String() string { return t.Name }
+
+func (t postgresBasicType) TypeName() string { return t.Name }
+
+func (t postgresBasicType) JSONSchema(isColumnNullable, isPrimaryKey bool, featureFlags map[string]bool) (*jsonschema.Schema, error) {
+	var colSchema, err = lookupColumnSchema(isPrimaryKey, t.Name)
+	if err != nil {
+		return nil, err
+	}
+	colSchema.nullable = isColumnNullable
+	return colSchema.toType(), nil
+}
+
+type postgresSizedTextType struct {
+	Inner     postgresTypeDescription
+	MinLength *uint64
+	MaxLength *uint64
+}
+
+func (t postgresSizedTextType) String() string {
+	return t.Inner.String()
+}
+
+func (t postgresSizedTextType) TypeName() string { return t.Inner.TypeName() }
+
+func (t postgresSizedTextType) JSONSchema(isColumnNullable, isPrimaryKey bool, featureFlags map[string]bool) (*jsonschema.Schema, error) {
+	var jsonSchema, err = t.Inner.JSONSchema(isColumnNullable, isPrimaryKey, featureFlags)
+	if err != nil {
+		return nil, err
+	}
+	jsonSchema.MinLength = t.MinLength
+	jsonSchema.MaxLength = t.MaxLength
+	return jsonSchema, nil
+}
+
+type postgresArrayType struct {
+	Items postgresTypeDescription
+}
+
+func (t postgresArrayType) String() string { return "_" + t.Items.String() }
+
+func (t postgresArrayType) TypeName() string { return "_" + t.Items.TypeName() }
+
+func (t postgresArrayType) JSONSchema(isColumnNullable, isPrimaryKey bool, featureFlags map[string]bool) (*jsonschema.Schema, error) {
+	if featureFlags["multidimensional_arrays"] {
+		// When 'multidimensional_arrays' is enabled, we don't specify an element type
+		// in order to avoid the mess of trying to describe the recursive scalar-or-self
+		// nature of the array elements. It's just an array of unspecified values.
+		var jsonType = &jsonschema.Schema{
+			Extras: map[string]any{"type": "array"},
+		}
+		if isColumnNullable {
+			// The column value itself may be null if the column is nullable.
+			jsonType.Extras["type"] = []string{"array", "null"}
+		}
+		return jsonType, nil
+	}
+
+	// Generate the column schema, with the understanding that the element type is always
+	// nullable inside an array column regardless of column nullability.
+	var colSchema, err = t.Items.JSONSchema(true, isPrimaryKey, featureFlags)
+	if err != nil {
+		return nil, err
+	}
+
+	// Legacy behavior: represent array values as an object with {elements,dimensions} fields.
+	if !featureFlags["flatten_arrays"] {
+		var jsonType = &jsonschema.Schema{
+			Extras: map[string]any{
+				"properties": map[string]*jsonschema.Schema{
+					"dimensions": {
+						Type:  "array",
+						Items: &jsonschema.Schema{Type: "integer"},
+					},
+					"elements": {
+						Type:  "array",
+						Items: colSchema,
+					},
+				},
+				"additionalProperties": false,
+			},
+			Required: []string{"dimensions", "elements"},
+		}
+
+		if isColumnNullable {
+			jsonType.Extras["type"] = []string{"object", "null"}
+		} else {
+			jsonType.Type = "object"
+		}
+		return jsonType, nil
+	}
+
+	// Default behavior: flatten_arrays=true and multidimensional_arrays=false
+	// Arrays are captured as just their flattened elements, without dimensionality.
+	var jsonType = &jsonschema.Schema{
+		Items:  colSchema,
+		Extras: map[string]any{"type": "array"},
+	}
+	if isColumnNullable {
+		jsonType.Extras["type"] = []string{"array", "null"}
+	}
+	return jsonType, nil
 }
 
 type postgresEnumType struct{}
 
 func (t postgresEnumType) String() string { return "enum" }
-func (t postgresEnumType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
-	return columnSchema{jsonTypes: []string{"string"}}, nil
+
+func (t postgresEnumType) TypeName() string { return t.String() }
+
+func (t postgresEnumType) JSONSchema(isColumnNullable, isPrimaryKey bool, featureFlags map[string]bool) (*jsonschema.Schema, error) {
+	var colSchema = columnSchema{
+		jsonTypes: []string{"string"},
+		nullable:  isColumnNullable,
+	}
+	return colSchema.toType(), nil
 }
 
 type postgresRangeType struct {
@@ -599,33 +656,25 @@ func (t postgresRangeType) String() string {
 	return "range"
 }
 
-func (t postgresRangeType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
-	return columnSchema{jsonTypes: []string{"string"}}, nil
+func (t postgresRangeType) TypeName() string { return t.String() }
+
+func (t postgresRangeType) JSONSchema(isColumnNullable, isPrimaryKey bool, featureFlags map[string]bool) (*jsonschema.Schema, error) {
+	var colSchema = columnSchema{
+		jsonTypes: []string{"string"},
+		nullable:  isColumnNullable,
+	}
+	return colSchema.toType(), nil
 }
 
 type postgresCompositeType struct{}
 
 func (t postgresCompositeType) String() string { return "composite" }
-func (t postgresCompositeType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
-	return columnSchema{}, nil
-}
 
-type postgresSizedTextType struct {
-	Type      string
-	MinLength *uint64
-	MaxLength *uint64
-}
+func (t postgresCompositeType) TypeName() string { return t.String() }
 
-func (t postgresSizedTextType) String() string { return t.Type }
-
-func (t postgresSizedTextType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
-	var colSchema, ok = postgresTypeToJSON[t.Type]
-	if !ok {
-		return columnSchema{}, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", t.Type)
-	}
-	colSchema.minLength = t.MinLength
-	colSchema.maxLength = t.MaxLength
-	return colSchema, nil
+func (t postgresCompositeType) JSONSchema(isColumnNullable, isPrimaryKey bool, featureFlags map[string]bool) (*jsonschema.Schema, error) {
+	var colSchema = columnSchema{nullable: isColumnNullable}
+	return colSchema.toType(), nil
 }
 
 // Query copied from pgjdbc's method PgDatabaseMetaData.getPrimaryKeys() with
