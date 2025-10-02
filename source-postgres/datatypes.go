@@ -365,8 +365,8 @@ func oversizePlaceholderJSON(orig []byte) json.RawMessage {
 // PostgreSQL `cidr` type becomes a `*net.IPNet`, but the default JSON
 // marshalling of a `net.IPNet` isn't a great fit and we'd prefer to use
 // the `String()` method to get the usual "192.168.100.0/24" notation.
-func (db *postgresDatabase) translateRecordField(discoveredColumnType any, isPrimaryKey bool, val any) (any, error) {
-	switch discoveredColumnType {
+func (db *postgresDatabase) translateRecordField(discoveredColumnType postgresTypeDescription, isPrimaryKey bool, val any) (any, error) {
+	switch discoveredColumnType.TypeName() {
 	case "timetz":
 		if x, ok := val.(string); ok {
 			var formats = []string{
@@ -514,6 +514,8 @@ func stringifySpecialFloats(x float64) (string, bool) {
 	return "", false
 }
 
+var unknownElementType = postgresBasicType{Name: "unknown-range-element-type"}
+
 func (db *postgresDatabase) stringifyRange(r pgtype.Range[any], isPrimaryKey bool) (string, error) {
 	if r.LowerType == pgtype.Empty || r.UpperType == pgtype.Empty {
 		return "empty", nil
@@ -527,7 +529,7 @@ func (db *postgresDatabase) stringifyRange(r pgtype.Range[any], isPrimaryKey boo
 		buf.WriteString("(")
 	}
 	if r.LowerType == pgtype.Inclusive || r.LowerType == pgtype.Exclusive {
-		if translated, err := db.translateRecordField(nil, isPrimaryKey, r.Lower); err != nil {
+		if translated, err := db.translateRecordField(unknownElementType, isPrimaryKey, r.Lower); err != nil {
 			fmt.Fprintf(buf, "%v", r.Lower)
 		} else {
 			fmt.Fprintf(buf, "%v", translated)
@@ -535,7 +537,7 @@ func (db *postgresDatabase) stringifyRange(r pgtype.Range[any], isPrimaryKey boo
 	}
 	buf.WriteString(",")
 	if r.UpperType == pgtype.Inclusive || r.UpperType == pgtype.Exclusive {
-		if translated, err := db.translateRecordField(nil, isPrimaryKey, r.Upper); err != nil {
+		if translated, err := db.translateRecordField(unknownElementType, isPrimaryKey, r.Upper); err != nil {
 			fmt.Fprintf(buf, "%v", r.Upper)
 		} else {
 			fmt.Fprintf(buf, "%v", translated)
@@ -560,17 +562,19 @@ func formatRFC3339(t time.Time) (any, error) {
 	return t.Format(time.RFC3339Nano), nil
 }
 
-func (db *postgresDatabase) translateArray(discoveredColumnType any, isPrimaryKey bool, x pgtype.Array[any]) (any, error) {
-	// Turn the array type into the element type by string manipulation
-	var scalarColumnType any
-	if str, ok := discoveredColumnType.(string); ok {
-		scalarColumnType = strings.TrimLeft(str, "_")
+func (db *postgresDatabase) translateArray(discoveredColumnType postgresTypeDescription, isPrimaryKey bool, x pgtype.Array[any]) (any, error) {
+	// Extract the element type of the array
+	var elementType postgresTypeDescription
+	if t, ok := discoveredColumnType.(postgresArrayType); ok {
+		elementType = t.Items
+	} else {
+		return nil, fmt.Errorf("unable to extract element type from array type %v", discoveredColumnType)
 	}
 
 	// Translate the values of x.Elements in place (since we're discarding the original
 	// pgtype.Array value after this).
 	for idx := range x.Elements {
-		var translated, err = db.translateRecordField(scalarColumnType, isPrimaryKey, x.Elements[idx])
+		var translated, err = db.translateRecordField(elementType, isPrimaryKey, x.Elements[idx])
 		if err != nil {
 			return nil, err
 		}
