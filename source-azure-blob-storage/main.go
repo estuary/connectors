@@ -157,9 +157,17 @@ func (az *azureBlobStore) check(ctx context.Context) error {
 }
 
 func (az *azureBlobStore) List(ctx context.Context, query filesource.Query) (filesource.Listing, error) {
-	pager := az.client.NewListBlobsFlatPager(az.cfg.ContainerName, &azblob.ListBlobsFlatOptions{
+	var container, prefix = filesource.PathToParts(query.Prefix)
+
+	listOptions := &azblob.ListBlobsFlatOptions{
 		Include: azblob.ListBlobsInclude{Snapshots: true, Versions: true},
-	})
+	}
+
+	if prefix != "" {
+		listOptions.Prefix = &prefix
+	}
+
+	pager := az.client.NewListBlobsFlatPager(container, listOptions)
 	page, err := pager.NextPage(ctx)
 	if err != nil {
 		return nil, err
@@ -172,11 +180,14 @@ func (az *azureBlobStore) List(ctx context.Context, query filesource.Query) (fil
 		index:             0,
 		currentPageLength: len(page.Segment.BlobItems),
 		page:              page,
+		query:             query,
+		container:         container,
 	}, nil
 }
 
 func (s *azureBlobStore) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
-	resp, err := s.client.DownloadStream(ctx, s.cfg.ContainerName, obj.Path, nil)
+	var container, key = filesource.PathToParts(obj.Path)
+	resp, err := s.client.DownloadStream(ctx, container, key, nil)
 	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
@@ -200,6 +211,8 @@ type azureBlobListing struct {
 	index             int
 	currentPageLength int
 	page              azblob.ListBlobsFlatResponse
+	query             filesource.Query
+	container         string
 }
 
 func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
@@ -228,7 +241,7 @@ func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
 
 		obj := filesource.ObjectInfo{}
 
-		obj.Path = *blob.Name
+		obj.Path = filesource.PartsToPath(l.container, *blob.Name)
 		obj.ModTime = *blob.Properties.LastModified
 		obj.ContentType = *blob.Properties.ContentType
 		obj.Size = *blob.Properties.ContentLength
@@ -236,6 +249,7 @@ func (l *azureBlobListing) Next() (filesource.ObjectInfo, error) {
 		if blob.Properties.ContentEncoding != nil {
 			obj.ContentEncoding = *blob.Properties.ContentEncoding
 		}
+
 		log.Debug("Listing object: ", obj.Path)
 
 		return obj, nil
