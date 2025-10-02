@@ -215,9 +215,14 @@ func predictableColumnOrder(colType any) bool {
 	// Currently all textual primary key columns are considered to be 'unpredictable' so that backfills
 	// will default to using the 'imprecise' ordering semantics which avoids full-table sorts. Refer to
 	// https://github.com/estuary/connectors/issues/1343 for more details.
+	if t, ok := colType.(postgresSizedTextType); ok {
+		colType = t.Type // Unwrap sized text and just look at the type name
+	}
 	if colType == "varchar" || colType == "bpchar" || colType == "text" || colType == "citext" {
 		return false
-	} else if _, ok := colType.(postgresEnumType); ok {
+	}
+
+	if _, ok := colType.(postgresEnumType); ok {
 		return false
 	}
 
@@ -347,12 +352,16 @@ type columnSchema struct {
 	format          string
 	nullable        bool
 	jsonTypes       []string
+	minLength       *uint64
+	maxLength       *uint64
 }
 
 func (s columnSchema) toType() *jsonschema.Schema {
 	var out = &jsonschema.Schema{
-		Format: s.format,
-		Extras: make(map[string]interface{}),
+		Format:    s.format,
+		Extras:    make(map[string]interface{}),
+		MinLength: s.minLength,
+		MaxLength: s.maxLength,
 	}
 
 	if s.contentEncoding != "" {
@@ -488,7 +497,8 @@ const queryDiscoverColumns = `
 		 a.attname as column_name,
 		 NOT (a.attnotnull OR (t.typtype = 'd' AND t.typnotnull)) AS is_nullable,
 		 COALESCE(bt.typname, t.typname) AS udt_name,
-		 t.typtype::text AS typtype
+		 t.typtype::text AS typtype,
+		 information_schema._pg_char_max_length(a.atttypid, a.atttypmod) AS char_max_length
 	FROM pg_catalog.pg_attribute a
 	JOIN pg_catalog.pg_type t ON a.atttypid = t.oid
 	JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
@@ -512,8 +522,25 @@ func getColumns(ctx context.Context, conn *pgxpool.Pool) ([]sqlcapture.ColumnInf
 	for rows.Next() {
 		var col sqlcapture.ColumnInfo
 		var typtype string
-		if err := rows.Scan(&col.TableSchema, &col.TableName, &col.Index, &col.Name, &col.IsNullable, &col.DataType, &typtype); err != nil {
+		var charMaxLength *int64
+		if err := rows.Scan(&col.TableSchema, &col.TableName, &col.Index, &col.Name, &col.IsNullable, &col.DataType, &typtype, &charMaxLength); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
+		}
+
+		// Add length constraints for char/varchar columns with defined lengths
+		if charMaxLength != nil && *charMaxLength > 0 {
+			if typeName, ok := col.DataType.(string); ok {
+				switch typeName {
+				case "bpchar": // CHAR(n) - fixed-length, blank-padded
+					// For fixed-length character types, set both minLength and maxLength
+					var length = uint64(*charMaxLength)
+					col.DataType = postgresSizedTextType{Type: typeName, MinLength: &length, MaxLength: &length}
+				case "varchar": // VARCHAR(n) - variable-length with limit
+					// For variable-length character types, only set maxLength
+					var length = uint64(*charMaxLength)
+					col.DataType = postgresSizedTextType{Type: typeName, MaxLength: &length}
+				}
+			}
 		}
 
 		// Special cases for user-defined types where we must resolve the columnSchema directly.
@@ -573,6 +600,24 @@ type postgresCompositeType struct{}
 func (t postgresCompositeType) String() string { return "composite" }
 func (t postgresCompositeType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
 	return columnSchema{}, nil
+}
+
+type postgresSizedTextType struct {
+	Type      string
+	MinLength *uint64
+	MaxLength *uint64
+}
+
+func (t postgresSizedTextType) String() string { return t.Type }
+
+func (t postgresSizedTextType) toColumnSchema(_ sqlcapture.ColumnInfo) (columnSchema, error) {
+	var colSchema, ok = postgresTypeToJSON[t.Type]
+	if !ok {
+		return columnSchema{}, fmt.Errorf("unable to translate PostgreSQL type %q into JSON schema", t.Type)
+	}
+	colSchema.minLength = t.MinLength
+	colSchema.maxLength = t.MaxLength
+	return colSchema, nil
 }
 
 // Query copied from pgjdbc's method PgDatabaseMetaData.getPrimaryKeys() with

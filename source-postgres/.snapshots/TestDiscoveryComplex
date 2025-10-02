@@ -16,6 +16,7 @@ Binding 0:
           "$anchor": "TestDiscoverycomplex_cheap_oxygenation",
           "properties": {
             "Bounded Text": {
+              "maxLength": 255,
               "description": "(source type: varchar)",
               "type": [
                 "string",

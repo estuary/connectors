@@ -15,6 +15,7 @@ Binding 0:
           "$anchor": "TestGeneratedcolumn_91418628",
           "properties": {
             "a": {
+              "maxLength": 32,
               "description": "(source type: varchar)",
               "type": [
                 "string",
@@ -22,6 +23,7 @@ Binding 0:
               ]
             },
             "b": {
+              "maxLength": 32,
               "description": "(source type: varchar)",
               "type": [
                 "string",
