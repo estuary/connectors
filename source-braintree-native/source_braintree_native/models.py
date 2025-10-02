@@ -139,6 +139,20 @@ class TransactionSearchResponse(SearchResponse):
 class CreditCardVerificationSearchResponse(SearchResponse):
     class CreditCardVerifications(SearchResponseResources):
         resource: SearchResponseResource = Field(alias="verification", default=None)
+        # Sometimes, Braintree's API returns records that are not credit card
+        # verifications in a CreditCardVerificationSearchResponse. These are completely
+        # different records, and shouldn't be returned in the API response in the first place.
+        # Braintree's official Python SDK filters out/ignores records that aren't credit card
+        # verifications, so we do the same.
+        #
+        # We could ignore any extra fields when validating the model to solve this. However,
+        # Braintree's API is not formally documented and we reversed engineered how the API
+        # works via the Braintree SDK, so I have low confidence that Braintree won't make
+        # breaking changes to the API. I'd like to know if any API responses deviate from
+        # the shape we expect, so instead of ignoring all extra fields, I'm choosing
+        # to exclude specific fields and still fail validation if any unexpected
+        # fields exist in the response.
+        us_bank_account_verification: Any = Field(exclude=True, default=None)
 
     resources: CreditCardVerifications = Field(alias="credit_card_verifications")
 
