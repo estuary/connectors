@@ -65,6 +65,10 @@ def incremental_resources(
         task: Task,
         all_bindings,
     ):
+        extra_filter_params = None
+        if resource is LogResource and config.advanced.logs_query:
+            extra_filter_params = {"query": config.advanced.logs_query}
+
         common.open_binding(
             binding,
             binding_index,
@@ -77,6 +81,7 @@ def incremental_resources(
                 config.common_headers,
                 resource,
                 config.advanced.window_size,
+                extra_filter_params,
             ),
             fetch_page=functools.partial(
                 fetch_events_page,
@@ -85,6 +90,7 @@ def incremental_resources(
                 config.common_headers,
                 resource,
                 config.start_date,
+                extra_filter_params,
             ),
         )
 
