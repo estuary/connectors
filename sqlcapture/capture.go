@@ -164,6 +164,7 @@ const (
 	streamIdleWarning           = 60 * time.Second // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
 	streamProgressInterval      = 60 * time.Second // After `streamProgressInterval` the replication streaming code may log a progress report.
 	rediscoverInterval          = 5 * time.Minute  // The capture will re-run discovery and reinitialize missing/pending tables this frequently.
+	periodicChecksInterval      = 10 * time.Minute // The capture may run some database-specific sanity checks periodically at this interval.
 )
 
 var (
@@ -230,6 +231,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	}
 
 	var rediscoverAfter time.Time
+	var periodicChecksAfter time.Time
 	for ctx.Err() == nil {
 		if time.Now().After(rediscoverAfter) {
 			log.WithField("eventType", "connectorStatus").Info("Rediscovering database tables")
@@ -246,6 +248,13 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 				return fmt.Errorf("error initializing pending streams: %w", err)
 			}
 			rediscoverAfter = time.Now().Add(rediscoverInterval)
+		}
+
+		if time.Now().After(periodicChecksAfter) {
+			if err := c.Database.PeriodicChecks(ctx); err != nil {
+				log.WithError(err).Warn("error running periodic checks")
+			}
+			periodicChecksAfter = time.Now().Add(periodicChecksInterval)
 		}
 
 		// If any tables are currently backfilling, go perform another backfill iteration.

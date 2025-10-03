@@ -249,6 +249,10 @@ type Database interface {
 	// function provides a hook for database-specific diagnostic information to
 	// be logged.
 	ReplicationDiagnostics(ctx context.Context) error
+
+	// Called periodically just so we can make sure everything looks good on the
+	// DB and log warnings as necessary.
+	PeriodicChecks(ctx context.Context) error
 }
 
 // ReplicationStream represents the process of receiving change events
