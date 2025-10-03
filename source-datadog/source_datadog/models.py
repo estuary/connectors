@@ -128,6 +128,7 @@ class ApiResponse(BaseModel, Generic[TApiResponse]):
 class DatadogResource(BaseDocument, extra="allow"):
     RESOURCE_NAME: ClassVar[str]
     PRIMARY_KEYS: ClassVar[list[str]]
+    PATH: ClassVar[str]
 
     id: str
 
@@ -142,8 +143,10 @@ class IncrementalResource(DatadogResource):
 class RealUserMonitoringResource(IncrementalResource):
     RESOURCE_NAME = "real_user_monitoring"
     PRIMARY_KEYS = ["/id"]
+    PATH = "/rum/events/search"
 
 
 class LogResource(IncrementalResource):
     RESOURCE_NAME = "logs"
     PRIMARY_KEYS = ["/id"]
+    PATH = "/logs/events/search"
