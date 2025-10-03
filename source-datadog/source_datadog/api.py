@@ -86,6 +86,7 @@ async def fetch_events_page(
     common_headers: dict[str, str],
     resource_type: type[TResourceType],
     start_date: datetime,
+    extra_filter_params: dict | None,
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
@@ -94,7 +95,7 @@ async def fetch_events_page(
     assert page is None or isinstance(page, str)
 
     url = f"{base_url}/{resource_type.PATH}"
-    request_body = _build_search_request_body(start_date, cutoff, page)
+    request_body = _build_search_request_body(start_date, cutoff, page, extra_filter_params)
 
     api_response = ApiResponse[list[resource_type]].model_validate_json(
         await http.request(
@@ -125,9 +126,9 @@ async def fetch_events_changes(
     common_headers: dict[str, str],
     resource_type: type[TResourceType],
     window_size: int,
+    extra_filter_params: dict | None,
     log: Logger,
     log_cursor: LogCursor,
-    extra_filter_params: dict | None = None,
 ) -> AsyncGenerator[TResourceType | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 

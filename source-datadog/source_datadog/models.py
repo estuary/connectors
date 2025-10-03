@@ -15,7 +15,7 @@ from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
 from estuary_cdk.flow import AccessToken
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, BeforeValidator, Field
 
 ConnectorState = GenericConnectorState[ResourceState]
 
@@ -40,6 +40,18 @@ class ApiKey(AccessToken):
 def default_start_date() -> datetime:
     dt = datetime.now(tz=UTC) - timedelta(days=30)
     return dt
+
+
+def validate_logs_query(v: str | None) -> str | None:
+    if v is None:
+        return None
+
+    v = v.strip()
+
+    if not v:
+        return None
+
+    return v
 
 
 class EndpointConfig(BaseModel):
@@ -67,6 +79,16 @@ class EndpointConfig(BaseModel):
     )
 
     class Advanced(BaseModel):
+        logs_query: Annotated[
+            str | None,
+            Field(
+                description="Query string to filter logs captured from Datadog. Uses Datadog's log search syntax described at https://docs.datadoghq.com/logs/explorer/search_syntax/. If not provided, all logs will be captured.",
+                title="Log Query Filter",
+                default=None,
+                max_length=10_000
+            ),
+            BeforeValidator(validate_logs_query),
+        ]
         window_size: Annotated[
             int,
             Field(
