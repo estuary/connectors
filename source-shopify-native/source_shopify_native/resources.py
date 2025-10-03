@@ -59,6 +59,7 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.SmartCollectionMetafields,
     gql.Locations,
     gql.LocationMetafields,
+    gql.SubscriptionContracts,
 ]
 
 
