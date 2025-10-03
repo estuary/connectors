@@ -5,6 +5,20 @@
       "$defs": {
         "Advanced": {
           "properties": {
+            "logs_query": {
+              "anyOf": [
+                {
+                  "maxLength": 10000,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Query string to filter logs captured from Datadog. Uses Datadog's log search syntax described at https://docs.datadoghq.com/logs/explorer/search_syntax/. If not provided, all logs will be captured.",
+              "title": "Log Query Filter"
+            },
             "window_size": {
               "default": 30,
               "description": "Window size in days for incremental streams. The default of 30 days is recommended for most use cases.",

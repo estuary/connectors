@@ -16,19 +16,14 @@ from .models import (
     LogResource
 )
 
-INCREMENTAL_RESOURCES: list[
-    tuple[
-        str,
-        type[IncrementalResource],
-    ]
-] = [
-    ("/rum/events/search", RealUserMonitoringResource),
-    ("/logs/events/search", LogResource),
+INCREMENTAL_RESOURCES: list[type[IncrementalResource]] = [
+    RealUserMonitoringResource,
+    LogResource,
 ]
 
 
 async def validate_credentials(log: Logger, http: HTTPSession, config: EndpointConfig):
-    url = f"{config.base_url}/logs/events/search"
+    url = f"{config.base_url}{LogResource.PATH}"
     headers = config.common_headers
     body = {
         "filter": {
@@ -63,7 +58,6 @@ def incremental_resources(
     config: EndpointConfig,
 ) -> list[common.Resource]:
     def open(
-        endpoint: str,
         resource: type[IncrementalResource],
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -71,6 +65,10 @@ def incremental_resources(
         task: Task,
         all_bindings,
     ):
+        extra_filter_params = None
+        if resource is LogResource and config.advanced.logs_query:
+            extra_filter_params = {"query": config.advanced.logs_query}
+
         common.open_binding(
             binding,
             binding_index,
@@ -81,18 +79,18 @@ def incremental_resources(
                 http,
                 config.base_url,
                 config.common_headers,
-                endpoint,
                 resource,
                 config.advanced.window_size,
+                extra_filter_params,
             ),
             fetch_page=functools.partial(
                 fetch_events_page,
                 http,
                 config.base_url,
                 config.common_headers,
-                endpoint,
                 resource,
                 config.start_date,
+                extra_filter_params,
             ),
         )
 
@@ -105,7 +103,6 @@ def incremental_resources(
             model=resource,
             open=functools.partial(
                 open,
-                endpoint,
                 resource,
             ),
             initial_state=common.ResourceState(
@@ -117,7 +114,7 @@ def incremental_resources(
             ),
             schema_inference=True,
         )
-        for endpoint, resource in INCREMENTAL_RESOURCES
+        for resource in INCREMENTAL_RESOURCES
     ]
 
 
