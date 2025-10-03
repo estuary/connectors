@@ -360,6 +360,14 @@ func (db *postgresDatabase) constructJSONTranscoder(discoveredColumnType any, is
 	// This is the main value encoding logic used for most data types outside of special cases.
 	// We go the long way, first using PGX to decode the value and then translating it to another
 	// Go value and then finally serializing that as JSON.
+	var columnType postgresTypeDescription
+	if t, ok := discoveredColumnType.(postgresTypeDescription); ok {
+		columnType = t
+	} else {
+		return jsonTranscoderFunc(func(buf []byte, bs []byte) ([]byte, error) {
+			return nil, fmt.Errorf("invalid column type description %v", discoveredColumnType)
+		})
+	}
 	return jsonTranscoderFunc(func(buf []byte, bs []byte) ([]byte, error) {
 		var val any
 		var err error
@@ -368,7 +376,7 @@ func (db *postgresDatabase) constructJSONTranscoder(discoveredColumnType any, is
 		}
 		if err != nil {
 			return nil, fmt.Errorf("error decoding value: %w", err)
-		} else if translated, err := db.translateRecordField(discoveredColumnType, isPrimaryKey, val); err != nil {
+		} else if translated, err := db.translateRecordField(columnType, isPrimaryKey, val); err != nil {
 			return nil, fmt.Errorf("error translating value %v for JSON serialization: %w", val, err)
 		} else {
 			return json.Append(buf, translated, json.EscapeHTML|json.SortMapKeys) // Consider removing json.EscapeHTML, though it will change some outputs like the `circle` column type
