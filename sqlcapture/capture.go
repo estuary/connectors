@@ -924,7 +924,7 @@ func (c *Capture) emitSourcedSchemas(discovery map[StreamID]*DiscoveryInfo) erro
 		if !info.EmitSourcedSchemas {
 			continue // Only emit SourcedSchema updates for tables with the feature enabled
 		}
-		var collectionSchema, _, err = generateCollectionSchema(c.Database, info, false)
+		var collectionSchema, _, _, err = generateCollectionSchema(c.Database, info, false)
 		if err != nil {
 			log.WithError(err).WithField("stream", binding.StreamID).Error("error generating schema")
 			continue

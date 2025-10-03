@@ -282,6 +282,7 @@ type DiscoveryInfo struct {
 	Schema      string                // The schema (a namespace, in normal parlance) which contains the table.
 	Columns     map[string]ColumnInfo // Information about each column of the table.
 	PrimaryKey  []string              // An ordered list of the column names which together form the table's primary key.
+	FallbackKey bool                  // True if the 'Primary Key' is actually a unique secondary index chosen as a fallback.
 	ColumnNames []string              // The names of all columns, in the table's natural order.
 	BaseTable   bool                  // True if the table type is 'BASE TABLE' and false for views or other not-physical-table entities.
 	OmitBinding bool                  // True if the table should be omitted from discovery catalog generation.

@@ -58,7 +58,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 			continue
 		}
 
-		var documentSchema, keyPointers, err = generateCollectionSchema(db, table, true)
+		var documentSchema, keyPointers, isFallback, err = generateCollectionSchema(db, table, true)
 		if err != nil {
 			return nil, fmt.Errorf("error generating schema for %q: %w", streamID, err)
 		}
@@ -73,6 +73,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 		var suggestedMode = BackfillModeAutomatic
 		if len(keyPointers) == 0 {
 			keyPointers = db.FallbackCollectionKey()
+			isFallback = true
 			suggestedMode = BackfillModeWithoutKey
 		}
 		var res = Resource{
@@ -90,6 +91,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 			ResourceConfigJson: resourceSpecJSON,
 			DocumentSchemaJson: documentSchema,
 			Key:                keyPointers,
+			IsFallbackKey:      isFallback,
 		})
 
 	}
@@ -103,7 +105,7 @@ func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovere
 
 // generateCollectionSchema translates the discovery information of a table into a Flow
 // collection schema (plus the discovered collection key, for convenience).
-func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema bool) (json.RawMessage, []string, error) {
+func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema bool) (json.RawMessage, []string, bool, error) {
 	// Schema of the embedded "source" property.
 	var sourceSchema = db.SourceMetadataSchema(fullWriteSchema)
 
@@ -136,6 +138,7 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	for _, colName := range collectionKey {
 		keyPointers = append(keyPointers, primaryKeyToCollectionKey(colName))
 	}
+	var isFallback = table.FallbackKey
 
 	// The anchor by which we'll reference the table schema.
 	//lint:ignore SA1019 We don't need the title-casing to handle punctuation properly so strings.Title() is sufficient
@@ -294,9 +297,9 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 
 	var documentSchema, err = schema.MarshalJSON()
 	if err != nil {
-		return nil, nil, fmt.Errorf("error marshalling schema JSON: %w", err)
+		return nil, nil, false, fmt.Errorf("error marshalling schema JSON: %w", err)
 	}
-	return documentSchema, keyPointers, nil
+	return documentSchema, keyPointers, isFallback, nil
 }
 
 // Per the flow JSON schema: Collection names are paths of Unicode letters, numbers, '-', '_', or
