@@ -1270,48 +1270,6 @@ func (s *replicationStream) Close(ctx context.Context) error {
 	return nil
 }
 
-func (db *postgresDatabase) ReplicationDiagnostics(ctx context.Context) error {
-	var query = func(q string) {
-		logrus.WithField("query", q).Info("running diagnostics query")
-		var result, err = db.conn.Query(ctx, q)
-		if err != nil {
-			logrus.WithFields(logrus.Fields{
-				"query": q,
-				"err":   err,
-			}).Error("unable to execute diagnostics query")
-			return
-		}
-		defer result.Close()
-
-		var numResults int
-		var keys = result.FieldDescriptions()
-		for result.Next() {
-			numResults++
-			var row, err = result.Values()
-			if err != nil {
-				logrus.WithField("err", err).Error("unable to process result row")
-				continue
-			}
-
-			var logFields = logrus.Fields{}
-			for idx, val := range row {
-				logFields[string(keys[idx].Name)] = val
-			}
-			logrus.WithFields(logFields).Info("got diagnostic row")
-		}
-		if numResults == 0 {
-			logrus.WithField("query", q).Info("no results")
-		}
-	}
-
-	if !db.config.Advanced.ReadOnlyCapture {
-		query("SELECT * FROM " + db.WatermarksTable().String() + ";")
-	}
-	query("SELECT * FROM pg_replication_slots;")
-	query("SELECT CASE WHEN pg_is_in_recovery() THEN pg_last_wal_replay_lsn() ELSE pg_current_wal_flush_lsn() END;")
-	return nil
-}
-
 func unmarshalJSONString(bs json.RawMessage) (string, error) {
 	if bs == nil {
 		return "", nil
