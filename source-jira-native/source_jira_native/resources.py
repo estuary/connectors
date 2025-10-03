@@ -35,6 +35,7 @@ from .models import (
     ResourceConfig,
     ResourceState,
     ScreenTabFields,
+    SprintIssues,
     StandardPermissions,
     Statuses,
     SystemAvatars,
@@ -62,6 +63,7 @@ from .api import (
     snapshot_permissions,
     snapshot_project_child_resources,
     snapshot_screen_tab_fields,
+    snapshot_sprint_issues,
     snapshot_statuses,
     snapshot_system_avatars,
     url_base,
@@ -260,6 +262,13 @@ def _get_partial_snapshot_fn(
             config.domain,
             stream,
             timezone,
+        )
+    elif issubclass(stream, SprintIssues):
+        snapshot_fn = functools.partial(
+            snapshot_sprint_issues,
+            http,
+            config.domain,
+            stream,
         )
     elif issubclass(stream, BoardChildStream):
         snapshot_fn = functools.partial(

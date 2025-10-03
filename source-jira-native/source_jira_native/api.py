@@ -51,6 +51,9 @@ from .models import (
     ResponseSizeParameter,
     ScreenTabFields,
     ScreenTabs,
+    SprintIssues,
+    SprintIssuesResponse,
+    Sprints,
     Statuses,
     SystemAvatarsResponse,
     EPOCH,
@@ -736,6 +739,32 @@ async def snapshot_epics(
         "count of epics from issues": len(issue_epics),
         "epics from issues": issue_epics,
     })
+
+
+async def snapshot_sprint_issues(
+    http: HTTPSession,
+    domain: str,
+    stream: type[SprintIssues],
+    log: Logger,
+) -> AsyncGenerator[JiraResource, None]:
+    sprint_ids: list[int] = []
+    async for sprint in snapshot_board_child_resources(http, domain, Sprints, log):
+        sprint_ids.append(sprint.id)
+
+    for id in sorted(sprint_ids):
+        path = f"{Sprints.path}/{id}/{stream.path}"
+        async for issue in _paginate_through_resources(
+            http,
+            domain,
+            stream.api,
+            path,
+            stream.extra_headers,
+            stream.extra_params,
+            SprintIssuesResponse,
+            log,
+        ):
+            issue["sprintId"] = id
+            yield JiraResource.model_validate(issue)
 
 
 def _is_within_dst_fallback_window(

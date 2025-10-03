@@ -549,6 +549,10 @@ class BoardChildStream(FullRefreshStream):
     api: ClassVar[JiraAPI] = JiraAPI.SOFTWARE
 
 
+class SprintIssuesResponse(PaginatedResponse):
+    values: list[APIRecord] = Field(alias="issues")
+
+
 class Epics(BoardChildStream):
     name: ClassVar[str] = "epics"
     path: ClassVar[str] = "epic"
@@ -559,6 +563,16 @@ class Sprints(BoardChildStream):
     name: ClassVar[str] = "sprints"
     path: ClassVar[str] = "sprint"
     disable: ClassVar[bool] = False
+
+
+class SprintIssues(FullRefreshStream):
+    api: ClassVar[JiraAPI] = JiraAPI.SOFTWARE
+    name: ClassVar[str] = "sprint_issues"
+    path: ClassVar[str] = "issue"
+    extra_params: ClassVar[Optional[dict[str, str]]] = {
+        "fields": "id",
+        "jql": "ORDER BY id"
+    }
 
 
 # Service Managmement API Streams
@@ -627,6 +641,7 @@ FULL_REFRESH_STREAMS: list[type[FullRefreshStream]] = [
     ScreenTabs,
     Screens,
     ServiceDesks,
+    SprintIssues,
     Sprints,
     Statuses,
     SystemAvatars,
