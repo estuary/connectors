@@ -59,12 +59,14 @@ def check_response_for_partial_data(
 def _build_search_request_body(
     start_date: datetime,
     end_date: datetime,
+    query: str,
     page_cursor: str | None = None,
     extra_filter_params: dict | None = None,
 ) -> dict:
     filter_params = {
         "from": start_date.isoformat(),
         "to": end_date.isoformat(),
+        "query": query,
     }
 
     if extra_filter_params:
@@ -87,6 +89,7 @@ async def fetch_events_page(
     endpoint: str,
     resource_type: type[TResourceType],
     start_date: datetime,
+    query: str,
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
@@ -95,7 +98,7 @@ async def fetch_events_page(
     assert page is None or isinstance(page, str)
 
     url = f"{base_url}/{endpoint}"
-    request_body = _build_search_request_body(start_date, cutoff, page)
+    request_body = _build_search_request_body(start_date, cutoff, query, page)
 
     api_response = ApiResponse[list[resource_type]].model_validate_json(
         await http.request(
@@ -127,6 +130,7 @@ async def fetch_events_changes(
     endpoint: str,
     resource_type: type[TResourceType],
     window_size: int,
+    query: str,
     log: Logger,
     log_cursor: LogCursor,
     extra_filter_params: dict | None = None,
@@ -143,7 +147,7 @@ async def fetch_events_changes(
         return
 
     request_body = _build_search_request_body(
-        log_cursor, end, None, extra_filter_params
+        log_cursor, end, query, None, extra_filter_params
     )
 
     count = 0

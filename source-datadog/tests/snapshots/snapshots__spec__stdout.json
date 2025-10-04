@@ -78,6 +78,12 @@
           "title": "Start Date",
           "type": "string"
         },
+        "query": {
+          "default": "*",
+          "description": "Query filter to apply when fetching events from Datadog. Must be compatible with Datadog log search syntax - as well as RUM search syntax when fetching RUM events. If left blank, all events will be fetched.",
+          "title": "Query",
+          "type": "string"
+        },
         "advanced": {
           "$ref": "#/$defs/Advanced",
           "advanced": true,
