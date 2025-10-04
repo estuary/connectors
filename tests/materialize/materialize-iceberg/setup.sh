@@ -63,17 +63,35 @@ resources_json_template='[
   }
 ]'
 
+# Return the first non-null/non-empty-string value in a list of paths.
+select_first() {
+	jq -r 'first($ARGS.positional[] as $f | getpath($f / ".") | strings | select(. != ""))' --args "$@"
+}
+
+# Extract the signing name from the first component of the host.
+#
+# Example:
+# ```
+# >>> signing_name glue.foo.bar
+# glue
+# ```
+signing_name() {
+	read -r tmp
+	tmp=${tmp#*//}
+	echo ${tmp%%.*}
+}
+
 CATALOG_TYPE="${CATALOG_TYPE:-rest}"
 export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.${CATALOG_TYPE}.yaml)"
 export CATALOG_URL="$(echo $CONNECTOR_CONFIG | jq -r .url)"
 export WAREHOUSE="$(echo $CONNECTOR_CONFIG | jq -r .warehouse)"
 export NAMESPACE="$(echo $CONNECTOR_CONFIG | jq -r .namespace)"
-export CATALOG_CREDENTIAL="$(echo $CONNECTOR_CONFIG | jq -r .catalog_authentication.credential)"
-export CATALOG_SCOPE="$(echo $CONNECTOR_CONFIG | jq -r .catalog_authentication.scope)"
-export CATALOG_AWS_ACCESS_KEY_ID="$(echo $CONNECTOR_CONFIG | jq -r .catalog_authentication.aws_access_key_id)"
-export CATALOG_AWS_SECRET_ACCESS_KEY="$(echo $CONNECTOR_CONFIG | jq -r .catalog_authentication.aws_secret_access_key)"
-export CATALOG_REGION="$(echo $CONNECTOR_CONFIG | jq -r .catalog_authentication.region)"
-export CATALOG_AWS_SIGNING_NAME="$(echo $CONNECTOR_CONFIG | jq -r .catalog_authentication.signing_name)"
+export CATALOG_CREDENTIAL="$(echo $CONNECTOR_CONFIG | select_first credentials.credential catalog_authentication.credential)"
+export CATALOG_SCOPE="$(echo $CONNECTOR_CONFIG | select_first credentials.scope catalog_authentication.scope)"
+export CATALOG_AWS_ACCESS_KEY_ID="$(echo $CONNECTOR_CONFIG | select_first credentials.aws_access_key_id catalog_authentication.aws_access_key_id)"
+export CATALOG_AWS_SECRET_ACCESS_KEY="$(echo $CONNECTOR_CONFIG | select_first credentials.aws_secret_access_key catalog_authentication.aws_secret_access_key)"
+export CATALOG_REGION="$(echo $CONNECTOR_CONFIG | select_first credentials.aws_region catalog_authentication.region)"
+export CATALOG_AWS_SIGNING_NAME="$(echo $CONNECTOR_CONFIG | jq -r .url | signing_name)"
 
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
 

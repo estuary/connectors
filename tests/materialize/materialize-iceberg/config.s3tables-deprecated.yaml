@@ -1,0 +1,35 @@
+url: https://s3tables.us-east-2.amazonaws.com/iceberg
+warehouse: arn:aws:s3tables:us-east-2:076183946664:bucket/estuary-test-table-bucket
+namespace: ci_testing
+hard_delete: true
+catalog_authentication:
+    catalog_auth_type: AWS SigV4
+    aws_access_key_id_sops: ENC[AES256_GCM,data:rjlhgHI4lBC4tn2c26sXhBHYssA=,iv:u0/KXArIZ0xSXBheNVmfJ38L/6Cofqhp6ah2z+E9HHw=,tag:BZXuQRKntqj1UIjRG0sYnQ==,type:str]
+    aws_secret_access_key_sops: ENC[AES256_GCM,data:omek+Y+1o4to+AKbLuFbC0Sh3aKSAdWg11JrRPrtSIJGQYG5cWag0w==,iv:Viq2mm+WdsKlcwk7ixBLb49GdZKOnCn2oPmtOp8jc94=,tag:6+zSF7xzFyHUk6Nmavm+IA==,type:str]
+    region: us-east-2
+    signing_name: s3tables
+compute:
+    compute_type: AWS EMR Serverless
+    aws_access_key_id_sops: ENC[AES256_GCM,data:cF3FsiBxupKJqIXrNirqMNmc+gI=,iv:rFYnteMlz4HIQFMnHsK58HWqRktgVUEXAPvfqe0ji4E=,tag:zIK1AURXB6Cy89n/WWtnKQ==,type:str]
+    aws_secret_access_key_sops: ENC[AES256_GCM,data:G+ID20UxMkynXMbFYAoRRP4iVWR808DpooU9qogTLHXe88W7qN91yg==,iv:UNTAkOtvJTYxxl9hKIVo8PBLJ8ilDzr/TdWX/k2RT2E=,tag:ruqjZB9JN2+AwIPfBIT4uQ==,type:str]
+    region: us-east-2
+    application_id_sops: ENC[AES256_GCM,data:M6HYI9phB3kVtWtBVwJc8w==,iv:hVoxuRUcP2spQboGMbE1xnsrCn6SSdk/+mo3Tm17Fn8=,tag:zV/ncAbs1WlewIKJ7dk9cQ==,type:str]
+    execution_role_arn_sops: ENC[AES256_GCM,data:LvzVMnd+GzMzD9A7hoQZcQBbqbvf0O/HIS3JrzmEsuBvMREkRMVl53Iv2XobwbhoXQ==,iv:j57OWmRI7CGsDYrnOlnky5I9cvnvAo+4xuO4A7HRKxI=,tag:bFVuW6uyctTNccRjf2kuXg==,type:str]
+    bucket: estuary-emr-staging
+    bucket_path: connector-test
+syncSchedule:
+    syncFrequency: 0s
+sops:
+    kms: []
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2025-02-28T17:40:07Z"
+          enc: CiQAdmEdwkxYkj/Bh7vWFgJOpCbLmF0dD6KMahjNQTh1i96/MqcSSQCtUdBGGlqYa5l4zokHQo3eLpZZbuZ4RV6xhb3Jh9dC4ch0fy2sCgr0vtvLe7pRXA0FATethXKpAj+p1ymM8K7G3qEtQGbjjVI=
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-03-25T21:15:02Z"
+    mac: ENC[AES256_GCM,data:2QWRKsxBgSo4V16+oV0gQUo5U41cWhDlRqN3LQmtzZ83ntmUHlTUfzidswsF2DDoCQmhpFqyJZUIqzEooMlX+N89De+McOfelubrF/aTQni/siV7Gt9/apF3apszSWGwj5HA512mDX0ZovGTetZH+qWnHgY5n7vmSN0UG0l+O7Y=,iv:fN64af+uGgJnSwU+9ksV2TLxBwSVuKliG7p0ApGsBGY=,tag:HEbCAbxCxgNDS9roPqpzVg==,type:str]
+    pgp: []
+    encrypted_suffix: _sops
+    version: 3.9.4

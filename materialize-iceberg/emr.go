@@ -40,7 +40,7 @@ func (e *emrClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr) {
 		errs.Err(fmt.Errorf("failed to list job runs for application %q: %w", e.cfg.ApplicationId, err))
 	}
 
-	if e.catalogAuth.CatalogAuthType == catalogAuthTypeClientCredential {
+	if e.catalogAuth.AuthType == catalogAuthTypeClientCredential {
 		testParameter := e.cfg.SystemsManagerPrefix + "test"
 		if _, err := e.ssmClient.PutParameter(ctx, &ssm.PutParameterInput{
 			Name:      aws.String(testParameter),
@@ -130,13 +130,17 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 		"--region", e.cfg.Region,
 	}
 
-	if e.catalogAuth.CatalogAuthType == catalogAuthTypeClientCredential {
+	if e.catalogAuth.AuthType == catalogAuthTypeClientCredential {
 		args = append(args, "--credential-secret-name", e.clientCredSecretName())
 		if s := e.catalogAuth.Scope; s != "" {
 			args = append(args, "--scope", s)
 		}
-	} else if e.catalogAuth.CatalogAuthType == catalogAuthTypeSigV4 {
-		args = append(args, "--signing-name", e.catalogAuth.catalogAuthSigV4Config.SigningName)
+	} else if e.catalogAuth.AuthType == catalogAuthTypeSigV4 || e.catalogAuth.AuthType == catalogAuthTypeAWSIAM {
+		signingName, err := SigningName(e.catalogURL)
+		if err != nil {
+			return err
+		}
+		args = append(args, "--signing-name", signingName)
 	}
 
 	start, err := e.c.StartJobRun(ctx, &emr.StartJobRunInput{

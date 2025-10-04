@@ -2,17 +2,15 @@ url: https://na81867.us-east-2.aws.snowflakecomputing.com/polaris/api/catalog
 warehouse: estuary_test
 namespace: ci_testing
 hard_delete: true
-credentials:
-    auth_type: OAuth 2.0 Client Credentials
+catalog_authentication:
+    catalog_auth_type: OAuth 2.0 Client Credentials
     oauth2_server_uri: v1/oauth/tokens
-    credential_sops: ENC[AES256_GCM,data:Ym6Jrqjhl6V5WQWKHg7mkjQGNkZiNuDqYXlYTLG/8MSytthIw1lKVBGoQQAtysolSgyaaWL/Aop8duj7f7CvvB+y1LKW+6j2aQ==,iv:/OtOsViZnfQCa7QxX+gxYQ9/hmPbzlfNO88vCe8jvXc=,tag:CSUJWtLjWkPVgK6faFrwkQ==,type:str]
+    credential_sops: ENC[AES256_GCM,data:Oac4hXeguBE6BZzNG9gCPcAuMrTCLqjkjJWskX3DDBVHyjOEC1F0gUDkrkubUnFy7IUpl683TLzQ8NQSTDMli48IUr4T2Wn3qQ==,iv:Gxwtz7oSz+wTUNaBWVjB5jha5L5MOw0WJMXIrnEkatk=,tag:8nQLL329Vx2Qgs0W7nvxlw==,type:str]
     scope: PRINCIPAL_ROLE:estuary_test_principal
 compute:
     compute_type: AWS EMR Serverless
-    credentials:
-        auth_type: AWSAccessKey
-        aws_access_key_id_sops: ENC[AES256_GCM,data:nFGSrKfGMpIFPWL6E0wViRdsQOU=,iv:QAaiJwOA27UQiv1oJ0nA8Hds5q4xa2GG/bxVrHW9xUY=,tag:HY7832SjjcWWcZpWJidFlw==,type:str]
-        aws_secret_access_key_sops: ENC[AES256_GCM,data:12jNjnfLDUg+/nHNxUWzYfufjNQ3Jf4BvlNUkhyaHHuPUbqcd/U/hA==,iv:Q1iob4WsbOqBBaKh6zAEmQ3cHkOoWnkb9dfAeLT6dMg=,tag:/ziILRKINKNnqwwG+kH9Pg==,type:str]
+    aws_access_key_id_sops: ENC[AES256_GCM,data:kzYYqI3MMGwi0Xcxg5Pgcm3B4qE=,iv:iBOmilXG9TWhQKAPw4R8QVvfqLY09gK4dRZi1xNg9CQ=,tag:8e0HbfoQP8AR172X5/e9CA==,type:str]
+    aws_secret_access_key_sops: ENC[AES256_GCM,data:rSA0ZsLqGhmAsyxmCcEWgrSMQ+DNAwN9pXrKkP2M8Ea1w/9oSi6SSA==,iv:zFx5QiXs2Zf1NnuVbwWunSm4u7QYNrwFabpeDsBgUUc=,tag:mLbE4qpc+eiIitpDQmBT9A==,type:str]
     region: us-east-2
     application_id_sops: ENC[AES256_GCM,data:5YR5bOWXFiZLsr93iesAOw==,iv:IWFmkC9+7E+bhK+wP32i1UTW9eUAuzpGlPqhwt18oos=,tag:+4t3h9sKIMWc/+tlRLP8yg==,type:str]
     execution_role_arn_sops: ENC[AES256_GCM,data:GqpQw/et43W2On51d+v/7WCNKldzcsOsdgRr85bvmR0SB7HcEjebC0SMsy5E81m+sQ==,iv:ad+ZXJ3rKqe0zzZr2RVbo4fXO0dCsxdt8OGJCiq+EaY=,tag:1n4OdiwK+VdoLzw704lR2w==,type:str]
@@ -22,11 +20,16 @@ compute:
 syncSchedule:
     syncFrequency: 0s
 sops:
+    kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2025-02-28T17:40:03Z"
           enc: CiQAdmEdwuDzO+JgxRvKOCcWqizfuOMoTV7GPa8MEp6/6kcN9FsSSQCtUdBGPXvOXXD39buCdUnlpUXk1ijEHVl2POcLjW6Qib6n9EP5LAC5f7cqB98JT54Vk9V4/TYWpQ/M0IYljxzCvPfPcG44/us=
-    lastmodified: "2025-10-08T16:24:44Z"
-    mac: ENC[AES256_GCM,data:SbsvXhmj4iv9NdoO1fLYovVFYdAuExSnPERlwsQnMFt6RATXcYj5Im9IbpX/YCV44q8JYe+5+OxsACDlEoziuu+47WvTh+qjC5VRutnUJhqJvOgDCn9xOjkP4q/ywrLJeykZXveMItXFu0HCzHi/d/dJEbAd8NmWMWAIp7lfNi8=,iv:76rypkstxiFPF0KzOeJTSBZOpile2lgK/kwsuu6CpWE=,tag:1HK4XoLlh9VJCnljBofXFQ==,type:str]
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2025-03-13T14:19:11Z"
+    mac: ENC[AES256_GCM,data:enUWPVEh81IDFN0s1el9ALzmv1evBk8f3NMvdgrUbzVQrVK7G0h10Yd4fce5swjAJ8I0Vp9GWxnGHcJRSpYRZj8Kv1HyKZ1DvwqHomLs9Ziy6+l31tSDDV58nJINtQmiIM5UOX0bF+Njt1otWMDpHG641lW9vC4l512jVX6ilF0=,iv:WQFCkU17aRwFNA/A0eeYsRRqavY1kQZYoGkN9gxFcJg=,tag:315z8c9iluOgVUoJ3vN6wg==,type:str]
+    pgp: []
     encrypted_suffix: _sops
-    version: 3.10.2
+    version: 3.9.4

@@ -49,16 +49,16 @@ func testConfig(t *testing.T, ns string) config {
 
 	switch os.Getenv("ICEBERG_CATALOG_AUTH_TYPE") {
 	case "OAuth 2.0 Client Credentials":
-		cfg.CatalogAuthentication.CatalogAuthType = catalogAuthTypeClientCredential
+		cfg.CatalogAuthentication.CatalogAuthType = oldCatalogAuthTypeClientCredential
 		cfg.CatalogAuthentication.catalogAuthClientCredentialConfig.Oauth2ServerURI = os.Getenv("ICEBERG_CATALOG_OAUTH2_SERVER_URI")
 		cfg.CatalogAuthentication.catalogAuthClientCredentialConfig.Credential = os.Getenv("ICEBERG_CATALOG_CREDENTIAL")
 		cfg.CatalogAuthentication.catalogAuthClientCredentialConfig.Scope = os.Getenv("ICEBERG_CATALOG_SCOPE")
 	case "AWS SigV4":
-		cfg.CatalogAuthentication.CatalogAuthType = catalogAuthTypeSigV4
-		cfg.CatalogAuthentication.catalogAuthSigV4Config.AWSAccessKeyID = os.Getenv("ICEBERG_AWS_ACCESS_KEY_ID")
-		cfg.CatalogAuthentication.catalogAuthSigV4Config.AWSSecretAccessKey = os.Getenv("ICEBERG_AWS_SECRET_ACCESS_KEY")
-		cfg.CatalogAuthentication.catalogAuthSigV4Config.Region = os.Getenv("ICEBERG_AWS_REGION_NAME")
-		cfg.CatalogAuthentication.catalogAuthSigV4Config.SigningName = os.Getenv("ICEBERG_AWS_SIGNING_NAME")
+		cfg.CatalogAuthentication.CatalogAuthType = oldCatalogAuthTypeSigV4
+		cfg.CatalogAuthentication.oldCatalogAuthSigV4Config.AWSAccessKeyID = os.Getenv("ICEBERG_AWS_ACCESS_KEY_ID")
+		cfg.CatalogAuthentication.oldCatalogAuthSigV4Config.AWSSecretAccessKey = os.Getenv("ICEBERG_AWS_SECRET_ACCESS_KEY")
+		cfg.CatalogAuthentication.oldCatalogAuthSigV4Config.Region = os.Getenv("ICEBERG_AWS_REGION_NAME")
+		cfg.CatalogAuthentication.oldCatalogAuthSigV4Config.SigningName = os.Getenv("ICEBERG_AWS_SIGNING_NAME")
 	}
 
 	if err := cfg.Validate(); err != nil {

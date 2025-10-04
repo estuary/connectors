@@ -4,15 +4,13 @@ namespace: ci_testing
 hard_delete: true
 credentials:
     auth_type: AWS SigV4
-    aws_access_key_id_sops: ENC[AES256_GCM,data:IiV0oeF/XCIus6+4GqlYxpBn3zQ=,iv:yY/m81gJkHzAu79ffGCakBTzYpChkK6mHuCiHVLvkmI=,tag:KRYTLVBAoUAsO8nU0wbgNw==,type:str]
-    aws_secret_access_key_sops: ENC[AES256_GCM,data:aW3UBCvtFkosvdRXXKwZWsdr3gvijDd7bmiGTO/VG3D2LKn1wuL6IA==,iv:thTlzZ6x+pYySkZIUl+fLpFYTzFjGozjiFaT8Z8zdoQ=,tag:utt5rfkB3Ac5OCh7dH5IHw==,type:str]
-    aws_region: us-east-2
+    aws_access_key_id_sops: ENC[AES256_GCM,data:mWckT8VVPERjaFGsDSJFg65UoYw=,iv:1KBaEgkWoe4F5SKwybYgH4Ng9eHBLEald71N35KijVE=,tag:jyB9cw5llj57SVi6P7mVrA==,type:str]
+    aws_secret_access_key_sops: ENC[AES256_GCM,data:5ACTZyPRQP+VwHJEMsIfWiPn5mN8ADQEx46ag0sO1M7MQx1dlmEWQQ==,iv:nIcKLKMAF6vWpTMeTdzIWxBoy/CXRp1rTK8bHWg3N8w=,tag:0ZAlg5n26y6G2t7iYLldfw==,type:str]
+    region: us-east-2
 compute:
     compute_type: AWS EMR Serverless
     credentials:
-        auth_type: AWSAccessKey
-        aws_access_key_id_sops: ENC[AES256_GCM,data:N0HWEwl4Eu9ASqBShSy4JKyTO2c=,iv:hCz4QmhPEJ8nsmlUcMzVLww2sInCxl4agVelgSozn/U=,tag:mY7l7NhywQ3sSTKLR8NUVA==,type:str]
-        aws_secret_access_key_sops: ENC[AES256_GCM,data:2eIhWi9GxgmZrCqas6CMTCRJAUV6yuDFwZSja61DQaJl2toaC8Hl7Q==,iv:5aIlMNt8Bbhuxp9gOhjxWpoDrbork6gXnAjtEXTrqYg=,tag:Y+ousFiAAIjVVUYlIGdMdA==,type:str]
+        auth_type: UseCatalogAuth
     region: us-east-2
     application_id_sops: ENC[AES256_GCM,data:M6HYI9phB3kVtWtBVwJc8w==,iv:hVoxuRUcP2spQboGMbE1xnsrCn6SSdk/+mo3Tm17Fn8=,tag:zV/ncAbs1WlewIKJ7dk9cQ==,type:str]
     execution_role_arn_sops: ENC[AES256_GCM,data:LvzVMnd+GzMzD9A7hoQZcQBbqbvf0O/HIS3JrzmEsuBvMREkRMVl53Iv2XobwbhoXQ==,iv:j57OWmRI7CGsDYrnOlnky5I9cvnvAo+4xuO4A7HRKxI=,tag:bFVuW6uyctTNccRjf2kuXg==,type:str]
@@ -25,7 +23,7 @@ sops:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2025-02-28T17:40:07Z"
           enc: CiQAdmEdwkxYkj/Bh7vWFgJOpCbLmF0dD6KMahjNQTh1i96/MqcSSQCtUdBGGlqYa5l4zokHQo3eLpZZbuZ4RV6xhb3Jh9dC4ch0fy2sCgr0vtvLe7pRXA0FATethXKpAj+p1ymM8K7G3qEtQGbjjVI=
-    lastmodified: "2025-10-08T16:57:21Z"
-    mac: ENC[AES256_GCM,data:dyfWl0/AITHKNCCIor/XYZWglZrIloBfzBGecdHnjk3Q97Xqx3SdZWFycMuwfL64je0AnB2wQCIvnr5M1FuvfQIf0iSU5nHDx+dCI31RvG0n8uzXEnJl1jmufqwFf06FigTLk6BhhEfsi56Ns3wIfsHXfg4JHPdP2CkbjPqPW30=,iv:HrRbQxOOKLcARg7ztxHWXDgao7MdHoxr4wg2TIOiI+Y=,tag:EFQ3dz2n8Dw8VgmABBmlPQ==,type:str]
+    lastmodified: "2025-10-07T23:10:34Z"
+    mac: ENC[AES256_GCM,data:5FRGNuF0Vvd4uHqRlbXAWxW6V54GEjS9ajIHN4YMvUQqdR1idZj+LrkTEa89G7y2TTUsNWcjYCaDel7uz3tr4c9m8ndf8OdgWV7vbPF5aWB+tD1rnWfVbh0NnYKFEBR3hZvzeUzwDeeyDLglj6WCV0Sa4yibG2XZv3TxTgFO4z4=,iv:mPfVYO3bdParAdPXoi2WPUWewsKmsLGB0yV3lis/Sls=,tag:Af1QYBfLaUVcHvvfh3qKag==,type:str]
     encrypted_suffix: _sops
     version: 3.10.2
