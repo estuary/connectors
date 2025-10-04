@@ -65,6 +65,11 @@ class EndpointConfig(BaseModel):
         default_factory=default_start_date,
         le=datetime.now(tz=UTC),
     )
+    query: str = Field(
+        title="Query",
+        description="Query filter to apply when fetching events from Datadog. Must be compatible with Datadog log search syntax - as well as RUM search syntax when fetching RUM events. If left blank, all events will be fetched.",
+        default="*",
+    )
 
     class Advanced(BaseModel):
         window_size: Annotated[

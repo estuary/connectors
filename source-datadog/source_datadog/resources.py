@@ -33,6 +33,7 @@ async def validate_credentials(log: Logger, http: HTTPSession, config: EndpointC
     body = {
         "filter": {
             "from": "now-1s",
+            "query": "*",
         },
         "page": {
             "limit": 1,
@@ -84,6 +85,7 @@ def incremental_resources(
                 endpoint,
                 resource,
                 config.advanced.window_size,
+                config.query,
             ),
             fetch_page=functools.partial(
                 fetch_events_page,
@@ -93,6 +95,7 @@ def incremental_resources(
                 endpoint,
                 resource,
                 config.start_date,
+                config.query,
             ),
         )
 
