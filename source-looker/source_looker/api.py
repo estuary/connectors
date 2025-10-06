@@ -21,7 +21,7 @@ def url_base(subdomain: str) -> str:
 async def snapshot_resources(
     http: HTTPSession,
     subdomain: str,
-    stream: LookerStream,
+    stream: type[LookerStream],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     url = f"{url_base(subdomain)}/{stream.path}"
@@ -35,7 +35,7 @@ async def snapshot_resources(
 async def snapshot_child_resources(
     http: HTTPSession,
     subdomain: str,
-    stream: LookerChildStream,
+    stream: type[LookerChildStream],
     log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
     parent_url = f"{url_base(subdomain)}/{stream.parent.path}"
