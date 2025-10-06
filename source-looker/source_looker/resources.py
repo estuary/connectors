@@ -22,7 +22,7 @@ from .models import (
 from .api import (
     snapshot_resources,
     snapshot_child_resources,
-    snapshot_lookml_model_explore,
+    snapshot_lookml_model_explores,
     url_base,
 )
 
@@ -133,12 +133,12 @@ def full_refresh_child_resource(
             task: Task,
             all_bindings
     ):
-        if isinstance(stream, LookMLModelExplores):
+        if stream is LookMLModelExplores:
             fetch_snapshot = functools.partial(
-                    snapshot_lookml_model_explore,
-                    http,
-                    config.subdomain,
-                )
+                snapshot_lookml_model_explores,
+                http,
+                config.subdomain,
+            )
         else:
             fetch_snapshot = functools.partial(
                 snapshot_child_resources,
