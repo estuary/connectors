@@ -1,0 +1,108 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AzureSASToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "SAS Token",
+              "default": "SAS Token",
+              "order": 0,
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "sas_token": {
+              "description": "SAS Token",
+              "order": 1,
+              "secret": true,
+              "title": "SAS Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "sas_token"
+          ],
+          "title": "AzureSASToken",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "account_name": {
+          "description": "The Azure account name.",
+          "order": 0,
+          "title": "Account name",
+          "type": "string"
+        },
+        "filesystem": {
+          "description": "The filesystem containing your Dynamics 365 Finance and Operations data.",
+          "order": 1,
+          "title": "Filesystem",
+          "type": "string"
+        },
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "SAS Token": "#/$defs/AzureSASToken"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AzureSASToken"
+            }
+          ],
+          "order": 2,
+          "title": "Authentication"
+        }
+      },
+      "required": [
+        "account_name",
+        "filesystem",
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-dynamics-365-finance-and-operations",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
