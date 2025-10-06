@@ -83,7 +83,7 @@ async def snapshot_child_resources(
             yield resource
 
 
-async def snapshot_lookml_model_explore(
+async def snapshot_lookml_model_explores(
     http: HTTPSession,
     subdomain: str,
     log: Logger,
