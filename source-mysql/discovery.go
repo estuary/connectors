@@ -278,14 +278,19 @@ func getTables(_ context.Context, conn mysqlClient, selectedSchemas []string) ([
 	for _, row := range results.Values {
 		var tableSchema = string(row[0].AsString())
 		var tableName = string(row[1].AsString())
+		var tableType = string(row[2].AsString())
 		var collation = string(row[4].AsString())
+		// Accept both regular base tables and MariaDB system-versioned tables
+		var isEligibleTable = strings.EqualFold(tableType, "BASE TABLE") || strings.EqualFold(tableType, "SYSTEM VERSIONED")
+		var isSystemVersioned = strings.EqualFold(tableType, "SYSTEM VERSIONED")
 		tables = append(tables, &sqlcapture.DiscoveryInfo{
 			Schema:    tableSchema,
 			Name:      tableName,
-			BaseTable: strings.EqualFold(string(row[2].AsString()), "BASE TABLE"),
+			BaseTable: isEligibleTable,
 			ExtraDetails: &mysqlTableDiscoveryDetails{
-				StorageEngine:  string(row[3].AsString()),
-				DefaultCharset: charsetFromCollation(collation),
+				StorageEngine:     string(row[3].AsString()),
+				DefaultCharset:    charsetFromCollation(collation),
+				IsSystemVersioned: isSystemVersioned,
 			},
 		})
 	}
@@ -318,8 +323,9 @@ func charsetFromCollation(name string) string {
 }
 
 type mysqlTableDiscoveryDetails struct {
-	StorageEngine  string
-	DefaultCharset string
+	StorageEngine    string
+	DefaultCharset   string
+	IsSystemVersioned bool
 }
 
 func (db *mysqlDatabase) getColumns(_ context.Context, conn mysqlClient, selectedSchemas []string) ([]sqlcapture.ColumnInfo, error) {

@@ -2,11 +2,11 @@ version: "3.7"
 
 services:
   db:
-    image: 'mysql:8.4'
-    command: [ "--gtid-mode=ON", "--enforce-gtid-consistency=ON" ]
+    # image: 'mysql:8.4'
+    # command: [ "--gtid-mode=ON", "--enforce-gtid-consistency=ON" ]
     ## Alternative setup for testing MariaDB:
-    # image: 'mariadb:latest'
-    # command: [ "--log-bin", "--binlog-format=ROW" ]
+    image: 'mariadb:latest'
+    command: [ "--log-bin=mysqld-bin", "--binlog-format=ROW" ]
     ports:
       - "3306:3306"
     volumes:
@@ -16,7 +16,7 @@ services:
       - type: bind
         source: ../tests/files/b.csv
         target: /b.csv
-      - mysql_data:/var/lib/mysql
+      - mariadb_data:/var/lib/mysql
     healthcheck:
       test: [ "CMD", "mysqladmin", "ping", "--silent" ]
     environment:
@@ -33,4 +33,4 @@ networks:
     external: true
 
 volumes:
-  mysql_data: {}
+  mariadb_data: {}

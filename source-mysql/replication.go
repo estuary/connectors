@@ -510,6 +510,11 @@ func (rs *mysqlReplicationStream) handleRowsEvent(ctx context.Context, event *re
 	var columnNames = data.Table.ColumnNameString()
 	if len(columnNames) == 0 {
 		columnNames = metadata.Schema.Columns
+	} else {
+		// TODO(wgd): When binlog row metadata is available, we need to test empirically
+		// whether row_start/row_end column names are present in the binlog events for
+		// MariaDB system-versioned tables. If they are not, we'll need to append them
+		// here as well.
 	}
 
 	keyColumns, ok := rs.keyColumns(streamID)
@@ -720,6 +725,12 @@ func decodeRow(streamID sqlcapture.StreamID, expectedArity int, row []any, skips
 		if expectedArity == 0 {
 			return nil, fmt.Errorf("metadata error (go.estuary.dev/eiKbOh): unknown column names for stream %q", streamID)
 		}
+		logrus.WithFields(logrus.Fields{
+			"stream":         streamID,
+			"expectedArity":  expectedArity,
+			"actualArity":    len(row),
+			"rowValues":      row,
+		}).Warn("inconsistent metadata: column count mismatch")
 		return nil, &InconsistentMetadataError{
 			StreamID: streamID,
 			Message:  fmt.Sprintf("%d columns found when %d are expected", len(row), expectedArity),
@@ -1247,9 +1258,11 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID sq
 
 	// Extract some details from the provided discovery info, if present.
 	var nonTransactional bool
+	var isSystemVersioned bool
 	if discovery != nil {
 		if extraDetails, ok := discovery.ExtraDetails.(*mysqlTableDiscoveryDetails); ok {
 			nonTransactional = extraDetails.StorageEngine == "MyISAM"
+			isSystemVersioned = extraDetails.IsSystemVersioned
 		}
 	}
 
@@ -1313,6 +1326,24 @@ func (rs *mysqlReplicationStream) ActivateTable(ctx context.Context, streamID sq
 		metadata.Schema.ColumnTypes = colTypes
 		if extraDetails, ok := discovery.ExtraDetails.(*mysqlTableDiscoveryDetails); ok {
 			metadata.DefaultCharset = extraDetails.DefaultCharset
+		}
+
+		// For MariaDB system-versioned tables, add the hidden row_start and row_end columns
+		// to the metadata so replication events with these columns don't trigger metadata
+		// inconsistency errors. These columns are not present in discovery because they're
+		// marked as INVISIBLE, but they are present in binlog replication events.
+		//
+		// TODO(wgd): Decide on semantics for system-versioned tables. Currently backfills
+		// capture only the current state (no row_start/row_end), while replication captures
+		// all row versions with timestamps. Options:
+		//   1. Backfill current state with timestamps using `SELECT *, ROW_START, ROW_END`
+		//   2. Backfill all history using `SELECT *, ROW_START, ROW_END FOR SYSTEM_TIME ALL`
+		//   3. Filter out historical row versions during replication to match backfill behavior
+		// Option 2 most closely matches replication semantics but needs testing.
+		if isSystemVersioned {
+			metadata.Schema.Columns = append(metadata.Schema.Columns, "row_start", "row_end")
+			colTypes["row_start"] = "timestamp"
+			colTypes["row_end"] = "timestamp"
 		}
 
 		logrus.WithFields(logrus.Fields{
