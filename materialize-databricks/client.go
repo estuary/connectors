@@ -16,6 +16,7 @@ import (
 	"github.com/databricks/databricks-sdk-go/service/catalog"
 	databricksSql "github.com/databricks/databricks-sdk-go/service/sql"
 	dbsqlerr "github.com/databricks/databricks-sql-go/errors"
+	databricks_auth "github.com/estuary/connectors/go/auth/databricks"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -42,11 +43,22 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
-	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
-		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-		Token:       cfg.Credentials.PersonalAccessToken,
-		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
-	})
+	var wsClientConfig *databricks.Config
+	if cfg.Credentials.AuthType == databricks_auth.PAT {
+		wsClientConfig = &databricks.Config{
+			Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+			Token:       cfg.Credentials.PersonalAccessToken,
+			Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
+		}
+	} else if cfg.Credentials.AuthType == databricks_auth.OAuth2 {
+		wsClientConfig = &databricks.Config{
+			Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+			Token:       cfg.Credentials.AccessToken,
+			Credentials: dbConfig.PatCredentials{}, // use token as PAT
+		}
+	}
+
+	wsClient, err := databricks.NewWorkspaceClient(wsClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("creating workspace client: %w", err)
 	}
@@ -224,11 +236,23 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 
 func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
-	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
-		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-		Token:       cfg.Credentials.PersonalAccessToken,
-		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
-	})
+
+	var wsClientConfig *databricks.Config
+	if cfg.Credentials.AuthType == databricks_auth.PAT {
+		wsClientConfig = &databricks.Config{
+			Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+			Token:       cfg.Credentials.PersonalAccessToken,
+			Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
+		}
+	} else if cfg.Credentials.AuthType == databricks_auth.OAuth2 {
+		wsClientConfig = &databricks.Config{
+			Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+			Token:       cfg.Credentials.AccessToken,
+			Credentials: dbConfig.PatCredentials{}, // use token as PAT
+		}
+	}
+
+	wsClient, err := databricks.NewWorkspaceClient(wsClientConfig)
 	if err != nil {
 		errs.Err(fmt.Errorf("creating workspace client: %w", err))
 		return errs
