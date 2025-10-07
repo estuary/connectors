@@ -352,6 +352,8 @@ func (t *mysqlColumnType) constructJSONTranscoder(isBackfill bool) (jsonTranscod
 		return &mysqlTextTranscoderReplication{Charset: t.Charset}, nil
 	case "binary":
 		return &mysqlBinaryTranscoder{MaxLength: t.MaxLength}, nil
+	case "varbinary":
+		return jsonTranscoderFunc(transcodeVarbinaryValue), nil
 	default:
 		return nil, fmt.Errorf("unhandled complex column type %v", t.Type)
 	}
