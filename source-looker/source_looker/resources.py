@@ -15,6 +15,7 @@ from .models import (
     ResourceState,
     LookerStream,
     LookerChildStream,
+    LookerSearchStream,
     LookMLModelExplores,
     STREAMS,
     OAUTH2_SPEC,
@@ -22,6 +23,7 @@ from .models import (
 from .api import (
     snapshot_resources,
     snapshot_child_resources,
+    snapshot_searchable_resources,
     snapshot_lookml_model_explores,
     url_base,
 )
@@ -94,17 +96,27 @@ def full_refresh_resource(
             task: Task,
             all_bindings
     ):
+        if issubclass(stream, LookerSearchStream):
+            fetch_snapshot = functools.partial(
+                snapshot_searchable_resources,
+                http,
+                config.subdomain,
+                stream,
+            )
+        else:
+            fetch_snapshot = functools.partial(
+                snapshot_resources,
+                http,
+                config.subdomain,
+                stream,
+            )
+
         common.open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_snapshot=functools.partial(
-                snapshot_resources,
-                http,
-                config.subdomain,
-                stream,
-            ),
+            fetch_snapshot=fetch_snapshot,
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
 
