@@ -504,5 +504,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FGeneric_KeylessCapture_91511186":{"backfilled":500,"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"varchar"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FGeneric_KeylessCapture_91511186":{"backfilled":500,"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","maxlen":2000,"type":"varchar"},"id":{"type":"int"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
