@@ -3,11 +3,13 @@ from typing import AsyncGenerator, Awaitable
 
 from estuary_cdk.buffer_ordered import buffer_ordered
 from estuary_cdk.http import HTTPSession
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import TypeAdapter
 
 from .models import (
     API_VERSION,
     LookerStream,
+    LookerSearchStream,
     LookerChildStream,
     FullRefreshResource,
     LookMLModel,
@@ -16,6 +18,55 @@ from .models import (
 
 def url_base(subdomain: str) -> str:
     return f"https://{subdomain}/api/{API_VERSION}"
+
+
+async def _paginate_through_search(
+    http: HTTPSession,
+    url: str,
+    log: Logger,
+    fields: list[str] | None,
+    limit: int = 100
+) -> AsyncGenerator[FullRefreshResource, None]:
+    offset = 0
+
+    params: dict[str, int | str] = {
+        "sorts": "id",
+        "limit": limit,
+        "offset": offset,
+    }
+
+    if fields:
+        params["fields"] = ",".join(fields)
+
+    while True:
+        params["offset"] = offset
+        _, body = await http.request_stream(log, url, params=params)
+
+        count = 0
+        async for resource in IncrementalJsonProcessor(
+            body(),
+            "item",
+            FullRefreshResource,
+        ):
+            yield resource
+            count += 1
+
+        if count < limit:
+            break
+
+        offset += limit
+
+
+async def snapshot_searchable_resources(
+    http: HTTPSession,
+    subdomain: str,
+    stream: type[LookerSearchStream],
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    url = f"{url_base(subdomain)}/{stream.path}"
+
+    async for resource in _paginate_through_search(http, url, log, stream.fields, stream.limit):
+        yield resource
 
 
 async def snapshot_resources(
