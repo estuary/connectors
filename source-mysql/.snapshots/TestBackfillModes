@@ -2007,5 +2007,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FBackfillModes_11837744":{"backfilled":1000,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"charset":"utf8mb4","type":"varchar"}}}},"mode":"Active"},"test%2FBackfillModes_25282936":{"backfilled":1000,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"charset":"utf8mb4","type":"varchar"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FBackfillModes_11837744":{"backfilled":1000,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"charset":"utf8mb4","maxlen":32,"type":"varchar"}}}},"mode":"Active"},"test%2FBackfillModes_25282936":{"backfilled":1000,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","data"],"types":{"data":{"charset":"utf8mb4","type":"text"},"id":{"charset":"utf8mb4","maxlen":32,"type":"varchar"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

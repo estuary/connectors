@@ -16,11 +16,13 @@ Binding 0:
           "properties": {
             "a_varbinary": {
               "type": "string",
+              "maxLength": 44,
               "description": "(source type: non-nullable varbinary)",
               "contentEncoding": "base64"
             },
             "a_varchar": {
               "type": "string",
+              "maxLength": 32,
               "description": "(source type: non-nullable varchar)"
             },
             "id": {
