@@ -8,17 +8,14 @@ syncSchedule:
 credentials:
     auth_type: PAT
     personal_access_token_sops: ENC[AES256_GCM,data:XIk56zlHUY/JOcXcJHEjn1lwBPkHrnEeelbwlluZpJLsxO5F,iv:5wFjIu/MRFf9NSGZJ7NVYql8n6v46DZ1+NjpKlBBaek=,tag:+zjtRfAA4ak/krR78PQyMA==,type:str]
+advanced:
+    no_flow_document: true
 sops:
-    kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2024-02-01T17:08:49Z"
           enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
-    azure_kv: []
-    hc_vault: []
-    age: []
-    lastmodified: "2024-08-12T16:51:23Z"
-    mac: ENC[AES256_GCM,data:KwymtIUa8+JtaFOf3EE6RI93WP03Ho41xFjzW1lNAHQQBjEkvPcqor3+zbZWsbIdBRmxjr9Yw71QbX0mZTRdyDhQl9HhZKVZrHxsav69BhKmpruKNP1X7eX9sR/axO+TbfYjAkyZw7Fmo76lnUXn6J0wAN1cIkuUQyPecv/iqHs=,iv:ZSXsvS7gYGlI3HU4BXwPwk3f1XvLVkwU/91Pmz3lOo0=,tag:0KGzElp/6wNvq/CIu+wXrg==,type:str]
-    pgp: []
+    lastmodified: "2025-10-07T17:37:17Z"
+    mac: ENC[AES256_GCM,data:OU6WsQOfPQummFNyMyXMdCWF09rs57zx7OInbYZu3q1H7bLoNE8qUP5xYjj8AbK4ijswpVLEOXVxy+ejNFjIvFJt8q3tAsM387e5IHbVhbMJxMyaqOpQ1YLsWtet+VyZuHwOtYdoldTaXHHe1Lpem1Wok+stHg/WkAftmzhK30s=,iv:1UHXJMPxkNdr94/5HUcrqtGRGqkjk+o/11DEMXLNrx4=,tag:csGMckZxEMLyVc0z6ejvSg==,type:str]
     encrypted_suffix: _sops
-    version: 3.8.1
+    version: 3.10.2

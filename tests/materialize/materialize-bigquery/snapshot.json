@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INTEGER NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INTEGER,\n\t\tstr STRING NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INTEGER NOT NULL,\n\t\tarray_int JSON,\n\t\tbinary_field STRING,\n\t\tbool_field BOOLEAN,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested JSON,\n\t\tnullable_int INTEGER,\n\t\tstr_field STRING NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INTEGER NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str BIGNUMERIC(38,0),\n\t\tint_str BIGNUMERIC(38,0),\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.unsigned_bigint (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tunsigned_bigint BIGNUMERIC(38,0),\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.deletions (\n\t\tid INTEGER NOT NULL,\n\t\t_meta_op STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.string_escaped_key (\n\t\tid STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_one (\n\t\tid INTEGER NOT NULL,\n\t\tstrintkey STRING NOT NULL,\n\t\tstrnumkey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tstrint BIGNUMERIC(38,0),\n\t\tstrnum FLOAT64,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id, strintkey, strnumkey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_two (\n\t\tid INTEGER NOT NULL,\n\t\tdatekey STRING NOT NULL,\n\t\ttimekey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tdate DATE,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\ttime STRING,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id, datekey, timekey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_three (\n\t\tid INTEGER NOT NULL,\n\t\tdatetimekey STRING NOT NULL,\n\t\tuuidkey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tuuid STRING,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id, datetimekey, uuidkey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.fields_with_projections (\n\t\tid INTEGER NOT NULL,\n\t\tanother_field STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tprojected_another STRING,\n\t\tprojected_field STRING,\n\t\tflow_document JSON NOT NULL\n)\nCLUSTER BY id;\n"
+  "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INTEGER NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INTEGER,\n\t\tstr STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INTEGER NOT NULL,\n\t\tarray_int JSON,\n\t\tbinary_field STRING,\n\t\tbool_field BOOLEAN,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested JSON,\n\t\tnullable_int INTEGER,\n\t\tstr_field STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INTEGER NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str BIGNUMERIC(38,0),\n\t\tint_str BIGNUMERIC(38,0),\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.unsigned_bigint (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tunsigned_bigint BIGNUMERIC(38,0)\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.deletions (\n\t\tid INTEGER NOT NULL,\n\t\t_meta_op STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.string_escaped_key (\n\t\tid STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_one (\n\t\tid INTEGER NOT NULL,\n\t\tstrintkey STRING NOT NULL,\n\t\tstrnumkey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tstrint BIGNUMERIC(38,0),\n\t\tstrnum FLOAT64\n)\nCLUSTER BY id, strintkey, strnumkey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_two (\n\t\tid INTEGER NOT NULL,\n\t\tdatekey STRING NOT NULL,\n\t\ttimekey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tdate DATE,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\ttime STRING\n)\nCLUSTER BY id, datekey, timekey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_three (\n\t\tid INTEGER NOT NULL,\n\t\tdatetimekey STRING NOT NULL,\n\t\tuuidkey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tuuid STRING\n)\nCLUSTER BY id, datetimekey, uuidkey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.fields_with_projections (\n\t\tid INTEGER NOT NULL,\n\t\tanother_field STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tprojected_another STRING,\n\t\tprojected_field STRING\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.many_columns (\n\t\tid INTEGER NOT NULL,\n\t\ta0 INTEGER,\n\t\ta1 INTEGER,\n\t\ta10 INTEGER,\n\t\ta11 INTEGER,\n\t\ta12 INTEGER,\n\t\ta13 INTEGER,\n\t\ta14 INTEGER,\n\t\ta15 INTEGER,\n\t\ta16 INTEGER,\n\t\ta17 INTEGER,\n\t\ta18 INTEGER,\n\t\ta19 INTEGER,\n\t\ta2 INTEGER,\n\t\ta20 INTEGER,\n\t\ta21 INTEGER,\n\t\ta22 INTEGER,\n\t\ta23 INTEGER,\n\t\ta24 INTEGER,\n\t\ta25 INTEGER,\n\t\ta26 INTEGER,\n\t\ta27 INTEGER,\n\t\ta28 INTEGER,\n\t\ta29 INTEGER,\n\t\ta3 INTEGER,\n\t\ta30 INTEGER,\n\t\ta31 INTEGER,\n\t\ta32 INTEGER,\n\t\ta33 INTEGER,\n\t\ta34 INTEGER,\n\t\ta35 INTEGER,\n\t\ta36 INTEGER,\n\t\ta37 INTEGER,\n\t\ta38 INTEGER,\n\t\ta39 INTEGER,\n\t\ta4 INTEGER,\n\t\ta40 INTEGER,\n\t\ta41 INTEGER,\n\t\ta42 INTEGER,\n\t\ta43 INTEGER,\n\t\ta44 INTEGER,\n\t\ta45 INTEGER,\n\t\ta46 INTEGER,\n\t\ta47 INTEGER,\n\t\ta48 INTEGER,\n\t\ta49 INTEGER,\n\t\ta5 INTEGER,\n\t\ta50 INTEGER,\n\t\ta51 INTEGER,\n\t\ta52 INTEGER,\n\t\ta53 INTEGER,\n\t\ta54 INTEGER,\n\t\ta55 INTEGER,\n\t\ta56 INTEGER,\n\t\ta57 INTEGER,\n\t\ta58 INTEGER,\n\t\ta59 INTEGER,\n\t\ta6 INTEGER,\n\t\ta60 INTEGER,\n\t\ta61 INTEGER,\n\t\ta62 INTEGER,\n\t\ta63 INTEGER,\n\t\ta64 INTEGER,\n\t\ta65 INTEGER,\n\t\ta66 INTEGER,\n\t\ta67 INTEGER,\n\t\ta68 INTEGER,\n\t\ta69 INTEGER,\n\t\ta7 INTEGER,\n\t\ta70 INTEGER,\n\t\ta71 INTEGER,\n\t\ta72 INTEGER,\n\t\ta73 INTEGER,\n\t\ta74 INTEGER,\n\t\ta75 INTEGER,\n\t\ta76 INTEGER,\n\t\ta77 INTEGER,\n\t\ta78 INTEGER,\n\t\ta79 INTEGER,\n\t\ta8 INTEGER,\n\t\ta80 INTEGER,\n\t\ta81 INTEGER,\n\t\ta82 INTEGER,\n\t\ta83 INTEGER,\n\t\ta84 INTEGER,\n\t\ta85 INTEGER,\n\t\ta86 INTEGER,\n\t\ta87 INTEGER,\n\t\ta88 INTEGER,\n\t\ta89 INTEGER,\n\t\ta9 INTEGER,\n\t\ta90 INTEGER,\n\t\ta91 INTEGER,\n\t\ta92 INTEGER,\n\t\ta93 INTEGER,\n\t\ta94 INTEGER,\n\t\ta95 INTEGER,\n\t\ta96 INTEGER,\n\t\ta97 INTEGER,\n\t\ta98 INTEGER,\n\t\ta99 INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL\n)\nCLUSTER BY id;\n"
 ]
 [
   "connectorState",
@@ -13,7 +13,7 @@
   {
     "updated": {
       "estuary-theatre%2Ftesting%2Fall_key_types_part_one": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.all_key_types_part_one (id, strintkey, strnumkey, counter, flow_published_at, strint, strnum, flow_document)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7 FROM flow_temp_table_7;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.all_key_types_part_one (id, strintkey, strnumkey, counter, flow_published_at, strint, strnum)\nSELECT c0, c1, c2, c3, c4, c5, c6 FROM flow_temp_table_7;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -21,7 +21,7 @@
         "TempTableName": "flow_temp_table_7"
       },
       "estuary-theatre%2Ftesting%2Fall_key_types_part_three": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.all_key_types_part_three (id, datetimekey, uuidkey, counter, datetime, flow_published_at, uuid, flow_document)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7 FROM flow_temp_table_9;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.all_key_types_part_three (id, datetimekey, uuidkey, counter, datetime, flow_published_at, uuid)\nSELECT c0, c1, c2, c3, c4, c5, c6 FROM flow_temp_table_9;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -29,7 +29,7 @@
         "TempTableName": "flow_temp_table_9"
       },
       "estuary-theatre%2Ftesting%2Fall_key_types_part_two": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.all_key_types_part_two (id, datekey, timekey, counter, date, flow_published_at, time, flow_document)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7 FROM flow_temp_table_8;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.all_key_types_part_two (id, datekey, timekey, counter, date, flow_published_at, time)\nSELECT c0, c1, c2, c3, c4, c5, c6 FROM flow_temp_table_8;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -37,7 +37,7 @@
         "TempTableName": "flow_temp_table_8"
       },
       "estuary-theatre%2Ftesting%2Fdeletions": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.deletions (id, _meta_op, flow_published_at, flow_document)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_5;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.deletions (id, _meta_op, flow_published_at)\nSELECT c0, c1, c2 FROM flow_temp_table_5;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -45,7 +45,7 @@
         "TempTableName": "flow_temp_table_5"
       },
       "estuary-theatre%2Ftesting%2Fduplicate_keys": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.duplicate_keys (id, flow_published_at, int, str, flow_document)\nSELECT c0, c1, c2, c3, c4 FROM flow_temp_table_1;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.duplicate_keys (id, flow_published_at, int, str)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_1;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -53,7 +53,7 @@
         "TempTableName": "flow_temp_table_1"
       },
       "estuary-theatre%2Ftesting%2Ffields_with_projections": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.fields_with_projections (id, another_field, flow_published_at, projected_another, projected_field, flow_document)\nSELECT c0, c1, c2, c3, c4, c5 FROM flow_temp_table_10;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.fields_with_projections (id, another_field, flow_published_at, projected_another, projected_field)\nSELECT c0, c1, c2, c3, c4 FROM flow_temp_table_10;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -61,15 +61,23 @@
         "TempTableName": "flow_temp_table_10"
       },
       "estuary-theatre%2Ftesting%2Fformatted_strings": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.formatted_strings (id, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time, flow_document)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9 FROM flow_temp_table_3;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.formatted_strings (id, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7, c8 FROM flow_temp_table_3;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
         "JobPrefix": "<uuid>",
         "TempTableName": "flow_temp_table_3"
       },
+      "estuary-theatre%2Ftesting%2Fmany_columns": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.many_columns (id, a0, a1, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a2, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a3, a30, a31, a32, a33, a34, a35, a36, a37, a38, a39, a4, a40, a41, a42, a43, a44, a45, a46, a47, a48, a49, a5, a50, a51, a52, a53, a54, a55, a56, a57, a58, a59, a6, a60, a61, a62, a63, a64, a65, a66, a67, a68, a69, a7, a70, a71, a72, a73, a74, a75, a76, a77, a78, a79, a8, a80, a81, a82, a83, a84, a85, a86, a87, a88, a89, a9, a90, a91, a92, a93, a94, a95, a96, a97, a98, a99, flow_published_at)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, c22, c23, c24, c25, c26, c27, c28, c29, c30, c31, c32, c33, c34, c35, c36, c37, c38, c39, c40, c41, c42, c43, c44, c45, c46, c47, c48, c49, c50, c51, c52, c53, c54, c55, c56, c57, c58, c59, c60, c61, c62, c63, c64, c65, c66, c67, c68, c69, c70, c71, c72, c73, c74, c75, c76, c77, c78, c79, c80, c81, c82, c83, c84, c85, c86, c87, c88, c89, c90, c91, c92, c93, c94, c95, c96, c97, c98, c99, c100, c101 FROM flow_temp_table_11;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_11"
+      },
       "estuary-theatre%2Ftesting%2Fmultiple_types": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.multiple_types (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10 FROM flow_temp_table_2;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.multiple_types (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9 FROM flow_temp_table_2;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -77,7 +85,7 @@
         "TempTableName": "flow_temp_table_2"
       },
       "estuary-theatre%2Ftesting%2Fsimple": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.simple (id, canary, flow_published_at, flow_document)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_0;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.simple (id, canary, flow_published_at)\nSELECT c0, c1, c2 FROM flow_temp_table_0;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -85,7 +93,7 @@
         "TempTableName": "flow_temp_table_0"
       },
       "estuary-theatre%2Ftesting%2Fstring_escaped_key": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.string_escaped_key (id, counter, flow_published_at, flow_document)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_6;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.string_escaped_key (id, counter, flow_published_at)\nSELECT c0, c1, c2 FROM flow_temp_table_6;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -93,7 +101,7 @@
         "TempTableName": "flow_temp_table_6"
       },
       "estuary-theatre%2Ftesting%2Funsigned_bigint": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.unsigned_bigint (id, flow_published_at, unsigned_bigint, flow_document)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_4;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.unsigned_bigint (id, flow_published_at, unsigned_bigint)\nSELECT c0, c1, c2 FROM flow_temp_table_4;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -108,7 +116,7 @@
   {
     "updated": {
       "estuary-theatre%2Ftesting%2Fall_key_types_part_one": {
-        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_one AS l\nUSING flow_temp_table_7 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.strintkey = r.c1 AND l.strintkey >= '1' AND l.strintkey <= '1'\n\tAND l.strnumkey = r.c2 AND l.strnumkey >= '10.1' AND l.strnumkey <= '10.1'\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.flow_published_at = r.c4, l.strint = r.c5, l.strnum = r.c6, l.flow_document = r.c7\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, strintkey, strnumkey, counter, flow_published_at, strint, strnum, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7);\n",
+        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_one AS l\nUSING flow_temp_table_7 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.strintkey = r.c1 AND l.strintkey >= '1' AND l.strintkey <= '1'\n\tAND l.strnumkey = r.c2 AND l.strnumkey >= '10.1' AND l.strnumkey <= '10.1'\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.flow_published_at = r.c4, l.strint = r.c5, l.strnum = r.c6\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, strintkey, strnumkey, counter, flow_published_at, strint, strnum)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6);\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -116,7 +124,7 @@
         "TempTableName": "flow_temp_table_7"
       },
       "estuary-theatre%2Ftesting%2Fall_key_types_part_three": {
-        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_three AS l\nUSING flow_temp_table_9 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.datetimekey = r.c1\n\tAND l.uuidkey = r.c2 AND l.uuidkey >= '550e8400-e29b-41d4-a716-446655440000' AND l.uuidkey <= '550e8400-e29b-41d4-a716-446655440000'\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.datetime = r.c4, l.flow_published_at = r.c5, l.uuid = r.c6, l.flow_document = r.c7\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, datetimekey, uuidkey, counter, datetime, flow_published_at, uuid, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7);\n",
+        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_three AS l\nUSING flow_temp_table_9 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.datetimekey = r.c1\n\tAND l.uuidkey = r.c2 AND l.uuidkey >= '550e8400-e29b-41d4-a716-446655440000' AND l.uuidkey <= '550e8400-e29b-41d4-a716-446655440000'\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.datetime = r.c4, l.flow_published_at = r.c5, l.uuid = r.c6\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, datetimekey, uuidkey, counter, datetime, flow_published_at, uuid)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6);\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -124,7 +132,7 @@
         "TempTableName": "flow_temp_table_9"
       },
       "estuary-theatre%2Ftesting%2Fall_key_types_part_two": {
-        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_two AS l\nUSING flow_temp_table_8 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.datekey = r.c1 AND l.datekey >= '0000-01-01' AND l.datekey <= '0000-01-01'\n\tAND l.timekey = r.c2 AND l.timekey >= '12:34:56Z' AND l.timekey <= '12:34:56Z'\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.date = r.c4, l.flow_published_at = r.c5, l.time = r.c6, l.flow_document = r.c7\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, datekey, timekey, counter, date, flow_published_at, time, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7);\n",
+        "Query": "MERGE INTO `estuary-theatre`.testing.all_key_types_part_two AS l\nUSING flow_temp_table_8 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\n\tAND l.datekey = r.c1 AND l.datekey >= '0000-01-01' AND l.datekey <= '0000-01-01'\n\tAND l.timekey = r.c2 AND l.timekey >= '12:34:56Z' AND l.timekey <= '12:34:56Z'\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c3, l.date = r.c4, l.flow_published_at = r.c5, l.time = r.c6\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, datekey, timekey, counter, date, flow_published_at, time)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6);\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -132,7 +140,7 @@
         "TempTableName": "flow_temp_table_8"
       },
       "estuary-theatre%2Ftesting%2Fdeletions": {
-        "Query": "MERGE INTO `estuary-theatre`.testing.deletions AS l\nUSING flow_temp_table_5 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 3\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l._meta_op = r.c1, l.flow_published_at = r.c2, l.flow_document = r.c3\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, _meta_op, flow_published_at, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3);\n",
+        "Query": "MERGE INTO `estuary-theatre`.testing.deletions AS l\nUSING flow_temp_table_5 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 3\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l._meta_op = r.c1, l.flow_published_at = r.c2\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, _meta_op, flow_published_at)\n\tVALUES (r.c0, r.c1, r.c2);\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -140,7 +148,7 @@
         "TempTableName": "flow_temp_table_5"
       },
       "estuary-theatre%2Ftesting%2Fduplicate_keys": {
-        "Query": "MERGE INTO `estuary-theatre`.testing.duplicate_keys AS l\nUSING flow_temp_table_1 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 5\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.flow_published_at = r.c1, l.int = r.c2, l.str = r.c3, l.flow_document = r.c4\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, flow_published_at, int, str, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4);\n",
+        "Query": "MERGE INTO `estuary-theatre`.testing.duplicate_keys AS l\nUSING flow_temp_table_1 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 5\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.flow_published_at = r.c1, l.int = r.c2, l.str = r.c3\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, flow_published_at, int, str)\n\tVALUES (r.c0, r.c1, r.c2, r.c3);\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -148,7 +156,7 @@
         "TempTableName": "flow_temp_table_1"
       },
       "estuary-theatre%2Ftesting%2Ffields_with_projections": {
-        "Query": "MERGE INTO `estuary-theatre`.testing.fields_with_projections AS l\nUSING flow_temp_table_10 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.another_field = r.c1, l.flow_published_at = r.c2, l.projected_another = r.c3, l.projected_field = r.c4, l.flow_document = r.c5\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, another_field, flow_published_at, projected_another, projected_field, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5);\n",
+        "Query": "MERGE INTO `estuary-theatre`.testing.fields_with_projections AS l\nUSING flow_temp_table_10 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.another_field = r.c1, l.flow_published_at = r.c2, l.projected_another = r.c3, l.projected_field = r.c4\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, another_field, flow_published_at, projected_another, projected_field)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4);\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -156,15 +164,23 @@
         "TempTableName": "flow_temp_table_10"
       },
       "estuary-theatre%2Ftesting%2Fformatted_strings": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.formatted_strings (id, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time, flow_document)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9 FROM flow_temp_table_3;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.formatted_strings (id, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time)\nSELECT c0, c1, c2, c3, c4, c5, c6, c7, c8 FROM flow_temp_table_3;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
         "JobPrefix": "<uuid>",
         "TempTableName": "flow_temp_table_3"
       },
+      "estuary-theatre%2Ftesting%2Fmany_columns": {
+        "Query": "MERGE INTO `estuary-theatre`.testing.many_columns AS l\nUSING flow_temp_table_11 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 1\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.a0 = r.c1, l.a1 = r.c2, l.a10 = r.c3, l.a11 = r.c4, l.a12 = r.c5, l.a13 = r.c6, l.a14 = r.c7, l.a15 = r.c8, l.a16 = r.c9, l.a17 = r.c10, l.a18 = r.c11, l.a19 = r.c12, l.a2 = r.c13, l.a20 = r.c14, l.a21 = r.c15, l.a22 = r.c16, l.a23 = r.c17, l.a24 = r.c18, l.a25 = r.c19, l.a26 = r.c20, l.a27 = r.c21, l.a28 = r.c22, l.a29 = r.c23, l.a3 = r.c24, l.a30 = r.c25, l.a31 = r.c26, l.a32 = r.c27, l.a33 = r.c28, l.a34 = r.c29, l.a35 = r.c30, l.a36 = r.c31, l.a37 = r.c32, l.a38 = r.c33, l.a39 = r.c34, l.a4 = r.c35, l.a40 = r.c36, l.a41 = r.c37, l.a42 = r.c38, l.a43 = r.c39, l.a44 = r.c40, l.a45 = r.c41, l.a46 = r.c42, l.a47 = r.c43, l.a48 = r.c44, l.a49 = r.c45, l.a5 = r.c46, l.a50 = r.c47, l.a51 = r.c48, l.a52 = r.c49, l.a53 = r.c50, l.a54 = r.c51, l.a55 = r.c52, l.a56 = r.c53, l.a57 = r.c54, l.a58 = r.c55, l.a59 = r.c56, l.a6 = r.c57, l.a60 = r.c58, l.a61 = r.c59, l.a62 = r.c60, l.a63 = r.c61, l.a64 = r.c62, l.a65 = r.c63, l.a66 = r.c64, l.a67 = r.c65, l.a68 = r.c66, l.a69 = r.c67, l.a7 = r.c68, l.a70 = r.c69, l.a71 = r.c70, l.a72 = r.c71, l.a73 = r.c72, l.a74 = r.c73, l.a75 = r.c74, l.a76 = r.c75, l.a77 = r.c76, l.a78 = r.c77, l.a79 = r.c78, l.a8 = r.c79, l.a80 = r.c80, l.a81 = r.c81, l.a82 = r.c82, l.a83 = r.c83, l.a84 = r.c84, l.a85 = r.c85, l.a86 = r.c86, l.a87 = r.c87, l.a88 = r.c88, l.a89 = r.c89, l.a9 = r.c90, l.a90 = r.c91, l.a91 = r.c92, l.a92 = r.c93, l.a93 = r.c94, l.a94 = r.c95, l.a95 = r.c96, l.a96 = r.c97, l.a97 = r.c98, l.a98 = r.c99, l.a99 = r.c100, l.flow_published_at = r.c101\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, a0, a1, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a2, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a3, a30, a31, a32, a33, a34, a35, a36, a37, a38, a39, a4, a40, a41, a42, a43, a44, a45, a46, a47, a48, a49, a5, a50, a51, a52, a53, a54, a55, a56, a57, a58, a59, a6, a60, a61, a62, a63, a64, a65, a66, a67, a68, a69, a7, a70, a71, a72, a73, a74, a75, a76, a77, a78, a79, a8, a80, a81, a82, a83, a84, a85, a86, a87, a88, a89, a9, a90, a91, a92, a93, a94, a95, a96, a97, a98, a99, flow_published_at)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10, r.c11, r.c12, r.c13, r.c14, r.c15, r.c16, r.c17, r.c18, r.c19, r.c20, r.c21, r.c22, r.c23, r.c24, r.c25, r.c26, r.c27, r.c28, r.c29, r.c30, r.c31, r.c32, r.c33, r.c34, r.c35, r.c36, r.c37, r.c38, r.c39, r.c40, r.c41, r.c42, r.c43, r.c44, r.c45, r.c46, r.c47, r.c48, r.c49, r.c50, r.c51, r.c52, r.c53, r.c54, r.c55, r.c56, r.c57, r.c58, r.c59, r.c60, r.c61, r.c62, r.c63, r.c64, r.c65, r.c66, r.c67, r.c68, r.c69, r.c70, r.c71, r.c72, r.c73, r.c74, r.c75, r.c76, r.c77, r.c78, r.c79, r.c80, r.c81, r.c82, r.c83, r.c84, r.c85, r.c86, r.c87, r.c88, r.c89, r.c90, r.c91, r.c92, r.c93, r.c94, r.c95, r.c96, r.c97, r.c98, r.c99, r.c100, r.c101);\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_11"
+      },
       "estuary-theatre%2Ftesting%2Fmultiple_types": {
-        "Query": "MERGE INTO `estuary-theatre`.testing.multiple_types AS l\nUSING flow_temp_table_2 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 10\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.c1, l.binary_field = r.c2, l.bool_field = r.c3, l.float_field = r.c4, l.flow_published_at = r.c5, l.multiple = r.c6, l.nested = r.c7, l.nullable_int = r.c8, l.str_field = r.c9, l.flow_document = r.c10\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10);\n",
+        "Query": "MERGE INTO `estuary-theatre`.testing.multiple_types AS l\nUSING flow_temp_table_2 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 10\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.c1, l.binary_field = r.c2, l.bool_field = r.c3, l.float_field = r.c4, l.flow_published_at = r.c5, l.multiple = r.c6, l.nested = r.c7, l.nullable_int = r.c8, l.str_field = r.c9\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9);\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -172,7 +188,7 @@
         "TempTableName": "flow_temp_table_2"
       },
       "estuary-theatre%2Ftesting%2Fsimple": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.simple (id, canary, flow_published_at, flow_document)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_0;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.simple (id, canary, flow_published_at)\nSELECT c0, c1, c2 FROM flow_temp_table_0;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -180,7 +196,7 @@
         "TempTableName": "flow_temp_table_0"
       },
       "estuary-theatre%2Ftesting%2Fstring_escaped_key": {
-        "Query": "MERGE INTO `estuary-theatre`.testing.string_escaped_key AS l\nUSING flow_temp_table_6 AS r\nON \n\tl.id = r.c0 AND l.id >= '\\\\he \\\\ \\' \" `llo`' AND l.id <= '\\\\he \\\\ \\' \" `llo`'\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c1, l.flow_published_at = r.c2, l.flow_document = r.c3\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, counter, flow_published_at, flow_document)\n\tVALUES (r.c0, r.c1, r.c2, r.c3);\n",
+        "Query": "MERGE INTO `estuary-theatre`.testing.string_escaped_key AS l\nUSING flow_temp_table_6 AS r\nON \n\tl.id = r.c0 AND l.id >= '\\\\he \\\\ \\' \" `llo`' AND l.id <= '\\\\he \\\\ \\' \" `llo`'\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.c1, l.flow_published_at = r.c2\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, counter, flow_published_at)\n\tVALUES (r.c0, r.c1, r.c2);\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -195,7 +211,7 @@
   {
     "updated": {
       "estuary-theatre%2Ftesting%2Fduplicate_keys": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.duplicate_keys (id, flow_published_at, int, str, flow_document)\nSELECT c0, c1, c2, c3, c4 FROM flow_temp_table_1;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.duplicate_keys (id, flow_published_at, int, str)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_1;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -210,7 +226,7 @@
   {
     "updated": {
       "estuary-theatre%2Ftesting%2Fduplicate_keys": {
-        "Query": "INSERT INTO `estuary-theatre`.testing.duplicate_keys (id, flow_published_at, int, str, flow_document)\nSELECT c0, c1, c2, c3, c4 FROM flow_temp_table_1;\n",
+        "Query": "INSERT INTO `estuary-theatre`.testing.duplicate_keys (id, flow_published_at, int, str)\nSELECT c0, c1, c2, c3 FROM flow_temp_table_1;\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],
@@ -224,61 +240,51 @@
   "rows": [
     {
       "canary": "amputation's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7545a800-1dda-11b2-8000-071353030311\"},\"canary\":\"amputation's\",\"id\":1}",
       "flow_published_at": "1970-01-01T01:00:00Z",
       "id": 1
     },
     {
       "canary": "armament's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"75de3e80-1dda-11b2-8000-071353030311\"},\"canary\":\"armament's\",\"id\":2}",
       "flow_published_at": "1970-01-01T01:00:01Z",
       "id": 2
     },
     {
       "canary": "splatters",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7676d500-1dda-11b2-8000-071353030311\"},\"canary\":\"splatters\",\"id\":3}",
       "flow_published_at": "1970-01-01T01:00:02Z",
       "id": 3
     },
     {
       "canary": "strengthen",
-      "flow_document": "{\"_meta\":{\"uuid\":\"770f6b80-1dda-11b2-8000-071353030311\"},\"canary\":\"strengthen\",\"id\":4}",
       "flow_published_at": "1970-01-01T01:00:03Z",
       "id": 4
     },
     {
       "canary": "Kringle's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"77a80200-1dda-11b2-8000-071353030311\"},\"canary\":\"Kringle's\",\"id\":5}",
       "flow_published_at": "1970-01-01T01:00:04Z",
       "id": 5
     },
     {
       "canary": "grosbeak's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"78409880-1dda-11b2-8000-071353030311\"},\"canary\":\"grosbeak's\",\"id\":6}",
       "flow_published_at": "1970-01-01T01:00:05Z",
       "id": 6
     },
     {
       "canary": "pieced",
-      "flow_document": "{\"_meta\":{\"uuid\":\"d70a1000-1de2-11b2-8000-071353030311\"},\"canary\":\"pieced\",\"id\":7}",
       "flow_published_at": "1970-01-01T02:00:00Z",
       "id": 7
     },
     {
       "canary": "roaches",
-      "flow_document": "{\"_meta\":{\"uuid\":\"d7a2a680-1de2-11b2-8000-071353030311\"},\"canary\":\"roaches\",\"id\":8}",
       "flow_published_at": "1970-01-01T02:00:01Z",
       "id": 8
     },
     {
       "canary": "devilish",
-      "flow_document": "{\"_meta\":{\"uuid\":\"d83b3d00-1de2-11b2-8000-071353030311\"},\"canary\":\"devilish\",\"id\":9}",
       "flow_published_at": "1970-01-01T02:00:02Z",
       "id": 9
     },
     {
       "canary": "glucose's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"d8d3d380-1de2-11b2-8000-071353030311\"},\"canary\":\"glucose's\",\"id\":10}",
       "flow_published_at": "1970-01-01T02:00:03Z",
       "id": 10
     }
@@ -288,70 +294,60 @@
 {
   "rows": [
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"d96c6a00-1de2-11b2-8000-071353030311\"},\"id\":1,\"int\":7,\"str\":\"str 6\"}",
       "flow_published_at": "1970-01-01T02:00:04Z",
       "id": 1,
       "int": 7,
       "str": "str 6"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"da050080-1de2-11b2-8000-071353030311\"},\"id\":2,\"int\":9,\"str\":\"str 7\"}",
       "flow_published_at": "1970-01-01T02:00:05Z",
       "id": 2,
       "int": 9,
       "str": "str 7"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"da9d9700-1de2-11b2-8000-071353030311\"},\"id\":3,\"int\":11,\"str\":\"str 8\"}",
       "flow_published_at": "1970-01-01T02:00:06Z",
       "id": 3,
       "int": 11,
       "str": "str 8"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"db362d80-1de2-11b2-8000-071353030311\"},\"id\":4,\"int\":13,\"str\":\"str 9\"}",
       "flow_published_at": "1970-01-01T02:00:07Z",
       "id": 4,
       "int": 13,
       "str": "str 9"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"dbcec400-1de2-11b2-8000-071353030311\"},\"id\":5,\"int\":15,\"str\":\"str 10\"}",
       "flow_published_at": "1970-01-01T02:00:08Z",
       "id": 5,
       "int": 15,
       "str": "str 10"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"38ce7800-1deb-11b2-8000-071353030311\"},\"id\":6,\"int\":11,\"str\":\"str 11\"}",
       "flow_published_at": "1970-01-01T03:00:00Z",
       "id": 6,
       "int": 11,
       "str": "str 11"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"39670e80-1deb-11b2-8000-071353030311\"},\"id\":7,\"int\":12,\"str\":\"str 12\"}",
       "flow_published_at": "1970-01-01T03:00:01Z",
       "id": 7,
       "int": 12,
       "str": "str 12"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"39ffa500-1deb-11b2-8000-071353030311\"},\"id\":8,\"int\":13,\"str\":\"str 13\"}",
       "flow_published_at": "1970-01-01T03:00:02Z",
       "id": 8,
       "int": 13,
       "str": "str 13"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"3a983b80-1deb-11b2-8000-071353030311\"},\"id\":9,\"int\":14,\"str\":\"str 14\"}",
       "flow_published_at": "1970-01-01T03:00:03Z",
       "id": 9,
       "int": 14,
       "str": "str 14"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"3b30d200-1deb-11b2-8000-071353030311\"},\"id\":10,\"int\":15,\"str\":\"str 15\"}",
       "flow_published_at": "1970-01-01T03:00:04Z",
       "id": 10,
       "int": 15,
@@ -367,7 +363,6 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 1.1,
-      "flow_document": "{\"_meta\":{\"uuid\":\"7d054c80-1dda-11b2-8000-071353030311\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"multiple\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}",
       "flow_published_at": "1970-01-01T01:00:13Z",
       "id": 1,
       "multiple": "1",
@@ -380,7 +375,6 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 2.2,
-      "flow_document": "{\"_meta\":{\"uuid\":\"7d9de300-1dda-11b2-8000-071353030311\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"multiple\":2.2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}",
       "flow_published_at": "1970-01-01T01:00:14Z",
       "id": 2,
       "multiple": "2.2",
@@ -393,7 +387,6 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 3.3,
-      "flow_document": "{\"_meta\":{\"uuid\":\"7e367980-1dda-11b2-8000-071353030311\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"multiple\":true,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}",
       "flow_published_at": "1970-01-01T01:00:15Z",
       "id": 3,
       "multiple": "true",
@@ -406,7 +399,6 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 4.4,
-      "flow_document": "{\"_meta\":{\"uuid\":\"7ecf1000-1dda-11b2-8000-071353030311\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"multiple\":false,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}",
       "flow_published_at": "1970-01-01T01:00:16Z",
       "id": 4,
       "multiple": "false",
@@ -419,7 +411,6 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 5.5,
-      "flow_document": "{\"_meta\":{\"uuid\":\"7f67a680-1dda-11b2-8000-071353030311\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"multiple\":\"string five\",\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}",
       "flow_published_at": "1970-01-01T01:00:17Z",
       "id": 5,
       "multiple": "\"string five\"",
@@ -432,7 +423,6 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 66.66,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e25d3b80-1de2-11b2-8000-071353030311\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"multiple\":[\"one\",2,true],\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}",
       "flow_published_at": "1970-01-01T02:00:19Z",
       "id": 6,
       "multiple": "[\"one\",2,true]",
@@ -445,7 +435,6 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 77.77,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e2f5d200-1de2-11b2-8000-071353030311\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"multiple\":{\"object\":\"seven\"},\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}",
       "flow_published_at": "1970-01-01T02:00:20Z",
       "id": 7,
       "multiple": "{\"object\":\"seven\"}",
@@ -458,7 +447,6 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 88.88,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e38e6880-1de2-11b2-8000-071353030311\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}",
       "flow_published_at": "1970-01-01T02:00:21Z",
       "id": 8,
       "multiple": null,
@@ -471,7 +459,6 @@
       "binary_field": "YWxvaGEK",
       "bool_field": false,
       "float_field": 99.99,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e426ff00-1de2-11b2-8000-071353030311\"},\"array_int\":[91,92],\"binary_field\":\"YWxvaGEK\",\"bool_field\":false,\"float_field\":99.99,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9 v2\"}",
       "flow_published_at": "1970-01-01T02:00:22Z",
       "id": 9,
       "multiple": null,
@@ -484,7 +471,6 @@
       "binary_field": "c2F5xY1uYXJhCg==",
       "bool_field": true,
       "float_field": 1010.101,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e4bf9580-1de2-11b2-8000-071353030311\"},\"array_int\":[1,2],\"binary_field\":\"c2F5xY1uYXJhCg==\",\"bool_field\":true,\"float_field\":1010.101,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10 v2\"}",
       "flow_published_at": "1970-01-01T02:00:23Z",
       "id": 10,
       "multiple": null,
@@ -500,7 +486,6 @@
     {
       "date": "0001-01-01",
       "datetime": "0001-01-01T00:00:00Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"dec9b480-1de2-11b2-8000-071353030311\"},\"date\":\"0000-01-01\",\"datetime\":\"0000-01-01T00:00:00Z\",\"id\":1,\"int_and_str\":1,\"int_str\":\"10\",\"num_and_str\":1.1,\"num_str\":\"10.1\",\"time\":\"00:00:00Z\"}",
       "flow_published_at": "1970-01-01T02:00:13Z",
       "id": 1,
       "int_and_str": "1",
@@ -512,7 +497,6 @@
     {
       "date": "1999-02-02",
       "datetime": "1999-02-02T14:20:12.33Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"df624b00-1de2-11b2-8000-071353030311\"},\"date\":\"1999-02-02\",\"datetime\":\"1999-02-02T14:20:12.33Z\",\"id\":2,\"int_and_str\":2,\"int_str\":\"20\",\"num_and_str\":2.1,\"num_str\":\"20.1\",\"time\":\"14:20:12.33Z\"}",
       "flow_published_at": "1970-01-01T02:00:14Z",
       "id": 2,
       "int_and_str": "2",
@@ -524,7 +508,6 @@
     {
       "date": "1000-03-03",
       "datetime": "1000-03-03T23:59:38.1Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7bd41f80-1dda-11b2-8000-071353030311\"},\"date\":\"1000-03-03\",\"datetime\":\"1000-03-03T23:59:38.10Z\",\"id\":3,\"int_and_str\":3,\"int_str\":\"30\",\"num_and_str\":3.1,\"num_str\":\"30.1\",\"time\":\"23:59:38.10Z\"}",
       "flow_published_at": "1970-01-01T01:00:11Z",
       "id": 3,
       "int_and_str": "3",
@@ -536,7 +519,6 @@
     {
       "date": "2023-08-29",
       "datetime": "2023-08-29T23:59:38Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7c6cb600-1dda-11b2-8000-071353030311\"},\"date\":\"2023-08-29\",\"datetime\":\"2023-08-29T23:59:38Z\",\"id\":4,\"int_and_str\":\"4\",\"int_str\":\"40\",\"num_and_str\":\"4.1\",\"num_str\":\"40.1\",\"time\":\"23:59:38Z\"}",
       "flow_published_at": "1970-01-01T01:00:12Z",
       "id": 4,
       "int_and_str": "4",
@@ -548,7 +530,6 @@
     {
       "date": "9999-12-31",
       "datetime": "9999-12-31T23:59:59Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"dffae180-1de2-11b2-8000-071353030311\"},\"date\":\"9999-12-31\",\"datetime\":\"9999-12-31T23:59:59Z\",\"id\":5,\"int_and_str\":\"5\",\"int_str\":\"50\",\"num_and_str\":\"5.1\",\"num_str\":\"50.1\",\"time\":\"23:59:59Z\"}",
       "flow_published_at": "1970-01-01T02:00:15Z",
       "id": 5,
       "int_and_str": "5",
@@ -563,7 +544,6 @@
 {
   "rows": [
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"85f61e00-1dda-11b2-8000-071353030311\"},\"id\":1,\"unsigned_bigint\":18446744073709551615}",
       "flow_published_at": "1970-01-01T01:00:28Z",
       "id": 1,
       "unsigned_bigint": "18446744073709551615"
@@ -575,13 +555,11 @@
   "rows": [
     {
       "_meta_op": "u",
-      "flow_document": "{\"_meta\":{\"op\":\"u\",\"uuid\":\"e6895900-1de2-11b2-8000-071353030311\"},\"id\":2}",
       "flow_published_at": "1970-01-01T02:00:26Z",
       "id": 2
     },
     {
       "_meta_op": "c",
-      "flow_document": "{\"_meta\":{\"op\":\"c\",\"uuid\":\"e721ef80-1de2-11b2-8000-071353030311\"},\"id\":3}",
       "flow_published_at": "1970-01-01T02:00:27Z",
       "id": 3
     }
@@ -592,7 +570,6 @@
   "rows": [
     {
       "counter": 3,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e9844980-1de2-11b2-8000-071353030311\"},\"counter\":3,\"id\":\"\\\\he \\\\ ' \\\" `llo`\"}",
       "flow_published_at": "1970-01-01T02:00:31Z",
       "id": "\\he \\ ' \" `llo`"
     }
@@ -603,7 +580,6 @@
   "rows": [
     {
       "counter": 2,
-      "flow_document": "{\"_meta\":{\"uuid\":\"ea1ce000-1de2-11b2-8000-071353030311\"},\"counter\":2,\"id\":1,\"strint\":\"1\",\"strintkey\":\"1\",\"strnum\":\"10.1\",\"strnumkey\":\"10.1\"}",
       "flow_published_at": "1970-01-01T02:00:32Z",
       "id": 1,
       "strint": "1",
@@ -620,7 +596,6 @@
       "counter": 2,
       "date": "0001-01-01",
       "datekey": "0000-01-01",
-      "flow_document": "{\"_meta\":{\"uuid\":\"eab57680-1de2-11b2-8000-071353030311\"},\"counter\":2,\"date\":\"0001-01-01\",\"datekey\":\"0000-01-01\",\"id\":1,\"time\":\"12:34:56Z\",\"timekey\":\"12:34:56Z\"}",
       "flow_published_at": "1970-01-01T02:00:33Z",
       "id": 1,
       "time": "12:34:56Z",
@@ -635,7 +610,6 @@
       "counter": 2,
       "datetime": "0001-01-01T00:00:00Z",
       "datetimekey": "0000-01-01T12:34:56Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"eb4e0d00-1de2-11b2-8000-071353030311\"},\"counter\":2,\"datetime\":\"0000-01-01T12:34:56Z\",\"datetimekey\":\"0000-01-01T12:34:56Z\",\"id\":1,\"uuid\":\"550e8400-e29b-41d4-a716-446655440000\",\"uuidkey\":\"550e8400-e29b-41d4-a716-446655440000\"}",
       "flow_published_at": "1970-01-01T02:00:34Z",
       "id": 1,
       "uuid": "550e8400-e29b-41d4-a716-446655440000",
@@ -648,7 +622,6 @@
   "rows": [
     {
       "another_field": "another_updated",
-      "flow_document": "{\"_meta\":{\"uuid\":\"ebe6a380-1de2-11b2-8000-071353030311\"},\"another_field\":\"another_updated\",\"id\":1,\"original_field\":\"updated_value\"}",
       "flow_published_at": "1970-01-01T02:00:35Z",
       "id": 1,
       "projected_another": "another_updated",
@@ -656,6 +629,115 @@
     }
   ],
   "table": "fields_with_projections"
+}
+{
+  "rows": [
+    {
+      "a0": 100,
+      "a1": 101,
+      "a10": null,
+      "a11": null,
+      "a12": null,
+      "a13": null,
+      "a14": null,
+      "a15": 115,
+      "a16": null,
+      "a17": null,
+      "a18": null,
+      "a19": null,
+      "a2": null,
+      "a20": null,
+      "a21": null,
+      "a22": null,
+      "a23": null,
+      "a24": null,
+      "a25": 125,
+      "a26": null,
+      "a27": null,
+      "a28": null,
+      "a29": null,
+      "a3": null,
+      "a30": null,
+      "a31": null,
+      "a32": null,
+      "a33": null,
+      "a34": null,
+      "a35": 135,
+      "a36": null,
+      "a37": null,
+      "a38": null,
+      "a39": null,
+      "a4": null,
+      "a40": null,
+      "a41": null,
+      "a42": null,
+      "a43": null,
+      "a44": null,
+      "a45": 145,
+      "a46": null,
+      "a47": null,
+      "a48": null,
+      "a49": null,
+      "a5": null,
+      "a50": null,
+      "a51": null,
+      "a52": null,
+      "a53": null,
+      "a54": null,
+      "a55": 155,
+      "a56": null,
+      "a57": null,
+      "a58": null,
+      "a59": null,
+      "a6": null,
+      "a60": null,
+      "a61": null,
+      "a62": null,
+      "a63": null,
+      "a64": null,
+      "a65": 165,
+      "a66": null,
+      "a67": null,
+      "a68": null,
+      "a69": null,
+      "a7": null,
+      "a70": null,
+      "a71": null,
+      "a72": null,
+      "a73": null,
+      "a74": null,
+      "a75": 175,
+      "a76": null,
+      "a77": null,
+      "a78": null,
+      "a79": null,
+      "a8": null,
+      "a80": null,
+      "a81": null,
+      "a82": null,
+      "a83": null,
+      "a84": null,
+      "a85": 185,
+      "a86": null,
+      "a87": null,
+      "a88": null,
+      "a89": null,
+      "a9": null,
+      "a90": null,
+      "a91": null,
+      "a92": null,
+      "a93": null,
+      "a94": null,
+      "a95": 195,
+      "a96": null,
+      "a97": null,
+      "a98": null,
+      "a99": 199,
+      "flow_published_at": "1970-01-01T02:00:36Z",
+      "id": 1
+    }
+  ],
+  "table": "many_columns"
 }
 [
   "applied.actionDescription",

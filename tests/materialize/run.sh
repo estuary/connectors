@@ -55,6 +55,7 @@ export TEST_COLLECTION_ALL_KEY_TYPES_PART_ONE="tests/all-key-types-part-one"
 export TEST_COLLECTION_ALL_KEY_TYPES_PART_TWO="tests/all-key-types-part-two"
 export TEST_COLLECTION_ALL_KEY_TYPES_PART_THREE="tests/all-key-types-part-three"
 export TEST_COLLECTION_FIELDS_WITH_PROJECTIONS="tests/fields-with-projections"
+export TEST_COLLECTION_MANY_COLUMNS="tests/many-columns"
 
 function decrypt_config {
   sops --output-type json --decrypt $1 | jq 'walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)' 

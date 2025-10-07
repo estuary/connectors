@@ -27,7 +27,10 @@ config_json_template='{
    "database": "$SQLSERVER_DATABASE",
    "password": "$SQLSERVER_PASSWORD",
    "user":     "$SQLSERVER_USER",
-   "hardDelete": true
+   "hardDelete": true,
+   "advanced": {
+    "no_flow_document": true
+   }
 }'
 
 resources_json_template='[
@@ -141,6 +144,15 @@ resources_json_template='[
         "another_field": {},
         "projected_another": {}
       }
+    }
+  },
+  {
+    "resource": {
+      "table": "many_columns"
+    },
+    "source": "${TEST_COLLECTION_MANY_COLUMNS}",
+    "fields": {
+      "recommended": true
     }
   }
 ]'

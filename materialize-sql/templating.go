@@ -44,6 +44,20 @@ func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
 		"ColumnWithAlias": func (c Column, alias string) ColumnWithAlias {
 			return ColumnWithAlias{Column: c, Alias: alias}
 		},
+		"ChunkColumns": func(cols []*Column, size int) [][]*Column {
+			if size <= 0 {
+				return [][]*Column{cols}
+			}
+			var chunks [][]*Column
+			for i := 0; i < len(cols); i += size {
+				end := i + size
+				if end > len(cols) {
+					end = len(cols)
+				}
+				chunks = append(chunks, cols[i:end])
+			}
+			return chunks
+		},
 	})
 	return template.Must(tpl.Parse(body))
 }
