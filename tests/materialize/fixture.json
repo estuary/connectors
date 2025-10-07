@@ -48,7 +48,9 @@
     ["tests/all-key-types-part-two", {"id": 1, "timekey": "12:34:56Z", "datekey": "0000-01-01", "date": "0001-01-01", "time": "12:34:56Z", "counter": 1}],
     ["tests/all-key-types-part-three", {"id": 1, "datetimekey": "0000-01-01T12:34:56Z", "uuidkey": "550e8400-e29b-41d4-a716-446655440000", "datetime": "0000-01-01T12:34:56Z", "uuid": "550e8400-e29b-41d4-a716-446655440000", "counter": 1}],
 
-    ["tests/fields-with-projections", {"id": 1, "original_field": "value1", "another_field": "another1"}]
+    ["tests/fields-with-projections", {"id": 1, "original_field": "value1", "another_field": "another1"}],
+
+    ["tests/many-columns", {"id": 1, "a0": 0, "a1": 1, "a2": 2, "a3": 3, "a4": 4, "a5": 5, "a10": 10, "a20": 20, "a30": 30, "a40": 40, "a50": 50, "a60": 60, "a70": 70, "a80": 80, "a90": 90, "a99": 99}]
   ],
   [
     ["tests/simple", { "id": 7, "canary": "pieced"}],
@@ -97,7 +99,9 @@
     ["tests/all-key-types-part-two", {"id": 1, "timekey": "12:34:56Z", "datekey": "0000-01-01", "date": "0001-01-01", "time": "12:34:56Z", "counter": 2}],
     ["tests/all-key-types-part-three", {"id": 1, "datetimekey": "0000-01-01T12:34:56Z", "uuidkey": "550e8400-e29b-41d4-a716-446655440000", "datetime": "0000-01-01T12:34:56Z", "uuid": "550e8400-e29b-41d4-a716-446655440000", "counter": 2}],
 
-    ["tests/fields-with-projections", {"id": 1, "original_field": "updated_value", "another_field": "another_updated"}]
+    ["tests/fields-with-projections", {"id": 1, "original_field": "updated_value", "another_field": "another_updated"}],
+
+    ["tests/many-columns", {"id": 1, "a0": 100, "a1": 101, "a15": 115, "a25": 125, "a35": 135, "a45": 145, "a55": 155, "a65": 165, "a75": 175, "a85": 185, "a95": 195, "a99": 199}]
   ],
   [
     ["tests/duplicated-keys", { "id": 6, "int": 11, "str": "str 11"}],

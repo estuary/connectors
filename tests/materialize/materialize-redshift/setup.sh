@@ -104,6 +104,15 @@ resources_json_template='[
         "projected_another": {}
       }
     }
+  },
+  {
+    "resource": {
+      "table": "many_columns"
+    },
+    "source": "${TEST_COLLECTION_MANY_COLUMNS}",
+    "fields": {
+      "recommended": true
+    }
   }
 ]'
 

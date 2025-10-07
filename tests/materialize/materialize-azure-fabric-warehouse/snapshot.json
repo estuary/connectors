@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "\nCREATE TABLE whb_warehouse.estuary_test_schema.simple (\n\tid BIGINT,\n\tcanary VARCHAR(MAX),\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.duplicate_keys_standard (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\t\"int\" BIGINT,\n\tstr VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.duplicate_keys_delta (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\t\"int\" BIGINT,\n\tstr VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.multiple_types (\n\tid BIGINT,\n\tarray_int VARCHAR(MAX),\n\tbinary_field VARBINARY(MAX),\n\tbool_field BIT,\n\tfloat_field FLOAT,\n\tflow_published_at DATETIME2(6),\n\tmultiple VARCHAR(MAX),\n\tnested VARCHAR(MAX),\n\tnullable_int BIGINT,\n\tstr_field VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.formatted_strings (\n\tid BIGINT,\n\t\"date\" DATE,\n\tdatetime DATETIME2(6),\n\tflow_published_at DATETIME2(6),\n\tint_and_str DECIMAL(38,0),\n\tint_str DECIMAL(38,0),\n\tnum_and_str FLOAT,\n\tnum_str FLOAT,\n\t\"time\" TIME(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.deletions (\n\tid BIGINT,\n\t\"_meta/op\" VARCHAR(MAX),\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.binary_key (\n\tid VARBINARY(MAX),\n\tcounter BIGINT,\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.string_escaped_key (\n\tid VARCHAR(MAX),\n\tcounter BIGINT,\n\tflow_published_at DATETIME2(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.all_key_types_part_one (\n\tid BIGINT,\n\tstrintkey VARCHAR(MAX),\n\tstrnumkey VARCHAR(MAX),\n\tcounter BIGINT,\n\tflow_published_at DATETIME2(6),\n\tstrint DECIMAL(38,0),\n\tstrnum FLOAT,\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.all_key_types_part_two (\n\tid BIGINT,\n\tdatekey VARCHAR(MAX),\n\ttimekey VARCHAR(MAX),\n\tcounter BIGINT,\n\t\"date\" DATE,\n\tflow_published_at DATETIME2(6),\n\t\"time\" TIME(6),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.all_key_types_part_three (\n\tid BIGINT,\n\tdatetimekey VARCHAR(MAX),\n\tuuidkey VARCHAR(MAX),\n\tcounter BIGINT,\n\tdatetime DATETIME2(6),\n\tflow_published_at DATETIME2(6),\n\tuuid VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.fields_with_projections (\n\tid BIGINT,\n\tanother_field VARCHAR(MAX),\n\tflow_published_at DATETIME2(6),\n\tprojected_another VARCHAR(MAX),\n\tprojected_field VARCHAR(MAX),\n\tflow_document VARCHAR(MAX)\n);\n"
+  "\nCREATE TABLE whb_warehouse.estuary_test_schema.simple (\n\tid BIGINT,\n\tcanary VARCHAR(MAX),\n\tflow_published_at DATETIME2(6)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.duplicate_keys_standard (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\t\"int\" BIGINT,\n\tstr VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.duplicate_keys_delta (\n\tid BIGINT,\n\tflow_published_at DATETIME2(6),\n\t\"int\" BIGINT,\n\tstr VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.multiple_types (\n\tid BIGINT,\n\tarray_int VARCHAR(MAX),\n\tbinary_field VARBINARY(MAX),\n\tbool_field BIT,\n\tfloat_field FLOAT,\n\tflow_published_at DATETIME2(6),\n\tmultiple VARCHAR(MAX),\n\tnested VARCHAR(MAX),\n\tnullable_int BIGINT,\n\tstr_field VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.formatted_strings (\n\tid BIGINT,\n\t\"date\" DATE,\n\tdatetime DATETIME2(6),\n\tflow_published_at DATETIME2(6),\n\tint_and_str DECIMAL(38,0),\n\tint_str DECIMAL(38,0),\n\tnum_and_str FLOAT,\n\tnum_str FLOAT,\n\t\"time\" TIME(6)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.deletions (\n\tid BIGINT,\n\t\"_meta/op\" VARCHAR(MAX),\n\tflow_published_at DATETIME2(6)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.binary_key (\n\tid VARBINARY(MAX),\n\tcounter BIGINT,\n\tflow_published_at DATETIME2(6)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.string_escaped_key (\n\tid VARCHAR(MAX),\n\tcounter BIGINT,\n\tflow_published_at DATETIME2(6)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.all_key_types_part_one (\n\tid BIGINT,\n\tstrintkey VARCHAR(MAX),\n\tstrnumkey VARCHAR(MAX),\n\tcounter BIGINT,\n\tflow_published_at DATETIME2(6),\n\tstrint DECIMAL(38,0),\n\tstrnum FLOAT\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.all_key_types_part_two (\n\tid BIGINT,\n\tdatekey VARCHAR(MAX),\n\ttimekey VARCHAR(MAX),\n\tcounter BIGINT,\n\t\"date\" DATE,\n\tflow_published_at DATETIME2(6),\n\t\"time\" TIME(6)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.all_key_types_part_three (\n\tid BIGINT,\n\tdatetimekey VARCHAR(MAX),\n\tuuidkey VARCHAR(MAX),\n\tcounter BIGINT,\n\tdatetime DATETIME2(6),\n\tflow_published_at DATETIME2(6),\n\tuuid VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.fields_with_projections (\n\tid BIGINT,\n\tanother_field VARCHAR(MAX),\n\tflow_published_at DATETIME2(6),\n\tprojected_another VARCHAR(MAX),\n\tprojected_field VARCHAR(MAX)\n);\n\n\nCREATE TABLE whb_warehouse.estuary_test_schema.many_columns (\n\tid BIGINT,\n\ta0 BIGINT,\n\ta1 BIGINT,\n\ta10 BIGINT,\n\ta11 BIGINT,\n\ta12 BIGINT,\n\ta13 BIGINT,\n\ta14 BIGINT,\n\ta15 BIGINT,\n\ta16 BIGINT,\n\ta17 BIGINT,\n\ta18 BIGINT,\n\ta19 BIGINT,\n\ta2 BIGINT,\n\ta20 BIGINT,\n\ta21 BIGINT,\n\ta22 BIGINT,\n\ta23 BIGINT,\n\ta24 BIGINT,\n\ta25 BIGINT,\n\ta26 BIGINT,\n\ta27 BIGINT,\n\ta28 BIGINT,\n\ta29 BIGINT,\n\ta3 BIGINT,\n\ta30 BIGINT,\n\ta31 BIGINT,\n\ta32 BIGINT,\n\ta33 BIGINT,\n\ta34 BIGINT,\n\ta35 BIGINT,\n\ta36 BIGINT,\n\ta37 BIGINT,\n\ta38 BIGINT,\n\ta39 BIGINT,\n\ta4 BIGINT,\n\ta40 BIGINT,\n\ta41 BIGINT,\n\ta42 BIGINT,\n\ta43 BIGINT,\n\ta44 BIGINT,\n\ta45 BIGINT,\n\ta46 BIGINT,\n\ta47 BIGINT,\n\ta48 BIGINT,\n\ta49 BIGINT,\n\ta5 BIGINT,\n\ta50 BIGINT,\n\ta51 BIGINT,\n\ta52 BIGINT,\n\ta53 BIGINT,\n\ta54 BIGINT,\n\ta55 BIGINT,\n\ta56 BIGINT,\n\ta57 BIGINT,\n\ta58 BIGINT,\n\ta59 BIGINT,\n\ta6 BIGINT,\n\ta60 BIGINT,\n\ta61 BIGINT,\n\ta62 BIGINT,\n\ta63 BIGINT,\n\ta64 BIGINT,\n\ta65 BIGINT,\n\ta66 BIGINT,\n\ta67 BIGINT,\n\ta68 BIGINT,\n\ta69 BIGINT,\n\ta7 BIGINT,\n\ta70 BIGINT,\n\ta71 BIGINT,\n\ta72 BIGINT,\n\ta73 BIGINT,\n\ta74 BIGINT,\n\ta75 BIGINT,\n\ta76 BIGINT,\n\ta77 BIGINT,\n\ta78 BIGINT,\n\ta79 BIGINT,\n\ta8 BIGINT,\n\ta80 BIGINT,\n\ta81 BIGINT,\n\ta82 BIGINT,\n\ta83 BIGINT,\n\ta84 BIGINT,\n\ta85 BIGINT,\n\ta86 BIGINT,\n\ta87 BIGINT,\n\ta88 BIGINT,\n\ta89 BIGINT,\n\ta9 BIGINT,\n\ta90 BIGINT,\n\ta91 BIGINT,\n\ta92 BIGINT,\n\ta93 BIGINT,\n\ta94 BIGINT,\n\ta95 BIGINT,\n\ta96 BIGINT,\n\ta97 BIGINT,\n\ta98 BIGINT,\n\ta99 BIGINT,\n\tflow_published_at DATETIME2(6)\n);\n"
 ]
 [
   "connectorState",
@@ -29,61 +29,51 @@
   "rows": [
     {
       "canary": "amputation's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7545a800-1dda-11b2-8000-071353030311\"},\"canary\":\"amputation's\",\"id\":1}",
       "flow_published_at": "1970-01-01 01:00:00 +0000 UTC",
       "id": 1
     },
     {
       "canary": "armament's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"75de3e80-1dda-11b2-8000-071353030311\"},\"canary\":\"armament's\",\"id\":2}",
       "flow_published_at": "1970-01-01 01:00:01 +0000 UTC",
       "id": 2
     },
     {
       "canary": "splatters",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7676d500-1dda-11b2-8000-071353030311\"},\"canary\":\"splatters\",\"id\":3}",
       "flow_published_at": "1970-01-01 01:00:02 +0000 UTC",
       "id": 3
     },
     {
       "canary": "strengthen",
-      "flow_document": "{\"_meta\":{\"uuid\":\"770f6b80-1dda-11b2-8000-071353030311\"},\"canary\":\"strengthen\",\"id\":4}",
       "flow_published_at": "1970-01-01 01:00:03 +0000 UTC",
       "id": 4
     },
     {
       "canary": "Kringle's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"77a80200-1dda-11b2-8000-071353030311\"},\"canary\":\"Kringle's\",\"id\":5}",
       "flow_published_at": "1970-01-01 01:00:04 +0000 UTC",
       "id": 5
     },
     {
       "canary": "grosbeak's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"78409880-1dda-11b2-8000-071353030311\"},\"canary\":\"grosbeak's\",\"id\":6}",
       "flow_published_at": "1970-01-01 01:00:05 +0000 UTC",
       "id": 6
     },
     {
       "canary": "pieced",
-      "flow_document": "{\"_meta\":{\"uuid\":\"d70a1000-1de2-11b2-8000-071353030311\"},\"canary\":\"pieced\",\"id\":7}",
       "flow_published_at": "1970-01-01 02:00:00 +0000 UTC",
       "id": 7
     },
     {
       "canary": "roaches",
-      "flow_document": "{\"_meta\":{\"uuid\":\"d7a2a680-1de2-11b2-8000-071353030311\"},\"canary\":\"roaches\",\"id\":8}",
       "flow_published_at": "1970-01-01 02:00:01 +0000 UTC",
       "id": 8
     },
     {
       "canary": "devilish",
-      "flow_document": "{\"_meta\":{\"uuid\":\"d83b3d00-1de2-11b2-8000-071353030311\"},\"canary\":\"devilish\",\"id\":9}",
       "flow_published_at": "1970-01-01 02:00:02 +0000 UTC",
       "id": 9
     },
     {
       "canary": "glucose's",
-      "flow_document": "{\"_meta\":{\"uuid\":\"d8d3d380-1de2-11b2-8000-071353030311\"},\"canary\":\"glucose's\",\"id\":10}",
       "flow_published_at": "1970-01-01 02:00:03 +0000 UTC",
       "id": 10
     }
@@ -93,70 +83,60 @@
   "_table": "duplicate_keys_standard",
   "rows": [
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"d96c6a00-1de2-11b2-8000-071353030311\"},\"id\":1,\"int\":7,\"str\":\"str 6\"}",
       "flow_published_at": "1970-01-01 02:00:04 +0000 UTC",
       "id": 1,
       "int": 7,
       "str": "str 6"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"da050080-1de2-11b2-8000-071353030311\"},\"id\":2,\"int\":9,\"str\":\"str 7\"}",
       "flow_published_at": "1970-01-01 02:00:05 +0000 UTC",
       "id": 2,
       "int": 9,
       "str": "str 7"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"da9d9700-1de2-11b2-8000-071353030311\"},\"id\":3,\"int\":11,\"str\":\"str 8\"}",
       "flow_published_at": "1970-01-01 02:00:06 +0000 UTC",
       "id": 3,
       "int": 11,
       "str": "str 8"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"db362d80-1de2-11b2-8000-071353030311\"},\"id\":4,\"int\":13,\"str\":\"str 9\"}",
       "flow_published_at": "1970-01-01 02:00:07 +0000 UTC",
       "id": 4,
       "int": 13,
       "str": "str 9"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"dbcec400-1de2-11b2-8000-071353030311\"},\"id\":5,\"int\":15,\"str\":\"str 10\"}",
       "flow_published_at": "1970-01-01 02:00:08 +0000 UTC",
       "id": 5,
       "int": 15,
       "str": "str 10"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"38ce7800-1deb-11b2-8000-071353030311\"},\"id\":6,\"int\":11,\"str\":\"str 11\"}",
       "flow_published_at": "1970-01-01 03:00:00 +0000 UTC",
       "id": 6,
       "int": 11,
       "str": "str 11"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"39670e80-1deb-11b2-8000-071353030311\"},\"id\":7,\"int\":12,\"str\":\"str 12\"}",
       "flow_published_at": "1970-01-01 03:00:01 +0000 UTC",
       "id": 7,
       "int": 12,
       "str": "str 12"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"39ffa500-1deb-11b2-8000-071353030311\"},\"id\":8,\"int\":13,\"str\":\"str 13\"}",
       "flow_published_at": "1970-01-01 03:00:02 +0000 UTC",
       "id": 8,
       "int": 13,
       "str": "str 13"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"3a983b80-1deb-11b2-8000-071353030311\"},\"id\":9,\"int\":14,\"str\":\"str 14\"}",
       "flow_published_at": "1970-01-01 03:00:03 +0000 UTC",
       "id": 9,
       "int": 14,
       "str": "str 14"
     },
     {
-      "flow_document": "{\"_meta\":{\"uuid\":\"3b30d200-1deb-11b2-8000-071353030311\"},\"id\":10,\"int\":15,\"str\":\"str 15\"}",
       "flow_published_at": "1970-01-01 03:00:04 +0000 UTC",
       "id": 10,
       "int": 15,
@@ -267,7 +247,6 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 1.1,
-      "flow_document": "{\"_meta\":{\"uuid\":\"7d054c80-1dda-11b2-8000-071353030311\"},\"array_int\":[11,12],\"bool_field\":false,\"float_field\":1.1,\"id\":1,\"multiple\":1,\"nested\":{\"id\":\"i1\"},\"nullable_int\":null,\"str_field\":\"str1\"}",
       "flow_published_at": "1970-01-01 01:00:13 +0000 UTC",
       "id": 1,
       "multiple": "1",
@@ -280,7 +259,6 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 2.2,
-      "flow_document": "{\"_meta\":{\"uuid\":\"7d9de300-1dda-11b2-8000-071353030311\"},\"array_int\":[21,22],\"bool_field\":true,\"float_field\":2.2,\"id\":2,\"multiple\":2.2,\"nested\":{\"id\":\"i2\"},\"nullable_int\":2,\"str_field\":\"str2\"}",
       "flow_published_at": "1970-01-01 01:00:14 +0000 UTC",
       "id": 2,
       "multiple": "2.2",
@@ -293,7 +271,6 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 3.3,
-      "flow_document": "{\"_meta\":{\"uuid\":\"7e367980-1dda-11b2-8000-071353030311\"},\"array_int\":[31,32],\"bool_field\":false,\"float_field\":3.3,\"id\":3,\"multiple\":true,\"nested\":{\"id\":\"i3\"},\"nullable_int\":null,\"str_field\":\"str3\"}",
       "flow_published_at": "1970-01-01 01:00:15 +0000 UTC",
       "id": 3,
       "multiple": "true",
@@ -306,7 +283,6 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 4.4,
-      "flow_document": "{\"_meta\":{\"uuid\":\"7ecf1000-1dda-11b2-8000-071353030311\"},\"array_int\":[41,42],\"bool_field\":true,\"float_field\":4.4,\"id\":4,\"multiple\":false,\"nested\":{\"id\":\"i4\"},\"nullable_int\":4,\"str_field\":\"str4\"}",
       "flow_published_at": "1970-01-01 01:00:16 +0000 UTC",
       "id": 4,
       "multiple": "false",
@@ -319,7 +295,6 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 5.5,
-      "flow_document": "{\"_meta\":{\"uuid\":\"7f67a680-1dda-11b2-8000-071353030311\"},\"array_int\":[51,52],\"bool_field\":false,\"float_field\":5.5,\"id\":5,\"multiple\":\"string five\",\"nested\":{\"id\":\"i5\"},\"nullable_int\":null,\"str_field\":\"str5\"}",
       "flow_published_at": "1970-01-01 01:00:17 +0000 UTC",
       "id": 5,
       "multiple": "\"string five\"",
@@ -332,7 +307,6 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 66.66,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e25d3b80-1de2-11b2-8000-071353030311\"},\"array_int\":[61,62],\"bool_field\":true,\"float_field\":66.66,\"id\":6,\"multiple\":[\"one\",2,true],\"nested\":{\"id\":\"i6\"},\"nullable_int\":6,\"str_field\":\"str6 v2\"}",
       "flow_published_at": "1970-01-01 02:00:19 +0000 UTC",
       "id": 6,
       "multiple": "[\"one\",2,true]",
@@ -345,7 +319,6 @@
       "binary_field": null,
       "bool_field": false,
       "float_field": 77.77,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e2f5d200-1de2-11b2-8000-071353030311\"},\"array_int\":[71,72],\"bool_field\":false,\"float_field\":77.77,\"id\":7,\"multiple\":{\"object\":\"seven\"},\"nested\":{\"id\":\"i7\"},\"nullable_int\":null,\"str_field\":\"str7 v2\"}",
       "flow_published_at": "1970-01-01 02:00:20 +0000 UTC",
       "id": 7,
       "multiple": "{\"object\":\"seven\"}",
@@ -358,7 +331,6 @@
       "binary_field": null,
       "bool_field": true,
       "float_field": 88.88,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e38e6880-1de2-11b2-8000-071353030311\"},\"array_int\":[81,82],\"bool_field\":true,\"float_field\":88.88,\"id\":8,\"multiple\":null,\"nested\":{\"id\":\"i8\"},\"nullable_int\":8,\"str_field\":\"str8 v2\"}",
       "flow_published_at": "1970-01-01 02:00:21 +0000 UTC",
       "id": 8,
       "multiple": null,
@@ -371,7 +343,6 @@
       "binary_field": "YWxvaGEK",
       "bool_field": false,
       "float_field": 99.99,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e426ff00-1de2-11b2-8000-071353030311\"},\"array_int\":[91,92],\"binary_field\":\"YWxvaGEK\",\"bool_field\":false,\"float_field\":99.99,\"id\":9,\"nested\":{\"id\":\"i9\"},\"nullable_int\":null,\"str_field\":\"str9 v2\"}",
       "flow_published_at": "1970-01-01 02:00:22 +0000 UTC",
       "id": 9,
       "multiple": null,
@@ -384,7 +355,6 @@
       "binary_field": "c2F5xY1uYXJhCg==",
       "bool_field": true,
       "float_field": 1010.101,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e4bf9580-1de2-11b2-8000-071353030311\"},\"array_int\":[1,2],\"binary_field\":\"c2F5xY1uYXJhCg==\",\"bool_field\":true,\"float_field\":1010.101,\"id\":10,\"nested\":{\"id\":\"i10\"},\"nullable_int\":10,\"str_field\":\"str10 v2\"}",
       "flow_published_at": "1970-01-01 02:00:23 +0000 UTC",
       "id": 10,
       "multiple": null,
@@ -400,7 +370,6 @@
     {
       "date": "0001-01-01 00:00:00 +0000 UTC",
       "datetime": "0001-01-01 00:00:00 +0000 UTC",
-      "flow_document": "{\"_meta\":{\"uuid\":\"dec9b480-1de2-11b2-8000-071353030311\"},\"date\":\"0000-01-01\",\"datetime\":\"0000-01-01T00:00:00Z\",\"id\":1,\"int_and_str\":1,\"int_str\":\"10\",\"num_and_str\":1.1,\"num_str\":\"10.1\",\"time\":\"00:00:00Z\"}",
       "flow_published_at": "1970-01-01 02:00:13 +0000 UTC",
       "id": 1,
       "int_and_str": "1",
@@ -412,7 +381,6 @@
     {
       "date": "1999-02-02 00:00:00 +0000 UTC",
       "datetime": "1999-02-02 14:20:12.33 +0000 UTC",
-      "flow_document": "{\"_meta\":{\"uuid\":\"df624b00-1de2-11b2-8000-071353030311\"},\"date\":\"1999-02-02\",\"datetime\":\"1999-02-02T14:20:12.33Z\",\"id\":2,\"int_and_str\":2,\"int_str\":\"20\",\"num_and_str\":2.1,\"num_str\":\"20.1\",\"time\":\"14:20:12.33Z\"}",
       "flow_published_at": "1970-01-01 02:00:14 +0000 UTC",
       "id": 2,
       "int_and_str": "2",
@@ -424,7 +392,6 @@
     {
       "date": "1000-03-03 00:00:00 +0000 UTC",
       "datetime": "1000-03-03 23:59:38.1 +0000 UTC",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7bd41f80-1dda-11b2-8000-071353030311\"},\"date\":\"1000-03-03\",\"datetime\":\"1000-03-03T23:59:38.10Z\",\"id\":3,\"int_and_str\":3,\"int_str\":\"30\",\"num_and_str\":3.1,\"num_str\":\"30.1\",\"time\":\"23:59:38.10Z\"}",
       "flow_published_at": "1970-01-01 01:00:11 +0000 UTC",
       "id": 3,
       "int_and_str": "3",
@@ -436,7 +403,6 @@
     {
       "date": "2023-08-29 00:00:00 +0000 UTC",
       "datetime": "2023-08-29 23:59:38 +0000 UTC",
-      "flow_document": "{\"_meta\":{\"uuid\":\"7c6cb600-1dda-11b2-8000-071353030311\"},\"date\":\"2023-08-29\",\"datetime\":\"2023-08-29T23:59:38Z\",\"id\":4,\"int_and_str\":\"4\",\"int_str\":\"40\",\"num_and_str\":\"4.1\",\"num_str\":\"40.1\",\"time\":\"23:59:38Z\"}",
       "flow_published_at": "1970-01-01 01:00:12 +0000 UTC",
       "id": 4,
       "int_and_str": "4",
@@ -448,7 +414,6 @@
     {
       "date": "9999-12-31 00:00:00 +0000 UTC",
       "datetime": "9999-12-31 23:59:59 +0000 UTC",
-      "flow_document": "{\"_meta\":{\"uuid\":\"dffae180-1de2-11b2-8000-071353030311\"},\"date\":\"9999-12-31\",\"datetime\":\"9999-12-31T23:59:59Z\",\"id\":5,\"int_and_str\":\"5\",\"int_str\":\"50\",\"num_and_str\":\"5.1\",\"num_str\":\"50.1\",\"time\":\"23:59:59Z\"}",
       "flow_published_at": "1970-01-01 02:00:15 +0000 UTC",
       "id": 5,
       "int_and_str": "5",
@@ -460,7 +425,6 @@
     {
       "date": null,
       "datetime": null,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e0937800-1de2-11b2-8000-071353030311\"},\"id\":8,\"num_str\":\"NaN\"}",
       "flow_published_at": "1970-01-01 02:00:16 +0000 UTC",
       "id": 8,
       "int_and_str": null,
@@ -472,7 +436,6 @@
     {
       "date": null,
       "datetime": null,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e12c0e80-1de2-11b2-8000-071353030311\"},\"id\":9,\"num_str\":\"Infinity\"}",
       "flow_published_at": "1970-01-01 02:00:17 +0000 UTC",
       "id": 9,
       "int_and_str": null,
@@ -484,7 +447,6 @@
     {
       "date": null,
       "datetime": null,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e1c4a500-1de2-11b2-8000-071353030311\"},\"id\":10,\"num_str\":\"-Infinity\"}",
       "flow_published_at": "1970-01-01 02:00:18 +0000 UTC",
       "id": 10,
       "int_and_str": null,
@@ -500,13 +462,11 @@
   "rows": [
     {
       "_meta/op": "u",
-      "flow_document": "{\"_meta\":{\"op\":\"u\",\"uuid\":\"e6895900-1de2-11b2-8000-071353030311\"},\"id\":2}",
       "flow_published_at": "1970-01-01 02:00:26 +0000 UTC",
       "id": 2
     },
     {
       "_meta/op": "c",
-      "flow_document": "{\"_meta\":{\"op\":\"c\",\"uuid\":\"e721ef80-1de2-11b2-8000-071353030311\"},\"id\":3}",
       "flow_published_at": "1970-01-01 02:00:27 +0000 UTC",
       "id": 3
     }
@@ -517,7 +477,6 @@
   "rows": [
     {
       "counter": 1,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e8ebb300-1de2-11b2-8000-071353030311\"},\"counter\":1,\"id\":\"c2F5xY1uYXJhCg==\"}",
       "flow_published_at": "1970-01-01 02:00:30 +0000 UTC",
       "id": "c2F5xY1uYXJhCg=="
     }
@@ -528,7 +487,6 @@
   "rows": [
     {
       "counter": 3,
-      "flow_document": "{\"_meta\":{\"uuid\":\"e9844980-1de2-11b2-8000-071353030311\"},\"counter\":3,\"id\":\"\\\\he \\\\ ' \\\" `llo`\"}",
       "flow_published_at": "1970-01-01 02:00:31 +0000 UTC",
       "id": "\\he \\ ' \" `llo`"
     }
@@ -539,7 +497,6 @@
   "rows": [
     {
       "counter": 2,
-      "flow_document": "{\"_meta\":{\"uuid\":\"ea1ce000-1de2-11b2-8000-071353030311\"},\"counter\":2,\"id\":1,\"strint\":\"1\",\"strintkey\":\"1\",\"strnum\":\"10.1\",\"strnumkey\":\"10.1\"}",
       "flow_published_at": "1970-01-01 02:00:32 +0000 UTC",
       "id": 1,
       "strint": "1",
@@ -556,7 +513,6 @@
       "counter": 2,
       "date": "0001-01-01 00:00:00 +0000 UTC",
       "datekey": "0000-01-01",
-      "flow_document": "{\"_meta\":{\"uuid\":\"eab57680-1de2-11b2-8000-071353030311\"},\"counter\":2,\"date\":\"0001-01-01\",\"datekey\":\"0000-01-01\",\"id\":1,\"time\":\"12:34:56Z\",\"timekey\":\"12:34:56Z\"}",
       "flow_published_at": "1970-01-01 02:00:33 +0000 UTC",
       "id": 1,
       "time": "0001-01-01 12:34:56 +0000 UTC",
@@ -571,7 +527,6 @@
       "counter": 2,
       "datetime": "0001-01-01 00:00:00 +0000 UTC",
       "datetimekey": "0000-01-01T12:34:56Z",
-      "flow_document": "{\"_meta\":{\"uuid\":\"eb4e0d00-1de2-11b2-8000-071353030311\"},\"counter\":2,\"datetime\":\"0000-01-01T12:34:56Z\",\"datetimekey\":\"0000-01-01T12:34:56Z\",\"id\":1,\"uuid\":\"550e8400-e29b-41d4-a716-446655440000\",\"uuidkey\":\"550e8400-e29b-41d4-a716-446655440000\"}",
       "flow_published_at": "1970-01-01 02:00:34 +0000 UTC",
       "id": 1,
       "uuid": "550e8400-e29b-41d4-a716-446655440000",
@@ -584,11 +539,119 @@
   "rows": [
     {
       "another_field": "another_updated",
-      "flow_document": "{\"_meta\":{\"uuid\":\"ebe6a380-1de2-11b2-8000-071353030311\"},\"another_field\":\"another_updated\",\"id\":1,\"original_field\":\"updated_value\"}",
       "flow_published_at": "1970-01-01 02:00:35 +0000 UTC",
       "id": 1,
       "projected_another": "another_updated",
       "projected_field": "updated_value"
+    }
+  ]
+}
+{
+  "_table": "many_columns",
+  "rows": [
+    {
+      "a0": 100,
+      "a1": 101,
+      "a10": null,
+      "a11": null,
+      "a12": null,
+      "a13": null,
+      "a14": null,
+      "a15": 115,
+      "a16": null,
+      "a17": null,
+      "a18": null,
+      "a19": null,
+      "a2": null,
+      "a20": null,
+      "a21": null,
+      "a22": null,
+      "a23": null,
+      "a24": null,
+      "a25": 125,
+      "a26": null,
+      "a27": null,
+      "a28": null,
+      "a29": null,
+      "a3": null,
+      "a30": null,
+      "a31": null,
+      "a32": null,
+      "a33": null,
+      "a34": null,
+      "a35": 135,
+      "a36": null,
+      "a37": null,
+      "a38": null,
+      "a39": null,
+      "a4": null,
+      "a40": null,
+      "a41": null,
+      "a42": null,
+      "a43": null,
+      "a44": null,
+      "a45": 145,
+      "a46": null,
+      "a47": null,
+      "a48": null,
+      "a49": null,
+      "a5": null,
+      "a50": null,
+      "a51": null,
+      "a52": null,
+      "a53": null,
+      "a54": null,
+      "a55": 155,
+      "a56": null,
+      "a57": null,
+      "a58": null,
+      "a59": null,
+      "a6": null,
+      "a60": null,
+      "a61": null,
+      "a62": null,
+      "a63": null,
+      "a64": null,
+      "a65": 165,
+      "a66": null,
+      "a67": null,
+      "a68": null,
+      "a69": null,
+      "a7": null,
+      "a70": null,
+      "a71": null,
+      "a72": null,
+      "a73": null,
+      "a74": null,
+      "a75": 175,
+      "a76": null,
+      "a77": null,
+      "a78": null,
+      "a79": null,
+      "a8": null,
+      "a80": null,
+      "a81": null,
+      "a82": null,
+      "a83": null,
+      "a84": null,
+      "a85": 185,
+      "a86": null,
+      "a87": null,
+      "a88": null,
+      "a89": null,
+      "a9": null,
+      "a90": null,
+      "a91": null,
+      "a92": null,
+      "a93": null,
+      "a94": null,
+      "a95": 195,
+      "a96": null,
+      "a97": null,
+      "a98": null,
+      "a99": 199,
+      "flow_published_at": "1970-01-01 02:00:36 +0000 UTC",
+      "id": 1
     }
   ]
 }

@@ -21,7 +21,10 @@ config_json_template='{
    "password": "$PGPASSWORD",
    "user":     "$PGUSER",
    "schema":   "public",
-   "hardDelete": true
+   "hardDelete": true,
+   "advanced": {
+    "no_flow_document": true
+   }
 }'
 
 resources_json_template='[
@@ -123,6 +126,15 @@ resources_json_template='[
         "another_field": {},
         "projected_another": {}
       }
+    }
+  },
+  {
+    "resource": {
+      "table": "many_columns"
+    },
+    "source": "${TEST_COLLECTION_MANY_COLUMNS}",
+    "fields": {
+      "recommended": true
     }
   }
 ]'

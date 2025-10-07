@@ -10,17 +10,14 @@ region: us-east-2
 hardDelete: true
 syncSchedule:
     syncFrequency: 0s
+advanced:
+    no_flow_document: true
 sops:
-    kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2024-02-01T17:08:49Z"
           enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
-    azure_kv: []
-    hc_vault: []
-    age: []
-    lastmodified: "2025-07-01T20:14:25Z"
-    mac: ENC[AES256_GCM,data:a3k77KKy2QF0vuAH7p4n9OMlwzQQkQ2v5owooWgHpmTbBbIyNv1kfs0E+Vdj8JBcJHUGVVScrm7kiPXq6DkaQKQAwDbwGETpEota3CmXlw7y6fy5ecEDBb1s4sHcwkMdgHMHFxJZ8/9Ie0pOZDyv8JlMAVHgfyXzuDRO0LcmnkU=,iv:UAZrOEakRooZd95QwwqO24Vv7haUZAlv9NOVsuYvDXU=,tag:vdX3V0vmaRonyiTY8Hm70g==,type:str]
-    pgp: []
+    lastmodified: "2025-10-07T17:37:57Z"
+    mac: ENC[AES256_GCM,data:TukNmERD7cMzMXNmZInpluK0nZWyuYfIVjhQBLqXmJthitXXRmhBdkRpWlOSfHuP8R+mHvMvkt55OVEJ2o1EXYzlN/GOxQY1VRyFcI+CiWCiWeIR2UCMZ7z2b9KmTxMGZ5XsrSI7OSkmY9EccFGUvMLIGfpZL8jaRj4Akn6L5Ic=,iv:jENsHMNHz85D+H9SliYpiccm7zFdps98NztdXFrI96k=,tag:Rg2Kixxk+jZCjwtoG7eRnw==,type:str]
     encrypted_suffix: _sops
-    version: 3.9.4
+    version: 3.10.2

@@ -9,17 +9,14 @@ containerName: tmp
 hardDelete: true
 syncSchedule:
     syncFrequency: 0s
+advanced:
+    no_flow_document: true
 sops:
-    kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2024-02-01T17:08:49Z"
           enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
-    azure_kv: []
-    hc_vault: []
-    age: []
-    lastmodified: "2025-01-23T16:43:43Z"
-    mac: ENC[AES256_GCM,data:51LJ2l8bnb26p7GyoHvpsadwGRuNsFrMvvukYamOsWeRi78A/znYmZd40kFnTn7zQydC2EyBzB141Iz5VVPKEmuvM40WTYUby2rdGj5GTaYJvBHsvwITkBW1h+IaDkwU+T7vEb9BiIZnNeFEwbHzBw2wJidnHXPNnxpMgjf93f4=,iv:64mvPbohXVQugJ1qXOtrY9YfPwnFACyF2MzUPLQXxH4=,tag:2wMVeOxkgArRYFY7Ji34SA==,type:str]
-    pgp: []
+    lastmodified: "2025-10-07T17:37:00Z"
+    mac: ENC[AES256_GCM,data:m109CRg5illSceZPGYycF10Xxbv4DFpq+SBCZFJc8TOkOn+tEeaXLjlNbVh6N0H48PRg4x0pi7jkTEuFUJ+9uZaZ/VCDiE7/Its0lHkivj9F8apIITMLHscJP5zT6/gkrAIgBLZ0TuXrDLNqB+6it8LtI7klasrx8gRd6me6I5E=,iv:rPXDWUgs6A63RaomiV3JyNfKCYo0h9HiRkF3K+PfzPE=,tag:jDcV22bD3mqwsbF858hcNA==,type:str]
     encrypted_suffix: _sops
-    version: 3.8.1
+    version: 3.10.2
