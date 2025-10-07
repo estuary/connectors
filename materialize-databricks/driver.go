@@ -67,6 +67,7 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-databricks",
+		OAuth2:           OAuthSpec(),
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
 		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
@@ -136,12 +137,24 @@ func newTransactor(
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 
-	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
-		Host:               fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-		Token:              cfg.Credentials.PersonalAccessToken,
-		Credentials:        dbConfig.PatCredentials{}, // enforce PAT auth
-		HTTPTimeoutSeconds: 5 * 60,                    // This is necessary for file uploads as they can sometimes take longer than the default 60s
-	})
+	var wsClientConfig *databricks.Config
+	if cfg.Credentials.AuthType == PAT {
+		wsClientConfig = &databricks.Config{
+			Host:               fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+			Token:              cfg.Credentials.PersonalAccessToken,
+			Credentials:        dbConfig.PatCredentials{}, // enforce PAT auth
+			HTTPTimeoutSeconds: 5 * 60,                    // This is necessary for file uploads as they can sometimes take longer than the default 60s
+		}
+	} else if cfg.Credentials.AuthType == OAuth2 {
+		wsClientConfig = &databricks.Config{
+			Host:               fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+			Token:              cfg.Credentials.AccessToken,
+			Credentials:        dbConfig.PatCredentials{}, // use token as PAT
+			HTTPTimeoutSeconds: 5 * 60,                    // This is necessary for file uploads as they can sometimes take longer than the default 60s
+		}
+	}
+
+	wsClient, err := databricks.NewWorkspaceClient(wsClientConfig)
 	if err != nil {
 		return nil, fmt.Errorf("initialising workspace client: %w", err)
 	}
