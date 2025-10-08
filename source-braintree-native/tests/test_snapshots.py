@@ -71,31 +71,34 @@ def test_capture(request, snapshot):
             unique_stream_lines.append(line)
             seen.add(stream)
 
-    for l in unique_stream_lines:
-        stream, rec = l[0], l[1]
+    # NOTE: Commenting out the below redactions are temporary while I work on improving
+    # how the connector parses XML and transforms XML into Pydantic documents.
+    #
+    # for l in unique_stream_lines:
+    #     stream, rec = l[0], l[1]
 
-        for field in COMMON_FIELDS_TO_REDACT:
-            if field in rec:
-                rec[field] = 'redacted'
+    #     for field in COMMON_FIELDS_TO_REDACT:
+    #         if field in rec:
+    #             rec[field] = 'redacted'
 
-        if 'evidence' in rec:
-            evidence: list = rec['evidence']
-            for e in evidence:
-                if 'url' in e:
-                    e['url'] = 'redacted'
-        if stream == 'acmeCo/subscriptions':
-            for field in SUBSCRIPTION_FIELDS_TO_REDACT:
-                rec[field] = 'redacted'
-            rec['current_billing_cycle'] = 0
+    #     if 'evidence' in rec:
+    #         evidence: list = rec['evidence']
+    #         for e in evidence:
+    #             if 'url' in e:
+    #                 e['url'] = 'redacted'
+    #     if stream == 'acmeCo/subscriptions':
+    #         for field in SUBSCRIPTION_FIELDS_TO_REDACT:
+    #             rec[field] = 'redacted'
+    #         rec['current_billing_cycle'] = 0
 
-            rec['status_history'] = [rec['status_history'][-1]]
-            rec['transactions'] = [rec['transactions'][-1]]
-        if stream == 'acmeCo/transactions':
-            for field in TRANSACTION_FIELDS_TO_REDACT:
-                if isinstance(rec[field], list) or isinstance(rec[field], dict):
-                    redact_nested_fields(rec[field])
-                else:
-                    rec[field] = 'redacted'
+    #         rec['status_history'] = [rec['status_history'][-1]]
+    #         rec['transactions'] = [rec['transactions'][-1]]
+    #     if stream == 'acmeCo/transactions':
+    #         for field in TRANSACTION_FIELDS_TO_REDACT:
+    #             if isinstance(rec[field], list) or isinstance(rec[field], dict):
+    #                 redact_nested_fields(rec[field])
+    #             else:
+    #                 rec[field] = 'redacted'
 
     assert snapshot("capture.stdout.json") == unique_stream_lines
 
