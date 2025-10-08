@@ -23,6 +23,30 @@
           "title": "AccessToken",
           "type": "object"
         },
+        "GoogleServiceAccount": {
+          "properties": {
+            "credentials_title": {
+              "const": "Google Service Account",
+              "default": "Google Service Account",
+              "order": 0,
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "service_account": {
+              "description": "Service account JSON key",
+              "multiline": true,
+              "order": 1,
+              "secret": true,
+              "title": "Google Service Account",
+              "type": "string"
+            }
+          },
+          "required": [
+            "service_account"
+          ],
+          "title": "GoogleServiceAccount",
+          "type": "object"
+        },
         "_OAuth2Credentials": {
           "properties": {
             "credentials_title": {
@@ -61,6 +85,7 @@
         "credentials": {
           "discriminator": {
             "mapping": {
+              "Google Service Account": "#/$defs/GoogleServiceAccount",
               "OAuth Credentials": "#/$defs/_OAuth2Credentials",
               "Private App Credentials": "#/$defs/AccessToken"
             },
@@ -69,6 +94,9 @@
           "oneOf": [
             {
               "$ref": "#/$defs/_OAuth2Credentials"
+            },
+            {
+              "$ref": "#/$defs/GoogleServiceAccount"
             },
             {
               "$ref": "#/$defs/AccessToken"

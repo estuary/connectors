@@ -10,6 +10,7 @@ from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource
 
 from .models import (
     EndpointConfig,
+    GOOGLE_SPEC,
     OAUTH2_SPEC,
     ResourceConfig,
     ResourceState,
@@ -25,7 +26,7 @@ from .api import (
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
-    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, google_spec=GOOGLE_SPEC, credentials=config.credentials)
     spreadsheet_id = get_spreadsheet_id(config.spreadsheet_url)
 
     spreadsheet = await fetch_spreadsheet(log, http, spreadsheet_id)
