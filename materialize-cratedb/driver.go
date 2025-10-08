@@ -25,7 +25,9 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	"drop_table": true,
+}
 
 const (
 	// As a very rough approximation, this will limit the amount of memory used for accumulating

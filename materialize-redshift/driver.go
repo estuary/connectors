@@ -55,6 +55,7 @@ const (
 var featureFlagDefaults = map[string]bool{
 	"datetime_keys_as_string":    true,
 	"s3_use_dualstack_endpoints": false,
+	"drop_table":                 true,
 }
 
 type sshForwarding struct {

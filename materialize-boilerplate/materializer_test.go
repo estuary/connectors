@@ -164,6 +164,75 @@ func TestRunApply(t *testing.T) {
 	}
 }
 
+func TestRunApplyNoDropTable(t *testing.T) {
+	ctx := context.Background()
+
+	for _, tt := range []struct {
+		name         string
+		originalSpec *pf.MaterializationSpec
+		newSpec      *pf.MaterializationSpec
+		want         testCalls
+		expectError  bool
+	}{
+		{
+			name:         "should not truncate resource when no_drop_table is set",
+			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
+			newSpec:      loadMaterializerSpec(t, "backfill-nullable.flow.proto"),
+			want: testCalls{
+				// No truncateResource call - it should be skipped
+				updateResource: [][]string{{"key_value"}},
+			},
+			expectError: false,
+		},
+		{
+			name:         "should error when drop/recreate is required and no_drop_table is set",
+			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
+			newSpec:      loadMaterializerSpec(t, "backfill-key-change.flow.proto"),
+			want:         testCalls{
+				// No calls should be made because it errors before getting there
+			},
+			expectError: true,
+		},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			req := &pm.Request_Apply{
+				Materialization:     tt.newSpec,
+				Version:             "thisone",
+				LastMaterialization: tt.originalSpec,
+				LastVersion:         "oldone",
+			}
+
+			// Parse the original spec's ConfigJson and set no_drop_table feature flag and set back on the req
+			var config testEndpointConfiger
+			require.NoError(t, json.Unmarshal(req.Materialization.ConfigJson, &config))
+
+			// Modify config to disable drop_table
+			config.Config = map[string]any{
+				"advanced": map[string]any{
+					"feature_flags": "no_drop_table",
+				},
+			}
+
+			modifiedConfigJson, err := json.Marshal(config)
+			require.NoError(t, err)
+			req.Materialization.ConfigJson = modifiedConfigJson
+
+			is := testInfoSchemaFromSpec(t, tt.originalSpec, func(in string) string { return in })
+			got := &testCalls{}
+
+			_, err = RunApply(ctx, req, makeTestMaterializerFn(got, is))
+
+			if tt.expectError {
+				require.Error(t, err)
+				require.Contains(t, err.Error(), "drop_table")
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, tt.want, *got)
+			}
+		})
+	}
+}
+
 type testCalls struct {
 	createResource   [][]string
 	updateResource   [][]string
@@ -266,7 +335,16 @@ func (c testEndpointConfiger) DefaultNamespace() string {
 }
 
 func (c testEndpointConfiger) FeatureFlags() (string, map[string]bool) {
-	return "", nil
+	featureFlags := ""
+	if advanced, ok := c.Config["advanced"].(map[string]any); ok {
+		if ff, ok := advanced["feature_flags"].(string); ok {
+			featureFlags = ff
+		}
+	}
+
+	return featureFlags, map[string]bool{
+		"drop_table": true,
+	}
 }
 
 type testFieldConfiger struct{}

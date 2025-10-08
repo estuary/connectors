@@ -18,7 +18,9 @@ import (
 	_ "github.com/trinodb/trino-go-client/trino"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	"drop_table": true,
+}
 
 // config represents the endpoint configuration for starburst.
 // It must match the one defined for the source specs (flow.yaml) in Rust.

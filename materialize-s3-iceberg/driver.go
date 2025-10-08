@@ -24,7 +24,9 @@ import (
 	iso8601 "github.com/senseyeio/duration"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	"drop_table": true,
+}
 
 type catalogType string
 
