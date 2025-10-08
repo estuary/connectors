@@ -5,13 +5,13 @@ from typing import AsyncGenerator
 
 import braintree
 from braintree import BraintreeGateway
-from braintree.util.xml_util import XmlUtil
 
 from estuary_cdk.http import HTTPSession
 
 from .common import (
     HEADERS,
     TRANSACTION_SEARCH_LIMIT,
+    braintree_xml_to_dict,
 )
 from ..models import (
     Transaction,
@@ -184,7 +184,7 @@ async def _fetch_transaction_ids_disbursed_between(
     }
 
     response = IdSearchResponse.model_validate(
-        XmlUtil.dict_from_xml(
+        braintree_xml_to_dict(
             await http.request(log, url, "POST", json=body, headers=HEADERS)
         )
     )

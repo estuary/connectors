@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<transaction>
+    <id>txn_789</id>
+    <amount type="decimal">100.00</amount>
+    <tax-amount type="decimal" nil="true"></tax-amount>
+    <shipping-amount type="decimal"></shipping-amount>
+    <discount-amount type="decimal">0.00</discount-amount>
+    <settled type="boolean">true</settled>
+    <voided type="boolean">false</voided>
+    <refunded-transaction-id nil="true"></refunded-transaction-id>
+    <billing></billing>
+    <shipping nil="true"></shipping>
+</transaction>

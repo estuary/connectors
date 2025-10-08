@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<add-ons type="array">
+    <add-on>
+        <amount>8.00</amount>
+        <created-at type="datetime">2024-12-02T20:59:46Z</created-at>
+        <description></description>
+        <id>g9km</id>
+        <kind>add_on</kind>
+        <merchant-id>7bsbj4jzqs733j2f</merchant-id>
+        <name>test_add_on</name>
+        <never-expires type="boolean">true</never-expires>
+        <number-of-billing-cycles nil="true"/>
+        <updated-at type="datetime">2024-12-02T20:59:46Z</updated-at>
+    </add-on>
+</add-ons>
