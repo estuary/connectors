@@ -20,7 +20,9 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	"drop_table": true,
+}
 
 type config struct {
 	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=Access Key ID,description=AWS Access Key ID for materializing to DynamoDB." jsonschema_extras:"order=1"`

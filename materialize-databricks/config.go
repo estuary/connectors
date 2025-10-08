@@ -13,6 +13,7 @@ import (
 
 var featureFlagDefaults = map[string]bool{
 	"datetime_keys_as_string": true,
+	"drop_table":              true,
 }
 
 // config represents the endpoint configuration for sql server.
