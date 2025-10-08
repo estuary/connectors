@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"strings"
@@ -221,8 +222,18 @@ func (c *capture) doBackfill(
 	}
 
 	cursorField := binding.resource.getCursorField()
+
+	// Check if the collection is sharded. For sharded collections, we must use explicit sort
+	// to ensure consistent ordering across rounds, as natural order is non-deterministic
+	// when results are merged from multiple shards.
+	isSharded, err := c.isShardedCollection(ctx, binding.resource.Database, binding.resource.Collection)
+	if err != nil {
+		return fmt.Errorf("checking if collection is sharded: %w", err)
+	}
+	logEntry = logEntry.WithField("sharded", isSharded)
+
 	var opts *options.FindOptions
-	if cursorField == idProperty && binding.resource.getMode() == captureModeChangeStream {
+	if cursorField == idProperty && binding.resource.getMode() == captureModeChangeStream && !isSharded {
 		// By not specifying a sort parameter, MongoDB uses natural sort to order documents. Natural
 		// sort is approximately insertion order (but not guaranteed). We hint to MongoDB to use the _id
 		// index (an index that always exists) to speed up the process. Note that if we specify the sort
@@ -432,4 +443,37 @@ func makeBackfillDocument(binding bindingInfo, doc primitive.M) (json.RawMessage
 	}
 
 	return docJson, err
+}
+
+// isShardedCollection checks if a collection is sharded by running a $collStats aggregation.
+// For sharded collections, $collStats returns one document per shard.
+func (c *capture) isShardedCollection(ctx context.Context, database, collection string) (bool, error) {
+	pipeline := mongo.Pipeline{
+		{{Key: "$collStats", Value: bson.D{{Key: "count", Value: bson.D{}}}}},
+	}
+
+	cursor, err := c.client.Database(database).Collection(collection).Aggregate(ctx, pipeline)
+	if err != nil {
+		// Check if this is a NamespaceNotFound error (code 26). This can occur for new/empty
+		// collections that haven't been physically created yet. Treat these as non-sharded.
+		var cmdErr mongo.CommandError
+		if errors.As(err, &cmdErr) && cmdErr.Code == 26 {
+			log.WithFields(log.Fields{
+				"database":   database,
+				"collection": collection,
+			}).Debug("collection not found, assuming not sharded")
+			return false, nil
+		}
+		return false, fmt.Errorf("running $collStats aggregation: %w", err)
+	}
+	defer cursor.Close(ctx)
+
+	// If there are two or more documents, the collection is sharded (one doc per shard)
+	hasShards := cursor.Next(ctx) && cursor.Next(ctx)
+
+	if err := cursor.Err(); err != nil {
+		return false, fmt.Errorf("iterating $collStats results: %w", err)
+	}
+
+	return hasShards, nil
 }
