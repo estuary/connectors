@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<disbursement-detail>
+    <settlement-amount type="decimal">1000.00</settlement-amount>
+    <settlement-date type="date">2023-06-15</settlement-date>
+    <success type="boolean">true</success>
+    <retry type="boolean">false</retry>
+    <merchant-account>
+        <id>merchant_123</id>
+        <status>active</status>
+    </merchant-account>
+</disbursement-detail>

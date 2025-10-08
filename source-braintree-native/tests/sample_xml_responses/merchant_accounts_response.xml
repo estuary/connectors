@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<merchant-accounts type="collection">
+    <current-page-number type="integer">1</current-page-number>
+    <page-size type="integer">20</page-size>
+    <total-items type="integer">1</total-items>
+    <merchant-account>
+        <status>active</status>
+        <id>estuary</id>
+        <currency-iso-code>USD</currency-iso-code>
+        <default type="boolean">true</default>
+        <sub-merchant-account type="boolean">false</sub-merchant-account>
+        <accepted-payment-methods type="array">
+            <item>AMERICAN_EXPRESS</item>
+            <item>DISCOVER</item>
+            <item>JCB</item>
+            <item>MASTERCARD</item>
+            <item>VISA</item>
+            <item>PAYPAL_ACCOUNT</item>
+            <item>LOCAL_PAYMENT</item>
+        </accepted-payment-methods>
+        <bank-account/>
+        <paypal-account/>
+        <three-d-secure>
+            <v1>
+                <enabled type="boolean">false</enabled>
+                <card-types type="array"/>
+            </v1>
+            <v2>
+                <enabled type="boolean">true</enabled>
+                <card-types type="array">
+                    <item>AMERICAN_EXPRESS</item>
+                    <item>DISCOVER</item>
+                    <item>MASTERCARD</item>
+                    <item>VISA</item>
+                </card-types>
+            </v2>
+        </three-d-secure>
+        <type>MERCHANT_ACCOUNT</type>
+    </merchant-account>
+</merchant-accounts>

@@ -3,10 +3,9 @@ from typing import AsyncGenerator
 
 import braintree
 from braintree import BraintreeGateway
-from braintree.util.xml_util import XmlUtil
 from estuary_cdk.http import HTTPSession
 
-from .common import HEADERS, braintree_object_to_dict
+from .common import HEADERS, braintree_object_to_dict, braintree_xml_to_dict
 from ..models import FullRefreshResource, MerchantAccountsResponse
 
 
@@ -24,7 +23,7 @@ async def snapshot_merchant_accounts(
 
     while True:
         response = MerchantAccountsResponse.model_validate(
-            XmlUtil.dict_from_xml(
+            braintree_xml_to_dict(
                 await http.request(log, url, params=params, headers=HEADERS)
             )
         )

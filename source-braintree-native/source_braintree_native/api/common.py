@@ -5,6 +5,8 @@ from braintree import (
     )
 from braintree.attribute_getter import AttributeGetter
 from datetime import datetime, timedelta, UTC
+import xmltodict
+import re
 
 CONVENIENCE_OBJECTS = [
     'gateway'
@@ -22,6 +24,102 @@ TRANSACTION_SEARCH_LIMIT = 50_000
 
 SEARCH_PAGE_SIZE = 50
 SEMAPHORE_LIMIT = 20
+
+
+def braintree_xml_to_dict(xml_data):
+    def parse_node(obj):
+        if isinstance(obj, dict):
+            # Handle array-typed elements first - if it has @type="array", return the array content
+            if obj.get('@type') == 'array':
+                # Find the first non-@ key which contains the actual array items
+                for inner_key, inner_value in obj.items():
+                    if not inner_key.startswith('@'):
+                        # Convert the inner array content
+                        converted_inner = parse_node(inner_value)
+                        # Ensure it's a list (single items might not be in a list) 
+                        # but preserve the full structure of each item
+                        if not isinstance(converted_inner, list):
+                            converted_inner = [converted_inner] if converted_inner is not None else []
+                        return converted_inner
+                # No content found, return empty list
+                return []
+
+            # Check if this is a simple text node (has only text content + attributes)
+            non_attr_keys = [k for k in obj.keys() if not k.startswith('@')]
+
+            # Case 1: No child elements at all - empty element
+            if len(non_attr_keys) == 0:
+                # No content at all - return node_content with None  
+                return node_content(obj, None)
+            # Case 2: Only has #text key - this is simple text content
+            elif len(non_attr_keys) == 1 and '#text' in obj:
+                # Only text content - return node_content with text value
+                return node_content(obj, obj['#text'])
+            # Case 3: Has child elements - build dict (even if just one child)
+            # This matches Braintree SDK behavior: if there are child elements, build dict
+
+            # Case 2: Complex object with child elements - build dict
+            new_dict = {}
+            for key, value in obj.items():
+                # Skip XML metadata attributes and text content
+                if key.startswith('@') or key == '#text':
+                    continue
+
+                # Convert key format: "search-results" -> "search_results"  
+                new_key = key.replace('-', '_')
+                parsed_value = parse_node(value)
+
+                # Handle multiple elements with same name (convert to list)
+                if new_key in new_dict:
+                    if not isinstance(new_dict[new_key], list):
+                        new_dict[new_key] = [new_dict[new_key]]
+                    new_dict[new_key].append(parsed_value)
+                else:
+                    new_dict[new_key] = parsed_value
+            return new_dict
+
+        elif isinstance(obj, list):
+            return [parse_node(item) for item in obj]
+        elif obj is None:
+            # Handle None values (empty elements from xmltodict)
+            return ""
+        else:
+            # Simple string/number value
+            return obj
+
+    def node_content(parent, content):
+        parent_type = parent.get('@type') if isinstance(parent, dict) else None
+        parent_nil = parent.get('@nil') if isinstance(parent, dict) else None
+
+        if parent_nil == 'true':
+            return None
+        elif parent_type == 'integer':
+            return int(content) if content is not None and content != "" else 0
+        elif parent_type == 'boolean':
+            if content == "true" or content == "1":
+                return True
+            else:
+                return False
+        elif parent_type == 'datetime':
+            if content and content.strip():
+                # Parse datetime to match Braintree SDK behavior
+                # Remove timezone info and microseconds to match Braintree SDK
+                clean_content = re.sub(r'[TZ]', ' ', content).strip()
+                clean_content = re.sub(r'\.\d+', '', clean_content)  # Remove microseconds
+                return datetime.strptime(clean_content, '%Y-%m-%d %H:%M:%S')
+            return content or ""
+        elif parent_type == 'date':
+            if content and content.strip():
+                # Parse date to match Braintree SDK behavior  
+                return datetime.strptime(content, '%Y-%m-%d').date()
+            return content or ""
+        elif parent_type == 'decimal':
+            return content or ""  # Return as string like Braintree SDK, empty string if None
+        else:
+            return content or ""
+
+    parsed = xmltodict.parse(xml_data)
+    return parse_node(parsed)
 
 
 def braintree_object_to_dict(braintree_object):

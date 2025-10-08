@@ -16,6 +16,7 @@ aiohttp = ">=3.11.10"
 pycares = ">=4.9.0"
 requests = ">=2.32.4"
 urllib3 = ">=2.5.0"
+xmltodict = "^1.0.2"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"
