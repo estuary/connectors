@@ -25,39 +25,38 @@ SEMAPHORE_LIMIT = 20
 
 
 def braintree_object_to_dict(braintree_object):
-        """
-        Recursively convert a Braintree object and its nested objects to a dictionary.
-        Convenience objects intended to make subsequent Braintree requests easier are ommitted.
-        """
-        if isinstance(braintree_object, (Configuration, AddOnGateway, BraintreeGateway)):
-            return None
-        data = braintree_object.__dict__.copy()
-        # Remove convenience objects (like BraintreeGateways for making more requests).
-        for key in CONVENIENCE_OBJECTS:
-            data.pop(key, None)
+    """
+    Recursively convert a Braintree object and its nested objects to a dictionary.
+    Memory-optimized version that minimizes temporary objects.
+    """
+    if isinstance(braintree_object, (Configuration, AddOnGateway, BraintreeGateway)):
+        return None
 
-        for key, value in data.items():
-            if isinstance(value, AttributeGetter):
-                data[key] = braintree_object_to_dict(value)
-            elif isinstance(value, datetime):
-                data[key] =  value.replace(tzinfo=UTC)
-            elif hasattr(value, "__dict__"):
-                data[key] = braintree_object_to_dict(value)
-            elif isinstance(value, list):
-                new_value = []
-                for item in value:
-                    if hasattr(item, "__dict__"):
-                        new_value.append(braintree_object_to_dict(item))
-                    elif isinstance(item, datetime):
-                        new_value.append(item.replace(tzinfo=UTC))
-                    else:
-                        new_value.append(item)
+    source_data = braintree_object.__dict__
+    data = {}
 
-                data[key] = new_value
+    for key, value in source_data.items():
+        # Skip convenience and private attributes upfront
+        if key in CONVENIENCE_OBJECTS or key == '_setattrs':
+            continue
 
-        # Remove private attributes.
-        data.pop('_setattrs', None)
-        return data
+        if isinstance(value, AttributeGetter):
+            data[key] = braintree_object_to_dict(value)
+        elif isinstance(value, datetime):
+            data[key] = value.replace(tzinfo=UTC)
+        elif hasattr(value, "__dict__"):
+            data[key] = braintree_object_to_dict(value)
+        elif isinstance(value, list):
+            data[key] = [
+                braintree_object_to_dict(item) if hasattr(item, "__dict__")
+                else item.replace(tzinfo=UTC) if isinstance(item, datetime)
+                else item
+                for item in value
+            ]
+        else:
+            data[key] = value
+
+    return data
 
 
 def reduce_window_end(
