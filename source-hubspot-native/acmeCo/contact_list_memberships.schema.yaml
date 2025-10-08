@@ -19,39 +19,25 @@ $defs:
     title: Meta
     type: object
 additionalProperties: true
+description: "The enriched entity, containing the id of the list that contact belongs to."
 properties:
   _meta:
     $ref: "#/$defs/Meta"
     description: Document metadata
-  id:
-    title: Id
+  recordId:
+    title: Recordid
     type: string
-  created:
+  membershipTimestamp:
     format: date-time
-    title: Created
+    title: Membershiptimestamp
     type: string
-  type:
-    enum:
-      - SENT
-      - DROPPED
-      - PROCESSED
-      - DELIVERED
-      - DEFERRED
-      - BOUNCE
-      - OPEN
-      - CLICK
-      - PRINT
-      - FORWARD
-      - STATUSCHANGE
-      - SPAMREPORT
-      - SUPPRESSED
-      - SUPPRESSION
-      - UNBOUNCE
-    title: Type
+  listId:
+    title: Listid
     type: string
 required:
-  - id
-  - created
-title: EmailEvent
+  - recordId
+  - membershipTimestamp
+  - listId
+title: ContactListMembership
 type: object
 x-infer-schema: true

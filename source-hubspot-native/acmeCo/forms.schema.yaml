@@ -26,32 +26,22 @@ properties:
   id:
     title: Id
     type: string
-  created:
-    format: date-time
-    title: Created
-    type: string
-  type:
-    enum:
-      - SENT
-      - DROPPED
-      - PROCESSED
-      - DELIVERED
-      - DEFERRED
-      - BOUNCE
-      - OPEN
-      - CLICK
-      - PRINT
-      - FORWARD
-      - STATUSCHANGE
-      - SPAMREPORT
-      - SUPPRESSED
-      - SUPPRESSION
-      - UNBOUNCE
-    title: Type
-    type: string
+  createdAt:
+    anyOf:
+      - format: date-time
+        type: string
+      - type: "null"
+    title: Createdat
+  updatedAt:
+    anyOf:
+      - format: date-time
+        type: string
+      - type: "null"
+    title: Updatedat
 required:
   - id
-  - created
-title: EmailEvent
+  - createdAt
+  - updatedAt
+title: Form
 type: object
 x-infer-schema: true

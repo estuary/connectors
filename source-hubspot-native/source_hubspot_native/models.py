@@ -33,6 +33,7 @@ scopes = [
 optional_scopes = [
     "automation",
     "content",
+    "crm.lists.read",
     "crm.objects.custom.read",
     "crm.objects.feedback_submissions.read",
     "crm.objects.goals.read",
@@ -148,6 +149,9 @@ class Names(StrEnum):
     partner_clients = auto()
     marketing_event = auto()
     marketing_emails = auto()
+    contact_lists = auto()
+    contact_list_memberships = auto()
+    feedback_submissions = auto()
 
 
 # A Property is a HubSpot or HubSpot-user defined attribute that's
@@ -351,6 +355,10 @@ class LineItem(BaseCRMObject):
     invoices: list[int] = []
     quotes: list[int] = []
     subscriptions: list[int] = []
+
+
+class FeedbackSubmission(BaseCRMObject):
+    ASSOCIATED_ENTITIES = []
 
 
 # An Association, as returned by the v4 associations API.
@@ -594,3 +602,36 @@ class CustomObjectSearchResult(BaseModel):
 
     id: int
     properties: Properties
+
+
+class ContactList(BaseDocument, extra="allow"):
+    listId: str
+    updatedAt: AwareDatetime
+    additionalProperties: dict[str, Any]
+
+
+class ContactListSearch(BaseModel, extra="allow"):
+    lists: list[ContactList]
+
+    hasMore: bool
+    offset: int
+
+
+class ContactListMembership(BaseDocument, extra="allow"):
+    """
+    The enriched list membership entity, containing the id of the list that contact belongs to.
+
+    This corresponds to the schema returned by the "/crm/v3/lists/{listId}/memberships" endpoint
+    (https://developers.hubspot.com/docs/api-reference/crm-lists-v3/memberships/get-crm-v3-lists-listId-memberships).
+
+    The alternative "/crm/v3/lists/records/{objectTypeId}/{recordId}/memberships" endpoint
+    (https://developers.hubspot.com/docs/api-reference/crm-lists-v3/memberships/get-crm-v3-lists-records-objectTypeId-recordId-memberships)
+    yields more data, but since getting added to a list doesn't update a contact's
+    `lastmodifieddate` there's no way to tell which contacts to request memberships for.
+    List `updatedAt` fields do not get updated either, but we assume there will always be
+    less lists than contacts to query.
+    """
+
+    listId: str
+    recordId: str
+    membershipTimestamp: AwareDatetime
