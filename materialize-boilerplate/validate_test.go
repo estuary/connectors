@@ -62,7 +62,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "same binding again - standard updates",
@@ -72,7 +72,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "new materialization - delta updates",
@@ -82,7 +82,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "same binding again - delta updates",
@@ -92,7 +92,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "binding update with incompatible changes",
@@ -102,7 +102,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "incompatible-changes.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "fields exist in destination but not in collection",
@@ -112,7 +112,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "fewer-fields.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "change root document projection for standard updates",
@@ -122,7 +122,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "alternate-root.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "change root document projection for delta updates",
@@ -132,7 +132,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "alternate-root.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "increment backfill counter",
@@ -142,7 +142,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "increment-backfill.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "increment backfill counter for disabled -> enabled binding",
@@ -152,7 +152,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "increment-backfill.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "table already exists with identical spec",
@@ -162,7 +162,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "base.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true, "flow_document": true},
+			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true, "flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "table already exists with incompatible proposed spec",
@@ -172,7 +172,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "incompatible-changes.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true, "flow_document": true},
+			featureFlags:       map[string]bool{"allow_existing_tables_for_new_bindings": true, "flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "field names over the length limit are forbidden",
@@ -182,7 +182,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "long-fields.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     20,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "can materialize a subset of key fields",
@@ -192,7 +192,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "key-subset.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 		{
 			name:               "cannot add or remove selected key fields for standard updates",
@@ -202,7 +202,7 @@ func TestValidate(t *testing.T) {
 			proposedSpec:       loadValidateSpec(t, "key-subset.flow.proto"),
 			fieldNameTransform: simpleTestTransform,
 			maxFieldLength:     0,
-			featureFlags:       map[string]bool{"flow_document": true},
+			featureFlags:       map[string]bool{"flow_document": true, "drop_table": true},
 		},
 	}
 
@@ -232,7 +232,7 @@ func TestValidate(t *testing.T) {
 	t.Run("new binding with existing table - feature flag disabled (default)", func(t *testing.T) {
 		// Table exists but no lastBinding (new binding) - should error
 		is := testInfoSchemaFromSpec(t, loadValidateSpec(t, "base.flow.proto"), simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
+		featureFlags := map[string]bool{"flow_document": true, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil) // No feature flags
 
 		_, err := validator.ValidateBinding(
@@ -251,7 +251,7 @@ func TestValidate(t *testing.T) {
 	t.Run("new binding with existing table - feature flag enabled", func(t *testing.T) {
 		// Table exists but no lastBinding (new binding) - should succeed with feature flag
 		is := testInfoSchemaFromSpec(t, loadValidateSpec(t, "base.flow.proto"), simpleTestTransform)
-		featureFlags := map[string]bool{"allow_existing_tables_for_new_bindings": true}
+		featureFlags := map[string]bool{"allow_existing_tables_for_new_bindings": true, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
 
 		cs, err := validator.ValidateBinding(
@@ -271,7 +271,7 @@ func TestValidate(t *testing.T) {
 
 		// Use the simpleTestTransform which appends "_transformed" to field names
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
+		featureFlags := map[string]bool{"flow_document": true, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
 
 		cs, err := validator.ValidateBinding(
@@ -299,7 +299,7 @@ func TestValidate(t *testing.T) {
 		// Use identity transform (no change to field names)
 		identityTransform := func(s string) string { return s }
 		is := testInfoSchemaFromSpec(t, nil, identityTransform)
-		featureFlags := map[string]bool{"flow_document": true}
+		featureFlags := map[string]bool{"flow_document": true, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
 
 		cs, err := validator.ValidateBinding(
@@ -326,7 +326,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].Collection.Projections[3].Field = "keyRenamedToSomethingThatIsReallyLong"
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
+		featureFlags := map[string]bool{"flow_document": true, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 20, true, nil)
 
 		_, err := validator.ValidateBinding(
@@ -348,7 +348,7 @@ func TestValidate(t *testing.T) {
 		// it has already been materialized, and is either the root document projection or a
 		// collection key.
 		is := testInfoSchemaFromSpec(t, proposed, simpleTestTransform)
-		featureFlags := map[string]bool{"allow_existing_tables_for_new_bindings": true}
+		featureFlags := map[string]bool{"allow_existing_tables_for_new_bindings": true, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 20, true, featureFlags)
 
 		_, err := validator.ValidateBinding(
@@ -370,7 +370,7 @@ func TestValidate(t *testing.T) {
 		existing.Bindings[0].DeltaUpdates = true
 
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
+		featureFlags := map[string]bool{"flow_document": true, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
 
 		// Enabled binding.
@@ -405,7 +405,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].DeltaUpdates = true
 
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
+		featureFlags := map[string]bool{"flow_document": true, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
 
 		_, err := validator.ValidateBinding(
@@ -427,7 +427,7 @@ func TestValidate(t *testing.T) {
 		proposed.Bindings[0].Collection.Projections[3].Inference.DefaultJson = nil
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
+		featureFlags := map[string]bool{"flow_document": true, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
 
 		_, err := validator.ValidateBinding(
@@ -446,7 +446,7 @@ func TestValidate(t *testing.T) {
 		proposed := loadValidateSpec(t, "nullable-key.flow.proto")
 
 		is := testInfoSchemaFromSpec(t, nil, simpleTestTransform)
-		featureFlags := map[string]bool{"flow_document": true}
+		featureFlags := map[string]bool{"flow_document": true, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
 
 		_, err := validator.ValidateBinding(
@@ -529,7 +529,7 @@ func TestFlowDocumentFeatureFlag(t *testing.T) {
 		existing := loadValidateSpec(t, "base.flow.proto")
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
 
-		featureFlags := map[string]bool{"flow_document": true}
+		featureFlags := map[string]bool{"flow_document": true, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
 		constraints, err := validator.validateNewBinding(collection, false, map[string]json.RawMessage{})
 		require.NoError(t, err)
@@ -551,7 +551,7 @@ func TestFlowDocumentFeatureFlag(t *testing.T) {
 		existing := loadValidateSpec(t, "base.flow.proto")
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
 
-		featureFlags := map[string]bool{"flow_document": false}
+		featureFlags := map[string]bool{"flow_document": false, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
 		constraints, err := validator.validateNewBinding(collection, false, map[string]json.RawMessage{})
 		require.NoError(t, err)
@@ -572,7 +572,7 @@ func TestFlowDocumentFeatureFlag(t *testing.T) {
 		existing := loadValidateSpec(t, "base.flow.proto")
 		is := testInfoSchemaFromSpec(t, existing, simpleTestTransform)
 
-		featureFlags := map[string]bool{"flow_document": false}
+		featureFlags := map[string]bool{"flow_document": false, "drop_table": true}
 		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
 		constraints, err := validator.validateNewBinding(collection, true, map[string]json.RawMessage{}) // Delta updates = true
 		require.NoError(t, err)
