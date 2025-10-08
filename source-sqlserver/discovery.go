@@ -282,21 +282,27 @@ func getColumns(ctx context.Context, conn *sql.DB, uppercaseQuery bool) ([]sqlca
 				collation = *collationName
 			}
 			var fullType = typeName
+			var columnSize int = 64 // For historical reasons we want to overestimate if CHAR_MAX_LENGTH is null
+			if maxCharLength != nil {
+				columnSize = *maxCharLength
+			}
 			if slices.Contains([]string{"char", "varchar", "nchar", "nvarchar"}, typeName) {
-				// We arbitrarily use max(64, <database maximum>) here just to be extra conservative
-				// and provide a sane default in the event of NULL or zero values. The size here only
-				// matters for the 'declared parameter' hack used in backfill queries, so overestimating
-				// is very benign.
-				var columnSize int = 64
-				if maxCharLength != nil && *maxCharLength >= columnSize {
-					columnSize = *maxCharLength
-				}
 				fullType = fmt.Sprintf("%s(%d)", typeName, columnSize)
 			}
 			ci.DataType = &sqlserverTextColumnType{
 				Type:      typeName,
 				Collation: collation,
 				FullType:  fullType,
+				MaxLength: columnSize,
+			}
+		} else if slices.Contains([]string{"binary", "varbinary"}, typeName) {
+			var columnSize int
+			if maxCharLength != nil {
+				columnSize = *maxCharLength
+			}
+			ci.DataType = &sqlserverBinaryColumnType{
+				Type:      typeName,
+				MaxLength: columnSize,
 			}
 		} else {
 			ci.DataType = typeName
@@ -309,11 +315,21 @@ func getColumns(ctx context.Context, conn *sql.DB, uppercaseQuery bool) ([]sqlca
 type sqlserverTextColumnType struct {
 	Type      string // The basic type of the column (char / varchar / nchar / nvarchar / text / ntext)
 	Collation string // The collation used by the column
-	FullType  string // The full type of the column, such as `varchar(32)` for example
+	FullType  string // The full type of the column, such as `varchar(32)` for example (used for backfill queries)
+	MaxLength int    // The exact maximum length of the column
 }
 
 func (t sqlserverTextColumnType) String() string {
 	return t.FullType
+}
+
+type sqlserverBinaryColumnType struct {
+	Type      string // The basic type of the column (binary / varbinary)
+	MaxLength int    // The exact maximum length of the column in bytes
+}
+
+func (t sqlserverBinaryColumnType) String() string {
+	return fmt.Sprintf("%s(%d)", t.Type, t.MaxLength)
 }
 
 // Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
@@ -444,6 +460,38 @@ func (db *sqlserverDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo,
 		if schema, ok = db.databaseTypeToJSON(typeInfo.Type); !ok {
 			return nil, fmt.Errorf("unhandled SQL Server type %q (found on column %q of table %q)", typeInfo.Type, column.Name, column.TableName)
 		}
+		// Add length constraints for char/varchar/nchar/nvarchar
+		if typeInfo.MaxLength > 0 {
+			switch typeInfo.Type {
+			case "char", "nchar":
+				// CHAR/NCHAR - fixed-length
+				var length = uint64(typeInfo.MaxLength)
+				schema.minLength = &length
+				schema.maxLength = &length
+			case "varchar", "nvarchar":
+				// VARCHAR/NVARCHAR - variable-length with limit
+				var length = uint64(typeInfo.MaxLength)
+				schema.maxLength = &length
+			}
+		}
+	} else if typeInfo, ok := column.DataType.(*sqlserverBinaryColumnType); ok {
+		if schema, ok = db.databaseTypeToJSON(typeInfo.Type); !ok {
+			return nil, fmt.Errorf("unhandled SQL Server type %q (found on column %q of table %q)", typeInfo.Type, column.Name, column.TableName)
+		}
+		// Add length constraints for binary/varbinary
+		// Binary data is base64 encoded: every 3 bytes becomes 4 characters
+		if typeInfo.MaxLength > 0 {
+			var base64Length = uint64((typeInfo.MaxLength + 2) / 3 * 4)
+			switch typeInfo.Type {
+			case "binary":
+				// BINARY - fixed-length
+				schema.minLength = &base64Length
+				schema.maxLength = &base64Length
+			case "varbinary":
+				// VARBINARY - variable-length with limit
+				schema.maxLength = &base64Length
+			}
+		}
 	} else if typeName, ok := column.DataType.(string); ok {
 		if schema, ok = db.databaseTypeToJSON(typeName); !ok {
 			return nil, fmt.Errorf("unhandled SQL Server type %q (found on column %q of table %q)", typeName, column.Name, column.TableName)
@@ -467,6 +515,8 @@ type columnSchema struct {
 	nullable        bool
 	extras          map[string]interface{}
 	jsonType        string
+	minLength       *uint64
+	maxLength       *uint64
 }
 
 func (s columnSchema) toType() *jsonschema.Schema {
@@ -474,6 +524,8 @@ func (s columnSchema) toType() *jsonschema.Schema {
 		Format:      s.format,
 		Description: s.description,
 		Extras:      make(map[string]interface{}),
+		MinLength:   s.minLength,
+		MaxLength:   s.maxLength,
 	}
 	for k, v := range s.extras {
 		out.Extras[k] = v

@@ -15,14 +15,16 @@ Binding 0:
           "$anchor": "DboTest_ComputedColumn_18851564",
           "properties": {
             "a": {
-              "description": "(source type: varchar(64))",
+              "maxLength": 32,
+              "description": "(source type: varchar(32))",
               "type": [
                 "string",
                 "null"
               ]
             },
             "b": {
-              "description": "(source type: varchar(64))",
+              "maxLength": 32,
+              "description": "(source type: varchar(32))",
               "type": [
                 "string",
                 "null"

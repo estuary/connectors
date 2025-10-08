@@ -124,10 +124,10 @@ func TestColumnCollations(t *testing.T) {
 
 			// Simulate what we'd end up with after all the discovery->backfill plumbing.
 			var keyColumns = []string{"id"}
-			var idCollation = &sqlserverTextColumnType{strings.ToLower(tc.ColumnType), tc.CollationName, tc.ColumnType + "(32)"}
+			var idCollation = &sqlserverTextColumnType{strings.ToLower(tc.ColumnType), tc.CollationName, tc.ColumnType + "(32)", 32}
 			var columnTypes = map[string]any{
 				"id":   idCollation,
-				"data": &sqlserverTextColumnType{"text", "SQL_Latin1_General_CP1_CI_AS", "TEXT"},
+				"data": &sqlserverTextColumnType{"text", "SQL_Latin1_General_CP1_CI_AS", "TEXT", 0},
 			}
 
 			var prevID string
