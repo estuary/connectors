@@ -23,35 +23,21 @@ properties:
   _meta:
     $ref: "#/$defs/Meta"
     description: Document metadata
-  id:
-    title: Id
+  listId:
+    title: Listid
     type: string
-  created:
+  updatedAt:
     format: date-time
-    title: Created
+    title: Updatedat
     type: string
-  type:
-    enum:
-      - SENT
-      - DROPPED
-      - PROCESSED
-      - DELIVERED
-      - DEFERRED
-      - BOUNCE
-      - OPEN
-      - CLICK
-      - PRINT
-      - FORWARD
-      - STATUSCHANGE
-      - SPAMREPORT
-      - SUPPRESSED
-      - SUPPRESSION
-      - UNBOUNCE
-    title: Type
-    type: string
+  additionalProperties:
+    additionalProperties: true
+    title: Additionalproperties
+    type: object
 required:
-  - id
-  - created
-title: EmailEvent
+  - listId
+  - updatedAt
+  - additionalProperties
+title: ContactList
 type: object
 x-infer-schema: true
