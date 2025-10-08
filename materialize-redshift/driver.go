@@ -163,6 +163,7 @@ func (c config) toS3Client(ctx context.Context) (*s3.Client, error) {
 			credentials.NewStaticCredentialsProvider(c.AWSAccessKeyID, c.AWSSecretAccessKey, ""),
 		),
 		awsConfig.WithRegion(c.Region),
+		awsConfig.WithRetryMaxAttempts(7),
 	)
 	if err != nil {
 		return nil, err
