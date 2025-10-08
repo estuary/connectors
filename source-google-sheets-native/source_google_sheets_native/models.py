@@ -12,12 +12,30 @@ from estuary_cdk.capture.common import (
     ResourceConfig,
     ResourceState,
 )
+from estuary_cdk.flow import (
+    GoogleServiceAccount,
+    GoogleServiceAccountSpec,
+)
 
+
+scopes = [
+    "https://www.googleapis.com/auth/spreadsheets.readonly",
+    "https://www.googleapis.com/auth/drive.readonly",
+]
 
 # TODO(johnny): Lift this string building into higher-order helpers.
 OAUTH2_SPEC = OAuth2Spec(
     provider="google",
-    authUrlTemplate="https://accounts.google.com/o/oauth2/auth?access_type=offline&prompt=consent&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&scope=https://www.googleapis.com/auth/spreadsheets.readonly https://www.googleapis.com/auth/drive.readonly&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+    authUrlTemplate=(
+        "https://accounts.google.com/o/oauth2/auth?"
+        "access_type=offline&"
+        "prompt=consent&"
+        "client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&"
+        "redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&"
+        "response_type=code&"
+        f"scope={" ".join(scopes)}&"
+        "state={{#urlencode}}{{{ state }}}{{/urlencode}}"
+    ),
     accessTokenUrlTemplate="https://oauth2.googleapis.com/token",
     accessTokenBody=(
         '{"grant_type": "authorization_code", "client_id": "{{{ client_id }}}", "client_secret": "{{{ client_secret }}}", "redirect_uri": "{{{ redirect_uri }}}", "code": "{{{ code }}}"}'
@@ -33,8 +51,12 @@ else:
     OAuth2Credentials = BaseOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
 
 
+GOOGLE_SPEC = GoogleServiceAccountSpec(
+    scopes=scopes,
+)
+
 class EndpointConfig(BaseModel):
-    credentials: OAuth2Credentials | AccessToken = Field(
+    credentials: OAuth2Credentials | GoogleServiceAccount | AccessToken = Field(
         discriminator="credentials_title",
         title="Authentication",
     )
