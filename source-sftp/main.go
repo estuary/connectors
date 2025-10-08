@@ -145,6 +145,12 @@ var additionalKexAlgos = []string{
 	"diffie-hellman-group1-sha1",    // kexAlgoDH1SHA1
 }
 
+// additionalCiphers specifies any additional ciphers which we support which
+// aren't in the defaults from golang.org/x/crypto/ssh/common.go
+var additionalCiphers = []string{
+	"aes256-cbc",
+}
+
 func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
 	var user = cfg.Credentials.Username
 	if len(user) == 0 && len(cfg.Username) > 0 {
@@ -157,9 +163,10 @@ func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	// Extend the default list of key-exchange algorithms with a few additional ones we want to support.
+	// Extend the default list of key-exchange algorithms and ciphers with additional ones we want to support.
 	sshConfig.SetDefaults()
 	sshConfig.KeyExchanges = append(sshConfig.KeyExchanges, additionalKexAlgos...)
+	sshConfig.Ciphers = append(sshConfig.Ciphers, additionalCiphers...)
 
 	// Legacy authentication method
 	if cfg.Credentials.Type == "" && cfg.Password != "" {
