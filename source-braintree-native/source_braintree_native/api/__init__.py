@@ -27,6 +27,16 @@ from ..models import IncrementalResource, SearchResponse, IncrementalResourceBra
 # Braintree, so we enforce that dispute date windows must be at least 24 hours wide.
 MIN_DISPUTES_WINDOW_SIZE = 24
 
+# We've observed updates in Braintree sometimes take a few seconds to appear
+# in the API, and the connector has missed updated transactions due to this.
+# This could be due to minor distributed clock or eventual consistency issues.
+# To address both, we can ensure the incremental tasks never fetch data more
+# recent than 15 minutes in the past. This caps how "real-time" transactions are,
+# but it's a simple fix that's easily rolled back if we come up with a better solution.
+# The default resource interval is already 5 minutes, so the connector isn't really
+# "real-time" anyway.
+LAG = timedelta(minutes=15)
+
 DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
@@ -56,9 +66,15 @@ async def fetch_transactions(
         http=http,
         base_url=base_url,
         start=log_cursor,
-        initial_end=min(log_cursor + timedelta(hours=window_size), datetime.now(tz=UTC)),
+        initial_end=min(
+            log_cursor + timedelta(hours=window_size),
+            datetime.now(tz=UTC) - LAG,
+        ),
         log=log,
     )
+
+    if log_cursor >= end:
+        return
 
     # When a transaction's disbursement_details/disbursed_date is updated, none of the TRANSACTION_SEARCH_FIELDS
     # or the non-searchable updated_at field are updated. Meaning, only incrementally replicating based off
@@ -151,9 +167,15 @@ async def fetch_incremental_resources(
         path=path,
         field_name="created_at",
         start=log_cursor,
-        initial_end=min(log_cursor + timedelta(hours=window_size), datetime.now(tz=UTC)),
+        initial_end=min(
+            log_cursor + timedelta(hours=window_size),
+            datetime.now(tz=UTC) - LAG,
+        ),
         log=log,
     )
+
+    if log_cursor >= end:
+        return
 
     async for doc in fetch_searchable_resources_created_between(
         http,
@@ -235,7 +257,13 @@ async def fetch_disputes(
     assert isinstance(log_cursor, datetime)
     most_recent_created_at = log_cursor
     window_end = log_cursor + timedelta(hours=max(window_size, MIN_DISPUTES_WINDOW_SIZE))
-    end = min(window_end, datetime.now(tz=UTC)).replace(microsecond=0)
+    end = min(
+        window_end,
+        datetime.now(tz=UTC) - LAG,
+    ).replace(microsecond=0)
+
+    if log_cursor >= end:
+        return
 
     # Braintree does not let us search disputes based on the created_at field, and the received_date field is
     # the best alternative that Braintree exposes for searching. Since received_date can be earlier than
