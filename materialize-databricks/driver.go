@@ -14,7 +14,6 @@ import (
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
-	databricks_auth "github.com/estuary/connectors/go/auth/databricks"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -68,7 +67,7 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-databricks",
-		OAuth2:           databricks_auth.OAuthSpec(),
+		OAuth2:           OAuthSpec(),
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
 		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
@@ -139,14 +138,14 @@ func newTransactor(
 	var cfg = ep.Config
 
 	var wsClientConfig *databricks.Config
-	if cfg.Credentials.AuthType == databricks_auth.PAT {
+	if cfg.Credentials.AuthType == PAT {
 		wsClientConfig = &databricks.Config{
 			Host:               fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
 			Token:              cfg.Credentials.PersonalAccessToken,
 			Credentials:        dbConfig.PatCredentials{}, // enforce PAT auth
 			HTTPTimeoutSeconds: 5 * 60,                    // This is necessary for file uploads as they can sometimes take longer than the default 60s
 		}
-	} else if cfg.Credentials.AuthType == databricks_auth.OAuth2 {
+	} else if cfg.Credentials.AuthType == OAuth2 {
 		wsClientConfig = &databricks.Config{
 			Host:               fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
 			Token:              cfg.Credentials.AccessToken,

@@ -5,7 +5,6 @@ import (
 	"net/url"
 	"strings"
 
-	databricks_auth "github.com/estuary/connectors/go/auth/databricks"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 )
@@ -21,7 +20,7 @@ type config struct {
 	CatalogName   string                              `json:"catalog_name" jsonschema:"title=Catalog Name,description=Name of your Unity Catalog." jsonschema_extras:"order=2"`
 	SchemaName    string                              `json:"schema_name" jsonschema:"title=Schema Name,description=Default schema to materialize to,default=default" jsonschema_extras:"order=3"`
 	HardDelete    bool                                `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
-	Credentials   *databricks_auth.CredentialConfig   `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=5"`
+	Credentials   *CredentialConfig   `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=5"`
 	Schedule      m.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 	DBTJobTrigger dbt.JobConfig    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
@@ -80,9 +79,9 @@ func (c config) ToURI() string {
 	params.Add("userAgentEntry", "Estuary Technologies Flow")
 
 	var token string
-	if c.Credentials.AuthType == databricks_auth.PAT {
+	if c.Credentials.AuthType == PAT {
 		token = c.Credentials.PersonalAccessToken
-	} else if c.Credentials.AuthType == databricks_auth.OAuth2 {
+	} else if c.Credentials.AuthType == OAuth2 {
 		// OAuth2 authentication using access token
 		// The token is used similar to PAT
 		token = c.Credentials.AccessToken

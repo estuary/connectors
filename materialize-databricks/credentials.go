@@ -1,4 +1,4 @@
-package databricks
+package main
 
 import (
 	"encoding/json"
