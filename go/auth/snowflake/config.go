@@ -3,11 +3,13 @@ package snowflake
 import (
 	"crypto/rsa"
 	"crypto/x509"
+	"encoding/json"
 	"encoding/pem"
 	"fmt"
 	"strings"
 
 	"github.com/invopop/jsonschema"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	orderedmap "github.com/wk8/go-ordered-map/v2"
 )
 
