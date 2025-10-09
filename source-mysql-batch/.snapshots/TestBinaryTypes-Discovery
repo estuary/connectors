@@ -86,7 +86,6 @@ Binding 0:
           },
           "binary_col": {
             "maxLength": 24,
-            "minLength": 24,
             "description": "(source type: binary)",
             "type": [
               "string",
