@@ -199,11 +199,6 @@
             "title": "Discovery Schema Selection",
             "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."
           },
-          "discover_only_published": {
-            "type": "boolean",
-            "title": "Discover Only Published Tables",
-            "description": "When set the capture will only discover tables which have already been added to the publication. This can be useful if you intend to manage which tables are captured by adding or removing them from the publication."
-          },
           "min_backfill_xid": {
             "type": "string",
             "title": "Minimum Backfill XID",
