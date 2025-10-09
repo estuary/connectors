@@ -36,15 +36,15 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: `float`, ExpectType: `{"type":["number","null"]}`, InputValue: `1234.50`, ExpectValue: `1234.5`},
 		{ColumnType: `real`, ExpectType: `{"type":["number","null"]}`, InputValue: `1234.50`, ExpectValue: `1234.5`},
 
-		{ColumnType: `char(6)`, ExpectType: `{"type":["string","null"]}`, InputValue: `asdf`, ExpectValue: `"asdf  "`},
-		{ColumnType: `varchar(6)`, ExpectType: `{"type":["string","null"]}`, InputValue: `asdf`, ExpectValue: `"asdf"`},
+		{ColumnType: `char(6)`, ExpectType: `{"type":["string","null"],"minLength":6,"maxLength":6}`, InputValue: `asdf`, ExpectValue: `"asdf  "`},
+		{ColumnType: `varchar(6)`, ExpectType: `{"type":["string","null"],"maxLength":6}`, InputValue: `asdf`, ExpectValue: `"asdf"`},
 		{ColumnType: `text`, ExpectType: `{"type":["string","null"]}`, InputValue: `asdf`, ExpectValue: `"asdf"`},
-		{ColumnType: `nchar(6)`, ExpectType: `{"type":["string","null"]}`, InputValue: `asdf`, ExpectValue: `"asdf  "`},
-		{ColumnType: `nvarchar(6)`, ExpectType: `{"type":["string","null"]}`, InputValue: `asdf`, ExpectValue: `"asdf"`},
+		{ColumnType: `nchar(6)`, ExpectType: `{"type":["string","null"],"minLength":6,"maxLength":6}`, InputValue: `asdf`, ExpectValue: `"asdf  "`},
+		{ColumnType: `nvarchar(6)`, ExpectType: `{"type":["string","null"],"maxLength":6}`, InputValue: `asdf`, ExpectValue: `"asdf"`},
 		{ColumnType: `ntext`, ExpectType: `{"type":["string","null"]}`, InputValue: `asdf`, ExpectValue: `"asdf"`},
 
-		{ColumnType: `binary(8)`, ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeAAAAAA="`},
-		{ColumnType: `varbinary(8)`, ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
+		{ColumnType: `binary(8)`, ExpectType: `{"type":["string","null"],"contentEncoding":"base64","minLength":12,"maxLength":12}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeAAAAAA="`},
+		{ColumnType: `varbinary(8)`, ExpectType: `{"type":["string","null"],"contentEncoding":"base64","maxLength":12}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
 		{ColumnType: `image`, ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
 
 		{ColumnType: `date`, ExpectType: `{"type":["string","null"],"format":"date"}`, InputValue: `1991-08-31`, ExpectValue: `"1991-08-31"`},

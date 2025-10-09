@@ -19,6 +19,7 @@ Binding 0:
               "description": "(source type: non-nullable int)"
             },
             "b": {
+              "maxLength": 2000,
               "description": "(source type: varchar(2000))",
               "type": [
                 "string",
@@ -30,6 +31,7 @@ Binding 0:
               "description": "(source type: non-nullable real)"
             },
             "d": {
+              "maxLength": 255,
               "description": "(source type: varchar(255))",
               "type": [
                 "string",

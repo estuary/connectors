@@ -30,7 +30,8 @@ Binding 0:
             },
             "id": {
               "type": "string",
-              "description": "(source type: non-nullable varchar(64))"
+              "maxLength": 8,
+              "description": "(source type: non-nullable varchar(8))"
             }
           }
         }

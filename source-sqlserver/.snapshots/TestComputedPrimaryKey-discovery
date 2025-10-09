@@ -17,7 +17,8 @@ Binding 0:
               "description": "(source type: non-nullable int)"
             },
             "data": {
-              "description": "(source type: varchar(64))",
+              "maxLength": 32,
+              "description": "(source type: varchar(32))",
               "type": [
                 "string",
                 "null"
