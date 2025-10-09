@@ -12,7 +12,9 @@ import (
 	"github.com/estuary/flow/go/protocols/materialize"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	"drop_table": true,
+}
 
 type config struct {
 	filesink.S3StoreConfig

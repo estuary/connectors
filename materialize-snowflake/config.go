@@ -19,6 +19,7 @@ var featureFlagDefaults = map[string]bool{
 	// authentication.
 	"snowpipe_streaming":      true,
 	"datetime_keys_as_string": true,
+	"drop_table":              true,
 }
 
 type config struct {

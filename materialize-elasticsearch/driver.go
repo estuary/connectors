@@ -23,7 +23,9 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-var featureFlagDefaults = map[string]bool{}
+var featureFlagDefaults = map[string]bool{
+	"drop_table": true,
+}
 
 type sshForwarding struct {
 	SshEndpoint string `json:"sshEndpoint"`

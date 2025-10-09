@@ -18,6 +18,7 @@ import (
 
 var featureFlagDefaults = map[string]bool{
 	"datetime_keys_as_string": true,
+	"drop_table":              true,
 }
 
 type config struct {

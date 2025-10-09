@@ -21,6 +21,7 @@ var featureFlagDefaults = map[string]bool{
 	// columns, instead of the historical behavior of strings.
 	"objects_and_arrays_as_json": true,
 	"datetime_keys_as_string":    true,
+	"drop_table":                 true,
 }
 
 type config struct {
