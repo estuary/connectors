@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<search-results>
+    <current-page-number type="integer">1</current-page-number>
+    <page-size type="integer">50</page-size>
+    <total-items type="integer">2</total-items>
+    <ids type="array">
+        <item>id_1</item>
+        <item>id_2</item>
+    </ids>
+    <subscriptions type="array">
+        <subscription>
+            <id>sub_1</id>
+            <price type="decimal">19.99</price>
+            <trial-period type="boolean">false</trial-period>
+            <add-ons type="array">
+                <add-on>
+                    <id>addon_1</id>
+                    <amount type="decimal">5.00</amount>
+                </add-on>
+            </add-ons>
+            <descriptor>
+                <name>Test Service</name>
+                <phone>555-0123</phone>
+                <url nil="true"></url>
+            </descriptor>
+        </subscription>
+    </subscriptions>
+</search-results>

@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<subscription>
+    <id>sub_123</id>
+    <status>Active</status>
+    <price type="decimal">29.99</price>
+    <billing-cycle-attempts type="integer">1</billing-cycle-attempts>
+    <never-expires type="boolean">false</never-expires>
+    <plan-id>plan_basic</plan-id>
+    <discounts type="array">
+        <discount>
+            <id>discount_1</id>
+            <amount type="decimal">5.00</amount>
+            <name>Early Bird</name>
+        </discount>
+        <discount>
+            <id>discount_2</id>
+            <amount type="decimal">2.50</amount>
+            <name>Loyalty</name>
+        </discount>
+    </discounts>
+    <transactions type="array">
+        <transaction>
+            <id>txn_456</id>
+            <amount type="decimal">27.49</amount>
+            <status>settled</status>
+            <created-at type="datetime">2023-06-01T12:00:00Z</created-at>
+        </transaction>
+    </transactions>
+</subscription>

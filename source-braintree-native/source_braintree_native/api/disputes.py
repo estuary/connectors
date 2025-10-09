@@ -3,10 +3,9 @@ from logging import Logger
 from typing import AsyncGenerator
 
 import braintree
-from braintree.util.xml_util import XmlUtil
 from estuary_cdk.http import HTTPSession
 
-from .common import HEADERS, SEARCH_PAGE_SIZE, braintree_object_to_dict
+from .common import HEADERS, SEARCH_PAGE_SIZE, braintree_object_to_dict, braintree_xml_to_dict
 from ..models import IncrementalResource, DisputesSearchResponse
 
 # Unlike the other incremental resource endpoints, the number of records returned by a single disputes
@@ -33,7 +32,7 @@ async def fetch_disputes_received_between(
 
     while True:
         response = DisputesSearchResponse.model_validate(
-            XmlUtil.dict_from_xml(
+            braintree_xml_to_dict(
                 await http.request(log, url, "POST", params, body, headers=HEADERS)
             )
         )

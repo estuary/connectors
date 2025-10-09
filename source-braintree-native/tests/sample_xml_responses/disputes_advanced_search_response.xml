@@ -1,0 +1,218 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<disputes type="collection">
+    <current-page-number type="integer">1</current-page-number>
+    <page-size type="integer">50</page-size>
+    <total-items type="integer">2</total-items>
+    <dispute>
+        <id>h265trcz93982trf</id>
+        <global-id>ZGlzcHV0ZV9oMjY1dHJjejkzOTgydHJm</global-id>
+        <amount>83.00</amount>
+        <amount-disputed>83.00</amount-disputed>
+        <amount-won>0.00</amount-won>
+        <case-number>CB078633484687</case-number>
+        <created-at type="dateTime">2024-11-26T14:28:37Z</created-at>
+        <currency-iso-code>USD</currency-iso-code>
+        <date-opened type="date">2024-11-26</date-opened>
+        <date-won nil="true"/>
+        <evidence-submittable type="boolean">false</evidence-submittable>
+        <processor-comments nil="true"/>
+        <kind>chargeback</kind>
+        <merchant-account-id>estuary</merchant-account-id>
+        <pre-dispute-program>none</pre-dispute-program>
+        <reason>fraud</reason>
+        <reason-code>83</reason-code>
+        <reason-description nil="true"/>
+        <received-date type="date">2024-11-26</received-date>
+        <reference-number nil="true"/>
+        <remaining-file-evidence-storage type="integer">524266137</remaining-file-evidence-storage>
+        <reply-by-date type="date">2024-12-02</reply-by-date>
+        <processor-reply-by-date type="date">2024-12-06</processor-reply-by-date>
+        <response-deadline type="dateTime">2024-12-01T05:59:59Z</response-deadline>
+        <status>lost</status>
+        <updated-at type="dateTime">2025-01-31T06:18:52Z</updated-at>
+        <original-dispute-id nil="true"/>
+        <paypal-messages type="array"/>
+        <evidence type="array">
+            <evidence>
+                <id>kytznm736zt25p99</id>
+                <global-id>ZGlzcHV0ZWV2aWRlbmNlX2t5dHpubTczNnp0MjVwOTk</global-id>
+                <comment nil="true"/>
+                <category nil="true"/>
+                <sequence-number nil="true"/>
+                <created-at type="dateTime">2024-11-26T14:32:52Z</created-at>
+                <sent-to-processor-at nil="true"/>
+                <url>https://bt-sandbox-arbiter-evidence-files.s3.amazonaws.com/7bsbj4jzqs733j2f/dispute_attachments/h265trcz93982trf/frontmatter.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=ASIAUNQLLX724GND3CKS%2F20251008%2Fus-east-1%2Fs3%2Faws4_request&amp;X-Amz-Date=20251008T191313Z&amp;X-Amz-Expires=600&amp;X-Amz-Security-Token=IQoJb3JpZ2luX2VjECsaCXVzLWVhc3QtMSJIMEYCIQCL5q%2FVl0Q4f%2FLfsZuI1k39AfwiHEpNDVvh8YhhuIjjCwIhAO6O1bTw1QaZBCjfKCCTwYwmm8D2ov1cYZepAYimRrSvKp8CCMT%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEQBBoMMzAzODkyNzc0OTAxIgyXJ5Cfu7xftVetLL4q8wEacRcA%2FB7vMNt70OA3D4WdvxZ1aoQl7p8Ydh3D1rL96qDDzLy0Ze9gBVq3F2EKQDKs1sriEQAKPT711LRfoMZTmB0POY7IJQ2ptLemC2xwhlyErqCeEdAT2rEzZYbdg5GPH0r701YvIdivqjEScl%2FyITVCzjcbfXJvOix%2B6AMP52O423eSDO9l8mjzy%2BUxKf%2BDCqmLFP7%2BCt%2F5qIGv%2FsDSz5BnFkihMqoIalyGquOT3zWj1JEpXANYXyzzy6pYmf%2FYvbT9rCrYOIT5BVt9gfpxHu8TLgPhDeUqQ9A0VObXoJJxJYJqHBq%2FGzGwUuSJTfMSLmcws%2BKaxwY6nAFU9OmeynmMrNUhGU1Lx135OcE4ju8pH6ddSqirvw5npw%2B6ZrMbPRRs7PPDEqcK9l31fkU5AQ53zougVHwsmLhQXLrrVzky%2B5P5uN%2Foa88OX%2FxPe9TkHV2xHTAq%2BCGdNUHWPj%2Btdw00pzgVradL4LxsOW4fFpmBPpq20PQed1PSYJlw5a05Ae1rR8j%2Bj6rd81r%2FTP%2FsQ0j64mfM4Fk%3D&amp;X-Amz-SignedHeaders=host&amp;X-Amz-Signature=7e48d829578ffa0719890d5f946840241db9d8bcec490940c9fff6bf4c1d8744</url>
+            </evidence>
+            <evidence>
+                <id>y9gz2vc8rw5yg5j6</id>
+                <global-id>ZGlzcHV0ZWV2aWRlbmNlX3k5Z3oydmM4cnc1eWc1ajY</global-id>
+                <comment>2024-11-25T05:00:00Z</comment>
+                <category>DOWNLOAD_DATE_TIME</category>
+                <sequence-number nil="true"/>
+                <created-at type="dateTime">2024-11-26T14:31:29Z</created-at>
+                <sent-to-processor-at nil="true"/>
+                <url nil="true"/>
+            </evidence>
+            <evidence>
+                <id>hmkzcgv3r96x42qj</id>
+                <global-id>ZGlzcHV0ZWV2aWRlbmNlX2hta3pjZ3Yzcjk2eDQycWo</global-id>
+                <comment>Jack Smith</comment>
+                <category>PURCHASER_NAME</category>
+                <sequence-number nil="true"/>
+                <created-at type="dateTime">2024-11-26T14:31:29Z</created-at>
+                <sent-to-processor-at nil="true"/>
+                <url nil="true"/>
+            </evidence>
+            <evidence>
+                <id>88xwvx9nz5fg59sd</id>
+                <global-id>ZGlzcHV0ZWV2aWRlbmNlXzg4eHd2eDluejVmZzU5c2Q</global-id>
+                <comment>jacksmith@mycompany.com</comment>
+                <category>PURCHASER_EMAIL_ADDRESS</category>
+                <sequence-number nil="true"/>
+                <created-at type="dateTime">2024-11-26T14:31:29Z</created-at>
+                <sent-to-processor-at nil="true"/>
+                <url nil="true"/>
+            </evidence>
+            <evidence>
+                <id>pvf7bm9k3n8hhqgv</id>
+                <global-id>ZGlzcHV0ZWV2aWRlbmNlX3B2ZjdibTlrM244aGhxZ3Y</global-id>
+                <comment>iPhone</comment>
+                <category>DEVICE_NAME</category>
+                <sequence-number nil="true"/>
+                <created-at type="dateTime">2024-11-26T14:31:29Z</created-at>
+                <sent-to-processor-at nil="true"/>
+                <url nil="true"/>
+            </evidence>
+            <evidence>
+                <id>nsxhns952z63g3f7</id>
+                <global-id>ZGlzcHV0ZWV2aWRlbmNlX25zeGhuczk1Mno2M2czZjc</global-id>
+                <comment>1</comment>
+                <category>DEVICE_ID</category>
+                <sequence-number nil="true"/>
+                <created-at type="dateTime">2024-11-26T14:31:29Z</created-at>
+                <sent-to-processor-at nil="true"/>
+                <url nil="true"/>
+            </evidence>
+        </evidence>
+        <status-history type="array">
+            <status-history>
+                <auto-accepted-reason nil="true"/>
+                <disbursement-date nil="true"/>
+                <effective-date type="date">2025-01-31</effective-date>
+                <status>lost</status>
+                <timestamp type="dateTime">2025-01-31T06:18:52Z</timestamp>
+            </status-history>
+            <status-history>
+                <auto-accepted-reason nil="true"/>
+                <disbursement-date nil="true"/>
+                <effective-date type="date">2024-11-26</effective-date>
+                <status>disputed</status>
+                <timestamp type="dateTime">2024-11-26T14:31:30Z</timestamp>
+            </status-history>
+            <status-history>
+                <auto-accepted-reason nil="true"/>
+                <disbursement-date type="date">2024-11-26</disbursement-date>
+                <effective-date type="date">2024-11-26</effective-date>
+                <status>open</status>
+                <timestamp type="dateTime">2024-11-26T14:28:37Z</timestamp>
+            </status-history>
+        </status-history>
+        <transaction>
+            <id>dx8qvkbv</id>
+            <global-id>dHJhbnNhY3Rpb25fZHg4cXZrYnY</global-id>
+            <amount>83.00</amount>
+            <created-at>2024-11-26T14:28:36Z</created-at>
+            <installment-count nil="true"/>
+            <order-id></order-id>
+            <purchase-order-number></purchase-order-number>
+            <payment-instrument-subtype>Visa</payment-instrument-subtype>
+        </transaction>
+        <chargeback-protection-level nil="true"/>
+    </dispute>
+    <dispute>
+        <id>c3pfw5qxbt5rg38p</id>
+        <global-id>ZGlzcHV0ZV9jM3BmdzVxeGJ0NXJnMzhw</global-id>
+        <amount>53.00</amount>
+        <amount-disputed>53.00</amount-disputed>
+        <amount-won>0.00</amount-won>
+        <case-number>CB262657160630</case-number>
+        <created-at type="dateTime">2024-11-26T14:24:31Z</created-at>
+        <currency-iso-code>USD</currency-iso-code>
+        <date-opened type="date">2024-11-26</date-opened>
+        <date-won nil="true"/>
+        <evidence-submittable type="boolean">false</evidence-submittable>
+        <processor-comments nil="true"/>
+        <kind>chargeback</kind>
+        <merchant-account-id>estuary</merchant-account-id>
+        <pre-dispute-program>none</pre-dispute-program>
+        <reason>fraud</reason>
+        <reason-code>62</reason-code>
+        <reason-description nil="true"/>
+        <received-date type="date">2024-11-26</received-date>
+        <reference-number nil="true"/>
+        <remaining-file-evidence-storage type="integer">524267928</remaining-file-evidence-storage>
+        <reply-by-date type="date">2024-12-02</reply-by-date>
+        <processor-reply-by-date type="date">2024-12-06</processor-reply-by-date>
+        <response-deadline type="dateTime">2024-12-01T05:59:59Z</response-deadline>
+        <status>lost</status>
+        <updated-at type="dateTime">2025-01-31T06:18:52Z</updated-at>
+        <original-dispute-id nil="true"/>
+        <paypal-messages type="array"/>
+        <evidence type="array">
+            <evidence>
+                <id>366xrm6h974mcp3n</id>
+                <global-id>ZGlzcHV0ZWV2aWRlbmNlXzM2NnhybTZoOTc0bWNwM24</global-id>
+                <comment nil="true"/>
+                <category nil="true"/>
+                <sequence-number nil="true"/>
+                <created-at type="dateTime">2024-11-26T14:25:58Z</created-at>
+                <sent-to-processor-at nil="true"/>
+                <url>https://bt-sandbox-arbiter-evidence-files.s3.amazonaws.com/7bsbj4jzqs733j2f/dispute_attachments/c3pfw5qxbt5rg38p/frontmatter.pdf?X-Amz-Algorithm=AWS4-HMAC-SHA256&amp;X-Amz-Credential=ASIAUNQLLX72T2ZIUNDX%2F20251008%2Fus-east-1%2Fs3%2Faws4_request&amp;X-Amz-Date=20251008T191313Z&amp;X-Amz-Expires=600&amp;X-Amz-Security-Token=IQoJb3JpZ2luX2VjECsaCXVzLWVhc3QtMSJGMEQCIE7zrQUeSnKD9Vy2Z9aPinWxudarvtkbOxbEcGQXQRp7AiAvR50hgl4KA4MJQEu9v7e9nK5cUG70uqemO9%2FUrxXXXSqfAgjE%2F%2F%2F%2F%2F%2F%2F%2F%2F%2F8BEAQaDDMwMzg5Mjc3NDkwMSIMsFaPuGGgcyDLTxyDKvMBhjmtVAVvbldWU51VnSowCuqt%2Fu9VMr1vkUvSt988oBYMm7lJTmmuDJG%2F7B01XQ%2B7x3tBzM6b2BrMTP6HL3SPYJ47ee8M8vkb3FJkNbncne4vG%2FaUaer0doNqqXfXbdSuNRBhaKuGe0M2XHFYIoWZYr8GmGORWtVhut5NzznvXfdVsHXDA%2B33NmDotc9xhiEM0OJcGg8%2Fc%2F0KSCpFRWS3SokB718AJbIbuSawE0xNzvMcb4h7JV3x7EfV9Ujq9SL61S%2BTKHz9sl4djpGcnPEEbx3W8x9Wk1WnEV4kf5TpID4kqAJHQtZFCxkuPTq%2FZkwYeD8sMJbgmscGOp4BDcGf82i6jonRzh79ZMkU%2B3nwEnBp4l8Rgu5ywUDbk7%2FFCVfhlSpN09VBBPfgGwrBlHfLMwybGJxSyaFs9fU1lMmZteRwGZVmbv2SHCzSmLL%2Fd%2BRozOgamSrB7uv9Vh5DB59SHn7Ge2Q%2BJoDNItU3ELs3kZUJsk47kZRoyAwf4doywK3y%2BPhQ%2BxTSTRpS57RChvZ0bf3lxntKXJYndK8%3D&amp;X-Amz-SignedHeaders=host&amp;X-Amz-Signature=a3261283846d1915ce9b8df715ae80aaaefc74204ca32b8d4170d7ef46bdfdec</url>
+            </evidence>
+            <evidence>
+                <id>kdjj85pp49j7xw73</id>
+                <global-id>ZGlzcHV0ZWV2aWRlbmNlX2tkamo4NXBwNDlqN3h3NzM</global-id>
+                <comment>Test dispute.</comment>
+                <category nil="true"/>
+                <sequence-number nil="true"/>
+                <created-at type="dateTime">2024-11-26T14:25:31Z</created-at>
+                <sent-to-processor-at nil="true"/>
+                <url nil="true"/>
+            </evidence>
+        </evidence>
+        <status-history type="array">
+            <status-history>
+                <auto-accepted-reason nil="true"/>
+                <disbursement-date nil="true"/>
+                <effective-date type="date">2025-01-31</effective-date>
+                <status>lost</status>
+                <timestamp type="dateTime">2025-01-31T06:18:52Z</timestamp>
+            </status-history>
+            <status-history>
+                <auto-accepted-reason nil="true"/>
+                <disbursement-date nil="true"/>
+                <effective-date type="date">2024-11-26</effective-date>
+                <status>disputed</status>
+                <timestamp type="dateTime">2024-11-26T14:25:31Z</timestamp>
+            </status-history>
+            <status-history>
+                <auto-accepted-reason nil="true"/>
+                <disbursement-date type="date">2024-11-26</disbursement-date>
+                <effective-date type="date">2024-11-26</effective-date>
+                <status>open</status>
+                <timestamp type="dateTime">2024-11-26T14:24:31Z</timestamp>
+            </status-history>
+        </status-history>
+        <transaction>
+            <id>b8yw4ccn</id>
+            <global-id>dHJhbnNhY3Rpb25fYjh5dzRjY24</global-id>
+            <amount>53.00</amount>
+            <created-at>2024-11-26T14:24:30Z</created-at>
+            <installment-count nil="true"/>
+            <order-id>123654</order-id>
+            <purchase-order-number>123654</purchase-order-number>
+            <payment-instrument-subtype>Visa</payment-instrument-subtype>
+        </transaction>
+        <chargeback-protection-level nil="true"/>
+    </dispute>
+</disputes>

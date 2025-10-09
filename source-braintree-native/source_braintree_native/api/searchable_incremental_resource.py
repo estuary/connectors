@@ -5,7 +5,6 @@ from logging import Logger
 from typing import Any, AsyncGenerator, TypeVar
 
 from braintree import BraintreeGateway
-from braintree.util.xml_util import XmlUtil
 
 from estuary_cdk.http import HTTPSession
 
@@ -15,6 +14,7 @@ from .common import (
     SEMAPHORE_LIMIT,
     SEARCH_LIMIT,
     braintree_object_to_dict,
+    braintree_xml_to_dict,
     search_limit_error_message,
     reduce_window_end,
 )
@@ -49,7 +49,7 @@ async def fetch_searchable_resource_ids_by_field_between(
     }
 
     response = IdSearchResponse.model_validate(
-        XmlUtil.dict_from_xml(
+        braintree_xml_to_dict(
             await http.request(log, url, "POST", json=body, headers=HEADERS)
         )
     )
@@ -113,7 +113,7 @@ async def _fetch_chunk(
 
     async with semaphore:
         response = response_model.model_validate(
-            XmlUtil.dict_from_xml(
+            braintree_xml_to_dict(
                 await http.request(log, url, "POST", json=body, headers=HEADERS)
             )
         )
@@ -121,10 +121,11 @@ async def _fetch_chunk(
     if response.resources.resource is None:
         return []
 
-    if isinstance(response.resources.resource, dict):
-        response.resources.resource = [response.resources.resource]
+    resources = response.resources.resource
+    if isinstance(resources, dict):
+        resources = [resources]
 
-    return response.resources.resource
+    return resources
 
 
 _IncrementalDocument = TypeVar("_IncrementalDocument", bound=IncrementalResource | Transaction)

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<customer>
+    <id>123456</id>
+    <first-name>John</first-name>
+    <last-name>Doe</last-name>
+    <email>john@example.com</email>
+    <created-at type="datetime">2023-01-15T10:30:00Z</created-at>
+    <updated-at type="datetime">2023-06-20T14:45:00Z</updated-at>
+</customer>

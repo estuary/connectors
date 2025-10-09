@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plans type="array">
+    <plan>
+        <id>basic_plan</id>
+        <name>Basic Plan</name>
+        <price type="decimal">9.99</price>
+    </plan>
+</plans>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<plans type="array">
+    <plan>
+        <id>38py</id>
+        <merchant-id>7bsbj4jzqs733j2f</merchant-id>
+        <billing-day-of-month nil="true"/>
+        <billing-frequency type="integer">1</billing-frequency>
+        <currency-iso-code>USD</currency-iso-code>
+        <description>Some test subscription</description>
+        <name>Test Subscriptoin</name>
+        <number-of-billing-cycles nil="true"/>
+        <price>11.00</price>
+        <trial-duration nil="true"/>
+        <trial-duration-unit nil="true"/>
+        <trial-period type="boolean">false</trial-period>
+        <created-at type="datetime">2024-11-26T15:43:33Z</created-at>
+        <updated-at type="datetime">2024-11-26T15:43:33Z</updated-at>
+        <add-ons type="array"/>
+        <discounts type="array"/>
+    </plan>
+</plans>

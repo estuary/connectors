@@ -2,10 +2,9 @@ from logging import Logger
 from typing import AsyncGenerator
 
 from braintree import BraintreeGateway
-from braintree.util.xml_util import XmlUtil
 from estuary_cdk.http import HTTPSession
 
-from .common import HEADERS, braintree_object_to_dict
+from .common import HEADERS, braintree_object_to_dict, braintree_xml_to_dict
 from ..models import FullRefreshResource, NonPaginatedSnapshotResponse, NonPaginatedSnapshotBraintreeClass
 
 
@@ -20,7 +19,7 @@ async def snapshot_non_paginated_resource(
 ) -> AsyncGenerator[FullRefreshResource, None]:
     url = f"{base_url}/{path}"
     response = response_model.model_validate(
-        XmlUtil.dict_from_xml(
+        braintree_xml_to_dict(
             await http.request(log, url, headers=HEADERS)
         )
     )
