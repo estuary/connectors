@@ -95,16 +95,75 @@ class LookerChildStream(LookerStream):
     required_can_permission: ClassVar[str | None] = None 
 
 
-class Dashboards(LookerStream):
+class LookerSearchStream(LookerStream):
+    limit: ClassVar[int]
+    # We do not want some fields to be returned from the API (ex: dashboard_elements is
+    # a separate stream and should not be returned in a dashboards record). To exclude
+    # these fields from the API response, we have to specify which fields _should_
+    # be returned.
+    fields: ClassVar[list[str] | None] = None
+
+
+class Dashboards(LookerSearchStream):
     name: ClassVar[str] = "dashboards"
-    path: ClassVar[str] = "dashboards"
+    path: ClassVar[str] = "dashboards/search"
+    limit: ClassVar[int] = 100
+    # NOTE: This list of fields does not include dashboard_elements, dashboard_filters,
+    # dashboard_layouts, or folder. There are either existing streams that already capture
+    # the same data or we can add streams to capture that data in the future.
+    fields: ClassVar[list[str]] = [
+        "alert_sync_with_dashboard_filter_enabled",
+        "appearance",
+        "background_color",
+        "can",
+        "content_favorite_id",
+        "content_metadata_id",
+        "created_at",
+        "crossfilter_enabled",
+        "deleted",
+        "deleted_at",
+        "deleter_id",
+        "description",
+        "edit_uri",
+        "enable_viz_full_screen",
+        "favorite_count",
+        "filters_bar_collapsed",
+        "filters_location_top",
+        "folder_id",
+        "hidden",
+        "id",
+        "last_accessed_at",
+        "last_updater_id",
+        "last_updater_name",
+        "last_view_at",
+        "load_configuration",
+        "lookml_link_id",
+        "model",
+        "preferred_viewer",
+        "query_timezone",
+        "readonly",
+        "refresh_interval",
+        "refresh_interval_to_i",
+        "show_filters_bar",
+        "show_title",
+        "slug",
+        "text_tile_text_color",
+        "tile_background_color",
+        "tile_text_color",
+        "title",
+        "title_color",
+        "updated_at",
+        "url",
+        "user_id",
+        "user_name",
+        "view_count"
+    ]
 
 
-class DashboardElements(LookerChildStream):
+class DashboardElements(LookerSearchStream):
     name: ClassVar[str] = "dashboards_elements"
-    path: ClassVar[str] = "dashboard_elements"
-    parent: ClassVar[type[LookerStream]] = Dashboards
-    required_can_permission: ClassVar[str] = "show"
+    path: ClassVar[str] = "dashboard_elements/search"
+    limit: ClassVar[int] = 1000
 
 
 class Folders(LookerStream):
@@ -155,9 +214,9 @@ class UserRoles(LookerStream):
 STREAMS = [
     {
         "stream": Dashboards,
-        "children": [
-            {"stream": DashboardElements}
-        ]
+    },
+    {
+        "stream": DashboardElements,
     },
     {
         "stream": Folders,

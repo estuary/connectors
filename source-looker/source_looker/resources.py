@@ -15,6 +15,7 @@ from .models import (
     ResourceState,
     LookerStream,
     LookerChildStream,
+    LookerSearchStream,
     LookMLModelExplores,
     STREAMS,
     OAUTH2_SPEC,
@@ -22,7 +23,8 @@ from .models import (
 from .api import (
     snapshot_resources,
     snapshot_child_resources,
-    snapshot_lookml_model_explore,
+    snapshot_searchable_resources,
+    snapshot_lookml_model_explores,
     url_base,
 )
 
@@ -84,7 +86,7 @@ async def is_accessible_endpoint(
 
 
 def full_refresh_resource(
-        stream: LookerStream, log: Logger, http: HTTPMixin, config: EndpointConfig,
+        stream: type[LookerStream], log: Logger, http: HTTPMixin, config: EndpointConfig,
 ) -> common.Resource:
 
     def open(
@@ -94,17 +96,27 @@ def full_refresh_resource(
             task: Task,
             all_bindings
     ):
+        if issubclass(stream, LookerSearchStream):
+            fetch_snapshot = functools.partial(
+                snapshot_searchable_resources,
+                http,
+                config.subdomain,
+                stream,
+            )
+        else:
+            fetch_snapshot = functools.partial(
+                snapshot_resources,
+                http,
+                config.subdomain,
+                stream,
+            )
+
         common.open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_snapshot=functools.partial(
-                snapshot_resources,
-                http,
-                config.subdomain,
-                stream,
-            ),
+            fetch_snapshot=fetch_snapshot,
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
         )
 
@@ -123,7 +135,7 @@ def full_refresh_resource(
 
 
 def full_refresh_child_resource(
-        stream: LookerChildStream, log: Logger, http: HTTPMixin, config: EndpointConfig
+        stream: type[LookerChildStream], log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> common.Resource:
 
     def open(
@@ -133,12 +145,12 @@ def full_refresh_child_resource(
             task: Task,
             all_bindings
     ):
-        if isinstance(stream, LookMLModelExplores):
+        if stream is LookMLModelExplores:
             fetch_snapshot = functools.partial(
-                    snapshot_lookml_model_explore,
-                    http,
-                    config.subdomain,
-                )
+                snapshot_lookml_model_explores,
+                http,
+                config.subdomain,
+            )
         else:
             fetch_snapshot = functools.partial(
                 snapshot_child_resources,
@@ -179,14 +191,14 @@ async def all_resources(
 
     async def build_resource_if_accessible_stream(element: dict) -> list[common.Resource]:
         resources: list[common.Resource] = []
-        base_stream: LookerStream = element["stream"]
+        base_stream: type[LookerStream] = element["stream"]
         url = f"{base_url}/{base_stream.path}"
 
         if await is_accessible_endpoint(http, log, url):
             resources.append(full_refresh_resource(base_stream, log, http, config))
 
             for child in element.get("children", []):
-                child_stream: LookerChildStream = child["stream"]
+                child_stream: type[LookerChildStream] = child["stream"]
                 resources.append(full_refresh_child_resource(child_stream, log, http, config))
 
         return resources
