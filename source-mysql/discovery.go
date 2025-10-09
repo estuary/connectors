@@ -240,6 +240,34 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isP
 				// which this breaks. Re-enable this after we've fixed those.
 				// schema.extras["minimum"] = 0
 			}
+		case "char":
+			// CHAR(n) - fixed-length, space-padded
+			if columnType.MaxLength > 0 {
+				var length = uint64(columnType.MaxLength)
+				schema.minLength = &length
+				schema.maxLength = &length
+			}
+		case "varchar":
+			// VARCHAR(n) - variable-length with limit
+			if columnType.MaxLength > 0 {
+				var length = uint64(columnType.MaxLength)
+				schema.maxLength = &length
+			}
+		case "binary":
+			// BINARY(n) - fixed-length binary, base64 encoded
+			// Binary data is base64 encoded: every 3 bytes becomes 4 characters
+			if columnType.MaxLength > 0 {
+				var base64Length = uint64((columnType.MaxLength + 2) / 3 * 4)
+				schema.minLength = &base64Length
+				schema.maxLength = &base64Length
+			}
+		case "varbinary":
+			// VARBINARY(n) - variable-length binary, base64 encoded
+			// Binary data is base64 encoded: every 3 bytes becomes 4 characters
+			if columnType.MaxLength > 0 {
+				var base64Length = uint64((columnType.MaxLength + 2) / 3 * 4)
+				schema.maxLength = &base64Length
+			}
 		}
 		// TODO(wgd): Is there a good way to describe possible SET values
 		// as a JSON schema? Currently discovery just says 'string'.
@@ -401,9 +429,11 @@ func (db *mysqlDatabase) parseDataType(typeName, fullColumnType, charset string,
 			return &mysqlColumnType{Type: "boolean"}, nil
 		}
 		return &mysqlColumnType{Type: typeName, Unsigned: strings.Contains(fullColumnType, "unsigned")}, nil
-	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
+	case "tinytext", "text", "mediumtext", "longtext":
 		return &mysqlColumnType{Type: typeName, Charset: charset}, nil
-	case "binary":
+	case "char", "varchar":
+		return &mysqlColumnType{Type: typeName, Charset: charset, MaxLength: maxLength}, nil
+	case "binary", "varbinary":
 		return &mysqlColumnType{Type: typeName, MaxLength: maxLength}, nil
 	}
 	return typeName, nil
@@ -680,6 +710,8 @@ type columnSchema struct {
 	nullable        bool
 	extras          map[string]interface{}
 	jsonType        string
+	minLength       *uint64
+	maxLength       *uint64
 }
 
 func (s columnSchema) toType() *jsonschema.Schema {
@@ -687,6 +719,8 @@ func (s columnSchema) toType() *jsonschema.Schema {
 		Format:      s.format,
 		Description: s.description,
 		Extras:      make(map[string]interface{}),
+		MinLength:   s.minLength,
+		MaxLength:   s.maxLength,
 	}
 	for k, v := range s.extras {
 		out.Extras[k] = v
