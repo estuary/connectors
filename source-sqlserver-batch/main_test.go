@@ -1168,6 +1168,34 @@ func TestNonexistentCursor(t *testing.T) {
 	})
 }
 
+// TestFieldLengthDiscovery exercises discovery of column types with specific field lengths.
+func TestFieldLengthDiscovery(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+		id INT PRIMARY KEY,
+
+		char_5 CHAR(5),
+		varchar_100 VARCHAR(100),
+		varchar_max VARCHAR(MAX),
+		nchar_15 NCHAR(15),
+		nvarchar_max NVARCHAR(MAX),
+		binary_8 BINARY(8),
+		varbinary_16 VARBINARY(16),
+		varbinary_max VARBINARY(MAX),
+
+		decimal_10_2 DECIMAL(10,2),
+		decimal_38_10 DECIMAL(38,10),
+		numeric_5_0 NUMERIC(5,0),
+		numeric_18_4 NUMERIC(18,4),
+		float_24 FLOAT(24),
+		float_53 FLOAT(53),
+	)`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings))
+}
+
 // TestSourceTag verifies the output of a capture with /advanced/source_tag set
 func TestSourceTag(t *testing.T) {
 	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
