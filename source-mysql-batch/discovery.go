@@ -347,7 +347,7 @@ func discoverColumns(ctx context.Context, db *client.Conn) ([]*discoveredColumn,
 			switch typeName {
 			case "char": // CHAR(n) - fixed-length, blank-padded
 				var length = uint64(characterMaximumLength)
-				dataType.minLength = &length
+				//dataType.minLength = &length // TODO(wgd): This is being violated in practice and
 				dataType.maxLength = &length
 			case "varchar": // VARCHAR(n) - variable-length with limit
 				var length = uint64(characterMaximumLength)
@@ -355,7 +355,7 @@ func discoverColumns(ctx context.Context, db *client.Conn) ([]*discoveredColumn,
 			case "binary": // BINARY(n) - fixed-length binary, base64 encoded
 				// Binary data is base64 encoded: every 3 bytes becomes 4 characters
 				var base64Length = uint64((characterMaximumLength + 2) / 3 * 4)
-				dataType.minLength = &base64Length
+				//dataType.minLength = &base64Length // TODO(wgd): Disabling out of caution since CHAR(n) minLength is causing trouble
 				dataType.maxLength = &base64Length
 			case "varbinary": // VARBINARY(n) - variable-length binary, base64 encoded
 				// Binary data is base64 encoded: every 3 bytes becomes 4 characters

@@ -86,7 +86,6 @@ Binding 0:
           },
           "char_col": {
             "maxLength": 10,
-            "minLength": 10,
             "description": "(source type: char)",
             "type": [
               "string",

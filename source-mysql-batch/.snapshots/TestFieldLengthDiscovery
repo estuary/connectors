@@ -83,7 +83,6 @@ Binding 0:
           },
           "binary_16": {
             "maxLength": 24,
-            "minLength": 24,
             "description": "(source type: binary)",
             "type": [
               "string",
@@ -99,7 +98,6 @@ Binding 0:
           },
           "char_15": {
             "maxLength": 15,
-            "minLength": 15,
             "description": "(source type: char)",
             "type": [
               "string",
@@ -108,7 +106,6 @@ Binding 0:
           },
           "char_5": {
             "maxLength": 5,
-            "minLength": 5,
             "description": "(source type: char)",
             "type": [
               "string",
