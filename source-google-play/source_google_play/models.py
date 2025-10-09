@@ -138,7 +138,7 @@ class ReviewValidationContext(BaseValidationContext):
             A tuple containing the year and month as strings.
         """
         # Matches reviews_[anything]_YYYYMM[_optionalstuff].csv
-        pattern = r'reviews_[^_]+_(\d{6})(?:_[^.]*)?\.csv$'
+        pattern = r'reviews_.+_(\d{6})(?:_[^.]*)?\.csv$'
         match = re.search(pattern, filename)
 
         assert match, f"Filename does not match expected pattern: {filename}"
