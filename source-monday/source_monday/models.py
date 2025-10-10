@@ -171,6 +171,7 @@ class ActivityLogEvents(StrEnum):
     ARCHIVE_GROUP = "archive_group"
     ARCHIVE_PULSE = "archive_pulse"
     BATCH_CHANGE_PULSES_COLUMN_VALUE = "batch_change_pulses_column_value"
+    BOARD_ARCHIVED = "board_archived"
     BOARD_DELETED = "board_deleted"
     BOARD_DISCONNECT = "board_disconnect"
     BATCH_CREATE_PULSES = "batch_create_pulses"
@@ -187,6 +188,7 @@ class ActivityLogEvents(StrEnum):
     BOARD_VIEW_ENABLED = "board_view_enabled"
     BOARD_VIEW_DISABLED = "board_view_disabled"
     BOARD_VIEW_DUPLICATED = "board_view_duplicated"
+    BOARD_VIEW_REGENERATE_TOKEN = "board_view_regenerate_token"
     BOARD_WORKSPACE_ID_CHANGED = "board_workspace_id_changed"
     CHANGE_COLUMN_SETTINGS = "change_column_settings"
     CREATE_COLUMN = "create_column"
@@ -276,6 +278,7 @@ class ActivityLog(BaseModel, extra="allow"):
                 ActivityLogEvents.ARCHIVE_GROUP
                 | ActivityLogEvents.ADD_OWNER
                 | ActivityLogEvents.REMOVE_OWNER
+                | ActivityLogEvents.BOARD_ARCHIVED
                 | ActivityLogEvents.BOARD_DISCONNECT
                 | ActivityLogEvents.BOARD_VIEW_ADDED
                 | ActivityLogEvents.BOARD_VIEW_CHANGED
@@ -283,6 +286,7 @@ class ActivityLog(BaseModel, extra="allow"):
                 | ActivityLogEvents.BOARD_VIEW_DISABLED
                 | ActivityLogEvents.BOARD_VIEW_DELETED
                 | ActivityLogEvents.BOARD_VIEW_DUPLICATED
+                | ActivityLogEvents.BOARD_VIEW_REGENERATE_TOKEN
                 | ActivityLogEvents.BOARD_WORKSPACE_ID_CHANGED
                 | ActivityLogEvents.CHANGE_COLUMN_SETTINGS
                 | ActivityLogEvents.UPDATE_BOARD_NICKNAME
