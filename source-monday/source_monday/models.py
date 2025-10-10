@@ -210,6 +210,7 @@ class ActivityLogEvents(StrEnum):
     SUBSCRIBE = "subscribe"
     UPDATE_BOARD_NAME = "update_board_name"
     UPDATE_BOARD_NICKNAME = "update_board_nickname"
+    UPDATE_BOARD_GRANULAR_PERMISSIONS = "update_board_granular_permissions"
     UPDATE_BOARD_PERMISSIONS = "update_board_permissions"
     UPDATE_COLUMN_NAME = "update_column_name"
     UPDATE_COLUMN_VALUE = "update_column_value"
@@ -290,6 +291,7 @@ class ActivityLog(BaseModel, extra="allow"):
                 | ActivityLogEvents.BOARD_WORKSPACE_ID_CHANGED
                 | ActivityLogEvents.CHANGE_COLUMN_SETTINGS
                 | ActivityLogEvents.UPDATE_BOARD_NICKNAME
+                | ActivityLogEvents.UPDATE_BOARD_GRANULAR_PERMISSIONS
                 | ActivityLogEvents.UPDATE_BOARD_PERMISSIONS
                 | ActivityLogEvents.RESTORE_GROUP
             ):
