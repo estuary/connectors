@@ -148,6 +148,7 @@ type catalogOpts struct {
 	awsAccessKeyID     string
 	awsSecretAccessKey string
 	awsRegion          string
+	awsSessionToken    string
 	signingName        string
 }
 
@@ -164,12 +165,13 @@ func WithClientCredential(credential string, oath2ServerUri string, scope *strin
 	}
 }
 
-func WithSigV4(signingName, awsAccessKeyID, awsSecretAccessKey, awsRegion string) CatalogOption {
+func WithSigV4(signingName, awsAccessKeyID, awsSecretAccessKey, awsRegion, sessionToken string) CatalogOption {
 	return func(c *catalogOpts) {
 		c.useSigV4 = true
 		c.awsAccessKeyID = awsAccessKeyID
 		c.awsSecretAccessKey = awsSecretAccessKey
 		c.awsRegion = awsRegion
+		c.awsSessionToken = sessionToken
 		c.signingName = signingName
 	}
 }
@@ -217,6 +219,7 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 			creds: aws.Credentials{
 				AccessKeyID:     cfg.awsAccessKeyID,
 				SecretAccessKey: cfg.awsSecretAccessKey,
+				SessionToken:    cfg.awsSessionToken,
 			},
 			signingName: cfg.signingName,
 		})

@@ -62,7 +62,7 @@ func getCatalog(ctx context.Context) (*catalog.Catalog, error) {
 	if usingClientCredentialAuth {
 		opts = append(opts, catalog.WithClientCredential(*clientCredential, *oauth2ServerUri, scope))
 	} else if usingSigV4Auth {
-		opts = append(opts, catalog.WithSigV4(*signingName, *awsAccessKeyID, *awsSecretAccessKey, *region))
+		opts = append(opts, catalog.WithSigV4(*signingName, *awsAccessKeyID, *awsSecretAccessKey, *region, ""))
 	}
 
 	cat, err := catalog.New(ctx, *catalogUrl, *warehouse, opts...)
@@ -369,6 +369,9 @@ func doPurgeTable(ctx context.Context, cat *catalog.Catalog, args []string) (str
 
 	loc = strings.TrimPrefix(loc, "s3://")
 	split := strings.SplitN(loc, "/", 2)
+	if len(split) != 2 {
+		return "", fmt.Errorf("error parsing bucket/prefix: %v\n", loc)
+	}
 	bucket := split[0]
 	prefix := split[1]
 

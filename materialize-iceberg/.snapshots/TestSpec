@@ -34,13 +34,13 @@
         "description": "If this option is enabled items deleted in the source will also be deleted from the destination. It is disabled by default and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
         "order": 4
       },
-      "catalog_authentication": {
+      "credentials": {
         "oneOf": [
           {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "https://github.com/estuary/connectors/materialize-iceberg/catalog-auth-client-credential-config",
             "properties": {
-              "catalog_auth_type": {
+              "auth_type": {
                 "type": "string",
                 "const": "OAuth 2.0 Client Credentials",
                 "default": "OAuth 2.0 Client Credentials",
@@ -78,7 +78,7 @@
             "$schema": "https://json-schema.org/draft/2020-12/schema",
             "$id": "https://github.com/estuary/connectors/materialize-iceberg/catalog-auth-sig-v4-config",
             "properties": {
-              "catalog_auth_type": {
+              "auth_type": {
                 "type": "string",
                 "const": "AWS SigV4",
                 "default": "AWS SigV4",
@@ -97,42 +97,60 @@
                 "order": 2,
                 "secret": true
               },
-              "region": {
+              "aws_region": {
                 "type": "string",
                 "title": "Region",
                 "description": "AWS region for authentication.",
                 "order": 3
-              },
-              "signing_name": {
-                "type": "string",
-                "enum": [
-                  "glue",
-                  "s3tables"
-                ],
-                "title": "Signing Name",
-                "description": "Signing Name for SigV4 authentication.",
-                "default": "glue",
-                "order": 4
               }
             },
             "type": "object",
             "required": [
               "aws_access_key_id",
               "aws_secret_access_key",
-              "region",
-              "signing_name"
+              "aws_region"
             ],
             "title": "AWS SigV4 Authentication"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/aws-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWS IAM",
+                "default": "AWS IAM",
+                "order": 0
+              },
+              "aws_region": {
+                "type": "string",
+                "title": "AWS Region",
+                "description": "AWS Region of your resource"
+              },
+              "aws_role_arn": {
+                "type": "string",
+                "title": "AWS Role ARN",
+                "description": "AWS Role which has access to the resource which will be assumed by Flow"
+              }
+            },
+            "type": "object",
+            "required": [
+              "aws_region",
+              "aws_role_arn"
+            ],
+            "title": "AWS IAM Authentication"
           }
         ],
         "type": "object",
         "title": "Catalog Authentication",
         "default": {
-          "catalog_auth_type": "OAuth 2.0 Client Credentials"
+          "auth_type": "OAuth 2.0 Client Credentials"
         },
         "discriminator": {
-          "propertyName": "catalog_auth_type"
-        }
+          "propertyName": "auth_type"
+        },
+        "order": 5,
+        "x-iam-auth": true
       },
       "compute": {
         "oneOf": [
@@ -145,19 +163,6 @@
                 "const": "AWS EMR Serverless",
                 "default": "AWS EMR Serverless",
                 "order": 0
-              },
-              "aws_access_key_id": {
-                "type": "string",
-                "title": "AWS Access Key ID",
-                "description": "Access Key ID for authenticating with EMR and writing data to the staging bucket.",
-                "order": 1
-              },
-              "aws_secret_access_key": {
-                "type": "string",
-                "title": "AWS Secret Access key",
-                "description": "Secret Access Key for authenticating with EMR and writing data to the staging bucket.",
-                "order": 2,
-                "secret": true
               },
               "region": {
                 "type": "string",
@@ -195,16 +200,73 @@
                 "description": "Prefix for parameters in Systems Manager as an absolute directory path (must start and end with /). This is required when using Client Credentials for catalog authentication.",
                 "order": 8,
                 "pattern": "^/.+/$"
+              },
+              "credentials": {
+                "oneOf": [
+                  {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "$id": "https://github.com/estuary/connectors/materialize-iceberg/access-key-credentials",
+                    "properties": {
+                      "auth_type": {
+                        "type": "string",
+                        "const": "AWSAccessKey",
+                        "default": "AWSAccessKey",
+                        "order": 0
+                      },
+                      "aws_access_key_id": {
+                        "type": "string",
+                        "title": "AWS Access Key ID",
+                        "description": "Access Key ID for writing data to the bucket.",
+                        "order": 1
+                      },
+                      "aws_secret_access_key": {
+                        "type": "string",
+                        "title": "AWS Secret Access key",
+                        "description": "Secret Access Key for writing data to the bucket.",
+                        "order": 2,
+                        "secret": true
+                      }
+                    },
+                    "type": "object",
+                    "required": [
+                      "aws_access_key_id",
+                      "aws_secret_access_key"
+                    ],
+                    "title": "AWS AccessKey"
+                  },
+                  {
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "$id": "https://github.com/estuary/connectors/materialize-iceberg/emr-iam-config",
+                    "properties": {
+                      "auth_type": {
+                        "type": "string",
+                        "const": "UseCatalogAuth",
+                        "default": "UseCatalogAuth",
+                        "order": 0
+                      }
+                    },
+                    "type": "object",
+                    "title": "Use Catalog Authentication"
+                  }
+                ],
+                "type": "object",
+                "title": "Authentication",
+                "default": {
+                  "auth_type": "AWSAccessKey"
+                },
+                "discriminator": {
+                  "propertyName": "auth_type"
+                },
+                "order": 9
               }
             },
             "type": "object",
             "required": [
-              "aws_access_key_id",
-              "aws_secret_access_key",
               "region",
               "application_id",
               "execution_role_arn",
-              "bucket"
+              "bucket",
+              "credentials"
             ],
             "title": "AWS EMR Serverless"
           }
@@ -349,7 +411,7 @@
       "url",
       "warehouse",
       "namespace",
-      "catalog_authentication",
+      "credentials",
       "compute"
     ],
     "title": "configSchema"

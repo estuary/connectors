@@ -111,13 +111,18 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 		return nil, fmt.Errorf("creating EMR client: %w", err)
 	}
 
+	catalogAuth, err := cfg.CatalogAuthConfig()
+	if err != nil {
+		return nil, err
+	}
+
 	return &materialization{
 		cfg:     cfg,
 		catalog: catalog,
 		bucket:  bucket,
 		emrClient: &emrClient{
 			cfg:                 cfg.Compute.emrConfig,
-			catalogAuth:         cfg.CatalogAuthentication,
+			catalogAuth:         *catalogAuth,
 			catalogURL:          cfg.URL,
 			warehouse:           cfg.Warehouse,
 			materializationName: materializationName,
@@ -288,8 +293,13 @@ func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (map
 }
 
 func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
-	if d.cfg.CatalogAuthentication.CatalogAuthType == catalogAuthTypeClientCredential {
-		if err := d.emrClient.ensureSecret(ctx, d.cfg.CatalogAuthentication.Credential); err != nil {
+	catalogAuth, err := d.cfg.CatalogAuthConfig()
+	if err != nil {
+		return "", err
+	}
+
+	if catalogAuth.AuthType == catalogAuthTypeClientCredential {
+		if err := d.emrClient.ensureSecret(ctx, catalogAuth.Credential); err != nil {
 			return "", err
 		}
 	}
