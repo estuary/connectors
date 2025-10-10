@@ -87,7 +87,8 @@ func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, 
 
 	clientOpts = append(clientOpts,
 		option.WithCredentialsJSON([]byte(c.CredentialsJSON)),
-		option.WithUserAgent("Estuary Technologies"))
+		option.WithUserAgent("EstuaryFlow (GPN:Estuary;)"),
+	)
 
 	// Allow overriding the main 'project_id' with 'billing_project_id' for client operation billing.
 	var billingProjectID = c.BillingProjectID
