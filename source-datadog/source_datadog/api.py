@@ -12,7 +12,7 @@ from .models import (
 
 TResourceType = TypeVar("TResourceType", bound=IncrementalResource)
 
-MAX_PAGE_SIZE = 100
+MAX_PAGE_SIZE = 1_000
 CHECKPOINT_INTERVAL = 1_000
 MIN_INCREMENTAL_WINDOW_SIZE = timedelta(minutes=1)
 
