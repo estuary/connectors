@@ -103,6 +103,13 @@ func (c config) toURI(includeSchema bool) (string, error) {
 			queryParams.Add("authenticator", strings.ToLower(sf.AuthTypeJwt.String()))
 		}
 		user = url.QueryEscape(c.Credentials.User)
+	} else if c.Credentials.AuthType == snowflake_auth.OAuth2 {
+		// OAuth2 authentication using refresh token
+		// The Snowflake Go driver will automatically handle token refresh
+		queryParams.Add("authenticator", "oauth")
+		queryParams.Add("token", c.Credentials.RefreshToken)
+		// OAuth2 doesn't require a username in the DSN when using the token
+		user = ""
 	} else {
 		return "", fmt.Errorf("unknown auth type: %s", c.Credentials.AuthType)
 	}

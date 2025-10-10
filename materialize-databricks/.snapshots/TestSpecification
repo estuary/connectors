@@ -47,7 +47,7 @@
               "personal_access_token": {
                 "type": "string",
                 "title": "Personal Access Token",
-                "description": "Personal Access Token,description=Your personal access token for accessing the SQL warehouse",
+                "description": "Your personal access token for accessing the SQL warehouse",
                 "secret": true
               }
             },
@@ -56,6 +56,35 @@
               "personal_access_token"
             ],
             "title": "Personal Access Token"
+          },
+          {
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "oauth2",
+                "default": "oauth2"
+              },
+              "client_id": {
+                "type": "string",
+                "secret": true
+              },
+              "client_secret": {
+                "type": "string",
+                "secret": true
+              },
+              "access_token": {
+                "type": "string",
+                "secret": true
+              }
+            },
+            "required": [
+              "auth_type",
+              "client_id",
+              "client_secret",
+              "access_token"
+            ],
+            "title": "OAuth2",
+            "x-oauth2-provider": "databricks"
           }
         ],
         "type": "object",
@@ -241,5 +270,17 @@
     ],
     "title": "SQL Table"
   },
-  "documentation_url": "https://go.estuary.dev/materialize-databricks"
+  "documentation_url": "https://go.estuary.dev/materialize-databricks",
+  "oauth2": {
+    "provider": "databricks",
+    "auth_url_template": "https://{{{ config.address }}}/oidc/v1/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}\u0026redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}\u0026response_type=code\u0026scope={{#urlencode}}all-apis{{/urlencode}}\u0026state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+    "access_token_url_template": "https://{{{ config.address }}}/oidc/v1/token",
+    "access_token_body": "grant_type=authorization_code\u0026client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}\u0026client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}\u0026redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}\u0026code={{#urlencode}}{{{ code }}}{{/urlencode}}",
+    "access_token_headers_json_map": {
+      "content-type": "application/x-www-form-urlencoded"
+    },
+    "access_token_response_json_map": {
+      "access_token": "/access_token"
+    }
+  }
 }

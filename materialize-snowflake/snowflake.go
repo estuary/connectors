@@ -83,6 +83,7 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-snowflake",
+		OAuth2:           snowflake_auth.OAuthSpec(),
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
 		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{

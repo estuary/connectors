@@ -82,6 +82,35 @@
             "properties": {
               "auth_type": {
                 "type": "string",
+                "const": "oauth2",
+                "default": "oauth2"
+              },
+              "client_id": {
+                "type": "string",
+                "secret": true
+              },
+              "client_secret": {
+                "type": "string",
+                "secret": true
+              },
+              "refresh_token": {
+                "type": "string",
+                "secret": true
+              }
+            },
+            "required": [
+              "auth_type",
+              "client_id",
+              "client_secret",
+              "refresh_token"
+            ],
+            "title": "OAuth2",
+            "x-oauth2-provider": "snowflake"
+          },
+          {
+            "properties": {
+              "auth_type": {
+                "type": "string",
                 "const": "user_password",
                 "default": "user_password"
               },
@@ -284,5 +313,17 @@
     ],
     "title": "SQL Table"
   },
-  "documentation_url": "https://go.estuary.dev/materialize-snowflake"
+  "documentation_url": "https://go.estuary.dev/materialize-snowflake",
+  "oauth2": {
+    "provider": "snowflake",
+    "auth_url_template": "https://{{{ config.host }}}/oauth/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}\u0026redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}\u0026response_type=code\u0026scope={{#urlencode}}refresh_token{{/urlencode}}\u0026state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+    "access_token_url_template": "https://{{{ config.host }}}/oauth/token-request",
+    "access_token_body": "grant_type=authorization_code\u0026client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}\u0026client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}\u0026redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}\u0026code={{#urlencode}}{{{ code }}}{{/urlencode}}",
+    "access_token_headers_json_map": {
+      "content-type": "application/x-www-form-urlencoded"
+    },
+    "access_token_response_json_map": {
+      "refresh_token": "/refresh_token"
+    }
+  }
 }

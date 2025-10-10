@@ -31,6 +31,8 @@ type Driver[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]] s
 	// can include multiple separate errors if it possible to determine that
 	// there is more than one issue that needs corrected.
 	PreReqs func(ctx context.Context, cfg EC) *cerrors.PrereqErr
+	// OAuth2 is an optional OAuth2 specification for the connector.
+	OAuth2 *pf.OAuth2
 }
 
 var _ boilerplate.Connector = &Driver[boilerplate.EndpointConfiger, Resource]{}
@@ -62,6 +64,7 @@ func (d *Driver[EC, RC]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Re
 		ConfigSchemaJson:         json.RawMessage(endpoint),
 		ResourceConfigSchemaJson: json.RawMessage(resource),
 		DocumentationUrl:         docsUrlFromEnv(d.DocumentationURL),
+		Oauth2:                   d.OAuth2,
 	}, nil
 }
 
