@@ -169,6 +169,7 @@ func connectBigQuery(ctx context.Context, cfg *Config) (*bigquery.Client, error)
 
 	var clientOpts = []option.ClientOption{
 		option.WithCredentialsJSON([]byte(cfg.CredentialsJSON)),
+		option.WithUserAgent("EstuaryFlow (GPN:Estuary;)"),
 	}
 	var client, err = bigquery.NewClient(ctx, cfg.ProjectID, clientOpts...)
 	if err != nil {
