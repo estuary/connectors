@@ -30,7 +30,7 @@ const (
 	cdcPollingWorkers     = 4                      // Number of parallel worker threads to execute CDC polling operations
 	cdcCleanupWorkers     = 16                     // Number of parallel worker threads to execute table cleanup operations
 	cdcPollingInterval    = 500 * time.Millisecond // How frequently to perform CDC polling
-	cdcCleanupInterval    = 15 * time.Second       // How frequently to perform CDC table cleanup
+	cdcCleanupInterval    = 15 * time.Minute       // How frequently to perform CDC table cleanup
 	cdcManagementInterval = 30 * time.Second       // How frequently to perform CDC instance management
 
 	// streamToFenceWatchdogTimeout is the length of time after which a stream-to-fence
