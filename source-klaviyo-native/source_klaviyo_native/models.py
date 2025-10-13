@@ -6,13 +6,50 @@ from estuary_cdk.capture.common import (
     AccessToken,
     BaseDocument,
     ConnectorState as GenericConnectorState,
-    ResourceConfig,
-    ResourceState,
+    ResourceConfig as BaseResourceConfig,
+    ResourceState as CDKResourceState,
 )
 from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+
+
+AIRBYTE_RESOURCE_CONFIG_FIELDS = [
+    "stream",
+    "syncMode",
+    "namespace",
+    "cursorField",
+]
+
+AIRBYTE_RESOURCE_STATE_FIELDS = [
+    "rowId",
+    "state",
+]
+
+
+class ResourceConfig(BaseResourceConfig):
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_from_airbyte(cls, values: dict[str, Any]) -> dict[str, Any]:
+        if isinstance(values, dict):
+            # If we have the old 'stream' field but no 'name', migrate it
+            if "stream" in values and "name" not in values:
+                values["name"] = values["stream"]
+
+            # Remove the previous resource config fields prior to validation
+            for field in AIRBYTE_RESOURCE_CONFIG_FIELDS:
+                if field in values:
+                    del values[field]
+        return values
+
+
+class ResourceState(CDKResourceState, extra="allow"):
+    def should_migrate(self) -> bool:
+        return (
+            hasattr(self, 'rowId')
+            and hasattr(self, 'state')
+        )
 
 
 def default_start_date():

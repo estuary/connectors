@@ -17,6 +17,7 @@ from .models import (
     Accounts,
     BaseStream,
     Campaigns,
+    ConnectorState,
     CouponCodes,
     EmailCampaigns,
     EmailCampaignsArchived,
@@ -98,7 +99,7 @@ def full_refresh_resources(
             name=model.name,
             key=["/_meta/row_id"],
             model=common.BaseDocument,
-            open=functools.partial(open, model),
+            open=functools.partial(open, model),  # type: ignore
             initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=model.name, interval=timedelta(minutes=60)
@@ -149,7 +150,7 @@ def incremental_resources(
             name=model.name,
             key=["/id"],
             model=IncrementalStream,
-            open=functools.partial(open, model),
+            open=functools.partial(open, model),  # type: ignore
             initial_state=ResourceState(
                 inc=ResourceState.Incremental(cursor=cutoff),
                 backfill=ResourceState.Backfill(cutoff=cutoff, next_page=start)
@@ -176,6 +177,23 @@ def campaigns(
         task: Task,
         all_bindings,
     ):
+        if state.should_migrate():
+            log.info("Migrating state!!!")
+            task.checkpoint(
+                state=ConnectorState(
+                    bindingStateV1={
+                        binding.stateKey: None
+                    }
+                )
+            )
+            task.checkpoint(
+                state=ConnectorState(
+                    bindingStateV1={
+                        binding.stateKey: initial_state,
+                    }
+                )
+            )
+
         common.open_binding(
             binding,
             binding_index,
@@ -231,12 +249,8 @@ def campaigns(
     cutoff = datetime.now(tz=UTC)
     start = dt_to_str(config.start_date - timedelta(seconds=1))
 
-    return common.Resource(
-        name=Campaigns.name,
-        key=["/id"],
-        model=IncrementalStream,
-        open=open,
-        initial_state=ResourceState(
+
+    initial_state = ResourceState(
             inc={
                 "email": ResourceState.Incremental(cursor=cutoff),
                 "archived_email": ResourceState.Incremental(cursor=cutoff),
@@ -253,7 +267,14 @@ def campaigns(
                 "mobile_push": ResourceState.Backfill(cutoff=cutoff, next_page=start),
                 "archived_mobile_push": ResourceState.Backfill(cutoff=cutoff, next_page=start),
             }
-        ),
+        )
+
+    return common.Resource(
+        name=Campaigns.name,
+        key=["/id"],
+        model=IncrementalStream,
+        open=open,  # type: ignore
+        initial_state=initial_state,
         initial_config=ResourceConfig(
             name=Campaigns.name, interval=timedelta(minutes=5)
         ),
@@ -271,7 +292,7 @@ def flows(
         state: ResourceState,
         task: Task,
         all_bindings,
-    ):
+    ) -> None:
         common.open_binding(
             binding,
             binding_index,
@@ -305,7 +326,7 @@ def flows(
         name=Flows.name,
         key=["/id"],
         model=IncrementalStream,
-        open=open,
+        open=open,  # type: ignore  # type: ignore
         initial_state=ResourceState(
             inc={
                 "active": ResourceState.Incremental(cursor=cutoff),
@@ -360,7 +381,7 @@ def events(
         name=Events.name,
         key=["/id"],
         model=IncrementalStream,
-        open=open,
+        open=open,  # type: ignore
         initial_state=ResourceState(
             inc={
                 "realtime": ResourceState.Incremental(cursor=cutoff),
