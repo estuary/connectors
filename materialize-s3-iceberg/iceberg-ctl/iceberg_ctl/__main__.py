@@ -1,6 +1,8 @@
 import asyncio
 import json
+import sys
 import time
+import traceback
 from typing import Any, Literal
 
 import click
@@ -25,6 +27,11 @@ from pyiceberg.types import (
     TimeType,
     UUIDType,
 )
+
+
+def log(msg: str):
+    """Write to stderr and flush immediately."""
+    print(msg, file=sys.stderr, flush=True)
 
 
 def _field_to_type(typ_str: str) -> IcebergType:
@@ -90,6 +97,7 @@ def run(
             case _:
                 raise Exception(f"unhandled catalog type: {cfg.catalog.catalog_type}")
 
+
 @run.command()
 def print_config_schema():
     print(
@@ -127,7 +135,7 @@ def info_schema(
 
     The resource-paths argument is a JSON array of tuples of the form
     (namespace, table).
-    
+
     For efficiency, we only list tables that are included in the list of
     resources for the materialization. For the purposes of computing apply
     actions and validation constraints, we don't care about tables other than
@@ -145,6 +153,7 @@ def info_schema(
     for path in find_paths:
         find_tables.setdefault(path[0], []).append(path[1])
 
+    log(f"info_schema: scanning {len(find_paths)} tables")
     for ns in catalog.list_namespaces():
         if ns[0] not in find_namespaces:
             # Namespace is not relevant for the list of tables and namespaces
@@ -168,6 +177,7 @@ def info_schema(
                 for f in loaded.schema().fields
             ]
 
+    log(f"info_schema: found {len(tables)} tables")
     print(TypeAdapter(dict[str, list[IcebergColumn]]).dump_json(tables).decode())
 
 
@@ -220,6 +230,7 @@ def create_table(
     table: str,
     table_create_json: str,
 ):
+    log(f"create_table: creating table {table}")
     catalog = ctx.obj["catalog"]
     assert isinstance(catalog, Catalog)
 
@@ -236,6 +247,7 @@ def create_table(
     ]
 
     catalog.create_table(table, Schema(*columns), table_create.location)
+    log(f"create_table: created table {table}")
 
 
 @run.command()
@@ -278,6 +290,7 @@ def alter_table(
     table: str,
     table_alter_json: str,
 ):
+    log(f"alter_table: altering table {table}")
     catalog = ctx.obj["catalog"]
     assert isinstance(catalog, Catalog)
 
@@ -297,6 +310,8 @@ def alter_table(
         if table_alter.newly_nullable_columns is not None:
             for c in table_alter.newly_nullable_columns:
                 update.update_column(path=c, required=False)
+
+    log(f"alter_table: altered table {table}")
 
 
 @run.command()
@@ -345,14 +360,22 @@ def append_files(
     table is already at "next-checkpoint" and the actual append operation.
     '''
 
+    log(f"append_files: starting for table={table}, materialization={materialization}, prev_checkpoint={prev_checkpoint}, next_checkpoint={next_checkpoint}, num_files={len(file_paths.split(','))}")
+
     catalog = ctx.obj["catalog"]
     assert isinstance(catalog, Catalog)
 
+    log(f"append_files: loading table {table}")
     tbl = catalog.load_table(table)
+    log(f"append_files: table loaded successfully")
+
+    log(f"append_files: parsing checkpoints from table properties")
     checkpoints = TypeAdapter(dict[str, str]).validate_json(tbl.properties.get("flow_checkpoints_v1", "{}"))
-    cp = checkpoints.get(materialization, "") # prev_checkpoint will be unset if this is the first commit to the table
+    cp = checkpoints.get(materialization, "")  # prev_checkpoint will be unset if this is the first commit to the table
+    log(f"append_files: current checkpoint from table is '{cp}'")
 
     if cp == next_checkpoint:
+        log(f"append_files: checkpoint is already '{next_checkpoint}', skipping append")
         print(f"checkpoint is already '{next_checkpoint}'")
         return  # already appended these files
     # TODO(whb): Re-enable this sanity check after any tasks effected by the
@@ -365,7 +388,7 @@ def append_files(
     #     raise Exception(
     #         f"checkpoint from snapshot ({cp}) did not match either previous ({prev_checkpoint}) or next ({next_checkpoint}) checkpoint"
     #     )
-    
+
     # Files are only added if the table checkpoint property has the prior checkpoint. The checkpoint
     # property is updated to the current checkpoint in an atomic operation with appending the files.
     # Note that this is not 100% correct exactly-once semantics, since there is a potential race
@@ -374,23 +397,35 @@ def append_files(
     # operations necessary for true exactly-once semantics, but we'd need to work with the catalog
     # at a lower level than PyIceberg currently makes available.
     checkpoints[materialization] = next_checkpoint
-    
+
     attempt = 1
     while True:
         try:
+            log(f"append_files: starting transaction attempt {attempt}")
             txn = tbl.transaction()
+            log(f"append_files: adding files to transaction")
             txn.add_files(file_paths.split(","))
+            log(f"append_files: setting checkpoint property on transaction")
             txn.set_properties({"flow_checkpoints_v1": json.dumps(checkpoints)})
+            log(f"append_files: committing transaction attempt {attempt}")
             txn.commit_transaction()
+            log(f"append_files: transaction committed successfully")
             break
         except Exception as e:
+            log(f"append_files: exception on attempt {attempt}: {type(e).__name__}: {str(e)}")
             if attempt == 3:
+                log(f"append_files: max retries reached, re-raising exception")
+                log(f"append_files: traceback:\n{traceback.format_exc()}")
                 raise
+            log(f"append_files: sleeping {attempt * 2} seconds before retry")
             time.sleep(attempt * 2)
             attempt += 1
 
+    log(f"append_files: reloading table to verify update")
     tbl = catalog.load_table(table)
-    print(f"{table} updated with flow_checkpoints_v1 property of {tbl.properties.get("flow_checkpoints_v1")} from {cp} after {attempt} attempts") 
+    log(f"append_files: table reloaded, operation complete")
+    print(f"{table} updated with flow_checkpoints_v1 property of {tbl.properties.get('flow_checkpoints_v1')} from {cp} after {attempt} attempts")
+
 
 if __name__ == "__main__":
     run(auto_envvar_prefix="ICEBERG")
