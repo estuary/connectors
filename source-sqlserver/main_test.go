@@ -339,6 +339,11 @@ func TestCaptureInstanceCleanup(t *testing.T) {
 		t.Skip("skipping test in short mode.")
 	}
 
+	// Lower the cleanup interval for the purposes of speedy test execution
+	var oldInterval = cdcCleanupInterval
+	t.Cleanup(func() { cdcCleanupInterval = oldInterval })
+	cdcCleanupInterval = 5 * time.Second
+
 	var tb, ctx = sqlserverTestBackend(t), context.Background()
 	for _, tc := range []struct {
 		Name     string

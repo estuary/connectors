@@ -30,7 +30,6 @@ const (
 	cdcPollingWorkers     = 4                      // Number of parallel worker threads to execute CDC polling operations
 	cdcCleanupWorkers     = 4                      // Number of parallel worker threads to execute table cleanup operations
 	cdcPollingInterval    = 500 * time.Millisecond // How frequently to perform CDC polling
-	cdcCleanupInterval    = 15 * time.Minute       // How frequently to perform CDC table cleanup
 	cdcManagementInterval = 30 * time.Second       // How frequently to perform CDC instance management
 
 	// streamToFenceWatchdogTimeout is the length of time after which a stream-to-fence
@@ -49,6 +48,11 @@ const (
 	// on the actual `pollinginterval` setting in `cdc.dbo_jobs`. I suspect this will never
 	// actually be an issue.
 	establishFenceTimeout = 5 * time.Minute
+)
+
+// Constants which need to be changed in tests
+var (
+	cdcCleanupInterval = 15 * time.Minute // How frequently to perform CDC table cleanup
 )
 
 // LSN is just a type alias for []byte to make the code that works with LSN values a bit clearer.
