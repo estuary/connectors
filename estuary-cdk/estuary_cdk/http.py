@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from logging import Logger
 from pydantic import BaseModel
-from typing import AsyncGenerator, Any, TypeVar, Callable, Awaitable
+from typing import AsyncGenerator, Any, Awaitable, TypeVar, Callable, Protocol
 import abc
 import aiohttp
 import asyncio
@@ -43,6 +43,35 @@ Headers = dict[str, Any]
 BodyGeneratorFunction = Callable[[], AsyncGenerator[bytes, None]]
 HeadersAndBodyGenerator = tuple[Headers, BodyGeneratorFunction]
 
+class ShouldRetryProtocol(Protocol):
+    """
+    ShouldRetryProtocol defines a callback function signature for custom retry logic.
+
+    Implementations should return True if the HTTP request should be retried, or False
+    if the request should fail immediately with an HTTPError. This allows connectors
+    to implement custom retry strategies for server errors (5xx status codes) based
+    on the response status, headers, body, and current attempt number.
+
+    Parameters:
+     * `status` is the HTTP status code of the response
+     * `headers` are the HTTP response headers as a dict
+     * `body` is the response body as bytes
+     * `attempt` is the current attempt number (starts at 1)
+
+    Example usage:
+        def custom_retry(status: int, headers: Headers, body: bytes, attempt: int) -> bool:
+            if status == 503 and attempt > 2:
+                return False
+            return status >= 500
+    """
+    def __call__(
+        self,
+        status: int,
+        headers: Headers,
+        body: bytes,
+        attempt: int
+    ) -> bool: ...
+
 
 class HTTPError(RuntimeError):
     """
@@ -71,6 +100,7 @@ class HTTPSession(abc.ABC):
      * `params` are encoded as URL parameters of the query
      * `json` is a JSON-encoded request body (if set, `form` cannot be)
      * `form` is a form URL-encoded request body (if set, `json` cannot be)
+     * `should_retry` determines whether 5xx errors are retried or bubbled up. If not provided, all 5xx errors are retried.
     """
 
     async def request(
@@ -83,12 +113,13 @@ class HTTPSession(abc.ABC):
         form: dict[str, Any] | None = None,
         _with_token: bool = True,  # Unstable internal API.
         headers: dict[str, Any] | None = None,
+        should_retry: ShouldRetryProtocol | None = None,
     ) -> bytes:
         """Request a url and return its body as bytes"""
 
         chunks: list[bytes] = []
         _, body_generator = await self._request_stream(
-            log, url, method, params, json, form, _with_token, headers
+            log, url, method, params, json, form, _with_token, headers, should_retry,
         )
 
         async for chunk in body_generator():
@@ -111,11 +142,12 @@ class HTTPSession(abc.ABC):
         form: dict[str, Any] | None = None,
         delim: bytes = b"\n",
         headers: dict[str, Any] | None = None,
+        should_retry: ShouldRetryProtocol | None = None,
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and return its response as streaming lines, as they arrive"""
 
         resp_headers, body = await self._request_stream(
-            log, url, method, params, json, form, True, headers
+            log, url, method, params, json, form, True, headers, should_retry,
         )
 
         async def gen() -> AsyncGenerator[bytes, None]:
@@ -141,10 +173,11 @@ class HTTPSession(abc.ABC):
         form: dict[str, Any] | None = None,
         _with_token: bool = True,  # Unstable internal API.
         headers: dict[str, Any] | None = None,
+        should_retry: ShouldRetryProtocol | None = None,
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and and return the raw response as a stream of bytes"""
 
-        return await self._request_stream(log, url, method, params, json, form, _with_token, headers)
+        return await self._request_stream(log, url, method, params, json, form, _with_token, headers, should_retry)
 
 
     @abc.abstractmethod
@@ -158,6 +191,7 @@ class HTTPSession(abc.ABC):
         form: dict[str, Any] | None,
         _with_token: bool,
         headers: dict[str, Any] | None = None,
+        should_retry: ShouldRetryProtocol | None = None,
     ) -> HeadersAndBodyGenerator: ...
 
     # TODO(johnny): This is an unstable API.
@@ -484,14 +518,17 @@ class HTTPMixin(Mixin, HTTPSession):
         form: dict[str, Any] | None,
         _with_token: bool,
         headers: dict[str, Any] | None = None,
+        should_retry: ShouldRetryProtocol | None = None,
     ) -> HeadersAndBodyGenerator:
         if headers is None:
             headers = {}
+        attempt = 0
 
         while True:
             cur_delay = self.rate_limiter.delay
             await asyncio.sleep(cur_delay)
 
+            attempt += 1
             resp = await self._retry_on_connection_error(
                 log, url, method,
                 lambda: self._establish_connection_and_get_response(
@@ -516,10 +553,20 @@ class HTTPMixin(Mixin, HTTPSession):
 
                 elif resp.status >= 500 and resp.status < 600:
                     body = await resp.read()
-                    log.warning(
-                        "server internal error (will retry)",
-                        {"body": body.decode("utf-8")},
-                    )
+
+                    if (
+                        should_retry is None
+                        or should_retry(resp.status, dict(resp.headers), body, attempt)
+                    ):
+                        log.warning(
+                            "server internal error (will retry)",
+                            {"body": body.decode("utf-8")},
+                        )
+                    else:
+                        raise HTTPError(
+                            f"Encountered HTTP error status {resp.status}.\nURL: {url}\nResponse:\n{body.decode('utf-8')}",
+                            resp.status,
+                        )
                 elif resp.status >= 400 and resp.status < 500:
                     body = await resp.read()
                     raise HTTPError(
