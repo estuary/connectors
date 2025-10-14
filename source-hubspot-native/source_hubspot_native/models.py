@@ -632,11 +632,10 @@ class ContactListMembershipResponse(BaseModel, extra="allow"):
         after: str
 
     class Paging(BaseModel, extra="allow"):
-        next: ContactListMembershipResponse.Cursor | None
+        next: ContactListMembershipResponse.Cursor | None = None
 
     results: list[ContactListMembership]
     paging: Paging | None = None
-    total: int
 
     @model_validator(mode="before")
     @classmethod

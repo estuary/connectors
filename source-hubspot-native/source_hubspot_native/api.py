@@ -2,7 +2,8 @@ import asyncio
 import functools
 import itertools
 import json
-import time
+from asyncio.exceptions import CancelledError
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import (
@@ -22,6 +23,7 @@ from estuary_cdk.capture.common import (
     Triggers,
 )
 from estuary_cdk.http import HTTPSession
+from estuary_cdk.utils import format_error_message
 from pydantic import TypeAdapter
 
 from .models import (
@@ -1482,7 +1484,7 @@ async def fetch_contact_lists_page(
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
-) -> AsyncGenerator[ContactList | PageCursor, None]:
+) -> AsyncGenerator[ContactList, None]:
     assert isinstance(page, str | None)
     assert isinstance(cutoff, datetime)
 
@@ -1521,68 +1523,138 @@ async def fetch_contact_lists(
         yield max_ts
 
 
+@dataclass
+class ContactListMembershipControl:
+    """Coordination for concurrent contact list membership fetches."""
+
+    # We expect users to have tens of thousands of lists to fetch.
+    # This semaphore limits the number of tasks we keep in memory at any given time
+    task_slots: asyncio.Semaphore = field(default_factory=lambda: asyncio.Semaphore(25))
+    http_slots: asyncio.Semaphore = field(default_factory=lambda: asyncio.Semaphore(5))
+    results: asyncio.Queue[ContactListMembership | None] = field(
+        default_factory=lambda: asyncio.Queue(1)
+    )
+    finished_tasks: int = 0
+    first_error: str | None = None
+
+
 async def _request_contact_list_memberships(
     http: HTTPSession,
     log: Logger,
     contact_list: ContactList,
+    context: ContactListMembershipControl,
     start: datetime,
     end: datetime | None = None,
-) -> AsyncGenerator[ContactListMembership, None]:
+) -> None:
     url = f"{HUB}/crm/v3/lists/{contact_list.listId}/memberships"
     params = {"limit": 250}
 
-    while True:
-        response = ContactListMembershipResponse.model_validate(
-            json.loads(await http.request(log, url, params=params)),
-            context=contact_list,
-        )
+    try:
+        while True:
+            async with context.http_slots:
+                response = ContactListMembershipResponse.model_validate_json(
+                    await http.request(log, url, params=params),
+                    context=contact_list,
+                )
+
+            for item in response.results:
+                if item.membershipTimestamp < start:
+                    continue
+                if end and item.membershipTimestamp >= end:
+                    continue
+
+                await context.results.put(item)
+
+            if (next_cursor := response.get_next_cursor()) is None:
+                break
+            params["after"] = next_cursor
+
         log.info(
-            "Fetched results",
-            {"list": contact_list.model_dump(), "total": response.total},
+            "Finished fetching memberships for list",
+            {"list": contact_list.model_dump()},
         )
+        await context.results.put(None)
+    except CancelledError as e:
+        # If no worker has been cancelled or encountered an exception yet,
+        # that means this worker was cancelled from something other than the
+        # TaskGroup. A non-CancelledError should be raised so the
+        # TaskGroup cancels the remaining tasks & propagates an exception
+        # up through the connector.
+        if not context.first_error:
+            msg = format_error_message(e)
+            context.first_error = msg
 
-        for item in response.results:
-            if item.membershipTimestamp < start:
-                continue
-            if end and item.membershipTimestamp >= end:
-                continue
+            raise Exception(
+                f"Contact list {contact_list.listId} worker was unexpectedly cancelled: {msg}"
+            )
+        # If a different worker already failed, then this worker task was cancelled by
+        # the TaskGroup as part of its exception handling and it's safe to propagate the
+        # CancelledError.
+        else:
+            raise e
+    except BaseException as e:
+        msg = format_error_message(e)
+        if not context.first_error:
+            context.first_error = msg
 
-            yield item
-
-        log.info(
-            "Fetched page",
+        log.error(
+            f"Contact list {contact_list.listId} worker encountered an error.",
             {
-                "list": contact_list.model_dump(),
-                "total_results": response.total,
+                "exception": msg,
             },
         )
-
-        if next_cursor := response.get_next_cursor() is None:
-            break
-        params["after"] = next_cursor
-
-    log.info(
-        "Finished fetching memberships for list",
-        {"list": contact_list.model_dump()},
-    )
+        raise e
 
 
 async def _request_all_contact_list_memberships(
     http: HTTPSession, log: Logger, start: datetime, end: datetime | None = None
 ) -> AsyncGenerator[ContactListMembership, None]:
-    async for contact_list in _request_contact_lists_in_time_range(
-        http,
-        log,
-        # We only care about listIds, so we do not want to make an extra request
-        #  asking for all the additional properties there are
-        False,
-        start,
-        end,
-    ):
-        async for membership in _request_contact_list_memberships(
-            http, log, contact_list, start, end
-        ):
-            yield membership
+    log.info(
+        "Fetching contact list memberships",
+        {
+            "start": start.isoformat(),
+            "end": end.isoformat() if end else None,
+        },
+    )
+
+    control = ContactListMembershipControl()
+    all_lists = [
+        item
+        async for item in _request_contact_lists_in_time_range(
+            http,
+            log,
+            # We only care about listIds, so we do not want to make an extra request
+            #  asking for all the additional properties there are
+            False,
+            start,
+            end,
+        )
+    ]
+
+    async with asyncio.TaskGroup() as tg:
+
+        async def dispatcher() -> None:
+            for contact_list in all_lists:
+                await control.task_slots.acquire()
+                tg.create_task(
+                    _request_contact_list_memberships(
+                        http, log, contact_list, control, start, end
+                    )
+                )
+
+        tg.create_task(dispatcher())
+
+        while True:
+            item = await control.results.get()
+            if item is None:
+                # A worker task has completed
+                control.finished_tasks += 1
+                control.task_slots.release()
+
+                if control.finished_tasks == len(all_lists):
+                    break
+            else:
+                yield item
 
 
 async def fetch_contact_list_memberships_page(
