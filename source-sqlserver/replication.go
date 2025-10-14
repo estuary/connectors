@@ -27,10 +27,9 @@ import (
 var replicationBufferSize = 4 * 1024 // Assuming change events average ~2kB then 4k * 2kB = 8MB
 
 const (
-	cdcPollingWorkers     = 4                      // Number of parallel worker threads to execute CDC polling operations
-	cdcCleanupWorkers     = 4                      // Number of parallel worker threads to execute table cleanup operations
-	cdcPollingInterval    = 500 * time.Millisecond // How frequently to perform CDC polling
-	cdcManagementInterval = 30 * time.Second       // How frequently to perform CDC instance management
+	cdcPollingWorkers     = 4                // Number of parallel worker threads to execute CDC polling operations
+	cdcCleanupWorkers     = 4                // Number of parallel worker threads to execute table cleanup operations
+	cdcManagementInterval = 30 * time.Second // How frequently to perform CDC instance management
 
 	// streamToFenceWatchdogTimeout is the length of time after which a stream-to-fence
 	// operation will error out if no further events are received when there ought to be
@@ -708,7 +707,14 @@ func (rs *sqlserverReplicationStream) run(ctx context.Context) error {
 		return fmt.Errorf("error managing capture instances: %w", err)
 	}
 
-	var poll = time.NewTicker(cdcPollingInterval)
+	// Parse the configured polling interval. Should never fail since we validated
+	// it already, but we'll default to 500ms if it somehow did.
+	var pollingInterval = 500 * time.Millisecond
+	if parsedInterval, err := time.ParseDuration(rs.cfg.Advanced.PollingInterval); err == nil {
+		pollingInterval = parsedInterval
+	}
+
+	var poll = time.NewTicker(pollingInterval)
 	var cleanup = time.NewTicker(cdcCleanupInterval)
 	var manage = time.NewTicker(cdcManagementInterval)
 	defer poll.Stop()

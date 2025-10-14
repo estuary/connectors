@@ -90,6 +90,7 @@ type advancedConfig struct {
 	DiscoverOnlyEnabled         bool   `json:"discover_only_enabled,omitempty" jsonschema:"title=Discover Only CDC-Enabled Tables,description=When set the connector will only discover tables which have already had CDC capture instances enabled."`
 	SkipBackfills               string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
 	BackfillChunkSize           int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	PollingInterval             string `json:"polling_interval,omitempty" jsonschema:"title=CDC Polling Interval,default=500ms,description=The interval at which the connector polls for CDC changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
 	AutomaticChangeTableCleanup bool   `json:"change_table_cleanup,omitempty" jsonschema:"title=Automatic Change Table Cleanup,default=false,description=When set the connector will delete CDC change table entries as soon as they are persisted into Flow. Requires DBO permissions to use."`
 	AutomaticCaptureInstances   bool   `json:"capture_instance_management,omitempty" jsonschema:"title=Automatic Capture Instance Management,default=false,description=When set the connector will respond to alterations of captured tables by automatically creating updated capture instances and deleting the old ones. Requires DBO permissions to use."`
 	Filegroup                   string `json:"filegroup,omitempty" jsonschema:"title=CDC Instance Filegroup,description=When set the connector will create new CDC instances with the specified 'filegroup_name' argument. Has no effect if CDC instances are managed manually."`
@@ -128,6 +129,12 @@ func (c *Config) Validate() error {
 		}
 	}
 
+	if c.Advanced.PollingInterval != "" {
+		if _, err := time.ParseDuration(c.Advanced.PollingInterval); err != nil {
+			return fmt.Errorf("invalid 'polling_interval' configuration: %w", err)
+		}
+	}
+
 	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
 		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
 	}
@@ -150,6 +157,9 @@ func (c *Config) SetDefaults() {
 	}
 	if c.Advanced.BackfillChunkSize <= 0 {
 		c.Advanced.BackfillChunkSize = 50000
+	}
+	if c.Advanced.PollingInterval == "" {
+		c.Advanced.PollingInterval = "500ms"
 	}
 	if c.Timezone == "" {
 		c.Timezone = "UTC"
