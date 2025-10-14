@@ -11,6 +11,7 @@ import (
 	"strings"
 	"text/template"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -52,7 +53,8 @@ const (
 )
 
 var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string": true,
+	"datetime_keys_as_string":    true,
+	"s3_use_dualstack_endpoints": false,
 }
 
 type sshForwarding struct {
@@ -157,14 +159,20 @@ func (c config) toURI() string {
 	return uri.String()
 }
 
-func (c config) toS3Client(ctx context.Context) (*s3.Client, error) {
-	awsCfg, err := awsConfig.LoadDefaultConfig(ctx,
+func (c config) toS3Client(ctx context.Context, featureFlags map[string]bool) (*s3.Client, error) {
+	opts := []func(*awsConfig.LoadOptions) error{
 		awsConfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(c.AWSAccessKeyID, c.AWSSecretAccessKey, ""),
 		),
 		awsConfig.WithRegion(c.Region),
 		awsConfig.WithRetryMaxAttempts(7),
-	)
+	}
+	if featureFlags["s3_use_dualstack_endpoints"] {
+		opts = append(opts, awsConfig.WithUseDualStackEndpoint(aws.DualStackEndpointStateEnabled))
+	}
+
+	awsCfg, err := awsConfig.LoadDefaultConfig(ctx, opts...)
+
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +329,7 @@ func prepareNewTransactor(
 			be:        be,
 		}
 
-		s3client, err := d.cfg.toS3Client(ctx)
+		s3client, err := d.cfg.toS3Client(ctx, featureFlags)
 		if err != nil {
 			return nil, err
 		}
