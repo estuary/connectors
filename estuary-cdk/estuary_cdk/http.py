@@ -38,9 +38,7 @@ DEFAULT_AUTHORIZATION_TOKEN_TYPE = "Bearer"
 
 T = TypeVar("T")
 
-class Headers(dict[str, Any]):
-    pass
-
+Headers = dict[str, Any]
 
 BodyGeneratorFunction = Callable[[], AsyncGenerator[bytes, None]]
 HeadersAndBodyGenerator = tuple[Headers, BodyGeneratorFunction]
@@ -538,7 +536,7 @@ class HTTPMixin(Mixin, HTTPSession):
                         finally:
                             await resp.release()
 
-                    response_headers = Headers({k: v for k, v in resp.headers.items()})
+                    response_headers = dict(resp.headers)
                     should_release_response = False
                     return (response_headers, body_generator)
 
