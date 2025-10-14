@@ -58,6 +58,13 @@
             "description": "The number of rows which should be fetched from the database in a single backfill query.",
             "default": 50000
           },
+          "polling_interval": {
+            "type": "string",
+            "title": "CDC Polling Interval",
+            "description": "The interval at which the connector polls for CDC changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified.",
+            "default": "500ms",
+            "pattern": "^[0-9]+(ms|s|m|h)$"
+          },
           "change_table_cleanup": {
             "type": "boolean",
             "title": "Automatic Change Table Cleanup",
