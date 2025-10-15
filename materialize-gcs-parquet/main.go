@@ -16,7 +16,7 @@ var featureFlagDefaults = map[string]bool{
 	// Starting on 18-Aug-2025 newly created parquet materializations will use
 	// STRING logical type for UUID fields, rather than a UUID logical type.
 	"uuid_logical_type": false,
-	"drop_table":        true,
+	"retain_existing_data_on_backfill": false,
 }
 
 type config struct {

@@ -19,7 +19,7 @@ import (
 )
 
 var featureFlagDefaults = map[string]bool{
-	"drop_table": true,
+	"retain_existing_data_on_backfill": false,
 }
 
 // config represents the endpoint configuration for starburst.

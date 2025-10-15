@@ -51,7 +51,7 @@ const (
 
 var featureFlagDefaults = map[string]bool{
 	"datetime_keys_as_string": true,
-	"drop_table":              true,
+	"retain_existing_data_on_backfill": false,
 }
 
 func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
