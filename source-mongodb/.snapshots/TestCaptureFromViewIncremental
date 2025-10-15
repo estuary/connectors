@@ -1,0 +1,18 @@
+# ================================
+# Collection "acmeCo/test/incrementalView": 10 Documents
+# ================================
+{"_id":"0","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 0"}
+{"_id":"1","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 1"}
+{"_id":"2","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 2"}
+{"_id":"3","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 3"}
+{"_id":"4","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 4"}
+{"_id":"5","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 5"}
+{"_id":"6","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 6"}
+{"_id":"7","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 7"}
+{"_id":"8","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 8"}
+{"_id":"9","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 9"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"testDb%2FincrementalView":{"backfill":{"backfilled_docs":10,"done":true,"last_id":{"Type":16,"Value":"CQAAAA=="},"last_poll_start":"<LAST_POLLED_TS>"}}}}
+

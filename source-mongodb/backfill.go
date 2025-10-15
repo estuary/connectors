@@ -454,15 +454,26 @@ func (c *capture) isShardedCollection(ctx context.Context, database, collection 
 
 	cursor, err := c.client.Database(database).Collection(collection).Aggregate(ctx, pipeline)
 	if err != nil {
-		// Check if this is a NamespaceNotFound error (code 26). This can occur for new/empty
-		// collections that haven't been physically created yet. Treat these as non-sharded.
 		var cmdErr mongo.CommandError
-		if errors.As(err, &cmdErr) && cmdErr.Code == 26 {
-			log.WithFields(log.Fields{
-				"database":   database,
-				"collection": collection,
-			}).Debug("collection not found, assuming not sharded")
-			return false, nil
+		if errors.As(err, &cmdErr) {
+			// Check if this is a NamespaceNotFound error (code 26). This can occur for new/empty
+			// collections that haven't been physically created yet. Treat these as non-sharded.
+			if cmdErr.Code == 26 {
+				log.WithFields(log.Fields{
+					"database":   database,
+					"collection": collection,
+				}).Debug("collection not found, assuming not sharded")
+				return false, nil
+			}
+			// Check if this is a CommandNotSupportedOnView error (code 166). Views can have _id
+			// from multiple tables, so we treat them as sharded to ensure proper sorting.
+			if cmdErr.Code == 166 {
+				log.WithFields(log.Fields{
+					"database":   database,
+					"collection": collection,
+				}).Debug("collection is a view, treating as sharded")
+				return true, nil
+			}
 		}
 		return false, fmt.Errorf("running $collStats aggregation: %w", err)
 	}
