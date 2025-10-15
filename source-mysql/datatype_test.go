@@ -65,8 +65,8 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "numeric(15,2)", ExpectType: `{"type":["string","null"],"format":"number"}`, InputValue: 1234567890123.451, ExpectValue: `"1234567890123.45"`},
 
 		// MySQL strips trailing spaces from CHAR on retrieval, and doesn't do that for VARCHAR
-		{ColumnType: "char(5)", ExpectType: `{"type":["string","null"],"minLength":5,"maxLength":5}`, InputValue: "foo", ExpectValue: `"foo"`},
-		{ColumnType: "char(5)", ExpectType: `{"type":["string","null"],"minLength":5,"maxLength":5}`, InputValue: "foo  ", ExpectValue: `"foo"`},
+		{ColumnType: "char(5)", ExpectType: `{"type":["string","null"],"maxLength":5}`, InputValue: "foo", ExpectValue: `"foo"`},
+		{ColumnType: "char(5)", ExpectType: `{"type":["string","null"],"maxLength":5}`, InputValue: "foo  ", ExpectValue: `"foo"`},
 		{ColumnType: "varchar(5)", ExpectType: `{"type":["string","null"],"maxLength":5}`, InputValue: "foo", ExpectValue: `"foo"`},
 		{ColumnType: "varchar(5)", ExpectType: `{"type":["string","null"],"maxLength":5}`, InputValue: "foo  ", ExpectValue: `"foo  "`},
 		{ColumnType: "tinytext", ExpectType: `{"type":["string","null"]}`, InputValue: "foo", ExpectValue: `"foo"`},
@@ -75,8 +75,8 @@ func TestDatatypes(t *testing.T) {
 		{ColumnType: "mediumtext", ExpectType: `{"type":["string","null"]}`, InputValue: "foo", ExpectValue: `"foo"`},
 		{ColumnType: "longtext", ExpectType: `{"type":["string","null"]}`, InputValue: "foo", ExpectValue: `"foo"`},
 
-		{ColumnType: "binary(5)", ExpectType: `{"type":["string","null"],"contentEncoding":"base64","minLength":8,"maxLength":8}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78, 0x9A}, ExpectValue: `"EjRWeJo="`},
-		{ColumnType: "binary(8)", ExpectType: `{"type":["string","null"],"contentEncoding":"base64","minLength":12,"maxLength":12}`, InputValue: []byte{0xE2, 0x28, 0xA1, 0x00, 0x00}, ExpectValue: `"4iihAAAAAAA="`},
+		{ColumnType: "binary(5)", ExpectType: `{"type":["string","null"],"contentEncoding":"base64","maxLength":8}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78, 0x9A}, ExpectValue: `"EjRWeJo="`},
+		{ColumnType: "binary(8)", ExpectType: `{"type":["string","null"],"contentEncoding":"base64","maxLength":12}`, InputValue: []byte{0xE2, 0x28, 0xA1, 0x00, 0x00}, ExpectValue: `"4iihAAAAAAA="`},
 		{ColumnType: "varbinary(5)", ExpectType: `{"type":["string","null"],"contentEncoding":"base64","maxLength":8}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},
 		{ColumnType: "varbinary(8)", ExpectType: `{"type":["string","null"],"contentEncoding":"base64","maxLength":12}`, InputValue: []byte{0xE2, 0x28, 0xA1, 0x00, 0x00}, ExpectValue: `"4iihAAA="`},
 		{ColumnType: "tinyblob", ExpectType: `{"type":["string","null"],"contentEncoding":"base64"}`, InputValue: []byte{0x12, 0x34, 0x56, 0x78}, ExpectValue: `"EjRWeA=="`},

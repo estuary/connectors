@@ -244,7 +244,9 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isP
 			// CHAR(n) - fixed-length, space-padded
 			if columnType.MaxLength > 0 {
 				var length = uint64(columnType.MaxLength)
-				schema.minLength = &length
+				// NOTE: In theory we might want to discover a minimum length for fixed-length
+				// CHAR(n) columns, but in practice we have observed this minimum being violated
+				// and there's no real benefit to having it right now, so we don't.
 				schema.maxLength = &length
 			}
 		case "varchar":
@@ -258,7 +260,10 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isP
 			// Binary data is base64 encoded: every 3 bytes becomes 4 characters
 			if columnType.MaxLength > 0 {
 				var base64Length = uint64((columnType.MaxLength + 2) / 3 * 4)
-				schema.minLength = &base64Length
+				// NOTE: As with CHAR(n) we could theoretically discover a minimum here, and
+				// we have not observed that minimum being violated in the real world for a
+				// BINARY(n) column, but since there's no real benefit we choose not to at
+				// this time.
 				schema.maxLength = &base64Length
 			}
 		case "varbinary":
