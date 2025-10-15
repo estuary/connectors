@@ -130,8 +130,10 @@ func (c *Config) Validate() error {
 	}
 
 	if c.Advanced.PollingInterval != "" {
-		if _, err := time.ParseDuration(c.Advanced.PollingInterval); err != nil {
-			return fmt.Errorf("invalid 'polling_interval' configuration: %w", err)
+		if parsedInterval, err := time.ParseDuration(c.Advanced.PollingInterval); err != nil {
+			return fmt.Errorf("invalid 'polling_interval' configuration %q: %w", c.Advanced.PollingInterval, err)
+		} else if parsedInterval < 100*time.Millisecond {
+			return fmt.Errorf("invalid 'polling_interval' configuration %q: must be at least 100ms", c.Advanced.PollingInterval)
 		}
 	}
 

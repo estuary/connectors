@@ -707,10 +707,12 @@ func (rs *sqlserverReplicationStream) run(ctx context.Context) error {
 		return fmt.Errorf("error managing capture instances: %w", err)
 	}
 
-	// Parse the configured polling interval. Should never fail since we validated
-	// it already, but we'll default to 500ms if it somehow did.
-	var pollingInterval = 500 * time.Millisecond
-	if parsedInterval, err := time.ParseDuration(rs.cfg.Advanced.PollingInterval); err == nil {
+	// Parse the configured polling interval.
+	var pollingInterval time.Duration
+	if parsedInterval, err := time.ParseDuration(rs.cfg.Advanced.PollingInterval); err != nil {
+		// Should never happen since we validated it earlier
+		return fmt.Errorf("internal error: failed to parse polling interval %q: %w", rs.cfg.Advanced.PollingInterval, err)
+	} else {
 		pollingInterval = parsedInterval
 	}
 
