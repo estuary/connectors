@@ -14,7 +14,7 @@ import (
 
 var featureFlagDefaults = map[string]bool{
 	"datetime_keys_as_string": true,
-	"drop_table":              true,
+	"retain_existing_data_on_backfill": false,
 }
 
 type advancedConfig struct {

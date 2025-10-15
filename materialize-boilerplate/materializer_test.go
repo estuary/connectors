@@ -164,7 +164,7 @@ func TestRunApply(t *testing.T) {
 	}
 }
 
-func TestRunApplyNoDropTable(t *testing.T) {
+func TestRunApplyRetainExistingDataOnBackfill(t *testing.T) {
 	ctx := context.Background()
 
 	for _, tt := range []struct {
@@ -175,7 +175,7 @@ func TestRunApplyNoDropTable(t *testing.T) {
 		expectError  bool
 	}{
 		{
-			name:         "should not truncate resource when no_drop_table is set",
+			name:         "should not truncate resource when retain_existing_data_on_backfill is set",
 			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
 			newSpec:      loadMaterializerSpec(t, "backfill-nullable.flow.proto"),
 			want: testCalls{
@@ -185,7 +185,7 @@ func TestRunApplyNoDropTable(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:         "should error when drop/recreate is required and no_drop_table is set",
+			name:         "should error when drop/recreate is required and retain_existing_data_on_backfill is set",
 			originalSpec: loadMaterializerSpec(t, "base.flow.proto"),
 			newSpec:      loadMaterializerSpec(t, "backfill-key-change.flow.proto"),
 			want:         testCalls{
@@ -202,14 +202,14 @@ func TestRunApplyNoDropTable(t *testing.T) {
 				LastVersion:         "oldone",
 			}
 
-			// Parse the original spec's ConfigJson and set no_drop_table feature flag and set back on the req
+			// Parse the original spec's ConfigJson and set retain_existing_data_on_backfill feature flag and set back on the req
 			var config testEndpointConfiger
 			require.NoError(t, json.Unmarshal(req.Materialization.ConfigJson, &config))
 
-			// Modify config to disable drop_table
+			// Modify config to enable retain_existing_data_on_backfill
 			config.Config = map[string]any{
 				"advanced": map[string]any{
-					"feature_flags": "no_drop_table",
+					"feature_flags": "retain_existing_data_on_backfill",
 				},
 			}
 
@@ -224,7 +224,7 @@ func TestRunApplyNoDropTable(t *testing.T) {
 
 			if tt.expectError {
 				require.Error(t, err)
-				require.Contains(t, err.Error(), "drop_table")
+				require.Contains(t, err.Error(), "retain_existing_data_on_backfill")
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, tt.want, *got)
@@ -343,7 +343,7 @@ func (c testEndpointConfiger) FeatureFlags() (string, map[string]bool) {
 	}
 
 	return featureFlags, map[string]bool{
-		"drop_table": true,
+		"retain_existing_data_on_backfill": false,
 	}
 }
 

@@ -557,14 +557,13 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		}
 
 		if !mCfg.NoTruncateResources && !parsedFlags["always_drop_tables_on_backfill"] && doTruncate {
-			// Only run TruncateTable if drop_table is enabled
-			if parsedFlags["drop_table"] {
-				if desc, action, err := materializer.TruncateResource(ctx, thisBinding.ResourcePath); err != nil {
-					return nil, fmt.Errorf("getting TruncateResource action: %w", err)
-				} else {
-					truncationActionDescriptions = append(truncationActionDescriptions, desc)
-					truncationActions = append(truncationActions, action)
-				}
+			if parsedFlags["retain_existing_data_on_backfill"] {
+				// Only run TruncateTable if retain_existing_data_on_backfill is disabled
+			} else if desc, action, err := materializer.TruncateResource(ctx, thisBinding.ResourcePath); err != nil {
+				return nil, fmt.Errorf("getting TruncateResource action: %w", err)
+			} else {
+				truncationActionDescriptions = append(truncationActionDescriptions, desc)
+				truncationActions = append(truncationActions, action)
 			}
 
 			// A resource may be truncated, but require other updates as well.
@@ -574,9 +573,9 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 			}
 			common.updatedBindings[bindingIdx] = *upd
 		} else {
-			// Check if drop_table is disabled, and if so, return an error
-			if !parsedFlags["drop_table"] {
-				return nil, fmt.Errorf("backfill for binding %q requires dropping and re-creating the table, but the 'drop_table' feature flag is disabled. Enable the feature flag by removing 'no_drop_table' from 'advanced.feature_flags' in the endpoint configuration", thisBinding.ResourcePath)
+			// Check if retain_existing_data_on_backfill is enabled, and if so, return an error
+			if parsedFlags["retain_existing_data_on_backfill"] {
+				return nil, fmt.Errorf("backfill for binding %q requires dropping and re-creating the table, but the 'retain_existing_data_on_backfill' feature flag is enabled. Disable the feature flag by removing 'retain_existing_data_on_backfill' from 'advanced.feature_flags' in the endpoint configuration", thisBinding.ResourcePath)
 			}
 
 			if deleteDesc, deleteAction, err := materializer.DeleteResource(ctx, thisBinding.ResourcePath); err != nil {
