@@ -26,6 +26,7 @@ from .orders.orders import Orders
 from .orders.refunds import OrderRefunds
 from .orders.risks import OrderRisks
 from .orders.transactions import OrderTransactions
+from .subscriptions.subscription_contracts import SubscriptionContracts
 
 
 __all__ = [
@@ -55,4 +56,5 @@ __all__ = [
     "OrderRefunds",
     "OrderRisks",
     "OrderTransactions",
+    "SubscriptionContracts",
 ]
