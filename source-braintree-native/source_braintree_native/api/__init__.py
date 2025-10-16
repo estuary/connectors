@@ -19,8 +19,13 @@ from .searchable_incremental_resource import (
     determine_next_searchable_resource_window_end_by_field,
     fetch_searchable_resources_created_between,
 )
-from .disputes import fetch_disputes_received_between
-from ..models import IncrementalResource, SearchResponse, IncrementalResourceBraintreeClass
+from .disputes import fetch_disputes_between
+from ..models import (
+    DisputeSearchField,
+    IncrementalResource,
+    IncrementalResourceBraintreeClass,
+    SearchResponse,
+)
 
 
 # Disputes are searched using the received_date field, which is a date not a datetime. Using a window size
@@ -286,9 +291,10 @@ async def fetch_disputes(
     # a window size of 1 hour. To avoid missing these type of results, we move the start of the received_date search back one day.
     start = log_cursor - timedelta(days=1) if _are_same_day(log_cursor, end) else log_cursor
 
-    async for doc in fetch_disputes_received_between(
+    async for doc in fetch_disputes_between(
         http,
         base_url,
+        DisputeSearchField.RECEIVED_DATE,
         start,
         end,
         log,
@@ -328,9 +334,10 @@ async def backfill_disputes(
     # always search the previous day for results created in this date window as well.
     search_start = start - timedelta(days=1)
 
-    async for doc in fetch_disputes_received_between(
+    async for doc in fetch_disputes_between(
         http,
         base_url,
+        DisputeSearchField.RECEIVED_DATE,
         search_start,
         end,
         log,

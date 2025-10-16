@@ -6,13 +6,14 @@ import braintree
 from estuary_cdk.http import HTTPSession
 
 from .common import HEADERS, SEARCH_PAGE_SIZE, braintree_object_to_dict, braintree_xml_to_dict
-from ..models import IncrementalResource, DisputesSearchResponse
+from ..models import IncrementalResource, DisputeSearchField, DisputesSearchResponse
 
 # Unlike the other incremental resource endpoints, the number of records returned by a single disputes
 # search is not limited to 10,000 records.
-async def fetch_disputes_received_between(
+async def fetch_disputes_between(
     http: HTTPSession,
     base_url: str,
+    search_field: DisputeSearchField,
     start: datetime,
     end: datetime,
     log: Logger,
@@ -20,7 +21,7 @@ async def fetch_disputes_received_between(
     url = f"{base_url}/disputes/advanced_search"
     body = {
         "search": {
-            "received_date": {
+            search_field: {
                 "min": start.isoformat(),
                 "max": end.isoformat(),
             }

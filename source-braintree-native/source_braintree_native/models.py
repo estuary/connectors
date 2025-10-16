@@ -1,6 +1,7 @@
 import braintree
 from braintree import BraintreeGateway
 from datetime import datetime, timezone, timedelta
+from enum import StrEnum
 from logging import Logger
 from pydantic import AwareDatetime, BaseModel, Field
 from typing import Annotated, Any, AsyncGenerator, Callable, Literal
@@ -166,6 +167,19 @@ class SubscriptionSearchResponse(SearchResponse):
         resource: SearchResponseResource = Field(alias="subscription", default=None)
 
     resources: Subscriptions = Field(alias="subscriptions")
+
+
+class DisputeSearchField(StrEnum):
+    # received_date searches disputes by when they were received by Braintree. This is a rough, imperfect
+    # way to mimic searching by the created_at field; we've observed created_at and received_date can
+    # be up to 2 days apart.
+    RECEIVED_DATE = "received_date"
+    # Search disputes by effective_date in status_history. If _any_ of the statuses in a dispute's status_history
+    # have an effective_date that matches the search, that dispute is included in the search results.
+    # 
+    # Since the most recent status' timestamp is used for the dispute's updated_at field, searching by effective_date
+    # should be a sufficient proxy for searching by updated_at.
+    EFFECTIVE_DATE = "effective_date"
 
 
 class DisputesSearchResponse(SearchResponse):
