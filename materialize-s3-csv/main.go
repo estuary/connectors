@@ -57,7 +57,7 @@ var driver = filesink.FileDriver{
 		return cfg, nil
 	},
 	NewStore: func(ctx context.Context, c filesink.Config, featureFlags map[string]bool) (filesink.Store, error) {
-		return filesink.NewS3Store(ctx, c.(config).S3StoreConfig)
+		return filesink.NewS3Store(ctx, c.(config).S3StoreConfig, featureFlags)
 	},
 	NewWriter: func(c filesink.Config, featureFlags map[string]bool, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (filesink.StreamWriter, error) {
 		return filesink.NewCsvStreamWriter(c.(config).CsvConfig, b, w), nil
