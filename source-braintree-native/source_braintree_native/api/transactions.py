@@ -236,3 +236,80 @@ async def fetch_transactions_disbursed_between(
 
         if len(ids) < TRANSACTION_SEARCH_LIMIT:
             return
+
+
+# Disputed transactions
+async def _fetch_transaction_ids_disputed_between(
+    http: HTTPSession,
+    base_url: str,
+    start: datetime,
+    end: datetime,
+    earliest_created_at: datetime,
+    log: Logger,
+) -> list[str]:
+    url = f"{base_url}/transactions/advanced_search_ids"
+    body = {
+        "search": {
+            "created_at": {
+                "max": earliest_created_at.isoformat(),
+            },
+            "dispute_date": {
+                "min": start.isoformat(),
+                "max": end.isoformat(),
+            }
+        }
+    }
+
+    response = IdSearchResponse.model_validate(
+        braintree_xml_to_dict(
+            await http.request(log, url, "POST", json=body, headers=HEADERS)
+        )
+    )
+
+    return response.search_results.ids
+
+
+async def fetch_transactions_disputed_between(
+    http: HTTPSession,
+    base_url: str,
+    start: datetime,
+    end: datetime,
+    gateway: BraintreeGateway,
+    log: Logger,
+) -> AsyncGenerator[Transaction, None]:
+    start_date = start.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_date = end.replace(hour=0, minute=0, second=0, microsecond=0)
+    log.info(f"Fetching disputed transactions.", {
+        "start": start_date,
+        "end": end_date,
+    })
+
+    earliest_created_at = end_date + timedelta(days=1)
+    while True:
+        ids = await _fetch_transaction_ids_disputed_between(
+            http,
+            base_url,
+            start,
+            end,
+            earliest_created_at,
+            log,
+        )
+
+        async for doc in fetch_by_ids(
+            http,
+            base_url,
+            TRANSACTION_PATH_COMPONENT,
+            TransactionSearchResponse,
+            Transaction,
+            ids,
+            gateway,
+            braintree.Transaction,
+            log,
+        ):
+            yield doc
+
+            if doc.created_at < earliest_created_at:
+                earliest_created_at = doc.created_at
+
+        if len(ids) < TRANSACTION_SEARCH_LIMIT:
+            return
