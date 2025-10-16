@@ -421,10 +421,7 @@ def append_files(
             time.sleep(attempt * 2)
             attempt += 1
 
-    log(f"append_files: reloading table to verify update")
-    tbl = catalog.load_table(table)
-    log(f"append_files: table reloaded, operation complete")
-    print(f"{table} updated with flow_checkpoints_v1 property of {tbl.properties.get('flow_checkpoints_v1')} from {cp} after {attempt} attempts")
+    print(f"{table} updated to {next_checkpoint} after {attempt} attempts")
 
 
 if __name__ == "__main__":
