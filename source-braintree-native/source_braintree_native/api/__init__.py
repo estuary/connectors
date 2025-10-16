@@ -10,6 +10,7 @@ from .transactions import (
     determine_next_transaction_window_end,
     fetch_transactions_created_between,
     fetch_transactions_disbursed_between,
+    fetch_transactions_disputed_between,
     fetch_transactions_updated_between,
     TRANSACTION_PATH_COMPONENT,
     TRANSACTION_SEARCH_LIMIT,
@@ -76,17 +77,30 @@ async def fetch_transactions(
     if log_cursor >= end:
         return
 
-    # When a transaction's disbursement_details/disbursed_date is updated, none of the TRANSACTION_SEARCH_FIELDS
-    # or the non-searchable updated_at field are updated. Meaning, only incrementally replicating based off
-    # the TRANSACTION_SEARCH_FIELDS will cause the connector to miss updates to transactions' disbursement dates.
-    # To capture these elusive updates, we search the previous day(s) for disbursed transactions and yield them
-    # when the date window spans more than a single day.
+    # When a transaction's disbursement_details/disbursed_date/disputes are updated, none of
+    # the TRANSACTION_SEARCH_FIELDS are updated. Meaning, only incrementally replicating based
+    # off the TRANSACTION_SEARCH_FIELDS will cause the connector to miss updates to disbursed
+    # and disputed transactions. To capture these elusive updates, we search the previous day(s)
+    # for disbursed and disputed transactions and yield them when the date window spans
+    # more than a single day.
+
     if not _are_same_day(log_cursor, end):
+        yesterday = end - timedelta(days=1)
         async for doc in fetch_transactions_disbursed_between(
             http=http,
             base_url=base_url,
             start=log_cursor,
-            end=(end - timedelta(days=1)),
+            end=yesterday,
+            gateway=braintree_gateway,
+            log=log,
+        ):
+            yield doc
+
+        async for doc in fetch_transactions_disputed_between(
+            http=http,
+            base_url=base_url,
+            start=log_cursor,
+            end=yesterday,
             gateway=braintree_gateway,
             log=log,
         ):
