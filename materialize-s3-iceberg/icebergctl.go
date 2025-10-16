@@ -59,7 +59,7 @@ func runIcebergctl(ctx context.Context, cfg *config, args ...string) ([]byte, er
 	out, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			return nil, fmt.Errorf("error running iceberg_ctl: %s", string(exitErr.Stderr))
+			return nil, fmt.Errorf("error running iceberg_ctl (exit code %d): %s", exitErr.ExitCode(), string(exitErr.Stderr))
 		}
 
 		return nil, err

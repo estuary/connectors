@@ -401,13 +401,13 @@ def append_files(
     attempt = 1
     while True:
         try:
-            log(f"append_files: starting transaction attempt {attempt}")
+            log(f"append_files: starting transaction (attempt {attempt})")
             txn = tbl.transaction()
             log(f"append_files: adding files to transaction")
             txn.add_files(file_paths.split(","))
             log(f"append_files: setting checkpoint property on transaction")
             txn.set_properties({"flow_checkpoints_v1": json.dumps(checkpoints)})
-            log(f"append_files: committing transaction attempt {attempt}")
+            log(f"append_files: committing transaction (attempt {attempt})")
             txn.commit_transaction()
             log(f"append_files: transaction committed successfully")
             break
