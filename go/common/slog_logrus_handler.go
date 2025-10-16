@@ -32,12 +32,12 @@ func (l *LogrusHandler) Handle(ctx context.Context, r slog.Record) error {
 
 	for _, attr := range l.withAttrs {
 		if attr.Key != "" {
-			entry = entry.WithField(attr.Key, attr.Value)
+			entry = entry.WithField(attr.Key, attr.Value.String())
 		}
 	}
 	for attr := range r.Attrs {
 		if attr.Key != "" {
-			entry = entry.WithField(attr.Key, attr.Value)
+			entry = entry.WithField(attr.Key, attr.Value.String())
 		}
 	}
 
