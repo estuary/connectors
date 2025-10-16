@@ -49,6 +49,7 @@ COPY --from=pybuilder /opt/iceberg-ctl /opt/iceberg-ctl
 COPY --from=gobuilder /builder/connector /opt/materialize-s3-iceberg
 
 ENV GOMEMLIMIT=900MiB
+ENV PYMEMLIMIT=900
 ENV PYTHON_PATH=/opt/venv/bin/python
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize

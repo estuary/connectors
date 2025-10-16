@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+import resource
 import sys
 import time
 import traceback
@@ -425,4 +427,13 @@ def append_files(
 
 
 if __name__ == "__main__":
+    try:
+        # Configure Python memory limits based on PYMEMLIMIT environment variable.
+        # This variable is used so that Go and Python limits can be tuned in the
+        # same place in the connector Dockerfile.
+        if pymemlimit := os.getenv("PYMEMLIMIT"):
+            limit_bytes = int(pymemlimit) * 1024 * 1024
+            resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, resource.RLIM_INFINITY))
+    except (ValueError, OSError) as e:
+        print(f"warning: failed to set memory limit from PYMEMLIMIT={pymemlimit}: {e}", file=sys.stderr, flush=True)
     run(auto_envvar_prefix="ICEBERG")
