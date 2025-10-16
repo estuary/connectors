@@ -263,7 +263,7 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 		AWSAccessKeyID:     d.cfg.AWSAccessKeyID,
 		AWSSecretAccessKey: d.cfg.AWSSecretAccessKey,
 		Region:             d.cfg.Region,
-	})
+	}, nil)
 	if err != nil {
 		errs.Err(fmt.Errorf("creating s3 store: %w", err))
 		return errs
@@ -425,7 +425,7 @@ func (d *materialization) NewMaterializerTransactor(
 		AWSAccessKeyID:     d.cfg.AWSAccessKeyID,
 		AWSSecretAccessKey: d.cfg.AWSSecretAccessKey,
 		Region:             d.cfg.Region,
-	})
+	}, nil)
 	if err != nil {
 		return nil, fmt.Errorf("creating s3 store: %w", err)
 	}

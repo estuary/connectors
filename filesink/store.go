@@ -143,7 +143,7 @@ func (c S3StoreConfig) CredentialsProvider(ctx context.Context) (aws.Credentials
 	return nil, errors.New("unknown 'auth_type'")
 }
 
-func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
+func NewS3Store(ctx context.Context, cfg S3StoreConfig, featureFlags map[string]bool) (*S3Store, error) {
 	credProvider, err := cfg.CredentialsProvider(ctx)
 	if err != nil {
 		return nil, err
@@ -152,6 +152,9 @@ func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
 	opts := []func(*awsConfig.LoadOptions) error{
 		awsConfig.WithCredentialsProvider(credProvider),
 		awsConfig.WithRegion(cfg.Region),
+	}
+	if featureFlags["s3_use_dualstack_endpoints"] {
+		opts = append(opts, awsConfig.WithUseDualStackEndpoint(aws.DualStackEndpointStateEnabled))
 	}
 
 	if cfg.Endpoint != "" {

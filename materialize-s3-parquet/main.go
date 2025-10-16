@@ -16,6 +16,8 @@ var featureFlagDefaults = map[string]bool{
 	// Starting on 18-Aug-2025 newly created parquet materializations will use
 	// STRING logical type for UUID fields, rather than a UUID logical type.
 	"uuid_logical_type": false,
+
+	"s3_use_dualstack_endpoints": false,
 }
 
 type config struct {
@@ -61,7 +63,7 @@ var driver = filesink.FileDriver{
 		return cfg, nil
 	},
 	NewStore: func(ctx context.Context, c filesink.Config, featureFlags map[string]bool) (filesink.Store, error) {
-		return filesink.NewS3Store(ctx, c.(config).S3StoreConfig)
+		return filesink.NewS3Store(ctx, c.(config).S3StoreConfig, featureFlags)
 	},
 	NewWriter: func(c filesink.Config, featureFlags map[string]bool, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (filesink.StreamWriter, error) {
 		return filesink.NewParquetWriter(c.(config).ParquetConfig, b, w, featureFlags["uuid_logical_type"])
