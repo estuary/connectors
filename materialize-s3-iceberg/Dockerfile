@@ -6,6 +6,8 @@ FROM base AS pybuilder
 
 RUN apt-get update && \
     apt install -y --no-install-recommends \
+    build-essential \
+    python3-dev \
     python3-poetry
 
 RUN python -m venv /opt/venv
