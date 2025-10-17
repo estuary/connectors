@@ -290,9 +290,16 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	pingCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
+	// Query database collation to determine if resources are case-insensitive
+	caseInsensitiveResources, err := isCaseInsensitiveDatabase(ctx, db, cfg.Warehouse)
+	if err != nil {
+		errs.Err(err)
+		return errs
+	}
+
 	// Get feature flags and create dialect for preReqs function
 	_, featureFlags := cfg.FeatureFlags()
-	dialect := createDialect(featureFlags)
+	dialect := createDialect(featureFlags, caseInsensitiveResources)
 	var wh int
 	if err := db.QueryRowContext(pingCtx, fmt.Sprintf("SELECT 1 from sys.databases WHERE name = %s;", dialect.Literal(cfg.Warehouse))).Scan(&wh); err != nil {
 		var authErr *azidentity.AuthenticationFailedError

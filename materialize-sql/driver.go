@@ -127,15 +127,16 @@ func (s *sqlMaterialization[EC, RC]) Config() boilerplate.MaterializeCfg {
 	_, doCreateSchemas := s.client.(SchemaManager)
 
 	return boilerplate.MaterializeCfg{
-		Locate:                ToLocatePathFn(s.endpoint.Dialect.TableLocator),
-		TranslateNamespace:    s.endpoint.SchemaLocator,
-		TranslateField:        s.endpoint.ColumnLocator,
-		MaxFieldLength:        s.endpoint.Dialect.MaxColumnCharLength,
-		CaseInsensitiveFields: s.endpoint.Dialect.CaseInsensitiveColumns,
-		ConcurrentApply:       s.endpoint.ConcurrentApply,
-		NoCreateNamespaces:    !doCreateSchemas,
-		SerPolicy:             s.endpoint.SerPolicy,
-		MaterializeOptions:    s.endpoint.Options,
+		Locate:                   ToLocatePathFn(s.endpoint.Dialect.TableLocator),
+		TranslateNamespace:       s.endpoint.SchemaLocator,
+		TranslateField:           s.endpoint.ColumnLocator,
+		MaxFieldLength:           s.endpoint.Dialect.MaxColumnCharLength,
+		CaseInsensitiveFields:    s.endpoint.Dialect.CaseInsensitiveColumns,
+		CaseInsensitiveResources: s.endpoint.Dialect.CaseInsensitiveResources,
+		ConcurrentApply:          s.endpoint.ConcurrentApply,
+		NoCreateNamespaces:       !doCreateSchemas,
+		SerPolicy:                s.endpoint.SerPolicy,
+		MaterializeOptions:       s.endpoint.Options,
 	}
 }
 

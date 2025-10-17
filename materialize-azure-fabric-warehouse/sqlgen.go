@@ -10,7 +10,7 @@ import (
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 )
 
-func createDialect(featureFlags map[string]bool) sql.Dialect {
+func createDialect(featureFlags map[string]bool, caseInsensitiveResources bool) sql.Dialect {
 	// Although the documentation states this limit as 1MB, via empirical
 	// testing I have determined it to actually be 1 MiB.
 	const maxFabricStringLength = 1024 * 1024
@@ -113,9 +113,10 @@ func createDialect(featureFlags map[string]bool) sql.Dialect {
 			// parameterIndex starts at 0, but sqlserver parameters start at @p1
 			return fmt.Sprintf("@p%d", index+1)
 		}),
-		TypeMapper:             mapper,
-		MaxColumnCharLength:    0,
-		CaseInsensitiveColumns: true,
+		TypeMapper:               mapper,
+		MaxColumnCharLength:      0,
+		CaseInsensitiveColumns:   true,
+		CaseInsensitiveResources: caseInsensitiveResources,
 	}
 }
 

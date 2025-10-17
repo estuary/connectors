@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-var testDialect = createDialect(featureFlagDefaults)
+var testDialect = createDialect(featureFlagDefaults, false)
 var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
-	testDialect := createDialect(map[string]bool{"datetime_keys_as_string": true})
+	testDialect := createDialect(map[string]bool{"datetime_keys_as_string": true}, false)
 
 	snap, tables := sql.RunSqlGenTests(
 		t,
