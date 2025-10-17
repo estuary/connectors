@@ -160,8 +160,7 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 
 --- Begin key_value loadQueryNoFlowDocument ---
 
-SELECT 0, 
-JSON_OBJECT(
+SELECT 0, JSON_OBJECT(
     'key1', r.key1,
     'key2', r.key2,
     'key!binary', r.`key!binary`,

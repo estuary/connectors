@@ -184,7 +184,15 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	if len(ta.DropNotNulls) > 0 || len(ta.AddColumns) > 0 {
 		var alterColumnStmtBuilder strings.Builder
-		if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
+
+		var product string
+		if conn, err := c.db.Conn(ctx); err != nil {
+			return "", nil, fmt.Errorf("getting connection from pool: %w", err)
+		} else if product, err = queryDatabaseProduct(ctx, conn); err != nil {
+			return "", nil, err
+		}
+
+		if err := renderTemplates(c.ep.Dialect, product).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
 		alterColumnStmt := alterColumnStmtBuilder.String()
