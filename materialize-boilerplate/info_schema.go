@@ -96,12 +96,13 @@ type TranslateFieldFn func(string) string
 // InfoSchema contains the information about materialized collections and fields that exist within
 // the endpoint.
 type InfoSchema struct {
-	namespaces            []string
-	resources             []*ExistingResource
-	locatePath            LocatePathFn
-	translateNamespace    TranslateNamespaceFn
-	translateField        TranslateFieldFn
-	caseInsensitiveFields bool
+	namespaces               []string
+	resources                []*ExistingResource
+	locatePath               LocatePathFn
+	translateNamespace       TranslateNamespaceFn
+	translateField           TranslateFieldFn
+	caseInsensitiveFields    bool
+	caseInsensitiveResources bool
 }
 
 // NewInfoSchema creates a new InfoSchema that will use the `locate` and `translateField` functions
@@ -111,12 +112,14 @@ func NewInfoSchema(
 	translateNamespace TranslateNamespaceFn,
 	translateField TranslateFieldFn,
 	caseInsensitiveFields bool,
+	caseInsensitiveResources bool,
 ) *InfoSchema {
 	return &InfoSchema{
-		locatePath:            locate,
-		translateNamespace:    translateNamespace,
-		translateField:        translateField,
-		caseInsensitiveFields: caseInsensitiveFields,
+		locatePath:               locate,
+		translateNamespace:       translateNamespace,
+		translateField:           translateField,
+		caseInsensitiveFields:    caseInsensitiveFields,
+		caseInsensitiveResources: caseInsensitiveResources,
 	}
 }
 
@@ -146,7 +149,9 @@ func (i *InfoSchema) HasNamespace(ns string) bool {
 // pre-populated by a different query than listing the fields for them.
 func (i *InfoSchema) PushResource(location ...string) *ExistingResource {
 	for _, r := range i.resources {
-		if slices.Equal(r.location, location) {
+		if i.caseInsensitiveResources && slices.EqualFunc(r.location, location, strings.EqualFold) {
+			return r
+		} else if slices.Equal(r.location, location) {
 			return r
 		}
 	}
@@ -164,8 +169,11 @@ func (i *InfoSchema) PushResource(location ...string) *ExistingResource {
 // GetResource returns the ExistingResource for a given Flow resource path, or
 // nil if it is not found.
 func (i *InfoSchema) GetResource(resourcePath []string) *ExistingResource {
+	located := i.locatePath(resourcePath)
 	for _, r := range i.resources {
-		if slices.Equal(r.location, i.locatePath(resourcePath)) {
+		if i.caseInsensitiveResources && slices.EqualFunc(r.location, located, strings.EqualFold) {
+			return r
+		} else if slices.Equal(r.location, located) {
 			return r
 		}
 	}
