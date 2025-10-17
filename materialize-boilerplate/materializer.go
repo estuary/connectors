@@ -56,6 +56,11 @@ type MaterializeCfg struct {
 	// is passed to the protocol-level case_insensitive_fields setting.
 	CaseInsensitiveFields bool
 
+	// CaseInsensitiveResources indicates if resources that differ only in
+	// capitalization will conflict in the materialized system. When true,
+	// resource lookups will use case-insensitive comparison.
+	CaseInsensitiveResources bool
+
 	// ConcurrentApply of Apply actions, for system that may benefit from a
 	// scatter/gather strategy for changing many resources in a single Apply
 	// RPC.
@@ -759,7 +764,7 @@ func initInfoSchema(cfg MaterializeCfg) *InfoSchema {
 		translateField = cfg.TranslateField
 	}
 
-	return NewInfoSchema(locatePath, translateNamespace, translateField, cfg.CaseInsensitiveFields)
+	return NewInfoSchema(locatePath, translateNamespace, translateField, cfg.CaseInsensitiveFields, cfg.CaseInsensitiveResources)
 }
 
 func buildMappedBinding[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
