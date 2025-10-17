@@ -122,12 +122,41 @@ func (r tableConfig) Parameters() ([]string, bool, error) {
 	return []string{r.warehouse, r.Schema, r.Table}, r.Delta, nil
 }
 
+// isCaseInsensitiveDatabase checks if the database uses a case-insensitive collation
+// by querying DATABASEPROPERTYEX and looking for _CI_ in the collation name.
+// SQL Server collations use _CI_ for case-insensitive and _CS_ for case-sensitive.
+func isCaseInsensitiveDatabase(ctx context.Context, db *stdsql.DB, warehouse string) (bool, error) {
+	// Create a temporary dialect just to get the Literal function for the query
+	tmpDialect := createDialect(featureFlagDefaults, false)
+	var collation string
+	if err := db.QueryRowContext(ctx, fmt.Sprintf(
+		"SELECT DATABASEPROPERTYEX(%s, 'Collation')",
+		tmpDialect.Literal(warehouse),
+	)).Scan(&collation); err != nil {
+		return false, fmt.Errorf("querying database collation: %w", err)
+	}
+
+	return strings.Contains(collation, "_CI_"), nil
+}
+
 func newDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-azure-fabric-warehouse",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
 		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
-			dialect := createDialect(featureFlags)
+			// Query database collation to determine if resources are case-insensitive
+			db, err := cfg.db()
+			if err != nil {
+				return nil, fmt.Errorf("opening database connection: %w", err)
+			}
+			defer db.Close()
+
+			caseInsensitiveResources, err := isCaseInsensitiveDatabase(ctx, db, cfg.Warehouse)
+			if err != nil {
+				return nil, err
+			}
+
+			dialect := createDialect(featureFlags, caseInsensitiveResources)
 			templates := renderTemplates(dialect)
 			return &sql.Endpoint[config]{
 				Config:              cfg,

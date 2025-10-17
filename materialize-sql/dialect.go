@@ -21,6 +21,9 @@ type Dialect struct {
 	MaxColumnCharLength int
 	// CaseInsensitiveColumns is provided as the "caseInsensitiveFields" parameter to boilerplate.NewValidator.
 	CaseInsensitiveColumns bool
+	// CaseInsensitiveResources indicates if resources (tables/schemas) are case-insensitive.
+	// This is provided as the "CaseInsensitiveResources" parameter to boilerplate.MaterializeCfg.
+	CaseInsensitiveResources bool
 
 	// MigratableTypes is a map of current column DDL as key, and a slice of DDLs
 	// which the key type can be migrated to.

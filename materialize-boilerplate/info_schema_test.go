@@ -26,7 +26,7 @@ func TestInfoSchema(t *testing.T) {
 		return strings.TrimSuffix(in, "_transformed")
 	}
 
-	is := NewInfoSchema(transformPath, transform, transform, true)
+	is := NewInfoSchema(transformPath, transform, transform, true, false)
 
 	nullableField := ExistingField{
 		Name:               transform("nullableField"),
@@ -118,6 +118,7 @@ func TestInfoSchema(t *testing.T) {
 			translate,
 			translate,
 			false,
+			false,
 		)
 
 		paths := [][]string{
@@ -157,6 +158,7 @@ func TestInfoSchema(t *testing.T) {
 			},
 			translate,
 			translate,
+			false,
 			false,
 		)
 

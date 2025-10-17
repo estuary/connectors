@@ -79,6 +79,7 @@ func TestValidateAndApply(t *testing.T) {
 				func(f string) string { return f },
 				func(f string) string { return f },
 				true,
+				false,
 			)
 			require.NoError(t, catalog.populateInfoSchema(ctx, is, [][]string{path}))
 
