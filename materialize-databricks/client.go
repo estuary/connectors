@@ -42,22 +42,11 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
 
-	var wsClientConfig *databricks.Config
-	if cfg.Credentials.AuthType == PAT {
-		wsClientConfig = &databricks.Config{
-			Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-			Token:       cfg.Credentials.PersonalAccessToken,
-			Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
-		}
-	} else if cfg.Credentials.AuthType == OAuth2 {
-		wsClientConfig = &databricks.Config{
-			Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-			Token:       cfg.Credentials.AccessToken,
-			Credentials: dbConfig.PatCredentials{}, // use token as PAT
-		}
-	}
-
-	wsClient, err := databricks.NewWorkspaceClient(wsClientConfig)
+	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
+		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+		Token:       cfg.Credentials.PersonalAccessToken,
+		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
+	})
 	if err != nil {
 		return nil, fmt.Errorf("creating workspace client: %w", err)
 	}
@@ -235,23 +224,11 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 
 func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
-
-	var wsClientConfig *databricks.Config
-	if cfg.Credentials.AuthType == PAT {
-		wsClientConfig = &databricks.Config{
-			Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-			Token:       cfg.Credentials.PersonalAccessToken,
-			Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
-		}
-	} else if cfg.Credentials.AuthType == OAuth2 {
-		wsClientConfig = &databricks.Config{
-			Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
-			Token:       cfg.Credentials.AccessToken,
-			Credentials: dbConfig.PatCredentials{}, // use token as PAT
-		}
-	}
-
-	wsClient, err := databricks.NewWorkspaceClient(wsClientConfig)
+	wsClient, err := databricks.NewWorkspaceClient(&databricks.Config{
+		Host:        fmt.Sprintf("%s/%s", cfg.Address, cfg.HTTPPath),
+		Token:       cfg.Credentials.PersonalAccessToken,
+		Credentials: dbConfig.PatCredentials{}, // enforce PAT auth
+	})
 	if err != nil {
 		errs.Err(fmt.Errorf("creating workspace client: %w", err))
 		return errs
