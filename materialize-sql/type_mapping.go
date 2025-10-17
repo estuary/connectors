@@ -240,18 +240,18 @@ type mapStaticConfig struct {
 	converter  ElementConverter
 }
 
-type mapStaticOption func(*mapStaticConfig)
+type MapStaticOption func(*mapStaticConfig)
 
 // AlsoCompatibleWith sets additional column types that the mapped type should
 // be considered compatible with.
-func AlsoCompatibleWith(compatibleTypes ...string) mapStaticOption {
+func AlsoCompatibleWith(compatibleTypes ...string) MapStaticOption {
 	return func(c *mapStaticConfig) {
 		c.compatible = append(c.compatible, compatibleTypes...)
 	}
 }
 
 // Using converter sets a custom ElementConverter for the mapped type.
-func UsingConverter(converter ElementConverter) mapStaticOption {
+func UsingConverter(converter ElementConverter) MapStaticOption {
 	return func(c *mapStaticConfig) {
 		c.converter = converter
 	}
@@ -262,7 +262,7 @@ func UsingConverter(converter ElementConverter) mapStaticOption {
 // the DDL for a column as the "leaf" MapProjectionFn in a possibly compound
 // arrangement of additional MapProjectionFn's, such as MapPrimaryKey or
 // MapString.
-func MapStatic(ddl string, opts ...mapStaticOption) MapProjectionFn {
+func MapStatic(ddl string, opts ...MapStaticOption) MapProjectionFn {
 	cfg := mapStaticConfig{
 		// A projection is always valid with a reported endpoint column type
 		// that matches it exactly.

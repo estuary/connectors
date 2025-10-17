@@ -307,6 +307,13 @@ jobs:
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 
+      - name: Materialization connector ${{ matrix.connector }} integration tests
+        if: matrix.connector == 'materialize-mysql'
+
+        run: |
+          docker tag ghcr.io/estuary/materialize-mysql:local ghcr.io/estuary/materialize-singlestore:local
+          CONNECTOR=materialize-singlestore VERSION=local tests/materialize/run.sh
+
       - name: Push ${{ matrix.connector }} image(s) with commit SHA tag
         run: |
           for VARIANT in ${{ steps.prep.outputs.variants }}; do
