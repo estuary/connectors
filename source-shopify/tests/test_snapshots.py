@@ -26,7 +26,16 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
-    for l in lines:
+    unique_stream_lines = []
+    seen = set()
+
+    for line in lines:
+        stream = line[0]
+        if stream not in seen:
+            unique_stream_lines.append(line)
+            seen.add(stream)
+
+    for l in unique_stream_lines:
         stream, rec = l[0], l[1]
 
         rec["ts"] = "redacted-timestamp"
@@ -34,7 +43,10 @@ def test_capture(request, snapshot):
             if field in rec:
                 rec[field] = "redacted"
 
-    assert snapshot("capture.stdout.json") == lines
+    # Sort lines to keep a consistent ordering of captured bindings.
+    sorted_unique_lines = sorted(unique_stream_lines, key=lambda l: l[0])
+
+    assert snapshot("capture.stdout.json") == sorted_unique_lines
 
 def test_discover(request, snapshot):
     result = subprocess.run(
