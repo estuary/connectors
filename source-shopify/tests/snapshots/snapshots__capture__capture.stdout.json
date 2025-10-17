@@ -9,9 +9,9 @@
       "collection_id": 466392154422,
       "created_at": "2023-11-09T13:19:30-05:00",
       "id": 39115256693046,
-      "position": 1,
+      "position": "redacted",
       "product_id": 8907741167926,
-      "sort_value": "0000000001",
+      "sort_value": "redacted",
       "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
@@ -26,9 +26,9 @@
       "collection_id": 466392219958,
       "created_at": "2023-11-09T13:19:35-05:00",
       "id": 39115256725814,
-      "position": 1,
+      "position": "redacted",
       "product_id": 8907741430070,
-      "sort_value": "0000000001",
+      "sort_value": "redacted",
       "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
@@ -43,9 +43,9 @@
       "collection_id": 466392219958,
       "created_at": "2023-11-09T13:19:35-05:00",
       "id": 39115256758582,
-      "position": 2,
+      "position": "redacted",
       "product_id": 8907741692214,
-      "sort_value": "0000000002",
+      "sort_value": "redacted",
       "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
@@ -60,9 +60,9 @@
       "collection_id": 466392219958,
       "created_at": "2023-11-09T13:19:35-05:00",
       "id": 39115256791350,
-      "position": 3,
+      "position": "redacted",
       "product_id": 8907741724982,
-      "sort_value": "0000000003",
+      "sort_value": "redacted",
       "updated_at": "redacted",
       "ts": "redacted-timestamp"
     }
