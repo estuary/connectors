@@ -2,7 +2,7 @@ client_id_sops: ENC[AES256_GCM,data:K9tgt9G4qoaPMLEP+EpYvZEfs41fHabHbhBnyJvYVN4=
 client_secret_sops: ENC[AES256_GCM,data:OrA44wU/U9A2hN/h84MvovKvPSKz1h7h4vHQ19slnqf4YATx7+KQ2lG4QsE=,iv:hrRSy8Z7LZjF6PlnSF+oVL1WQicKFF5mZ+3tbF487a0=,tag:kOxKQEN2vd8PNeKqM038Ww==,type:str]
 advertiser_ids_sops:
     - ENC[AES256_GCM,data:sOWaH5Q=,iv:tpMM7YXEVf+W1wx/DXRJi5KoP+TAMSgz9kDmnw44a9w=,tag:OrkGTOjwwGzkdV5jn664ZQ==,type:str]
-start_date: "2023-07-01"
+start_date: "2025-09-01"
 reports:
     - name: MyReport
       currency: GBP
@@ -24,8 +24,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2023-12-19T13:24:03Z"
-    mac: ENC[AES256_GCM,data:1lV30IVsOnmSVoZhE8JawVeU634636VVjOtefnybwJMC9/bwXZycKEY/63ezNNMf4h+fIBPxJUE1u9kTmqs4F74c+RjaELMYWspuByGpA82OSgb6wL2vh6k0Oxm2MkAderq6/4YxCnWLMtp0Ya+STFGGMyQQ5oUTr/eWVhAtFj0=,iv:j3+7m7fywSr3V6Ur1AmUxwMwn0Y7Agdh8zbQKb3K9rQ=,tag:ZTdn+H2RdD15IOXSglE/RQ==,type:str]
+    lastmodified: "2025-10-17T16:07:15Z"
+    mac: ENC[AES256_GCM,data:2P5cO/rvoxmxXV7POUO2xWc0vamJYaFHr+qH+J3wMeDZVKgdfUZzN5tjojHgnsDPv2jcKTTnjEVCEfwleRKQtWXiUiEDRGrjfBuHYAzM9DWjR/bWXNNJZP/1epPlHTVYl8UO1EoU7e9A5HUXKty25nIUkNUgXcKHdA0I5HxewLU=,iv:yrgTT6uIc2vSwZaAlKUs6CnS6o2Bgm96+Y8X/IAv6fs=,tag:m/Z0G/PZY+ibrwGcOdVvIg==,type:str]
     pgp: []
     encrypted_suffix: _sops
-    version: 3.7.3
+    version: 3.9.0
