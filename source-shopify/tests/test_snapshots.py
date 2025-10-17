@@ -3,6 +3,12 @@ import subprocess
 
 
 def test_capture(request, snapshot):
+    FIELDS_TO_REDACT = [
+        "position",
+        "sort_value",
+        "updated_at",
+    ]
+
     result = subprocess.run(
         [
             "flowctl",
@@ -24,8 +30,9 @@ def test_capture(request, snapshot):
         stream, rec = l[0], l[1]
 
         rec["ts"] = "redacted-timestamp"
-        if "updated_at" in rec:
-            rec["updated_at"] = "redacted"
+        for field in FIELDS_TO_REDACT:
+            if field in rec:
+                rec[field] = "redacted"
 
     assert snapshot("capture.stdout.json") == lines
 
