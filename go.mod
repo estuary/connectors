@@ -31,7 +31,7 @@ require (
 	github.com/aws/smithy-go v1.22.4
 	github.com/bradleyjkemp/cupaloy v2.3.0+incompatible
 	github.com/cespare/xxhash/v2 v2.3.0
-	github.com/databricks/databricks-sdk-go v0.41.0
+	github.com/databricks/databricks-sdk-go v0.86.0
 	github.com/databricks/databricks-sql-go v1.6.2-0.20250318155202-2a39cfaf0c27
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
