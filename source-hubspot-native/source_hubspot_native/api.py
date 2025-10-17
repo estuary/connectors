@@ -1,9 +1,11 @@
 import asyncio
 import functools
 import itertools
+import json
+from asyncio.exceptions import CancelledError
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-import time
 from typing import (
     Any,
     AsyncGenerator,
@@ -13,20 +15,27 @@ from typing import (
     Iterable,
 )
 
+import estuary_cdk.emitted_changes_cache as cache
+from estuary_cdk.buffer_ordered import buffer_ordered
 from estuary_cdk.capture.common import (
     LogCursor,
     PageCursor,
     Triggers,
 )
 from estuary_cdk.http import HTTPSession
+from estuary_cdk.utils import format_error_message
 from pydantic import TypeAdapter
 
 from .models import (
     Association,
     BatchResult,
-    CRMObject,
     Company,
     Contact,
+    ContactList,
+    ContactListMembership,
+    ContactListMembershipResponse,
+    ContactListSearch,
+    CRMObject,
     CustomObject,
     CustomObjectSchema,
     CustomObjectSearchResult,
@@ -35,6 +44,7 @@ from .models import (
     EmailEvent,
     EmailEventsResponse,
     Engagement,
+    FeedbackSubmission,
     Form,
     FormSubmission,
     FormSubmissionContext,
@@ -54,15 +64,14 @@ from .models import (
     Ticket,
 )
 
-import estuary_cdk.emitted_changes_cache as cache
-from estuary_cdk.buffer_ordered import buffer_ordered
-
-# Hubspot returns a 500 internal server error if querying for data 
+# Hubspot returns a 500 internal server error if querying for data
 EPOCH_PLUS_ONE_SECOND = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=1)
 HUB = "https://api.hubapi.com"
 MARKETING_EMAILS_PAGE_SIZE = 300
+OBJECT_TYPE_IDS = {"contact": "0-1", "contact_list": "0-45"}
 
-properties_cache: dict[str, Properties]= {}
+properties_cache: dict[str, Properties] = {}
+
 
 async def fetch_properties(
     log: Logger, http: HTTPSession, object_name: str
@@ -71,23 +80,24 @@ async def fetch_properties(
         return properties_cache[object_name]
 
     url = f"{HUB}/crm/v3/properties/{object_name}"
-    properties_cache[object_name] = Properties.model_validate_json(await http.request(log, url))
+    properties_cache[object_name] = Properties.model_validate_json(
+        await http.request(log, url)
+    )
     for p in properties_cache[object_name].results:
         p.hubspotObject = object_name
 
     return properties_cache[object_name]
 
 
-async def fetch_deal_pipelines(
-    log: Logger, http: HTTPSession
-) -> DealPipelines:
+async def fetch_deal_pipelines(log: Logger, http: HTTPSession) -> DealPipelines:
     url = f"{HUB}/crm-pipelines/v1/pipelines/deals"
 
     return DealPipelines.model_validate_json(await http.request(log, url))
 
 
 async def fetch_owners(
-   http: HTTPSession, log: Logger, 
+    http: HTTPSession,
+    log: Logger,
 ) -> AsyncGenerator[Owner, None]:
     url = f"{HUB}/crm/v3/owners"
     after: str | None = None
@@ -114,7 +124,8 @@ async def fetch_owners(
 
 
 async def fetch_forms(
-   http: HTTPSession, log: Logger, 
+    http: HTTPSession,
+    log: Logger,
 ) -> AsyncGenerator[Form, None]:
     url = f"{HUB}/marketing/v3/forms"
     after: str | None = None
@@ -159,8 +170,7 @@ async def _fetch_form_submissions_since(
             params["after"] = after
 
         result = PageResult[FormSubmission].model_validate_json(
-            await http.request(log, url, params=params),
-            context=validation_context
+            await http.request(log, url, params=params), context=validation_context
         )
 
         for form_submission in result.results:
@@ -192,7 +202,9 @@ async def fetch_form_submissions(
     latest_submitted_at = log_cursor
 
     for id in form_ids:
-        async for submission in _fetch_form_submissions_since(http, log, id, log_cursor):
+        async for submission in _fetch_form_submissions_since(
+            http, log, id, log_cursor
+        ):
             if submission.submittedAt > latest_submitted_at:
                 latest_submitted_at = submission.submittedAt
 
@@ -240,7 +252,7 @@ async def fetch_page_with_associations(
         property_names = ",".join(props)
 
         input = {
-            "limit": 100, 
+            "limit": 100,
             "properties": property_names,
         }
         if with_history:
@@ -273,11 +285,13 @@ async def fetch_page_with_associations(
                 # its properties.
                 if output[idx].updatedAt != doc.updatedAt:
                     assert doc.updatedAt >= cutoff
-                    output[idx].updatedAt = doc.updatedAt # We'll discard this document per the check a little further down.
+                    output[idx].updatedAt = (
+                        doc.updatedAt
+                    )  # We'll discard this document per the check a little further down.
 
                 output[idx].properties.update(doc.properties)
                 if with_history:
-                    output[idx].propertiesWithHistory.update(doc.propertiesWithHistory) 
+                    output[idx].propertiesWithHistory.update(doc.propertiesWithHistory)
 
     for doc in output:
         if doc.updatedAt < cutoff:
@@ -365,7 +379,7 @@ FetchRecentFn = Callable[
     [Logger, HTTPSession, bool, datetime, datetime | None],
     AsyncGenerator[tuple[datetime, str, Any], None],
 ]
-'''
+"""
 Returns a stream of (timestamp, key, document) tuples that represent a
 potentially incomplete stream of very recent documents. The timestamp is used to
 checkpoint the next log cursor. The key is used for updating the emitted changes
@@ -377,13 +391,13 @@ seeing an entry that's as-old or older than the datetime cursor.
 The first datetime parameter represents the "since" value, which is the oldest
 documents that are required. The second datetime parameter is an "until" value,
 which if not None is a hint that more recent documents are not needed.
-'''
+"""
 
 FetchDelayedFn = Callable[
     [Logger, HTTPSession, bool, datetime, datetime],
     AsyncGenerator[tuple[datetime, str, Any], None],
 ]
-'''
+"""
 Returns a stream of (timestamp, key, document) tuples that represent a complete
 stream of not-so-recent documents. The key is used for seeing if a more recent
 change event document has already been emitted by the FetchRecentFn.
@@ -393,7 +407,7 @@ stops when seeing an entry that's as-old or older than the "since" datetime
 cursor, which is the first datetime parameter. The second datetime parameter
 represents an "until" value, and documents more recent than this are discarded
 and should usually not even be retrieved if possible.
-'''
+"""
 
 # In-memory cache of how far along the "delayed" change stream is.
 last_delayed_fetch_end: dict[str, datetime] = {}
@@ -441,7 +455,7 @@ async def process_changes(
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Any | LogCursor, None]:
-    '''
+    """
     High-level processing of changes event documents, where there is both a
     stream of very recent documents that is potentially incomplete, and a
     trailing stream that is delayed but 100% complete.
@@ -471,7 +485,7 @@ async def process_changes(
       point it may have left off.
     - While the connector is running, the delayed stream progress is kept in
       memory.
-    '''
+    """
     assert isinstance(log_cursor, datetime)
 
     now_time = datetime.now(UTC)
@@ -482,8 +496,10 @@ async def process_changes(
         fetch_recent_end_time = log_cursor + max_fetch_recent_window
 
     max_ts: datetime = log_cursor
-    try: 
-        async for ts, key, obj in fetch_recent(log, http, with_history, log_cursor, fetch_recent_end_time):
+    try:
+        async for ts, key, obj in fetch_recent(
+            log, http, with_history, log_cursor, fetch_recent_end_time
+        ):
             if fetch_recent_end_time and ts > fetch_recent_end_time:
                 continue
             elif ts > log_cursor:
@@ -515,7 +531,13 @@ async def process_changes(
     if delayed_fetch_next_end - delayed_fetch_next_start > delayed_fetch_minimum_window:
         # Poll the delayed stream for documents if we need to.
         try:
-            async for ts, key, obj in fetch_delayed(log, http, with_history, delayed_fetch_next_start, delayed_fetch_next_end):
+            async for ts, key, obj in fetch_delayed(
+                log,
+                http,
+                with_history,
+                delayed_fetch_next_start,
+                delayed_fetch_next_end,
+            ):
                 if ts > delayed_fetch_next_end:
                     # In case the FetchDelayedFn is unable to filter based on
                     # `delayed_fetch_next_end`.
@@ -538,7 +560,15 @@ async def process_changes(
 
         log.info(
             "fetched delayed events for stream",
-            {"object_name": object_name, "since": delayed_fetch_next_start, "until": delayed_fetch_next_end, "emitted": delayed_emitted, "cache_hits": cache_hits, "evicted": evicted, "new_size": cache.count_for(object_name)}
+            {
+                "object_name": object_name,
+                "since": delayed_fetch_next_start,
+                "until": delayed_fetch_next_end,
+                "emitted": delayed_emitted,
+                "cache_hits": cache_hits,
+                "evicted": evicted,
+                "new_size": cache.count_for(object_name),
+            },
         )
 
     if max_ts != log_cursor:
@@ -549,14 +579,15 @@ _FetchIdsFn = Callable[
     [PageCursor, int],
     Awaitable[tuple[Iterable[tuple[datetime, str]], PageCursor]],
 ]
-'''
+"""
 Returns a stream of object IDs that can be used to fetch the full object details
 along with its associations. Used in `fetch_changes_with_associations`.
 
 IDs may be returned in any order, but iteration will be stopped upon seeing an
 entry that's as-old or older than the datetime cursor. Entries newer than the
 until datetime will be discarded.
-'''
+"""
+
 
 async def fetch_changes_with_associations(
     object_name: str,
@@ -568,7 +599,7 @@ async def fetch_changes_with_associations(
     since: datetime,
     until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, CRMObject], None]:
-    
+
     # Walk pages of recent IDs until we see one which is as-old
     # as `since`, or no pages remain.
     recent: list[tuple[datetime, str]] = []
@@ -599,7 +630,9 @@ async def fetch_changes_with_associations(
 
     recent.sort()  # Oldest updates first.
 
-    async def _do_batch_fetch(batch: list[tuple[datetime, str]]) -> Iterable[tuple[datetime, str, CRMObject]]:
+    async def _do_batch_fetch(
+        batch: list[tuple[datetime, str]],
+    ) -> Iterable[tuple[datetime, str, CRMObject]]:
         # Enable lookup of datetimes for IDs from the result batch.
         dts = {id: dt for dt, id in batch}
 
@@ -613,26 +646,36 @@ async def fetch_changes_with_associations(
             except Exception as e:
                 if attempt == 5:
                     raise
-                log.warning("failed to fetch batch with associations (will retry)", {"error": str(e), "attempt": attempt})
+                log.warning(
+                    "failed to fetch batch with associations (will retry)",
+                    {"error": str(e), "attempt": attempt},
+                )
                 await asyncio.sleep(attempt * 2)
                 attempt += 1
 
         return ((dts[str(doc.id)], str(doc.id), doc) for doc in documents.results)
 
-    async def _batches_gen() -> AsyncGenerator[Awaitable[Iterable[tuple[datetime, str, CRMObject]]], None]:
+    async def _batches_gen() -> (
+        AsyncGenerator[Awaitable[Iterable[tuple[datetime, str, CRMObject]]], None]
+    ):
         for batch_it in itertools.batched(recent, 50 if with_history else 100):
             yield _do_batch_fetch(list(batch_it))
 
     total = len(recent)
     if total >= 10_000:
-        log.info("will process large batch of changes with associations", {"total": total})
+        log.info(
+            "will process large batch of changes with associations", {"total": total}
+        )
 
     count = 0
     async for res in buffer_ordered(_batches_gen(), 3):
         for ts, id, doc in res:
             count += 1
             if count > 0 and count % 10_000 == 0:
-                log.info("fetching changes with associations", {"count": count, "total": total})
+                log.info(
+                    "fetching changes with associations",
+                    {"count": count, "total": total},
+                )
             yield ts, id, doc
 
 
@@ -643,9 +686,9 @@ async def fetch_search_objects(
     since: datetime,
     until: datetime | None,
     _: PageCursor,
-    last_modified_property_name: str = "hs_lastmodifieddate"
+    last_modified_property_name: str = "hs_lastmodifieddate",
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    '''
+    """
     Retrieve all records between 'since' and 'until' (or the present time).
 
     The HubSpot Search API has an undocumented maximum offset of 10,000 items,
@@ -657,8 +700,8 @@ async def fetch_search_objects(
     indeed large runs of these may have the same value. So a "new" search will
     inevitably grab some records again, and deduplication is handled here via
     the set.
-    '''
-    
+    """
+
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
     limit = 200
     output_items: set[tuple[datetime, str]] = set()
@@ -668,33 +711,34 @@ async def fetch_search_objects(
     original_total: int | None = None
 
     while True:
-        filter = {
-            "propertyName": last_modified_property_name,
-            "operator": "BETWEEN",
-            "value": _dt_to_str(since),
-            "highValue": _dt_to_str(until),
-        } if until else {
-            "propertyName": last_modified_property_name,
-            "operator": "GTE",
-            "value": _dt_to_str(since),
-        }
+        filter = (
+            {
+                "propertyName": last_modified_property_name,
+                "operator": "BETWEEN",
+                "value": _dt_to_str(since),
+                "highValue": _dt_to_str(until),
+            }
+            if until
+            else {
+                "propertyName": last_modified_property_name,
+                "operator": "GTE",
+                "value": _dt_to_str(since),
+            }
+        )
 
         input = {
             "filters": [filter],
             "sorts": [
-                {
-                    "propertyName": last_modified_property_name,
-                    "direction": "ASCENDING"
-                }
+                {"propertyName": last_modified_property_name, "direction": "ASCENDING"}
             ],
             "limit": limit,
         }
         if cursor:
             input["after"] = cursor
 
-        result: SearchPageResult[CustomObjectSearchResult] = SearchPageResult[CustomObjectSearchResult].model_validate_json(
-            await http.request(log, url, method="POST", json=input)
-        )
+        result: SearchPageResult[CustomObjectSearchResult] = SearchPageResult[
+            CustomObjectSearchResult
+        ].model_validate_json(await http.request(log, url, method="POST", json=input))
 
         if not original_total:
             # Record the total from the original entire request range for
@@ -728,8 +772,10 @@ async def fetch_search_objects(
 
             if this_mod_time < max_updated:
                 log.error("search query input", input)
-                raise Exception(f"search query returned records out of order for {r.id} with {this_mod_time} < {max_updated}")
-            
+                raise Exception(
+                    f"search query returned records out of order for {r.id} with {this_mod_time} < {max_updated}"
+                )
+
             max_updated = this_mod_time
             output_items.add((this_mod_time, str(r.id)))
 
@@ -740,7 +786,7 @@ async def fetch_search_objects(
                     {
                         "final_count": len(output_items),
                         "total": original_total,
-                    }
+                    },
                 )
             break
 
@@ -756,9 +802,11 @@ async def fetch_search_objects(
                     "cycle detected for lastmodifieddate, fetching all ids for records modified at that instant",
                     {"object_name": object_name, "instant": since},
                 )
-                output_items.update(await fetch_search_objects_modified_at(
-                    object_name, log, http, max_updated, last_modified_property_name
-                ))
+                output_items.update(
+                    await fetch_search_objects_modified_at(
+                        object_name, log, http, max_updated, last_modified_property_name
+                    )
+                )
 
                 # HubSpot APIs use millisecond resolution, so move the time
                 # cursor forward by that minimum amount now that we know we have
@@ -793,9 +841,9 @@ async def fetch_search_objects_modified_at(
     log: Logger,
     http: HTTPSession,
     modified: datetime,
-    last_modified_property_name: str = "hs_lastmodifieddate"
+    last_modified_property_name: str = "hs_lastmodifieddate",
 ) -> set[tuple[datetime, str]]:
-    '''
+    """
     Fetch all of the ids of the given object that were modified at the given
     time. Used exclusively for breaking out of cycles in the search API
     resulting from more than 10,000 records being modified at the same time,
@@ -804,7 +852,7 @@ async def fetch_search_objects_modified_at(
     To simplify the pagination strategy, the actual `paging` result isn't used
     at all other than to see when we have reached the end, and the search query
     just always asks for ids larger than what it had previously seen.
-    '''
+    """
 
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
     limit = 200
@@ -813,33 +861,32 @@ async def fetch_search_objects_modified_at(
     round = 0
 
     while True:
-        filters: list[dict[str, Any]] = [{
-            "propertyName": last_modified_property_name,
-            "operator": "EQ",
-            "value": _dt_to_str(modified),
-        }]
+        filters: list[dict[str, Any]] = [
+            {
+                "propertyName": last_modified_property_name,
+                "operator": "EQ",
+                "value": _dt_to_str(modified),
+            }
+        ]
 
         if id_cursor:
-            filters.append({
-                "propertyName": "hs_object_id",
-                "operator": "GT",
-                "value": id_cursor,
-            })
+            filters.append(
+                {
+                    "propertyName": "hs_object_id",
+                    "operator": "GT",
+                    "value": id_cursor,
+                }
+            )
 
         input = {
             "filters": filters,
-            "sorts": [
-                {
-                    "propertyName": "hs_object_id",
-                    "direction": "ASCENDING"
-                }
-            ],
+            "sorts": [{"propertyName": "hs_object_id", "direction": "ASCENDING"}],
             "limit": limit,
         }
 
-        result: SearchPageResult[CustomObjectSearchResult] = SearchPageResult[CustomObjectSearchResult].model_validate_json(
-            await http.request(log, url, method="POST", json=input)
-        )
+        result: SearchPageResult[CustomObjectSearchResult] = SearchPageResult[
+            CustomObjectSearchResult
+        ].model_validate_json(await http.request(log, url, method="POST", json=input))
 
         for r in result.results:
             if id_cursor and r.id <= id_cursor:
@@ -859,7 +906,7 @@ async def fetch_search_objects_modified_at(
                     "instant": modified,
                     "count": len(output_items),
                     "remaining": result.total,
-                }
+                },
             )
 
         if not result.paging:
@@ -871,10 +918,17 @@ async def fetch_search_objects_modified_at(
 
 
 def fetch_recent_custom_objects(
-    object_name: str, log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime | None
+    object_name: str,
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, CustomObject], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         return await fetch_search_objects(object_name, log, http, since, until, page)
 
     return fetch_changes_with_associations(
@@ -883,21 +937,35 @@ def fetch_recent_custom_objects(
 
 
 def fetch_delayed_custom_objects(
-    object_name: str, log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
+    object_name: str,
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime,
 ) -> AsyncGenerator[tuple[datetime, str, CustomObject], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         return await fetch_search_objects(object_name, log, http, since, until, page)
 
     return fetch_changes_with_associations(
         object_name, CustomObject, do_fetch, log, http, with_history, since, until
     )
 
+
 def fetch_recent_companies(
-    log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime | None,
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, Company], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         if count >= 9_900:
             log.warn("limit of 9,900 recent companies reached")
             return [], None
@@ -913,7 +981,6 @@ def fetch_recent_companies(
             for r in result.results
         ), result.hasMore and result.offset
 
-
     return fetch_changes_with_associations(
         Names.companies, Company, do_fetch, log, http, with_history, since, until
     )
@@ -923,8 +990,12 @@ def fetch_delayed_companies(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
 ) -> AsyncGenerator[tuple[datetime, str, Company], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-        return await fetch_search_objects(Names.companies, log, http, since, until, page)
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(
+            Names.companies, log, http, since, until, page
+        )
 
     return fetch_changes_with_associations(
         Names.companies, Company, do_fetch, log, http, with_history, since, until
@@ -932,9 +1003,15 @@ def fetch_delayed_companies(
 
 
 def fetch_recent_contacts(
-    log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime | None
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, Contact], None]:
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         if count >= 9_900:
             # There is actually no documented limit on the number of contacts
             # that can be returned by this API, other than that it goes back a
@@ -957,7 +1034,6 @@ def fetch_recent_contacts(
             for r in result.contacts
         ), result.has_more and result.time_offset
 
-
     return fetch_changes_with_associations(
         Names.contacts, Contact, do_fetch, log, http, with_history, since, until
     )
@@ -967,8 +1043,12 @@ def fetch_delayed_contacts(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
 ) -> AsyncGenerator[tuple[datetime, str, Contact], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-        return await fetch_search_objects(Names.contacts, log, http, since, until, page, "lastmodifieddate")
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(
+            Names.contacts, log, http, since, until, page, "lastmodifieddate"
+        )
 
     return fetch_changes_with_associations(
         Names.contacts, Contact, do_fetch, log, http, with_history, since, until
@@ -976,10 +1056,16 @@ def fetch_delayed_contacts(
 
 
 def fetch_recent_deals(
-    log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime | None
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, Deal], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         if count >= 9_900:
             log.warn("limit of 9,900 recent deals reached")
             return [], None
@@ -996,7 +1082,6 @@ def fetch_recent_deals(
             for r in result.results
         ), result.hasMore and result.offset
 
-
     return fetch_changes_with_associations(
         Names.deals, Deal, do_fetch, log, http, with_history, since, until
     )
@@ -1006,7 +1091,9 @@ def fetch_delayed_deals(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
 ) -> AsyncGenerator[tuple[datetime, str, Deal], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         return await fetch_search_objects(Names.deals, log, http, since, until, page)
 
     return fetch_changes_with_associations(
@@ -1015,7 +1102,7 @@ def fetch_delayed_deals(
 
 
 async def _fetch_engagements(
-    log: Logger, http:  HTTPSession, page: PageCursor, count: int
+    log: Logger, http: HTTPSession, page: PageCursor, count: int
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
     if count >= 9_900:
         # "Engagements" as we are capturing them has a 10k limit on how many
@@ -1038,7 +1125,11 @@ async def _fetch_engagements(
 
 
 def fetch_recent_engagements(
-    log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime | None
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, Engagement], None]:
     return fetch_changes_with_associations(
         Names.engagements,
@@ -1065,17 +1156,23 @@ def fetch_delayed_engagements(
         functools.partial(_fetch_engagements, log, http),
         log,
         http,
-        with_history,        
+        with_history,
         since,
         until,
     )
 
 
 def fetch_recent_tickets(
-    log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime | None
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, Ticket], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         # This API will return a maximum of 1000 tickets, and does not appear to
         # ever return an error. It just ends at the 1000 most recently modified
         # tickets.
@@ -1087,7 +1184,6 @@ def fetch_recent_tickets(
         )
         return ((_ms_to_dt(r.timestamp), str(r.objectId)) for r in result), None
 
-
     return fetch_changes_with_associations(
         Names.tickets, Ticket, do_fetch, log, http, with_history, since, until
     )
@@ -1097,7 +1193,9 @@ def fetch_delayed_tickets(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
 ) -> AsyncGenerator[tuple[datetime, str, Ticket], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         return await fetch_search_objects(Names.tickets, log, http, since, until, page)
 
     return fetch_changes_with_associations(
@@ -1106,10 +1204,16 @@ def fetch_delayed_tickets(
 
 
 def fetch_recent_products(
-    log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime | None
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, Product], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         return await fetch_search_objects(Names.products, log, http, since, until, page)
 
     return fetch_changes_with_associations(
@@ -1121,7 +1225,9 @@ def fetch_delayed_products(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
 ) -> AsyncGenerator[tuple[datetime, str, Product], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         return await fetch_search_objects(Names.products, log, http, since, until, page)
 
     return fetch_changes_with_associations(
@@ -1130,11 +1236,19 @@ def fetch_delayed_products(
 
 
 def fetch_recent_line_items(
-    log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime | None
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, LineItem], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-        return await fetch_search_objects(Names.line_items, log, http, since, until, page)
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(
+            Names.line_items, log, http, since, until, page
+        )
 
     return fetch_changes_with_associations(
         Names.line_items, LineItem, do_fetch, log, http, with_history, since, until
@@ -1145,18 +1259,56 @@ def fetch_delayed_line_items(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
 ) -> AsyncGenerator[tuple[datetime, str, LineItem], None]:
 
-    async def do_fetch(page: PageCursor, count: int) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-        return await fetch_search_objects(Names.line_items, log, http, since, until, page)
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(
+            Names.line_items, log, http, since, until, page
+        )
 
     return fetch_changes_with_associations(
         Names.line_items, LineItem, do_fetch, log, http, with_history, since, until
     )
 
+
+def fetch_recent_feedback_submissions(
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
+) -> AsyncGenerator[tuple[datetime, str, FeedbackSubmission], None]:
+
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(
+            Names.feedback_submissions, log, http, since, until, page
+        )
+
+    return fetch_changes_with_associations(
+        Names.feedback_submissions,
+        FeedbackSubmission,
+        do_fetch,
+        log,
+        http,
+        with_history,
+        since,
+        until,
+    )
+
+
+def fetch_delayed_feedback_submissions(
+    log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, str, FeedbackSubmission], None]:
+    return fetch_recent_feedback_submissions(log, http, with_history, since, until)
+
+
 async def list_custom_objects(
     log: Logger,
     http: HTTPSession,
 ) -> list[str]:
-    
+
     url = f"{HUB}/crm/v3/schemas"
     # Note: The schemas endpoint always returns all items in a single call, so there's never
     # pagination.
@@ -1173,12 +1325,12 @@ async def fetch_email_events_page(
     page: PageCursor | None,
     cutoff: LogCursor,
 ) -> AsyncGenerator[EmailEvent | PageCursor, None]:
-    
+
     assert isinstance(cutoff, datetime)
-    
+
     url = f"{HUB}/email/public/v1/events"
     input: Dict[str, Any] = {
-        "endTimestamp": _dt_to_ms(cutoff) - 1, # endTimestamp is inclusive.
+        "endTimestamp": _dt_to_ms(cutoff) - 1,  # endTimestamp is inclusive.
         "limit": 1000,
     }
     if page:
@@ -1226,6 +1378,7 @@ def fetch_recent_email_events(
 ) -> AsyncGenerator[tuple[datetime, str, EmailEvent], None]:
 
     return _fetch_email_events(log, http, since + timedelta(milliseconds=1), until)
+
 
 def fetch_delayed_email_events(
     log: Logger, http: HTTPSession, _: bool, since: datetime, until: datetime
@@ -1278,11 +1431,11 @@ async def _fetch_marketing_emails_updated_between(
         "updatedBefore": _dt_to_str(end),
     }
 
-    # The /marketing/v3/emails API has a bug: when "includeStats=true", HubSpot returns 
-    # an incomplete subset of emails, omitting some records entirely. When "includeStats=false", 
-    # all emails are returned but without statistics. To work around this API limitation and 
-    # ensure we capture all records, we use a two-pass approach: 1) fetch emails with stats 
-    # enabled and yield all returned records, 2) fetch all emails without stats and yield 
+    # The /marketing/v3/emails API has a bug: when "includeStats=true", HubSpot returns
+    # an incomplete subset of emails, omitting some records entirely. When "includeStats=false",
+    # all emails are returned but without statistics. To work around this API limitation and
+    # ensure we capture all records, we use a two-pass approach: 1) fetch emails with stats
+    # enabled and yield all returned records, 2) fetch all emails without stats and yield
     # only those records that were missing from the first pass.
     # Additionally, we have to make separate queries for archived and non-archived records.
     # NOTE: This means yielded documents are *not* ordered by the updatedAt field.
@@ -1313,40 +1466,372 @@ async def fetch_marketing_emails_page(
     # results in the date window from start to end are yielded. For now, fetch_marketing_emails_page
     # is simple and tries to fetch all marketing emails in a single sweep. Typically, most accounts don't
     # have tons of marketing emails, so this backfill doesn't take very long to complete.
-    async for (_, _, email) in _fetch_marketing_emails_updated_between(
-        log,
-        http,
-        start=start,
-        end=cutoff
+    async for _, _, email in _fetch_marketing_emails_updated_between(
+        log, http, start=start, end=cutoff
     ):
         yield email
 
 
 def fetch_recent_marketing_emails(
-    log: Logger, http: HTTPSession, _: bool, since: datetime, until: datetime | None,
+    log: Logger,
+    http: HTTPSession,
+    _: bool,
+    since: datetime,
+    until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, MarketingEmail], None]:
 
     return _fetch_marketing_emails_updated_between(log, http, since, until)
 
 
 def fetch_delayed_marketing_emails(
-    log: Logger, http: HTTPSession, _: bool, since: datetime, until: datetime,
+    log: Logger,
+    http: HTTPSession,
+    _: bool,
+    since: datetime,
+    until: datetime,
 ) -> AsyncGenerator[tuple[datetime, str, MarketingEmail], None]:
 
     return _fetch_marketing_emails_updated_between(log, http, since, until)
 
 
+async def request_contact_list_page(
+    http: HTTPSession, log: Logger, offset: int, prop_names: list[str] = []
+) -> ContactListSearch:
+    url = f"{HUB}/crm/v3/lists/search"
+
+    request_body = {
+        "count": 500,
+        "offset": offset,
+        "objectTypeId": OBJECT_TYPE_IDS["contact"],
+        "sort": "HS_LIST_ID",
+        "additionalProperties": prop_names,
+    }
+
+    return ContactListSearch.model_validate_json(
+        await http.request(
+            log,
+            url,
+            method="POST",
+            json=request_body,
+        )
+    )
+
+
+async def check_contact_lists_access(
+    http: HTTPSession, log: Logger
+) -> AsyncGenerator[ContactList, None]:
+    """Lightweight wrapper for permission checking contact lists endpoint."""
+    response = await request_contact_list_page(http, log, 0, [])
+    for contact_list in response.lists:
+        yield contact_list
+
+
+async def check_contact_list_memberships_access(
+    http: HTTPSession, log: Logger
+) -> AsyncGenerator[ContactListMembership, None]:
+    """Lightweight wrapper for permission checking contact list memberships endpoint."""
+    # First get a list to check memberships for
+    lists_response = await request_contact_list_page(http, log, 0, [])
+    if not lists_response.lists:
+        return
+
+    list_id = lists_response.lists[0].listId
+    url = f"{HUB}/crm/v3/lists/{list_id}/memberships"
+    response_json = await http.request(log, url, params={"limit": 1})
+    response = json.loads(response_json)
+
+    for item in response.get("results", []):
+        yield ContactListMembership(listId=list_id, **item)
+
+
+async def _request_contact_lists(
+    http: HTTPSession, log: Logger, should_fetch_all_properties: bool
+) -> AsyncGenerator[ContactList, None]:
+    """
+    The lists search API is different enough that it requires its own
+    integration logic. Markedly, it is currently impossible to filter
+    or sort results based on the `hs_lastmodifieddate` property.
+    In-memory filtering is the most viable option at the moment.
+    """
+    pagination_offset = 0
+
+    if should_fetch_all_properties:
+        all_props = (
+            await fetch_properties(log, http, OBJECT_TYPE_IDS["contact_list"])
+        ).results
+        prop_names = [p.name for p in all_props]
+    else:
+        prop_names = ["hs_lastmodifieddate"]
+
+    while True:
+        response = await request_contact_list_page(
+            http, log, pagination_offset, prop_names
+        )
+
+        for contact_list in response.lists:
+            yield contact_list
+
+        pagination_offset = response.offset
+        if not response.hasMore:
+            return
+
+
+async def _request_contact_lists_in_time_range(
+    http: HTTPSession,
+    log: Logger,
+    should_fetch_all_properties: bool,
+    start: datetime,
+    end: datetime | None = None,
+) -> AsyncGenerator[ContactList, None]:
+    async for item in _request_contact_lists(http, log, should_fetch_all_properties):
+        last_modified_date = item.get_cursor_value()
+
+        if last_modified_date < start:
+            continue
+        if end and last_modified_date >= end:
+            continue
+
+        yield item
+
+
+async def fetch_contact_lists_page(
+    http: HTTPSession,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+) -> AsyncGenerator[ContactList, None]:
+    assert isinstance(page, str | None)
+    assert isinstance(cutoff, datetime)
+
+    page_ts = (
+        datetime.fromisoformat(page) if page is not None else EPOCH_PLUS_ONE_SECOND
+    )
+
+    async for item in _request_contact_lists_in_time_range(
+        http, log, True, page_ts, cutoff
+    ):
+        yield item
+
+    return
+
+
+async def fetch_contact_lists(
+    http: HTTPSession, log: Logger, log_cursor: LogCursor
+) -> AsyncGenerator[ContactList | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    # We are deliberately not implementing the same delayed stream mechanism
+    # used in CRM object APIs. We have no way to filter/sort by `hs_lastmodifieddate`
+    # and we don't want to paginate through all items twice
+    start_date = log_cursor - delayed_offset
+    max_ts = log_cursor
+
+    async for item in _request_contact_lists_in_time_range(http, log, True, start_date):
+        log.info("Processing contact list", {"listId": item.listId})
+        timestamp = _ms_to_dt(int(item.additionalProperties["hs_lastmodifieddate"]))
+
+        if cache.should_yield(Names.contact_lists, item.listId, timestamp):
+            max_ts = max(max_ts, timestamp)
+            yield item
+
+    if max_ts != log_cursor:
+        yield max_ts
+
+
+@dataclass
+class ContactListMembershipControl:
+    """Coordination for concurrent contact list membership fetches."""
+
+    # We expect users to have tens of thousands of lists to fetch.
+    # This semaphore limits the number of tasks we keep in memory at any given time
+    task_slots: asyncio.Semaphore = field(default_factory=lambda: asyncio.Semaphore(25))
+    http_slots: asyncio.Semaphore = field(default_factory=lambda: asyncio.Semaphore(5))
+    results: asyncio.Queue[ContactListMembership | None] = field(
+        default_factory=lambda: asyncio.Queue(1)
+    )
+    finished_tasks: int = 0
+    first_error: str | None = None
+
+
+async def _request_contact_list_memberships(
+    http: HTTPSession,
+    log: Logger,
+    contact_list: ContactList,
+    context: ContactListMembershipControl,
+    start: datetime,
+    end: datetime | None = None,
+) -> None:
+    url = f"{HUB}/crm/v3/lists/{contact_list.listId}/memberships"
+    params = {"limit": 250}
+
+    try:
+        while True:
+            async with context.http_slots:
+                response = ContactListMembershipResponse.model_validate_json(
+                    await http.request(log, url, params=params),
+                    context=contact_list,
+                )
+
+            for item in response.results:
+                if item.membershipTimestamp < start:
+                    continue
+                if end and item.membershipTimestamp >= end:
+                    continue
+
+                await context.results.put(item)
+
+            if (next_cursor := response.get_next_cursor()) is None:
+                break
+            params["after"] = next_cursor
+
+        log.info(
+            "Finished fetching memberships for list",
+            {"list": contact_list.model_dump()},
+        )
+        await context.results.put(None)
+    except CancelledError as e:
+        # If no worker has been cancelled or encountered an exception yet,
+        # that means this worker was cancelled from something other than the
+        # TaskGroup. A non-CancelledError should be raised so the
+        # TaskGroup cancels the remaining tasks & propagates an exception
+        # up through the connector.
+        if not context.first_error:
+            msg = format_error_message(e)
+            context.first_error = msg
+
+            raise Exception(
+                f"Contact list {contact_list.listId} worker was unexpectedly cancelled: {msg}"
+            )
+        # If a different worker already failed, then this worker task was cancelled by
+        # the TaskGroup as part of its exception handling and it's safe to propagate the
+        # CancelledError.
+        else:
+            raise e
+    except BaseException as e:
+        msg = format_error_message(e)
+        if not context.first_error:
+            context.first_error = msg
+
+        log.error(
+            f"Contact list {contact_list.listId} worker encountered an error.",
+            {
+                "exception": msg,
+            },
+        )
+        raise e
+
+
+async def _request_all_contact_list_memberships(
+    http: HTTPSession, log: Logger, start: datetime, end: datetime | None = None
+) -> AsyncGenerator[ContactListMembership, None]:
+    log.info(
+        "Fetching contact list memberships",
+        {
+            "start": start.isoformat(),
+            "end": end.isoformat() if end else None,
+        },
+    )
+
+    control = ContactListMembershipControl()
+    all_lists = [
+        item
+        async for item in _request_contact_lists_in_time_range(
+            http,
+            log,
+            # We only care about listIds, so we do not want to make an extra request
+            #  asking for all the additional properties there are
+            False,
+            start,
+            end,
+        )
+    ]
+
+    async with asyncio.TaskGroup() as tg:
+
+        async def dispatcher() -> None:
+            for contact_list in all_lists:
+                await control.task_slots.acquire()
+                tg.create_task(
+                    _request_contact_list_memberships(
+                        http, log, contact_list, control, start, end
+                    )
+                )
+
+        tg.create_task(dispatcher())
+
+        while True:
+            item = await control.results.get()
+            if item is None:
+                # A worker task has completed
+                control.finished_tasks += 1
+                control.task_slots.release()
+
+                if control.finished_tasks == len(all_lists):
+                    break
+            else:
+                yield item
+
+
+async def fetch_contact_list_memberships_page(
+    http: HTTPSession,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+) -> AsyncGenerator[ContactListMembership | PageCursor, None]:
+    assert isinstance(page, str | None)
+    assert isinstance(cutoff, datetime)
+
+    page_ts = (
+        datetime.fromisoformat(page) if page is not None else EPOCH_PLUS_ONE_SECOND
+    )
+
+    async for membership in _request_all_contact_list_memberships(
+        http, log, page_ts, cutoff
+    ):
+        yield membership
+
+    return
+
+
+async def fetch_contact_list_memberships(
+    http: HTTPSession, log: Logger, log_cursor: LogCursor
+) -> AsyncGenerator[ContactListMembership | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    # We are deliberately not implementing the same delayed stream mechanism
+    # used in CRM object APIs. We have no way to filter/sort by `hs_lastmodifieddate`
+    # and we don't want to paginate through all items twice
+    start_date = log_cursor - delayed_offset
+    max_ts = log_cursor
+
+    async for item in _request_all_contact_list_memberships(http, log, start_date):
+        key = f"{item.listId}:{item.membershipTimestamp}"
+
+        if cache.should_yield(
+            Names.contact_list_memberships, key, item.membershipTimestamp
+        ):
+            max_ts = max(max_ts, item.membershipTimestamp)
+            yield item
+
+    if max_ts != log_cursor:
+        yield max_ts
+
+
 def _ms_to_dt(ms: int) -> datetime:
     return datetime.fromtimestamp(ms / 1000.0, tz=UTC)
+
 
 def _dt_to_ms(dt: datetime) -> int:
     return int(dt.timestamp() * 1000)
 
+
 def _str_to_dt(s: str) -> datetime:
-    return datetime.fromisoformat(s.replace('Z', '+00:00'))
+    return datetime.fromisoformat(s.replace("Z", "+00:00"))
+
 
 def _dt_to_str(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+
 
 def _chunk_props(props: list[str], max_bytes: int) -> list[list[str]]:
     result: list[list[str]] = []
@@ -1355,7 +1840,7 @@ def _chunk_props(props: list[str], max_bytes: int) -> list[list[str]]:
     current_size = 0
 
     for p in props:
-        sz = len(p.encode('utf-8'))
+        sz = len(p.encode("utf-8"))
 
         if current_size + sz > max_bytes:
             result.append(current_chunk)

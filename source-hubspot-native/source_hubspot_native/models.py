@@ -1,7 +1,17 @@
+from __future__ import annotations
 import urllib.parse
-from datetime import datetime
+from datetime import UTC, datetime
 from enum import StrEnum, auto
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Generic, Literal, Self, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    ClassVar,
+    Generic,
+    Literal,
+    Self,
+    TypeVar,
+)
 
 from estuary_cdk.capture.common import (
     AccessToken,
@@ -14,7 +24,13 @@ from estuary_cdk.capture.common import (
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
-from pydantic import AwareDatetime, BaseModel, Field, model_validator, ValidationInfo
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    Field,
+    ValidationInfo,
+    model_validator,
+)
 
 scopes = [
     "crm.lists.read",
@@ -33,6 +49,7 @@ scopes = [
 optional_scopes = [
     "automation",
     "content",
+    "crm.lists.read",
     "crm.objects.custom.read",
     "crm.objects.feedback_submissions.read",
     "crm.objects.goals.read",
@@ -87,7 +104,7 @@ class EndpointConfig(BaseModel):
     # that "setup documentation [and] in platform experience should not include an app that
     # requires API keys in order to be installed". Essentially, users should only be presented
     # the option to authenticate with OAuth in the UI.
-    # 
+    #
     # There are already existing captures authenticating with access tokens, so we can't
     # simply strip out support for access token authentication. Patching model_json_schema to remove
     # AccessToken makes OAuth2 the only authentication option in the UI, and effectively
@@ -148,6 +165,9 @@ class Names(StrEnum):
     partner_clients = auto()
     marketing_event = auto()
     marketing_emails = auto()
+    contact_lists = auto()
+    contact_list_memberships = auto()
+    feedback_submissions = auto()
 
 
 # A Property is a HubSpot or HubSpot-user defined attribute that's
@@ -194,7 +214,9 @@ class FormSubmission(BaseDocument, extra="allow"):
     @model_validator(mode="before")
     def set_form_id(cls, values: dict[str, Any], info: ValidationInfo):
         if not info.context or not isinstance(info.context, FormSubmissionContext):
-            raise RuntimeError(f"Validation context is not set or is not of type FormSubmissionContext: {info.context}")
+            raise RuntimeError(
+                f"Validation context is not set or is not of type FormSubmissionContext: {info.context}"
+            )
 
         assert "formId" not in values
         values["formId"] = info.context.form_id
@@ -351,6 +373,10 @@ class LineItem(BaseCRMObject):
     invoices: list[int] = []
     quotes: list[int] = []
     subscriptions: list[int] = []
+
+
+class FeedbackSubmission(BaseCRMObject):
+    ASSOCIATED_ENTITIES = []
 
 
 # An Association, as returned by the v4 associations API.
@@ -594,3 +620,73 @@ class CustomObjectSearchResult(BaseModel):
 
     id: int
     properties: Properties
+
+
+class ContactList(BaseDocument, extra="allow"):
+    listId: str
+    updatedAt: AwareDatetime
+    additionalProperties: dict[str, Any]
+
+    def get_cursor_value(self) -> datetime:
+        if "hs_lastmodifieddate" not in self.additionalProperties:
+            return self.updatedAt
+
+        raw_last_modified_timestamp = self.additionalProperties["hs_lastmodifieddate"]
+        last_modified_timestamp = int(raw_last_modified_timestamp) / 1000
+
+        return datetime.fromtimestamp(last_modified_timestamp, tz=UTC)
+
+
+class ContactListSearch(BaseModel, extra="allow"):
+    lists: list[ContactList]
+
+    hasMore: bool
+    offset: int
+
+
+class ContactListMembershipResponse(BaseModel, extra="allow"):
+    class Cursor(BaseModel, extra="allow"):
+        after: str
+
+    class Paging(BaseModel, extra="allow"):
+        next: ContactListMembershipResponse.Cursor | None = None
+
+    results: list[ContactListMembership]
+    paging: Paging | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _set_membership_list_ids(cls, values: dict[str, Any], info: ValidationInfo):
+        if not info.context or not isinstance(info.context, ContactList):
+            raise RuntimeError(
+                f"Validation context is not set or is not of type ContactList: {info.context}"
+            )
+
+        for membership in values["results"]:
+            membership["listId"] = info.context.listId
+
+        return values
+
+    def get_next_cursor(self) -> str | None:
+        if self.paging is None or self.paging.next is None:
+            return None
+
+        return self.paging.next.after
+
+
+class ContactListMembership(BaseDocument, extra="allow"):
+    # The enriched list membership entity, containing the id of the list that contact belongs to.
+    #
+    # This corresponds to the schema returned by the "/crm/v3/lists/{listId}/memberships" endpoint
+    # (https://developers.hubspot.com/docs/api-reference/crm-lists-v3/memberships/get-crm-v3-lists-listId-memberships).
+    #
+    # The alternative "/crm/v3/lists/records/{objectTypeId}/{recordId}/memberships" endpoint
+    # (https://developers.hubspot.com/docs/api-reference/crm-lists-v3/memberships/get-crm-v3-lists-records-objectTypeId-recordId-memberships)
+    # yields more data, but since getting added to a list doesn't update a contact's
+    # `lastmodifieddate` there's no way to tell which contacts to request memberships for.
+    # List `updatedAt` fields do not get updated either, but we assume there will always be
+    # less lists than contacts to query.
+
+    listId: str
+    recordId: str
+    membershipTimestamp: AwareDatetime
