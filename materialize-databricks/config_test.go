@@ -15,7 +15,7 @@ func TestDatabricksConfig(t *testing.T) {
 		Address:     "db-something.cloud.databricks.com:400",
 		CatalogName: "mycatalog",
 		HTTPPath:    "/sql/1.0/warehouses/someid",
-		Credentials: &CredentialConfig{
+		Credentials: credentialConfig{
 			AuthType:            "PAT",
 			PersonalAccessToken: "secret",
 		},

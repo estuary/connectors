@@ -43,7 +43,7 @@ func mustGetCfg(t *testing.T) config {
 		*prop.dest = os.Getenv(prop.key)
 	}
 
-	out.Credentials.AuthType = PAT
+	out.Credentials.AuthType = PAT_AUTH_TYPE
 
 	if err := out.Validate(); err != nil {
 		t.Fatal(err)
