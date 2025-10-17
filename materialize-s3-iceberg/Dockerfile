@@ -21,7 +21,7 @@ RUN poetry install
 
 # Go build stage
 ################################################################################
-FROM --platform=linux/amd64 golang:1.24-bookworm AS gobuilder
+FROM --platform=linux/amd64 golang:1.25-bookworm AS gobuilder
 
 WORKDIR /builder
 
