@@ -12,7 +12,7 @@ import (
 )
 
 var testDialect = mysqlDialect(time.UTC, "flow", "mysql", featureFlagDefaults)
-var testTemplates = renderTemplates(testDialect)
+var testTemplates = renderTemplates(testDialect, "mysql")
 
 func TestSQLGeneration(t *testing.T) {
 
@@ -63,7 +63,7 @@ func TestDateTimeColumn(t *testing.T) {
 	require.Equal(t, "DATETIME(6) NOT NULL", mapped.DDL)
 
 	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
-	require.Equal(t, "2022-04-04T10:09:08.234567", parsed)
+	require.Equal(t, "2022-04-04 10:09:08.234567", parsed)
 	require.NoError(t, err)
 }
 

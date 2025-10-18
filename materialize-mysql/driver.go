@@ -280,6 +280,11 @@ func newMysqlDriver() *sql.Driver[config, tableConfig] {
 				return nil, fmt.Errorf("could not create a connection to database %q at %q: %w", cfg.Database, cfg.Address, err)
 			}
 
+			var product string
+			if product, err = queryDatabaseProduct(ctx, conn); err != nil {
+				return nil, err
+			}
+
 			var tzLocation *time.Location
 			if cfg.Timezone != "" {
 				// The user-entered timezone value is verified to parse without error in (*Config).Validate,
@@ -297,7 +302,7 @@ func newMysqlDriver() *sql.Driver[config, tableConfig] {
 				// Infer the location in which captured DATETIME values will be interpreted from the system
 				// variable 'time_zone' if it is set on the database.
 				var tzName string
-				if tzName, err = queryTimeZone(ctx, conn); err == nil {
+				if tzName, err = queryTimeZone(ctx, conn, product); err == nil {
 					if tzLocation, err = schedule.ParseTimezone(tzName); err == nil {
 						log.WithFields(log.Fields{
 							"tzName": tzName,
@@ -312,13 +317,8 @@ func newMysqlDriver() *sql.Driver[config, tableConfig] {
 				}
 			}
 
-			var product string
-			if product, err = queryDatabaseProduct(ctx, conn); err != nil {
-				return nil, err
-			}
-
 			var dialect = mysqlDialect(tzLocation, cfg.Database, product, featureFlags)
-			var templates = renderTemplates(dialect)
+			var templates = renderTemplates(dialect, product)
 
 			return &sql.Endpoint[config]{
 				Config:              cfg,
@@ -326,7 +326,7 @@ func newMysqlDriver() *sql.Driver[config, tableConfig] {
 				MetaCheckpoints:     sql.FlowCheckpointsTable(nil),
 				NewClient:           prepareNewClient(tzLocation),
 				CreateTableTemplate: templates.createTargetTable,
-				NewTransactor:       prepareNewTransactor(templates),
+				NewTransactor:       prepareNewTransactor(templates, product),
 				ConcurrentApply:     false,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 				Options: m.MaterializeOptions{
@@ -342,6 +342,7 @@ func newMysqlDriver() *sql.Driver[config, tableConfig] {
 // we're talking to
 func queryDatabaseProduct(ctx context.Context, conn *stdsql.Conn) (string, error) {
 	var rawVersionString string
+	var rawVersionComment string
 	var row = conn.QueryRowContext(ctx, `SELECT @@GLOBAL.version;`)
 	if err := row.Err(); err != nil {
 		return "", fmt.Errorf("unable to query database version: %w", err)
@@ -349,9 +350,19 @@ func queryDatabaseProduct(ctx context.Context, conn *stdsql.Conn) (string, error
 		return "", fmt.Errorf("unable to query database version: malformed response")
 	}
 
+	row = conn.QueryRowContext(ctx, `SELECT @@GLOBAL.version_comment;`)
+	if err := row.Err(); err != nil {
+		return "", fmt.Errorf("unable to query database version: %w", err)
+	} else if err := row.Scan(&rawVersionComment); err != nil {
+		return "", fmt.Errorf("unable to query database version: malformed response")
+	}
+
 	var product = "mysql"
+
 	if strings.Contains(strings.ToLower(rawVersionString), "mariadb") {
 		product = "mariadb"
+	} else if strings.Contains(strings.ToLower(rawVersionComment), "singlestoredb") {
+		product = "singlestore"
 	}
 
 	log.WithFields(log.Fields{
@@ -364,23 +375,33 @@ func queryDatabaseProduct(ctx context.Context, conn *stdsql.Conn) (string, error
 
 var errDatabaseTimezoneUnknown = errors.New("system variable 'time_zone' or timezone from capture configuration must contain a valid IANA time zone name or +HH:MM offset")
 
-func queryTimeZone(ctx context.Context, conn *stdsql.Conn) (string, error) {
+func queryTimeZone(ctx context.Context, conn *stdsql.Conn, product string) (string, error) {
 	var row = conn.QueryRowContext(ctx, `SELECT @@GLOBAL.time_zone;`)
 	var tzName string
 	if err := row.Scan(&tzName); err != nil {
 		return "", fmt.Errorf("error reading 'time_zone' system variable: %w", err)
 	}
 
-	log.WithField("time_zone", tzName).Debug("queried time_zone system variable")
 	if tzName == "SYSTEM" {
-		return "", errDatabaseTimezoneUnknown
+		if product == "singlestore" {
+			row = conn.QueryRowContext(ctx, `SELECT @@SYSTEM_TIME_ZONE;`)
+			if err := row.Scan(&tzName); err != nil {
+				return "", fmt.Errorf("error reading 'time_zone' system variable: %w", err)
+			}
+		} else {
+			return "", errDatabaseTimezoneUnknown
+		}
 	}
+
+	log.WithField("time_zone", tzName).Debug("queried time_zone system variable")
 
 	return tzName, nil
 }
 
 type transactor struct {
 	cfg config
+
+	product string
 
 	dialect   sql.Dialect
 	templates templates
@@ -407,6 +428,7 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 func prepareNewTransactor(
 	templates templates,
+	product string,
 ) func(context.Context, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *m.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
@@ -419,7 +441,7 @@ func prepareNewTransactor(
 		be *m.BindingEvents,
 	) (m.Transactor, error) {
 		var cfg = ep.Config
-		var d = &transactor{dialect: ep.Dialect, templates: templates, cfg: cfg, be: be}
+		var d = &transactor{dialect: ep.Dialect, templates: templates, cfg: cfg, be: be, product: product}
 		d.store.fence = fence
 
 		// Establish connections.
@@ -589,7 +611,13 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
-	var txn, err = d.load.conn.BeginTx(ctx, &stdsql.TxOptions{ReadOnly: true})
+	var txOptions = &stdsql.TxOptions{ReadOnly: true}
+	if d.product == "singlestore" {
+		// SingleStoreDB does not support read-only transactions
+		txOptions.ReadOnly = false
+	}
+	
+	var txn, err = d.load.conn.BeginTx(ctx, txOptions)
 	if err != nil {
 		return fmt.Errorf("DB.BeginTx: %w", err)
 	}

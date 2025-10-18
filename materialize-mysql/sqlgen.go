@@ -42,6 +42,30 @@ func identifierSanitizer(delegate func(string) string) func(string) string {
 	}
 }
 
+const (
+	singleStoreMinimumTimestamp = "1000-01-01T00:00:00Z"
+	singleStoreMinimumDate      = "1000-01-01"
+)
+
+var ClampDatetime sql.ElementConverter = sql.StringCastConverter(func(str string) (interface{}, error) {
+	str = strings.Replace(str, "z", "Z", 1)
+	if parsed, err := time.Parse(time.RFC3339Nano, str); err != nil {
+		return nil, err
+	} else if parsed.Year() < 1000 {
+		return singleStoreMinimumTimestamp, nil
+	}
+	return str, nil
+})
+
+var ClampDate sql.ElementConverter = sql.StringCastConverter(func(str string) (interface{}, error) {
+	if parsed, err := time.Parse(time.DateOnly, str); err != nil {
+		return nil, err
+	} else if parsed.Year() < 1000 {
+		return singleStoreMinimumDate, nil
+	}
+	return str, nil
+})
+
 var mysqlDialect = func(tzLocation *time.Location, database string, product string, featureFlags map[string]bool) sql.Dialect {
 	var jsonType = "JSON"
 	var jsonMapper = sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes))
@@ -49,11 +73,22 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		jsonType = "LONGTEXT"
 		jsonMapper = sql.MapStatic("LONGTEXT", sql.UsingConverter(sql.ToJsonString))
 	}
+
 	primaryKeyTextType := sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar"))
+	if product == "singlestore" {
+		primaryKeyTextType = sql.MapStatic("TEXT", sql.AlsoCompatibleWith("varchar"))
+	}
 
 	// Define base date/time mappings without primary key wrapper
-	dateMapping := sql.MapStatic("DATE")
-	datetimeMapping := sql.MapStatic("DATETIME(6)", sql.AlsoCompatibleWith("datetime"), sql.UsingConverter(rfc3339ToTZ(tzLocation)))
+
+	var dateOpts = []sql.MapStaticOption{}
+	var datetimeOpts = []sql.MapStaticOption{sql.AlsoCompatibleWith("datetime"), sql.UsingConverter(rfc3339ToTZ(tzLocation, false))}
+	if product == "singlestore" {
+		dateOpts = []sql.MapStaticOption{sql.UsingConverter(ClampDate)}
+		datetimeOpts = []sql.MapStaticOption{sql.AlsoCompatibleWith("datetime"), sql.UsingConverter(rfc3339ToTZ(tzLocation, true))}
+	}
+	dateMapping := sql.MapStatic("DATE", dateOpts...)
+	datetimeMapping := sql.MapStatic("DATETIME(6)", datetimeOpts...)
 	timeMapping := sql.MapStatic("TIME(6)", sql.AlsoCompatibleWith("time"), sql.UsingConverter(rfc3339TimeToTZ(tzLocation)))
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
@@ -122,8 +157,8 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 	// MariaDB uses longtext for JSON type, so migrating to JSON on MariaDB is not distinguishable from migrating
 	// to a normal longtext
 	if product != "mariadb" {
-		migrationSpecs["varchar"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast))}
-		migrationSpecs["longtext"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast))}
+		migrationSpecs["varchar"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast(product)))}
+		migrationSpecs["longtext"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast(product)))}
 		migrationSpecs["*"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"})}
 	}
 
@@ -173,8 +208,16 @@ func migrationIdentifier(migration sql.ColumnTypeMigration) string {
 	return migration.Identifier
 }
 
-func jsonQuoteCast(migration sql.ColumnTypeMigration) string {
-	return fmt.Sprintf(`JSON_QUOTE(%s)`, migration.Identifier)
+func jsonQuoteCast(product string) func(migration sql.ColumnTypeMigration) string {
+	if product == "singlestore" {
+		return func(migration sql.ColumnTypeMigration) string {
+			return fmt.Sprintf(`TO_JSON(%s)`, migration.Identifier)
+		}
+	}
+
+	return func(migration sql.ColumnTypeMigration) string {
+		return fmt.Sprintf(`JSON_QUOTE(%s)`, migration.Identifier)
+	}
 }
 
 func prepareDatetimeToStringCast(loc *time.Location) sql.CastSQLFunc {
@@ -183,17 +226,25 @@ func prepareDatetimeToStringCast(loc *time.Location) sql.CastSQLFunc {
 	}
 }
 
-func rfc3339ToTZ(loc *time.Location) sql.ElementConverter {
+func rfc3339ToTZ(loc *time.Location, clamp bool) sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
+		var date = str
+		if clamp {
+			if clamped, err := ClampDatetime(str); err != nil {
+				return nil, err
+			} else {
+				date = clamped.(string)
+			}
+		}
 		// sanity check, this should not happen
 		if loc == nil {
 			return nil, fmt.Errorf("no timezone has been specified either in server or in connector configuration, cannot materialize date-time field. Consider setting a timezone in your database or in the connector configuration to continue")
 		}
 
-		if t, err := time.Parse(time.RFC3339Nano, str); err != nil {
-			return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
+		if t, err := time.Parse(time.RFC3339Nano, date); err != nil {
+			return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", date, err)
 		} else {
-			return t.In(loc).Format("2006-01-02T15:04:05.999999999"), nil
+			return t.In(loc).Format("2006-01-02 15:04:05.999999999"), nil
 		}
 	})
 }
@@ -249,7 +300,14 @@ type templates struct {
 	updateFence             *template.Template
 }
 
-func renderTemplates(dialect sql.Dialect) templates {
+func renderTemplates(dialect sql.Dialect, product string) templates {
+	var jsonBuildFunction = "JSON_OBJECT"
+	var tempTruncateCommand = "TRUNCATE"
+	if product == "singlestore" {
+		jsonBuildFunction = "JSON_BUILD_OBJECT"
+		tempTruncateCommand = "DELETE FROM "
+	}
+
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
 {{ define "temp_load_name" -}}
 flow_temp_load_table_{{ $.Binding }}
@@ -321,7 +379,7 @@ CREATE TEMPORARY TABLE {{ template "temp_load_name" . }} (
 -- Templated truncation of the temporary load table:
 
 {{ define "truncateTempTable" }}
-TRUNCATE {{ template "temp_load_name" . }};
+` + tempTruncateCommand + ` {{ template "temp_load_name" . }};
 {{ end }}
 
 -- Templated load into the temporary load table:
@@ -380,8 +438,7 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 
 {{ define "loadQueryNoFlowDocument" }}
 {{ if not $.DeltaUpdates -}}
-SELECT {{ $.Binding }}, 
-JSON_OBJECT(
+SELECT {{ $.Binding }}, ` + jsonBuildFunction + `(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}},{{end}}
     {{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
@@ -466,7 +523,7 @@ FROM {{ template "temp_update_name" . }};
 
 
 {{ define "truncateUpdateTable" }}
-TRUNCATE {{ template "temp_update_name" . }};
+` + tempTruncateCommand + ` {{ template "temp_update_name" . }};
 {{ end }}
 
 
@@ -513,7 +570,7 @@ WHERE
 {{ end }}
 
 {{ define "truncateDeleteTable" }}
-TRUNCATE {{ template "temp_delete_name" . }};
+` + tempTruncateCommand + ` {{ template "temp_delete_name" . }};
 {{ end }}
 
 {{ define "installFence" }}
