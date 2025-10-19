@@ -127,7 +127,7 @@ resources_json_template='[
 ]'
 
 STORAGE_TYPE="${STORAGE_TYPE:-s3}"
-export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.${STORAGE_TYPE}.yaml)"
+export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.${STORAGE_TYPE}.yaml)"
 export MOTHERDUCK_DATABASE="$(echo $CONNECTOR_CONFIG | jq -r .database)"
 export MOTHERDUCK_SCHEMA="$(echo $CONNECTOR_CONFIG | jq -r .schema)"
 export motherduck_token="$(echo $CONNECTOR_CONFIG | jq -r .token)"

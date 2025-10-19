@@ -122,7 +122,7 @@ resources_json_template='[
   }
 ]'
 
-export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
 
 export DBSQLCLI_HOST_NAME="$(echo $CONNECTOR_CONFIG | jq -r .address)"

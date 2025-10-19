@@ -5,14 +5,14 @@ set -o pipefail
 set -o nounset
 
 function query() {
-  echo "$1" | docker run -e MYSQL_HOST -e MYSQL_PORT -e MYSQL_DATABASE -e MYSQL_PASSWORD -e MYSQL_USER -i --rm mysql \
+  echo "$1" | docker run -i --rm mysql \
     mysqlsh --sql --json=raw \
     --host=$MYSQL_HOST --port=$MYSQL_PORT \
     --user=$MYSQL_USER --password=$MYSQL_PASSWORD \
     --database $MYSQL_DATABASE
 }
 
-singlestore_api_token="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/api-token.yaml | jq -r '.token')"
+singlestore_api_token="$(decrypt_config $CONNECTOR_TEST_DIR/api-token.yaml | jq -r '.token')"
 
 workspace_id='e3db037e-1201-4e0b-9622-28a3deccafd6'
 curl -XPOST \
@@ -147,7 +147,7 @@ resources_json_template='[
   }
 ]'
 
-export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
 
 export MYSQL_HOST="$(echo $CONNECTOR_CONFIG | jq -r .address | cut -d':' -f1)"

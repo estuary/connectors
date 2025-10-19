@@ -25,7 +25,7 @@ resources_json_template='[
   }
 ]'
 
-export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
 export SPREADSHEET_ID=$(echo $CONNECTOR_CONFIG | jq -r .spreadsheetUrl | sed -E 's#.*/d/([^/]+)/.*#\1#')
 export GCP_SERVICE_ACCOUNT_KEY=$(echo $CONNECTOR_CONFIG | jq -r .credentials.credentials_json)
 

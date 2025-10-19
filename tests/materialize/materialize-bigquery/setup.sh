@@ -102,7 +102,7 @@ resources_json_template='[
   }
 ]'
 
-export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
 export GCP_BQ_PROJECT_ID="$(echo $CONNECTOR_CONFIG | jq -r .project_id)"
 export GCP_BQ_DATASET="$(echo $CONNECTOR_CONFIG | jq -r .dataset)"
 export GCP_BQ_REGION="$(echo $CONNECTOR_CONFIG | jq -r .region)"
