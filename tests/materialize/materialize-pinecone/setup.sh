@@ -33,7 +33,7 @@ resources_json_template='[
   }
 ]'
 
-export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
 export PINECONE_INDEX="$(echo $CONNECTOR_CONFIG | jq -r .index)"
 export PINECONE_API_KEY="$(echo $CONNECTOR_CONFIG | jq -r .pineconeApiKey)"
 

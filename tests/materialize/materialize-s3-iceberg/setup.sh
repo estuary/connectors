@@ -48,7 +48,7 @@ function decrypt_config {
   sops --output-type json --decrypt $1 | jq 'walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)' 
 }
 
-export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
 export AWS_ACCESS_KEY_ID="$(echo $CONNECTOR_CONFIG | jq -r .aws_access_key_id)"
 export AWS_SECRET_ACCESS_KEY="$(echo $CONNECTOR_CONFIG | jq -r .aws_secret_access_key)"
 export AWS_REGION="$(echo $CONNECTOR_CONFIG | jq -r .region)"

@@ -82,7 +82,7 @@ signing_name() {
 }
 
 CATALOG_TYPE="${CATALOG_TYPE:-rest}"
-export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.${CATALOG_TYPE}.yaml)"
+export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.${CATALOG_TYPE}.yaml)"
 export CATALOG_URL="$(echo $CONNECTOR_CONFIG | jq -r .url)"
 export WAREHOUSE="$(echo $CONNECTOR_CONFIG | jq -r .warehouse)"
 export NAMESPACE="$(echo $CONNECTOR_CONFIG | jq -r .namespace)"

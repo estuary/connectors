@@ -138,7 +138,7 @@ resources_json_template='[
   }
 ]'
 
-export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
 export SNOWFLAKE_HOST="$(echo $CONNECTOR_CONFIG | jq -r .host)"
 export SNOWFLAKE_ACCOUNT="$(echo $CONNECTOR_CONFIG | jq -r .account)"
 export SNOWFLAKE_DATABASE="$(echo $CONNECTOR_CONFIG | jq -r .database)"

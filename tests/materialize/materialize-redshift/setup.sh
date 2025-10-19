@@ -116,7 +116,7 @@ resources_json_template='[
   }
 ]'
 
-export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
 export REDSHIFT_ADDRESS="$(echo $CONNECTOR_CONFIG | jq -r .address)"
 export REDSHIFT_USER="$(echo $CONNECTOR_CONFIG | jq -r .user)"
 export REDSHIFT_PASSWORD="$(echo $CONNECTOR_CONFIG | jq -r .password)"

@@ -109,7 +109,7 @@ resources_json_template='[
   }
 ]'
 
-export CONNECTOR_CONFIG="$(decrypt_config ${TEST_DIR}/${CONNECTOR}/config.yaml)"
+export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
 export FABRIC_WAREHOUSE_CLIENT_ID="$(echo $CONNECTOR_CONFIG | jq -r .clientID)"
 export FABRIC_WAREHOUSE_CLIENT_SECRET="$(echo $CONNECTOR_CONFIG | jq -r .clientSecret)"
 export FABRIC_WAREHOUSE_CONNECTION_STRING="$(echo $CONNECTOR_CONFIG | jq -r .connectionString)"
