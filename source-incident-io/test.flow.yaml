@@ -1,0 +1,14 @@
+---
+captures:
+  acmeCo/source-incidentio:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_incident_io
+        config:
+          credentials:
+            credentials_title: Private App Credentials
+            access_token: not_a_real_access_token
+    bindings: []

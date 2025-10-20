@@ -1,0 +1,666 @@
+[
+  {
+    "recommendedName": "catalog_entries",
+    "resourceConfig": {
+      "name": "catalog_entries",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "updated_at"
+      ],
+      "title": "IncrementalStream",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "catalog_resources",
+    "resourceConfig": {
+      "name": "catalog_resources",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "catalog_types",
+    "resourceConfig": {
+      "name": "catalog_types",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "updated_at"
+      ],
+      "title": "IncrementalStream",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "custom_fields",
+    "resourceConfig": {
+      "name": "custom_fields",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "updated_at"
+      ],
+      "title": "IncrementalStream",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "incident_attachments",
+    "resourceConfig": {
+      "name": "incident_attachments",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "incident_roles",
+    "resourceConfig": {
+      "name": "incident_roles",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "updated_at"
+      ],
+      "title": "IncrementalStream",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "incident_statuses",
+    "resourceConfig": {
+      "name": "incident_statuses",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "updated_at"
+      ],
+      "title": "IncrementalStream",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "incident_timestamps",
+    "resourceConfig": {
+      "name": "incident_timestamps",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "incident_types",
+    "resourceConfig": {
+      "name": "incident_types",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "updated_at"
+      ],
+      "title": "IncrementalStream",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "incidents",
+    "resourceConfig": {
+      "name": "incidents",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "updated_at"
+      ],
+      "title": "IncrementalStream",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "severities",
+    "resourceConfig": {
+      "name": "severities",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "updated_at"
+      ],
+      "title": "IncrementalStream",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "users",
+    "resourceConfig": {
+      "name": "users",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  }
+]
