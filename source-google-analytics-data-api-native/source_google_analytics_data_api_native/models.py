@@ -18,7 +18,7 @@ from estuary_cdk.capture.common import (
     Logger,
 )
 
-from pydantic import AwareDatetime, BaseModel, Field, create_model
+from pydantic import AwareDatetime, BaseModel, Field, create_model, field_validator
 
 
 # Google enforces that start dates must be greater than 2015-08-13
@@ -186,6 +186,19 @@ class RunReportResponse(BaseModel, extra="allow"):
     totals: Optional[list[Row]] = None
     minimums: Optional[list[Row]] = None
     maximums: Optional[list[Row]] = None
+
+    @field_validator('totals', 'minimums', 'maximums', mode='before')
+    @classmethod
+    def validate_empty_aggregates(cls, v):
+        # When a metric aggregation is used and no rows are returned, the API sometimes 
+        # returns a list with a single empty object [{}] instead of leaving the aggregation
+        # field absent in the response. Both signify "there aren't any rows for this date range"
+        # and converting to None during validation simplifies handling in the connector.
+        if v and len(v) == 1:
+            row = v[0]
+            if not row:
+                return None
+        return v
 
     class Metadata(BaseModel, extra="allow"):
         timeZone: str
