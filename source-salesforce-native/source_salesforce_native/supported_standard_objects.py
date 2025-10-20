@@ -17,6 +17,7 @@ class ObjectDetails(TypedDict, total=False):
     cursor_field: Optional[CursorFields] # If absent, the object is full refresh. If present, the object is incremental.
     enabled_by_default: Optional[bool] # If absent, the object is not enabled by default. If present and True, the object is enabled by default.
     is_supported_by_bulk_api: Optional[bool] # If absent, the object is supported by the Bulk API. If present and False, the object is not supported by the Bulk API.
+    additional_fields_to_include_in_refresh: Optional[list[str]] # If present, these fields will be also be included in formula field refreshes.
 
 
 CUSTOM_OBJECT_WITH_SYSTEM_MODSTAMP_DETAILS: ObjectDetails = {
@@ -1374,7 +1375,16 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
         "cursor_field": CursorFields.CREATED_DATE
     },
     "ContractLineItem": {
-        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "additional_fields_to_include_in_refresh": [
+            # Salesforce's docs say: "Status is determined by your organization’s current system date and
+            # the contract line item’s Start Date and End Date." This certainly sounds like how a formula
+            # field works, and we've verified it does behave like a formula field (i.e. changes to it
+            # doesn't update any cursor fields' values). However, Salesforce's metadata doesn't indicate
+            # that Status is a formula field. To capture changes to Status during formula field refreshes,
+            # we manually specify it as an additional field to include alongside any other formula fields.
+            "Status",
+        ],
     },
     "ContractLineItemFeed": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP

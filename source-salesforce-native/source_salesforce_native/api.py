@@ -52,19 +52,19 @@ def _determine_cursor_field(
         raise RuntimeError("Attempted to find cursor field but no valid cursor field exists.")
 
 
-def _filter_to_only_formula_fields(all_fields: FieldDetailsDict, cursor_field: str) -> tuple[bool, FieldDetailsDict]:
+def _filter_to_only_refresh_fields(all_fields: FieldDetailsDict, cursor_field: str) -> tuple[bool, FieldDetailsDict]:
     mandatory_fields: list[str] = ['Id', cursor_field]
 
     mandatory_and_formula_fields: dict[str, FieldDetails] = {}
-    has_formula_fields = False
+    has_fields_to_refresh = False
     for field, details in all_fields.items():
-        if field in mandatory_fields or details.calculated:
+        if field in mandatory_fields or details.should_include_in_refresh:
             mandatory_and_formula_fields[field] = details
-        
-        if details.calculated:
-            has_formula_fields = True
 
-    return (has_formula_fields, FieldDetailsDict.model_validate(mandatory_and_formula_fields))
+        if details.should_include_in_refresh:
+            has_fields_to_refresh = True
+
+    return (has_fields_to_refresh, FieldDetailsDict.model_validate(mandatory_and_formula_fields))
 
 
 async def snapshot_resources(
@@ -158,7 +158,7 @@ async def backfill_incremental_resources(
     # On connector-initiated backfills, only fetch formula fields and rely on the top level
     # merge reduction strategy to merge in partial documents containing updated formula fields.
     if is_connector_initiated:
-        has_formula_fields, fields = _filter_to_only_formula_fields(fields, cursor_field)
+        has_fields_to_refresh, fields = _filter_to_only_refresh_fields(fields, cursor_field)
 
         # Formula fields can only contain scalar values. Even if the object contains complex
         # fields that can't be quried via the Bulk API, formula fields should always be query-able
@@ -166,7 +166,7 @@ async def backfill_incremental_resources(
         is_supported_by_bulk_api = True
 
         # If there are no formula fields in this object, return early.
-        if not has_formula_fields:
+        if not has_fields_to_refresh:
             return
 
     async def _execute(

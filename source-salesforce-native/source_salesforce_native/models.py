@@ -121,20 +121,24 @@ SOAP_TYPES_NOT_SUPPORTED_BY_BULK_API = [
     SoapTypes.SEARCH_LAYOUT_FIELDS_DISPLAYED,
 ]
 
-
-# FieldDetails is used by the connector to make decisions based on field metadata, like type
-# conversions or custom/formula field specific behavior.
-class FieldDetails(BaseModel, extra="allow"):
+# BaseFieldDetails represents field metadata returned from Salesforce.
+class BaseFieldDetails(BaseModel, extra="allow"):
     soapType: SoapTypes # Type of field
     calculated: bool # Indicates whether or not this is a formula field.
     custom: bool # Indicates whether or not this is a custom field.
 
 
 class SObject(PartialSObject):
-    class ObjectField(FieldDetails):
+    class ObjectField(BaseFieldDetails):
         name: str
 
     fields: list[ObjectField]
+
+
+# FieldDetails is used by the connector to make decisions based on field metadata, like type
+# conversions or custom/formula field specific behavior.
+class FieldDetails(BaseFieldDetails, extra="allow"):
+    should_include_in_refresh: bool = False
 
 
 # FieldDetailsDict is a connector-internal structure used to convert field
