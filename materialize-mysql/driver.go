@@ -611,13 +611,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
 
-	var txOptions = &stdsql.TxOptions{ReadOnly: true}
-	if d.product == "singlestore" {
-		// SingleStoreDB does not support read-only transactions
-		txOptions.ReadOnly = false
-	}
-	
-	var txn, err = d.load.conn.BeginTx(ctx, txOptions)
+	var txn, err = d.load.conn.BeginTx(ctx, &stdsql.TxOptions{})
 	if err != nil {
 		return fmt.Errorf("DB.BeginTx: %w", err)
 	}
