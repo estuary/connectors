@@ -6,13 +6,19 @@ import re
 from typing import AsyncGenerator, Iterable
 
 from estuary_cdk.capture import Task
-from estuary_cdk.capture.common import LogCursor, PageCursor, Resource, open_binding
+from estuary_cdk.capture.common import Resource, open_binding
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
 from .api import (
     FetchDelayedFn,
     FetchRecentFn,
+    fetch_contact_list_memberships,
+    fetch_contact_lists_page,
+    check_contact_list_memberships_access,
+    check_contact_lists_access,
+    fetch_contact_list_memberships_page,
+    fetch_contact_lists,
     fetch_deal_pipelines,
     fetch_delayed_companies,
     fetch_delayed_contacts,
@@ -20,6 +26,7 @@ from .api import (
     fetch_delayed_deals,
     fetch_delayed_email_events,
     fetch_delayed_engagements,
+    fetch_delayed_feedback_submissions,
     fetch_delayed_line_items,
     fetch_delayed_marketing_emails,
     fetch_delayed_products,
@@ -37,6 +44,7 @@ from .api import (
     fetch_recent_deals,
     fetch_recent_email_events,
     fetch_recent_engagements,
+    fetch_recent_feedback_submissions,
     fetch_recent_line_items,
     fetch_recent_marketing_emails,
     fetch_recent_products,
@@ -49,12 +57,15 @@ from .models import (
     Company,
     Contact,
     CRMObject,
+    ContactList,
+    ContactListMembership,
     CustomObject,
     Deal,
     DealPipeline,
     EmailEvent,
     EndpointConfig,
     Engagement,
+    FeedbackSubmission,
     Form,
     FormSubmission,
     LineItem,
@@ -101,6 +112,20 @@ async def _remove_permission_blocked_resources(
         (Names.email_events, fetch_recent_email_events(log, http, False, datetime.now(tz=UTC), None)),
         (Names.forms, fetch_forms(http, log)),
         (Names.form_submissions, fetch_form_submissions(http, log, 0)),
+        (
+            Names.feedback_submissions,
+            fetch_recent_feedback_submissions(
+                log, http, False, datetime.now(tz=UTC), None
+            ),
+        ),
+        (
+            Names.contact_lists,
+            check_contact_lists_access(http, log),
+        ),
+        (
+            Names.contact_list_memberships,
+            check_contact_list_memberships_access(http, log),
+        ),
     ]
 
     for resource, gen in PERMISSION_BLOCKED_RESOURCES:
@@ -164,6 +189,9 @@ async def all_resources(
         forms(http),
         form_submissions(http),
         marketing_emails(http),
+        feedback_submissions(http, with_history),
+        contact_lists(http),
+        contact_list_memberships(http),
     ]
 
     if should_check_permissions:
@@ -461,5 +489,87 @@ def marketing_emails(http: HTTPSession) -> Resource:
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
         initial_config=ResourceConfig(name=Names.marketing_emails),
+        schema_inference=True,
+    )
+
+
+def feedback_submissions(http: HTTPSession, with_history: bool) -> Resource:
+    return crm_object_with_associations(
+        FeedbackSubmission,
+        Names.feedback_submissions,
+        Names.feedback_submissions,
+        http,
+        with_history,
+        fetch_recent_feedback_submissions,
+        fetch_delayed_feedback_submissions,
+    )
+
+
+def contact_lists(http: HTTPSession) -> Resource:
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(fetch_contact_lists, http),
+            fetch_page=functools.partial(fetch_contact_lists_page, http),
+        )
+
+    started_at = datetime.now(tz=UTC)
+
+    return Resource(
+        name=Names.contact_lists,
+        key=["/listId"],
+        model=ContactList,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfig(
+            name=Names.contact_lists, interval=timedelta(hours=3)
+        ),
+        schema_inference=True,
+    )
+
+
+def contact_list_memberships(http: HTTPSession) -> Resource:
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(fetch_contact_list_memberships, http),
+            fetch_page=functools.partial(fetch_contact_list_memberships_page, http),
+        )
+
+    started_at = datetime.now(tz=UTC)
+
+    return Resource(
+        name=Names.contact_list_memberships,
+        key=["/listId", "/recordId"],
+        model=ContactListMembership,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfig(
+            name=Names.contact_list_memberships, interval=timedelta(hours=3)
+        ),
         schema_inference=True,
     )

@@ -3,7 +3,7 @@ import functools
 import itertools
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-import time
+from types import NoneType
 from typing import (
     Any,
     AsyncGenerator,
@@ -13,6 +13,8 @@ from typing import (
     Iterable,
 )
 
+import estuary_cdk.emitted_changes_cache as cache
+from estuary_cdk.buffer_ordered import buffer_ordered
 from estuary_cdk.capture.common import (
     LogCursor,
     PageCursor,
@@ -24,9 +26,13 @@ from pydantic import TypeAdapter
 from .models import (
     Association,
     BatchResult,
-    CRMObject,
     Company,
     Contact,
+    ContactList,
+    ContactListMembership,
+    ContactListMembershipResponse,
+    ContactListSearch,
+    CRMObject,
     CustomObject,
     CustomObjectSchema,
     CustomObjectSearchResult,
@@ -35,6 +41,7 @@ from .models import (
     EmailEvent,
     EmailEventsResponse,
     Engagement,
+    FeedbackSubmission,
     Form,
     FormSubmission,
     FormSubmissionContext,
@@ -54,13 +61,12 @@ from .models import (
     Ticket,
 )
 
-import estuary_cdk.emitted_changes_cache as cache
-from estuary_cdk.buffer_ordered import buffer_ordered
 
 # Hubspot returns a 500 internal server error if querying for data 
 EPOCH_PLUS_ONE_SECOND = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=1)
 HUB = "https://api.hubapi.com"
 MARKETING_EMAILS_PAGE_SIZE = 300
+OBJECT_TYPE_IDS = {"contact": "0-1", "contact_list": "0-45"}
 
 properties_cache: dict[str, Properties]= {}
 
@@ -1152,6 +1158,40 @@ def fetch_delayed_line_items(
         Names.line_items, LineItem, do_fetch, log, http, with_history, since, until
     )
 
+
+def fetch_recent_feedback_submissions(
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
+) -> AsyncGenerator[tuple[datetime, str, FeedbackSubmission], None]:
+
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(
+            Names.feedback_submissions, log, http, since, until, page
+        )
+
+    return fetch_changes_with_associations(
+        Names.feedback_submissions,
+        FeedbackSubmission,
+        do_fetch,
+        log,
+        http,
+        with_history,
+        since,
+        until,
+    )
+
+
+def fetch_delayed_feedback_submissions(
+    log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, str, FeedbackSubmission], None]:
+    return fetch_recent_feedback_submissions(log, http, with_history, since, until)
+
+
 async def list_custom_objects(
     log: Logger,
     http: HTTPSession,
@@ -1334,6 +1374,242 @@ def fetch_delayed_marketing_emails(
 ) -> AsyncGenerator[tuple[datetime, str, MarketingEmail], None]:
 
     return _fetch_marketing_emails_updated_between(log, http, since, until)
+
+
+async def _request_contact_list_page(
+    http: HTTPSession, log: Logger, offset: int, prop_names: list[str] = []
+) -> ContactListSearch:
+    url = f"{HUB}/crm/v3/lists/search"
+
+    request_body = {
+        "count": 500,
+        "offset": offset,
+        "objectTypeId": OBJECT_TYPE_IDS["contact"],
+        "sort": "HS_LIST_ID",  # Required for list membership backfill checkpoints
+        "additionalProperties": prop_names,
+    }
+
+    return ContactListSearch.model_validate_json(
+        await http.request(
+            log,
+            url,
+            method="POST",
+            json=request_body,
+        )
+    )
+
+
+async def _request_contact_lists(
+    http: HTTPSession, log: Logger, should_fetch_all_properties: bool
+) -> AsyncGenerator[ContactList, None]:
+    """
+    The lists search API is different enough that it requires its own
+    integration logic. Markedly, it is currently impossible to filter
+    or sort results based on the `hs_lastmodifieddate` property.
+    In-memory filtering is the most viable option at the moment.
+
+    Results are in ascending list id order.
+    """
+    pagination_offset = 0
+
+    if should_fetch_all_properties:
+        all_props = (
+            await fetch_properties(log, http, OBJECT_TYPE_IDS["contact_list"])
+        ).results
+        prop_names = [p.name for p in all_props]
+    else:
+        prop_names = ["hs_lastmodifieddate"]
+
+    while True:
+        response = await _request_contact_list_page(
+            http, log, pagination_offset, prop_names
+        )
+
+        for contact_list in response.lists:
+            yield contact_list
+
+        pagination_offset = response.offset
+        if not response.hasMore:
+            return
+
+
+async def check_contact_lists_access(
+    http: HTTPSession, log: Logger
+) -> AsyncGenerator[ContactList, None]:
+    """Lightweight wrapper for permission checking contact lists endpoint."""
+    async for contact_list in _request_contact_lists(http, log, False):
+        yield contact_list
+
+
+async def check_contact_list_memberships_access(
+    http: HTTPSession, log: Logger
+) -> AsyncGenerator[ContactListMembership, None]:
+    """Lightweight wrapper for permission checking contact list memberships endpoint."""
+    async for contact_list in _request_contact_lists(http, log, False):
+        url = f"{HUB}/crm/v3/lists/{contact_list.listId}/memberships"
+
+        response = ContactListMembershipResponse.model_validate_json(
+            (await http.request(log, url, params={"limit": 1})), context=contact_list
+        )
+        for membership in response.results:
+            yield membership
+
+
+async def _request_contact_lists_in_time_range(
+    http: HTTPSession,
+    log: Logger,
+    should_fetch_all_properties: bool,
+    start: datetime,
+    end: datetime | None = None,
+) -> AsyncGenerator[ContactList, None]:
+    async for item in _request_contact_lists(http, log, should_fetch_all_properties):
+        last_modified_date = item.get_cursor_value()
+
+        if last_modified_date < start:
+            continue
+        if end and last_modified_date >= end:
+            continue
+
+        yield item
+
+
+async def fetch_contact_lists_page(
+    http: HTTPSession,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+) -> AsyncGenerator[ContactList, None]:
+    assert isinstance(page, NoneType)
+    assert isinstance(cutoff, datetime)
+
+    page_ts = (
+        datetime.fromisoformat(page) if page is not None else EPOCH_PLUS_ONE_SECOND
+    )
+
+    async for item in _request_contact_lists_in_time_range(
+        http, log, True, page_ts, cutoff
+    ):
+        yield item
+
+    return
+
+
+async def fetch_contact_lists(
+    http: HTTPSession, log: Logger, log_cursor: LogCursor
+) -> AsyncGenerator[ContactList | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    # We are deliberately not implementing the same delayed stream mechanism
+    # used in CRM object APIs. We have no way to filter/sort by `hs_lastmodifieddate`
+    # and we don't want to paginate through all items twice
+    start_date = log_cursor - delayed_offset
+    now = datetime.now(tz=UTC)
+
+    async for item in _request_contact_lists_in_time_range(http, log, True, start_date):
+        log.info("Processing contact list", {"listId": item.listId})
+        timestamp = _ms_to_dt(int(item.additionalProperties["hs_lastmodifieddate"]))
+
+        if cache.should_yield(Names.contact_lists, item.listId, timestamp):
+            yield item
+
+    yield now
+
+
+async def _request_contact_list_memberships(
+    http: HTTPSession,
+    log: Logger,
+    contact_list: ContactList,
+    start: datetime,
+    end: datetime | None = None,
+) -> AsyncGenerator[ContactListMembership, None]:
+    url = f"{HUB}/crm/v3/lists/{contact_list.listId}/memberships"
+    params = {"limit": 250}
+
+    while True:
+        response = ContactListMembershipResponse.model_validate_json(
+            await http.request(log, url, params=params),
+            context=contact_list,
+        )
+
+        for item in response.results:
+            if item.membershipTimestamp < start:
+                continue
+            if end and item.membershipTimestamp >= end:
+                continue
+
+            yield item
+
+        if (next_cursor := response.get_next_cursor()) is None:
+            break
+        params["after"] = next_cursor
+
+
+async def _request_all_contact_list_memberships(
+    http: HTTPSession, log: Logger, start: datetime, end: datetime | None = None
+) -> AsyncGenerator[ContactListMembership, None]:
+    async for contact_list in _request_contact_lists_in_time_range(
+        http,
+        log,
+        # We only care about listIds, so we do not want to make an extra request
+        #  asking for all the additional properties there are
+        False,
+        start,
+        end,
+    ):
+        async for membership in _request_contact_list_memberships(
+            http, log, contact_list, start, end
+        ):
+            yield membership
+
+
+async def fetch_contact_list_memberships_page(
+    http: HTTPSession,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+) -> AsyncGenerator[ContactListMembership | PageCursor, None]:
+    assert isinstance(page, int | None)
+    assert isinstance(cutoff, datetime)
+
+    next_list = await anext(
+        (
+            item
+            async for item in _request_contact_lists(http, log, False)
+            if page is None or item.listId > page
+        ),
+        None,
+    )
+    if next_list is None:
+        return
+
+    async for membership in _request_contact_list_memberships(
+        http, log, next_list, EPOCH_PLUS_ONE_SECOND
+    ):
+        yield membership
+
+    yield next_list.listId
+
+
+async def fetch_contact_list_memberships(
+    http: HTTPSession, log: Logger, log_cursor: LogCursor
+) -> AsyncGenerator[ContactListMembership | LogCursor, None]:
+    assert isinstance(log_cursor, datetime)
+
+    # We are deliberately not implementing the same delayed stream mechanism
+    # used in CRM object APIs. We have no way to filter/sort by `hs_lastmodifieddate`
+    # and we don't want to paginate through all items twice
+    start_date = log_cursor - delayed_offset
+    now = datetime.now(tz=UTC)
+
+    async for item in _request_all_contact_list_memberships(http, log, start_date):
+        key = f"{item.listId}:{item.membershipTimestamp}"
+
+        if cache.should_yield(
+            Names.contact_list_memberships, key, item.membershipTimestamp
+        ):
+            yield item
+
+    yield now
 
 
 def _ms_to_dt(ms: int) -> datetime:
