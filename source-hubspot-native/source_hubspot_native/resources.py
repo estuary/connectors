@@ -80,7 +80,9 @@ from .models import (
 )
 
 
-MISSING_SCOPE_REGEX = r"This app hasn't been granted all required scopes to make this call."
+MISSING_SCOPE_REGEX = (
+    r"This app hasn't been granted all required scopes to make this call."
+)
 
 
 async def _can_access_endpoint(
@@ -92,7 +94,9 @@ async def _can_access_endpoint(
 
         return True
     except HTTPError as err:
-        is_missing_scope = err.code == 403 and bool(re.search(MISSING_SCOPE_REGEX, err.message))
+        is_missing_scope = err.code == 403 and bool(
+            re.search(MISSING_SCOPE_REGEX, err.message)
+        )
 
         if is_missing_scope:
             return False
@@ -101,15 +105,19 @@ async def _can_access_endpoint(
 
 
 async def _remove_permission_blocked_resources(
-    log: Logger,
-    http: HTTPMixin,
-    resources: list[Resource]
+    log: Logger, http: HTTPMixin, resources: list[Resource]
 ) -> list[Resource]:
     # Attempt to access resources' endpoints. If a resource's endpoint is
     # inaccessible, remove that resource from the list of discovered resources.
     PERMISSION_BLOCKED_RESOURCES: list[tuple[Names, AsyncGenerator]] = [
-        (Names.marketing_emails, fetch_recent_marketing_emails(log, http, False, datetime.now(tz=UTC), None)),
-        (Names.email_events, fetch_recent_email_events(log, http, False, datetime.now(tz=UTC), None)),
+        (
+            Names.marketing_emails,
+            fetch_recent_marketing_emails(log, http, False, datetime.now(tz=UTC), None),
+        ),
+        (
+            Names.email_events,
+            fetch_recent_email_events(log, http, False, datetime.now(tz=UTC), None),
+        ),
         (Names.forms, fetch_forms(http, log)),
         (Names.form_submissions, fetch_form_submissions(http, log, 0)),
         (
@@ -141,7 +149,9 @@ async def all_resources(
     config: EndpointConfig,
     should_check_permissions: bool = False,
 ) -> list[Resource]:
-    http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
+    http.token_source = TokenSource(
+        oauth_spec=OAUTH2_SPEC, credentials=config.credentials
+    )
 
     standard_object_names: list[str] = [
         Names.companies,
@@ -154,7 +164,7 @@ async def all_resources(
     custom_object_names = await list_custom_objects(log, http)
     # Some HubSpot endpoints like /v3/properties/{objectType} do not work for every custom object type.
     # However, these endpoints do work if we prepend a "p_" to the beginning of the custom object name
-    # and use that in the path instead. 
+    # and use that in the path instead.
     # Docs reference: https://developers.hubspot.com/docs/api/crm/crm-custom-objects#retrieve-existing-custom-objects
     custom_object_path_components = [f"p_{n}" for n in custom_object_names]
 
@@ -167,21 +177,83 @@ async def all_resources(
             custom_object_path_components[index],
             http,
             with_history,
-            functools.partial(fetch_recent_custom_objects, custom_object_path_components[index]),
-            functools.partial(fetch_delayed_custom_objects, custom_object_path_components[index]),
+            functools.partial(
+                fetch_recent_custom_objects, custom_object_path_components[index]
+            ),
+            functools.partial(
+                fetch_delayed_custom_objects, custom_object_path_components[index]
+            ),
         )
         for index, n in enumerate(custom_object_names)
     ]
 
-    resources =  [
-        crm_object_with_associations(Company, Names.companies, Names.companies, http, with_history, fetch_recent_companies, fetch_delayed_companies),
-        crm_object_with_associations(Contact, Names.contacts, Names.contacts, http, with_history, fetch_recent_contacts, fetch_delayed_contacts),
-        crm_object_with_associations(Deal, Names.deals, Names.deals, http, with_history, fetch_recent_deals, fetch_delayed_deals),
-        crm_object_with_associations(Engagement, Names.engagements, Names.engagements, http, with_history, fetch_recent_engagements, fetch_delayed_engagements),
-        crm_object_with_associations(Ticket, Names.tickets, Names.tickets, http, with_history, fetch_recent_tickets, fetch_delayed_tickets),
-        crm_object_with_associations(Product, Names.products, Names.products, http, with_history, fetch_recent_products, fetch_delayed_products),
-        crm_object_with_associations(LineItem, Names.line_items, Names.line_items, http, with_history, fetch_recent_line_items, fetch_delayed_line_items),
-        properties(http, itertools.chain(standard_object_names, custom_object_path_components)),
+    resources = [
+        crm_object_with_associations(
+            Company,
+            Names.companies,
+            Names.companies,
+            http,
+            with_history,
+            fetch_recent_companies,
+            fetch_delayed_companies,
+        ),
+        crm_object_with_associations(
+            Contact,
+            Names.contacts,
+            Names.contacts,
+            http,
+            with_history,
+            fetch_recent_contacts,
+            fetch_delayed_contacts,
+        ),
+        crm_object_with_associations(
+            Deal,
+            Names.deals,
+            Names.deals,
+            http,
+            with_history,
+            fetch_recent_deals,
+            fetch_delayed_deals,
+        ),
+        crm_object_with_associations(
+            Engagement,
+            Names.engagements,
+            Names.engagements,
+            http,
+            with_history,
+            fetch_recent_engagements,
+            fetch_delayed_engagements,
+        ),
+        crm_object_with_associations(
+            Ticket,
+            Names.tickets,
+            Names.tickets,
+            http,
+            with_history,
+            fetch_recent_tickets,
+            fetch_delayed_tickets,
+        ),
+        crm_object_with_associations(
+            Product,
+            Names.products,
+            Names.products,
+            http,
+            with_history,
+            fetch_recent_products,
+            fetch_delayed_products,
+        ),
+        crm_object_with_associations(
+            LineItem,
+            Names.line_items,
+            Names.line_items,
+            http,
+            with_history,
+            fetch_recent_line_items,
+            fetch_delayed_line_items,
+        ),
+        properties(
+            http, itertools.chain(standard_object_names, custom_object_path_components)
+        ),
         deal_pipelines(http),
         owners(http),
         *custom_object_resources,
@@ -215,7 +287,7 @@ def crm_object_with_associations(
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         open_binding(
             binding,
@@ -230,7 +302,9 @@ def crm_object_with_associations(
                 http,
                 with_history,
             ),
-            fetch_page=functools.partial(fetch_page_with_associations, cls, http, with_history, path_component),
+            fetch_page=functools.partial(
+                fetch_page_with_associations, cls, http, with_history, path_component
+            ),
         )
 
     started_at = datetime.now(tz=UTC)
@@ -262,7 +336,7 @@ def properties(http: HTTPSession, object_names: Iterable[str]) -> Resource:
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         open_binding(
             binding,
@@ -285,6 +359,7 @@ def properties(http: HTTPSession, object_names: Iterable[str]) -> Resource:
         schema_inference=True,
     )
 
+
 def deal_pipelines(http: HTTPSession) -> Resource:
 
     async def snapshot(log: Logger) -> AsyncGenerator[DealPipeline, None]:
@@ -297,7 +372,7 @@ def deal_pipelines(http: HTTPSession) -> Resource:
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         open_binding(
             binding,
@@ -305,7 +380,9 @@ def deal_pipelines(http: HTTPSession) -> Resource:
             state,
             task,
             fetch_snapshot=snapshot,
-            tombstone=DealPipeline(_meta=DealPipeline.Meta(op="d"), createdAt=None, updatedAt=None),
+            tombstone=DealPipeline(
+                _meta=DealPipeline.Meta(op="d"), createdAt=None, updatedAt=None
+            ),
         )
 
     return Resource(
@@ -328,7 +405,7 @@ def owners(http: HTTPSession) -> Resource:
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         open_binding(
             binding,
@@ -345,11 +422,10 @@ def owners(http: HTTPSession) -> Resource:
         model=Owner,
         open=open,
         initial_state=ResourceState(),
-        initial_config=ResourceConfig(
-            name=Names.owners, interval=timedelta(minutes=5)
-        ),
+        initial_config=ResourceConfig(name=Names.owners, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
+
 
 def email_events(http: HTTPSession) -> Resource:
     def open(
@@ -357,7 +433,7 @@ def email_events(http: HTTPSession) -> Resource:
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         open_binding(
             binding,
@@ -370,7 +446,7 @@ def email_events(http: HTTPSession) -> Resource:
                 fetch_recent_email_events,
                 fetch_delayed_email_events,
                 http,
-                True, # email events do not include property history
+                True,  # email events do not include property history
             ),
             fetch_page=functools.partial(fetch_email_events_page, http),
         )
@@ -390,13 +466,14 @@ def email_events(http: HTTPSession) -> Resource:
         schema_inference=True,
     )
 
+
 def forms(http: HTTPSession) -> Resource:
     def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         open_binding(
             binding,
@@ -404,7 +481,9 @@ def forms(http: HTTPSession) -> Resource:
             state,
             task,
             fetch_snapshot=functools.partial(fetch_forms, http),
-            tombstone=Form(_meta=Form.Meta(op="d"), id="", createdAt=None, updatedAt=None),
+            tombstone=Form(
+                _meta=Form.Meta(op="d"), id="", createdAt=None, updatedAt=None
+            ),
         )
 
     return Resource(
@@ -413,11 +492,10 @@ def forms(http: HTTPSession) -> Resource:
         model=Form,
         open=open,
         initial_state=ResourceState(),
-        initial_config=ResourceConfig(
-            name=Names.forms, interval=timedelta(minutes=5)
-        ),
+        initial_config=ResourceConfig(name=Names.forms, interval=timedelta(minutes=5)),
         schema_inference=True,
     )
+
 
 def form_submissions(http: HTTPSession) -> Resource:
     def open(
@@ -425,7 +503,7 @@ def form_submissions(http: HTTPSession) -> Resource:
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         open_binding(
             binding,
@@ -447,11 +525,11 @@ def form_submissions(http: HTTPSession) -> Resource:
             inc=ResourceState.Incremental(cursor=0),
         ),
         initial_config=ResourceConfig(
-            name=Names.form_submissions,
-            interval=timedelta(minutes=5)
+            name=Names.form_submissions, interval=timedelta(minutes=5)
         ),
         schema_inference=True,
     )
+
 
 def marketing_emails(http: HTTPSession) -> Resource:
     def open(
@@ -459,7 +537,7 @@ def marketing_emails(http: HTTPSession) -> Resource:
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings
+        all_bindings,
     ):
         open_binding(
             binding,
@@ -472,7 +550,7 @@ def marketing_emails(http: HTTPSession) -> Resource:
                 fetch_recent_marketing_emails,
                 fetch_delayed_marketing_emails,
                 http,
-                False, # marketing emails do not include property history
+                False,  # marketing emails do not include property history
             ),
             fetch_page=functools.partial(fetch_marketing_emails_page, http),
         )
