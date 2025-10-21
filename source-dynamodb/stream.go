@@ -297,7 +297,7 @@ func (c *capture) readShard(
 		if lastItemIdx > 0 || recs.NextShardIterator == nil {
 			newState := shardState{
 				LastReadSequence: lastReadSeq,
-				FinishedReading:  recs.NextShardIterator == nil,
+				FinishedReading:  !reachedHorizon && recs.NextShardIterator == nil,
 			}
 
 			if err := c.emitStream(t.bindingIdx, t.stateKey, *shard.ShardId, newState, recs.Records[:lastItemIdx], t.keyFields); err != nil {
