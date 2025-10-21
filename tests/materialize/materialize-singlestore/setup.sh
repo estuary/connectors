@@ -21,14 +21,27 @@ curl -XPOST \
   -H "Authorization: Bearer $singlestore_api_token" \
   -d '{"disableAutoSuspend": false}'
 
-while :
+max_attempts=180
+attempt=0
+
+while [ $attempt -lt $max_attempts ]
 do
   state=$(curl -s "https://api.singlestore.com/v1/workspaces/$workspace_id" -H "Authorization: Bearer $singlestore_api_token" | jq -r '.state')
   if [[ "$state" == "ACTIVE" ]]; then
     break
   fi
+  
+  attempt=$((attempt + 1))
+  
+  if [ $attempt -eq $max_attempts ]; then
+    echo "Error: Workspace did not become ACTIVE after $max_attempts attempts (15 minutes)" >&2
+    exit 1
+  fi
+  
   sleep 5
 done
+
+echo "Workspace is now ACTIVE (took $attempt attempts)"
 
 resources_json_template='[
   {
