@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"math"
 	"path"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -241,15 +240,18 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 					return nil, fmt.Errorf("listing previously staged files for recovery transaction: %w", err)
 				}
 
-				for idx, checkpointUri := range pyMergeBinding.Files {
+				var files []string
+				for _, checkpointUri := range pyMergeBinding.Files {
 					if _, ok := extantFiles[checkpointUri]; !ok {
 						log.WithFields(log.Fields{
 							"file":    checkpointUri,
 							"binding": b.Mapped.StateKey,
 						}).Info("previously checkpointed file no longer exists")
-						pyMergeBinding.Files = slices.Delete(pyMergeBinding.Files, idx, idx+1)
+						continue
 					}
+					files = append(files, checkpointUri)
 				}
+				pyMergeBinding.Files = files
 
 				if len(pyMergeBinding.Files) == 0 {
 					log.WithFields(log.Fields{
