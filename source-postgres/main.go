@@ -169,6 +169,8 @@ type advancedConfig struct {
 	CaptureAsPartitions   bool     `json:"capture_as_partitions,omitempty" jsonschema:"title=Capture Partitioned Tables As Partitions,description=When set the capture will discover and capture partitioned tables as individual partitions rather than as a single root table. This requires the publication to be created without 'publish_via_partition_root'."`
 	SourceTag             string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
 	FeatureFlags          string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+
+	DeprecatedDiscoverOnlyPublished bool `json:"discover_only_published,omitempty" jsonschema:"-"` // Unused, only supported to avoid breaking existing captures
 }
 
 var featureFlagDefaults = map[string]bool{
