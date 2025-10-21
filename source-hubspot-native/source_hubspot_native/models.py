@@ -2,7 +2,16 @@ from __future__ import annotations
 import urllib.parse
 from datetime import UTC, datetime
 from enum import StrEnum, auto
-from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Generic, Literal, Self, TypeVar
+from typing import (
+    TYPE_CHECKING,
+    Annotated,
+    Any,
+    ClassVar,
+    Generic,
+    Literal,
+    Self,
+    TypeVar,
+)
 
 from estuary_cdk.capture.common import (
     AccessToken,
@@ -88,7 +97,7 @@ class EndpointConfig(BaseModel):
     # that "setup documentation [and] in platform experience should not include an app that
     # requires API keys in order to be installed". Essentially, users should only be presented
     # the option to authenticate with OAuth in the UI.
-    # 
+    #
     # There are already existing captures authenticating with access tokens, so we can't
     # simply strip out support for access token authentication. Patching model_json_schema to remove
     # AccessToken makes OAuth2 the only authentication option in the UI, and effectively
@@ -198,7 +207,9 @@ class FormSubmission(BaseDocument, extra="allow"):
     @model_validator(mode="before")
     def set_form_id(cls, values: dict[str, Any], info: ValidationInfo):
         if not info.context or not isinstance(info.context, FormSubmissionContext):
-            raise RuntimeError(f"Validation context is not set or is not of type FormSubmissionContext: {info.context}")
+            raise RuntimeError(
+                f"Validation context is not set or is not of type FormSubmissionContext: {info.context}"
+            )
 
         assert "formId" not in values
         values["formId"] = info.context.form_id
