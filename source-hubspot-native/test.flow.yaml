@@ -8,11 +8,6 @@ captures:
         command:
           - python
           - "-m"
-          # - "-m"
-          # - "debugpy"
-          # - "--listen"
-          # - "0.0.0.0:5678"
-          # - "--wait-for-client"
           - source_hubspot_native
         config: config.yaml
     bindings:
@@ -43,16 +38,27 @@ captures:
         target: acmeCo/properties
         disable: true
       - resource:
-          name: email_events
-        target: acmeCo/email_events
-      - resource:
           name: deal_pipelines
-          interval: PT300S
+          interval: PT5M
         target: acmeCo/deal_pipelines
       - resource:
           name: owners
-          interval: PT300S
+          interval: PT5M
         target: acmeCo/owners
+      - resource:
+          name: email_events
+        target: acmeCo/email_events
+      - resource:
+          name: forms
+          interval: PT5M
+        target: acmeCo/forms
+      - resource:
+          name: form_submissions
+          interval: PT5M
+        target: acmeCo/form_submissions
+      - resource:
+          name: marketing_emails
+        target: acmeCo/marketing_emails
     interval: 3m
     shards:
       logLevel: debug

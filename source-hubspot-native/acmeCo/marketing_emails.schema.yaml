@@ -26,32 +26,13 @@ properties:
   id:
     title: Id
     type: string
-  created:
+  updatedAt:
     format: date-time
-    title: Created
-    type: string
-  type:
-    enum:
-      - SENT
-      - DROPPED
-      - PROCESSED
-      - DELIVERED
-      - DEFERRED
-      - BOUNCE
-      - OPEN
-      - CLICK
-      - PRINT
-      - FORWARD
-      - STATUSCHANGE
-      - SPAMREPORT
-      - SUPPRESSED
-      - SUPPRESSION
-      - UNBOUNCE
-    title: Type
+    title: Updatedat
     type: string
 required:
   - id
-  - created
-title: EmailEvent
+  - updatedAt
+title: MarketingEmail
 type: object
 x-infer-schema: true

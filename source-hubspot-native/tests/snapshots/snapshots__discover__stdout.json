@@ -7,7 +7,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "timestamp": {
               "format": "date-time",
@@ -91,7 +91,7 @@
           "type": "object"
         }
       },
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -193,7 +193,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "timestamp": {
               "format": "date-time",
@@ -277,7 +277,7 @@
           "type": "object"
         }
       },
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -371,7 +371,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "timestamp": {
               "format": "date-time",
@@ -455,7 +455,7 @@
           "type": "object"
         }
       },
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -565,7 +565,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "timestamp": {
               "format": "date-time",
@@ -649,7 +649,7 @@
           "type": "object"
         }
       },
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -847,7 +847,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "timestamp": {
               "format": "date-time",
@@ -931,7 +931,7 @@
           "type": "object"
         }
       },
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -1041,7 +1041,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "timestamp": {
               "format": "date-time",
@@ -1125,7 +1125,7 @@
           "type": "object"
         }
       },
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
@@ -1211,7 +1211,7 @@
     "documentSchema": {
       "$defs": {
         "History": {
-          "additionalProperties": false,
+          "additionalProperties": true,
           "properties": {
             "timestamp": {
               "format": "date-time",
@@ -1295,7 +1295,7 @@
           "type": "object"
         }
       },
-      "additionalProperties": false,
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",

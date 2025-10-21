@@ -455,7 +455,8 @@
           }
         ]
       },
-      "updatedAt": "2024-12-18T20:55:46.691000Z"
+      "updatedAt": "2024-12-18T20:55:46.691000Z",
+      "url": "https://app.hubspot.com/go-to/48603990/0-1/86000071941"
     }
   ],
   [
@@ -896,7 +897,8 @@
           }
         ]
       },
-      "updatedAt": "2024-12-18T20:55:47.220000Z"
+      "updatedAt": "2024-12-18T20:55:47.220000Z",
+      "url": "https://app.hubspot.com/go-to/48603990/0-1/86013551115"
     }
   ],
   [
@@ -1022,6 +1024,192 @@
       "updatedAt": "2024-12-18T20:40:48.711000Z",
       "userId": 73074756,
       "userIdIncludingInactive": 73074756
+    }
+  ],
+  [
+    "acmeCo/marketing_emails",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "activeDomain": "48603990.hs-sites.com",
+      "allEmailCampaignIds": [
+        "339252699",
+        "339252323"
+      ],
+      "archived": false,
+      "businessUnitId": "0",
+      "content": {
+        "templatePath": "@hubspot/email/dnd/Plain_email.html",
+        "widgets": {
+          "primary_rich_text_module": {
+            "body": {
+              "html": "Hi there, <br> Your request has been received and is being reviewed by our support team. We'll get back to you as soon as we can.<br> <br> <strong> Request details </strong> <br> Contact email: {{contact.email}} <br> Date submitted: {{ticket.createdate}} <br> Reference number: {{ticket.hs_ticket_id}} <br> Issue: {{ticket.subject}} <br> Issue description: {{ticket.content}} <br>",
+              "module_id": 1155639
+            },
+            "id": "primary_rich_text_module",
+            "module_id": 1155639,
+            "name": "primary_rich_text_module",
+            "type": "module"
+          }
+        }
+      },
+      "createdAt": "2024-12-18T20:50:41.988Z",
+      "createdById": "100",
+      "emailCampaignGroupId": "339252074",
+      "emailTemplateMode": "DRAG_AND_DROP",
+      "from": {
+        "fromName": "Developer-test-account-1-dev-48603990.com",
+        "replyTo": "support-1@developer-test-account-1-dev-48603990.com.hs-inbox.com"
+      },
+      "id": "184058151424",
+      "isAb": false,
+      "isPublished": true,
+      "isTransactional": true,
+      "jitterSendTime": true,
+      "language": "en",
+      "name": "Ticket received",
+      "previewKey": "wrDBmpYl",
+      "primaryEmailCampaignId": "339252699",
+      "publishDate": "2024-12-18T20:50:43Z",
+      "publishedAt": "2024-12-18T20:50:42.862Z",
+      "publishedById": "100",
+      "publishedByName": "HubSpot System",
+      "state": "AUTOMATED",
+      "stats": {
+        "counters": {},
+        "deviceBreakdown": {},
+        "qualifierStats": {},
+        "ratios": {
+          "bounceratio": 0,
+          "clickratio": 0,
+          "clickthroughratio": 0,
+          "contactslostratio": 0,
+          "deliveredratio": 0,
+          "hardbounceratio": 0,
+          "notsentratio": 0,
+          "openratio": 0,
+          "pendingratio": 0,
+          "replyratio": 0,
+          "softbounceratio": 0,
+          "spamreportratio": 0,
+          "unsubscribedratio": 0
+        }
+      },
+      "subcategory": "ticket_opened_kickback_email",
+      "subject": "Your ticket '{{ticket.subject}}' has been received",
+      "subscriptionDetails": {
+        "officeLocationId": "184058960702",
+        "subscriptionId": "-1",
+        "subscriptionName": "Transactional"
+      },
+      "to": {
+        "limitSendFrequency": false,
+        "suppressGraymail": false
+      },
+      "type": "TICKET_EMAIL",
+      "updatedAt": "2024-12-18T20:50:43.079000Z",
+      "updatedById": "100",
+      "webversion": {
+        "domain": "48603990.hs-sites.com",
+        "enabled": false,
+        "isPageRedirected": false,
+        "slug": "-temporary-slug-01cb7ad1-a2bc-4241-8ce1-b716bd1ea50e",
+        "url": "http://48603990.hs-sites.com/-temporary-slug-01cb7ad1-a2bc-4241-8ce1-b716bd1ea50e"
+      }
+    }
+  ],
+  [
+    "acmeCo/marketing_emails",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "activeDomain": "48603990.hs-sites.com",
+      "allEmailCampaignIds": [
+        "339251932",
+        "339252756"
+      ],
+      "archived": false,
+      "businessUnitId": "0",
+      "content": {
+        "templatePath": "@hubspot/email/dnd/Plain_email.html",
+        "widgets": {
+          "primary_rich_text_module": {
+            "body": {
+              "html": "Hi there, <br> <br> Your ticket has been closed. Thanks for contacting our support team. We hope that your issue has been resolved to your satisfaction. <br> <br> Please don't hesitate to reach out if your issue isn't resolved.<br> <br> <strong> Request details </strong> <br> Contact email: {{contact.email}} <br> Date submitted: {{ticket.createdate}} <br> Reference number: {{ticket.hs_ticket_id}} <br> Issue: {{ticket.subject}} <br> Issue description: {{ticket.content}} <br>",
+              "module_id": 1155639
+            },
+            "id": "primary_rich_text_module",
+            "module_id": 1155639,
+            "name": "primary_rich_text_module",
+            "type": "module"
+          }
+        }
+      },
+      "createdAt": "2024-12-18T20:50:40.757Z",
+      "createdById": "100",
+      "emailCampaignGroupId": "339252019",
+      "emailTemplateMode": "DRAG_AND_DROP",
+      "from": {
+        "fromName": "Developer-test-account-1-dev-48603990.com",
+        "replyTo": "support-1@developer-test-account-1-dev-48603990.com.hs-inbox.com"
+      },
+      "id": "184058616599",
+      "isAb": false,
+      "isPublished": true,
+      "isTransactional": true,
+      "jitterSendTime": true,
+      "language": "en",
+      "name": "Ticket closed",
+      "previewKey": "IhuJLhzB",
+      "primaryEmailCampaignId": "339251932",
+      "publishDate": "2024-12-18T20:50:41Z",
+      "publishedAt": "2024-12-18T20:50:41.520Z",
+      "publishedById": "100",
+      "publishedByName": "HubSpot System",
+      "state": "AUTOMATED",
+      "stats": {
+        "counters": {},
+        "deviceBreakdown": {},
+        "qualifierStats": {},
+        "ratios": {
+          "bounceratio": 0,
+          "clickratio": 0,
+          "clickthroughratio": 0,
+          "contactslostratio": 0,
+          "deliveredratio": 0,
+          "hardbounceratio": 0,
+          "notsentratio": 0,
+          "openratio": 0,
+          "pendingratio": 0,
+          "replyratio": 0,
+          "softbounceratio": 0,
+          "spamreportratio": 0,
+          "unsubscribedratio": 0
+        }
+      },
+      "subcategory": "ticket_closed_kickback_email",
+      "subject": "Your ticket '{{ticket.subject}}' has been closed",
+      "subscriptionDetails": {
+        "officeLocationId": "184058960702",
+        "subscriptionId": "-1",
+        "subscriptionName": "Transactional"
+      },
+      "to": {
+        "limitSendFrequency": false,
+        "suppressGraymail": false
+      },
+      "type": "TICKET_EMAIL",
+      "updatedAt": "2024-12-18T20:50:41.764000Z",
+      "updatedById": "100",
+      "webversion": {
+        "domain": "48603990.hs-sites.com",
+        "enabled": false,
+        "isPageRedirected": false,
+        "slug": "-temporary-slug-f6944693-f4d1-4de1-ba01-b04a51533c85",
+        "url": "http://48603990.hs-sites.com/-temporary-slug-f6944693-f4d1-4de1-ba01-b04a51533c85"
+      }
     }
   ]
 ]
