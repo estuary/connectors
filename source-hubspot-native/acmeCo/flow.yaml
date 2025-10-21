@@ -4,6 +4,15 @@ collections:
     schema: companies.schema.yaml
     key:
       - /id
+  acmeCo/contact_list_memberships:
+    schema: contact_list_memberships.schema.yaml
+    key:
+      - /listId
+      - /recordId
+  acmeCo/contact_lists:
+    schema: contact_lists.schema.yaml
+    key:
+      - /listId
   acmeCo/contacts:
     schema: contacts.schema.yaml
     key:
