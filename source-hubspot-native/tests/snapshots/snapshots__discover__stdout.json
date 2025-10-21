@@ -1911,5 +1911,137 @@
     "key": [
       "/id"
     ]
+  },
+  {
+    "recommendedName": "contact_lists",
+    "resourceConfig": {
+      "name": "contact_lists",
+      "interval": "PT3H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "listId": {
+          "title": "Listid",
+          "type": "integer"
+        },
+        "updatedAt": {
+          "format": "date-time",
+          "title": "Updatedat",
+          "type": "string"
+        },
+        "additionalProperties": {
+          "additionalProperties": true,
+          "title": "Additionalproperties",
+          "type": "object"
+        }
+      },
+      "required": [
+        "listId",
+        "updatedAt",
+        "additionalProperties"
+      ],
+      "title": "ContactList",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/listId"
+    ]
+  },
+  {
+    "recommendedName": "contact_list_memberships",
+    "resourceConfig": {
+      "name": "contact_list_memberships",
+      "interval": "PT3H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "listId": {
+          "title": "Listid",
+          "type": "integer"
+        },
+        "recordId": {
+          "title": "Recordid",
+          "type": "string"
+        },
+        "membershipTimestamp": {
+          "format": "date-time",
+          "title": "Membershiptimestamp",
+          "type": "string"
+        }
+      },
+      "required": [
+        "listId",
+        "recordId",
+        "membershipTimestamp"
+      ],
+      "title": "ContactListMembership",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/listId",
+      "/recordId"
+    ]
   }
 ]

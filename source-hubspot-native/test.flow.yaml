@@ -59,6 +59,14 @@ captures:
       - resource:
           name: marketing_emails
         target: acmeCo/marketing_emails
+      - resource:
+          name: contact_lists
+          interval: PT3H
+        target: acmeCo/contact_lists
+      - resource:
+          name: contact_list_memberships
+          interval: PT3H
+        target: acmeCo/contact_list_memberships
     interval: 3m
     shards:
       logLevel: debug
