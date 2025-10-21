@@ -23,35 +23,15 @@ properties:
   _meta:
     $ref: "#/$defs/Meta"
     description: Document metadata
-  id:
-    title: Id
-    type: string
-  created:
-    format: date-time
-    title: Created
-    type: string
-  type:
-    enum:
-      - SENT
-      - DROPPED
-      - PROCESSED
-      - DELIVERED
-      - DEFERRED
-      - BOUNCE
-      - OPEN
-      - CLICK
-      - PRINT
-      - FORWARD
-      - STATUSCHANGE
-      - SPAMREPORT
-      - SUPPRESSED
-      - SUPPRESSION
-      - UNBOUNCE
-    title: Type
+  submittedAt:
+    title: Submittedat
+    type: integer
+  formId:
+    title: Formid
     type: string
 required:
-  - id
-  - created
-title: EmailEvent
+  - submittedAt
+  - formId
+title: FormSubmission
 type: object
 x-infer-schema: true

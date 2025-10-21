@@ -207,10 +207,10 @@ class MarketingEmail(BaseDocument, extra="allow"):
 
 
 # Base Struct for all CRM Objects within HubSpot.
-class BaseCRMObject(BaseDocument, extra="forbid"):
+class BaseCRMObject(BaseDocument, extra="allow"):
     ASSOCIATED_ENTITIES: ClassVar[list[str]]
 
-    class History(BaseModel, extra="forbid"):
+    class History(BaseModel, extra="allow"):
         timestamp: datetime
         value: str
         sourceType: str
@@ -354,8 +354,8 @@ class LineItem(BaseCRMObject):
 
 
 # An Association, as returned by the v4 associations API.
-class Association(BaseModel, extra="forbid"):
-    class Type(BaseModel, extra="forbid"):
+class Association(BaseModel, extra="allow"):
+    class Type(BaseModel, extra="allow"):
         category: Literal["HUBSPOT_DEFINED", "USER_DEFINED"]
         # Type IDs are defined here: https://developers.hubspot.com/docs/api/crm/associations
         typeId: int
@@ -365,10 +365,10 @@ class Association(BaseModel, extra="forbid"):
         # paged vs batched reads of CRM records can have a consistent shape.
         label: str | None
 
-    class From(BaseModel, extra="forbid"):
+    class From(BaseModel, extra="allow"):
         id: int
 
-    class To(BaseModel, extra="forbid"):
+    class To(BaseModel, extra="allow"):
         toObjectId: int
         associationTypes: list["Association.Type"]
 
@@ -380,11 +380,11 @@ class Association(BaseModel, extra="forbid"):
     # it and having a position of "we'll get (only) the first page".
     # TODO(whb): We did encounter this, and for now have decided to ignore any
     # extra pages.
-    class Cursor(BaseModel, extra="forbid"):
+    class Cursor(BaseModel, extra="allow"):
         after: str
         link: str
 
-    class Paging(BaseModel, extra="forbid"):
+    class Paging(BaseModel, extra="allow"):
         next: "Association.Cursor"
 
     paging: Paging | None = None

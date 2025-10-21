@@ -1,7 +1,7 @@
 ---
 $defs:
   History:
-    additionalProperties: false
+    additionalProperties: true
     properties:
       timestamp:
         format: date-time
@@ -55,14 +55,10 @@ $defs:
         type: integer
     title: Meta
     type: object
-additionalProperties: false
+additionalProperties: true
 properties:
   _meta:
-    allOf:
-      - $ref: "#/$defs/Meta"
-    default:
-      op: u
-      row_id: -1
+    $ref: "#/$defs/Meta"
     description: Document metadata
   id:
     title: Id

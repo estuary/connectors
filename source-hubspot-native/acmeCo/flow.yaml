@@ -24,8 +24,21 @@ collections:
     schema: engagements.schema.yaml
     key:
       - /id
+  acmeCo/form_submissions:
+    schema: form_submissions.schema.yaml
+    key:
+      - /formId
+      - /submittedAt
+  acmeCo/forms:
+    schema: forms.schema.yaml
+    key:
+      - /_meta/row_id
   acmeCo/line_items:
     schema: line_items.schema.yaml
+    key:
+      - /id
+  acmeCo/marketing_emails:
+    schema: marketing_emails.schema.yaml
     key:
       - /id
   acmeCo/owners:
