@@ -50,6 +50,7 @@ on:
       - "source-klaviyo-native/**"
       - "source-sentry/**"
       - "source-dynamics-365-finance-and-operations/**"
+      - "source-incident-io/**"
 
   pull_request:
     branches: [main]
@@ -101,6 +102,7 @@ on:
       - "source-klaviyo-native/**"
       - "source-sentry/**"
       - "source-dynamics-365-finance-and-operations/**"
+      - "source-incident-io/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -293,6 +295,10 @@ jobs:
             version: v2
             usage_rate: "1.0"
           - name: source-dynamics-365-finance-and-operations
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-incident-io
             type: capture
             version: v1
             usage_rate: "1.0"
