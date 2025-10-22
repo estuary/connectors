@@ -153,7 +153,7 @@
     "documentationUrl": "https://go.estuary.dev/source-shopify-native",
     "oauth2": {
       "provider": "shopify",
-      "authUrlTemplate": "https://{{{ config.store }}}.myshopify.com/admin/oauth/authorize?client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}&scope=read_locales,read_products,read_orders,read_checkouts,read_locations,read_inventory,read_fulfillments,read_customers,read_publications&state={{{#urlencode}}}{{{ state }}}{{{/urlencode}}}&redirect_uri={{{#urlencode}}}{{{ redirect_uri }}}{{{/urlencode}}}",
+      "authUrlTemplate": "https://{{{ config.store }}}.myshopify.com/admin/oauth/authorize?client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}&scope=read_locales,read_products,read_orders,read_checkouts,read_locations,read_inventory,read_fulfillments,read_customers,read_publications,read_own_subscription_contracts&state={{{#urlencode}}}{{{ state }}}{{{/urlencode}}}&redirect_uri={{{#urlencode}}}{{{ redirect_uri }}}{{{/urlencode}}}",
       "accessTokenUrlTemplate": "https://{{{ config.store }}}.myshopify.com/admin/oauth/access_token?client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}&client_secret={{{#urlencode}}}{{{ client_secret }}}{{{/urlencode}}}&code={{{#urlencode}}}{{{ code }}}{{{/urlencode}}}",
       "accessTokenBody": "client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}&client_secret={{{#urlencode}}}{{{ client_secret }}}{{{/urlencode}}}&code={{{#urlencode}}}{{{ code }}}{{{/urlencode}}}",
       "accessTokenHeaders": {
