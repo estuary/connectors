@@ -107,7 +107,3 @@ captures:
           name: location_metafields
           interval: PT5M
         target: acmeCo/location_metafields
-      - resource:
-          name: subscription_contracts
-          interval: PT5M
-        target: acmeCo/subscription_contracts
