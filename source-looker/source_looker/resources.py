@@ -203,7 +203,7 @@ async def all_resources(
 
         return resources
 
-    # Concurrently check accessibility & build resoruces for all streams.
+    # Concurrently check accessibility & build resources for all streams.
     results = await asyncio.gather(
         *(
             build_resource_if_accessible_stream(element)
