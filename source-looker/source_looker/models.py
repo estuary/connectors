@@ -197,18 +197,30 @@ class Users(LookerStream):
     path: ClassVar[str] = "users"
 
 
-class UserCredentialsEmbed(LookerStream):
+class UserCredentialsEmbed(LookerChildStream):
     name: ClassVar[str] = "user_credentials_embed"
     path: ClassVar[str] = "credentials_embed"
     parent: ClassVar[type[LookerStream]] = Users
     required_can_permission: ClassVar[str] = "show_creds"
 
 
-class UserRoles(LookerStream):
+class UserRoles(LookerChildStream):
     name: ClassVar[str] = "user_roles"
     path: ClassVar[str] = "roles"
     parent: ClassVar[type[LookerStream]] = Users
     required_can_permission: ClassVar[str] = "show_details"
+
+
+class UserAttributeValues(LookerChildStream):
+    name: ClassVar[str] = "user_attribute_values"
+    path: ClassVar[str] = "attribute_values"
+    parent: ClassVar[type[LookerStream]] = Users
+    required_can_permission: ClassVar[str] = "show_details"
+
+
+class UserAttributes(LookerStream):
+    name: ClassVar[str] = "user_attributes"
+    path: ClassVar[str] = "user_attributes"
 
 
 STREAMS = [
@@ -238,6 +250,10 @@ STREAMS = [
         "children": [
             {"stream": UserCredentialsEmbed},
             {"stream": UserRoles},
+            {"stream": UserAttributeValues},
         ]
-    }
+    },
+    {
+        "stream": UserAttributes,
+    },
 ]
