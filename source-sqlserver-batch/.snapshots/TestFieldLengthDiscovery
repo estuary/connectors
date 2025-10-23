@@ -83,7 +83,6 @@ Binding 0:
           },
           "binary_8": {
             "maxLength": 12,
-            "minLength": 12,
             "description": "(source type: binary)",
             "contentEncoding": "base64",
             "type": [
@@ -93,7 +92,6 @@ Binding 0:
           },
           "char_5": {
             "maxLength": 5,
-            "minLength": 5,
             "description": "(source type: char)",
             "type": [
               "string",
@@ -136,7 +134,6 @@ Binding 0:
           },
           "nchar_15": {
             "maxLength": 15,
-            "minLength": 15,
             "description": "(source type: nchar)",
             "type": [
               "string",
