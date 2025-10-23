@@ -6,7 +6,6 @@ import (
 	"slices"
 	"strings"
 	"text/template"
-	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	log "github.com/sirupsen/logrus"
@@ -51,13 +50,10 @@ var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeM
 	// Define base date/time mappings without primary key wrapper
 	primaryKeyTextType := sql.MapStatic("TEXT")
 	dateMapping := sql.MapStatic("DATE")
-
-	// For TIMESTAMP_NTZ, we need to normalize to UTC since it stores wallclock time without timezone adjustment
-	datetimeOptions := []sql.MapStaticOption{sql.AlsoCompatibleWith("timestamp_ntz", "timestamp_tz", "timestamp_ltz")}
-	if timestampMapping == timestampNTZ {
-		datetimeOptions = append(datetimeOptions, sql.UsingConverter(rfc3339ToUTC()))
-	}
-	datetimeMapping := sql.MapStatic(string(timestampMapping), datetimeOptions...)
+	datetimeMapping := sql.MapStatic(
+		string(timestampMapping),
+		sql.AlsoCompatibleWith("timestamp_ntz", "timestamp_tz", "timestamp_ltz"),
+	)
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
 	if featureFlags["datetime_keys_as_string"] {
@@ -154,16 +150,6 @@ func datetimeNoTzToStringCast(migration sql.ColumnTypeMigration) string {
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`TO_VARIANT(%s)`, migration.Identifier)
-}
-
-func rfc3339ToUTC() sql.ElementConverter {
-	return sql.StringCastConverter(func(str string) (interface{}, error) {
-		if t, err := time.Parse(time.RFC3339Nano, str); err != nil {
-			return "", fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
-		} else {
-			return t.UTC().Format(time.RFC3339Nano), nil
-		}
-	})
 }
 
 type templates struct {
