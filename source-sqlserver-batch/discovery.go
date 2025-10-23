@@ -368,19 +368,22 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 		if charMaxLength.Valid && charMaxLength.Int64 > 0 {
 			switch typeName {
 			case "char", "nchar":
-				// For fixed-length character types, set both minLength and maxLength
+				// NOTE: In theory we might want to discover a minimum length for fixed-length
+				// CHAR(n) columns, but in practice we have observed this minimum being violated
+				// and there's no real benefit to having it right now, so we don't.
 				var length = uint64(charMaxLength.Int64)
-				dataType.minLength = &length
 				dataType.maxLength = &length
 			case "varchar", "nvarchar":
-				// For variable-length character types, only set maxLength
 				var length = uint64(charMaxLength.Int64)
 				dataType.maxLength = &length
 			case "binary":
 				// For fixed-length binary types, calculate base64 encoded length
 				// Binary data is base64 encoded: every 3 bytes becomes 4 characters
 				var base64Length = uint64((charMaxLength.Int64 + 2) / 3 * 4)
-				dataType.minLength = &base64Length
+				// NOTE: As with CHAR(n) we could theoretically discover a minimum here, and
+				// we have not observed that minimum being violated in the real world for a
+				// BINARY(n) column, but since there's no real benefit we choose not to at
+				// this time.
 				dataType.maxLength = &base64Length
 			case "varbinary":
 				// For variable-length binary types, calculate max base64 encoded length
