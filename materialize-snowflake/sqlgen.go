@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"text/template"
+	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	log "github.com/sirupsen/logrus"
@@ -46,14 +47,38 @@ func (m timestampTypeMapping) valid() bool {
 	return m == timestampNTZ || m == timestampLTZ || m == timestampTZ
 }
 
-var snowflakeDialect = func(configSchema string, timestampMapping timestampTypeMapping, featureFlags map[string]bool) sql.Dialect {
+func rfc3339ToUTCString() sql.ElementConverter {
+	return sql.StringCastConverter(func(str string) (interface{}, error) {
+		if t, err := time.Parse(time.RFC3339Nano, str); err != nil {
+			return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
+		} else {
+			return t.UTC().Format(time.RFC3339Nano), nil
+		}
+	})
+}
+
+var snowflakeDialect = func(configSchema string, timestampType snowflakeTimestampType, featureFlags map[string]bool) sql.Dialect {
+	// Convert the configured timestamp type to the actual Snowflake type mapping
+	timestampMapping := timestampType.toTimestampTypeMapping()
+
 	// Define base date/time mappings without primary key wrapper
 	primaryKeyTextType := sql.MapStatic("TEXT")
 	dateMapping := sql.MapStatic("DATE")
-	datetimeMapping := sql.MapStatic(
-		string(timestampMapping),
-		sql.AlsoCompatibleWith("timestamp_ntz", "timestamp_tz", "timestamp_ltz"),
-	)
+
+	// For TIMESTAMP_NTZ with normalize, use a converter to transform to UTC strings
+	var datetimeMapping sql.MapProjectionFn
+	if timestampType == timestampTypeNTZNormalize {
+		datetimeMapping = sql.MapStatic(
+			string(timestampMapping),
+			sql.AlsoCompatibleWith("timestamp_ntz", "timestamp_tz", "timestamp_ltz"),
+			sql.UsingConverter(rfc3339ToUTCString()),
+		)
+	} else {
+		datetimeMapping = sql.MapStatic(
+			string(timestampMapping),
+			sql.AlsoCompatibleWith("timestamp_ntz", "timestamp_tz", "timestamp_ltz"),
+		)
+	}
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
 	if featureFlags["datetime_keys_as_string"] {

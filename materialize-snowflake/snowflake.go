@@ -107,7 +107,35 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 				return nil, fmt.Errorf("querying TIMESTAMP_TYPE_MAPPING: %w", err)
 			}
 
-			var dialect = snowflakeDialect(cfg.Schema, timestampTypeMapping, featureFlags)
+			// Apply backward compatibility logic for missing timestamp_type field
+			if cfg.TimestampType == "" {
+				// If not set, infer from warehouse TIMESTAMP_TYPE_MAPPING
+				switch timestampTypeMapping {
+				case timestampTZ:
+					cfg.TimestampType = timestampTypeTZ
+				case timestampLTZ:
+					cfg.TimestampType = timestampTypeLTZ
+				case timestampNTZ:
+					// Default to "discard TZ" variant for backward compatibility
+					cfg.TimestampType = timestampTypeNTZDiscard
+				default:
+					cfg.TimestampType = timestampTypeLTZ
+				}
+				log.WithField("inferred_timestamp_type", cfg.TimestampType).Info("timestamp type not configured, inferred from warehouse")
+			} else {
+				// Validate consistency between configured type and warehouse setting
+				if !cfg.TimestampType.isCompatibleWith(timestampTypeMapping) {
+					return nil, fmt.Errorf(
+						"your warehouse session has an explicit TIMESTAMP_TYPE_MAPPING of %s configured, which doesn't match the Snowflake Timestamp Type setting of %s. "+
+							"To eliminate the chance of confusion, we require that these settings are aligned. "+
+							"You can resolve this error by removing or changing the explicit TIMESTAMP_TYPE_MAPPING setting within your warehouse, "+
+							"or by selecting a Snowflake Timestamp Type that matches your warehouse's setting",
+						timestampTypeMapping, cfg.TimestampType,
+					)
+				}
+			}
+
+			var dialect = snowflakeDialect(cfg.Schema, cfg.TimestampType, featureFlags)
 			var templates = renderTemplates(dialect)
 
 			// Snowflake allows for 128 MiB VARIANT columns so we don't need to
