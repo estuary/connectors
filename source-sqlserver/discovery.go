@@ -466,7 +466,9 @@ func (db *sqlserverDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo,
 			case "char", "nchar":
 				// CHAR/NCHAR - fixed-length
 				var length = uint64(typeInfo.MaxLength)
-				schema.minLength = &length
+				// NOTE: In theory we might want to discover a minimum length for fixed-length
+				// CHAR(n) columns, but in practice we have observed this minimum being violated
+				// and there's no real benefit to having it right now, so we don't.
 				schema.maxLength = &length
 			case "varchar", "nvarchar":
 				// VARCHAR/NVARCHAR - variable-length with limit
@@ -485,7 +487,10 @@ func (db *sqlserverDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo,
 			switch typeInfo.Type {
 			case "binary":
 				// BINARY - fixed-length
-				schema.minLength = &base64Length
+				// NOTE: As with CHAR(n) we could theoretically discover a minimum here, and
+				// we have not observed that minimum being violated in the real world for a
+				// BINARY(n) column, but since there's no real benefit we choose not to at
+				// this time.
 				schema.maxLength = &base64Length
 			case "varbinary":
 				// VARBINARY - variable-length with limit
