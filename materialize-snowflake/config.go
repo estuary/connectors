@@ -12,6 +12,7 @@ import (
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	sf "github.com/snowflakedb/gosnowflake"
+	log "github.com/sirupsen/logrus"
 )
 
 var featureFlagDefaults = map[string]bool{
@@ -22,18 +23,67 @@ var featureFlagDefaults = map[string]bool{
 	"retain_existing_data_on_backfill": false,
 }
 
+// snowflakeTimestampType specifies how timestamp columns should be handled in Snowflake.
+type snowflakeTimestampType string
+
+const (
+	// timestampTypeLTZ stores timestamp as UTC with automatic timezone normalization by Snowflake
+	timestampTypeLTZ snowflakeTimestampType = "TIMESTAMP_LTZ"
+	// timestampTypeNTZDiscard stores timestamp as wall-clock time without timezone, discarding source TZ
+	timestampTypeNTZDiscard snowflakeTimestampType = "TIMESTAMP_NTZ_DISCARD"
+	// timestampTypeNTZNormalize stores timestamp as wall-clock time without timezone, normalizing to UTC first
+	timestampTypeNTZNormalize snowflakeTimestampType = "TIMESTAMP_NTZ_NORMALIZE"
+	// timestampTypeTZ stores timestamp with associated timezone offset
+	timestampTypeTZ snowflakeTimestampType = "TIMESTAMP_TZ"
+)
+
+// toTimestampTypeMapping returns the timestampTypeMapping for Snowflake based on the configured type.
+func (t snowflakeTimestampType) toTimestampTypeMapping() timestampTypeMapping {
+	switch t {
+	case timestampTypeLTZ:
+		return timestampLTZ
+	case timestampTypeNTZDiscard, timestampTypeNTZNormalize:
+		return timestampNTZ
+	case timestampTypeTZ:
+		return timestampTZ
+	default:
+		// Default to LTZ for safety
+		return timestampLTZ
+	}
+}
+
+// isCompatibleWith checks if the configured timestamp type is compatible with the warehouse's TIMESTAMP_TYPE_MAPPING.
+func (t snowflakeTimestampType) isCompatibleWith(mapping timestampTypeMapping) bool {
+	log.WithFields(log.Fields{
+		"configured_type": t,
+		"warehouse_mapping": mapping,
+	}).Info("checking timestamp type compatibility")
+
+	switch t {
+	case timestampTypeLTZ:
+		return mapping == timestampLTZ
+	case timestampTypeNTZDiscard, timestampTypeNTZNormalize:
+		return mapping == timestampNTZ
+	case timestampTypeTZ:
+		return mapping == timestampTZ
+	default:
+		return false
+	}
+}
+
 type config struct {
-	Host          string                           `json:"host" jsonschema:"title=Host (Account URL),description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
-	Database      string                           `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=3"`
-	Schema        string                           `json:"schema" jsonschema:"title=Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration)." jsonschema_extras:"order=4"`
-	Warehouse     string                           `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=5"`
-	Role          string                           `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=6"`
-	Account       string                           `json:"account,omitempty" jsonschema:"title=Account,description=Optional Snowflake account identifier." jsonschema_extras:"order=7,x-hidden-field=true"`
-	HardDelete    bool                             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=8"`
-	Credentials   *snowflake_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
-	Schedule      m.ScheduleConfig                 `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
-	DBTJobTrigger dbt.JobConfig                    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
-	Advanced      advancedConfig                   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	Host              string                           `json:"host" jsonschema:"title=Host (Account URL),description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
+	Database          string                           `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=3"`
+	Schema            string                           `json:"schema" jsonschema:"title=Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration)." jsonschema_extras:"order=4"`
+	Warehouse         string                           `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=5"`
+	Role              string                           `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=6"`
+	Account           string                           `json:"account,omitempty" jsonschema:"title=Account,description=Optional Snowflake account identifier." jsonschema_extras:"order=7,x-hidden-field=true"`
+	TimestampType     snowflakeTimestampType           `json:"timestamp_type" jsonschema:"title=Snowflake Timestamp Type,description=Controls how timestamp columns are stored in Snowflake.,enum=TIMESTAMP_LTZ,enum=TIMESTAMP_NTZ_DISCARD,enum=TIMESTAMP_NTZ_NORMALIZE,enum=TIMESTAMP_TZ" jsonschema_extras:"order=8"`
+	HardDelete        bool                             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=9"`
+	Credentials       *snowflake_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
+	Schedule          m.ScheduleConfig                 `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	DBTJobTrigger     dbt.JobConfig                    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
+	Advanced          advancedConfig                   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
 
 type advancedConfig struct {
