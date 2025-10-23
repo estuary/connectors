@@ -47,7 +47,7 @@ class EndpointConfig(BaseModel):
         window_size: Annotated[timedelta, Field(
             description="Date window size for the events backfill in ISO 8601 format. ex: P30D means 30 days, PT6H means 6 hours.",
             title="Window size",
-            default=timedelta(days=30),
+            default=timedelta(hours=1),
             ge=timedelta(seconds=30),
             le=timedelta(days=365),
         )]
