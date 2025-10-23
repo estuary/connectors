@@ -1342,7 +1342,10 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "Contract": {
-        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "additional_fields_to_include_in_refresh": [
+            "Status",
+        ],
     },
     "ContractContactRole": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -4360,6 +4363,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "ServiceContract": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
+        "additional_fields_to_include_in_refresh": [
+            "Status",
+        ],
         "enabled_by_default": True,
     },
     "ServiceContractFeed": {
