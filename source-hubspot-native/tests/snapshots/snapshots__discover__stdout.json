@@ -1954,6 +1954,11 @@
           "title": "Listid",
           "type": "integer"
         },
+        "objectTypeId": {
+          "const": "0-1",
+          "title": "Objecttypeid",
+          "type": "string"
+        },
         "updatedAt": {
           "format": "date-time",
           "title": "Updatedat",
@@ -1967,6 +1972,7 @@
       },
       "required": [
         "listId",
+        "objectTypeId",
         "updatedAt",
         "additionalProperties"
       ],
