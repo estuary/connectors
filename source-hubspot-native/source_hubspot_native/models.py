@@ -161,6 +161,8 @@ class Names(StrEnum):
     contact_lists = auto()
     contact_list_memberships = auto()
     feedback_submissions = auto()
+    goals = auto()
+    workflows = auto()
 
 
 # A Property is a HubSpot or HubSpot-user defined attribute that's
@@ -372,6 +374,10 @@ class FeedbackSubmission(BaseCRMObject):
     ASSOCIATED_ENTITIES = []
 
 
+class Goals(BaseCRMObject):
+    ASSOCIATED_ENTITIES = []
+
+
 # An Association, as returned by the v4 associations API.
 class Association(BaseModel, extra="allow"):
     class Type(BaseModel, extra="allow"):
@@ -569,6 +575,16 @@ class EmailEventsResponse(BaseModel, extra="allow"):
     hasMore: bool
     offset: str
     events: list[EmailEvent]
+
+
+class Workflow(BaseDocument, extra="allow"):
+    id: int
+    updatedAt: AwareDatetime
+    insertedAt: AwareDatetime
+
+
+class WorkflowsResponse(BaseModel, extra="allow"):
+    workflows: list[Workflow]
 
 
 # Custom objects can be associated with contacts, companies, deals, tickets, and any other custom

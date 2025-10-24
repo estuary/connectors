@@ -27,10 +27,12 @@ from .api import (
     fetch_delayed_email_events,
     fetch_delayed_engagements,
     fetch_delayed_feedback_submissions,
+    fetch_delayed_goals,
     fetch_delayed_line_items,
     fetch_delayed_marketing_emails,
     fetch_delayed_products,
     fetch_delayed_tickets,
+    fetch_delayed_workflows,
     fetch_email_events_page,
     fetch_form_submissions,
     fetch_forms,
@@ -45,10 +47,13 @@ from .api import (
     fetch_recent_email_events,
     fetch_recent_engagements,
     fetch_recent_feedback_submissions,
+    fetch_recent_goals,
     fetch_recent_line_items,
     fetch_recent_marketing_emails,
     fetch_recent_products,
     fetch_recent_tickets,
+    fetch_recent_workflows,
+    fetch_workflows_page,
     list_custom_objects,
     process_changes,
 )
@@ -68,6 +73,7 @@ from .models import (
     FeedbackSubmission,
     Form,
     FormSubmission,
+    Goals,
     LineItem,
     MarketingEmail,
     Names,
@@ -77,11 +83,13 @@ from .models import (
     ResourceConfig,
     ResourceState,
     Ticket,
+    Workflow,
 )
 
 
 MISSING_SCOPE_REGEX = (
-    r"This app hasn't been granted all required scopes to make this call."
+    r"This app hasn't been granted all required scopes to make this call.|"
+    r"auth request is missing required '.+' scope"
 )
 
 
@@ -133,6 +141,18 @@ async def _remove_permission_blocked_resources(
         (
             Names.contact_list_memberships,
             check_contact_list_memberships_access(http, log),
+        ),
+        (
+            Names.goals,
+            fetch_recent_goals(
+                log, http, False, datetime.now(tz=UTC), None,
+            ),
+        ),
+        (
+            Names.workflows,
+            fetch_recent_workflows(
+                log, http, False, datetime.now(tz=UTC), None,
+            )
         ),
     ]
 
@@ -251,6 +271,15 @@ async def all_resources(
             fetch_recent_line_items,
             fetch_delayed_line_items,
         ),
+        crm_object_with_associations(
+            Goals,
+            Names.goals,
+            Names.goals,
+            http,
+            with_history,
+            fetch_recent_goals,
+            fetch_delayed_goals,
+        ),
         properties(
             http, itertools.chain(standard_object_names, custom_object_path_components)
         ),
@@ -264,6 +293,7 @@ async def all_resources(
         feedback_submissions(http, with_history),
         contact_lists(http),
         contact_list_memberships(http),
+        workflows(http),
     ]
 
     if should_check_permissions:
@@ -649,5 +679,45 @@ def contact_list_memberships(http: HTTPSession) -> Resource:
         initial_config=ResourceConfig(
             name=Names.contact_list_memberships, interval=timedelta(hours=3)
         ),
+        schema_inference=True,
+    )
+
+
+def workflows(http: HTTPSession) -> Resource:
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                process_changes,
+                Names.workflows,
+                fetch_recent_workflows,
+                fetch_delayed_workflows,
+                http,
+                False,  # workflows do not include property history
+            ),
+            fetch_page=functools.partial(fetch_workflows_page, http),
+        )
+
+    started_at = datetime.now(tz=UTC)
+
+    return Resource(
+        name=Names.workflows,
+        key=["/id"],
+        model=Workflow,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfig(name=Names.workflows),
         schema_inference=True,
     )

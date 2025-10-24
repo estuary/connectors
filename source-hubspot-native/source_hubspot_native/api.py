@@ -48,6 +48,7 @@ from .models import (
     Form,
     FormSubmission,
     FormSubmissionContext,
+    Goals,
     LineItem,
     MarketingEmail,
     Names,
@@ -62,6 +63,8 @@ from .models import (
     Properties,
     SearchPageResult,
     Ticket,
+    Workflow,
+    WorkflowsResponse,
 )
 
 
@@ -1272,6 +1275,38 @@ def fetch_delayed_line_items(
     )
 
 
+def fetch_recent_goals(
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
+) -> AsyncGenerator[tuple[datetime, str, Goals], None]:
+
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(Names.goals, log, http, since, until, page)
+
+    return fetch_changes_with_associations(
+        Names.goals, Goals, do_fetch, log, http, with_history, since, until
+    )
+
+
+def fetch_delayed_goals(
+    log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, str, Goals], None]:
+
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(Names.goals, log, http, since, until, page)
+
+    return fetch_changes_with_associations(
+        Names.goals, Goals, do_fetch, log, http, with_history, since, until
+    )
+
+
 def fetch_recent_feedback_submissions(
     log: Logger,
     http: HTTPSession,
@@ -1493,6 +1528,64 @@ def fetch_delayed_marketing_emails(
 ) -> AsyncGenerator[tuple[datetime, str, MarketingEmail], None]:
 
     return _fetch_marketing_emails_updated_between(log, http, since, until)
+
+
+async def _fetch_workflows_updated_between(
+    log: Logger,
+    http: HTTPSession,
+    start: datetime,
+    end: datetime | None = None,
+) -> AsyncGenerator[tuple[datetime, str, Workflow], None]:
+    if not end:
+        end = datetime.now(tz=UTC)
+
+    assert start < end
+
+    url = f"{HUB}/automation/v3/workflows"
+
+    response = WorkflowsResponse.model_validate_json(
+        await http.request(log, url),
+    )
+
+    for workflow in response.workflows:
+        if start <= workflow.updatedAt <= end:
+            yield (workflow.updatedAt, str(workflow.id), workflow)
+
+
+async def fetch_workflows_page(
+    http: HTTPSession,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[Workflow, None]:
+    assert isinstance(cutoff, datetime)
+
+    start = EPOCH_PLUS_ONE_SECOND
+
+    async for _, _, workflow in _fetch_workflows_updated_between(
+        log, http, start=start, end=cutoff,
+    ):
+        yield workflow
+
+
+def fetch_recent_workflows(
+    log: Logger,
+    http: HTTPSession,
+    _: bool,
+    since: datetime,
+    until: datetime | None,
+) -> AsyncGenerator[tuple[datetime, str, Workflow], None]:
+    return _fetch_workflows_updated_between(log, http, since, until)
+
+
+def fetch_delayed_workflows(
+    log: Logger,
+    http: HTTPSession,
+    _: bool,
+    since: datetime,
+    until: datetime,
+) -> AsyncGenerator[tuple[datetime, str, Workflow], None]:
+    return _fetch_workflows_updated_between(log, http, since, until)
 
 
 async def _request_contact_list_page(
