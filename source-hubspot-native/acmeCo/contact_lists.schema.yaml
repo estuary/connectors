@@ -26,6 +26,10 @@ properties:
   listId:
     title: Listid
     type: integer
+  objectTypeId:
+    const: 0-1
+    title: Objecttypeid
+    type: string
   updatedAt:
     format: date-time
     title: Updatedat
@@ -36,6 +40,7 @@ properties:
     type: object
 required:
   - listId
+  - objectTypeId
   - updatedAt
   - additionalProperties
 title: ContactList
