@@ -27,6 +27,7 @@ from estuary_cdk.utils import format_error_message
 from pydantic import TypeAdapter
 
 from .models import (
+    OBJECT_TYPE_IDS,
     Association,
     BatchResult,
     Company,
@@ -34,7 +35,7 @@ from .models import (
     ContactList,
     ContactListMembership,
     ContactListMembershipResponse,
-    ContactListSearch,
+    ListSearch,
     CRMObject,
     CustomObject,
     CustomObjectSchema,
@@ -69,7 +70,6 @@ from .models import (
 EPOCH_PLUS_ONE_SECOND = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=1)
 HUB = "https://api.hubapi.com"
 MARKETING_EMAILS_PAGE_SIZE = 300
-OBJECT_TYPE_IDS = {"contact": "0-1", "contact_list": "0-45"}
 
 properties_cache: dict[str, Properties] = {}
 
@@ -1495,20 +1495,19 @@ def fetch_delayed_marketing_emails(
     return _fetch_marketing_emails_updated_between(log, http, since, until)
 
 
-async def _request_contact_list_page(
+async def _request_list_page(
     http: HTTPSession, log: Logger, offset: int, prop_names: list[str] = []
-) -> ContactListSearch:
+) -> ListSearch:
     url = f"{HUB}/crm/v3/lists/search"
 
     request_body = {
         "count": 500,
         "offset": offset,
-        "objectTypeId": OBJECT_TYPE_IDS["contact"],
         "sort": "HS_LIST_ID",  # Required for list membership backfill checkpoints
         "additionalProperties": prop_names,
     }
 
-    return ContactListSearch.model_validate_json(
+    return ListSearch.model_validate_json(
         await http.request(
             log,
             url,
@@ -1540,12 +1539,11 @@ async def _request_contact_lists(
         prop_names = ["hs_lastmodifieddate"]
 
     while True:
-        response = await _request_contact_list_page(
-            http, log, pagination_offset, prop_names
-        )
+        response = await _request_list_page(http, log, pagination_offset, prop_names)
 
-        for contact_list in response.lists:
-            yield contact_list
+        for item in response.lists:
+            if isinstance(item, ContactList):
+                yield item
 
         pagination_offset = response.offset
         if not response.hasMore:
