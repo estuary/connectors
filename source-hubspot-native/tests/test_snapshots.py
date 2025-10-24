@@ -3,6 +3,17 @@ import subprocess
 
 
 def test_capture(request, snapshot):
+    FIELDS_TO_REDACT = [
+        "url",
+    ]
+
+    PROPERTIES_TO_REDACT = [
+        "hs_time_in_lead",
+        "hs_time_in_opportunity",
+        "hs_time_in_appointmentscheduled",
+        "hs_time_in_1",
+    ]
+
     result = subprocess.run(
         [
             "flowctl",
@@ -24,14 +35,13 @@ def test_capture(request, snapshot):
         _collection, record = l[0], l[1]
 
         for m in ["properties", "propertiesWithHistory"]:
-            for prop in [
-                "hs_time_in_lead",
-                "hs_time_in_opportunity",
-                "hs_time_in_appointmentscheduled",
-                "hs_time_in_1",
-            ]:
+            for prop in PROPERTIES_TO_REDACT:
                 if m in record and prop in record[m]:
                     record[m][prop] = "redacted"
+
+        for field in FIELDS_TO_REDACT:
+            if field in record:
+                record[field] = "redacted"
 
     assert snapshot("stdout.json") == lines
 
