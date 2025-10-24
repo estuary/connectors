@@ -26,6 +26,9 @@ from estuary_cdk.capture.common import (
 )
 from pydantic import AwareDatetime, BaseModel, Field, model_validator, ValidationInfo
 
+OBJECT_TYPE_IDS = {"contact": "0-1", "contact_list": "0-45"}
+ContactTypeId = Literal["0-1"]
+
 scopes = [
     "crm.lists.read",
     "crm.objects.companies.read",
@@ -615,8 +618,13 @@ class CustomObjectSearchResult(BaseModel):
     properties: Properties
 
 
+class List(BaseDocument, extra="allow"):
+    objectTypeId: str
+
+
 class ContactList(BaseDocument, extra="allow"):
     listId: int
+    objectTypeId: ContactTypeId
     updatedAt: AwareDatetime
     additionalProperties: dict[str, Any]
 
@@ -630,8 +638,8 @@ class ContactList(BaseDocument, extra="allow"):
         return datetime.fromtimestamp(last_modified_timestamp, tz=UTC)
 
 
-class ContactListSearch(BaseModel, extra="allow"):
-    lists: list[ContactList]
+class ListSearch(BaseModel, extra="allow"):
+    lists: list[Annotated[ContactList | List, Field(union_mode="left_to_right")]]
 
     hasMore: bool
     offset: int
