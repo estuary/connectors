@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Generic, Any
 
 from ..flow import ResourceConfig, ConnectorState, ConnectorStateUpdate
+from ..pydantic_polyfill import GenericModel, VERSION as _PYDANTIC_VERSION
 
 
 class DiscoveredBinding(BaseModel, Generic[ResourceConfig]):
@@ -42,6 +43,13 @@ class SourcedSchema(BaseModel):
     # Pydantic's BaseModel already has a schema_json field, and it complains if we overwrite it.
     # We use a serialization alias to avoid Pydantic's complaints and serialize the field name correctly.
     schemaJson: dict = Field(serialization_alias="schema_json")
+
+    if _PYDANTIC_VERSION == "v2":
+        model_config = {"validate_by_name": True, "validate_by_alias": True}
+    else:
+        class Config:
+            allow_population_by_field_name = True
+
 
 
 class Checkpoint(BaseModel, Generic[ConnectorState]):
