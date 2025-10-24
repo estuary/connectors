@@ -161,6 +161,7 @@ class Names(StrEnum):
     contact_lists = auto()
     contact_list_memberships = auto()
     feedback_submissions = auto()
+    goals = auto()
 
 
 # A Property is a HubSpot or HubSpot-user defined attribute that's
@@ -369,6 +370,10 @@ class LineItem(BaseCRMObject):
 
 
 class FeedbackSubmission(BaseCRMObject):
+    ASSOCIATED_ENTITIES = []
+
+
+class Goals(BaseCRMObject):
     ASSOCIATED_ENTITIES = []
 
 

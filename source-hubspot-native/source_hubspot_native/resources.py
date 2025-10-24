@@ -27,6 +27,7 @@ from .api import (
     fetch_delayed_email_events,
     fetch_delayed_engagements,
     fetch_delayed_feedback_submissions,
+    fetch_delayed_goals,
     fetch_delayed_line_items,
     fetch_delayed_marketing_emails,
     fetch_delayed_products,
@@ -45,6 +46,7 @@ from .api import (
     fetch_recent_email_events,
     fetch_recent_engagements,
     fetch_recent_feedback_submissions,
+    fetch_recent_goals,
     fetch_recent_line_items,
     fetch_recent_marketing_emails,
     fetch_recent_products,
@@ -68,6 +70,7 @@ from .models import (
     FeedbackSubmission,
     Form,
     FormSubmission,
+    Goals,
     LineItem,
     MarketingEmail,
     Names,
@@ -133,6 +136,12 @@ async def _remove_permission_blocked_resources(
         (
             Names.contact_list_memberships,
             check_contact_list_memberships_access(http, log),
+        ),
+        (
+            Names.goals,
+            fetch_recent_goals(
+                log, http, False, datetime.now(tz=UTC), None,
+            ),
         ),
     ]
 
@@ -250,6 +259,15 @@ async def all_resources(
             with_history,
             fetch_recent_line_items,
             fetch_delayed_line_items,
+        ),
+        crm_object_with_associations(
+            Goals,
+            Names.goals,
+            Names.goals,
+            http,
+            with_history,
+            fetch_recent_goals,
+            fetch_delayed_goals,
         ),
         properties(
             http, itertools.chain(standard_object_names, custom_object_path_components)
