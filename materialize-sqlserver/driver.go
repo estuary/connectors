@@ -23,7 +23,7 @@ import (
 )
 
 var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string": true,
+	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
 }
 
@@ -526,13 +526,12 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// The last binding is fully processed for this RPC now, we can drain its
 		// remaining batches
 		if lastBinding != it.Binding {
-			var batch = batches[lastBinding]
-			var b = d.bindings[lastBinding]
-
-			if _, err := batch.ExecContext(ctx); err != nil {
-				return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
+			if batch, ok := batches[lastBinding]; ok {
+				var b = d.bindings[lastBinding]
+				if _, err := batch.ExecContext(ctx); err != nil {
+					return nil, fmt.Errorf("store batch insert on %q: %w", b.target.Identifier, err)
+				}
 			}
-
 			lastBinding = it.Binding
 		}
 
@@ -576,8 +575,10 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	if lastBinding != -1 {
-		if _, err := batches[lastBinding].ExecContext(ctx); err != nil {
-			return nil, fmt.Errorf("store batch insert on %q: %w", d.bindings[lastBinding].tempStoreTableName, err)
+		if batch, ok := batches[lastBinding]; ok {
+			if _, err := batch.ExecContext(ctx); err != nil {
+				return nil, fmt.Errorf("store batch insert on %q: %w", d.bindings[lastBinding].tempStoreTableName, err)
+			}
 		}
 	}
 
