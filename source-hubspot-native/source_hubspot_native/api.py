@@ -49,6 +49,7 @@ from .models import (
     Form,
     FormSubmission,
     FormSubmissionContext,
+    Goals,
     LineItem,
     MarketingEmail,
     Names,
@@ -1269,6 +1270,38 @@ def fetch_delayed_line_items(
 
     return fetch_changes_with_associations(
         Names.line_items, LineItem, do_fetch, log, http, with_history, since, until
+    )
+
+
+def fetch_recent_goals(
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
+) -> AsyncGenerator[tuple[datetime, str, Goals], None]:
+
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(Names.goals, log, http, since, until, page)
+
+    return fetch_changes_with_associations(
+        Names.goals, Goals, do_fetch, log, http, with_history, since, until
+    )
+
+
+def fetch_delayed_goals(
+    log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
+) -> AsyncGenerator[tuple[datetime, str, Goals], None]:
+
+    async def do_fetch(
+        page: PageCursor, count: int
+    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+        return await fetch_search_objects(Names.goals, log, http, since, until, page)
+
+    return fetch_changes_with_associations(
+        Names.goals, Goals, do_fetch, log, http, with_history, since, until
     )
 
 
