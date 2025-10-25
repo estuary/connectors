@@ -56,6 +56,7 @@ export TEST_COLLECTION_UNDERSCORE_COLUMN="tests/underscore-column"
 export TEST_COLLECTION_ALL_KEY_TYPES_PART_ONE="tests/all-key-types-part-one"
 export TEST_COLLECTION_ALL_KEY_TYPES_PART_TWO="tests/all-key-types-part-two"
 export TEST_COLLECTION_ALL_KEY_TYPES_PART_THREE="tests/all-key-types-part-three"
+export TEST_COLLECTION_TIMEZONE_DATETIMES="tests/timezone-datetimes"
 export TEST_COLLECTION_FIELDS_WITH_PROJECTIONS="tests/fields-with-projections"
 export TEST_COLLECTION_MANY_COLUMNS="tests/many-columns"
 

@@ -45,3 +45,26 @@ func TestConfigURI(t *testing.T) {
 		})
 	}
 }
+
+func TestTimestampTypeHelpers(t *testing.T) {
+	t.Run("toTimestampTypeMapping", func(t *testing.T) {
+		require.Equal(t, timestampLTZ, timestampTypeLTZ.toTimestampTypeMapping())
+		require.Equal(t, timestampNTZ, timestampTypeNTZDiscard.toTimestampTypeMapping())
+		require.Equal(t, timestampNTZ, timestampTypeNTZNormalize.toTimestampTypeMapping())
+		require.Equal(t, timestampTZ, timestampTypeTZ.toTimestampTypeMapping())
+	})
+
+	t.Run("isCompatibleWith", func(t *testing.T) {
+		require.True(t, timestampTypeLTZ.isCompatibleWith(timestampLTZ))
+		require.False(t, timestampTypeLTZ.isCompatibleWith(timestampNTZ))
+		require.False(t, timestampTypeLTZ.isCompatibleWith(timestampTZ))
+
+		require.True(t, timestampTypeNTZDiscard.isCompatibleWith(timestampNTZ))
+		require.True(t, timestampTypeNTZNormalize.isCompatibleWith(timestampNTZ))
+		require.False(t, timestampTypeNTZDiscard.isCompatibleWith(timestampLTZ))
+
+		require.True(t, timestampTypeTZ.isCompatibleWith(timestampTZ))
+		require.False(t, timestampTypeTZ.isCompatibleWith(timestampLTZ))
+		require.False(t, timestampTypeTZ.isCompatibleWith(timestampNTZ))
+	})
+}

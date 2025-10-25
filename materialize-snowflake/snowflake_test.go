@@ -19,7 +19,7 @@ import (
 	_ "github.com/snowflakedb/gosnowflake"
 )
 
-var testDialect = snowflakeDialect("PUBLIC", timestampLTZ, featureFlagDefaults)
+var testDialect = snowflakeDialect("PUBLIC", timestampTypeLTZ, featureFlagDefaults)
 var testTemplates = renderTemplates(testDialect)
 
 func mustGetCfg(t *testing.T) config {

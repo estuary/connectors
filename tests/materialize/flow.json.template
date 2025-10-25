@@ -24,6 +24,18 @@
        },
        "key": ["/id"]
     },
+    "tests/timezone-datetimes": {
+       "schema": {
+          "properties": {
+           "id": { "type": "integer" },
+           "utc_datetime": { "type": "string", "format": "date-time" },
+           "offset_datetime": { "type": "string", "format": "date-time" }
+          },
+          "required": ["id", "utc_datetime", "offset_datetime"],
+          "type": "object"
+       },
+       "key": ["/id"]
+    },
     "tests/multiple-data-types": {
        "schema": {
        "properties": {
