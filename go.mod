@@ -55,6 +55,7 @@ require (
 	github.com/marcboeker/go-duckdb/v2 v2.4.2
 	github.com/mattn/go-sqlite3 v2.0.3+incompatible
 	github.com/microsoft/go-mssqldb v1.8.2
+	github.com/microsoftgraph/msgraph-sdk-go v1.46.0
 	github.com/minio/highwayhash v1.0.2
 	github.com/mitchellh/mapstructure v1.5.0
 	github.com/pinecone-io/go-pinecone v1.1.1
@@ -150,6 +151,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/buger/jsonparser v1.1.1 // indirect
 	github.com/bytedance/sonic v1.10.0 // indirect
+	github.com/cjlapao/common-go v0.0.39 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/cncf/xds/go v0.0.0-20250501225837-2ac532fd4443 // indirect
 	github.com/cockroachdb/apd/v3 v3.2.1 // indirect
@@ -220,6 +222,14 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.19 // indirect
+	github.com/microsoft/kiota-abstractions-go v1.6.1 // indirect
+	github.com/microsoft/kiota-authentication-azure-go v1.0.2 // indirect
+	github.com/microsoft/kiota-http-go v1.3.1 // indirect
+	github.com/microsoft/kiota-serialization-form-go v1.0.0 // indirect
+	github.com/microsoft/kiota-serialization-json-go v1.0.7 // indirect
+	github.com/microsoft/kiota-serialization-multipart-go v1.0.0 // indirect
+	github.com/microsoft/kiota-serialization-text-go v1.0.0 // indirect
+	github.com/microsoftgraph/msgraph-sdk-go-core v1.1.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.3-0.20250322232337-35a7c28c31ee // indirect
 	github.com/montanaflynn/stats v0.7.1 // indirect
@@ -242,6 +252,7 @@ require (
 	github.com/spf13/afero v1.15.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.6.0 // indirect
+	github.com/std-uritemplate/std-uritemplate/go v0.0.57 // indirect
 	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/substrait-io/substrait v0.69.0 // indirect
 	github.com/substrait-io/substrait-go/v4 v4.4.0 // indirect
