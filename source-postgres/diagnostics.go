@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	log "github.com/sirupsen/logrus"
@@ -66,7 +68,33 @@ func (db *postgresDatabase) PeriodicChecks(ctx context.Context) error {
 	} else if slotInfo.RestartLSN == nil {
 		logSlot.Warn("replication slot has no restart_lsn (this should be impossible)")
 	} else if confirmationGap := *slotInfo.ConfirmedFlushLSN - *slotInfo.RestartLSN; confirmationGap > 0x100000000 {
-		logSlot.WithField("gap", confirmationGap).Warn("replication slot restart_lsn is lagging far behind confirmed_flush_lsn (probable long-running transaction)")
+		logSlot.WithFields(log.Fields{
+			"confirmed": *slotInfo.ConfirmedFlushLSN,
+			"restart":   *slotInfo.RestartLSN,
+			"gap":       confirmationGap,
+		}).Warn("replication slot restart_lsn is lagging far behind confirmed_flush_lsn (probable long-running transaction)")
+	}
+
+	// Query for any transactions which have been open for longer than 30 minutes,
+	// as these are generally going to cause problems with WAL retention.
+	if longTxns, err := listLongRunningTransactions(ctx, db.conn, 30*time.Minute); err != nil {
+		log.WithError(err).Debug("unable to query long-running transactions")
+	} else if len(longTxns) > 0 {
+		for _, txn := range longTxns {
+			logFields := log.Fields{
+				"pid":      txn.PID,
+				"duration": txn.Duration.String(),
+				"query":    txn.Query,
+				"state":    txn.State,
+			}
+			if txn.Username != nil {
+				logFields["username"] = *txn.Username
+			}
+			if txn.ApplicationName != nil {
+				logFields["application_name"] = *txn.ApplicationName
+			}
+			log.WithFields(logFields).Warn("detected long-running transaction")
+		}
 	}
 
 	return nil
@@ -80,4 +108,39 @@ func queryAndLogCurrentXID(ctx context.Context, conn *pgxpool.Pool) {
 	} else {
 		log.WithError(err).Warn("error querying current transaction ID")
 	}
+}
+
+type longRunningTransaction struct {
+	PID             int
+	Duration        time.Duration
+	Username        *string
+	ApplicationName *string
+	Query           string
+	State           string
+}
+
+const queryLongRunningTransactions = `
+    SELECT pid, now() - pg_stat_activity.xact_start AS duration, usename, application_name, query, state
+      FROM pg_stat_activity
+      WHERE pg_stat_activity.xact_start IS NOT NULL
+        AND (now() - pg_stat_activity.xact_start) > $1::interval;`
+
+func listLongRunningTransactions(ctx context.Context, conn *pgxpool.Pool, minDuration time.Duration) ([]longRunningTransaction, error) {
+	// Convert duration to PostgreSQL interval format (e.g., "1800 seconds")
+	var interval = fmt.Sprintf("%d seconds", int(minDuration.Seconds()))
+	var rows, err = conn.Query(ctx, queryLongRunningTransactions, interval)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var transactions []longRunningTransaction
+	for rows.Next() {
+		var txn longRunningTransaction
+		if err := rows.Scan(&txn.PID, &txn.Duration, &txn.Username, &txn.ApplicationName, &txn.Query, &txn.State); err != nil {
+			return nil, err
+		}
+		transactions = append(transactions, txn)
+	}
+	return transactions, rows.Err()
 }
