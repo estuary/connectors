@@ -162,6 +162,11 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		migrationSpecs["*"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"})}
 	}
 
+	var reservedWords = MYSQL_RESERVED_WORDS
+	if product == "singlestore" {
+		reservedWords = SINGLESTORE_RESERVED_WORDS
+	}
+
 	return sql.Dialect{
 		MigratableTypes: migrationSpecs,
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -175,7 +180,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			identifierSanitizer(sql.PassThroughTransform(
 				func(s string) bool {
-					return sql.IsSimpleIdentifier(s) && !slices.Contains(MYSQL_RESERVED_WORDS, strings.ToLower(s))
+					return sql.IsSimpleIdentifier(s) && !slices.Contains(reservedWords, strings.ToLower(s))
 				},
 				sql.QuoteTransform("`", "``"),
 			)))),

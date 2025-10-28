@@ -5,11 +5,16 @@ set -o pipefail
 set -o nounset
 
 function query() {
+  db=""
+  if [ -n "${MYSQL_DATABASE:-}" ]; then
+    db="--database=$MYSQL_DATABASE"
+  fi
+
+
   echo "$1" | docker run -i --rm mysql \
     mysqlsh --sql --json=raw \
     --host=$MYSQL_HOST --port=$MYSQL_PORT \
-    --user=$MYSQL_USER --password=$MYSQL_PASSWORD \
-    --database $MYSQL_DATABASE
+    --user=$MYSQL_USER --password=$MYSQL_PASSWORD $db
 }
 
 singlestore_api_token="$(decrypt_config $CONNECTOR_TEST_DIR/api-token.yaml | jq -r '.token')"
@@ -165,6 +170,9 @@ export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
 
 export MYSQL_HOST="$(echo $CONNECTOR_CONFIG | jq -r .address | cut -d':' -f1)"
 export MYSQL_PORT="$(echo $CONNECTOR_CONFIG | jq -r .address | cut -d':' -f2)"
-export MYSQL_DATABASE="$(echo $CONNECTOR_CONFIG | jq -r .database)"
 export MYSQL_PASSWORD="$(echo $CONNECTOR_CONFIG | jq -r .password)"
 export MYSQL_USER="$(echo $CONNECTOR_CONFIG | jq -r .user)"
+
+query "ATTACH DATABASE $(echo $CONNECTOR_CONFIG | jq -r .database);" || true
+
+export MYSQL_DATABASE="$(echo $CONNECTOR_CONFIG | jq -r .database)"
