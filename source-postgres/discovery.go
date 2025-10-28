@@ -183,14 +183,16 @@ func (db *postgresDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.
 		}
 	}
 
-	// Only discover tables which are already in the publication.
-	publicationStatus, err := listPublishedTables(ctx, db.conn, db.config.Advanced.PublicationName)
-	if err != nil {
-		return nil, err
-	}
-	for streamID, info := range tableMap {
-		if !publicationStatus[streamID] {
-			info.OmitBinding = true
+	// Filter discovery to only published tables unless explicitly configured otherwise.
+	if !db.config.Advanced.DiscoverUnpublishedTables {
+		publicationStatus, err := listPublishedTables(ctx, db.conn, db.config.Advanced.PublicationName)
+		if err != nil {
+			return nil, err
+		}
+		for streamID, info := range tableMap {
+			if !publicationStatus[streamID] {
+				info.OmitBinding = true
+			}
 		}
 	}
 

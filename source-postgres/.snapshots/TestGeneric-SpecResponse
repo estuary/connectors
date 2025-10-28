@@ -215,6 +215,11 @@
             "title": "Capture Partitioned Tables As Partitions",
             "description": "When set the capture will discover and capture partitioned tables as individual partitions rather than as a single root table. This requires the publication to be created without 'publish_via_partition_root'."
           },
+          "discover_unpublished_tables": {
+            "type": "boolean",
+            "title": "Discover Unpublished Tables",
+            "description": "When set the capture will discover all tables including those not currently in the publication. Unpublished tables will be added to the publication at capture time if possible. Use with caution as this requires appropriate database permissions."
+          },
           "source_tag": {
             "type": "string",
             "title": "Source Tag",
