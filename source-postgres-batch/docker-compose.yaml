@@ -19,7 +19,7 @@ services:
       - type: bind
         source: ./docker-initdb.sh
         target: /docker-entrypoint-initdb.d/init-user-db.sh
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
 
 networks:
   flow-test:
