@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"os"
 	"slices"
 	"strings"
 	"testing"
@@ -33,6 +34,9 @@ func testConfig() *config {
 
 func TestValidateAndApply(t *testing.T) {
 	flag.Parse()
+	if os.Getenv("TEST_DATABASE") != "yes" {
+		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
+	}
 
 	cfg := testConfig()
 

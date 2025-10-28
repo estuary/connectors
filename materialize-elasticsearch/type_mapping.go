@@ -80,7 +80,11 @@ func propForProjection(p *pf.Projection, types []string, fc fieldConfig) propert
 	case pf.JsonTypeBoolean:
 		return property{Type: elasticTypeBoolean}
 	case pf.JsonTypeInteger:
-		return property{Type: elasticTypeLong}
+		if fc.Keyword {
+			return property{Type: elasticTypeKeyword}
+		} else {
+			return property{Type: elasticTypeLong}
+		}
 	case pf.JsonTypeString:
 		inf := p.Inference.String_
 		if inf == nil {
