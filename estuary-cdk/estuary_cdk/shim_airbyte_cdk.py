@@ -170,11 +170,48 @@ def transform_airbyte_key(key: str | List[str] | List[List[str]]) -> List[str]:
     return key_fields
 
 
+def set_additional_properties_false(schema: dict) -> dict:
+    """
+    Recursively set additionalProperties to false for all objects in a JSON schema.
+    """
+    if not isinstance(schema, dict):
+        return schema
+
+    _schema = schema.copy()
+    schema_type = _schema.get("type")
+
+    if schema_type == "object" or (
+        isinstance(schema_type, list) and "object" in schema_type
+    ):
+        _schema["additionalProperties"] = False
+
+    for key, value in _schema.items():
+        if key == "properties" and isinstance(value, dict):
+            _schema[key] = {
+                prop_key: set_additional_properties_false(prop_value)
+                for prop_key, prop_value in value.items()
+            }
+        elif key == "items":
+            if isinstance(value, dict):
+                _schema[key] = set_additional_properties_false(value)
+            elif isinstance(value, list):
+                _schema[key] = [
+                    set_additional_properties_false(item) for item in value
+                ]
+        elif key in ["oneOf", "anyOf", "allOf"] and isinstance(value, list):
+            _schema[key] = [
+                set_additional_properties_false(item) for item in value
+            ]
+
+    return _schema
+
+
 @dataclass
 class CaptureShim(BaseCaptureConnector):
     delegate: AirbyteSource
     schema_inference: bool
     oauth2: OAuth2Spec | None
+    should_emit_sourced_schemas: bool = False
 
     def request_class(self):
         return Request[EndpointConfig, ResourceConfig, ConnectorState]
@@ -311,20 +348,35 @@ class CaptureShim(BaseCaptureConnector):
         config: EndpointConfig,
         connector_state: ConnectorState,
     ) -> None:
-        airbyte_streams: list[ConfiguredAirbyteStream] = [
-            ConfiguredAirbyteStream(
-                stream=AirbyteStream(
-                    json_schema=binding.collection.writeSchema,
-                    name=binding.resourceConfig.stream,
-                    namespace=binding.resourceConfig.namespace,
-                    supported_sync_modes=[binding.resourceConfig.sync_mode],
-                ),
-                cursor_field=binding.resourceConfig.cursor_field,
-                destination_sync_mode="append",
-                sync_mode=binding.resourceConfig.sync_mode,
+        airbyte_streams: list[ConfiguredAirbyteStream] = []
+        for binding_idx, (binding, resource) in enumerate(resolved):
+            airbyte_streams.append(
+                ConfiguredAirbyteStream(
+                    stream=AirbyteStream(
+                        json_schema=binding.collection.writeSchema,
+                        name=binding.resourceConfig.stream,
+                        namespace=binding.resourceConfig.namespace,
+                        supported_sync_modes=[binding.resourceConfig.sync_mode],
+                    ),
+                    cursor_field=binding.resourceConfig.cursor_field,
+                    destination_sync_mode="append",
+                    sync_mode=binding.resourceConfig.sync_mode,
+                )
             )
-            for binding, resource in resolved
-        ]
+            if self.should_emit_sourced_schemas:
+                assert isinstance(resource.model, common.Resource.FixedSchema)
+
+                schema = resource.model.value.copy()
+                schema.pop("$id", None)
+                # Recursively set additionalProperties to false for all nested objects
+                schema = set_additional_properties_false(schema)
+
+                task.sourced_schema(
+                    binding_index=binding_idx,
+                    schema=schema,
+                )
+                task.checkpoint(state=ConnectorState())
+
         airbyte_catalog = ConfiguredAirbyteCatalog(streams=airbyte_streams)
 
         if "bindingStateV1" not in connector_state.__fields_set__:
