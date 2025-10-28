@@ -120,6 +120,11 @@ Binding 0:
           "$ref": "#Test_DynamicTable_99720399"
         }
       ]
-    }
+    },
+    "key": [
+      "/_meta/source/seq",
+      "/_meta/source/off"
+    ],
+    "is_fallback_key": true
   }
 

@@ -139,6 +139,11 @@ Binding 0:
           "$ref": "#Test_TimestampDatatypes_38028141"
         }
       ]
-    }
+    },
+    "key": [
+      "/_meta/source/seq",
+      "/_meta/source/off"
+    ],
+    "is_fallback_key": true
   }
 

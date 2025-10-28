@@ -132,6 +132,11 @@ Binding 0:
           "$ref": "#Test_DiscoveryWithoutPrimaryKey_24824096"
         }
       ]
-    }
+    },
+    "key": [
+      "/_meta/source/seq",
+      "/_meta/source/off"
+    ],
+    "is_fallback_key": true
   }
 

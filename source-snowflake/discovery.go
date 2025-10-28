@@ -17,6 +17,12 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
+var (
+	// The fallback key we suggest for discovered collections when the source table has
+	// no primary key. A particular (seq, off) value should be unique within a collection.
+	fallbackKey = []string{"/_meta/source/seq", "/_meta/source/off"}
+)
+
 func (snowflakeDriver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Response_Discovered, error) {
 	var cfg = new(config)
 	if err := pf.UnmarshalStrict(req.ConfigJson, cfg); err != nil {
@@ -209,11 +215,17 @@ func catalogFromDiscovery(cfg *config, info *snowflakeDiscoveryResults) ([]*pc.R
 	for tableID, info := range streams {
 		var recommendedName = recommendCollectionName(tableID)
 
-		// If no primary key is identified by discovery, the suggested collection key
-		// here will remain nil.
+		// If no primary key is identified by discovery, suggest a "fallback key"
+		// which will always work (though it may not be ideal).
 		var primaryKey []string
-		for _, column := range info.PrimaryKey {
-			primaryKey = append(primaryKey, primaryKeyToCollectionKey(column))
+		var isFallbackKey bool
+		if len(info.PrimaryKey) > 0 {
+			for _, column := range info.PrimaryKey {
+				primaryKey = append(primaryKey, primaryKeyToCollectionKey(column))
+			}
+		} else {
+			primaryKey = fallbackKey
+			isFallbackKey = true
 		}
 
 		resourceConfigJSON, err := json.Marshal(resource{
@@ -234,6 +246,7 @@ func catalogFromDiscovery(cfg *config, info *snowflakeDiscoveryResults) ([]*pc.R
 			ResourceConfigJson: resourceConfigJSON,
 			DocumentSchemaJson: documentSchemaJSON,
 			Key:                primaryKey,
+			IsFallbackKey:      isFallbackKey,
 		})
 	}
 
