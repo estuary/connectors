@@ -17,5 +17,6 @@ asyncio.run(
             accessTokenHeaders={},
         ),
         schema_inference=False,
+        should_emit_sourced_schemas=True,
     ).serve()
 )
