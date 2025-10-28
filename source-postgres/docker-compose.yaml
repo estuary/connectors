@@ -1,5 +1,3 @@
-version: "3.7"
-
 services:
   db:
     image: 'postgres:latest'
@@ -24,7 +22,7 @@ services:
       - type: bind
         source: ../tests/files/b.csv
         target: /b.csv
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
 
 networks:
   flow-test:
