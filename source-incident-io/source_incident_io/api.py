@@ -187,6 +187,14 @@ async def _fetch_incidents_between(
         "page_size": stream.page_size,
         # The "updated_at[date_range]" query parameter is inclusive of both bounds.
         "updated_at[date_range]": f"{start.date()}~{end.date()}",
+        # Only standard and retrospective incidents are included by default. We must
+        # explicitly specify incident modes to capture the other types of incidents.
+        "mode[one_of]": [
+            "standard",
+            "retrospective",
+            "test",
+            "tutorial",
+        ]
     }
 
     async for incident in _paginate_through_resources(http, stream, params, log):
