@@ -124,6 +124,11 @@ Binding 0:
           "$ref": "#Test_VariantDatatypes_13308929"
         }
       ]
-    }
+    },
+    "key": [
+      "/_meta/source/seq",
+      "/_meta/source/off"
+    ],
+    "is_fallback_key": true
   }
 
