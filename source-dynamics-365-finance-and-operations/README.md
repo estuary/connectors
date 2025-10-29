@@ -22,10 +22,10 @@ Data is stored in a container named: `dataverse-[environmentName]-[organizationU
 └── [timestamp-folders]/         # Time-stamped incremental update folders. Each folder contains changes that occurred within a specific time interval.
     ├── model.json               # Schema metadata snapshot for tables in this folder. May differ from global schema if schema changes occurred. Empty while folder is being written to.
     ├── [TableName1]/            # The name of the Dynamics 365 table that was changed.
-    │   ├── [TableName1]_xxx.csv # A headerless CSV containing changes made to the table. Multiple CSVs may exist per table.
-    │   └── [TableName1]_yyy.csv
+    │   ├── xxx.csv              # A headerless CSV containing changes made to the table. Multiple CSVs may exist per table.
+    │   └── yyy.csv
     └── [TableName2]/
-        └── [TableName2]_zzz.csv
+        └── zzz.csv
 ```
 
 ### Timestamp Folders
@@ -75,7 +75,7 @@ The schema can evolve over time as tables are modified in Dynamics 365, so diffe
 ## CSV File Structure
 
 ### Naming Convention
-CSV files are named: `[TableName]_[suffix].csv`
+CSV files are located in subdirectories named after the table: `[timestamp-folder]/[TableName]/[filename].csv`
 - Multiple CSV files may exist per table within a timestamp folder.
 - Files contain no column headers. Column definitions are found only in the corresponding `model.json`.
 

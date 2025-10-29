@@ -113,7 +113,7 @@ async def read_csvs_in_folder(
         if (
             not metadata.isDirectory and
             metadata.name.endswith('.csv') and
-            metadata.name.startswith(f"{folder}/{table_name}")
+            metadata.name.startswith(f"{folder}/{table_name}/")
         ):
             csvs.append(metadata)
 
