@@ -45,6 +45,7 @@ type config struct {
 	Region             string         `json:"region"`
 	UploadInterval     string         `json:"upload_interval"`
 	Prefix             string         `json:"prefix,omitempty"`
+	S3Endpoint         string         `json:"s3_endpoint,omitempty"`
 	Catalog            catalogConfig  `json:"catalog"`
 	Advanced           advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
 }
@@ -215,6 +216,11 @@ type materialization struct {
 var _ boilerplate.Materializer[config, fieldConfig, resource, mappedType] = &materialization{}
 
 func newMaterialization(ctx context.Context, materializationName string, cfg config, featureFlags map[string]bool) (boilerplate.Materializer[config, fieldConfig, resource, mappedType], error) {
+	if strings.Contains(cfg.Catalog.URI, "r2.cloudflarestorage.com") {
+		if !strings.HasPrefix(cfg.Prefix, "__r2_data_catalog/") {
+			cfg.Prefix = "__r2_data_catalog/" + cfg.Prefix
+		}
+	}
 	catalog := newCatalog(cfg)
 
 	return &materialization{
@@ -265,6 +271,7 @@ func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.Prere
 		AWSAccessKeyID:     d.cfg.AWSAccessKeyID,
 		AWSSecretAccessKey: d.cfg.AWSSecretAccessKey,
 		Region:             d.cfg.Region,
+		Endpoint:           d.cfg.S3Endpoint,
 	})
 	if err != nil {
 		errs.Err(fmt.Errorf("creating s3 store: %w", err))
@@ -427,6 +434,7 @@ func (d *materialization) NewMaterializerTransactor(
 		AWSAccessKeyID:     d.cfg.AWSAccessKeyID,
 		AWSSecretAccessKey: d.cfg.AWSSecretAccessKey,
 		Region:             d.cfg.Region,
+		Endpoint:           d.cfg.S3Endpoint,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("creating s3 store: %w", err)
