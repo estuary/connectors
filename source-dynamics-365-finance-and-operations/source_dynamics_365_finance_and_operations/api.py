@@ -62,7 +62,6 @@ async def get_table(
     raise KeyError(f"Table {table_name} not found for in timestamp folder {timestamp}.")
 
 
-@alru_cache(maxsize=1, ttl=CACHE_TTL)
 async def get_in_progress_timestamp_folder(
     client: ADLSGen2Client,
 ) -> str:
@@ -71,7 +70,6 @@ async def get_in_progress_timestamp_folder(
     return response.decode('utf-8')
 
 
-@alru_cache(maxsize=1, ttl=CACHE_TTL)
 async def get_timestamp_folders(
     client: ADLSGen2Client,
 ) -> list[str]:
@@ -82,6 +80,23 @@ async def get_timestamp_folders(
             timestamp_folders.append(path.name)
 
     return sorted(timestamp_folders, key=str_to_dt)
+
+
+@alru_cache(maxsize=1, ttl=CACHE_TTL)
+async def get_finalized_timestamp_folders(
+    client: ADLSGen2Client,
+) -> list[str]:
+    folders = await get_timestamp_folders(client)
+    in_progress_folder = await get_in_progress_timestamp_folder(client)
+
+    finalized_folders = [
+        # Do not return the in progress folder. Its model.json is
+        # empty, meaning we don't know the tables' final schemas,
+        # and data is still being written to it.
+        folder for folder in folders if str_to_dt(folder) < str_to_dt(in_progress_folder)
+    ]
+
+    return sorted(finalized_folders, key=str_to_dt)
 
 
 @alru_cache(maxsize=32, ttl=CACHE_TTL)
@@ -139,22 +154,16 @@ async def fetch_changes(
 ) -> AsyncGenerator[BaseTable | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    in_progress_folder = await get_in_progress_timestamp_folder(client)
+    finalized_folders = await get_finalized_timestamp_folders(client)
 
-    folders = await get_timestamp_folders(client)
-
-    for folder in folders:
+    for folder in finalized_folders:
         if (
             # Do not read folders we've already read on previous sweeps.
             str_to_dt(folder) <= log_cursor
-            # Do not read the in progress folder. Its model.json is empty (meaning we don't
-            # know the tables' final schemas) and data is still being written to it.
-            or folder == in_progress_folder
         ):
             log.debug("Skipping folder", {
                 "folder": folder,
-                "in_progress_folder": in_progress_folder,
-                "log_cursor": log_cursor
+                "log_cursor": log_cursor,
             })
             continue
 
