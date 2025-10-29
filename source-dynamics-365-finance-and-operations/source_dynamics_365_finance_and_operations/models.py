@@ -42,20 +42,11 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
-class DataType(StrEnum):
-    BOOLEAN = "boolean"
-    DATETIME = "dateTime"
-    DECIMAL = "decimal"
-    GUID = "guid"
-    INT64 = "int64"
-    STRING = "string"
-
-
 class ModelDotJson(BaseModel, extra="allow"):
     class Entity(BaseModel, extra="allow"):
         class Attribute(BaseModel, extra="allow"):
             name: str
-            dataType: DataType
+            dataType: str
 
         type_: str = Field(alias="$type")
         name: str
@@ -71,7 +62,7 @@ class ModelDotJson(BaseModel, extra="allow"):
 class BaseTable(BaseCSVRow, extra="allow"):
     name: ClassVar[str]
     field_names: ClassVar[list[str]]
-    field_types: ClassVar[dict[str, DataType]]
+    field_types: ClassVar[dict[str, str]]
 
     Id: str
     IsDelete: bool | None
@@ -81,7 +72,7 @@ class BaseTable(BaseCSVRow, extra="allow"):
     def convert_boolean_fields(cls, values: dict) -> dict:
         if hasattr(cls, 'field_types'):
             for field_name, value in values.items():
-                if (cls.field_types.get(field_name) == DataType.BOOLEAN) and value is not None:
+                if (cls.field_types.get(field_name) == "boolean") and value is not None:
                     assert isinstance(value, str)
                     values[field_name] = value.lower() == 'true'
         return values

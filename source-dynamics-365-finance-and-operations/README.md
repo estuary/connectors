@@ -64,7 +64,7 @@ The schema can evolve over time as tables are modified in Dynamics 365, so diffe
       "attributes": [
         {
           "name": "ColumnName",
-          "dataType": "string|int64|boolean|dateTime|decimal|guid"
+          "dataType": "string|int64|boolean|dateTime|decimal|guid|dateTimeOffset"
         }
       ]
     }
