@@ -47,7 +47,7 @@ const (
 	singleStoreMinimumDate      = "1000-01-01"
 )
 
-var ClampDatetime sql.ElementConverter = sql.StringCastConverter(func(str string) (interface{}, error) {
+var SingleStoreClampDatetime sql.ElementConverter = sql.StringCastConverter(func(str string) (interface{}, error) {
 	str = strings.Replace(str, "z", "Z", 1)
 	if parsed, err := time.Parse(time.RFC3339Nano, str); err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ var ClampDatetime sql.ElementConverter = sql.StringCastConverter(func(str string
 	return str, nil
 })
 
-var ClampDate sql.ElementConverter = sql.StringCastConverter(func(str string) (interface{}, error) {
+var SingleStoreClampDate sql.ElementConverter = sql.StringCastConverter(func(str string) (interface{}, error) {
 	if parsed, err := time.Parse(time.DateOnly, str); err != nil {
 		return nil, err
 	} else if parsed.Year() < 1000 {
@@ -84,7 +84,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 	var dateOpts = []sql.MapStaticOption{}
 	var datetimeOpts = []sql.MapStaticOption{sql.AlsoCompatibleWith("datetime"), sql.UsingConverter(rfc3339ToTZ(tzLocation, false))}
 	if product == "singlestore" {
-		dateOpts = []sql.MapStaticOption{sql.UsingConverter(ClampDate)}
+		dateOpts = []sql.MapStaticOption{sql.UsingConverter(SingleStoreClampDate)}
 		datetimeOpts = []sql.MapStaticOption{sql.AlsoCompatibleWith("datetime"), sql.UsingConverter(rfc3339ToTZ(tzLocation, true))}
 	}
 	dateMapping := sql.MapStatic("DATE", dateOpts...)
@@ -235,7 +235,7 @@ func rfc3339ToTZ(loc *time.Location, clamp bool) sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
 		var date = str
 		if clamp {
-			if clamped, err := ClampDatetime(str); err != nil {
+			if clamped, err := SingleStoreClampDatetime(str); err != nil {
 				return nil, err
 			} else {
 				date = clamped.(string)
@@ -249,7 +249,7 @@ func rfc3339ToTZ(loc *time.Location, clamp bool) sql.ElementConverter {
 		if t, err := time.Parse(time.RFC3339Nano, date); err != nil {
 			return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", date, err)
 		} else {
-			return t.In(loc).Format("2006-01-02 15:04:05.999999999"), nil
+			return t.In(loc).Format("2006-01-02 15:04:05.999999"), nil
 		}
 	})
 }
@@ -279,7 +279,7 @@ func rfc3339TimeToTZ(loc *time.Location) sql.ElementConverter {
 			return nil, fmt.Errorf("could not parse %q as time: %w", str, err)
 		}
 
-		return t.In(loc).Format("15:04:05.999999999"), nil
+		return t.In(loc).Format("15:04:05.999999"), nil
 	})
 }
 

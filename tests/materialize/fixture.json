@@ -49,6 +49,8 @@
     ["tests/all-key-types-part-three", {"id": 1, "datetimekey": "0000-01-01T12:34:56Z", "uuidkey": "550e8400-e29b-41d4-a716-446655440000", "datetime": "0000-01-01T12:34:56Z", "uuid": "550e8400-e29b-41d4-a716-446655440000", "counter": 1}],
 
     ["tests/timezone-datetimes", {"id": 1, "utc_datetime": "2024-01-15T15:30:00Z", "offset_datetime": "2024-01-15T10:30:00-05:00"}],
+    ["tests/timezone-datetimes", {"id": 2, "utc_datetime": "0000-01-01T00:00:00Z", "offset_datetime": "0001-01-01T01:00:00+01:00"}],
+    ["tests/timezone-datetimes", {"id": 3, "utc_datetime": "2025-01-01T00:00:00.123456789Z", "offset_datetime": "2025-01-01T01:00:00.123456789+01:00"}],
 
     ["tests/fields-with-projections", {"id": 1, "original_field": "value1", "another_field": "another1"}],
 
