@@ -14,7 +14,8 @@ function query() {
   echo "$1" | docker run -i --rm mysql \
     mysqlsh --sql --json=raw \
     --host=$MYSQL_HOST --port=$MYSQL_PORT \
-    --user=$MYSQL_USER --password=$MYSQL_PASSWORD $db
+    --user=$MYSQL_USER --password=$MYSQL_PASSWORD $db \
+    | grep -v 'Using a password on the command line interface can be insecure'
 }
 
 singlestore_api_token="$(decrypt_config $CONNECTOR_TEST_DIR/api-token.yaml | jq -r '.token')"
@@ -159,6 +160,25 @@ resources_json_template='[
       "table": "many_columns"
     },
     "source": "${TEST_COLLECTION_MANY_COLUMNS}",
+    "fields": {
+      "recommended": true
+    }
+  },
+  {
+    "resource": {
+      "table": "timezone_datetimes_standard"
+    },
+    "source": "${TEST_COLLECTION_TIMEZONE_DATETIMES}",
+    "fields": {
+      "recommended": true
+    }
+  },
+  {
+    "resource": {
+      "table": "timezone_datetimes_delta",
+      "delta_updates": true
+    },
+    "source": "${TEST_COLLECTION_TIMEZONE_DATETIMES}",
     "fields": {
       "recommended": true
     }

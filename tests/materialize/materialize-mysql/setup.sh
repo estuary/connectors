@@ -148,6 +148,25 @@ resources_json_template='[
     "fields": {
       "recommended": true
     }
+  },
+  {
+    "resource": {
+      "table": "timezone_datetimes_standard"
+    },
+    "source": "${TEST_COLLECTION_TIMEZONE_DATETIMES}",
+    "fields": {
+      "recommended": true
+    }
+  },
+  {
+    "resource": {
+      "table": "timezone_datetimes_delta",
+      "delta_updates": true
+    },
+    "source": "${TEST_COLLECTION_TIMEZONE_DATETIMES}",
+    "fields": {
+      "recommended": true
+    }
   }
 ]'
 

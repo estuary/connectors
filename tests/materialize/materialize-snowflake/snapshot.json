@@ -468,7 +468,7 @@
                 ],
                 "chunk_md5": "<chunk_md5>",
                 "eps": {
-                  "rows": 1,
+                  "rows": 3,
                   "columns": {
                     "FLOW_PUBLISHED_AT": {
                       "columnId": 2,
@@ -476,7 +476,7 @@
                       "maxStrValue": null,
                       "minStrValue": null,
                       "maxLength": 0,
-                      "maxIntValue": 3636000000000,
+                      "maxIntValue": 3638000000000,
                       "minIntValue": 3636000000000,
                       "maxRealValue": null,
                       "minRealValue": null,
@@ -491,7 +491,7 @@
                       "maxStrValue": null,
                       "minStrValue": null,
                       "maxLength": 0,
-                      "maxIntValue": 1,
+                      "maxIntValue": 3,
                       "minIntValue": 1,
                       "maxRealValue": null,
                       "minRealValue": null,
@@ -506,8 +506,8 @@
                       "maxStrValue": null,
                       "minStrValue": null,
                       "maxLength": 0,
-                      "maxIntValue": 1705332600000000000,
-                      "minIntValue": 1705332600000000000,
+                      "maxIntValue": 1735689600123456789,
+                      "minIntValue": -62135596800000000000,
                       "maxRealValue": null,
                       "minRealValue": null,
                       "distinctValues": -1,
@@ -521,8 +521,8 @@
                       "maxStrValue": null,
                       "minStrValue": null,
                       "maxLength": 0,
-                      "maxIntValue": 1705332600000000000,
-                      "minIntValue": 1705332600000000000,
+                      "maxIntValue": 1735689600123456789,
+                      "minIntValue": -62167219200000000000,
                       "maxRealValue": null,
                       "minRealValue": null,
                       "distinctValues": -1,
@@ -2508,6 +2508,18 @@
       "ID": "1",
       "OFFSET_DATETIME": "2024-01-15T15:30:00Z",
       "UTC_DATETIME": "2024-01-15T15:30:00Z"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:37Z",
+      "ID": "2",
+      "OFFSET_DATETIME": "0001-01-01T00:00:00Z",
+      "UTC_DATETIME": "0000-01-01T00:00:00Z"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:38Z",
+      "ID": "3",
+      "OFFSET_DATETIME": "2025-01-01T00:00:00.123456789Z",
+      "UTC_DATETIME": "2025-01-01T00:00:00.123456789Z"
     }
   ]
 }
@@ -2519,6 +2531,18 @@
       "ID": "1",
       "OFFSET_DATETIME": "2024-01-15T15:30:00Z",
       "UTC_DATETIME": "2024-01-15T15:30:00Z"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:37Z",
+      "ID": "2",
+      "OFFSET_DATETIME": "0001-01-01T00:00:00Z",
+      "UTC_DATETIME": "0000-01-01T00:00:00Z"
+    },
+    {
+      "FLOW_PUBLISHED_AT": "1970-01-01T01:00:38Z",
+      "ID": "3",
+      "OFFSET_DATETIME": "2025-01-01T00:00:00.123456789Z",
+      "UTC_DATETIME": "2025-01-01T00:00:00.123456789Z"
     }
   ]
 }
