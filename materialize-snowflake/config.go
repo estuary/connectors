@@ -30,9 +30,9 @@ const (
 	// timestampTypeLTZ stores timestamp as UTC with automatic timezone normalization by Snowflake
 	timestampTypeLTZ snowflakeTimestampType = "TIMESTAMP_LTZ"
 	// timestampTypeNTZDiscard stores timestamp as wall-clock time without timezone, discarding source TZ
-	timestampTypeNTZDiscard snowflakeTimestampType = "TIMESTAMP_NTZ_DISCARD"
+	timestampTypeNTZDiscard snowflakeTimestampType = "TIMESTAMP_NTZ (discard TZ)"
 	// timestampTypeNTZNormalize stores timestamp as wall-clock time without timezone, normalizing to UTC first
-	timestampTypeNTZNormalize snowflakeTimestampType = "TIMESTAMP_NTZ_NORMALIZE"
+	timestampTypeNTZNormalize snowflakeTimestampType = "TIMESTAMP_NTZ (normalize to UTC)"
 	// timestampTypeTZ stores timestamp with associated timezone offset
 	timestampTypeTZ snowflakeTimestampType = "TIMESTAMP_TZ"
 )
@@ -78,7 +78,7 @@ type config struct {
 	Warehouse         string                           `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=5"`
 	Role              string                           `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=6"`
 	Account           string                           `json:"account,omitempty" jsonschema:"title=Account,description=Optional Snowflake account identifier." jsonschema_extras:"order=7,x-hidden-field=true"`
-	TimestampType     snowflakeTimestampType           `json:"timestamp_type" jsonschema:"title=Snowflake Timestamp Type,description=Controls how timestamp columns are stored in Snowflake.,enum=TIMESTAMP_LTZ,enum=TIMESTAMP_NTZ_DISCARD,enum=TIMESTAMP_NTZ_NORMALIZE,enum=TIMESTAMP_TZ" jsonschema_extras:"order=8"`
+	TimestampType     snowflakeTimestampType           `json:"timestamp_type" jsonschema:"title=Snowflake Timestamp Type,description=Controls how timestamp columns are stored in Snowflake.,enum=TIMESTAMP_LTZ,enum=TIMESTAMP_NTZ (discard TZ),enum=TIMESTAMP_NTZ (normalize to UTC),enum=TIMESTAMP_TZ" jsonschema_extras:"order=8"`
 	HardDelete        bool                             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=9"`
 	Credentials       *snowflake_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
 	Schedule          m.ScheduleConfig                 `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
