@@ -102,7 +102,7 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 			}
 			defer db.Close()
 
-			timestampTypeMapping, err := getTimestampTypeMapping(ctx, db)
+			timestampTypeMapping, isExplicit, err := getTimestampTypeMapping(ctx, db)
 			if err != nil {
 				return nil, fmt.Errorf("querying TIMESTAMP_TYPE_MAPPING: %w", err)
 			}
@@ -122,8 +122,8 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 					cfg.TimestampType = timestampTypeLTZ
 				}
 				log.WithField("inferred_timestamp_type", cfg.TimestampType).Info("timestamp type not configured, inferred from warehouse")
-			} else {
-				// Validate consistency between configured type and warehouse setting
+			} else if isExplicit {
+				// Only validate consistency when warehouse has an explicit TIMESTAMP_TYPE_MAPPING
 				if !cfg.TimestampType.isCompatibleWith(timestampTypeMapping) {
 					return nil, fmt.Errorf(
 						"your warehouse session has an explicit TIMESTAMP_TYPE_MAPPING of %s configured, which doesn't match the Snowflake Timestamp Type setting of %s. "+
@@ -175,7 +175,7 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 	}
 }
 
-func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeMapping, error) {
+func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeMapping, bool, error) {
 	xdb := sqlx.NewDb(db, "snowflake").Unsafe()
 
 	type paramRow struct {
@@ -185,23 +185,25 @@ func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeM
 
 	got := paramRow{}
 	if err := xdb.GetContext(ctx, &got, "SHOW PARAMETERS LIKE 'TIMESTAMP_TYPE_MAPPING';"); err != nil {
-		return "", err
+		return "", false, err
 	}
 
 	m := timestampTypeMapping(got.Value)
 	if !m.valid() {
-		return "", fmt.Errorf("invalid timestamp type mapping: %s", got.Value)
+		return "", false, fmt.Errorf("invalid timestamp type mapping: %s", got.Value)
 	}
 
 	log.WithFields(log.Fields{"value": got.Value, "level": got.Level}).Debug("queried TIMESTAMP_TYPE_MAPPING")
 
-	if m == timestampNTZ && got.Level == "" {
+	isExplicit := got.Level != ""
+
+	if m == timestampNTZ && !isExplicit {
 		// Default to LTZ if the TIMESTAMP_TYPE_MAPPING parameter is using the
 		// default and has not been explicitly set to use TIMESTAMP_NTZ.
 		m = timestampLTZ
 	}
 
-	return m, nil
+	return m, isExplicit, nil
 }
 
 type transactor struct {
