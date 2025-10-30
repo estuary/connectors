@@ -274,7 +274,7 @@ async def fetch_disputes(
         log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
-    most_recent_created_at = log_cursor
+    most_recent_updated_at = log_cursor
     window_end = log_cursor + timedelta(hours=max(window_size, MIN_DISPUTES_WINDOW_SIZE))
     end = min(
         window_end,
@@ -284,29 +284,20 @@ async def fetch_disputes(
     if log_cursor >= end:
         return
 
-    # Braintree does not let us search disputes based on the created_at field, and the received_date field is
-    # the best alternative that Braintree exposes for searching. Since received_date can be earlier than
-    # created_at, it's possible to miss records with a small enough window size when the stream is caught up to the present.
-    # Ex: {'id': 'dispute_1', 'received_date': '2025-01-10', 'created_at': '2025-01-11T00:50:00Z'} could be missed with
-    # a window size of 1 hour. To avoid missing these type of results, we move the start of the received_date search back one day.
-    start = log_cursor - timedelta(days=1) if _are_same_day(log_cursor, end) else log_cursor
-
     async for doc in fetch_disputes_between(
         http,
         base_url,
-        DisputeSearchField.RECEIVED_DATE,
-        start,
+        DisputeSearchField.EFFECTIVE_DATE,
+        log_cursor,
         end,
         log,
     ):
-        if doc.created_at > log_cursor:
+        if log_cursor < doc.updated_at <= end:
             yield doc
+            most_recent_updated_at = max(most_recent_updated_at, doc.updated_at)
 
-        if doc.created_at > most_recent_created_at:
-            most_recent_created_at = doc.created_at
-
-    if most_recent_created_at > log_cursor:
-        yield most_recent_created_at
+    if most_recent_updated_at > log_cursor:
+        yield most_recent_updated_at
     else:
         yield end
 
@@ -330,19 +321,15 @@ async def backfill_disputes(
     window_end = start + timedelta(hours=max(window_size, MIN_DISPUTES_WINDOW_SIZE))
     end = min(window_end, cutoff)
 
-    # Due to the potential day difference between received_date and created_at,
-    # always search the previous day for results created in this date window as well.
-    search_start = start - timedelta(days=1)
-
     async for doc in fetch_disputes_between(
         http,
         base_url,
-        DisputeSearchField.RECEIVED_DATE,
-        search_start,
+        DisputeSearchField.EFFECTIVE_DATE,
+        start,
         end,
         log,
     ):
-        if start < doc.created_at <= end:
+        if start < doc.updated_at <= end:
             yield doc
 
     yield dt_to_str(end)

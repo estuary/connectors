@@ -354,7 +354,7 @@ def disputes(
             backfill=ResourceState.Backfill(next_page=dt_to_str(config.start_date), cutoff=cutoff)
         ),
         initial_config=ResourceConfigWithSchedule(
-            name='disputes', interval=timedelta(minutes=5), schedule="0 20 * * 5"
+            name='disputes', interval=timedelta(minutes=5)
         ),
         schema_inference=True,
     )
