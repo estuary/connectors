@@ -231,8 +231,7 @@
     "recommendedName": "disputes",
     "resourceConfig": {
       "name": "disputes",
-      "interval": "PT5M",
-      "schedule": "0 20 * * 5"
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
