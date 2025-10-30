@@ -80,9 +80,6 @@ class FullRefreshResource(BaseDocument, extra="allow"):
 class IncrementalResource(BaseDocument, extra="allow"):
     id: str
     created_at: AwareDatetime
-
-
-class Transaction(IncrementalResource):
     updated_at: AwareDatetime
 
 
