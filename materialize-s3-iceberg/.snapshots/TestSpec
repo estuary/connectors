@@ -146,6 +146,13 @@
         "title": "Upload Interval",
         "type": "string"
       },
+      "s3_endpoint": {
+        "default": "",
+        "description": "Custom S3 endpoint URL. If not provided, the default AWS S3 endpoint for the specified region will be used.",
+        "order": 7,
+        "title": "S3 Endpoint",
+        "type": "string"
+      },
       "catalog": {
         "discriminator": {
           "mapping": {
@@ -162,7 +169,7 @@
             "$ref": "#/$defs/GlueCatalogConfig"
           }
         ],
-        "order": 7,
+        "order": 8,
         "title": "Catalog"
       },
       "advanced": {
@@ -177,7 +184,7 @@
         ],
         "default": null,
         "description": "Options for advanced users. You should not typically need to modify these.",
-        "order": 8,
+        "order": 9,
         "title": "Advanced Options"
       }
     },
