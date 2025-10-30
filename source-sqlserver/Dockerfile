@@ -30,6 +30,11 @@ RUN go build -o ./connector -v ./source-sqlserver/...
 ################################################################################
 FROM ${BASE_IMAGE}
 
+# Since Go 1.25:
+# > SHA-1 signature algorithms are now disallowed in TLS 1.2 handshakes, per
+# > RFC 9155. They can be re-enabled with the GODEBUG setting tlssha1=1
+ENV GODEBUG=tlssha1=1
+
 WORKDIR /connector
 ENV PATH="/connector:$PATH"
 
