@@ -20,7 +20,6 @@ from .common import (
 )
 from ..models import (
     IncrementalResource,
-    Transaction,
     IncrementalResourceBraintreeClass,
     IdSearchResponse,
     SearchResponse,
@@ -187,27 +186,24 @@ async def _fetch_resource_batch(
 
     return resources
 
-_IncrementalDocument = TypeVar("_IncrementalDocument", bound=IncrementalResource | Transaction)
-
 
 async def fetch_by_ids(
     http: HTTPSession,
     base_url: str,
     path: str,
     response_model: type[SearchResponse],
-    document_model: type[_IncrementalDocument],
     ids: list[str],
     gateway: BraintreeGateway,
     braintree_class: IncrementalResourceBraintreeClass,
     log: Logger,
-) -> AsyncGenerator[_IncrementalDocument, None]:
+) -> AsyncGenerator[IncrementalResource, None]:
     semaphore = asyncio.Semaphore(SEMAPHORE_LIMIT)
 
     async for resource in _process_completed_fetches(
         [_fetch_resource_batch(http, base_url, path, response_model, list(chunk), semaphore, log)
          for chunk in itertools.batched(ids, SEARCH_PAGE_SIZE)]
     ):
-        yield document_model.model_validate(
+        yield IncrementalResource.model_validate(
             braintree_object_to_dict(
                 braintree_class(gateway, resource)
             )
@@ -244,7 +240,6 @@ async def fetch_searchable_resources_created_between(
         base_url,
         path,
         response_model,
-        IncrementalResource,
         ids,
         gateway,
         braintree_class,

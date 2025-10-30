@@ -14,7 +14,7 @@ from .common import (
     braintree_xml_to_dict,
 )
 from ..models import (
-    Transaction,
+    IncrementalResource,
     IdSearchResponse,
     TransactionSearchResponse,
 )
@@ -104,7 +104,7 @@ async def fetch_transactions_updated_between(
     end: datetime,
     gateway: BraintreeGateway,
     log: Logger,
-) -> AsyncGenerator[Transaction, None]:
+) -> AsyncGenerator[IncrementalResource, None]:
     ids = await _fetch_unique_updated_transaction_ids(
         http,
         base_url,
@@ -118,7 +118,6 @@ async def fetch_transactions_updated_between(
         base_url,
         TRANSACTION_PATH_COMPONENT,
         TransactionSearchResponse,
-        Transaction,
         ids,
         gateway,
         braintree.Transaction,
@@ -134,7 +133,7 @@ async def fetch_transactions_created_between(
     end: datetime,
     gateway: BraintreeGateway,
     log: Logger,
-) -> AsyncGenerator[Transaction, None]:
+) -> AsyncGenerator[IncrementalResource, None]:
     ids = await fetch_searchable_resource_ids_by_field_between(
         http,
         base_url,
@@ -152,7 +151,6 @@ async def fetch_transactions_created_between(
         base_url,
         TRANSACTION_PATH_COMPONENT,
         TransactionSearchResponse,
-        Transaction,
         ids,
         gateway,
         braintree.Transaction,
@@ -199,7 +197,7 @@ async def fetch_transactions_disbursed_between(
     end: datetime,
     gateway: BraintreeGateway,
     log: Logger,
-) -> AsyncGenerator[Transaction, None]:
+) -> AsyncGenerator[IncrementalResource, None]:
     start_date = start.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = end.replace(hour=0, minute=0, second=0, microsecond=0)
     log.info(f"Fetching disbursed transactions.", {
@@ -223,7 +221,6 @@ async def fetch_transactions_disbursed_between(
             base_url,
             TRANSACTION_PATH_COMPONENT,
             TransactionSearchResponse,
-            Transaction,
             ids,
             gateway,
             braintree.Transaction,
@@ -276,7 +273,7 @@ async def fetch_transactions_disputed_between(
     end: datetime,
     gateway: BraintreeGateway,
     log: Logger,
-) -> AsyncGenerator[Transaction, None]:
+) -> AsyncGenerator[IncrementalResource, None]:
     start_date = start.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = end.replace(hour=0, minute=0, second=0, microsecond=0)
     log.info(f"Fetching disputed transactions.", {
@@ -300,7 +297,6 @@ async def fetch_transactions_disputed_between(
             base_url,
             TRANSACTION_PATH_COMPONENT,
             TransactionSearchResponse,
-            Transaction,
             ids,
             gateway,
             braintree.Transaction,

@@ -93,11 +93,17 @@
           "format": "date-time",
           "title": "Created At",
           "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
         }
       },
       "required": [
         "id",
-        "created_at"
+        "created_at",
+        "updated_at"
       ],
       "title": "IncrementalResource",
       "type": "object",
@@ -154,11 +160,17 @@
           "format": "date-time",
           "title": "Created At",
           "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
         }
       },
       "required": [
         "id",
-        "created_at"
+        "created_at",
+        "updated_at"
       ],
       "title": "IncrementalResource",
       "type": "object",
@@ -262,11 +274,17 @@
           "format": "date-time",
           "title": "Created At",
           "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
         }
       },
       "required": [
         "id",
-        "created_at"
+        "created_at",
+        "updated_at"
       ],
       "title": "IncrementalResource",
       "type": "object",
@@ -417,11 +435,17 @@
           "format": "date-time",
           "title": "Created At",
           "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
         }
       },
       "required": [
         "id",
-        "created_at"
+        "created_at",
+        "updated_at"
       ],
       "title": "IncrementalResource",
       "type": "object",
@@ -477,11 +501,17 @@
           "format": "date-time",
           "title": "Created At",
           "type": "string"
+        },
+        "updated_at": {
+          "format": "date-time",
+          "title": "Updated At",
+          "type": "string"
         }
       },
       "required": [
         "id",
-        "created_at"
+        "created_at",
+        "updated_at"
       ],
       "title": "IncrementalResource",
       "type": "object",
