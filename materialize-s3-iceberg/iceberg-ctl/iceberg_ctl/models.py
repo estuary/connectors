@@ -89,14 +89,19 @@ class EndpointConfig(BaseModel):
         description="Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.",
         json_schema_extra={"order": 6},
     )
+    s3_endpoint: str = Field(
+        default="",
+        description="Custom S3 endpoint URL. If not provided, the default AWS S3 endpoint for the specified region will be used.",
+        json_schema_extra={"order": 7},
+    )
     catalog: RestCatalogConfig | GlueCatalogConfig = Field(
         discriminator="catalog_type",
         title="Catalog",
-        json_schema_extra={"order": 7},
+        json_schema_extra={"order": 8},
     )
     advanced: Optional[AdvancedConfig] = Field(
         default=None,
         title="Advanced Options",
         description="Options for advanced users. You should not typically need to modify these.",
-        json_schema_extra={"order": 8, "advanced": True},
+        json_schema_extra={"order": 9, "advanced": True},
     )
