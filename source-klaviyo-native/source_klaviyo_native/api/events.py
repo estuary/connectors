@@ -220,7 +220,12 @@ class WorkManager:
     def _create_initial_chunks(self, start: datetime, end: datetime) -> list[DateChunk]:
         return [
             DateChunk(start=chunk_start, end=chunk_end)
-            for chunk_start, chunk_end in split_date_window(start, end, DEFAULT_BACKFILL_CONFIG.initial_chunks)
+            for chunk_start, chunk_end in split_date_window(
+                start=start,
+                end=end,
+                num_chunks=DEFAULT_BACKFILL_CONFIG.initial_chunks,
+                minimum_chunk_size=SMALLEST_KLAVIYO_DATETIME_GRAIN,
+            )
         ]
 
     async def _shutdown_monitor(self) -> None:
