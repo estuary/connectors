@@ -20,9 +20,6 @@ function exportToJsonl() {
 
 exportToJsonl "simple"
 exportToJsonl "duplicate_keys_standard"
-exportToJsonl "duplicate_keys_delta"
-exportToJsonl "duplicate_keys_delta_exclude_flow_doc"
-exportToJsonl '`duplicate keys @ with spaces`'
 exportToJsonl "multiple_types"
 exportToJsonl "formatted_strings"
 exportToJsonl "symbols"
@@ -35,4 +32,3 @@ exportToJsonl "all_key_types_part_three"
 exportToJsonl "fields_with_projections"
 exportToJsonl "many_columns"
 exportToJsonl "timezone_datetimes_standard"
-exportToJsonl "timezone_datetimes_delta"

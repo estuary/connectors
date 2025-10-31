@@ -59,18 +59,7 @@ func TestTableConfig(t *testing.T) {
 	path, delta, err := validTable.Parameters()
 	require.NoError(t, err)
 	require.Equal(t, []string{"my_table"}, path)
-	require.False(t, delta)
-
-	var deltaTable = tableConfig{
-		Table: "my_delta_table",
-		Delta: true,
-	}
-	require.NoError(t, deltaTable.Validate())
-
-	path, delta, err = deltaTable.Parameters()
-	require.NoError(t, err)
-	require.Equal(t, []string{"my_delta_table"}, path)
-	require.True(t, delta)
+	require.False(t, delta, "delta updates should always be false for Spanner")
 
 	var noTable = tableConfig{}
 	require.Error(t, noTable.Validate(), "expected validation error for missing table")
