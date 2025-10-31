@@ -64,6 +64,10 @@ func createSpannerDialect() sql.Dialect {
 				return sql.InfoTableLocation{TableSchema: "", TableName: path[len(path)-1]}
 			}
 		}),
+		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string {
+			// Spanner doesn't have schemas, so return empty string
+			return ""
+		}),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
 		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
 			sql.PassThroughTransform(
@@ -124,7 +128,7 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{- end -}}
 	)
 	{{- end }}
-);
+)
 {{ end }}
 
 -- Templated query which performs table alterations by adding columns.
@@ -137,7 +141,7 @@ ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
 	ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}}
-{{- end }};
+{{- end }}
 {{- end }}
 {{ end }}
 
@@ -149,7 +153,7 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
 	{{- end }}
-);
+)
 {{ end }}
 
 -- Templated insertion into the temporary load table:
@@ -166,7 +170,7 @@ INSERT INTO {{ template "temp_name" . }} (
 		{{- if $ind }}, {{ end -}}
 		{{ $key.Placeholder }}
 	{{- end -}}
-);
+)
 {{ end }}
 
 -- Templated query which joins keys from the load table with the target table, and returns values.
@@ -210,14 +214,14 @@ WHEN NOT MATCHED THEN
 		{{ $.KeyEnd }},
 		{{ $.Fence }},
 		{{ Literal (Base64Std $.Checkpoint) }}
-	);
+	)
 
 -- Return the fence and checkpoint
 SELECT fence, FROM_BASE64(checkpoint) AS checkpoint
 FROM {{ Identifier $.TablePath }}
 WHERE materialization = {{ Literal $.Materialization.String }}
 	AND key_begin = {{ $.KeyBegin }}
-	AND key_end = {{ $.KeyEnd }};
+	AND key_end = {{ $.KeyEnd }}
 {{ end }}
 
 {{ define "updateFence" }}
@@ -226,7 +230,7 @@ UPDATE {{ Identifier $.TablePath }}
 	WHERE materialization = {{ Literal $.Materialization.String }}
 	AND key_begin = {{ $.KeyBegin }}
 	AND key_end = {{ $.KeyEnd }}
-	AND fence = {{ $.Fence }};
+	AND fence = {{ $.Fence }}
 
 -- Verify the update succeeded (Spanner doesn't have @@ROWCOUNT)
 -- We'll handle verification in the Go code instead
