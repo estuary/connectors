@@ -1,8 +1,9 @@
+import asyncio
 from datetime import datetime
 from logging import Logger
 from typing import AsyncGenerator
 
-# Any functions that send a request to Azure for listing files or reading
+# Some functions that send a request to Azure for listing files or reading
 # metadata files are wrapped with the alru_cache decorator. alru_cache
 # prevents the connector from making multiple HTTP requests for the same
 # data. alru_cache also addresses the thundering herd problem when there's
@@ -10,6 +11,7 @@ from typing import AsyncGenerator
 # will share the same future.
 from async_lru import alru_cache
 from estuary_cdk.capture.common import LogCursor
+from estuary_cdk.http import HTTPError
 
 from .adls_gen2_client import ADLSGen2Client, ADLSPathMetadata
 from .models import (
@@ -25,12 +27,21 @@ MINIMUM_AZURE_SYNAPSE_LINK_EXPORT_INTERVAL = 300             # 5 minutes
 # in order to minimize how long stale data remains in the cache while
 # still picking up on any changes in Azure relatively quickly.
 CACHE_TTL = MINIMUM_AZURE_SYNAPSE_LINK_EXPORT_INTERVAL / 5   # 1 minute
+# FOLDER_PROCESSING_SEMAPHORE is used to bound how many timestamp
+# folders are processed concurrently. Processing an unbounded number
+# of folders can easily trigger the connector to exceed its memory
+# limit and get OOM killed. When 50+ bindings are reading CSVs
+# concurrently, the connector is CPU bound. Meaning, the CPU is
+# effectively already limiting how much concurrent processing occurs,
+# and this semphore should only server to guard against OOMs, not
+# slow down the connector further.
+FOLDER_PROCESSING_SEMAPHORE = asyncio.Semaphore(50)
 
 
 # model.json metadata files are not updated after they're written.
 # So there's no need to expire cache results with a TTL to ensure
 # we capture updates to these files.
-@alru_cache(maxsize=32, ttl=None)
+@alru_cache(maxsize=4, ttl=None)
 async def fetch_model_dot_json(
     client: ADLSGen2Client,
     directory: str | None = None,
@@ -99,18 +110,30 @@ async def get_finalized_timestamp_folders(
     return sorted(finalized_folders, key=str_to_dt)
 
 
-@alru_cache(maxsize=32, ttl=CACHE_TTL)
-async def get_folder_contents(
+async def get_folder_contents_for_table(
     folder: str,
+    table_name: str,
     client: ADLSGen2Client,
 ) -> list[ADLSPathMetadata]:
     metadata: list[ADLSPathMetadata] = []
 
-    async for m in client.list_paths(
-        directory=folder,
-        recursive=True
-    ):
-        metadata.append(m)
+    # The {folder}/{table_name} path will only exist if data exists for
+    # table_name within the folder. If no data exists for this table,
+    # we'll receive a 404 response. That's ok - it just means there were
+    # no changes to that table in the timespan covered by the folder.
+    path = f"{folder}/{table_name}"
+
+    try:
+        async for m in client.list_paths(
+            directory=path,
+            recursive=True
+        ):
+            metadata.append(m)
+    except HTTPError as err:
+        if err.code == 404 and "The specified path does not exist" in err.message:
+            pass
+        else:
+            raise err
 
     return metadata
 
@@ -120,7 +143,7 @@ async def read_csvs_in_folder(
     table_name: str,
     client: ADLSGen2Client,
 ) -> AsyncGenerator[BaseTable, None]:
-    folder_contents = await get_folder_contents(folder, client)
+    folder_contents = await get_folder_contents_for_table(folder, table_name, client)
 
     csvs: list[ADLSPathMetadata] = []
 
@@ -167,11 +190,12 @@ async def fetch_changes(
             })
             continue
 
-        log.debug(f"Reading CSVs in {folder}/{table_name}.")
-        async for row in read_csvs_in_folder(folder, table_name, client):
-            yield row
+        async with FOLDER_PROCESSING_SEMAPHORE:
+            log.debug(f"Reading CSVs in {folder}/{table_name}.")
+            async for row in read_csvs_in_folder(folder, table_name, client):
+                yield row
 
-        log.debug(f"Read all CSVs in folder. Yielding folder name as new cursor.", {
-            "folder": str_to_dt(folder),
-        })
-        yield str_to_dt(folder)
+            log.debug(f"Read all CSVs in folder. Yielding folder name as new cursor.", {
+                "folder": str_to_dt(folder),
+            })
+            yield str_to_dt(folder)
