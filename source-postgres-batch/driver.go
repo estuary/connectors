@@ -18,6 +18,8 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/sirupsen/logrus"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
@@ -786,11 +788,10 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 	if !ok {
 		return fmt.Errorf("internal error: no state for stream %q", res.Name)
 	}
-
-	// If the key of the output collection for this binding is the Row ID then we
-	// can automatically provide useful `/_meta/op` values and inferred deletions.
 	var isRowIDKey = len(binding.collectionKey) == 1 && binding.collectionKey[0] == "/_meta/row_id"
 
+	// If we're at the start of an incremental table update, set up new ScanTID/NextXID
+	// values. If we're resuming an interrupted scan operation this does nothing.
 	if state.ScanTID == "" {
 		state.ScanTID = "(0,0)"
 	}
@@ -802,51 +803,128 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 		state.NextXID = xid
 	}
 
+	// Figure out a maximum page ID and pages-per-chunk for the chunk-by-chunk polling
+	// The pages-per-chunk value is just a heuristic, aiming for ~20k-200k rows on typical data
+	var stats, err = queryTableStatistics(ctx, c.DB, res.SchemaName, res.TableName)
+	if err != nil {
+		return err
+	}
+	var maximumPageID = stats.MaxPageID
+	var pagesPerChunk = uint32(200000/(100*stats.PartitionCount)) + 1
+
+	// Parse the ScanTID string into a struct we can use
+	var afterCTID pgtype.TID
+	if err := afterCTID.Scan(string(state.ScanTID)); err != nil {
+		return fmt.Errorf("error parsing resume CTID %q: %w", state.ScanTID, err)
+	} else if !afterCTID.Valid {
+		return fmt.Errorf("internal error: invalid resume CTID value %q", state.ScanTID)
+	}
+
+	// Iterate over CTID range chunks until we reach the maximum possible CTID page for this table
+	for int64(afterCTID.BlockNumber) < maximumPageID {
+		var untilCTID = pgtype.TID{BlockNumber: afterCTID.BlockNumber + pagesPerChunk, Valid: true}
+		var resultCount, err = c.pollIncrementalChunk(ctx, &incrementalChunkDescription{
+			ResourceName:  res.Name,
+			SchemaName:    res.SchemaName,
+			TableName:     res.TableName,
+			AfterCTID:     fmt.Sprintf("(%d,%d)", afterCTID.BlockNumber, afterCTID.OffsetNumber),
+			UntilCTID:     fmt.Sprintf("(%d,%d)", untilCTID.BlockNumber, untilCTID.OffsetNumber),
+			BaseXID:       state.BaseXID,
+			NextXID:       state.NextXID,
+			DocumentCount: state.DocumentCount,
+			IsRowIDKey:    isRowIDKey,
+			BindingIndex:  binding.index,
+		})
+		if err != nil {
+			return err
+		}
+
+		// Advance chunk CTID and emit a checkpoint
+		afterCTID = untilCTID
+		state.ScanTID = fmt.Sprintf("(%d,%d)", afterCTID.BlockNumber, afterCTID.OffsetNumber)
+		state.DocumentCount += resultCount
+		if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+			return err
+		}
+	}
+
+	// Reset scanning state for the next incremental table update
+	state.ScanTID = ""
+	state.BaseXID = state.NextXID
+	state.NextXID = 0
+	return c.streamStateCheckpoint(stateKey, state)
+}
+
+// incrementalChunkDescription contains all the information required to issue and
+// process a single incremental chunk polling query.
+type incrementalChunkDescription struct {
+	ResourceName string
+	SchemaName   string
+	TableName    string
+
+	AfterCTID string // Lower bound of the CTID range
+	UntilCTID string // Upper bound of the CTID range
+
+	BaseXID uint64 // Lower bound of the XID range, or zero if no XID filtering
+	NextXID uint64 // Upper bound of the XID range, or zero if no XID filtering
+
+	DocumentCount int64 // Base document count for result row metadata
+	IsRowIDKey    bool  // True when the output collection us keyed on /_meta/row_id
+	BindingIndex  int   // Output binding index
+}
+
+func (c *capture) pollIncrementalChunk(ctx context.Context, chunk *incrementalChunkDescription) (int64, error) {
 	// Build the query. The base CTID for scanning is $1 and the minimum/maximum XIDs for filtering are $2 and $3.
 	// The XID filtering clauses here include both the upper/lower bound XIDs on the assumption that we can apply
 	// more precise filtering when processing query results if desired.
 	var queryBuf = new(strings.Builder)
 	var args []any
-	fmt.Fprintf(queryBuf, `SELECT ctid, xmin AS txid, * FROM %s WHERE ctid > $1`, quoteTableName(res.SchemaName, res.TableName))
-	args = append(args, state.ScanTID)
-	if state.BaseXID != 0 {
-		const filterRandom = "(RANDOM() < 0.001)"
+	fmt.Fprintf(queryBuf, `SELECT ctid, xmin AS txid, * FROM %s WHERE ctid > $1 AND ctid <= $2`, quoteTableName(chunk.SchemaName, chunk.TableName))
+	args = append(args, chunk.AfterCTID, chunk.UntilCTID)
+	if chunk.BaseXID != 0 {
 		const filterValidXID = "(xmin::text::bigint >= 3)"
-		const filterMinimumXID = "((((xmin::text::bigint - $2::bigint)<<32)>>32) >= 0)"
-		const filterMaximumXID = "(((($3::bigint - xmin::text::bigint)<<32)>>32) >= 0)"
-		fmt.Fprintf(queryBuf, ` AND (%s OR (%s AND %s AND %s))`, filterRandom, filterValidXID, filterMinimumXID, filterMaximumXID)
-		args = append(args, state.BaseXID, state.NextXID)
+		const filterMinimumXID = "((((xmin::text::bigint - $3::bigint)<<32)>>32) >= 0)"
+		const filterMaximumXID = "(((($4::bigint - xmin::text::bigint)<<32)>>32) >= 0)"
+		fmt.Fprintf(queryBuf, ` AND (%s AND %s AND %s)`, filterValidXID, filterMinimumXID, filterMaximumXID)
+		args = append(args, chunk.BaseXID, chunk.NextXID)
 	}
 	var query = queryBuf.String()
 
-	log.WithFields(log.Fields{
-		"name":  res.Name,
+	// Log chunk query information
+	var logEntry = log.WithFields(log.Fields{
+		"name":  chunk.ResourceName,
 		"query": query,
-		"args":  args,
-	}).Info("executing query")
-	var pollTime = time.Now().UTC()
+		"ctids": fmt.Sprintf("%s to %s", chunk.AfterCTID, chunk.UntilCTID),
+	})
+	if chunk.BaseXID != 0 {
+		logEntry = logEntry.WithField("txids", fmt.Sprintf("%d to %d", chunk.BaseXID, chunk.NextXID))
+	}
+	logEntry.Info("polling incremental chunk")
 
 	// Set up a watchdog timeout which will terminate the capture task if no data is
 	// received after a long period of time. The deferred stop ensures that the timeout
 	// will always be cancelled for good when the polling operation finishes.
 	var watchdog = time.AfterFunc(pollingWatchdogFirstRowTimeout, func() {
-		log.WithField("name", res.Name).Fatal("polling timed out")
+		log.WithField("name", chunk.ResourceName).Fatal("polling query timed out")
 	})
 	defer watchdog.Stop()
 
+	// Issue the query
 	rows, err := c.DB.QueryContext(ctx, query, args...)
 	if err != nil {
-		return fmt.Errorf("error executing query: %w", err)
+		return 0, fmt.Errorf("error executing query: %w", err)
 	}
 	defer rows.Close()
 
+	// Set up for result value processing
+	var pollTime = time.Now().UTC()
 	columnNames, err := rows.Columns()
 	if err != nil {
-		return fmt.Errorf("error processing query result: %w", err)
+		return 0, fmt.Errorf("error processing query result: %w", err)
 	}
 	columnTypes, err := rows.ColumnTypes()
 	if err != nil {
-		return fmt.Errorf("error processing query result: %w", err)
+		return 0, fmt.Errorf("error processing query result: %w", err)
 	}
 	for i, columnType := range columnTypes {
 		log.WithFields(log.Fields{
@@ -865,28 +943,29 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 		columnPointers[i] = &columnValues[i]
 	}
 
-	// Ensure that the CTID and XMIN columns come first and add special handling for them.
-	var ctidIndex = 0
-	var txidIndex = 1
+	// Ensure that the CTID and XMIN columns come first so we can handle them specially if needed.
+	var ctidIndex, txidIndex = 0, 1
 	if columnNames[ctidIndex] != "ctid" || columnNames[txidIndex] != "txid" {
-		return fmt.Errorf("unexpected column names: %q", columnNames[0:1])
+		return 0, fmt.Errorf("unexpected column names: %q", columnNames[0:1])
 	}
 
 	var outputNames = append(append([]string(nil), columnNames[1:]...), "_meta")
 	var outputValues = make([]any, len(columnNames)) // Minus ctid and plus _meta
-
 	var shape = encrow.NewShape(outputNames)
-	var serializedDocument []byte
 
-	var queryResultsCount int
+	var serializedDocument []byte
+	var queryResultsCount int64
+
+	// Process result rows
 	for rows.Next() {
 		if err := rows.Scan(columnPointers...); err != nil {
-			return fmt.Errorf("error scanning result row: %w", err)
+			return 0, fmt.Errorf("error scanning result row: %w", err)
 		}
 		watchdog.Reset(pollingWatchdogTimeout) // Reset the no-data watchdog timeout after each row received
 
 		var resultCTID = columnValues[ctidIndex].(string)
 		var resultXMIN = uint32(columnValues[txidIndex].(int64))
+		_ = resultCTID
 
 		// In the common case, our XID filtering logic is just applying a circular comparison
 		// to ensure that we output rows whose XMIN lies between the lower and upper values.
@@ -894,20 +973,13 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 		// But on an initial backfill query it's not appropriate to apply a lower bound, and
 		// we can only apply an upper bound when the server XID has never wrapped around. In
 		// that case it's appropriate to compare XID values directly and not circularly.
-		var filterBaseXID = compareXID32(resultXMIN, uint32(state.BaseXID)) < 0
-		var filterNextXID = compareXID32(uint32(state.NextXID), resultXMIN) <= 0
+		var filterBaseXID = compareXID32(resultXMIN, uint32(chunk.BaseXID)) < 0
+		var filterNextXID = compareXID32(uint32(chunk.NextXID), resultXMIN) <= 0
 		var filterXID = filterBaseXID || filterNextXID
-		if state.BaseXID == 0 {
-			filterXID = state.NextXID <= uint64(resultXMIN)
+		if chunk.BaseXID == 0 {
+			filterXID = chunk.NextXID <= uint64(resultXMIN)
 		}
 		if filterXID {
-			// When a row is rejected because its XMIN is unsuitable, it might be
-			// part of the random 0.1% sampling that ensures consistent progress,
-			// so we should update the state checkpoint with its CTID.
-			state.ScanTID = resultCTID
-			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
-				return err
-			}
 			continue
 		}
 
@@ -915,65 +987,49 @@ func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) err
 		for idx := 1; idx < len(columnValues); idx++ {
 			var translatedVal, err = c.TranslateValue(columnValues[idx], columnTypes[idx].DatabaseTypeName())
 			if err != nil {
-				return fmt.Errorf("error translating column %q value: %w", columnNames[idx], err)
+				return 0, fmt.Errorf("error translating column %q value: %w", columnNames[idx], err)
 			}
 			outputValues[idx-1] = translatedVal
 		}
 		var metadata = &documentMetadata{
-			RowID:  state.DocumentCount,
+			RowID:  chunk.DocumentCount + queryResultsCount,
 			Polled: pollTime,
-			Index:  queryResultsCount,
+			Index:  int(queryResultsCount),
 			Source: documentSourceMetadata{
-				Resource: res.Name,
-				Schema:   res.SchemaName,
-				Table:    res.TableName,
+				Resource: chunk.ResourceName,
+				Schema:   chunk.SchemaName,
+				Table:    chunk.TableName,
 				Tag:      c.Config.Advanced.SourceTag,
 			},
 		}
-		if isRowIDKey {
-			metadata.Op = "c" // Always create for incremental bindings with row ID key
+		if chunk.IsRowIDKey {
+			// Incremental bindings have a strictly increasing row ID for each output document,
+			// so if the collection key is /_meta/row_id we can always set operation to create.
+			metadata.Op = "c"
 		}
 		outputValues[len(outputValues)-1] = metadata
 
 		serializedDocument, err = shape.Encode(serializedDocument[:0], outputValues)
 		if err != nil {
-			return fmt.Errorf("error serializing document: %w", err)
-		} else if err := c.Output.Documents(binding.index, serializedDocument); err != nil {
-			return fmt.Errorf("error emitting document: %w", err)
+			return 0, fmt.Errorf("error serializing document: %w", err)
+		} else if err := c.Output.Documents(chunk.BindingIndex, serializedDocument); err != nil {
+			return 0, fmt.Errorf("error emitting document: %w", err)
 		}
 
-		// Update CTID cursor so we can make incremental progress across restarts
-		state.ScanTID = resultCTID
 		queryResultsCount++
-		state.DocumentCount++
-		if queryResultsCount%documentsPerCheckpoint == 0 {
-			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
-				return err
-			}
-		}
-		if queryResultsCount%100000 == 1 {
-			log.WithFields(log.Fields{
-				"name":  res.Name,
-				"count": queryResultsCount,
-				"rowID": state.DocumentCount,
-			}).Info("processing query results")
-		}
 	}
 	if err := rows.Err(); err != nil {
-		return fmt.Errorf("error processing results iterator: %w", err)
+		return 0, fmt.Errorf("error processing results iterator: %w", err)
 	}
 
 	log.WithFields(log.Fields{
-		"name":  res.Name,
+		"name":  chunk.ResourceName,
 		"query": query,
 		"count": queryResultsCount,
-		"docs":  state.DocumentCount,
-	}).Info("polling complete")
-	// Reset scanning state for the next poll
-	state.ScanTID = ""
-	state.BaseXID = state.NextXID
-	state.NextXID = 0
-	return c.streamStateCheckpoint(stateKey, state)
+		"total": chunk.DocumentCount + queryResultsCount,
+	}).Info("chunk query complete")
+
+	return queryResultsCount, nil
 }
 
 func queryCurrentXID(ctx context.Context, db *sql.DB) (uint64, error) {
@@ -998,4 +1054,45 @@ func compareXID32(a, b uint32) int {
 		return -1 // a < b
 	}
 	return 1 // a > b
+}
+
+type postgresTableStatistics struct {
+	RelPages       int64 // Approximate number of pages in the table
+	RelTuples      int64 // Approximate number of live tuples in the table
+	MaxPageID      int64 // Conservative upper bound for the maximum page ID
+	PartitionCount int   // Number of partitions for the table, including the parent table itself
+}
+
+const tableStatisticsQuery = `
+SELECT c.relpages, c.reltuples,
+  -- Maximum page ID across all partitions and the parent table. Each partition is a
+  -- separate table with its own page numbering. We multiply by a 1.05 fudge factor just
+  -- to make extra sure the result will be greater than any possible live row's page ID.
+  CEIL(1.05*GREATEST(
+    (pg_relation_size(c.oid) / current_setting('block_size')::int),
+    COALESCE((
+      SELECT MAX(pg_relation_size(inhrelid) / current_setting('block_size')::int)
+      FROM pg_inherits WHERE inhparent = c.oid
+    ), 0)
+  )) AS max_page_id,
+  -- Partition count, plus one for the parent table itself
+  (SELECT COUNT(inhrelid)::int + 1 FROM pg_inherits WHERE inhparent = c.oid) AS partition_count
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+WHERE n.nspname = $1 AND c.relname = $2;`
+
+func queryTableStatistics(ctx context.Context, conn *sql.DB, schema, table string) (*postgresTableStatistics, error) {
+	var tableID = schema + "." + table
+	var stats = &postgresTableStatistics{}
+	if err := conn.QueryRowContext(ctx, tableStatisticsQuery, schema, table).Scan(&stats.RelPages, &stats.RelTuples, &stats.MaxPageID, &stats.PartitionCount); err != nil {
+		return nil, fmt.Errorf("error querying table statistics for %s: %w", tableID, err)
+	}
+	logrus.WithFields(logrus.Fields{
+		"table":      tableID,
+		"relPages":   stats.RelPages,
+		"relTuples":  stats.RelTuples,
+		"maxPageID":  stats.MaxPageID,
+		"partitions": stats.PartitionCount,
+	}).Debug("queried table statistics")
+	return stats, nil
 }
