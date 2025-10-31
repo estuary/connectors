@@ -1,0 +1,37 @@
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+description: |-
+  Facebook Ad Videos resource.
+
+  Videos used in ad creatives.
+  Schema matches Airbyte source-facebook-marketing/schemas/videos.json
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  id:
+    anyOf:
+    - type: string
+    - type: 'null'
+    title: Id
+title: Videos
+type: object
+x-infer-schema: true
