@@ -71,7 +71,7 @@ func (c config) DefaultNamespace() string {
 type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
 	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run in the same transaction that creates the table." jsonschema_extras:"multiline=true"`
-	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	// Note: Delta updates are not supported in Cloud Spanner because all tables require primary keys
 }
 
 func (r tableConfig) Validate() error {
@@ -87,12 +87,17 @@ func (c tableConfig) WithDefaults(cfg config) tableConfig {
 }
 
 func (c tableConfig) Parameters() ([]string, bool, error) {
-	return []string{c.Table}, c.Delta, nil
+	// Delta updates are always false for Spanner since it requires primary keys
+	return []string{c.Table}, false, nil
 }
 
 func newSpannerDriver() *sql.Driver[config, tableConfig] {
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-spanner",
+		StartTunnel: func(ctx context.Context, cfg config) error {
+			// Spanner doesn't require network tunneling
+			return nil
+		},
 		NewEndpoint: func(ctx context.Context, cfg config, featureFlags map[string]bool) (*sql.Endpoint[config], error) {
 			log.WithFields(log.Fields{
 				"project":  cfg.ProjectID,
