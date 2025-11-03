@@ -1,0 +1,2046 @@
+[
+  {
+    "recommendedName": "Accounts",
+    "resourceConfig": {
+      "name": "Accounts",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Account",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Bill Payments",
+    "resourceConfig": {
+      "name": "Bill Payments",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "BillPayment",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Bills",
+    "resourceConfig": {
+      "name": "Bills",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Bill",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Budgets",
+    "resourceConfig": {
+      "name": "Budgets",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Budget",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Classes",
+    "resourceConfig": {
+      "name": "Classes",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Class",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Credit Memos",
+    "resourceConfig": {
+      "name": "Credit Memos",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "CreditMemo",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Customers",
+    "resourceConfig": {
+      "name": "Customers",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Customer",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Departments",
+    "resourceConfig": {
+      "name": "Departments",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Department",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Deposits",
+    "resourceConfig": {
+      "name": "Deposits",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Deposit",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Employees",
+    "resourceConfig": {
+      "name": "Employees",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Employee",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Estimates",
+    "resourceConfig": {
+      "name": "Estimates",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Estimate",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Invoices",
+    "resourceConfig": {
+      "name": "Invoices",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Invoice",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Items",
+    "resourceConfig": {
+      "name": "Items",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Item",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Journal Entries",
+    "resourceConfig": {
+      "name": "Journal Entries",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "JournalEntry",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Payment Methods",
+    "resourceConfig": {
+      "name": "Payment Methods",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "PaymentMethod",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Payments",
+    "resourceConfig": {
+      "name": "Payments",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Payment",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Purchase Orders",
+    "resourceConfig": {
+      "name": "Purchase Orders",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "PurchaseOrder",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Purchases",
+    "resourceConfig": {
+      "name": "Purchases",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Purchase",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Refund Receipts",
+    "resourceConfig": {
+      "name": "Refund Receipts",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "RefundReceipt",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Sales Receipts",
+    "resourceConfig": {
+      "name": "Sales Receipts",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "SalesReceipt",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Tax Agencies",
+    "resourceConfig": {
+      "name": "Tax Agencies",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "TaxAgency",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Tax Codes",
+    "resourceConfig": {
+      "name": "Tax Codes",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "TaxCode",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Tax Rates",
+    "resourceConfig": {
+      "name": "Tax Rates",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "TaxRate",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Terms",
+    "resourceConfig": {
+      "name": "Terms",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Term",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Time Activities",
+    "resourceConfig": {
+      "name": "Time Activities",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "TimeActivity",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Transfers",
+    "resourceConfig": {
+      "name": "Transfers",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Transfer",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Vendor Credits",
+    "resourceConfig": {
+      "name": "Vendor Credits",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "VendorCredit",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  },
+  {
+    "recommendedName": "Vendors",
+    "resourceConfig": {
+      "name": "Vendors",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        },
+        "QuickBooksEntityMetadata": {
+          "additionalProperties": true,
+          "properties": {
+            "LastUpdatedTime": {
+              "format": "date-time",
+              "title": "Lastupdatedtime",
+              "type": "string"
+            }
+          },
+          "required": [
+            "LastUpdatedTime"
+          ],
+          "title": "QuickBooksEntityMetadata",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "MetaData": {
+          "$ref": "#/$defs/QuickBooksEntityMetadata"
+        }
+      },
+      "required": [
+        "Id",
+        "MetaData"
+      ],
+      "title": "Vendor",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/Id"
+    ]
+  }
+]
