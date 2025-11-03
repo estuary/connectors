@@ -12,11 +12,14 @@ RUN python -m venv /opt/venv
 ENV VIRTUAL_ENV=/opt/venv
 
 WORKDIR /opt/${CONNECTOR_NAME}
-COPY ${CONNECTOR_NAME} /opt/${CONNECTOR_NAME}
+COPY ${CONNECTOR_NAME}/pyproject.toml ${CONNECTOR_NAME}/poetry.lock /opt/${CONNECTOR_NAME}
 COPY estuary-cdk /opt/estuary-cdk
 
-RUN poetry install
+RUN poetry install --no-root
 
+COPY ${CONNECTOR_NAME} /opt/${CONNECTOR_NAME}
+
+RUN poetry install
 
 FROM base AS runner
 
