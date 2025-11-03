@@ -1,0 +1,8 @@
+credentials:
+  client_id: dummy_client_id
+  client_secret: dummy_client_secret
+  credentials_title: OAuth Credentials
+  refresh_token: dummy_refresh_token
+  access_token: dummy_access_token
+  access_token_expires_at: 1762263652
+realm_id: "1234567890"

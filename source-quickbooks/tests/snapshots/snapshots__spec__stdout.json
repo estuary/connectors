@@ -1,0 +1,134 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "RotatingOAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "refresh_token": {
+              "secret": true,
+              "title": "Refresh Token",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            },
+            "access_token_expires_at": {
+              "format": "date-time",
+              "title": "Access token expiration time.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret",
+            "refresh_token",
+            "access_token",
+            "access_token_expires_at"
+          ],
+          "title": "OAuth",
+          "type": "object",
+          "x-oauth2-provider": "intuit"
+        }
+      },
+      "properties": {
+        "realm_id": {
+          "description": "ID for the Company to Request Data From",
+          "order": 0,
+          "title": "Company ID",
+          "type": "string"
+        },
+        "credentials": {
+          "$ref": "#/$defs/RotatingOAuth2Credentials",
+          "order": 1,
+          "title": "Authentication"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
+          "format": "date-time",
+          "order": 2,
+          "title": "Start Date",
+          "type": "string"
+        }
+      },
+      "required": [
+        "realm_id",
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-quickbooks",
+    "oauth2": {
+      "provider": "intuit",
+      "authUrlTemplate": "https://appcenter.intuit.com/connect/oauth2?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&scope=com.intuit.quickbooks.accounting%20com.intuit.quickbooks.payment%20openid%20profile%20email%20phone%20address&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
+      "accessTokenBody": "grant_type=authorization_code&code={{#urlencode}}{{{ code }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}",
+      "accessTokenHeaders": {
+        "Content-Type": "application/x-www-form-urlencoded"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/access_token",
+        "access_token_expires_at": "{{#now_plus}}{{ expires_in }}{{/now_plus}}",
+        "refresh_token": "/refresh_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

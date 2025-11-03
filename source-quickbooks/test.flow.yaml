@@ -1,0 +1,11 @@
+---
+captures:
+  acmeCo/source-quickbooks:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_quickbooks
+        config: config.yaml
+    bindings: []
