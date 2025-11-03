@@ -15,7 +15,16 @@ function exportToJsonl() {
     --instance="$SPANNER_INSTANCE_ID" \
     --project="$SPANNER_PROJECT_ID" \
     --sql="$query" \
-    --format=json | jq "{ \"_table\": \"$display_name\", rows: map(del(.flow_document)) }"
+    --format=json | jq "{ \"_table\": \"$display_name\", rows: [\
+      .metadata.rowType.fields as \$fields |\
+      .rows[] |\
+      [., \$fields] |\
+      .[1] as \$f |\
+      .[0] |\
+      to_entries |\
+      map({key: \$f[.key].name, value: .value}) |\
+      from_entries]\
+    }"
 }
 
 exportToJsonl "simple"

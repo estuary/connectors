@@ -3,7 +3,11 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
+	"strings"
+	"time"
 
+	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 	sql "github.com/estuary/connectors/materialize-sql"
 )
@@ -21,7 +25,8 @@ func buildInsertOrUpdateMutation(
 	// Convert values to Spanner-compatible types
 	spannerValues := make([]interface{}, len(values))
 	for i, val := range values {
-		spannerVal, err := toSpannerValue(val, binding.columns[i])
+		// Note: This function is not currently used. Column type is unknown here.
+		spannerVal, err := toSpannerValue(val, binding.columns[i], "")
 		if err != nil {
 			return nil, fmt.Errorf("converting value for column %s: %w", binding.columns[i], err)
 		}
@@ -48,7 +53,8 @@ func buildDeleteMutation(
 		if i >= len(binding.columns) {
 			return nil, fmt.Errorf("key index out of bounds: %d >= %d", i, len(binding.columns))
 		}
-		spannerVal, err := toSpannerValue(val, binding.columns[i])
+		// Note: This function is not currently used. Column type is unknown here.
+		spannerVal, err := toSpannerValue(val, binding.columns[i], "")
 		if err != nil {
 			return nil, fmt.Errorf("converting key value for column %s: %w", binding.columns[i], err)
 		}
@@ -62,74 +68,90 @@ func buildDeleteMutation(
 
 // toSpannerValue converts a Go value to a Spanner-compatible value.
 // This handles type conversions needed for Spanner's type system.
-func toSpannerValue(val interface{}, columnName string) (interface{}, error) {
+// columnType is the DDL type (e.g., "TIMESTAMP", "DATE", "INT64", "JSON")
+func toSpannerValue(val interface{}, columnName string, columnType string) (interface{}, error) {
 	if val == nil {
 		return spanner.NullString{Valid: false}, nil
 	}
 
 	switch v := val.(type) {
 	case json.RawMessage:
-		// JSON data - Spanner can store as JSON or STRING
-		return string(v), nil
+		// JSON data - Spanner expects spanner.NullJSON for JSON columns
+		return spanner.NullJSON{Value: v, Valid: len(v) > 0}, nil
 	case []byte:
-		// Binary data - store as BYTES
+		// Check if this might be JSON data (common for arrays/objects)
+		// If it starts with [ or {, treat it as JSON
+		if len(v) > 0 && (v[0] == '[' || v[0] == '{' || v[0] == '"') {
+			return spanner.NullJSON{Value: v, Valid: true}, nil
+		}
+		// Otherwise, binary data - store as BYTES
 		return v, nil
 	case string:
+		// Check column type to determine how to handle strings
+		if strings.Contains(columnType, "TIMESTAMP") {
+			// Parse as timestamp - try multiple formats
+			formats := []string{
+				time.RFC3339Nano,
+				time.RFC3339,
+				"2006-01-02T15:04:05.999999999Z07:00", // Extended precision
+				"2006-01-02T15:04:05Z07:00",
+			}
+
+			for _, format := range formats {
+				if t, err := time.Parse(format, v); err == nil {
+					return t, nil
+				}
+			}
+
+			// Log the actual value and column for debugging
+			return nil, fmt.Errorf("cannot parse string %q as TIMESTAMP for column %s (tried %d formats)", v, columnName, len(formats))
+		} else if strings.Contains(columnType, "DATE") {
+			// Parse as civil.Date for DATE columns
+			if d, err := civil.ParseDate(v); err == nil {
+				return d, nil
+			}
+			return nil, fmt.Errorf("cannot parse string %q as DATE for column %s", v, columnName)
+		}
+		// For other types, return string as-is
 		return v, nil
-	case int, int8, int16, int32, int64:
-		// All integers map to INT64
-		return toInt64(v), nil
-	case uint, uint8, uint16, uint32, uint64:
-		// Unsigned integers need careful conversion
-		return toInt64(v), nil
-	case float32, float64:
-		// All floats map to FLOAT64
-		return toFloat64(v), nil
+	case time.Time:
+		// time.Time is directly supported by Spanner for TIMESTAMP columns
+		return v, nil
+	case int:
+		return int64(v), nil
+	case int8:
+		return int64(v), nil
+	case int16:
+		return int64(v), nil
+	case int32:
+		return int64(v), nil
+	case int64:
+		return v, nil
+	case uint:
+		return int64(v), nil
+	case uint8:
+		return int64(v), nil
+	case uint16:
+		return int64(v), nil
+	case uint32:
+		return int64(v), nil
+	case uint64:
+		// uint64 needs careful handling to avoid overflow
+		if v > 9223372036854775807 { // math.MaxInt64
+			return fmt.Sprintf("%d", v), nil // Store as string if too large
+		}
+		return int64(v), nil
+	case float32:
+		return float64(v), nil
+	case float64:
+		return v, nil
 	case bool:
 		return v, nil
+	case *big.Int:
+		return v.String(), nil
 	default:
-		// For unknown types, convert to string
-		return fmt.Sprintf("%v", v), nil
-	}
-}
-
-// toInt64 converts various integer types to int64
-func toInt64(val interface{}) int64 {
-	switch v := val.(type) {
-	case int:
-		return int64(v)
-	case int8:
-		return int64(v)
-	case int16:
-		return int64(v)
-	case int32:
-		return int64(v)
-	case int64:
-		return v
-	case uint:
-		return int64(v)
-	case uint8:
-		return int64(v)
-	case uint16:
-		return int64(v)
-	case uint32:
-		return int64(v)
-	case uint64:
-		return int64(v)
-	default:
-		return 0
-	}
-}
-
-// toFloat64 converts various float types to float64
-func toFloat64(val interface{}) float64 {
-	switch v := val.(type) {
-	case float32:
-		return float64(v)
-	case float64:
-		return v
-	default:
-		return 0
+		// For unknown types, pass through as-is
+		return v, nil
 	}
 }
 

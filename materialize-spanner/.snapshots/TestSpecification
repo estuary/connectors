@@ -21,6 +21,13 @@
         "description": "Cloud Spanner Database name",
         "order": 2
       },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
+        "default": false,
+        "order": 3
+      },
       "credentials": {
         "properties": {
           "service_account_json": {
@@ -35,7 +42,7 @@
         "type": "object",
         "title": "Credentials",
         "description": "Google Cloud authentication credentials",
-        "order": 3
+        "order": 4
       },
       "advanced": {
         "properties": {
@@ -44,6 +51,17 @@
             "title": "Batch Size",
             "description": "Maximum number of mutations per commit (1-10000). Default is 5000.",
             "default": 5000
+          },
+          "no_flow_document": {
+            "type": "boolean",
+            "title": "Exclude Flow Document",
+            "description": "When enabled the root document will not be required for standard updates.",
+            "default": false
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
           }
         },
         "additionalProperties": false,
@@ -76,13 +94,6 @@
         "title": "Additional Table Create SQL",
         "description": "Additional SQL statement(s) to be run in the same transaction that creates the table.",
         "multiline": true
-      },
-      "delta_updates": {
-        "type": "boolean",
-        "title": "Delta Update",
-        "description": "Should updates to this table be done via delta updates. Default is false.",
-        "default": false,
-        "x-delta-updates": true
       }
     },
     "type": "object",
