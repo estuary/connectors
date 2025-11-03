@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -47,8 +48,16 @@ func (f *testLogFormatter) Format(entry *log.Entry) ([]byte, error) {
 	}
 	fmt.Fprintf(buf, "%-5s %s", strings.ToUpper(entry.Level.String()), entry.Message)
 	if len(entry.Data) > 0 {
+		// Sort keys alphabetically for consistent output
+		var keys = make([]string, 0, len(entry.Data))
+		for k := range entry.Data {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+
 		fmt.Fprintf(buf, " (")
-		for k, v := range entry.Data {
+		for _, k := range keys {
+			var v = entry.Data[k]
 			var s, ok = v.(string)
 			if !ok {
 				s = fmt.Sprint(v)
