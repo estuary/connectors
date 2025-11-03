@@ -5,8 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"text/template"
 
 	"cloud.google.com/go/spanner"
+	database "cloud.google.com/go/spanner/admin/database/apiv1"
+	databasepb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -15,7 +18,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
 	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 )
+
+var featureFlagDefaults = map[string]bool{
+	"datetimes_as_string": true,
+}
 
 // credentialConfig represents authentication options for Cloud Spanner
 type credentialConfig struct {
@@ -28,13 +36,17 @@ type config struct {
 	InstanceID string `json:"instance_id" jsonschema:"title=Instance ID,description=Cloud Spanner Instance ID" jsonschema_extras:"order=1"`
 	Database   string `json:"database" jsonschema:"title=Database,description=Cloud Spanner Database name" jsonschema_extras:"order=2"`
 
-	Credentials *credentialConfig `json:"credentials,omitempty" jsonschema:"title=Credentials,description=Google Cloud authentication credentials" jsonschema_extras:"order=3"`
+	HardDelete bool `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3"`
+
+	Credentials *credentialConfig `json:"credentials,omitempty" jsonschema:"title=Credentials,description=Google Cloud authentication credentials" jsonschema_extras:"order=4"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 type advancedConfig struct {
-	BatchSize int `json:"batch_size,omitempty" jsonschema:"title=Batch Size,description=Maximum number of mutations per commit (1-10000). Default is 5000.,default=5000"`
+	BatchSize      int    `json:"batch_size,omitempty" jsonschema:"title=Batch Size,description=Maximum number of mutations per commit (1-10000). Default is 5000.,default=5000"`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // Validate the configuration
@@ -59,7 +71,7 @@ func (c config) Validate() error {
 }
 
 func (c config) FeatureFlags() (string, map[string]bool) {
-	return "", map[string]bool{}
+	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
 func (c config) DefaultNamespace() string {
@@ -105,7 +117,7 @@ func newSpannerDriver() *sql.Driver[config, tableConfig] {
 				"database": cfg.Database,
 			}).Info("opening Spanner database")
 
-			dialect := createSpannerDialect()
+			dialect := createSpannerDialect(featureFlags)
 			templates := renderTemplates(dialect)
 
 			return &sql.Endpoint[config]{
@@ -124,20 +136,25 @@ func newSpannerDriver() *sql.Driver[config, tableConfig] {
 
 // transactor implements the materialization transactor for Spanner using mutations
 type transactor struct {
-	client    *spanner.Client
-	cfg       config
-	templates templates
-	bindings  []*spannerBinding
-	fence     sql.Fence
-	be        *m.BindingEvents
+	client      *spanner.Client
+	adminClient *database.DatabaseAdminClient
+	dbPath      string
+	cfg         config
+	templates   templates
+	bindings    []*spannerBinding
+	fence       sql.Fence
+	be          *m.BindingEvents
 }
 
 // spannerBinding represents a materialized binding with its configuration
 type spannerBinding struct {
-	target        sql.Table
-	loadQuerySQL  string
-	columnNames   []string // Column names in order for mutations
-	keyColumnIdxs []int    // Indexes of key columns within columnNames
+	target             sql.Table
+	createLoadTableSQL string
+	loadQuerySQL       string
+	dropLoadTableSQL   string
+	columnNames        []string // Column names in order for mutations
+	columnTypes        []string // DDL types for each column (e.g., "TIMESTAMP", "DATE", "INT64")
+	keyColumnIdxs      []int    // Indexes of key columns within columnNames
 }
 
 func newTransactor(
@@ -156,21 +173,42 @@ func newTransactor(
 	dbPath := fmt.Sprintf("projects/%s/instances/%s/databases/%s",
 		cfg.ProjectID, cfg.InstanceID, cfg.Database)
 
-	// Create Spanner client
-	// TODO: Add credential options based on cfg.Credentials if needed
-	client, err := spanner.NewClient(ctx, dbPath)
+	var opts []option.ClientOption
+
+	if cfg.Credentials != nil && cfg.Credentials.ServiceAccountJSON != "" {
+		opts = append(opts, option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON)))
+	}
+
+	// Create a client for this transactor
+	// Note: The client will be closed in the Destroy() method
+	client, err := spanner.NewClient(ctx, dbPath, opts...)
 	if err != nil {
-		return nil, fmt.Errorf("creating Spanner client: %w", err)
+		if strings.Contains(err.Error(), "PermissionDenied") {
+			return nil, fmt.Errorf("permission denied: check your credentials and IAM roles")
+		} else if strings.Contains(err.Error(), "NotFound") {
+			return nil, fmt.Errorf("database not found: %s (check project, instance, and database IDs)", dbPath)
+		} else {
+			return nil, fmt.Errorf("connecting to Spanner: %w", err)
+		}
+	}
+
+	// Create an admin client for DDL operations
+	adminClient, err := database.NewDatabaseAdminClient(ctx, opts...)
+	if err != nil {
+		client.Close()
+		return nil, fmt.Errorf("creating Spanner admin client: %w", err)
 	}
 
 	templates := renderTemplates(ep.Dialect)
 
 	t := &transactor{
-		client:    client,
-		cfg:       cfg,
-		templates: templates,
-		fence:     fence,
-		be:        be,
+		client:      client,
+		adminClient: adminClient,
+		dbPath:      dbPath,
+		cfg:         cfg,
+		templates:   templates,
+		fence:       fence,
+		be:          be,
 	}
 
 	// Setup bindings
@@ -186,24 +224,48 @@ func newTransactor(
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
 	b := &spannerBinding{target: target}
 
-	// Render the load query template
-	loadQuerySQL, err := sql.RenderTableTemplate(target, t.templates.loadQuery)
+	// Render createLoadTable template
+	createLoadTableSQL, err := sql.RenderTableTemplate(target, t.templates.createLoadTable)
+	if err != nil {
+		return fmt.Errorf("rendering createLoadTable template: %w", err)
+	}
+	b.createLoadTableSQL = createLoadTableSQL
+
+	// Render the appropriate load query template based on configuration
+	var loadTemplate *template.Template
+	if t.cfg.Advanced.NoFlowDocument {
+		loadTemplate = t.templates.loadQueryNoFlowDocument
+	} else {
+		loadTemplate = t.templates.loadQuery
+	}
+
+	loadQuerySQL, err := sql.RenderTableTemplate(target, loadTemplate)
 	if err != nil {
 		return fmt.Errorf("rendering load query: %w", err)
 	}
 	b.loadQuerySQL = loadQuerySQL
 
-	// Build column names list for mutations
+	// Render dropLoadTable template
+	dropLoadTableSQL, err := sql.RenderTableTemplate(target, t.templates.dropLoadTable)
+	if err != nil {
+		return fmt.Errorf("rendering dropLoadTable template: %w", err)
+	}
+	b.dropLoadTableSQL = dropLoadTableSQL
+
+	// Build column names and types list for mutations
 	// Order: keys first, then values, then flow_document
 	for _, key := range target.Keys {
 		b.columnNames = append(b.columnNames, key.Identifier)
+		b.columnTypes = append(b.columnTypes, key.DDL)
 		b.keyColumnIdxs = append(b.keyColumnIdxs, len(b.columnNames)-1)
 	}
 	for _, val := range target.Values {
 		b.columnNames = append(b.columnNames, val.Identifier)
+		b.columnTypes = append(b.columnTypes, val.DDL)
 	}
 	if target.Document != nil {
 		b.columnNames = append(b.columnNames, target.Document.Identifier)
+		b.columnTypes = append(b.columnTypes, target.Document.DDL)
 	}
 
 	t.bindings = append(t.bindings, b)
@@ -213,22 +275,56 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
 
-// Load implements the Load phase using SQL queries
+// Load implements the Load phase using temporary tables for efficient batch loading
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	ctx := it.Context()
 
-	// Build a WHERE IN clause for each binding's keys
-	type loadBatch struct {
-		binding int
-		keys    [][]interface{}
+	// Track which bindings have keys and prepare for mutation batching
+	type bindingState struct {
+		tempTableCreated bool
+		tempTableName    string
+		keyColumnNames   []string
 	}
+	bindingStates := make(map[int]*bindingState)
 
-	var batches []loadBatch
-	currentBatch := make(map[int]*loadBatch)
+	var currentMutations []*spanner.Mutation
+	hadLoads := false
 
+	// Step 1: Iterate through keys, create temp tables, and insert keys on-the-go
 	for it.Next() {
+		hadLoads = true
 		bindingIdx := it.Binding
 		b := t.bindings[bindingIdx]
+
+		// Create temp table for this binding on first key
+		if bindingStates[bindingIdx] == nil {
+			// Use admin client to execute DDL for creating temporary table
+			op, err := t.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+				Database: t.dbPath,
+				Statements: []string{b.createLoadTableSQL},
+			})
+			if err != nil {
+				return fmt.Errorf("creating temporary load table for binding %d: %w", bindingIdx, err)
+			}
+			// Wait for the DDL operation to complete
+			if err := op.Wait(ctx); err != nil {
+				return fmt.Errorf("waiting for temporary load table creation for binding %d: %w", bindingIdx, err)
+			}
+
+			tempTableName := fmt.Sprintf("flow_temp_table_%d", bindingIdx)
+			keyColumnNames := make([]string, len(b.target.Keys))
+			for i, key := range b.target.Keys {
+				keyColumnNames[i] = key.Identifier
+			}
+
+			bindingStates[bindingIdx] = &bindingState{
+				tempTableCreated: true,
+				tempTableName:    tempTableName,
+				keyColumnNames:   keyColumnNames,
+			}
+		}
+
+		state := bindingStates[bindingIdx]
 
 		// Convert the key
 		converted, err := b.target.ConvertKey(it.Key)
@@ -236,16 +332,26 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting Load key: %w", err)
 		}
 
-		// Add to current batch
-		if currentBatch[bindingIdx] == nil {
-			currentBatch[bindingIdx] = &loadBatch{binding: bindingIdx}
+		// Convert key values to Spanner-compatible types
+		spannerKeyVals := make([]interface{}, len(converted))
+		for i, keyVal := range converted {
+			spannerVal, err := toSpannerValue(keyVal, b.target.Keys[i].Identifier, b.target.Keys[i].DDL)
+			if err != nil {
+				return fmt.Errorf("converting key value for %s: %w", b.target.Keys[i].Identifier, err)
+			}
+			spannerKeyVals[i] = spannerVal
 		}
-		currentBatch[bindingIdx].keys = append(currentBatch[bindingIdx].keys, converted)
 
-		// Flush if batch is getting large
-		if len(currentBatch[bindingIdx].keys) >= 1000 {
-			batches = append(batches, *currentBatch[bindingIdx])
-			currentBatch[bindingIdx] = nil
+		// Add INSERT mutation for this key
+		mutation := spanner.Insert(state.tempTableName, state.keyColumnNames, spannerKeyVals)
+		currentMutations = append(currentMutations, mutation)
+
+		// Apply mutations in batches of 500
+		if len(currentMutations) >= 500 {
+			if _, err := t.client.Apply(ctx, currentMutations); err != nil {
+				return fmt.Errorf("applying load mutations: %w", err)
+			}
+			currentMutations = nil
 		}
 	}
 
@@ -253,66 +359,82 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return it.Err()
 	}
 
-	// Collect remaining batches
-	for _, batch := range currentBatch {
-		if batch != nil && len(batch.keys) > 0 {
-			batches = append(batches, *batch)
+	if !hadLoads {
+		return nil
+	}
+
+	// Apply any remaining mutations
+	if len(currentMutations) > 0 {
+		if _, err := t.client.Apply(ctx, currentMutations); err != nil {
+			return fmt.Errorf("applying remaining load mutations: %w", err)
 		}
 	}
 
-	// Execute loads for each batch
+	// Step 2: Build and execute single UNION ALL query to fetch all documents
 	t.be.StartedEvaluatingLoads()
 	defer t.be.FinishedEvaluatingLoads()
 
-	for _, batch := range batches {
-		b := t.bindings[batch.binding]
+	var unionQueries []string
+	for bindingIdx := range bindingStates {
+		b := t.bindings[bindingIdx]
+		unionQueries = append(unionQueries, b.loadQuerySQL)
+	}
 
-		// Build WHERE IN query
-		// For simplicity, we'll query one key at a time for now
-		// TODO: Optimize with proper WHERE IN for composite keys
-		for _, keyVals := range batch.keys {
-			var whereClause strings.Builder
-			whereClause.WriteString("WHERE ")
-			for i, key := range b.target.Keys {
-				if i > 0 {
-					whereClause.WriteString(" AND ")
+	combinedQuery := strings.Join(unionQueries, "\nUNION ALL\n")
+	iter := t.client.Single().Query(ctx, spanner.Statement{SQL: combinedQuery})
+	err := iter.Do(func(row *spanner.Row) error {
+		var bindingNum int64
+		var document spanner.NullJSON
+
+		if err := row.Columns(&bindingNum, &document); err != nil {
+			return fmt.Errorf("scanning row: %w", err)
+		}
+
+		// Convert NullJSON to json.RawMessage
+		var rawDoc json.RawMessage
+		if document.Valid {
+			switch v := document.Value.(type) {
+			case []byte:
+				rawDoc = json.RawMessage(v)
+			case string:
+				rawDoc = json.RawMessage(v)
+			default:
+				// If it's a structured value, marshal it to JSON
+				marshaled, err := json.Marshal(v)
+				if err != nil {
+					return fmt.Errorf("marshaling document: %w", err)
 				}
-				whereClause.WriteString(key.Identifier)
-				whereClause.WriteString(" = @key")
-				whereClause.WriteString(fmt.Sprintf("%d", i))
+				rawDoc = json.RawMessage(marshaled)
 			}
+		}
 
-			query := fmt.Sprintf("SELECT %d AS binding, %s FROM %s %s",
-				batch.binding,
-				b.target.Document.Identifier,
-				b.target.Identifier,
-				whereClause.String())
+		return loaded(int(bindingNum), rawDoc)
+	})
+	iter.Stop()
 
-			stmt := spanner.Statement{SQL: query}
-			// Add parameters
-			params := make(map[string]interface{})
-			for i, keyVal := range keyVals {
-				params[fmt.Sprintf("key%d", i)] = keyVal
-			}
-			stmt.Params = params
+	if err != nil && err != iterator.Done {
+		return fmt.Errorf("querying load: %w", err)
+	}
 
-			// Execute query
-			iter := t.client.Single().Query(ctx, stmt)
-			err := iter.Do(func(row *spanner.Row) error {
-				var bindingNum int
-				var document json.RawMessage
+	// Step 3: Drop all temporary tables
+	var dropStatements []string
+	for bindingIdx := range bindingStates {
+		b := t.bindings[bindingIdx]
+		dropStatements = append(dropStatements, b.dropLoadTableSQL)
+	}
 
-				if err := row.Columns(&bindingNum, &document); err != nil {
-					return fmt.Errorf("scanning row: %w", err)
-				}
-
-				return loaded(bindingNum, document)
-			})
-			iter.Stop()
-
-			if err != nil && err != iterator.Done {
-				return fmt.Errorf("querying load: %w", err)
-			}
+	// Use admin client to drop all temp tables in a single DDL operation
+	if len(dropStatements) > 0 {
+		op, err := t.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+			Database:   t.dbPath,
+			Statements: dropStatements,
+		})
+		if err != nil {
+			return fmt.Errorf("dropping temporary load tables: %w", err)
+		}
+		// Wait for the DDL operation to complete
+		if err := op.Wait(ctx); err != nil {
+			return fmt.Errorf("waiting for temporary load tables to drop: %w", err)
 		}
 	}
 
@@ -332,26 +454,54 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	for it.Next() {
 		b := t.bindings[it.Binding]
 
-		if it.Delete {
-			// TODO: Implement deletions
-			// Options:
-			// 1. Use spanner.Delete() mutation (simple, included in same batch)
-			// 2. Use DML DELETE statement (supports Partitioned DML for large deletes)
-			// 3. Soft delete with flow_deleted column
-			log.WithField("binding", it.Binding).Warn("deletions not yet implemented for Cloud Spanner, skipping")
-			continue
-		}
+		if it.Delete && t.cfg.HardDelete {
+			if !it.Exists {
+				// Ignore items which do not exist and are already deleted
+				continue
+			}
+			// Convert only the key columns for deletion
+			keyValues, err := b.target.ConvertKey(it.Key)
+			if err != nil {
+				return nil, fmt.Errorf("converting delete keys: %w", err)
+			}
 
-		// Build mutation for insert or update
-		// Spanner's InsertOrUpdate handles both cases
-		values, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
-		if err != nil {
-			return nil, fmt.Errorf("converting store values: %w", err)
-		}
+			// Convert key values to Spanner-compatible types
+			spannerKeyValues := make([]interface{}, len(keyValues))
+			for i, val := range keyValues {
+				spannerVal, err := toSpannerValue(val, b.columnNames[b.keyColumnIdxs[i]], b.columnTypes[b.keyColumnIdxs[i]])
+				if err != nil {
+					return nil, fmt.Errorf("converting key value for column %s: %w", b.columnNames[b.keyColumnIdxs[i]], err)
+				}
+				spannerKeyValues[i] = spannerVal
+			}
 
-		mutation := spanner.InsertOrUpdate(b.target.Identifier, b.columnNames, values)
-		mutations = append(mutations, mutation)
-		batchSize++
+			// Create a Delete mutation
+			key := spanner.Key(spannerKeyValues)
+			mutation := spanner.Delete(b.target.Identifier, spanner.KeySetFromKeys(key))
+			mutations = append(mutations, mutation)
+			batchSize++
+		} else {
+			// Build mutation for insert or update
+			// Spanner's InsertOrUpdate handles both cases
+			values, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+			if err != nil {
+				return nil, fmt.Errorf("converting store values: %w", err)
+			}
+
+			// Convert values to Spanner-compatible types
+			spannerValues := make([]interface{}, len(values))
+			for i, val := range values {
+				spannerVal, err := toSpannerValue(val, b.columnNames[i], b.columnTypes[i])
+				if err != nil {
+					return nil, fmt.Errorf("converting value for column %s: %w", b.columnNames[i], err)
+				}
+				spannerValues[i] = spannerVal
+			}
+
+			mutation := spanner.InsertOrUpdate(b.target.Identifier, b.columnNames, spannerValues)
+			mutations = append(mutations, mutation)
+			batchSize++
+		}
 
 		// Flush if batch is getting large
 		// Note: In production, we should also track byte size
@@ -386,16 +536,14 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				[]string{"materialization", "key_begin", "key_end", "fence", "checkpoint"},
 				[]interface{}{
 					t.fence.Materialization.String(),
-					t.fence.KeyBegin,
-					t.fence.KeyEnd,
-					t.fence.Fence,
+					int64(t.fence.KeyBegin), // Convert uint32 to int64
+					int64(t.fence.KeyEnd),   // Convert uint32 to int64
+					int64(t.fence.Fence),    // Convert uint64 to int64
 					string(checkpointBytes),
 				},
 			)
 			mutations = append(mutations, fenceMutation)
 
-			// Apply all mutations atomically
-			log.WithField("mutations", len(mutations)).Info("applying mutations to Spanner")
 			_, err = t.client.Apply(ctx, mutations)
 			if err != nil {
 				return fmt.Errorf("applying mutations: %w", err)
@@ -409,6 +557,9 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 func (t *transactor) Destroy() {
 	if t.client != nil {
 		t.client.Close()
+	}
+	if t.adminClient != nil {
+		t.adminClient.Close()
 	}
 }
 

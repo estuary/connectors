@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"slices"
 	"strings"
 	"text/template"
@@ -9,7 +10,41 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 )
 
-func createSpannerDialect() sql.Dialect {
+// Valid characters are: letters (a-z, A-Z), numbers (0-9), and underscores (_).
+var identifierSanitizerRegexp = regexp.MustCompile(`[^_0-9a-zA-Z]`)
+
+// sanitizeSpannerIdentifier normalizes an identifier to meet Spanner's rules:
+// - Replaces invalid characters with underscores
+// - Ensures it starts with a letter (prefixes with 'c_' if it starts with a digit or underscore)
+func sanitizeSpannerIdentifier(identifier string) string {
+	if len(identifier) == 0 {
+		panic("cannot sanitize empty identifier")
+	}
+
+	// Replace invalid characters with underscores
+	sanitized := identifierSanitizerRegexp.ReplaceAllString(identifier, "_")
+
+	// Ensure it starts with a letter (Spanner requirement)
+	if !regexp.MustCompile(`^[a-zA-Z]`).MatchString(sanitized) {
+		sanitized = "c_" + sanitized
+	}
+
+	return sanitized
+}
+
+func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
+	primaryKeyTextType := sql.MapStatic("STRING(MAX)")
+
+	// Define base date/time mappings without primary key wrapper
+	dateMapping := sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate))
+	datetimeMapping := sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime))
+
+	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
+	if featureFlags["datetimes_as_string"] {
+		dateMapping = sql.MapPrimaryKey(primaryKeyTextType, dateMapping)
+		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -19,18 +54,18 @@ func createSpannerDialect() sql.Dialect {
 			sql.NUMBER:  sql.MapStatic("FLOAT64"),
 			sql.BOOLEAN: sql.MapStatic("BOOL"),
 			// Cloud Spanner supports native JSON type
-			sql.OBJECT: sql.MapStatic("JSON"),
-			sql.ARRAY:  sql.MapStatic("JSON"),
+			sql.OBJECT: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.ARRAY:  sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
 			// Store binary data as BYTES
 			sql.BINARY:         sql.MapStatic("BYTES(MAX)"),
 			sql.MULTIPLE:       sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.STRING_INTEGER: sql.MapStatic("NUMERIC"),
-			sql.STRING_NUMBER:  sql.MapStatic("NUMERIC"),
+			sql.STRING_INTEGER: sql.MapStatic("NUMERIC", sql.UsingConverter(sql.StrToInt)),
+			sql.STRING_NUMBER:  sql.MapStatic("FLOAT64", sql.UsingConverter(sql.StrToFloat("NaN", "Infinity", "-Infinity"))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("STRING(MAX)"),
 				WithFormat: map[string]sql.MapProjectionFn{
-					"date":      sql.MapStatic("DATE", sql.UsingConverter(sql.ClampDate)),
-					"date-time": sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.ClampDatetime)),
+					"date":      dateMapping,
+					"date-time": datetimeMapping,
 					// Duration is not natively supported, store as STRING
 					"duration": sql.MapStatic("STRING(MAX)"),
 					// Network address types are not natively supported in Spanner
@@ -48,34 +83,34 @@ func createSpannerDialect() sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"NUMERIC":  {sql.NewMigrationSpec([]string{"FLOAT64", "STRING(MAX)"})},
-			"INT64":    {sql.NewMigrationSpec([]string{"FLOAT64", "NUMERIC", "STRING(MAX)"})},
-			"FLOAT64":  {sql.NewMigrationSpec([]string{"STRING(MAX)"})},
-			"DATE":     {sql.NewMigrationSpec([]string{"STRING(MAX)"})},
-			"TIMESTAMP": {sql.NewMigrationSpec([]string{"STRING(MAX)"}, sql.WithCastSQL(timestampToStringCast))},
+			"numeric":  {sql.NewMigrationSpec([]string{"float64", "string"})},
+			"int64":    {sql.NewMigrationSpec([]string{"float64", "numeric", "string"})},
+			"float64":  {sql.NewMigrationSpec([]string{"string"})},
+			"date":     {sql.NewMigrationSpec([]string{"string"})},
+			"timestamp": {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(timestampToStringCast))},
 			"*":        {sql.NewMigrationSpec([]string{"JSON"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
-			// Spanner doesn't have schemas, just table names
-			if len(path) == 1 {
-				return sql.InfoTableLocation{TableSchema: "", TableName: path[0]}
-			} else {
-				// If a schema is provided, ignore it and use the table name
-				return sql.InfoTableLocation{TableSchema: "", TableName: path[len(path)-1]}
-			}
+			return sql.InfoTableLocation{TableSchema: "", TableName: path[len(path)-1]}
 		}),
 		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string {
 			// Spanner doesn't have schemas, so return empty string
 			return ""
 		}),
-		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
-		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
-			sql.PassThroughTransform(
-				func(s string) bool {
-					return sql.IsSimpleIdentifier(s) && !slices.Contains(SPANNER_RESERVED_WORDS, strings.ToUpper(s))
-				},
-				sql.QuoteTransform("`", "``"),
-			))),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string {
+			return sanitizeSpannerIdentifier(field)
+		}),
+		Identifierer: sql.IdentifierFn(func(path ...string) string {
+			field := path[len(path)-1]
+
+			sanitized := sanitizeSpannerIdentifier(field)
+
+			if slices.Contains(SPANNER_RESERVED_WORDS, strings.ToLower(sanitized)) {
+				return sql.QuoteTransform("`", "``")(sanitized)
+			}
+
+			return sanitized
+		}),
 		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			// Cloud Spanner uses @p0, @p1, @p2, etc. for placeholders
@@ -96,13 +131,15 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 }
 
 type templates struct {
-	createLoadTable   *template.Template
-	createTargetTable *template.Template
-	alterTableColumns *template.Template
-	loadInsert        *template.Template
-	loadQuery         *template.Template
-	installFence      *template.Template
-	updateFence       *template.Template
+	createLoadTable         *template.Template
+	createTargetTable       *template.Template
+	alterTableColumns       *template.Template
+	loadInsert              *template.Template
+	loadQuery               *template.Template
+	loadQueryNoFlowDocument *template.Template
+	dropLoadTable           *template.Template
+	installFence            *template.Template
+	updateFence             *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -148,11 +185,18 @@ ALTER TABLE {{$.Identifier}}
 -- Templated creation of a temporary load table:
 
 {{ define "createLoadTable" }}
-CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
+CREATE TABLE {{ template "temp_name" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
-	{{- end }}
+	{{- end }},
+
+	PRIMARY KEY (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }}, {{end -}}
+		{{$key.Identifier}}
+	{{- end -}}
+	)
 )
 {{ end }}
 
@@ -188,6 +232,45 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{ end }}
+{{ end }}
+
+-- Templated query for no_flow_document feature - reconstructs JSON from root-level columns
+
+{{ define "uncast" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if eq $.AsFlatType "string_integer" -}}
+	CAST({{ $ident }} AS STRING)
+{{- else if eq $.AsFlatType "string_number" -}}
+	CAST({{ $ident }} AS STRING)
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
+	CAST({{ $ident }} AS STRING)
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
+	FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E6SZ', {{ $ident }}, 'UTC')
+{{- else -}}
+	{{ $ident }}
+{{- end -}}
+{{- end }}
+
+{{ define "loadQueryNoFlowDocument" }}
+SELECT {{ $.Binding }},
+TO_JSON(STRUCT(
+{{- range $i, $col := $.RootLevelColumns}}
+	{{- if $i}}, {{end}}
+	{{ template "uncast" (ColumnWithAlias $col "r") }} AS {{ $col.Field }}
+{{- end}}
+)) as flow_document
+FROM {{ template "temp_name" . }} AS l
+JOIN {{ $.Identifier}} AS r
+{{- range $ind, $key := $.Keys }}
+	{{ if $ind }} AND {{ else }} ON  {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end }}
+{{ end }}
+
+-- Templated drop of the temporary load table:
+
+{{ define "dropLoadTable" }}
+DROP TABLE {{ template "temp_name" . }}
 {{ end }}
 
 -- Templated fence installation for checkpoints table:
@@ -238,32 +321,34 @@ UPDATE {{ Identifier $.TablePath }}
 `)
 
 	return templates{
-		createLoadTable:   tplAll.Lookup("createLoadTable"),
-		createTargetTable: tplAll.Lookup("createTargetTable"),
-		alterTableColumns: tplAll.Lookup("alterTableColumns"),
-		loadInsert:        tplAll.Lookup("loadInsert"),
-		loadQuery:         tplAll.Lookup("loadQuery"),
-		installFence:      tplAll.Lookup("installFence"),
-		updateFence:       tplAll.Lookup("updateFence"),
+		createLoadTable:         tplAll.Lookup("createLoadTable"),
+		createTargetTable:       tplAll.Lookup("createTargetTable"),
+		alterTableColumns:       tplAll.Lookup("alterTableColumns"),
+		loadInsert:              tplAll.Lookup("loadInsert"),
+		loadQuery:               tplAll.Lookup("loadQuery"),
+		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
+		dropLoadTable:           tplAll.Lookup("dropLoadTable"),
+		installFence:            tplAll.Lookup("installFence"),
+		updateFence:             tplAll.Lookup("updateFence"),
 	}
 }
 
 // Spanner reserved words (subset of commonly used ones)
 // Full list: https://cloud.google.com/spanner/docs/lexical#reserved-keywords
 var SPANNER_RESERVED_WORDS = []string{
-	"ALL", "AND", "ANY", "ARRAY", "AS", "ASC", "ASSERT_ROWS_MODIFIED",
-	"AT", "BETWEEN", "BY", "CASE", "CAST", "COLLATE", "CREATE",
-	"CROSS", "CUBE", "CURRENT", "DEFAULT", "DEFINE", "DESC",
-	"DISTINCT", "ELSE", "END", "ENUM", "ESCAPE", "EXCEPT",
-	"EXISTS", "EXTRACT", "FALSE", "FETCH", "FOLLOWING", "FOR",
-	"FROM", "FULL", "GROUP", "GROUPING", "HASH", "HAVING",
-	"IF", "IGNORE", "IN", "INNER", "INTERSECT", "INTERVAL",
-	"INTO", "IS", "JOIN", "LEFT", "LIKE", "LIMIT", "LOOKUP",
-	"MERGE", "NATURAL", "NEW", "NO", "NOT", "NULL", "NULLS",
-	"OF", "ON", "OR", "ORDER", "OUTER", "OVER", "PARTITION",
-	"PRECEDING", "PROTO", "RANGE", "RECURSIVE", "RESPECT",
-	"RIGHT", "ROLLUP", "ROWS", "SELECT", "SET", "SOME",
-	"STRUCT", "TABLE", "THEN", "TO", "TREAT", "TRUE",
-	"UNBOUNDED", "UNION", "UNNEST", "USING", "WHEN", "WHERE",
-	"WINDOW", "WITH", "WITHIN",
+	"all", "and", "any", "array", "as", "asc", "assert_rows_modified",
+	"at", "between", "by", "case", "cast", "collate", "create",
+	"cross", "cube", "current", "default", "define", "desc",
+	"distinct", "else", "end", "enum", "escape", "except",
+	"exists", "extract", "false", "fetch", "following", "for",
+	"from", "full", "group", "grouping", "hash", "having",
+	"if", "ignore", "in", "inner", "intersect", "interval",
+	"into", "is", "join", "left", "like", "limit", "lookup",
+	"merge", "natural", "new", "no", "not", "null", "nulls",
+	"of", "on", "or", "order", "outer", "over", "partition",
+	"preceding", "proto", "range", "recursive", "respect",
+	"right", "rollup", "rows", "select", "set", "some",
+	"struct", "table", "then", "to", "treat", "true",
+	"unbounded", "union", "unnest", "using", "when", "where",
+	"window", "with", "within",
 }
