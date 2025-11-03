@@ -235,6 +235,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Now read these results back from the s3 file.
+	//
+	// If this file does not exist, then it is likely the COPY query was unable
+	// to write to the bucket.
 	r, err := d.bucket.NewReader(ctx, loadResKey)
 	if err != nil {
 		return fmt.Errorf("get load results object reader: %w", err)
