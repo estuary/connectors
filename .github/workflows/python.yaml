@@ -51,6 +51,7 @@ on:
       - "source-sentry/**"
       - "source-dynamics-365-finance-and-operations/**"
       - "source-incident-io/**"
+      - "source-navan/**"
 
   pull_request:
     branches: [main]
@@ -103,6 +104,7 @@ on:
       - "source-sentry/**"
       - "source-dynamics-365-finance-and-operations/**"
       - "source-incident-io/**"
+      - "source-navan/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -299,6 +301,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-incident-io
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-navan
             type: capture
             version: v1
             usage_rate: "1.0"
