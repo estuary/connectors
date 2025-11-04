@@ -1057,10 +1057,10 @@ func compareXID32(a, b uint32) int {
 }
 
 type postgresTableStatistics struct {
-	RelPages       int64 // Approximate number of pages in the table
-	RelTuples      int64 // Approximate number of live tuples in the table
-	MaxPageID      int64 // Conservative upper bound for the maximum page ID
-	PartitionCount int   // Number of partitions for the table, including the parent table itself
+	RelPages       int64   // Approximate number of pages in the table
+	RelTuples      float64 // Approximate number of live tuples in the table
+	MaxPageID      int64   // Conservative upper bound for the maximum page ID
+	PartitionCount int     // Number of partitions for the table, including the parent table itself
 }
 
 const tableStatisticsQuery = `
