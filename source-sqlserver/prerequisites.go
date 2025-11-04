@@ -263,20 +263,17 @@ func splitStreamID(streamID string) (string, string) {
 }
 
 func (db *sqlserverDatabase) prerequisiteMaximumLSN(ctx context.Context) error {
-	var maxLSN []byte
 	// Retry loop with a 1s delay between retries, in case the watermarks table
 	// capture instance was the first one created on this database.
-	for retries := 0; retries < 10; retries++ {
-		if err := db.conn.QueryRowContext(ctx, `SELECT sys.fn_cdc_get_max_lsn();`).Scan(&maxLSN); err != nil {
-			return fmt.Errorf("error querying the current LSN: %w", err)
-		}
-		if len(maxLSN) > 0 {
-			log.WithField("retries", retries).Debug("got current CDC LSN")
+	var err error
+	for retry := range 10 {
+		if _, err = cdcGetMaxLSN(ctx, db.conn); err == nil {
+			log.WithField("retry", retry).Debug("got current CDC LSN")
 			return nil
 		}
 		time.Sleep(1 * time.Second)
 	}
-	return fmt.Errorf("the agent process may not be running: maximum CDC LSN is currently unset")
+	return err
 }
 
 func (db *sqlserverDatabase) SetupTablePrerequisites(ctx context.Context, schema, table string) error {
