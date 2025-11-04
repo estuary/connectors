@@ -19,7 +19,7 @@ from estuary_cdk.capture.common import (
 )
 from estuary_cdk.http import HTTPSession
 
-from pydantic import AfterValidator, AwareDatetime, BaseModel, Field
+from pydantic import AfterValidator, AwareDatetime, BaseModel, Field, ValidationInfo, model_validator
 
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -322,12 +322,29 @@ INCREMENTAL_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, FilterParam, str, t
 ]
 
 
+class TicketChildResourceValidationContext:
+    def __init__(self, ticket_id: int):
+        self.ticket_id = ticket_id
+
+
+class TicketChildResource(ZendeskResource):
+    @model_validator(mode="before")
+    @classmethod
+    def _add_ticket_id(cls, values: dict[str, Any], info: ValidationInfo) -> dict[str, Any]:
+        if info.context and isinstance(info.context, TicketChildResourceValidationContext):
+            if 'ticket_id' not in values:
+                values['ticket_id'] = info.context.ticket_id
+        else:
+            raise RuntimeError("TicketChildResource requires either a TicketChildResourceValidationContext containing the ticket_id.")
+        return values
+
+
 class TicketAuditsResponse(IncrementalCursorPaginatedResponse):
-    resources: list[ZendeskResource] = Field(alias="audits")
+    resources: list[TicketChildResource] = Field(alias="audits")
 
 
 class TicketCommentsResponse(IncrementalCursorPaginatedResponse):
-    resources: list[ZendeskResource] = Field(alias="comments")
+    resources: list[TicketChildResource] = Field(alias="comments")
 
 
 class AbbreviatedTicket(BaseModel):

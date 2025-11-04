@@ -669,6 +669,7 @@
       },
       "plain_body": "Can I still cancel my order?",
       "public": true,
+      "ticket_id": 12,
       "type": "Comment",
       "via": {
         "channel": "sample_ticket",
