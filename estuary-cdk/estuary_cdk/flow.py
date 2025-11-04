@@ -1,7 +1,7 @@
 import abc
 from dataclasses import dataclass
 from datetime import datetime
-from pydantic import BaseModel, NonNegativeInt, PositiveInt, Field
+from pydantic import BaseModel, NonNegativeInt, PositiveInt, Field, ConfigDict
 from typing import Any, Literal, TypeVar, Generic, Literal
 
 from .pydantic_polyfill import GenericModel
@@ -148,6 +148,12 @@ class ResourceOwnerPasswordOAuth2Credentials(abc.ABC, BaseModel):
 
 
 class ClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
+    # This configuration provides a "title" annotation for the UI to display
+    # instead of the class name.
+    model_config = ConfigDict(
+        title="OAuth",
+    )
+
     credentials_title: Literal["OAuth Credentials"] = Field(
         default="OAuth Credentials",
         json_schema_extra={"type": "string"}
