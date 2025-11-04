@@ -1256,12 +1256,12 @@ func (rs *sqlserverReplicationStream) emitEvent(ctx context.Context, event sqlca
 
 func cdcGetMaxLSN(ctx context.Context, conn *sql.DB) (LSN, error) {
 	var maxLSN LSN
-	const query = `SELECT sys.fn_cdc_get_max_lsn();`
+	const query = `SELECT MAX(start_lsn) FROM cdc.lsn_time_mapping;`
 	if err := conn.QueryRowContext(ctx, query).Scan(&maxLSN); err != nil {
 		return nil, fmt.Errorf("error querying database maximum LSN: %w", err)
 	}
 	if len(maxLSN) == 0 {
-		return nil, fmt.Errorf("invalid result from 'sys.fn_cdc_get_max_lsn()', agent process likely not running")
+		return nil, fmt.Errorf("no maximum CDC LSN, agent process may not be running")
 	}
 	return maxLSN, nil
 }
