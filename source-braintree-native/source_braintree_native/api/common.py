@@ -1,3 +1,4 @@
+import asyncio
 from braintree import (
     BraintreeGateway,
     AddOnGateway,
@@ -5,6 +6,7 @@ from braintree import (
     )
 from braintree.attribute_getter import AttributeGetter
 from datetime import datetime, timedelta, UTC
+from typing import Awaitable, Any, AsyncGenerator
 import xmltodict
 import re
 
@@ -24,6 +26,16 @@ TRANSACTION_SEARCH_LIMIT = 50_000
 
 SEARCH_PAGE_SIZE = 50
 SEMAPHORE_LIMIT = 20
+
+
+async def process_completed_fetches(
+    fetch_coroutines: list[Awaitable[list[dict[str, Any]]]],
+) -> AsyncGenerator[dict[str, Any], None]:
+    """Helper to process fetching multiple pages of resources and yield individual resources."""
+    for coro in asyncio.as_completed(fetch_coroutines):
+        result = await coro
+        for resource in result:
+            yield resource
 
 
 def braintree_xml_to_dict(xml_data):
