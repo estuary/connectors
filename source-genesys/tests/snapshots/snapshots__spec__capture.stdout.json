@@ -3,7 +3,7 @@
     "protocol": 3032023,
     "configSchema": {
       "$defs": {
-        "OAuth": {
+        "ClientCredentialsOAuth2Credentials": {
           "properties": {
             "credentials_title": {
               "const": "OAuth Credentials",
@@ -61,13 +61,13 @@
         "credentials": {
           "discriminator": {
             "mapping": {
-              "OAuth Credentials": "#/$defs/OAuth"
+              "OAuth Credentials": "#/$defs/ClientCredentialsOAuth2Credentials"
             },
             "propertyName": "credentials_title"
           },
           "oneOf": [
             {
-              "$ref": "#/$defs/OAuth"
+              "$ref": "#/$defs/ClientCredentialsOAuth2Credentials"
             }
           ],
           "title": "Authentication"
