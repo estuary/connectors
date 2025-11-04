@@ -1,0 +1,87 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "ClientCredentialsOAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret"
+          ],
+          "title": "OAuth",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "$ref": "#/$defs/ClientCredentialsOAuth2Credentials",
+          "description": "See https://app.navan.com/app/helpcenter/articles/travel/admin/other-integrations/booking-data-integration",
+          "title": "Authentication"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-navan",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

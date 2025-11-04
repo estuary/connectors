@@ -1,0 +1,15 @@
+---
+captures:
+  acmeCo/source-navan:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_navan
+        config:
+          credentials:
+            credentials_title: OAuth Credentials
+            client_id: client_id_placeholder
+            client_secret: client_secret_placeholder
+    bindings: []
