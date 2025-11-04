@@ -33,6 +33,7 @@ from .models import (
     PostCommentVotesResponse,
     INCREMENTAL_CURSOR_EXPORT_TYPES,
     FilterParam,
+    TicketChildResourceValidationContext,
 )
 
 CHECKPOINT_INTERVAL = 1000
@@ -676,9 +677,12 @@ async def _fetch_ticket_child_resources(
         params: dict[str, str | int] = {
             "page[size]": CURSOR_PAGINATION_PAGE_SIZE,
         }
+        context = TicketChildResourceValidationContext(ticket_id=ticket_id)
+
         while True:
             response = response_model.model_validate_json(
-                await http.request(log, url, params=params)
+                await http.request(log, url, params=params),
+                context=context
             )
 
             for resource in response.resources:
