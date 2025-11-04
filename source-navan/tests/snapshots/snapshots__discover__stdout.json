@@ -1,0 +1,62 @@
+[
+  {
+    "recommendedName": "bookings",
+    "resourceConfig": {
+      "name": "bookings",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "uuid": {
+          "title": "Uuid",
+          "type": "string"
+        },
+        "lastModified": {
+          "format": "date-time",
+          "title": "Lastmodified",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uuid",
+        "lastModified"
+      ],
+      "title": "Booking",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/uuid"
+    ]
+  }
+]
