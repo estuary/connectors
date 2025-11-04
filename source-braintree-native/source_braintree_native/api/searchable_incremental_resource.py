@@ -15,6 +15,7 @@ from .common import (
     SEARCH_LIMIT,
     braintree_object_to_dict,
     braintree_xml_to_dict,
+    process_completed_fetches,
     search_limit_error_message,
     reduce_window_end,
 )
@@ -103,16 +104,6 @@ async def determine_next_searchable_resource_window_end_by_field(
     return end
 
 
-async def _process_completed_fetches(
-    fetch_coroutines: list[Awaitable[list[dict[str, Any]]]],
-) -> AsyncGenerator[dict[str, Any], None]:
-    """Helper to process fetching multiple pages of resources and yield individual resources."""
-    for coro in asyncio.as_completed(fetch_coroutines):
-        result = await coro
-        for resource in result:
-            yield resource
-
-
 async def _fetch_resource_page(
     http: HTTPSession,
     base_url: str,
@@ -179,7 +170,7 @@ async def _fetch_resource_batch(
 
     resources: list[dict[str, Any]] = []
 
-    async for resource in _process_completed_fetches(
+    async for resource in process_completed_fetches(
         [_fetch_resource_page(http, base_url, path, response_model, [id], semaphore, log) for id in ids]
     ):
         resources.append(resource)
@@ -199,7 +190,7 @@ async def fetch_by_ids(
 ) -> AsyncGenerator[IncrementalResource, None]:
     semaphore = asyncio.Semaphore(SEMAPHORE_LIMIT)
 
-    async for resource in _process_completed_fetches(
+    async for resource in process_completed_fetches(
         [_fetch_resource_batch(http, base_url, path, response_model, list(chunk), semaphore, log)
          for chunk in itertools.batched(ids, SEARCH_PAGE_SIZE)]
     ):
