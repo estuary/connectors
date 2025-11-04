@@ -4,6 +4,7 @@ from typing import AsyncGenerator
 
 from braintree import BraintreeGateway
 from estuary_cdk.capture.common import LogCursor, PageCursor
+import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.http import HTTPSession
 
 from .transactions import (
@@ -274,7 +275,6 @@ async def fetch_disputes(
         log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
-    most_recent_updated_at = log_cursor
     window_end = log_cursor + timedelta(hours=max(window_size, MIN_DISPUTES_WINDOW_SIZE))
     end = min(
         window_end,
@@ -292,14 +292,10 @@ async def fetch_disputes(
         end,
         log,
     ):
-        if log_cursor < doc.updated_at <= end:
+        if cache.should_yield("disputes", doc.id, doc.updated_at):
             yield doc
-            most_recent_updated_at = max(most_recent_updated_at, doc.updated_at)
 
-    if most_recent_updated_at > log_cursor:
-        yield most_recent_updated_at
-    else:
-        yield end
+    yield end
 
 
 async def backfill_disputes(
@@ -329,7 +325,7 @@ async def backfill_disputes(
         end,
         log,
     ):
-        if start < doc.updated_at <= end:
+        if cache.should_yield("disputes", doc.id, doc.updated_at):
             yield doc
 
     yield dt_to_str(end)

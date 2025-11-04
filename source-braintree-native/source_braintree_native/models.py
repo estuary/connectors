@@ -177,8 +177,11 @@ class DisputeSearchField(StrEnum):
     # Search disputes by effective_date in status_history. If _any_ of the statuses in a dispute's status_history
     # have an effective_date that matches the search, that dispute is included in the search results.
     # 
-    # Since the most recent status' timestamp is used for the dispute's updated_at field, searching by effective_date
-    # should be a sufficient proxy for searching by updated_at.
+    # Note: While the most recent status' timestamp is used for the dispute's updated_at field, 
+    # effective_date and updated_at can be days apart. This search method may return
+    # disputes where the effective_date falls within the search range but updated_at does not.
+    # Searching by `effective_date` can be used to capture updated disputes incrementally, but
+    # no assumptions should be made about how close together effective_date and updated_at can be.
     EFFECTIVE_DATE = "effective_date"
 
 
