@@ -1025,6 +1025,7 @@
       "external_id": null,
       "iana_time_zone": "America/New_York",
       "id": 28835702984212,
+      "is_billing_admin": true,
       "last_login_at": "redacted",
       "locale": "en-US",
       "locale_id": 1,
