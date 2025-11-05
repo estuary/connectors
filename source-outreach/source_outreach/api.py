@@ -33,9 +33,10 @@ def _extract_page_cursor(links: OutreachResponse.Links | None) -> str | None:
         return None
 
     parsed_url = urlparse(links.next)
-    params: dict[str, str] = parse_qs(parsed_url.query) #type: ignore
+    params = parse_qs(parsed_url.query)
 
-    return params.get('page[after]')
+    cursor_list = params.get('page[after]')
+    return cursor_list[0] if cursor_list else None
 
 
 async def backfill_resources(
