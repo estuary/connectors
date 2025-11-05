@@ -109,7 +109,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 			sql.OBJECT:  sql.MapStatic(jsonType),
 			sql.ARRAY:   sql.MapStatic(jsonType),
 			sql.BINARY: sql.MapPrimaryKey(
-				sql.MapStatic("VARCHAR(256)"),
+				sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar")),
 				sql.MapStatic("LONGTEXT"),
 			),
 			sql.MULTIPLE: jsonMapper,
@@ -384,7 +384,7 @@ CREATE TEMPORARY TABLE {{ template "temp_load_name" . }} (
 -- Templated truncation of the temporary load table:
 
 {{ define "truncateTempTable" }}
-` + tempTruncateCommand + ` {{ template "temp_load_name" . }};
+`+tempTruncateCommand+` {{ template "temp_load_name" . }};
 {{ end }}
 
 -- Templated load into the temporary load table:
@@ -443,7 +443,7 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 
 {{ define "loadQueryNoFlowDocument" }}
 {{ if not $.DeltaUpdates -}}
-SELECT {{ $.Binding }}, ` + jsonBuildFunction + `(
+SELECT {{ $.Binding }}, `+jsonBuildFunction+`(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}},{{end}}
     {{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col "r") }}
@@ -528,7 +528,7 @@ FROM {{ template "temp_update_name" . }};
 
 
 {{ define "truncateUpdateTable" }}
-` + tempTruncateCommand + ` {{ template "temp_update_name" . }};
+`+tempTruncateCommand+` {{ template "temp_update_name" . }};
 {{ end }}
 
 
@@ -575,7 +575,7 @@ WHERE
 {{ end }}
 
 {{ define "truncateDeleteTable" }}
-` + tempTruncateCommand + ` {{ template "temp_delete_name" . }};
+`+tempTruncateCommand+` {{ template "temp_delete_name" . }};
 {{ end }}
 
 {{ define "installFence" }}
