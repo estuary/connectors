@@ -1215,3 +1215,55 @@ func TestSourceTag(t *testing.T) {
 		cupaloy.SnapshotT(t, cs.Summary())
 	})
 }
+
+// TestDatetimeCursorRoundTrip tests that DATETIME column values used as cursors
+// are correctly round-tripped back to the database for incremental queries.
+//
+// This is a regression test for a bug where DATETIME cursor values with timezone
+// information added during output formatting were not correctly handled when passed
+// back to SQL Server as query parameters.
+func TestDatetimeCursorRoundTrip(t *testing.T) {
+	var ctx, control = context.Background(), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(id INTEGER PRIMARY KEY, data NVARCHAR(MAX), updated_at DATETIME)`)
+
+	for _, tc := range []struct {
+		name     string
+		timezone string
+	}{
+		{"UTC", "UTC"},
+		{"Chicago", "America/Chicago"},
+		{"PositiveOffset", "+04:00"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var cs = testCaptureSpec(t)
+			cs.EndpointSpec.(*Config).Advanced.Timezone = tc.timezone
+			cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+			setResourceCursor(t, cs.Bindings[0], "updated_at")
+
+			setShutdownAfterQuery(t, true)
+			baseTime := time.Date(2025, 1, 1, 12, 0, 0, 0, time.UTC)
+
+			// Clear the table before each timezone test
+			executeControlQuery(t, control, fmt.Sprintf("DELETE FROM %s", tableName))
+
+			// Initial batch of rows
+			for i := range 5 {
+				executeControlQuery(t, control, fmt.Sprintf(
+					"INSERT INTO %s (id, data, updated_at) VALUES (@p1, @p2, @p3)", tableName),
+					i, fmt.Sprintf("Initial row %d", i), baseTime.Add(time.Duration(i)*time.Minute))
+			}
+			cs.Capture(ctx, t, nil)
+
+			// Second batch to be captured using cursor
+			for i := 5; i < 10; i++ {
+				executeControlQuery(t, control, fmt.Sprintf(
+					"INSERT INTO %s (id, data, updated_at) VALUES (@p1, @p2, @p3)", tableName),
+					i, fmt.Sprintf("Second batch row %d", i), baseTime.Add(time.Duration(i)*time.Minute))
+			}
+			cs.Capture(ctx, t, nil)
+
+			cupaloy.SnapshotT(t, cs.Summary())
+		})
+	}
+}

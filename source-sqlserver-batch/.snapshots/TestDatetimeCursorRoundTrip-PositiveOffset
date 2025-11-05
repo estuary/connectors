@@ -1,0 +1,18 @@
+# ================================
+# Collection "acmeCo/test/dbo/datetimecursorroundtrip_190223": 6 Documents
+# ================================
+{"type":"object","required":["_meta","data","id","updated_at"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-sqlserver-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"},"source":{"properties":{"resource":{"type":"string","description":"Resource name of the binding from which this document was captured."},"schema":{"type":"string","description":"Database schema from which the document was read."},"table":{"type":"string","description":"Database table from which the document was read."},"tag":{"type":"string","description":"Optional 'Source Tag' property as defined in the endpoint configuration."}},"additionalProperties":false,"type":"object","required":["resource"]}},"additionalProperties":false,"type":"object","required":["polled","index","row_id","source"],"additionalProperties":false},"data":{"description":"(source type: nvarchar)","type":["string"]},"id":{"type":"integer","description":"(source type: non-nullable int)"},"updated_at":{"format":"date-time","description":"(source type: datetime)","type":["string"]}},"x-infer-schema":true}
+{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"source":{"resource":"datetimecursorroundtrip_190223","schema":"dbo","table":"datetimecursorroundtrip_190223"}},"data":"Initial row 0","id":0,"updated_at":"2025-01-01T12:00:00+04:00"}
+{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1,"source":{"resource":"datetimecursorroundtrip_190223","schema":"dbo","table":"datetimecursorroundtrip_190223"}},"data":"Initial row 1","id":1,"updated_at":"2025-01-01T12:01:00+04:00"}
+{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2,"source":{"resource":"datetimecursorroundtrip_190223","schema":"dbo","table":"datetimecursorroundtrip_190223"}},"data":"Initial row 2","id":2,"updated_at":"2025-01-01T12:02:00+04:00"}
+{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3,"source":{"resource":"datetimecursorroundtrip_190223","schema":"dbo","table":"datetimecursorroundtrip_190223"}},"data":"Initial row 3","id":3,"updated_at":"2025-01-01T12:03:00+04:00"}
+{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4,"source":{"resource":"datetimecursorroundtrip_190223","schema":"dbo","table":"datetimecursorroundtrip_190223"}},"data":"Initial row 4","id":4,"updated_at":"2025-01-01T12:04:00+04:00"}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"datetimecursorroundtrip_190223":{"CursorNames":["updated_at"],"CursorValues":["2025-01-01T12:04:00+04:00"],"DocumentCount":5,"LastPolled":"<TIMESTAMP>"}}}
+# ================================
+# Captures Terminated With Errors
+# ================================
+capture terminated with error: error polling binding "datetimecursorroundtrip_190223": error processing results iterator: mssql: Conversion failed when converting date and/or time from character string.
+
