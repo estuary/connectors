@@ -261,12 +261,25 @@ func translateSQLServerValue(cfg *Config, val any, databaseTypeName string) (any
 	return val, nil
 }
 
+// translateSQLServerCursor translates values specifically for cursor persistence and round-tripping.
+func translateSQLServerCursor(cfg *Config, val any, databaseTypeName string) (any, error) {
+	// Special cases where translateSQLServerValue is inappropriate
+	switch strings.ToUpper(databaseTypeName) {
+	case "DATETIME":
+		return val, nil
+	}
+
+	// Otherwise we defer to translateSQLServerValue
+	return translateSQLServerValue(cfg, val, databaseTypeName)
+}
+
 var sqlserverDriver = &BatchSQLDriver{
 	DocumentationURL:    "https://go.estuary.dev/source-sqlserver-batch",
 	ConfigSchema:        generateConfigSchema(),
 	Connect:             connectSQLServer,
 	GenerateResource:    generateSQLServerResource,
 	TranslateValue:      translateSQLServerValue,
+	TranslateCursor:     translateSQLServerCursor,
 	SelectQueryTemplate: selectQueryTemplate,
 }
 

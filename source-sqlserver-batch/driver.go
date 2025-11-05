@@ -69,6 +69,7 @@ type BatchSQLDriver struct {
 
 	Connect             func(ctx context.Context, cfg *Config) (*sql.DB, error)
 	TranslateValue      func(cfg *Config, val any, databaseTypeName string) (any, error)
+	TranslateCursor     func(cfg *Config, val any, databaseTypeName string) (any, error)
 	GenerateResource    func(cfg *Config, resourceName, schemaName, tableName, tableType string) (*Resource, error)
 	SelectQueryTemplate func(res *Resource) (string, error)
 }
@@ -228,14 +229,15 @@ func (drv *BatchSQLDriver) Pull(open *pc.Request_Open, stream *boilerplate.PullO
 	}
 
 	var capture = &capture{
-		Driver:         drv,
-		Config:         &cfg,
-		State:          &state,
-		DB:             db,
-		Bindings:       bindings,
-		Output:         stream,
-		TranslateValue: drv.TranslateValue,
-		Sempahore:      semaphore.NewWeighted(maxConcurrentQueries),
+		Driver:          drv,
+		Config:          &cfg,
+		State:           &state,
+		DB:              db,
+		Bindings:        bindings,
+		Output:          stream,
+		TranslateValue:  drv.TranslateValue,
+		TranslateCursor: drv.TranslateCursor,
+		Sempahore:       semaphore.NewWeighted(maxConcurrentQueries),
 	}
 	return capture.Run(stream.Context())
 }
@@ -310,7 +312,8 @@ type capture struct {
 		lastDiscoveryTime time.Time // The last time we ran schema discovery.
 	}
 
-	TranslateValue func(cfg *Config, val any, databaseTypeName string) (any, error)
+	TranslateValue  func(cfg *Config, val any, databaseTypeName string) (any, error)
+	TranslateCursor func(cfg *Config, val any, databaseTypeName string) (any, error)
 }
 
 type bindingInfo struct {
@@ -609,7 +612,11 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 			cursorValues = make([]any, len(cursorNames))
 		}
 		for i, j := range cursorIndices {
-			cursorValues[i] = columnValues[j]
+			var translatedCursor, err = c.TranslateCursor(c.Config, columnValues[j], columnTypes[j].DatabaseTypeName())
+			if err != nil {
+				return fmt.Errorf("error translating cursor column %q value: %w", columnNames[j], err)
+			}
+			cursorValues[i] = translatedCursor
 		}
 		state.CursorValues = cursorValues
 
