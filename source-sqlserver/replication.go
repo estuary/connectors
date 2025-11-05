@@ -35,7 +35,7 @@ const (
 	// operation will error out if no further events are received when there ought to be
 	// some. This should never be hit in normal operation, and exists only so that certain
 	// rare failure modes produce an error rather than blocking forever.
-	streamToFenceWatchdogTimeout = 5 * time.Minute
+	streamToFenceWatchdogTimeout = 15 * time.Minute
 
 	// establishFenceTimeout is the length of time after with an establish-fence-position
 	// operation will error out. Since the CDC worker should be running on the database
@@ -46,7 +46,7 @@ const (
 	// high as 24 hours, so the logic might be more robust if we scaled our timeout based
 	// on the actual `pollinginterval` setting in `cdc.dbo_jobs`. I suspect this will never
 	// actually be an issue.
-	establishFenceTimeout = 5 * time.Minute
+	establishFenceTimeout = 15 * time.Minute
 )
 
 // Constants which need to be changed in tests
