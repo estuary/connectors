@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
@@ -96,4 +97,25 @@ func TestTimeColumn(t *testing.T) {
 	parsed, err := mapped.Converter("10:09:08.234567Z")
 	require.Equal(t, "10:09:08.234567", parsed)
 	require.NoError(t, err)
+}
+
+func TestBinaryPKColumn(t *testing.T) {
+	var mapped = testDialect.MapType(&sql.Projection{
+		Projection: pf.Projection{
+			IsPrimaryKey: true,
+			Inference: pf.Inference{
+				Types: []string{"string"},
+				String_: &pf.Inference_String{
+					ContentEncoding: "base64",
+				},
+				Exists: pf.Inference_MUST,
+			},
+		},
+	}, sql.FieldConfig{})
+	require.Equal(t, "VARCHAR(256) NOT NULL", mapped.DDL)
+
+	var existing = boilerplate.ExistingField{
+		Type: "VARCHAR",
+	}
+	require.True(t, mapped.Compatible(existing))
 }
