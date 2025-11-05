@@ -108,17 +108,23 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	// Query INFORMATION_SCHEMA.TABLES and INFORMATION_SCHEMA.COLUMNS
-	// Build a map of tables we care about
+	// Build a map of tables we care about (both schema.table and just table for root namespace)
 	tableMap := make(map[string]bool)
 	for _, path := range resourcePaths {
-		tableName := c.ep.Dialect.TableLocator(path).TableName
-		tableMap[tableName] = true
+		locator := c.ep.Dialect.TableLocator(path)
+		// Store both "schema.table" and "table" formats
+		if locator.TableSchema != "" {
+			tableMap[locator.TableSchema+"."+locator.TableName] = true
+		} else {
+			tableMap[locator.TableName] = true
+		}
 	}
 
-	// Query for table information
+	// Query for table information including schema
 	stmt := spanner.Statement{
 		SQL: `
 			SELECT
+				t.table_schema,
 				t.table_name,
 				c.column_name,
 				c.spanner_type,
@@ -126,9 +132,9 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 				c.ordinal_position
 			FROM information_schema.tables t
 			JOIN information_schema.columns c
-				ON t.table_name = c.table_name
-			WHERE t.table_schema = ''
-			ORDER BY t.table_name, c.ordinal_position
+				ON t.table_schema = c.table_schema
+				AND t.table_name = c.table_name
+			ORDER BY t.table_schema, t.table_name, c.ordinal_position
 		`,
 	}
 
@@ -144,19 +150,27 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 			return fmt.Errorf("querying INFORMATION_SCHEMA: %w", err)
 		}
 
-		var tableName, columnName, spannerType, isNullable string
+		var schemaName, tableName, columnName, spannerType, isNullable string
 		var ordinalPosition int64
 
-		if err := row.Columns(&tableName, &columnName, &spannerType, &isNullable, &ordinalPosition); err != nil {
+		if err := row.Columns(&schemaName, &tableName, &columnName, &spannerType, &isNullable, &ordinalPosition); err != nil {
 			return fmt.Errorf("scanning row: %w", err)
 		}
 
+		// Build the resource key
+		var resourceKey string
+		if schemaName != "" {
+			resourceKey = schemaName + "." + tableName
+		} else {
+			resourceKey = tableName
+		}
+
 		// Only process tables we care about
-		if !tableMap[tableName] {
+		if !tableMap[resourceKey] {
 			continue
 		}
 
-		is.PushResource(tableName).PushField(boilerplate.ExistingField{
+		is.PushResource(resourceKey).PushField(boilerplate.ExistingField{
 			Name:               columnName,
 			Nullable:           isNullable == "YES",
 			Type:               spannerType,
@@ -282,6 +296,53 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 		return nil
 	}, nil
+}
+
+func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
+	// Query INFORMATION_SCHEMA.SCHEMATA for Cloud Spanner
+	stmt := spanner.Statement{
+		SQL: `SELECT schema_name FROM information_schema.schemata WHERE schema_name != ''`,
+	}
+
+	iter := c.dataClient.Single().Query(ctx, stmt)
+	defer iter.Stop()
+
+	var schemas []string
+	for {
+		row, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("querying information_schema.schemata: %w", err)
+		}
+
+		var schemaName string
+		if err := row.Columns(&schemaName); err != nil {
+			return nil, fmt.Errorf("scanning schema name: %w", err)
+		}
+		schemas = append(schemas, schemaName)
+	}
+
+	return schemas, nil
+}
+
+func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
+	stmt := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", c.ep.Dialect.Identifier(schemaName))
+
+	op, err := c.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+		Database:   c.dbPath,
+		Statements: []string{stmt},
+	})
+	if err != nil {
+		return "", fmt.Errorf("submitting CREATE SCHEMA DDL: %w", err)
+	}
+
+	if err := op.Wait(ctx); err != nil {
+		return "", fmt.Errorf("executing CREATE SCHEMA: %w", err)
+	}
+
+	return stmt, nil
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {

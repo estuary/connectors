@@ -91,25 +91,28 @@ func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
 			"*":        {sql.NewMigrationSpec([]string{"JSON"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
-			return sql.InfoTableLocation{TableSchema: "", TableName: path[len(path)-1]}
+			if len(path) == 2 {
+				return sql.InfoTableLocation{TableSchema: path[0], TableName: path[1]}
+			}
+			return sql.InfoTableLocation{TableSchema: "", TableName: path[0]}
 		}),
 		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string {
-			// Spanner doesn't have schemas, so return empty string
-			return ""
+			return schema
 		}),
 		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string {
 			return sanitizeSpannerIdentifier(field)
 		}),
 		Identifierer: sql.IdentifierFn(func(path ...string) string {
-			field := path[len(path)-1]
-
-			sanitized := sanitizeSpannerIdentifier(field)
-
-			if slices.Contains(SPANNER_RESERVED_WORDS, strings.ToLower(sanitized)) {
-				return sql.QuoteTransform("`", "``")(sanitized)
+			var parts []string
+			for _, part := range path {
+				sanitized := sanitizeSpannerIdentifier(part)
+				if slices.Contains(SPANNER_RESERVED_WORDS, strings.ToLower(sanitized)) {
+					parts = append(parts, sql.QuoteTransform("`", "``")(sanitized))
+				} else {
+					parts = append(parts, sanitized)
+				}
 			}
-
-			return sanitized
+			return strings.Join(parts, ".")
 		}),
 		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
@@ -145,7 +148,7 @@ type templates struct {
 func renderTemplates(dialect sql.Dialect) templates {
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
 {{ define "temp_name" -}}
-flow_temp_table_{{ $.Binding }}
+flow_internal.flow_temp_table_{{ $.Binding }}
 {{- end }}
 
 -- Templated creation of a materialized table definition:
