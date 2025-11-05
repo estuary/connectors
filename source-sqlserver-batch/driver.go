@@ -609,7 +609,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 			cursorValues = make([]any, len(cursorNames))
 		}
 		for i, j := range cursorIndices {
-			cursorValues[i] = rowValues[j]
+			cursorValues[i] = columnValues[j]
 		}
 		state.CursorValues = cursorValues
 
