@@ -82,6 +82,7 @@ func (c config) DefaultNamespace() string {
 // tableConfig represents per-binding resource configuration
 type tableConfig struct {
 	Table         string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
+	Schema        string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional). Overrides the default namespace."`
 	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run in the same transaction that creates the table." jsonschema_extras:"multiline=true"`
 	// Note: Delta updates are not supported in Cloud Spanner because all tables require primary keys
 }
@@ -100,7 +101,52 @@ func (c tableConfig) WithDefaults(cfg config) tableConfig {
 
 func (c tableConfig) Parameters() ([]string, bool, error) {
 	// Delta updates are always false for Spanner since it requires primary keys
-	return []string{c.Table}, false, nil
+	var path []string
+	if c.Schema != "" {
+		path = []string{c.Schema, c.Table}
+	} else {
+		path = []string{c.Table}
+	}
+	return path, false, nil
+}
+
+// initializeFlowTablesSchema sets up the flow_internal schema for Load operations
+// It drops any existing temporary tables, creates the schema if needed, and creates all Load tables in one DDL operation
+func initializeFlowTablesSchema(ctx context.Context, adminClient *database.DatabaseAdminClient, dbPath string, bindings []*spannerBinding) error {
+	log.Info("initializing flow_internal schema for Load operations")
+
+	// Build DDL statements: drop existing temp tables, create schema if not exists, and create all Load tables
+	var ddlStatements []string
+
+	// Step 1: Drop all temporary tables if they exist
+	// Note: Spanner doesn't support dropping a schema with tables in it, so we drop tables individually
+	for idx := range bindings {
+		tempTableName := fmt.Sprintf("flow_internal.flow_temp_table_%d", idx)
+		ddlStatements = append(ddlStatements, fmt.Sprintf("DROP TABLE IF EXISTS %s", tempTableName))
+	}
+
+	// Step 2: Create the schema if it doesn't exist
+	ddlStatements = append(ddlStatements, "CREATE SCHEMA IF NOT EXISTS flow_internal")
+
+	// Step 3: Create all Load tables for bindings
+	for _, binding := range bindings {
+		ddlStatements = append(ddlStatements, binding.createLoadTableSQL)
+	}
+
+	// Execute all DDL statements in a single operation for efficiency
+	log.WithField("statements", len(ddlStatements)).Info("executing flow_internal schema initialization")
+	op, err := adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+		Database:   dbPath,
+		Statements: ddlStatements,
+	})
+	if err != nil {
+		return fmt.Errorf("submitting flow_internal schema DDL: %w", err)
+	}
+	if err := op.Wait(ctx); err != nil {
+		return fmt.Errorf("executing flow_internal schema DDL: %w", err)
+	}
+
+	return nil
 }
 
 func newSpannerDriver() *sql.Driver[config, tableConfig] {
@@ -211,11 +257,18 @@ func newTransactor(
 		be:          be,
 	}
 
-	// Setup bindings
+	// Setup bindings first to get the createLoadTableSQL for each
 	for _, binding := range bindings {
 		if err := t.addBinding(ctx, binding, is); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
+	}
+
+	// Initialize flow_internal schema and create all Load tables in one DDL operation
+	if err := initializeFlowTablesSchema(ctx, adminClient, dbPath, t.bindings); err != nil {
+		adminClient.Close()
+		client.Close()
+		return nil, fmt.Errorf("initializing flow_internal schema: %w", err)
 	}
 
 	return t, nil
@@ -296,22 +349,18 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		bindingIdx := it.Binding
 		b := t.bindings[bindingIdx]
 
-		// Create temp table for this binding on first key
+		// Initialize state for this binding on first key
 		if bindingStates[bindingIdx] == nil {
-			// Use admin client to execute DDL for creating temporary table
-			op, err := t.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
-				Database: t.dbPath,
-				Statements: []string{b.createLoadTableSQL},
-			})
+			tempTableName := fmt.Sprintf("flow_internal.flow_temp_table_%d", bindingIdx)
+
+			// Clear any existing data from the table using a mutation
+			// Load tables are persistent and pre-created, so we need to delete old data
+			deleteMutation := spanner.Delete(tempTableName, spanner.AllKeys())
+			_, err := t.client.Apply(ctx, []*spanner.Mutation{deleteMutation})
 			if err != nil {
-				return fmt.Errorf("creating temporary load table for binding %d: %w", bindingIdx, err)
-			}
-			// Wait for the DDL operation to complete
-			if err := op.Wait(ctx); err != nil {
-				return fmt.Errorf("waiting for temporary load table creation for binding %d: %w", bindingIdx, err)
+				return fmt.Errorf("clearing temporary load table for binding %d: %w", bindingIdx, err)
 			}
 
-			tempTableName := fmt.Sprintf("flow_temp_table_%d", bindingIdx)
 			keyColumnNames := make([]string, len(b.target.Keys))
 			for i, key := range b.target.Keys {
 				keyColumnNames[i] = key.Identifier
@@ -416,27 +465,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return fmt.Errorf("querying load: %w", err)
 	}
 
-	// Step 3: Drop all temporary tables
-	var dropStatements []string
-	for bindingIdx := range bindingStates {
-		b := t.bindings[bindingIdx]
-		dropStatements = append(dropStatements, b.dropLoadTableSQL)
-	}
-
-	// Use admin client to drop all temp tables in a single DDL operation
-	if len(dropStatements) > 0 {
-		op, err := t.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
-			Database:   t.dbPath,
-			Statements: dropStatements,
-		})
-		if err != nil {
-			return fmt.Errorf("dropping temporary load tables: %w", err)
-		}
-		// Wait for the DDL operation to complete
-		if err := op.Wait(ctx); err != nil {
-			return fmt.Errorf("waiting for temporary load tables to drop: %w", err)
-		}
-	}
+	// Note: We no longer drop temporary tables here. They persist in the flow_internal schema
+	// and are cleaned up when the flow_internal schema is dropped and recreated on connector startup.
 
 	return nil
 }

@@ -89,6 +89,11 @@
         "description": "Name of the database table",
         "x-collection-name": true
       },
+      "schema": {
+        "type": "string",
+        "title": "Alternative Schema",
+        "description": "Alternative schema for this table (optional). Overrides the default namespace."
+      },
       "additional_table_create_sql": {
         "type": "string",
         "title": "Additional Table Create SQL",
