@@ -215,11 +215,16 @@ func translateSQLServerValue(cfg *Config, val any, databaseTypeName string) (any
 	switch strings.ToUpper(databaseTypeName) {
 	case "UNIQUEIDENTIFIER":
 		if bs, ok := val.([]byte); ok {
+			// Copy the bytes before swizzling to avoid mutating the input
+			var swizzled = make([]byte, len(bs))
+			copy(swizzled, bs)
+
 			// Correct Microsoft's insane fieldwise-little-endian UUID representation.
-			bs[0], bs[1], bs[2], bs[3] = bs[3], bs[2], bs[1], bs[0]
-			bs[4], bs[5] = bs[5], bs[4]
-			bs[6], bs[7] = bs[7], bs[6]
-			var u, err = uuid.FromBytes(bs)
+			swizzled[0], swizzled[1], swizzled[2], swizzled[3] = swizzled[3], swizzled[2], swizzled[1], swizzled[0]
+			swizzled[4], swizzled[5] = swizzled[5], swizzled[4]
+			swizzled[6], swizzled[7] = swizzled[7], swizzled[6]
+
+			var u, err = uuid.FromBytes(swizzled)
 			if err != nil {
 				return nil, fmt.Errorf("error parsing uniqueidentifier: %w", err)
 			}
