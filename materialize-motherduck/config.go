@@ -13,11 +13,12 @@ import (
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/invopop/jsonschema"
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/option"
 )
 
 var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string": true,
+	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
 }
 
@@ -168,20 +169,32 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 
 	// This temporary secret in MotherDuck is session-specific.
 	var createTempSecret string
+	var checkTempSecret string
+	var tempSecretName string
 	switch c.StagingBucket.StagingBucketType {
 	case stagingBucketTypeS3:
 		createTempSecret = fmt.Sprintf(`CREATE SECRET IF NOT EXISTS (
 			TYPE S3,
 			KEY_ID '%s',
 			SECRET '%s',
-			REGION '%s'
-		);`, c.StagingBucket.AWSAccessKeyID, c.StagingBucket.AWSSecretAccessKey, c.StagingBucket.Region)
+			REGION '%s',
+			SCOPE 's3://%s'
+		);`, c.StagingBucket.AWSAccessKeyID, c.StagingBucket.AWSSecretAccessKey, c.StagingBucket.Region, c.StagingBucket.BucketS3)
+		checkTempSecret = fmt.Sprintf(`SELECT name, persistent
+			FROM which_secret('s3://%s', 's3'
+		);`, c.StagingBucket.BucketS3)
+		tempSecretName = "__default_s3"
 	case stagingBucketTypeGCS:
 		createTempSecret = fmt.Sprintf(`CREATE SECRET IF NOT EXISTS (
 			TYPE GCS,
 			KEY_ID '%s',
-			SECRET '%s'
-		);`, c.StagingBucket.GCSHMACAccessID, c.StagingBucket.GCSHMACSecret)
+			SECRET '%s',
+			SCOPE 'gs://%s'
+		);`, c.StagingBucket.GCSHMACAccessID, c.StagingBucket.GCSHMACSecret, c.StagingBucket.BucketGCS)
+		checkTempSecret = fmt.Sprintf(`SELECT name, persistent
+			FROM which_secret('gs://%s', 'gcs'
+		);`, c.StagingBucket.BucketGCS)
+		tempSecretName = "__default_gcs"
 	}
 
 	for idx, c := range []string{
@@ -191,6 +204,35 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 	} {
 		if _, err := db.ExecContext(ctx, c); err != nil {
 			return nil, fmt.Errorf("executing setup command %d: %w", idx, err)
+		}
+	}
+
+	// It is possible to have multiple secrets that match a scope.  If this is
+	// the case then the one with the longest prefix will be used with temporary
+	// credentials having higher priority than persistent credentials in the
+	// case of ties.
+	//
+	// If Motherduck is unable to COPY to object store, there is no error.
+	//
+	// Using the wrong permission isn't necessarily a problem, so long as it
+	// has the required permissions, but it can be a source of confusion.
+	rows, err := db.QueryContext(ctx, checkTempSecret)
+	if err != nil {
+		return nil, fmt.Errorf("checking selected secret: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var name string
+		var persistent string
+		if err := rows.Scan(&name, &persistent); err != nil {
+			return nil, fmt.Errorf("scanning selected secret: %w", err)
+		}
+
+		// Only one temporary secret can be set per type, so we know if our
+		// secret is being used by the name because temporary secrets cannot
+		// have custom names.
+		if name != tempSecretName || persistent != "TEMPORARY" {
+			log.WithField("name", name).Warn("unexpected secret selected")
 		}
 	}
 
