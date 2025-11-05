@@ -300,12 +300,12 @@ func TestUniqueIdentifierCursorRoundTrip(t *testing.T) {
 	setShutdownAfterQuery(t, true)
 
 	var testUUIDs = []string{
-		"65c2815a-4dbf-44cf-b08a-ec5fd0559f2b",
-		"fe0761c1-e4e9-496d-be20-4fa97adafef2",
 		"09c58be4-5e1e-4074-9bf6-2113f97c6364",
 		"0112bf96-5d4b-4775-bcf5-0216610d9703",
-		"dd0ee7c0-9f04-4920-b982-7c1ad8998f1b",
 		"b9ecf3c0-253a-425b-b84c-4704fa4b2daf",
+		"dd0ee7c0-9f04-4920-b982-7c1ad8998f1b",
+		"fe0761c1-e4e9-496d-be20-4fa97adafef2",
+		"65c2815a-4dbf-44cf-b08a-ec5fd0559f2b",
 	}
 
 	for i := range 3 {
