@@ -132,6 +132,22 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	}
 }
 
+// CompatibleColumn is a type that can be tested for compatibility with an
+// existing field.
+type CompatibleColumnType interface {
+	Compatible(existing boilerplate.ExistingField) bool
+}
+
+// CompatibleStringEqualFold is a CompatibleColumn that is equal to the case
+// folded field type.
+type CompatibleStringEqualFold struct {
+	Inner string
+}
+
+func (s *CompatibleStringEqualFold) Compatible(existing boilerplate.ExistingField) bool {
+	return strings.EqualFold(existing.Type, s.Inner)
+}
+
 // CompatibleColumnTypes is a list of column types that the mapped type
 // corresponding to the Flow field's schema is compatible with. By default the
 // DDL used to create the column is included in this list, so any additional
@@ -140,7 +156,7 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 // Most often this is used when the endpoint's information schema describes the
 // column in a different way than the DDL used to create it. Types are
 // case-insensitive.
-type CompatibleColumnTypes []string
+type CompatibleColumnTypes []CompatibleColumnType
 
 type MappedType struct {
 	// DDL is the "CREATE TABLE" DDL type for this mapping, suited for direct inclusion in raw SQL
@@ -174,8 +190,8 @@ func (m MappedType) Compatible(existing boilerplate.ExistingField) bool {
 		return true
 	}
 
-	return slices.ContainsFunc(m.CompatibleColumnTypes, func(compatibleType string) bool {
-		return strings.EqualFold(existing.Type, compatibleType)
+	return slices.ContainsFunc(m.CompatibleColumnTypes, func(column CompatibleColumnType) bool {
+		return column.Compatible(existing)
 	})
 }
 
@@ -246,7 +262,9 @@ type MapStaticOption func(*mapStaticConfig)
 // be considered compatible with.
 func AlsoCompatibleWith(compatibleTypes ...string) MapStaticOption {
 	return func(c *mapStaticConfig) {
-		c.compatible = append(c.compatible, compatibleTypes...)
+		for _, compat := range compatibleTypes {
+			c.compatible = append(c.compatible, &CompatibleStringEqualFold{compat})
+		}
 	}
 }
 
@@ -266,7 +284,7 @@ func MapStatic(ddl string, opts ...MapStaticOption) MapProjectionFn {
 	cfg := mapStaticConfig{
 		// A projection is always valid with a reported endpoint column type
 		// that matches it exactly.
-		compatible: []string{ddl},
+		compatible: []CompatibleColumnType{&CompatibleStringEqualFold{ddl}},
 	}
 
 	for _, o := range opts {

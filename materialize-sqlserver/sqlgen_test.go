@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/stretchr/testify/require"
@@ -126,4 +127,176 @@ func TestBinaryPKColumn(t *testing.T) {
 		},
 	}, sql.FieldConfig{})
 	require.Equal(t, "varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL", mapped.DDL)
+}
+
+func TestTextType(t *testing.T) {
+	type CompatibleCheck struct {
+		existing   boilerplate.ExistingField
+		compatible bool
+	}
+	tests := []struct {
+		name        string
+		projection  *sql.Projection
+		expectedDDL string
+		compatCheck []CompatibleCheck
+	}{
+		{
+			name: "PK no maxLength",
+			projection: &sql.Projection{
+				Projection: pf.Projection{
+					Inference: pf.Inference{
+						Types:   []string{"string"},
+						String_: &pf.Inference_String{},
+						Exists:  pf.Inference_MUST,
+					},
+					IsPrimaryKey: true,
+				},
+			},
+			expectedDDL: "varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL",
+			compatCheck: []CompatibleCheck{
+				{
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: -1,
+					},
+					compatible: true,
+				},
+				{
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: 900,
+					},
+					compatible: true,
+				},
+				{
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: 16,
+					},
+					compatible: false,
+				},
+			},
+		},
+		{
+			name: "PK maxLength",
+			projection: &sql.Projection{
+				Projection: pf.Projection{
+					Inference: pf.Inference{
+						Types: []string{"string"},
+						String_: &pf.Inference_String{
+							MaxLength: 16,
+						},
+						Exists: pf.Inference_MUST,
+					},
+					IsPrimaryKey: true,
+				},
+			},
+			expectedDDL: "varchar(64) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL",
+			compatCheck: []CompatibleCheck{
+				{
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: -1,
+					},
+					compatible: true,
+				},
+				{
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: 64,
+					},
+					compatible: true,
+				},
+				{
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: 63,
+					},
+					compatible: false,
+				},
+			},
+		},
+		{
+			name: "no maxLength",
+			projection: &sql.Projection{
+				Projection: pf.Projection{
+					Inference: pf.Inference{
+						Types:   []string{"string"},
+						String_: &pf.Inference_String{},
+						Exists:  pf.Inference_MUST,
+					},
+					IsPrimaryKey: false,
+				},
+			},
+			expectedDDL: "varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL",
+			compatCheck: []CompatibleCheck{
+				{
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: -1,
+					},
+					compatible: true,
+				},
+				{
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: 16,
+					},
+					compatible: true,
+				},
+			},
+		},
+		{
+			name: "maxLength",
+			projection: &sql.Projection{
+				Projection: pf.Projection{
+					Inference: pf.Inference{
+						Types: []string{"string"},
+						String_: &pf.Inference_String{
+							MaxLength: 16,
+						},
+						Exists: pf.Inference_MUST,
+					},
+					IsPrimaryKey: false,
+				},
+			},
+			expectedDDL: "varchar(64) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL",
+			compatCheck: []CompatibleCheck{
+				{
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: -1,
+					},
+					compatible: true,
+				},
+				{
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: 64,
+					},
+					compatible: true,
+				},
+				{
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: 63,
+					},
+					compatible: false,
+				},
+			},
+		},
+	}
+
+	var dialect = testDialect
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var mapped = dialect.MapType(tt.projection, sql.FieldConfig{})
+			require.Equal(t, tt.expectedDDL, mapped.DDL)
+
+			for _, check := range tt.compatCheck {
+				require.Equal(t, check.compatible, mapped.Compatible(check.existing), check)
+			}
+
+		})
+	}
 }
