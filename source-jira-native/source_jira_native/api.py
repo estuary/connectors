@@ -380,6 +380,72 @@ async def snapshot_filter_sharing(
                 raise
 
 
+async def _fetch_issue_fields(
+    http: HTTPSession,
+    domain: str,
+    stream: type[IssueFields],
+    log: Logger,
+) -> AsyncGenerator[APIRecord, None]:
+    # Issue fields must be fetched using multiple endpoints, /field and /field/search,
+    # because they return different sets of fields. It's not clear to me why they
+    # return different results, but this Jira forum post suggests /field only returns
+    # global fields and /field/search can return fields scoped to a specific project.
+    # https://community.atlassian.com/forums/Jira-questions/GET-quot-rest-api-3-field-quot-doesn-t-return-all-fields-when/qaq-p/3091742
+    global_fields: set[str] = set()
+    search_only_fields: set[str] = set()
+
+    async for record in _fetch_non_paginated_arrayed_resources(
+        http=http,
+        domain=domain,
+        api=stream.api,
+        path="field",
+        extra_headers=None,
+        extra_params=None,
+        log=log,
+    ):
+        id = record.get("id", None)
+        assert isinstance(id, str)
+        if id not in global_fields:
+            global_fields.add(id)
+            yield record
+
+    async for record in _paginate_through_resources(
+        http=http,
+        domain=domain,
+        api=stream.api,
+        path="field/search",
+        extra_headers=None,
+        extra_params={
+            "orderBy": "name",
+            "expand": "key",
+        },
+        response_model=PaginatedResponse,
+        log=log,
+    ):
+        id = record.get("id", None)
+        assert isinstance(id, str)
+        if id not in global_fields and id not in search_only_fields:
+            search_only_fields.add(id)
+            yield record
+
+    log.debug("Finished fetching issue fields", {
+        "count of global fields": len(global_fields),
+        "global fields": global_fields,
+        "count of search only fields": len(search_only_fields),
+        "search only fields": search_only_fields,
+    })
+
+
+async def snapshot_issue_fields(
+    http: HTTPSession,
+    domain: str,
+    stream: type[IssueFields],
+    log: Logger,
+) -> AsyncGenerator[FullRefreshResource, None]:
+    async for record in _fetch_issue_fields(http, domain, stream, log):
+        yield FullRefreshResource.model_validate(record)
+
+
 def _is_field_with_options(
     record: APIRecord,
 ) -> bool:
@@ -407,9 +473,10 @@ async def _fetch_issue_custom_field_contexts(
     omit_fields_without_options: bool = False,
 ) -> AsyncGenerator[APIRecord, None]:
     issue_field_ids: list[str] = []
-    async for record in _fetch_non_paginated_arrayed_resources(http, domain, IssueFields.api, IssueFields.path, stream.extra_headers, IssueFields.extra_params, log):
-        is_custom_field: bool | None = record.get("custom", None)
+    async for record in _fetch_issue_fields(http, domain, IssueFields, log):
         issue_field_id: str | None = record.get("id", None)
+        assert isinstance(issue_field_id, str)
+        is_custom_field = "customfield_" in issue_field_id
 
         if omit_fields_without_options and not _is_field_with_options(record):
             continue
