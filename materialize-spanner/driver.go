@@ -145,6 +145,7 @@ func initializeFlowTablesSchema(ctx context.Context, adminClient *database.Datab
 	if err := op.Wait(ctx); err != nil {
 		return fmt.Errorf("executing flow_internal schema DDL: %w", err)
 	}
+	log.Info("created flow_internal schema for Load operations")
 
 	return nil
 }
@@ -353,6 +354,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if bindingStates[bindingIdx] == nil {
 			tempTableName := fmt.Sprintf("flow_internal.flow_temp_table_%d", bindingIdx)
 
+			log.Info("load: clearing temporary table table")
 			// Clear any existing data from the table using a mutation
 			// Load tables are persistent and pre-created, so we need to delete old data
 			deleteMutation := spanner.Delete(tempTableName, spanner.AllKeys())
@@ -360,6 +362,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			if err != nil {
 				return fmt.Errorf("clearing temporary load table for binding %d: %w", bindingIdx, err)
 			}
+			log.Info("load: cleared temporary table table")
 
 			keyColumnNames := make([]string, len(b.target.Keys))
 			for i, key := range b.target.Keys {
@@ -397,9 +400,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		// Apply mutations in batches of 500
 		if len(currentMutations) >= 500 {
+			log.Info("load: inserting load keys")
 			if _, err := t.client.Apply(ctx, currentMutations); err != nil {
 				return fmt.Errorf("applying load mutations: %w", err)
 			}
+			log.Info("load: inserted load keys")
 			currentMutations = nil
 		}
 	}
@@ -429,6 +434,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		unionQueries = append(unionQueries, b.loadQuerySQL)
 	}
 
+	log.Info("load: querying documents")
 	combinedQuery := strings.Join(unionQueries, "\nUNION ALL\n")
 	iter := t.client.Single().Query(ctx, spanner.Statement{SQL: combinedQuery})
 	err := iter.Do(func(row *spanner.Row) error {
@@ -465,8 +471,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return fmt.Errorf("querying load: %w", err)
 	}
 
-	// Note: We no longer drop temporary tables here. They persist in the flow_internal schema
-	// and are cleaned up when the flow_internal schema is dropped and recreated on connector startup.
+	log.Info("load: queried documents")
 
 	return nil
 }
@@ -536,7 +541,6 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// Flush if batch is getting large
 		// Note: In production, we should also track byte size
 		if batchSize >= maxBatch {
-			log.WithField("mutations", batchSize).Debug("flushing mutation batch")
 			// For now, we'll accumulate all mutations and commit at once
 			// A more sophisticated implementation would flush intermediate batches
 		}
@@ -574,10 +578,12 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			)
 			mutations = append(mutations, fenceMutation)
 
+			log.Info("store: applying mutations")
 			_, err = t.client.Apply(ctx, mutations)
 			if err != nil {
 				return fmt.Errorf("applying mutations: %w", err)
 			}
+			log.Info("store: applied mutations")
 
 			return nil
 		})

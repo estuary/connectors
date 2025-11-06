@@ -182,6 +182,7 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
+	log.WithField("name", tc.Identifier).Info("client: creating table")
 	var res tableConfig
 	if tc.Resource != nil {
 		res = tc.Resource.(tableConfig)
@@ -212,6 +213,7 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		return fmt.Errorf("executing CREATE TABLE DDL: %w", err)
 	}
 
+	log.WithField("name", tc.Identifier).Info("client: created")
 	return nil
 }
 
@@ -363,6 +365,7 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 }
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
+	log.Info("client: installing fence")
 	// First, ensure the checkpoints table exists
 	createTableStmt := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
@@ -446,6 +449,7 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 		fence.Checkpoint = checkpoint
 	}
 
+	log.Info("client: installed fence")
 	return fence, nil
 }
 
