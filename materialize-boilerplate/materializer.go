@@ -676,6 +676,17 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		return nil, err
 	}
 
+	// Flush any batched DDL operations if the materializer supports it
+	// This is an optional interface that connectors can implement to batch DDL operations
+	type DDLFlusher interface {
+		FlushDDL(context.Context) error
+	}
+	if flusher, ok := materializer.(DDLFlusher); ok {
+		if err := flusher.FlushDDL(ctx); err != nil {
+			return nil, fmt.Errorf("flushing batched DDL: %w", err)
+		}
+	}
+
 	allActions := append(namespaceActionDesciptions, setupActionDescriptions...)
 	allActions = append(allActions, truncationActionDescriptions...)
 	allActions = append(allActions, resourceActionDescriptions...)
