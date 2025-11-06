@@ -213,7 +213,7 @@ class ApplicationRoles(FullRefreshArrayedStream):
     path: ClassVar[str] = "applicationrole"
 
 
-class IssueFields(FullRefreshArrayedStream):
+class IssueFields(FullRefreshStream):
     name: ClassVar[str] = "issue_fields"
     path: ClassVar[str] = "field"
     disable: ClassVar[bool] = False

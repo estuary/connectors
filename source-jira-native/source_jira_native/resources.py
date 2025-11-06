@@ -24,6 +24,7 @@ from .models import (
     IssueChildStream,
     IssueCustomFieldContexts,
     IssueCustomFieldOptions,
+    IssueFields,
     JiraAPI,
     JiraResource,
     Labels,
@@ -55,6 +56,7 @@ from .api import (
     snapshot_filter_sharing,
     snapshot_issue_custom_field_contexts,
     snapshot_issue_custom_field_options,
+    snapshot_issue_fields,
     snapshot_labels,
     snapshot_nested_arrayed_resources,
     snapshot_non_paginated_arrayed_resources,
@@ -216,6 +218,13 @@ def _get_partial_snapshot_fn(
     elif issubclass(stream, FilterSharing):
         snapshot_fn = functools.partial(
             snapshot_filter_sharing,
+            http,
+            config.domain,
+            stream,
+        )
+    elif issubclass(stream, IssueFields):
+        snapshot_fn = functools.partial(
+            snapshot_issue_fields,
             http,
             config.domain,
             stream,
