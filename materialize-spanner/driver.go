@@ -110,10 +110,10 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 	return path, false, nil
 }
 
-// initializeFlowTablesSchema sets up the flow_internal schema for Load operations
-// It drops any existing temporary tables, creates the schema if needed, and creates all Load tables in one DDL operation
-func initializeFlowTablesSchema(ctx context.Context, adminClient *database.DatabaseAdminClient, dbPath string, bindings []*spannerBinding) error {
-	log.Info("initializing flow_internal schema for Load operations")
+// initializeFlowInternalSchema builds DDL statements for flow_internal schema setup
+// It returns DDL statements to drop existing temporary tables, create the schema, and create all Load tables
+func initializeFlowInternalSchema(bindings []*spannerBinding) []string {
+	log.Info("preparing flow_internal schema DDL for Load operations")
 
 	// Build DDL statements: drop existing temp tables, create schema if not exists, and create all Load tables
 	var ddlStatements []string
@@ -133,21 +133,8 @@ func initializeFlowTablesSchema(ctx context.Context, adminClient *database.Datab
 		ddlStatements = append(ddlStatements, binding.createLoadTableSQL)
 	}
 
-	// Execute all DDL statements in a single operation for efficiency
-	log.WithField("statements", len(ddlStatements)).Info("executing flow_internal schema initialization")
-	op, err := adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
-		Database:   dbPath,
-		Statements: ddlStatements,
-	})
-	if err != nil {
-		return fmt.Errorf("submitting flow_internal schema DDL: %w", err)
-	}
-	if err := op.Wait(ctx); err != nil {
-		return fmt.Errorf("executing flow_internal schema DDL: %w", err)
-	}
-	log.Info("created flow_internal schema for Load operations")
-
-	return nil
+	log.WithField("statements", len(ddlStatements)).Info("prepared flow_internal schema DDL")
+	return ddlStatements
 }
 
 func newSpannerDriver() *sql.Driver[config, tableConfig] {
@@ -265,12 +252,26 @@ func newTransactor(
 		}
 	}
 
-	// Initialize flow_internal schema and create all Load tables in one DDL operation
-	if err := initializeFlowTablesSchema(ctx, adminClient, dbPath, t.bindings); err != nil {
+	// Build DDL statements for flow_internal schema and Load tables
+	ddlStatements := initializeFlowInternalSchema(t.bindings)
+
+	// Execute all DDL statements in a single operation for efficiency
+	log.WithField("statements", len(ddlStatements)).Info("executing flow_internal schema initialization")
+	op, err := adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+		Database:   dbPath,
+		Statements: ddlStatements,
+	})
+	if err != nil {
 		adminClient.Close()
 		client.Close()
-		return nil, fmt.Errorf("initializing flow_internal schema: %w", err)
+		return nil, fmt.Errorf("submitting flow_internal schema DDL: %w", err)
 	}
+	if err := op.Wait(ctx); err != nil {
+		adminClient.Close()
+		client.Close()
+		return nil, fmt.Errorf("executing flow_internal schema DDL: %w", err)
+	}
+	log.Info("created flow_internal schema for Load operations")
 
 	return t, nil
 }

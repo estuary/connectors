@@ -254,6 +254,11 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 	return sql.StdSQLExecStatements(ctx, c.db, statements)
 }
 
+func (c *client) FlushDDL(ctx context.Context) error {
+	// SQL Server executes DDL immediately, no batching needed
+	return nil
+}
+
 func (c *client) Close() {
 	c.db.Close()
 }

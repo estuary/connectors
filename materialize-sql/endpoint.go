@@ -40,6 +40,12 @@ type Client interface {
 	// materialized collection.
 	TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error)
 
+	// FlushDDL executes any batched DDL operations that were accumulated during
+	// CreateTable, AlterTable, DeleteTable, or CreateSchema calls. This is called
+	// at the end of Apply operations to allow connectors to batch multiple DDL
+	// statements for efficiency. Connectors that don't batch DDL can return nil.
+	FlushDDL(ctx context.Context) error
+
 	// Close is called to free up any resources held by the Client.
 	Close()
 }

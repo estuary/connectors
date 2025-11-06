@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -23,6 +24,10 @@ type client struct {
 	ep          *sql.Endpoint[config]
 	templates   templates
 	dbPath      string // Full database path: projects/{project}/instances/{instance}/databases/{database}
+
+	// DDL batching
+	pendingDDL []string
+	ddlMutex   sync.Mutex
 }
 
 func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
@@ -106,6 +111,45 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	return errs
 }
 
+// addPendingDDL accumulates DDL statements to be executed in a batch later
+func (c *client) addPendingDDL(statements ...string) {
+	c.ddlMutex.Lock()
+	defer c.ddlMutex.Unlock()
+	for _, stmt := range statements {
+		if stmt != "" {
+			c.pendingDDL = append(c.pendingDDL, stmt)
+		}
+	}
+}
+
+// FlushDDL executes all accumulated DDL statements in a single batch operation
+func (c *client) FlushDDL(ctx context.Context) error {
+	c.ddlMutex.Lock()
+	defer c.ddlMutex.Unlock()
+
+	if len(c.pendingDDL) == 0 {
+		return nil
+	}
+
+	log.WithField("count", len(c.pendingDDL)).Info("flushing batched DDL statements")
+
+	op, err := c.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+		Database:   c.dbPath,
+		Statements: c.pendingDDL,
+	})
+	if err != nil {
+		return fmt.Errorf("submitting batched DDL: %w", err)
+	}
+
+	if err := op.Wait(ctx); err != nil {
+		return fmt.Errorf("executing batched DDL: %w", err)
+	}
+
+	log.Info("successfully executed batched DDL")
+	c.pendingDDL = nil
+	return nil
+}
+
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	// Query INFORMATION_SCHEMA.TABLES and INFORMATION_SCHEMA.COLUMNS
 	// Build a map of tables we care about (both schema.table and just table for root namespace)
@@ -182,38 +226,24 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	log.WithField("name", tc.Identifier).Info("client: creating table")
+	log.WithField("name", tc.Identifier).Info("client: queueing table creation for batched DDL")
 	var res tableConfig
 	if tc.Resource != nil {
 		res = tc.Resource.(tableConfig)
 	}
 
-	var ddlStatements []string
-	ddlStatements = append(ddlStatements, tc.TableCreateSql)
+	// Accumulate DDL statements for batch execution
+	c.addPendingDDL(tc.TableCreateSql)
 
 	if res.AdditionalSql != "" {
-		ddlStatements = append(ddlStatements, res.AdditionalSql)
+		c.addPendingDDL(res.AdditionalSql)
 		log.WithFields(log.Fields{
 			"table": tc.Identifier,
 			"query": res.AdditionalSql,
-		}).Info("will execute AdditionalSql")
+		}).Info("queuing AdditionalSql for batched DDL")
 	}
 
-	// Execute DDL statements
-	op, err := c.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
-		Database:   c.dbPath,
-		Statements: ddlStatements,
-	})
-	if err != nil {
-		return fmt.Errorf("submitting DDL request: %w", err)
-	}
-
-	// Wait for the operation to complete
-	if err := op.Wait(ctx); err != nil {
-		return fmt.Errorf("executing CREATE TABLE DDL: %w", err)
-	}
-
-	log.WithField("name", tc.Identifier).Info("client: created")
+	log.WithField("name", tc.Identifier).Info("client: queued table creation")
 	return nil
 }
 
@@ -221,14 +251,9 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	stmt := fmt.Sprintf("DROP TABLE %s", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		op, err := c.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
-			Database:   c.dbPath,
-			Statements: []string{stmt},
-		})
-		if err != nil {
-			return fmt.Errorf("submitting DROP TABLE DDL: %w", err)
-		}
-		return op.Wait(ctx)
+		// Accumulate for batched DDL execution
+		c.addPendingDDL(stmt)
+		return nil
 	}, nil
 }
 
@@ -283,19 +308,8 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 			return nil
 		}
 
-		op, err := c.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
-			Database:   c.dbPath,
-			Statements: ddlStatements,
-		})
-		if err != nil {
-			return fmt.Errorf("submitting ALTER TABLE DDL: %w", err)
-		}
-
-		if err := op.Wait(ctx); err != nil {
-			log.WithField("statements", ddlStatements).Error("alter table DDL failed")
-			return fmt.Errorf("executing ALTER TABLE for table %s: %w", ta.Identifier, err)
-		}
-
+		// Accumulate for batched DDL execution
+		c.addPendingDDL(ddlStatements...)
 		return nil
 	}, nil
 }
@@ -332,17 +346,8 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
 	stmt := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", c.ep.Dialect.Identifier(schemaName))
 
-	op, err := c.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
-		Database:   c.dbPath,
-		Statements: []string{stmt},
-	})
-	if err != nil {
-		return "", fmt.Errorf("submitting CREATE SCHEMA DDL: %w", err)
-	}
-
-	if err := op.Wait(ctx); err != nil {
-		return "", fmt.Errorf("executing CREATE SCHEMA: %w", err)
-	}
+	// Accumulate for batched DDL execution
+	c.addPendingDDL(stmt)
 
 	return stmt, nil
 }

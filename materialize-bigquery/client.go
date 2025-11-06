@@ -225,6 +225,11 @@ func (c *client) InstallFence(ctx context.Context, _ sql.Table, fence sql.Fence)
 
 }
 
+func (c *client) FlushDDL(ctx context.Context) error {
+	// BigQuery executes DDL immediately, no batching needed
+	return nil
+}
+
 func (c *client) Close() {
 	c.bigqueryClient.Close()
 }
