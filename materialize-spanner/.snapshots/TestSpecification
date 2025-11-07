@@ -46,12 +46,6 @@
       },
       "advanced": {
         "properties": {
-          "batch_size": {
-            "type": "integer",
-            "title": "Batch Size",
-            "description": "Maximum number of mutations per commit (1-10000). Default is 5000.",
-            "default": 5000
-          },
           "no_flow_document": {
             "type": "boolean",
             "title": "Exclude Flow Document",

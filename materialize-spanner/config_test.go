@@ -29,14 +29,6 @@ func TestSpannerConfig(t *testing.T) {
 	var noDatabase = validConfig
 	noDatabase.Database = ""
 	require.Error(t, noDatabase.Validate(), "expected validation error for missing database")
-
-	var invalidBatchSize = validConfig
-	invalidBatchSize.Advanced.BatchSize = 100000
-	require.Error(t, invalidBatchSize.Validate(), "expected validation error for batch_size too large")
-
-	var validBatchSize = validConfig
-	validBatchSize.Advanced.BatchSize = 1000
-	require.NoError(t, validBatchSize.Validate())
 }
 
 func TestSpecification(t *testing.T) {

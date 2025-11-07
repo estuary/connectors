@@ -8,8 +8,8 @@ WORKDIR /builder
 
 # Download & compile dependencies early. Doing this separately allows for layer
 # caching opportunities when no dependencies are updated.
-COPY go.* ./
-RUN go mod download
+#COPY go.* ./
+#RUN go mod download
 
 # Copy in the latest flowctl-go for usage by tests.
 COPY flow-bin/flowctl-go /usr/local/bin/flowctl-go

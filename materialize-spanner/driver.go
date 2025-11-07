@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"text/template"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -44,7 +45,6 @@ type config struct {
 }
 
 type advancedConfig struct {
-	BatchSize      int    `json:"batch_size,omitempty" jsonschema:"title=Batch Size,description=Maximum number of mutations per commit (1-10000). Default is 5000.,default=5000"`
 	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
 	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
@@ -59,12 +59,6 @@ func (c config) Validate() error {
 	}
 	if c.Database == "" {
 		return fmt.Errorf("missing 'database'")
-	}
-
-	if c.Advanced.BatchSize != 0 {
-		if c.Advanced.BatchSize < 1 || c.Advanced.BatchSize > maxMutationsPerBatch {
-			return fmt.Errorf("'batch_size' must be between 1 and %d", maxMutationsPerBatch)
-		}
 	}
 
 	return nil
@@ -330,8 +324,37 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
 
-// Load implements the Load phase using temporary tables for efficient batch loading
+// timedSpannerApply wraps spanner.Client.Apply with timing instrumentation
+func (t *transactor) timedSpannerApply(ctx context.Context, mutations []*spanner.Mutation, operation string) (time.Time, time.Duration, error) {
+	start := time.Now()
+	ts, err := t.client.Apply(ctx, mutations)
+	duration := time.Since(start)
+
+	log.WithFields(log.Fields{
+		"operation": operation,
+		"duration":  duration.Seconds(),
+		"mutations": len(mutations),
+	}).Debug("spanner: apply timing")
+
+	return ts, duration, err
+}
+
+// Load implements the Load phase using temporary tables with optimal batching
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
+	loadStart := time.Now()
+	var keyInsertionDuration, queryDuration time.Duration
+	var loadedCount int
+
+	defer func() {
+		log.WithFields(log.Fields{
+			"totalDuration":        time.Since(loadStart).Seconds(),
+			"keyInsertionDuration": keyInsertionDuration.Seconds(),
+			"queryDuration":        queryDuration.Seconds(),
+			"totalKeys":            it.Total,
+			"loadedDocs":           loadedCount,
+		}).Info("load: phase complete")
+	}()
+
 	ctx := it.Context()
 
 	// Track which bindings have keys and prepare for mutation batching
@@ -342,10 +365,40 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 	bindingStates := make(map[int]*bindingState)
 
-	var currentMutations []*spanner.Mutation
+	var currentBatch mutationBatch
+	currentBatch.reset()
 	hadLoads := false
+	batchCount := 0
 
-	// Step 1: Iterate through keys, create temp tables, and insert keys on-the-go
+	// Helper function to flush current batch
+	flushBatch := func() error {
+		if len(currentBatch.mutations) == 0 {
+			return nil
+		}
+
+		batchCount++
+
+		_, batchDuration, err := t.timedSpannerApply(ctx, currentBatch.mutations, fmt.Sprintf("load-insert-keys-batch-%d", batchCount))
+		if err != nil {
+			return fmt.Errorf("applying load batch %d (%d operations, %d mutations): %w", batchCount, len(currentBatch.mutations), currentBatch.mutationCount, err)
+		}
+
+		keyInsertionDuration += batchDuration
+
+		log.WithFields(log.Fields{
+			"operations":         len(currentBatch.mutations),
+			"mutationCount":      currentBatch.mutationCount,
+			"bytes":              currentBatch.byteSize,
+			"batch":              batchCount,
+			"batchDuration":      batchDuration.Seconds(),
+			"cumulativeDuration": keyInsertionDuration.Seconds(),
+		}).Info("load: inserting load keys")
+
+		currentBatch.reset()
+		return nil
+	}
+
+	// Step 1: Iterate through keys, create temp tables, and insert keys with optimal batching
 	for it.Next() {
 		hadLoads = true
 		bindingIdx := it.Binding
@@ -355,15 +408,15 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if bindingStates[bindingIdx] == nil {
 			tempTableName := fmt.Sprintf("flow_internal.flow_temp_table_%d", bindingIdx)
 
-			log.Info("load: clearing temporary table table")
+			log.WithField("table", tempTableName).Info("load: clearing temporary table")
 			// Clear any existing data from the table using a mutation
 			// Load tables are persistent and pre-created, so we need to delete old data
 			deleteMutation := spanner.Delete(tempTableName, spanner.AllKeys())
-			_, err := t.client.Apply(ctx, []*spanner.Mutation{deleteMutation})
+			_, clearDuration, err := t.timedSpannerApply(ctx, []*spanner.Mutation{deleteMutation}, "load-clear-temp-table")
 			if err != nil {
 				return fmt.Errorf("clearing temporary load table for binding %d: %w", bindingIdx, err)
 			}
-			log.Info("load: cleared temporary table table")
+			keyInsertionDuration += clearDuration
 
 			keyColumnNames := make([]string, len(b.target.Keys))
 			for i, key := range b.target.Keys {
@@ -396,17 +449,15 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 
 		// Add INSERT mutation for this key
+		// Note: Each column counts as one mutation in Spanner's mutation count
 		mutation := spanner.Insert(state.tempTableName, state.keyColumnNames, spannerKeyVals)
-		currentMutations = append(currentMutations, mutation)
+		currentBatch.addMutation(mutation, len(converted))
 
-		// Apply mutations in batches of 500
-		if len(currentMutations) >= 500 {
-			log.Info("load: inserting load keys")
-			if _, err := t.client.Apply(ctx, currentMutations); err != nil {
-				return fmt.Errorf("applying load mutations: %w", err)
+		// Flush if batch limits reached
+		if currentBatch.shouldFlush() {
+			if err := flushBatch(); err != nil {
+				return err
 			}
-			log.Info("load: inserted load keys")
-			currentMutations = nil
 		}
 	}
 
@@ -419,11 +470,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Apply any remaining mutations
-	if len(currentMutations) > 0 {
-		if _, err := t.client.Apply(ctx, currentMutations); err != nil {
-			return fmt.Errorf("applying remaining load mutations: %w", err)
-		}
+	if err := flushBatch(); err != nil {
+		return err
 	}
+
+	log.WithField("batches", batchCount).Info("load: completed inserting all load keys")
 
 	// Step 2: Build and execute single UNION ALL query to fetch all documents
 	t.be.StartedEvaluatingLoads()
@@ -436,6 +487,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	log.Info("load: querying documents")
+	queryStart := time.Now()
 	combinedQuery := strings.Join(unionQueries, "\nUNION ALL\n")
 	iter := t.client.Single().Query(ctx, spanner.Statement{SQL: combinedQuery})
 	err := iter.Do(func(row *spanner.Row) error {
@@ -464,9 +516,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 		}
 
+		loadedCount++
 		return loaded(int(bindingNum), rawDoc)
 	})
 	iter.Stop()
+	queryDuration = time.Since(queryStart)
 
 	if err != nil && err != iterator.Done {
 		return fmt.Errorf("querying load: %w", err)
@@ -477,18 +531,54 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return nil
 }
 
-// Store implements the Store phase using Spanner mutations
+// Store implements the Store phase using Spanner mutations with optimal batching
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
-	var mutations []*spanner.Mutation
-	batchSize := 0
+	storeStart := time.Now()
+	var storeMutationDuration time.Duration
+	var storeCount int
 
-	maxBatch := t.cfg.Advanced.BatchSize
-	if maxBatch == 0 {
-		maxBatch = 5000 // Default batch size
+	ctx := it.Context()
+
+	// Track all applied batches for error handling
+	var appliedBatches [][]*spanner.Mutation
+	var currentBatch mutationBatch
+	currentBatch.reset()
+
+	// Helper function to flush current batch
+	flushBatch := func() error {
+		if len(currentBatch.mutations) == 0 {
+			return nil
+		}
+
+		batchNum := len(appliedBatches) + 1
+		_, batchDuration, err := t.timedSpannerApply(ctx, currentBatch.mutations, fmt.Sprintf("store-apply-batch-%d", batchNum))
+		if err != nil {
+			return fmt.Errorf("applying batch %d (%d operations, %d mutations): %w", batchNum, len(currentBatch.mutations), currentBatch.mutationCount, err)
+		}
+
+		storeMutationDuration += batchDuration
+
+		log.WithFields(log.Fields{
+			"operations":         len(currentBatch.mutations),
+			"mutationCount":      currentBatch.mutationCount,
+			"bytes":              currentBatch.byteSize,
+			"batch":              batchNum,
+			"batchDuration":      batchDuration.Seconds(),
+			"cumulativeDuration": storeMutationDuration.Seconds(),
+		}).Info("store: applying mutation batch")
+
+		// Track applied batch for checkpoint handling
+		appliedBatches = append(appliedBatches, currentBatch.mutations)
+		currentBatch.reset()
+		return nil
 	}
 
+	// Process all store operations
 	for it.Next() {
+		storeCount++
 		b := t.bindings[it.Binding]
+
+		var mutation *spanner.Mutation
 
 		if it.Delete && t.cfg.HardDelete {
 			if !it.Exists {
@@ -513,9 +603,17 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			// Create a Delete mutation
 			key := spanner.Key(spannerKeyValues)
-			mutation := spanner.Delete(b.target.Identifier, spanner.KeySetFromKeys(key))
-			mutations = append(mutations, mutation)
-			batchSize++
+			mutation = spanner.Delete(b.target.Identifier, spanner.KeySetFromKeys(key))
+			// Delete mutations affect only key columns
+			currentBatch.addMutation(mutation, len(keyValues))
+
+			// Flush if batch limits reached
+			if currentBatch.shouldFlush() {
+				if err := flushBatch(); err != nil {
+					return nil, err
+				}
+			}
+			continue
 		} else {
 			// Build mutation for insert or update
 			// Spanner's InsertOrUpdate handles both cases
@@ -534,16 +632,16 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				spannerValues[i] = spannerVal
 			}
 
-			mutation := spanner.InsertOrUpdate(b.target.Identifier, b.columnNames, spannerValues)
-			mutations = append(mutations, mutation)
-			batchSize++
-		}
+			mutation = spanner.InsertOrUpdate(b.target.Identifier, b.columnNames, spannerValues)
+			// InsertOrUpdate mutations affect all columns
+			currentBatch.addMutation(mutation, len(values))
 
-		// Flush if batch is getting large
-		// Note: In production, we should also track byte size
-		if batchSize >= maxBatch {
-			// For now, we'll accumulate all mutations and commit at once
-			// A more sophisticated implementation would flush intermediate batches
+			// Flush if batch limits reached
+			if currentBatch.shouldFlush() {
+				if err := flushBatch(); err != nil {
+					return nil, err
+				}
+			}
 		}
 	}
 
@@ -554,6 +652,23 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	// Return the StartCommit function
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		return nil, m.RunAsyncOperation(func() error {
+			commitStart := time.Now()
+			var commitDuration time.Duration
+
+			defer func() {
+				storeDuration := time.Since(storeStart)
+				commitDuration = time.Since(commitStart)
+
+				log.WithFields(log.Fields{
+					"totalDuration":         storeDuration.Seconds(),
+					"storePhaseDuration":    (storeDuration - commitDuration).Seconds(),
+					"commitPhaseDuration":   commitDuration.Seconds(),
+					"storeMutationDuration": storeMutationDuration.Seconds(),
+					"storeCount":            storeCount,
+					"numBatches":            len(appliedBatches),
+				}).Info("store: phase complete")
+			}()
+
 			// Marshal the checkpoint
 			checkpointBytes, err := runtimeCheckpoint.Marshal()
 			if err != nil {
@@ -563,8 +678,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Update the fence checkpoint
 			t.fence.Checkpoint = checkpointBytes
 
-			// Add fence update mutation
-			// We need to update the checkpoints table
+			// Add fence update mutation to the current batch
 			fenceTableName := "flow_checkpoints_v1" // Default checkpoint table name
 			fenceMutation := spanner.InsertOrUpdate(
 				fenceTableName,
@@ -577,14 +691,15 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 					string(checkpointBytes),
 				},
 			)
-			mutations = append(mutations, fenceMutation)
+			// Fence mutation affects 5 columns
+			currentBatch.addMutation(fenceMutation, 5)
 
-			log.Info("store: applying mutations")
-			_, err = t.client.Apply(ctx, mutations)
-			if err != nil {
-				return fmt.Errorf("applying mutations: %w", err)
+			// Flush the final batch (includes fence mutation)
+			if err := flushBatch(); err != nil {
+				return err
 			}
-			log.Info("store: applied mutations")
+
+			log.WithField("batches", len(appliedBatches)).Info("store: completed all mutation batches")
 
 			return nil
 		})

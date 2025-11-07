@@ -59,6 +59,8 @@ export TEST_COLLECTION_ALL_KEY_TYPES_PART_THREE="tests/all-key-types-part-three"
 export TEST_COLLECTION_TIMEZONE_DATETIMES="tests/timezone-datetimes"
 export TEST_COLLECTION_FIELDS_WITH_PROJECTIONS="tests/fields-with-projections"
 export TEST_COLLECTION_MANY_COLUMNS="tests/many-columns"
+export TEST_COLLECTION_PERF_SIMPLE="tests/perf-simple"
+export TEST_COLLECTION_PERF_UUID_KEY="tests/perf-uuid-key"
 
 function decrypt_config {
   sops --output-type json --decrypt $1 | jq 'walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)' 
@@ -78,9 +80,24 @@ envsubst < ${TEST_DIR}/flow.json.template > ${TEMP_DIR}/flow.json \
 envsubst < ${TEST_DIR}/empty.flow.json.template > ${TEMP_DIR}/empty.flow.json \
     || bail "generating empty catalog failed"
 
+# Check if we have performance collections (tests/perf-*)
+PERF_MODE=$(echo "${RESOURCES_CONFIG}" | jq -r 'any(.source | test("tests/perf-"))' 2>/dev/null || echo "false")
+
+# Generate performance fixture if in performance mode
+if [[ "${PERF_MODE}" == "true" ]]; then
+    echo "Performance mode detected - generating large-scale fixture..."
+    FIXTURE=${TEMP_DIR}/perf-fixture.json
+    ${TEST_DIR}/generate-fixture.sh ${TEMP_DIR}/flow.json ${FIXTURE} \
+        || bail "performance fixture generation failed"
+else
+    FIXTURE=${TEST_DIR}/fixture.json
+fi
+
 # File into which we'll write a snapshot of the connector output.
 SNAPSHOT=$CONNECTOR_TEST_DIR/snapshot.json
-rm ${SNAPSHOT} || true
+if [[ "${PERF_MODE}" != "true" ]]; then
+    rm ${SNAPSHOT} || true
+fi
 
 function drive_connector {
     local source=$1;
@@ -93,10 +110,19 @@ function drive_connector {
 }
 
 # Drive the connector with the fixture.
-drive_connector ${TEMP_DIR}/flow.json ${TEST_DIR}/fixture.json
+echo "Starting connector test run..."
+START_TIME=$(date +%s)
+drive_connector ${TEMP_DIR}/flow.json ${FIXTURE}
+END_TIME=$(date +%s)
+DURATION=$((END_TIME - START_TIME))
+echo "Connector run completed in ${DURATION} seconds"
 
-# Extend the snapshot with additional fetched content for this connector.
-source $CONNECTOR_TEST_DIR/fetch.sh | jq -S '.' >> ${SNAPSHOT} || bail "fetching results failed"
+# Extend the snapshot with additional fetched content for this connector (skip in performance mode)
+if [[ "${PERF_MODE}" == "true" ]]; then
+    echo "Performance mode: skipping fetch.sh"
+else
+    source $CONNECTOR_TEST_DIR/fetch.sh | jq -S '.' >> ${SNAPSHOT} || bail "fetching results failed"
+fi
 
 # Drive it again to excercise any cleanup behavior when bindings are removed.
 drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.fixture.json
@@ -106,10 +132,15 @@ if [[ -f "$CONNECTOR_TEST_DIR/checks.sh" ]]; then
   source $CONNECTOR_TEST_DIR/checks.sh || bail "connector-specific checks failed"
 fi
 
-# Compare actual and expected snapshots.
-# Produce patch output, so that differences in CI can be reviewed and manually
-# patched into the expectation without having to run the test locally via:
-git diff --exit-code ${SNAPSHOT} || bail "Test Failed because snapshot is different"
+# Compare actual and expected snapshots (skip in performance mode)
+if [[ "${PERF_MODE}" == "true" ]]; then
+    echo "Performance mode: skipping snapshot verification"
+    echo "Snapshot written to: ${SNAPSHOT}"
+else
+    # Produce patch output, so that differences in CI can be reviewed and manually
+    # patched into the expectation without having to run the test locally via:
+    git diff --exit-code ${SNAPSHOT} || bail "Test Failed because snapshot is different"
+fi
 
 TEST_STATUS="Test Passed"
 

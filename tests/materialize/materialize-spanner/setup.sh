@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-resources_json_template='[
+standard_resources_json_template='[
   {
     "resource": {
       "table": "simple"
@@ -120,6 +120,21 @@ resources_json_template='[
   }
 ]'
 
+perf_resources_json_template='[
+  {
+    "resource": {
+      "table": "perf_simple"
+    },
+    "source": "${TEST_COLLECTION_PERF_SIMPLE}"
+  },
+  {
+    "resource": {
+      "table": "perf_uuid_key"
+    },
+    "source": "${TEST_COLLECTION_PERF_UUID_KEY}"
+  }
+]'
+
 export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
 export SPANNER_PROJECT_ID="$(echo $CONNECTOR_CONFIG | jq -r .project_id)"
 export SPANNER_INSTANCE_ID="$(echo $CONNECTOR_CONFIG | jq -r .instance_id)"
@@ -134,4 +149,10 @@ if [ -n "$SPANNER_SERVICE_ACCOUNT_JSON" ]; then
   export GOOGLE_APPLICATION_CREDENTIALS="$SPANNER_KEY_FILE"
 fi
 
-export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
+# Use performance bindings if PERF_DOC_COUNT is set, otherwise use standard test bindings
+if [[ -n "${PERF_DOC_COUNT:-}" ]]; then
+  echo "PERF_DOC_COUNT is set (${PERF_DOC_COUNT}), using performance test bindings only"
+  export RESOURCES_CONFIG="$(echo "$perf_resources_json_template" | envsubst | jq -c)"
+else
+  export RESOURCES_CONFIG="$(echo "$standard_resources_json_template" | envsubst | jq -c)"
+fi
