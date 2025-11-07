@@ -60,7 +60,7 @@ from .models import (
 )
 
 
-ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON = timedelta(hours=2)
+ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON = timedelta(hours=12)
 MIN_CHECKPOINT_INTERVAL = 200
 
 MISSING_RESOURCE_TITLE = r"Oops, you&#39;ve found a dead link"
