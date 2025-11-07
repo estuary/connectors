@@ -3,11 +3,13 @@ from logging import Logger
 from estuary_cdk.http import HTTPMixin, HTTPError
 from estuary_cdk.flow import ValidationError
 
+from .constants import BASE_URL
+
 
 async def validate_credentials(log: Logger, http: HTTPMixin) -> None:
     try:
         await http.request(
-            log, "https://graph.facebook.com/v23.0/me", params={"fields": "id,name"}
+            log, f"{BASE_URL}/me", params={"fields": "id,name"}
         )
     except HTTPError as e:
         if e.code == 401:
@@ -33,7 +35,7 @@ async def validate_access_to_accounts(
         try:
             await http.request(
                 log,
-                f"https://graph.facebook.com/v23.0/act_{account_id}",
+                f"{BASE_URL}/act_{account_id}",
                 params={
                     "fields": "account_id",
                 },

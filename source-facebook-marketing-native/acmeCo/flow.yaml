@@ -27,51 +27,51 @@ collections:
     schema: ads_insights.schema.yaml
     key:
     - /account_id
-    - /date_start
     - /ad_id
+    - /date_start
   acmeCo/ads_insights_action_type:
     schema: ads_insights_action_type.schema.yaml
     key:
     - /account_id
-    - /date_start
     - /ad_id
+    - /date_start
   acmeCo/ads_insights_age_and_gender:
     schema: ads_insights_age_and_gender.schema.yaml
     key:
     - /account_id
-    - /date_start
     - /ad_id
     - /age
+    - /date_start
     - /gender
   acmeCo/ads_insights_country:
     schema: ads_insights_country.schema.yaml
     key:
     - /account_id
-    - /date_start
     - /ad_id
     - /country
+    - /date_start
   acmeCo/ads_insights_dma:
     schema: ads_insights_dma.schema.yaml
     key:
     - /account_id
-    - /date_start
     - /ad_id
+    - /date_start
     - /dma
   acmeCo/ads_insights_platform_and_device:
     schema: ads_insights_platform_and_device.schema.yaml
     key:
     - /account_id
-    - /date_start
     - /ad_id
-    - /publisher_platform
-    - /platform_position
+    - /date_start
     - /impression_device
+    - /platform_position
+    - /publisher_platform
   acmeCo/ads_insights_region:
     schema: ads_insights_region.schema.yaml
     key:
     - /account_id
-    - /date_start
     - /ad_id
+    - /date_start
     - /region
   acmeCo/campaigns:
     schema: campaigns.schema.yaml

@@ -1,10 +1,9 @@
 account_ids: "111111111111111"
 credentials:
-    credentials_title: Private App Credentials
-    access_token: secret
-    auth_type: OAuth Credentials
-    client_id: placeholder
-    client_secret: placeholder
+    credentials_title: OAuth Credentials
+    client_id: placeholder_client_id
+    client_secret: placeholder_client_secret
+    access_token: placeholder_access_token
 start_date: "2023-03-24T00:00:00Z"
 custom_insights:
     - action_breakdowns: ""

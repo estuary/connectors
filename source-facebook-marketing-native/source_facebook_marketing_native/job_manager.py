@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, UTC
 from logging import Logger
 from typing import AsyncGenerator, Any
 from pydantic import BaseModel, ConfigDict
+from enum import StrEnum
 
 from estuary_cdk.http import HTTPSession
 
@@ -30,6 +31,14 @@ class AsyncJobStatusResponse(BaseModel):
     error: FacebookError | None = None
 
     model_config = ConfigDict(extra="allow")
+
+
+class AsyncJobStatus(StrEnum):
+    """Status values for async insights jobs."""
+
+    JOB_COMPLETED = "Job Completed"
+    JOB_FAILED = "Job Failed"
+    JOB_SKIPPED = "Job Skipped"
 
 
 class FacebookPaginatedInsightsResponse(BaseModel):
@@ -189,11 +198,11 @@ class FacebookInsightsJobManager:
                     f"Job {job_id} status: {status.async_status} ({status.async_percent_completion}%)"
                 )
 
-                if status.async_status == "Job Completed":
+                if status.async_status == AsyncJobStatus.JOB_COMPLETED:
                     log.info(f"Job {job_id} completed successfully")
                     return
 
-                elif status.async_status == "Job Failed":
+                elif status.async_status == AsyncJobStatus.JOB_FAILED:
                     error_msg = f"Job {job_id} failed"
                     log.error(error_msg)
 
@@ -203,7 +212,7 @@ class FacebookInsightsJobManager:
                         )
                     )
 
-                elif status.async_status == "Job Skipped":
+                elif status.async_status == AsyncJobStatus.JOB_SKIPPED:
                     error_msg = f"Job {job_id} was skipped"
                     log.warning(error_msg)
 
@@ -245,12 +254,13 @@ class FacebookInsightsJobManager:
         max_wait_time: timedelta | None = None,
     ) -> str:
         attempt = 0
+        job_id = None
 
         while attempt <= self._max_retries:
             try:
                 if attempt > 0:
                     log.info(
-                        f"Retrying job for account {account_id} (attempt {attempt}/{self._max_retries})"
+                        f"Retrying job for account {account_id} (previous job: {job_id}, attempt {attempt}/{self._max_retries})"
                     )
 
                 job_id = await self._submit_job(
@@ -262,6 +272,8 @@ class FacebookInsightsJobManager:
                     breakdowns=model.breakdowns,
                     action_breakdowns=model.action_breakdowns,
                 )
+
+                log.debug(f"Submitted job {job_id} for account {account_id}")
 
                 await self._wait_for_completion(log, job_id, max_wait_time)
 

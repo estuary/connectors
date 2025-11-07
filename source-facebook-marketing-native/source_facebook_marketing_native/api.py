@@ -50,7 +50,7 @@ async def snapshot_ad_creatives(
 ) -> AsyncGenerator[FacebookResource, None]:
     params = FacebookRequestParams(fields=resource_model.fields)
 
-    async def fetch_ad_creatives_with_thumbnails(
+    async def fetch_ad_creatives(
         account_id: str,
     ) -> AsyncGenerator[FacebookResource, None]:
         async for creative in client.fetch_all(
@@ -88,7 +88,7 @@ async def snapshot_ad_creatives(
 
             async def task():
                 results = []
-                async for item in fetch_ad_creatives_with_thumbnails(account_id):
+                async for item in fetch_ad_creatives(account_id):
                     results.append(item)
                 return results
 

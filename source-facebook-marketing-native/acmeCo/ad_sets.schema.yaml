@@ -28,10 +28,10 @@ properties:
     $ref: '#/$defs/Meta'
     description: Document metadata
   id:
-    anyOf:
-    - type: string
-    - type: 'null'
     title: Id
+    type: string
+required:
+- id
 title: AdSets
 type: object
 x-infer-schema: true

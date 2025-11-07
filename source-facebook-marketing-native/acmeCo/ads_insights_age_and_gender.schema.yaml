@@ -22,11 +22,6 @@ properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  id:
-    anyOf:
-    - type: string
-    - type: 'null'
-    title: Id
   account_id:
     title: Account Id
     type: string

@@ -16,30 +16,29 @@ from pydantic import (
     ValidationError,
 )
 
+from .constants import BASE_URL
 from .models import FacebookResource
 from .permissions import PermissionManager
 from .fields import DELIVERY_INFO_FIELDS
+from .enums import Field
 
-BASE_URL = "https://graph.facebook.com/v23.0"
 DEFAULT_PAGE_SIZE = 100
-MAX_ASYNC_JOBS = 10
 UNSUPPORTED_FIELDS = {
-    "unique_conversions",
-    "unique_ctr",
-    "unique_clicks",
-    "age_targeting",
-    "gender_targeting",
-    "labels",
-    "location",
-    "estimated_ad_recall_rate_lower_bound",
-    "estimated_ad_recall_rate_upper_bound",
-    "estimated_ad_recallers_lower_bound",
-    "estimated_ad_recallers_upper_bound",
+    Field.UNIQUE_CONVERSIONS,
+    Field.UNIQUE_CTR,
+    Field.UNIQUE_CLICKS,
+    Field.AGE_TARGETING,
+    Field.GENDER_TARGETING,
+    Field.LABELS,
+    Field.LOCATION,
+    Field.ESTIMATED_AD_RECALL_RATE_LOWER_BOUND,
+    Field.ESTIMATED_AD_RECALL_RATE_UPPER_BOUND,
+    Field.ESTIMATED_AD_RECALLERS_LOWER_BOUND,
+    Field.ESTIMATED_AD_RECALLERS_UPPER_BOUND,
 }
 
 # Permission error codes defined by Facebook API
 PERMISSION_ERROR_CODES = {100, 200, 10}
-
 
 class FacebookPermissionErrorType(Enum):
     BUSINESS_MANAGEMENT = "business_management"
@@ -142,8 +141,8 @@ class FacebookSingleResponse(RootModel[TFacebookResource | FacebookError]):
 
 
 FacebookResourceType = (
-    FacebookSingleResponse[TFacebookResource]
-    | FacebookPaginatedResponse[TFacebookResource]
+    FacebookSingleResponse[FacebookResource]
+    | FacebookPaginatedResponse[FacebookResource]
 )
 FacebookTypeAdapter = TypeAdapter[FacebookResourceType]
 
@@ -187,14 +186,6 @@ class FacebookRequestParams(BaseModel):
 
         return ",".join(fields) if fields else None
 
-    @field_serializer("after_cursor", mode="plain")
-    def serialize_after_cursor(self, after_cursor: str | None) -> str | None:
-        return after_cursor
-
-    @field_serializer("since", mode="plain")
-    def serialize_since(self, since: int | None) -> int | None:
-        return since
-
     @field_serializer("filtering", mode="plain")
     def serialize_filtering(self, filtering: list[dict] | None) -> str | None:
         if not filtering:
@@ -233,10 +224,7 @@ class FacebookAPIClient:
         url: str,
         params: FacebookRequestParams,
         include_deleted: bool,
-    ) -> (
-        FacebookSingleResponse[TFacebookResource]
-        | FacebookPaginatedResponse[TFacebookResource]
-    ):
+    ) -> FacebookResourceType:
         if include_deleted and resource_model.enable_deleted_filter:
             if hasattr(resource_model, "entity_prefix"):
                 filter = {
@@ -270,10 +258,10 @@ class FacebookAPIClient:
     def _build_adapter(
         self,
         resource_model: type[TFacebookResource],
-    ) -> TypeAdapter:
+    ) -> FacebookTypeAdapter:
         return TypeAdapter(
-            FacebookSingleResponse[resource_model]  # type: ignore
-            | FacebookPaginatedResponse[resource_model]  # type: ignore
+            FacebookSingleResponse[resource_model]
+            | FacebookPaginatedResponse[resource_model]
         )
 
     def _build_url(
@@ -284,6 +272,8 @@ class FacebookAPIClient:
         url = f"{self.base_url}/{resource_model.endpoint}"
         if account_id:
             url = f"{self.base_url}/act_{account_id}/{resource_model.endpoint}"
+        
+        self.log.debug(f"Built URL for {resource_model.name}: {url}")
 
         return url
 
@@ -292,7 +282,7 @@ class FacebookAPIClient:
         resource_model: type[TFacebookResource],
         params: FacebookRequestParams,
         account_id: str | None = None,
-    ) -> tuple[str, TypeAdapter, FacebookRequestParams]:
+    ) -> tuple[str, FacebookTypeAdapter, FacebookRequestParams]:
         url = self._build_url(resource_model, account_id)
         adapter = self._build_adapter(resource_model)
         request_params = params.model_copy()
@@ -312,15 +302,12 @@ class FacebookAPIClient:
     async def _fetch_with_error_handling(
         self,
         resource_model: type[TFacebookResource],
-        adapter: TypeAdapter,
+        adapter: FacebookTypeAdapter,
         url: str,
         request_params: FacebookRequestParams,
         include_deleted: bool,
         account_id: str | None = None,
-    ) -> (
-        FacebookSingleResponse[TFacebookResource]
-        | FacebookPaginatedResponse[TFacebookResource]
-    ):
+    ) -> FacebookResourceType:
         try:
             return await self._fetch_resource_data(
                 resource_model, adapter, url, request_params, include_deleted
@@ -350,10 +337,7 @@ class FacebookAPIClient:
         )
 
         while True:
-            response: (
-                FacebookSingleResponse[TFacebookResource]
-                | FacebookPaginatedResponse[TFacebookResource]
-            ) = await self._fetch_with_error_handling(
+            response: FacebookResourceType = await self._fetch_with_error_handling(
                 resource_model, adapter, url, request_params, include_deleted, account_id
             )
 
@@ -389,10 +373,7 @@ class FacebookAPIClient:
             resource_model, params, account_id
         )
 
-        response: (
-            FacebookSingleResponse[TFacebookResource]
-            | FacebookPaginatedResponse[TFacebookResource]
-        ) = await self._fetch_with_error_handling(
+        response: FacebookResourceType = await self._fetch_with_error_handling(
             resource_model, adapter, url, request_params, include_deleted, account_id
         )
 
@@ -422,8 +403,9 @@ class FacebookAPIClient:
     async def fetch_thumbnail_data_url(self, url: str) -> str | None:
         try:
             headers, body = await self.http.request_stream(self.log, url)
-            fallback_content_type = "image/jpeg"
-            content_type = headers.get("Content-Type", fallback_content_type)
+            content_type = headers.get("Content-Type")
+            if not content_type:
+                raise KeyError("Content-Type header not found in response")
 
             response_bytes = b""
             async for chunk in body():
@@ -435,7 +417,8 @@ class FacebookAPIClient:
             self.log.warning(
                 f"Got {str(exc)} while requesting thumbnail image from {url}"
             )
-            return None
+
+        return None
 
     @staticmethod
     def _identify_problematic_field(error_message: str) -> str | None:
@@ -455,29 +438,28 @@ class FacebookAPIClient:
     ):
         field_to_remove = self._identify_problematic_field(error.error.message)
 
-        match field_to_remove:
-            case str() if field_to_remove in request_params.fields:
-                self.log.warning(
-                    f"Removing field '{field_to_remove}' due to permission error: {error.error.message}"
-                )
+        if field_to_remove is None:
+            self.log.warning(
+                f"Could not identify problematic field from error message: {error.error.message}"
+            )
+            raise error
 
-                updated_fields = [
-                    f for f in request_params.fields if f != field_to_remove
-                ]
-                request_params.fields = updated_fields
+        if field_to_remove not in request_params.fields:
+            self.log.debug(
+                f"Identified problematic field '{field_to_remove}' but it's not in current request fields"
+            )
+            raise error
 
-                return await self._fetch_resource_data(
-                    resource_model, adapter, url, request_params, include_deleted
-                )
+        # Field identified and present in request - remove it and retry
+        self.log.warning(
+            f"Removing field '{field_to_remove}' due to permission error: {error.error.message}"
+        )
 
-            case str():
-                self.log.debug(
-                    f"Identified problematic field '{field_to_remove}' but it's not in current request fields"
-                )
-                raise error
+        updated_fields = [
+            f for f in request_params.fields if f != field_to_remove
+        ]
+        request_params.fields = updated_fields
 
-            case None:
-                self.log.warning(
-                    f"Could not identify problematic field from error message: {error.error.message}"
-                )
-                raise error
+        return await self._fetch_resource_data(
+            resource_model, adapter, url, request_params, include_deleted
+        )

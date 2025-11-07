@@ -17,8 +17,9 @@ from estuary_cdk.http import HTTPMixin, TokenSource
 
 from estuary_cdk.flow import ValidationError
 
+from .constants import BASE_URL
 from .utils import validate_credentials, validate_access_to_accounts, str_to_list
-from .client import FacebookAPIClient, BASE_URL
+from .client import FacebookAPIClient
 from .job_manager import FacebookInsightsJobManager
 from .api import (
     snapshot_resource,
@@ -57,6 +58,7 @@ from .models import (
     AdsInsightsActionType,
     InsightsConfig,
     build_custom_ads_insights_model,
+    DEFAULT_LOOKBACK_WINDOW,
 )
 from .fields import (
     AD_INSIGHTS_VALID_FIELDS,
@@ -96,6 +98,9 @@ INSIGHTS_RESOURCES: set[type[FacebookInsightsResource]] = {
     AdsInsightsPlatformAndDevice,
     AdsInsightsActionType,
 }
+
+TEST_CONFIG_CLIENT_ID = "placeholder_client_id"
+TEST_CONFIG_CLIENT_SECRET = "placeholder_client_secret"
 
 
 def _create_initial_state(account_ids: str | list[str]) -> ResourceState:
@@ -179,7 +184,9 @@ def validate_custom_insights(
     for insight in custom_insights:
         fields = str_to_list(insight.fields) if insight.fields else []
         breakdowns = str_to_list(insight.breakdowns) if insight.breakdowns else []
-        action_breakdowns = str_to_list(insight.action_breakdowns) if insight.action_breakdowns else []
+        action_breakdowns = (
+            str_to_list(insight.action_breakdowns) if insight.action_breakdowns else []
+        )
 
         if insight.name in default_insight_names:
             errors.append(
@@ -195,9 +202,7 @@ def validate_custom_insights(
         custom_insight_names.add(insight.name)
 
         if fields:
-            invalid_fields = [
-                f for f in fields if f not in AD_INSIGHTS_VALID_FIELDS
-            ]
+            invalid_fields = [f for f in fields if f not in AD_INSIGHTS_VALID_FIELDS]
             if invalid_fields:
                 errors.append(
                     f'Custom insight "{insight.name}" has invalid fields: {", ".join(invalid_fields)}. '
@@ -287,6 +292,7 @@ def full_refresh_resource(
         ),
         schema_inference=True,
     )
+
 
 def full_refresh_resources(
     client: FacebookAPIClient,
@@ -466,6 +472,7 @@ async def all_resources(
     log: Logger,
     http: HTTPMixin,
     config: EndpointConfig,
+    should_validate_access: bool = False,
 ) -> list[Resource]:
     http.token_source = TokenSource(
         oauth_spec=OAUTH2_SPEC, credentials=config.credentials
@@ -482,8 +489,13 @@ async def all_resources(
         max_retries=3,
     )
 
-    await validate_credentials(log, http)
-    await validate_access_to_accounts(log, http, config.accounts)
+    if (
+        should_validate_access
+        and config.credentials.client_id != TEST_CONFIG_CLIENT_ID
+        and config.credentials.client_secret != TEST_CONFIG_CLIENT_SECRET
+    ):
+        await validate_credentials(log, http)
+        await validate_access_to_accounts(log, http, config.accounts)
 
     if config.custom_insights:
         validate_custom_insights(log, config.custom_insights)
@@ -502,7 +514,8 @@ async def all_resources(
             start_date=config.start_date,
             accounts=config.accounts,
             initial_state=initial_state,
-            insights_lookback_window=config.insights_lookback_window or 28,
+            insights_lookback_window=config.insights_lookback_window
+            or DEFAULT_LOOKBACK_WINDOW,
             custom_insights=config.custom_insights,
             include_deleted=config.advanced.include_deleted,
         ),

@@ -173,7 +173,6 @@ class ActionBreakdown(StrEnum):
 
 
 class Field(StrEnum):
-    # Core identity and account fields
     ACCOUNT_CURRENCY = "account_currency"
     ACCOUNT_ID = "account_id"
     ACCOUNT_NAME = "account_name"
@@ -193,8 +192,6 @@ class Field(StrEnum):
     APPLICATION_NAME = "application_name"
     CAMPAIGN_ID = "campaign_id"
     CAMPAIGN_NAME = "campaign_name"
-
-    # Action and conversion fields
     ACTION_DESTINATION = "action_destination"
     ACTION_TARGET_ID = "action_target_id"
     ACTION_TYPE = "action_type"
@@ -202,8 +199,6 @@ class Field(StrEnum):
     ACTIONS = "actions"
     AD_CLICK_ACTIONS = "ad_click_actions"
     AD_IMPRESSION_ACTIONS = "ad_impression_actions"
-
-    # Financial fields
     AMOUNT_SPENT = "amount_spent"
     ATTRIBUTION_SETTING = "attribution_setting"
     AUCTION_BID = "auction_bid"
@@ -219,8 +214,6 @@ class Field(StrEnum):
     BUDGET_REBALANCE_FLAG = "budget_rebalance_flag"
     BUDGET_REMAINING = "budget_remaining"
     BUYING_TYPE = "buying_type"
-
-    # Business information fields
     BUSINESS = "business"
     BUSINESS_CITY = "business_city"
     BUSINESS_COUNTRY_CODE = "business_country_code"
@@ -229,19 +222,13 @@ class Field(StrEnum):
     BUSINESS_STREET = "business_street"
     BUSINESS_STREET2 = "business_street2"
     BUSINESS_ZIP = "business_zip"
-
-    # Capabilities and settings
     CAN_CREATE_BRAND_LIFT_STUDY = "can_create_brand_lift_study"
     CAPABILITIES = "capabilities"
-
-    # Catalog fields
     CATALOG_SEGMENT_ACTIONS = "catalog_segment_actions"
     CATALOG_SEGMENT_VALUE = "catalog_segment_value"
     CATALOG_SEGMENT_VALUE_MOBILE_PURCHASE_ROAS = "catalog_segment_value_mobile_purchase_roas"
     CATALOG_SEGMENT_VALUE_OMNI_PURCHASE_ROAS = "catalog_segment_value_omni_purchase_roas"
     CATALOG_SEGMENT_VALUE_WEBSITE_PURCHASE_ROAS = "catalog_segment_value_website_purchase_roas"
-
-    # Performance metrics
     CANVAS_AVG_VIEW_PERCENT = "canvas_avg_view_percent"
     CANVAS_AVG_VIEW_TIME = "canvas_avg_view_time"
     CLICKS = "clicks"
@@ -251,8 +238,6 @@ class Field(StrEnum):
     CONVERSION_SPECS = "conversion_specs"
     CONVERSION_VALUES = "conversion_values"
     CONVERSIONS = "conversions"
-
-    # Converted product fields
     CONVERTED_PRODUCT_APP_CUSTOM_EVENT_FB_MOBILE_PURCHASE = "converted_product_app_custom_event_fb_mobile_purchase"
     CONVERTED_PRODUCT_APP_CUSTOM_EVENT_FB_MOBILE_PURCHASE_VALUE = "converted_product_app_custom_event_fb_mobile_purchase_value"
     CONVERTED_PRODUCT_OFFLINE_PURCHASE = "converted_product_offline_purchase"
@@ -263,8 +248,6 @@ class Field(StrEnum):
     CONVERTED_PRODUCT_VALUE = "converted_product_value"
     CONVERTED_PRODUCT_WEBSITE_PIXEL_PURCHASE = "converted_product_website_pixel_purchase"
     CONVERTED_PRODUCT_WEBSITE_PIXEL_PURCHASE_VALUE = "converted_product_website_pixel_purchase_value"
-
-    # Converted promoted product fields
     CONVERTED_PROMOTED_PRODUCT_APP_CUSTOM_EVENT_FB_MOBILE_PURCHASE = "converted_promoted_product_app_custom_event_fb_mobile_purchase"
     CONVERTED_PROMOTED_PRODUCT_APP_CUSTOM_EVENT_FB_MOBILE_PURCHASE_VALUE = "converted_promoted_product_app_custom_event_fb_mobile_purchase_value"
     CONVERTED_PROMOTED_PRODUCT_OFFLINE_PURCHASE = "converted_promoted_product_offline_purchase"
@@ -275,8 +258,6 @@ class Field(StrEnum):
     CONVERTED_PROMOTED_PRODUCT_VALUE = "converted_promoted_product_value"
     CONVERTED_PROMOTED_PRODUCT_WEBSITE_PIXEL_PURCHASE = "converted_promoted_product_website_pixel_purchase"
     CONVERTED_PROMOTED_PRODUCT_WEBSITE_PIXEL_PURCHASE_VALUE = "converted_promoted_product_website_pixel_purchase_value"
-
-    # Cost per action fields
     COST_PER_15_SEC_VIDEO_VIEW = "cost_per_15_sec_video_view"
     COST_PER_2_SEC_CONTINUOUS_VIDEO_VIEW = "cost_per_2_sec_continuous_video_view"
     COST_PER_ACTION_TYPE = "cost_per_action_type"
@@ -297,14 +278,10 @@ class Field(StrEnum):
     COST_PER_UNIQUE_CONVERSION = "cost_per_unique_conversion"
     COST_PER_UNIQUE_INLINE_LINK_CLICK = "cost_per_unique_inline_link_click"
     COST_PER_UNIQUE_OUTBOUND_CLICK = "cost_per_unique_outbound_click"
-
-    # Standard cost metrics
     CPC = "cpc"
     CPM = "cpm"
     CPP = "cpp"
     CTR = "ctr"
-
-    # Creative fields
     ADLABELS = "adlabels"
     APPLINK_TREATMENT = "applink_treatment"
     ASSET_FEED_SPEC = "asset_feed_spec"
@@ -318,8 +295,6 @@ class Field(StrEnum):
     CURRENCY = "currency"
     CUSTOM_EVENT_TYPE = "custom_event_type"
     CUSTOM_LABELS = "custom_labels"
-
-    # Date and time fields
     BACKDATED_TIME = "backdated_time"
     BACKDATED_TIME_GRANULARITY = "backdated_time_granularity"
     CREATED_TIME = "created_time"
@@ -335,22 +310,16 @@ class Field(StrEnum):
     STOP_TIME = "stop_time"
     UPDATED_TIME = "updated_time"
     SCHEDULED_PUBLISH_TIME = "scheduled_publish_time"
-
-    # Budget fields
     DAILY_BUDGET = "daily_budget"
     LIFETIME_BUDGET = "lifetime_budget"
     MIN_CAMPAIGN_GROUP_SPEND_CAP = "min_campaign_group_spend_cap"
     MIN_DAILY_BUDGET = "min_daily_budget"
     SPEND_CAP = "spend_cap"
-
-    # Data sources and conversions
     DATA_SOURCES = "data_sources"
     DDA_COUNTBY_CONVS = "dda_countby_convs"
     DDA_RESULTS = "dda_results"
     DEFAULT_CONVERSION_VALUE = "default_conversion_value"
     DESCRIPTION = "description"
-
-    # Status and delivery fields
     DISABLE_REASON = "disable_reason"
     EFFECTIVE_INSTAGRAM_STORY_ID = "effective_instagram_story_id"
     EFFECTIVE_OBJECT_STORY_ID = "effective_object_story_id"
@@ -361,21 +330,15 @@ class Field(StrEnum):
     EVENT_SOURCE_TYPE = "event_source_type"
     EVENT_TYPE = "event_type"
     EXTRA_DATA = "extra_data"
-
-    # Extended fields
     END_ADVERTISER = "end_advertiser"
     END_ADVERTISER_NAME = "end_advertiser_name"
     EXTENDED_CREDIT_INVOICE_GROUP = "extended_credit_invoice_group"
-
-    # Ad recall and estimation fields
     ESTIMATED_AD_RECALL_RATE = "estimated_ad_recall_rate"
     ESTIMATED_AD_RECALL_RATE_LOWER_BOUND = "estimated_ad_recall_rate_lower_bound"
     ESTIMATED_AD_RECALL_RATE_UPPER_BOUND = "estimated_ad_recall_rate_upper_bound"
     ESTIMATED_AD_RECALLERS = "estimated_ad_recallers"
     ESTIMATED_AD_RECALLERS_LOWER_BOUND = "estimated_ad_recallers_lower_bound"
     ESTIMATED_AD_RECALLERS_UPPER_BOUND = "estimated_ad_recallers_upper_bound"
-
-    # Failed delivery and funding
     FAILED_DELIVERY_CHECKS = "failed_delivery_checks"
     FB_ENTITY = "fb_entity"
     FILENAME = "filename"
@@ -385,47 +348,31 @@ class Field(StrEnum):
     FULL_VIEW_REACH = "full_view_reach"
     FUNDING_SOURCE = "funding_source"
     FUNDING_SOURCE_DETAILS = "funding_source_details"
-
-    # Gender and targeting
     GENDER = "gender"
     GENDER_TARGETING = "gender_targeting"
-
-    # Hash and height
     HASH = "hash"
     HAS_MIGRATED_PERMISSIONS = "has_migrated_permissions"
     HEIGHT = "height"
     HOURLY_STATS_AGGREGATED_BY_ADVERTISER_TIME_ZONE = "hourly_stats_aggregated_by_advertiser_time_zone"
     HOURLY_STATS_AGGREGATED_BY_AUDIENCE_TIME_ZONE = "hourly_stats_aggregated_by_audience_time_zone"
-
-    # ID field
     ID = "id"
-
-    # Image fields
     ICON = "icon"
     IMAGE_CROPS = "image_crops"
     IMAGE_HASH = "image_hash"
     IMAGE_URL = "image_url"
-
-    # Impressions and engagement
     IMPRESSIONS = "impressions"
     IMPRESSION_DEVICE = "impression_device"
     INLINE_LINK_CLICK_CTR = "inline_link_click_ctr"
     INLINE_LINK_CLICKS = "inline_link_clicks"
     INLINE_POST_ENGAGEMENT = "inline_post_engagement"
-
-    # Instagram fields
     INSTAGRAM_ACTOR_ID = "instagram_actor_id"
     INSTAGRAM_PERMALINK_URL = "instagram_permalink_url"
     INSTAGRAM_STORY_ID = "instagram_story_id"
     INSTAGRAM_UPCOMING_EVENT_REMINDERS_SET = "instagram_upcoming_event_reminders_set"
-
-    # Instant experience fields
     INSTANT_EXPERIENCE_CLICKS_TO_OPEN = "instant_experience_clicks_to_open"
     INSTANT_EXPERIENCE_CLICKS_TO_START = "instant_experience_clicks_to_start"
     INSTANT_EXPERIENCE_OUTBOUND_CLICKS = "instant_experience_outbound_clicks"
     INTERACTIVE_COMPONENT_TAP = "interactive_component_tap"
-
-    # IO number and flags
     IO_NUMBER = "io_number"
     IS_ARCHIVED = "is_archived"
     IS_ASSOCIATED_CREATIVES_IN_ADGROUPS = "is_associated_creatives_in_adgroups"
@@ -442,8 +389,6 @@ class Field(StrEnum):
     IS_TAX_ID_REQUIRED = "is_tax_id_required"
     IS_UNAVAILABLE = "is_unavailable"
     ISSUES_INFO = "issues_info"
-
-    # Labels and landing page
     LABELS = "labels"
     LANDING_PAGE_VIEW_ACTIONS_PER_LINK_CLICK = "landing_page_view_actions_per_link_click"
     LANDING_PAGE_VIEW_PER_LINK_CLICK = "landing_page_view_per_link_click"
@@ -451,14 +396,10 @@ class Field(StrEnum):
     LAST_UPDATED_BY_APP_ID = "last_updated_by_app_id"
     LENGTH = "length"
     LINE_NUMBERS = "line_numbers"
-
-    # Link fields
     LINK_OG_ID = "link_og_id"
     LINK_URL = "link_url"
     LIVE_STATUS = "live_status"
     LOCATION = "location"
-
-    # Marketing messages fields
     MARKETING_MESSAGES_CLICK_RATE_BENCHMARK = "marketing_messages_click_rate_benchmark"
     MARKETING_MESSAGES_COST_PER_DELIVERED = "marketing_messages_cost_per_delivered"
     MARKETING_MESSAGES_COST_PER_LINK_BTN_CLICK = "marketing_messages_cost_per_link_btn_click"
@@ -480,15 +421,9 @@ class Field(StrEnum):
     MARKETING_MESSAGES_WEBSITE_INITIATE_CHECKOUT = "marketing_messages_website_initiate_checkout"
     MARKETING_MESSAGES_WEBSITE_PURCHASE = "marketing_messages_website_purchase"
     MARKETING_MESSAGES_WEBSITE_PURCHASE_VALUES = "marketing_messages_website_purchase_values"
-
-    # Media agency and mobile
     MEDIA_AGENCY = "media_agency"
     MOBILE_APP_PURCHASE_ROAS = "mobile_app_purchase_roas"
-
-    # Name fields
     NAME = "name"
-
-    # Object fields
     OBJECTIVE = "objective"
     OBJECTIVE_RESULT_RATE = "objective_result_rate"
     OBJECTIVE_RESULTS = "objective_results"
@@ -498,31 +433,21 @@ class Field(StrEnum):
     OBJECT_STORY_SPEC = "object_story_spec"
     OBJECT_TYPE = "object_type"
     OBJECT_URL = "object_url"
-
-    # Offline conversion and offsite pixels
     OFFLINE_CONVERSION_DATA_SET = "offline_conversion_data_set"
     OFFSITE_PIXELS_TOS_ACCEPTED = "offsite_pixels_tos_accepted"
     ONSITE_CONVERSION_MESSAGING_DETECTED_PURCHASE_DEDUPED = "onsite_conversion_messaging_detected_purchase_deduped"
     OPTIMIZATION_GOAL = "optimization_goal"
     ORIGINAL_HEIGHT = "original_height"
     ORIGINAL_WIDTH = "original_width"
-
-    # Outbound clicks
     OUTBOUND_CLICKS = "outbound_clicks"
     OUTBOUND_CLICKS_CTR = "outbound_clicks_ctr"
-
-    # Owner and partner
     OWNER = "owner"
     PARTNER = "partner"
-
-    # Permalink and place page
     PERMALINK_URL = "permalink_url"
     PLACE_PAGE_NAME = "place_page_name"
     PLATFORM_POSITION = "platform_position"
     POST_VIEWS = "post_views"
     PREMIERE_LIVING_ROOM_STATUS = "premiere_living_room_status"
-
-    # Product fields
     PRODUCT_BRAND = "product_brand"
     PRODUCT_CATEGORY = "product_category"
     PRODUCT_CONTENT_ID = "product_content_id"
@@ -537,92 +462,50 @@ class Field(StrEnum):
     PRODUCT_NAME = "product_name"
     PRODUCT_RETAILER_ID = "product_retailer_id"
     PRODUCT_SET_ID = "product_set_id"
-
-    # Promoted object
     PROMOTED_OBJECT = "promoted_object"
-
-    # Publisher platform
     PUBLISHER_PLATFORM = "publisher_platform"
     PUBLISHED = "published"
-
-    # Purchase fields
     PURCHASE_PER_LANDING_PAGE_VIEW = "purchase_per_landing_page_view"
     PURCHASE_ROAS = "purchase_roas"
     PURCHASES_PER_LINK_CLICK = "purchases_per_link_click"
-
-    # Qualifying question
     QUALIFYING_QUESTION_QUALIFY_ANSWER_RATE = "qualifying_question_qualify_answer_rate"
     QUALITY_RANKING = "quality_ranking"
-
-    # Reach and recommendations
     REACH = "reach"
     RECOMMENDATIONS = "recommendations"
     RETENTION_DAYS = "retention_days"
-
-    # Result fields
     RESULT_RATE = "result_rate"
     RESULT_VALUES_PERFORMANCE_INDICATOR = "result_values_performance_indicator"
     RESULTS = "results"
-
-    # RF spec and rule
     RF_SPEC = "rf_spec"
     RULE = "rule"
-
-    # Shops
     SHOPS_ASSISTED_PURCHASES = "shops_assisted_purchases"
-
-    # Smart promotion and social
     SMART_PROMOTION_TYPE = "smart_promotion_type"
     SOCIAL_SPEND = "social_spend"
     SOURCE = "source"
     SOURCE_AD_ID = "source_ad_id"
     SOURCE_CAMPAIGN_ID = "source_campaign_id"
-
-    # Special ad category
     SPECIAL_AD_CATEGORY = "special_ad_category"
     SPECIAL_AD_CATEGORY_COUNTRY = "special_ad_category_country"
-
-    # Spend
     SPEND = "spend"
-
-    # Status
     STATUS = "status"
-
-    # Targeting and tax
     TARGETING = "targeting"
     TAX_ID = "tax_id"
     TAX_ID_STATUS = "tax_id_status"
     TAX_ID_TYPE = "tax_id_type"
-
-    # Template fields
     TEMPLATE_URL = "template_url"
     TEMPLATE_URL_SPEC = "template_url_spec"
-
-    # Thumbnail fields
     THUMBNAIL_DATA_URL = "thumbnail_data_url"
     THUMBNAIL_URL = "thumbnail_url"
-
-    # Timezone fields
     TIMEZONE_ID = "timezone_id"
     TIMEZONE_NAME = "timezone_name"
     TIMEZONE_OFFSET_HOURS_UTC = "timezone_offset_hours_utc"
-
-    # Title
     TITLE = "title"
-
-    # TOS fields
     TOS_ACCEPTED = "tos_accepted"
-
-    # Postback fields
     TOTAL_POSTBACKS = "total_postbacks"
     TOTAL_POSTBACKS_DETAILED = "total_postbacks_detailed"
     TOTAL_POSTBACKS_DETAILED_V4 = "total_postbacks_detailed_v4"
-
-    # Tracking fields
     TRACKING_SPECS = "tracking_specs"
     TRANSLATED_EVENT_TYPE = "translated_event_type"
-
-    # Unique action fields
     UNIQUE_ACTIONS = "unique_actions"
     UNIQUE_CLICKS = "unique_clicks"
     UNIQUE_CONVERSIONS = "unique_conversions"
@@ -632,20 +515,12 @@ class Field(StrEnum):
     UNIQUE_LINK_CLICKS_CTR = "unique_link_clicks_ctr"
     UNIQUE_OUTBOUND_CLICKS = "unique_outbound_clicks"
     UNIQUE_OUTBOUND_CLICKS_CTR = "unique_outbound_clicks_ctr"
-
-    # Universal video
     UNIVERSAL_VIDEO_ID = "universal_video_id"
-
-    # URL fields
     URL = "url"
     URL_128 = "url_128"
     URL_TAGS = "url_tags"
-
-    # User fields
     USER_TASKS = "user_tasks"
     USER_TOS_ACCEPTED = "user_tos_accepted"
-
-    # Video fields
     VIDEO_ID = "video_id"
     VIDEO_15_SEC_WATCHED_ACTIONS = "video_15_sec_watched_actions"
     VIDEO_30_SEC_WATCHED_ACTIONS = "video_30_sec_watched_actions"
@@ -666,15 +541,11 @@ class Field(StrEnum):
     VIDEO_VIEW_PER_IMPRESSION = "video_view_per_impression"
     UNIQUE_VIDEO_CONTINUOUS_2_SEC_WATCHED_ACTIONS = "unique_video_continuous_2_sec_watched_actions"
     UNIQUE_VIDEO_VIEW_15_SEC = "unique_video_view_15_sec"
-
-    # Views and width
     VIEWS = "views"
     WEBSITE_CTR = "website_ctr"
     WEBSITE_PURCHASE_ROAS = "website_purchase_roas"
     WIDTH = "width"
     WISH_BID = "wish_bid"
-
-    # Breakdown dimension fields (used in breakdowns parameter)
     COUNTRY = "country"
     REGION = "region"
     DMA = "dma"

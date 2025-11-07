@@ -29,11 +29,6 @@ properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  id:
-    anyOf:
-    - type: string
-    - type: 'null'
-    title: Id
   object_id:
     title: Object Id
     type: string

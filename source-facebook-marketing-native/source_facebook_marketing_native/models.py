@@ -31,10 +31,10 @@ from estuary_cdk.capture.common import (
 )
 from estuary_cdk.flow import (
     OAuth2Spec,
-    BaseOAuth2Credentials,
-    AccessToken,
+    LongLivedClientCredentialsOAuth2Credentials,
     ValidationError,
 )
+from .constants import API_VERSION
 from .enums import (
     ActionBreakdown,
     ApiLevel,
@@ -62,172 +62,161 @@ ConnectorState = GenericConnectorState[ResourceState]
 DATA_RETENTION_PERIOD = 37
 ACCOUNT_IDS_PATTERN = r"^\d[\d,]+\d$"
 
+# Default lookback window for insights data. Facebook freezes insight data
+# after this many days, so we retrieve refreshed insights from this period.
+DEFAULT_LOOKBACK_WINDOW = 28
+
 # Type mapping for Facebook API fields (similar to Sage Intacct's DATATYPE_MAP)
 # Maps field names to Python types for proper schema generation and validation
 # Based on ads_insights.json schema from Airbyte source-facebook-marketing
 FACEBOOK_INSIGHTS_TYPE_MAP: dict[str, type] = {
-    # String fields - IDs and names
-    "account_currency": str,
-    "account_id": str,
-    "account_name": str,
-    "ad_id": str,
-    "ad_name": str,
-    "adset_id": str,
-    "adset_name": str,
-    "attribution_setting": str,
-    "buying_type": str,
-    "campaign_id": str,
-    "campaign_name": str,
-    "conversion_rate_ranking": str,
-    "created_time": str,  # Date string format
-    "date_start": str,  # Date string format
-    "date_stop": str,  # Date string format
-    "engagement_rate_ranking": str,
-    "objective": str,
-    "optimization_goal": str,
-    "quality_ranking": str,
-    "updated_time": str,  # Date string format
-    # Integer fields - counts
-    "clicks": int,
-    "impressions": int,
-    "inline_link_clicks": int,
-    "inline_post_engagement": int,
-    "reach": int,
-    "unique_clicks": int,
-    "unique_inline_link_clicks": int,
-    # Float/Number fields - metrics and rates
-    "auction_bid": float,
-    "auction_competitiveness": float,
-    "auction_max_competitor_bid": float,
-    "canvas_avg_view_percent": float,
-    "canvas_avg_view_time": float,
-    "cost_per_estimated_ad_recallers": float,
-    "cost_per_inline_link_click": float,
-    "cost_per_inline_post_engagement": float,
-    "cost_per_unique_click": float,
-    "cost_per_unique_inline_link_click": float,
-    "cpc": float,
-    "cpm": float,
-    "cpp": float,
-    "ctr": float,
-    "estimated_ad_recall_rate": float,
-    "estimated_ad_recallers": float,
-    "frequency": float,
-    "full_view_impressions": float,
-    "full_view_reach": float,
-    "inline_link_click_ctr": float,
-    "instant_experience_clicks_to_open": float,
-    "instant_experience_clicks_to_start": float,
-    "qualifying_question_qualify_answer_rate": float,
-    "social_spend": float,
-    "spend": float,
-    "unique_ctr": float,
-    "unique_inline_link_click_ctr": float,
-    "unique_link_clicks_ctr": float,
-    # Complex array/object fields (ads_action_stats)
-    "action_values": list,
-    "actions": list,
-    "ad_click_actions": list,
-    "ad_impression_actions": list,
-    "catalog_segment_actions": list,
-    "catalog_segment_value": list,
-    "catalog_segment_value_mobile_purchase_roas": list,
-    "catalog_segment_value_omni_purchase_roas": list,
-    "catalog_segment_value_website_purchase_roas": list,
-    "conversion_values": list,
-    "conversions": list,
-    "converted_product_quantity": list,
-    "converted_product_value": list,
-    "cost_per_15_sec_video_view": list,
-    "cost_per_2_sec_continuous_video_view": list,
-    "cost_per_action_type": list,
-    "cost_per_ad_click": list,
-    "cost_per_conversion": list,
-    "cost_per_outbound_click": list,
-    "cost_per_thruplay": list,
-    "cost_per_unique_action_type": list,
-    "cost_per_unique_outbound_click": list,
-    "instant_experience_outbound_clicks": list,
-    "mobile_app_purchase_roas": list,
-    "outbound_clicks": list,
-    "outbound_clicks_ctr": list,
-    "purchase_roas": list,
-    "unique_actions": list,
-    "unique_outbound_clicks": list,
-    "unique_outbound_clicks_ctr": list,
-    "video_15_sec_watched_actions": list,
-    "video_30_sec_watched_actions": list,
-    "video_avg_time_watched_actions": list,
-    "video_continuous_2_sec_watched_actions": list,
-    "video_p100_watched_actions": list,
-    "video_p25_watched_actions": list,
-    "video_p50_watched_actions": list,
-    "video_p75_watched_actions": list,
-    "video_p95_watched_actions": list,
-    "video_play_actions": list,
-    "video_play_curve_actions": list,  # ads_histogram_stats
-    "video_play_retention_0_to_15s_actions": list,  # ads_histogram_stats
-    "video_play_retention_20_to_60s_actions": list,  # ads_histogram_stats
-    "video_play_retention_graph_actions": list,  # ads_histogram_stats
-    "video_time_watched_actions": list,
-    "website_ctr": list,
-    "website_purchase_roas": list,
-    # Breakdown dimensions (string fields) - for breakdowns parameter
-    "age": str,
-    "gender": str,
-    "country": str,
-    "region": str,
-    "dma": str,
-    "publisher_platform": str,
-    "platform_position": str,
-    "device_platform": str,
-    "impression_device": str,
-    "product_id": str,
-    "hourly_stats_aggregated_by_advertiser_time_zone": str,
-    "hourly_stats_aggregated_by_audience_time_zone": str,
-    # Action breakdown dimensions
-    "action_type": str,
-    "action_target_id": str,
-    "action_destination": str,
+    F.ACCOUNT_CURRENCY: str,
+    F.ACCOUNT_ID: str,
+    F.ACCOUNT_NAME: str,
+    F.AD_ID: str,
+    F.AD_NAME: str,
+    F.ADSET_ID: str,
+    F.ADSET_NAME: str,
+    F.ATTRIBUTION_SETTING: str,
+    F.BUYING_TYPE: str,
+    F.CAMPAIGN_ID: str,
+    F.CAMPAIGN_NAME: str,
+    F.CONVERSION_RATE_RANKING: str,
+    F.CREATED_TIME: str,
+    F.DATE_START: str,
+    F.DATE_STOP: str,
+    F.ENGAGEMENT_RATE_RANKING: str,
+    F.OBJECTIVE: str,
+    F.OPTIMIZATION_GOAL: str,
+    F.QUALITY_RANKING: str,
+    F.UPDATED_TIME: str,
+    F.CLICKS: int,
+    F.IMPRESSIONS: int,
+    F.INLINE_LINK_CLICKS: int,
+    F.INLINE_POST_ENGAGEMENT: int,
+    F.REACH: int,
+    F.UNIQUE_CLICKS: int,
+    F.UNIQUE_INLINE_LINK_CLICKS: int,
+    F.AUCTION_BID: float,
+    F.AUCTION_COMPETITIVENESS: float,
+    F.AUCTION_MAX_COMPETITOR_BID: float,
+    F.CANVAS_AVG_VIEW_PERCENT: float,
+    F.CANVAS_AVG_VIEW_TIME: float,
+    F.COST_PER_ESTIMATED_AD_RECALLERS: float,
+    F.COST_PER_INLINE_LINK_CLICK: float,
+    F.COST_PER_INLINE_POST_ENGAGEMENT: float,
+    F.COST_PER_UNIQUE_CLICK: float,
+    F.COST_PER_UNIQUE_INLINE_LINK_CLICK: float,
+    F.CPC: float,
+    F.CPM: float,
+    F.CPP: float,
+    F.CTR: float,
+    F.ESTIMATED_AD_RECALL_RATE: float,
+    F.ESTIMATED_AD_RECALLERS: float,
+    F.FREQUENCY: float,
+    F.FULL_VIEW_IMPRESSIONS: float,
+    F.FULL_VIEW_REACH: float,
+    F.INLINE_LINK_CLICK_CTR: float,
+    F.INSTANT_EXPERIENCE_CLICKS_TO_OPEN: float,
+    F.INSTANT_EXPERIENCE_CLICKS_TO_START: float,
+    F.QUALIFYING_QUESTION_QUALIFY_ANSWER_RATE: float,
+    F.SOCIAL_SPEND: float,
+    F.SPEND: float,
+    F.UNIQUE_CTR: float,
+    F.UNIQUE_INLINE_LINK_CLICK_CTR: float,
+    F.UNIQUE_LINK_CLICKS_CTR: float,
+    F.ACTION_VALUES: list,
+    F.ACTIONS: list,
+    F.AD_CLICK_ACTIONS: list,
+    F.AD_IMPRESSION_ACTIONS: list,
+    F.CATALOG_SEGMENT_ACTIONS: list,
+    F.CATALOG_SEGMENT_VALUE: list,
+    F.CATALOG_SEGMENT_VALUE_MOBILE_PURCHASE_ROAS: list,
+    F.CATALOG_SEGMENT_VALUE_OMNI_PURCHASE_ROAS: list,
+    F.CATALOG_SEGMENT_VALUE_WEBSITE_PURCHASE_ROAS: list,
+    F.CONVERSION_VALUES: list,
+    F.CONVERSIONS: list,
+    F.CONVERTED_PRODUCT_QUANTITY: list,
+    F.CONVERTED_PRODUCT_VALUE: list,
+    F.COST_PER_15_SEC_VIDEO_VIEW: list,
+    F.COST_PER_2_SEC_CONTINUOUS_VIDEO_VIEW: list,
+    F.COST_PER_ACTION_TYPE: list,
+    F.COST_PER_AD_CLICK: list,
+    F.COST_PER_CONVERSION: list,
+    F.COST_PER_OUTBOUND_CLICK: list,
+    F.COST_PER_THRUPLAY: list,
+    F.COST_PER_UNIQUE_ACTION_TYPE: list,
+    F.COST_PER_UNIQUE_OUTBOUND_CLICK: list,
+    F.INSTANT_EXPERIENCE_OUTBOUND_CLICKS: list,
+    F.MOBILE_APP_PURCHASE_ROAS: list,
+    F.OUTBOUND_CLICKS: list,
+    F.OUTBOUND_CLICKS_CTR: list,
+    F.PURCHASE_ROAS: list,
+    F.UNIQUE_ACTIONS: list,
+    F.UNIQUE_OUTBOUND_CLICKS: list,
+    F.UNIQUE_OUTBOUND_CLICKS_CTR: list,
+    F.VIDEO_15_SEC_WATCHED_ACTIONS: list,
+    F.VIDEO_30_SEC_WATCHED_ACTIONS: list,
+    F.VIDEO_AVG_TIME_WATCHED_ACTIONS: list,
+    F.VIDEO_CONTINUOUS_2_SEC_WATCHED_ACTIONS: list,
+    F.VIDEO_P100_WATCHED_ACTIONS: list,
+    F.VIDEO_P25_WATCHED_ACTIONS: list,
+    F.VIDEO_P50_WATCHED_ACTIONS: list,
+    F.VIDEO_P75_WATCHED_ACTIONS: list,
+    F.VIDEO_P95_WATCHED_ACTIONS: list,
+    F.VIDEO_PLAY_ACTIONS: list,
+    F.VIDEO_PLAY_CURVE_ACTIONS: list,
+    F.VIDEO_PLAY_RETENTION_0_TO_15S_ACTIONS: list,
+    F.VIDEO_PLAY_RETENTION_20_TO_60S_ACTIONS: list,
+    F.VIDEO_PLAY_RETENTION_GRAPH_ACTIONS: list,
+    F.VIDEO_TIME_WATCHED_ACTIONS: list,
+    F.WEBSITE_CTR: list,
+    F.WEBSITE_PURCHASE_ROAS: list,
+    F.AGE: str,
+    F.GENDER: str,
+    F.COUNTRY: str,
+    F.REGION: str,
+    F.DMA: str,
+    F.PUBLISHER_PLATFORM: str,
+    F.PLATFORM_POSITION: str,
+    F.DEVICE_PLATFORM: str,
+    F.IMPRESSION_DEVICE: str,
+    F.PRODUCT_ID: str,
+    F.HOURLY_STATS_AGGREGATED_BY_ADVERTISER_TIME_ZONE: str,
+    F.HOURLY_STATS_AGGREGATED_BY_AUDIENCE_TIME_ZONE: str,
+    F.ACTION_TYPE: str,
+    F.ACTION_TARGET_ID: str,
+    F.ACTION_DESTINATION: str,
 }
 
 
 OAUTH2_SPEC = OAuth2Spec(
     provider="facebook",
     authUrlTemplate=(
-        "https://www.facebook.com/v23.0/dialog/oauth"
-        "?client_id={{client_id}}"
-        "&redirect_uri={{redirect_uri}}"
+        f"https://www.facebook.com/{API_VERSION}/dialog/oauth"
+        "?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
+        "&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
         "&scope=ads_management,ads_read,read_insights,business_management"
-        "&state={{state}}"
+        "&state={{#urlencode}}{{{  state }}}{{/urlencode}}"
     ),
+    accessTokenResponseMap={"access_token": "/access_token"},
     accessTokenUrlTemplate=(
-        "https://graph.facebook.com/v23.0/oauth/access_token"
-        "?client_id={{client_id}}"
-        "&client_secret={{client_secret}}"
-        "&code={{code}}"
-        "&redirect_uri={{redirect_uri}}"
+        f"https://graph.facebook.com/{API_VERSION}/oauth/access_token"
+        "?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
+        "&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}"
+        "&code={{#urlencode}}{{{ code }}}{{/urlencode}}"
+        "&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
     ),
-    accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
-    accessTokenBody=(
-        "client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}"
-        "&client_secret={{{#urlencode}}}{{{ client_secret }}}{{{/urlencode}}}"
-        "&code={{{#urlencode}}}{{{ code }}}{{{/urlencode}}}"
-        "&redirect_uri={{{#urlencode}}}{{{ redirect_uri }}}{{{/urlencode}}}"
-        "&grant_type=authorization_code"
-    ),
-    accessTokenResponseMap={
-        "access_token": "/access_token",
-        "expires_in": "/expires_in",
-    },
+    accessTokenHeaders={},
+    accessTokenBody="", # Use query arguments
 )
 
 if TYPE_CHECKING:
-    OAuth2Credentials = BaseOAuth2Credentials
     from .client import FacebookAPIClient
     from .job_manager import FacebookInsightsJobManager
+    OAuth2Credentials = LongLivedClientCredentialsOAuth2Credentials
 else:
-    OAuth2Credentials = BaseOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
+    OAuth2Credentials = LongLivedClientCredentialsOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
 
 
 def default_start_date() -> datetime:
@@ -252,7 +241,7 @@ class CommonConfigMixin(BaseModel, extra="allow"):
             "so you can retrieve refreshed insights from the past by setting this parameter. "
             "If you set a custom lookback window value in Facebook account, please provide the same value here."
         ),
-        default=28,
+        default=DEFAULT_LOOKBACK_WINDOW,
     )
 
     @field_validator("start_date")
@@ -303,19 +292,19 @@ class InsightsConfig(CommonConfigMixin):
     )
     fields: str = Field(
         title="Fields",
-        description="A comma-separated list of chosen fields for fields parameter",
+        description="A comma-separated list of chosen fields",
         examples=["account_id,ad_id,impressions,clicks,spend"],
         json_schema_extra={"order": 2},
     )
     breakdowns: str = Field(
         title="Breakdowns",
-        description="A comma-separated list of chosen breakdowns for breakdowns",
+        description="A comma-separated list of chosen breakdowns",
         examples=["age,gender,region"],
         json_schema_extra={"order": 3},
     )
     action_breakdowns: str = Field(
         title="Action Breakdowns",
-        description="A comma-separated list of chosen action_breakdowns for action_breakdowns",
+        description="A comma-separated list of chosen action breakdowns",
         examples=["action_type"],
         json_schema_extra={"order": 4},
     )
@@ -365,7 +354,7 @@ class EndpointConfig(CommonConfigMixin):
         json_schema_extra={"order": 0},
         pattern=ACCOUNT_IDS_PATTERN,
     )
-    credentials: OAuth2Credentials | AccessToken = Field(
+    credentials: OAuth2Credentials = Field(
         title="Authentication",
         discriminator="credentials_title",
     )
@@ -409,25 +398,19 @@ class EndpointConfig(CommonConfigMixin):
 
 class FacebookResource(BaseDocument, extra="allow"):
     name: ClassVar[str]
-    primary_keys: ClassVar[list[str]] = ["/id"]
+    primary_keys: ClassVar[list[str]]
     endpoint: ClassVar[str]
     cursor_field: ClassVar[str] = "updated_time"
     enable_deleted_filter: ClassVar[bool] = False
     entity_prefix: ClassVar[str] = ""  # Used for API filtering (e.g., "campaign", "ad")
     fields: ClassVar[list[str]] = []
 
-    id: str | None = Field(
-        default=None,
-        # Don't schematize the default value.
-        json_schema_extra=lambda x: x.pop("default"),  # type: ignore
-    )
-
     @classmethod
     def resource_name(cls) -> str:
         return cls.name if hasattr(cls, "name") else cls.__name__
 
     @staticmethod
-    def _coerce_to_type(field_name: str, value: Any, target_type: type) -> Any:
+    def _coerce_to_type(value: Any, target_type: type) -> Any:
         logger.debug(
             f"Coercing value '{value}' ({type(value).__name__}) to {target_type.__name__}"
         )
@@ -551,7 +534,7 @@ class FacebookResource(BaseDocument, extra="allow"):
             logger.debug(
                 f"Coercing field '{field_name}' from {type(value).__name__} to {expected_type.__name__}"
             )
-            return FacebookResource._coerce_to_type(field_name, value, expected_type)
+            return FacebookResource._coerce_to_type(value, expected_type)
         except Exception as e:
             logger.debug(
                 f"Failed to coerce field '{field_name}': {e}, keeping original value"
@@ -600,6 +583,9 @@ class FacebookResource(BaseDocument, extra="allow"):
     def _normalize_values(cls, data: dict) -> dict:
         """
         Normalize ALL field values to their expected types based on prior connector implementations.
+
+        This transformation ensures compatibility with documents output by the imported Airbyte
+        `source-facebook-marketing` connector by matching its type coercion behavior.
 
         Facebook API may return numbers as strings, booleans as strings, etc.
         This ensures serialized output has correct types for schema inference.
@@ -686,6 +672,7 @@ InsightsFetchChangesFn = Callable[
 
 class AdAccount(FacebookResource):
     name: ClassVar[str] = ResourceName.AD_ACCOUNT
+    primary_keys: ClassVar[list[str]] = ["/id"]
     endpoint: ClassVar[str] = "/"
     fields: ClassVar[list[str]] = [
         F.ID,
@@ -744,9 +731,12 @@ class AdAccount(FacebookResource):
         F.USER_TOS_ACCEPTED,
     ]
 
+    id: str
+
 
 class AdCreative(FacebookResource):
     name: ClassVar[str] = ResourceName.AD_CREATIVES
+    primary_keys: ClassVar[list[str]] = ["/id"]
     endpoint: ClassVar[str] = "adcreatives"
     fields: ClassVar[list[str]] = [
         F.ID,
@@ -784,9 +774,12 @@ class AdCreative(FacebookResource):
         F.VIDEO_ID,
     ]
 
+    id: str
+
 
 class CustomConversions(FacebookResource):
     name: ClassVar[str] = ResourceName.CUSTOM_CONVERSIONS
+    primary_keys: ClassVar[list[str]] = ["/id"]
     endpoint: ClassVar[str] = "customconversions"
     fields: ClassVar[list[str]] = [
         F.ID,
@@ -808,9 +801,12 @@ class CustomConversions(FacebookResource):
         F.RULE,
     ]
 
+    id: str
+
 
 class Campaigns(FacebookResource):
     name: ClassVar[str] = ResourceName.CAMPAIGNS
+    primary_keys: ClassVar[list[str]] = ["/id"]
     endpoint: ClassVar[str] = "campaigns"
     cursor_field: ClassVar[str] = CursorField.UPDATED_TIME
     entity_prefix: ClassVar[str] = ApiLevel.CAMPAIGN
@@ -840,6 +836,8 @@ class Campaigns(FacebookResource):
         F.UPDATED_TIME,
     ]
 
+    id: str
+
 
 class AdSets(FacebookResource):
     """Facebook Ad Sets resource.
@@ -849,6 +847,7 @@ class AdSets(FacebookResource):
     """
 
     name: ClassVar[str] = ResourceName.AD_SETS
+    primary_keys: ClassVar[list[str]] = ["/id"]
     endpoint: ClassVar[str] = "adsets"
     cursor_field: ClassVar[str] = CursorField.UPDATED_TIME
     entity_prefix: ClassVar[str] = ApiLevel.ADSET
@@ -875,6 +874,8 @@ class AdSets(FacebookResource):
         F.UPDATED_TIME,
     ]
 
+    id: str
+
 
 class Ads(FacebookResource):
     """Facebook Ads resource.
@@ -884,6 +885,7 @@ class Ads(FacebookResource):
     """
 
     name: ClassVar[str] = ResourceName.ADS
+    primary_keys: ClassVar[list[str]] = ["/id"]
     endpoint: ClassVar[str] = "ads"
     cursor_field: ClassVar[str] = CursorField.UPDATED_TIME
     entity_prefix: ClassVar[str] = ApiLevel.AD
@@ -910,6 +912,8 @@ class Ads(FacebookResource):
         F.TRACKING_SPECS,
         F.UPDATED_TIME,
     ]
+
+    id: str
 
 
 class Activities(FacebookResource):
@@ -962,6 +966,7 @@ class Images(FacebookResource):
     """
 
     name: ClassVar[str] = ResourceName.IMAGES
+    primary_keys: ClassVar[list[str]] = ["/id"]
     endpoint: ClassVar[str] = "adimages"
     cursor_field: ClassVar[str] = CursorField.UPDATED_TIME
     fields: ClassVar[list[str]] = [
@@ -984,6 +989,8 @@ class Images(FacebookResource):
         F.WIDTH,
     ]
 
+    id: str
+
 
 class Videos(FacebookResource):
     """Facebook Ad Videos resource.
@@ -993,6 +1000,7 @@ class Videos(FacebookResource):
     """
 
     name: ClassVar[str] = ResourceName.VIDEOS
+    primary_keys: ClassVar[list[str]] = ["/id"]
     endpoint: ClassVar[str] = "advideos"
     cursor_field: ClassVar[str] = CursorField.UPDATED_TIME
     fields: ClassVar[list[str]] = [
@@ -1027,6 +1035,8 @@ class Videos(FacebookResource):
         F.UPDATED_TIME,
         F.VIEWS,
     ]
+
+    id: str
 
 
 class FacebookInsightsResource(FacebookResource):
@@ -1109,11 +1119,11 @@ class AdsInsights(FacebookInsightsResource):
         F.CONVERSION_RATE_RANKING,
     ]
 
-    primary_keys: ClassVar[list[str]] = [
+    primary_keys: ClassVar[list[str]] = sorted([
         "/account_id",
         "/date_start",
         "/ad_id",
-    ]
+    ])
 
     level: ClassVar[ApiLevel] = ApiLevel.AD
     breakdowns: ClassVar[list[Breakdown]] = []
@@ -1189,7 +1199,9 @@ class AdsInsights(FacebookInsightsResource):
 class AdsInsightsAgeAndGender(AdsInsights):
     name: ClassVar[str] = ResourceName.ADS_INSIGHTS_AGE_AND_GENDER
     breakdowns: ClassVar[list[Breakdown]] = [Breakdown.AGE, Breakdown.GENDER]
-    primary_keys: ClassVar[list[str]] = AdsInsights.primary_keys + ["/age", "/gender"]
+    primary_keys: ClassVar[list[str]] = sorted(
+        AdsInsights.primary_keys + ["/age", "/gender"]
+    )
     age: str
     gender: str
 
@@ -1197,21 +1209,27 @@ class AdsInsightsAgeAndGender(AdsInsights):
 class AdsInsightsCountry(AdsInsights):
     name: ClassVar[str] = ResourceName.ADS_INSIGHTS_COUNTRY
     breakdowns: ClassVar[list[Breakdown]] = [Breakdown.COUNTRY]
-    primary_keys: ClassVar[list[str]] = AdsInsights.primary_keys + ["/country"]
+    primary_keys: ClassVar[list[str]] = sorted(
+        AdsInsights.primary_keys + ["/country"]
+    )
     country: str
 
 
 class AdsInsightsRegion(AdsInsights):
     name: ClassVar[str] = ResourceName.ADS_INSIGHTS_REGION
     breakdowns: ClassVar[list[Breakdown]] = [Breakdown.REGION]
-    primary_keys: ClassVar[list[str]] = AdsInsights.primary_keys + ["/region"]
+    primary_keys: ClassVar[list[str]] = sorted(
+        AdsInsights.primary_keys + ["/region"]
+    )
     region: str
 
 
 class AdsInsightsDma(AdsInsights):
     name: ClassVar[str] = ResourceName.ADS_INSIGHTS_DMA
     breakdowns: ClassVar[list[Breakdown]] = [Breakdown.DMA]
-    primary_keys: ClassVar[list[str]] = AdsInsights.primary_keys + ["/dma"]
+    primary_keys: ClassVar[list[str]] = sorted(
+        AdsInsights.primary_keys + ["/dma"]
+    )
     dma: str
 
 
@@ -1223,11 +1241,9 @@ class AdsInsightsPlatformAndDevice(AdsInsights):
         Breakdown.IMPRESSION_DEVICE,
     ]
     action_breakdowns: ClassVar[list[ActionBreakdown]] = [ActionBreakdown.ACTION_TYPE]
-    primary_keys: ClassVar[list[str]] = AdsInsights.primary_keys + [
-        "/publisher_platform",
-        "/platform_position",
-        "/impression_device",
-    ]
+    primary_keys: ClassVar[list[str]] = sorted(
+        AdsInsights.primary_keys + ["/publisher_platform", "/platform_position", "/impression_device"]
+    )
     publisher_platform: str
     platform_position: str
     impression_device: str
