@@ -171,35 +171,41 @@ type storeOperation struct {
 
 // mutationBatch accumulates mutations for efficient batching
 type mutationBatch struct {
-	mutations []*spanner.Mutation
-	byteSize  int // Approximate size in bytes
+	mutations    []*spanner.Mutation
+	mutationCount int // Spanner mutation count (columns * operations)
+	byteSize     int // Approximate size in bytes
 }
 
 const (
-	// Maximum mutations per commit (Spanner limit is 80,000, but we stay well below)
+	// Maximum mutations per commit (Spanner limit is 80,000)
+	// Note: Each insert/update/delete counts as (number of columns) mutations
 	// With indexes, the effective limit is lower (e.g., 1 index = 40,000 rows)
+	// We use a conservative limit to stay well under 80K
 	maxMutationsPerBatch = 10000
 
-	// Maximum byte size per batch (1-5 MB is recommended)
+	// Maximum byte size per batch (1-5 MB is recommended by Spanner)
 	maxBytesPerBatch = 4 * 1024 * 1024 // 4 MB
 
-	// Estimated average bytes per mutation (conservative estimate)
-	estimatedBytesPerMutation = 400
+	// Estimated average bytes per column mutation (conservative estimate)
+	estimatedBytesPerColumn = 100
 )
 
 // addMutation adds a mutation to the batch
-func (mb *mutationBatch) addMutation(m *spanner.Mutation) {
+// columnCount is the number of columns affected (each column counts as one mutation in Spanner)
+func (mb *mutationBatch) addMutation(m *spanner.Mutation, columnCount int) {
 	mb.mutations = append(mb.mutations, m)
-	mb.byteSize += estimatedBytesPerMutation
+	mb.mutationCount += columnCount
+	mb.byteSize += columnCount * estimatedBytesPerColumn
 }
 
 // shouldFlush returns true if the batch should be flushed
 func (mb *mutationBatch) shouldFlush() bool {
-	return len(mb.mutations) >= maxMutationsPerBatch || mb.byteSize >= maxBytesPerBatch
+	return mb.mutationCount >= maxMutationsPerBatch || mb.byteSize >= maxBytesPerBatch
 }
 
 // reset clears the batch
 func (mb *mutationBatch) reset() {
-	mb.mutations = make([]*spanner.Mutation, 0, maxMutationsPerBatch)
+	mb.mutations = make([]*spanner.Mutation, 0, 1000) // Preallocate reasonable size
+	mb.mutationCount = 0
 	mb.byteSize = 0
 }
