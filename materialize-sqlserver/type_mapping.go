@@ -79,7 +79,7 @@ func MapSizedText(stringType string, limit int, collation string) sql.MapProject
 		bytesPerCharacter = 1
 	}
 
-	return func(p *sql.Projection) (string, sql.CompatibleColumnTypes, sql.ElementConverter) {
+	return func(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
 		high, requiredSizeBytes := bits.Mul32(p.Inference.String_.MaxLength, bytesPerCharacter)
 		if high != 0 {
 			requiredSizeBytes = math.MaxUint32
@@ -91,7 +91,7 @@ func MapSizedText(stringType string, limit int, collation string) sql.MapProject
 				Size:       limit,
 				Collation:  collation,
 			}
-			return column.DDL(), []sql.CompatibleColumnType{column}, nil
+			return column, []sql.CompatibleColumnType{column}, nil
 		}
 
 		column := &SizedText{
@@ -99,6 +99,34 @@ func MapSizedText(stringType string, limit int, collation string) sql.MapProject
 			Size:       int(requiredSizeBytes),
 			Collation:  collation,
 		}
-		return column.DDL(), []sql.CompatibleColumnType{column}, nil
+		return column, []sql.CompatibleColumnType{column}, nil
 	}
 }
+
+type StringSizeMigrationTarget struct{}
+
+func (*StringSizeMigrationTarget) CanMigrate(existing boilerplate.ExistingField, desired sql.MappedType) bool {
+	target, ok := desired.TargetType.(*SizedText)
+	if !ok {
+		return false
+	}
+
+	if !strings.EqualFold(existing.Type, target.ColumnType) {
+		return false
+	}
+
+	// If the existing field was created with MAX as the string size, then this
+	// type needs to be the same.
+	if existing.CharacterMaxLength == MaxStringSize {
+		return target.Size == MaxStringSize
+	}
+
+	// We can always migrate to a MAX size string.
+	if target.Size == MaxStringSize {
+		return true
+	}
+
+	return target.Size >= existing.CharacterMaxLength
+}
+
+var _ sql.MigrationTarget = (*StringSizeMigrationTarget)(nil)

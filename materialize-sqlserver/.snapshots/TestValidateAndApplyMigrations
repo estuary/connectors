@@ -46,7 +46,7 @@ Migratable Changes Before Apply Schema:
 {"Name":"requiredNumeric","Nullable":"NO","Type":"bigint"}
 {"Name":"scalarValue","Nullable":"NO","Type":"varchar","CharacterMaxLength":-1}
 {"Name":"stringAddMaxLength","Nullable":"YES","Type":"varchar","CharacterMaxLength":-1}
-{"Name":"stringIncreaseMaxLength","Nullable":"YES","Type":"varchar","CharacterMaxLength":-1}
+{"Name":"stringIncreaseMaxLength","Nullable":"YES","Type":"varchar","CharacterMaxLength":64}
 {"Name":"stringWidenedToJson","Nullable":"YES","Type":"varchar","CharacterMaxLength":-1}
 {"Name":"timeValue","Nullable":"YES","Type":"time"}
 
@@ -103,12 +103,12 @@ Migratable Changes Applied Schema:
 {"Name":"requiredNumeric","Nullable":"NO","Type":"varchar","CharacterMaxLength":-1}
 {"Name":"scalarValue","Nullable":"NO","Type":"varchar","CharacterMaxLength":-1}
 {"Name":"stringAddMaxLength","Nullable":"YES","Type":"varchar","CharacterMaxLength":-1}
-{"Name":"stringIncreaseMaxLength","Nullable":"YES","Type":"varchar","CharacterMaxLength":-1}
+{"Name":"stringIncreaseMaxLength","Nullable":"YES","Type":"varchar","CharacterMaxLength":128}
 {"Name":"stringWidenedToJson","Nullable":"YES","Type":"varchar","CharacterMaxLength":-1}
 {"Name":"timeValue","Nullable":"YES","Type":"varchar","CharacterMaxLength":-1}
 
 
 Migratable Changes Applied Data:
-key (NVARCHAR), _meta/flow_truncated (BIT), boolWidenedToJson (BIT), fieldWithProjection (NVARCHAR), field_with_projection (NVARCHAR), flow_published_at (DATETIME2), int64ToNumber (NVARCHAR), multiple (NVARCHAR), nonScalarValue (NVARCHAR), optional (NVARCHAR), scalarValue (NVARCHAR), stringAddMaxLength (NVARCHAR), stringIncreaseMaxLength (NVARCHAR), stringWidenedToJson (NVARCHAR), flow_document (NVARCHAR), dateValue (NVARCHAR), datetimeValue (NVARCHAR), int64 (NVARCHAR), intToNumber (FLOAT), intWidenedToJson (NVARCHAR), numericString (NVARCHAR), requiredNumeric (NVARCHAR), timeValue (NVARCHAR)
-1, false, true, <nil>, <nil>, 2024-09-13T01:01:01Z, 10000000000000000000, <nil>, <nil>, <nil>, test, <nil>, <nil>, hello, {}, 2024-01-01, 2024-01-01T01:01:01.1111111Z, 1, 9.223372036854776e+18, 999, 123, 456, 01:01:01.0000000
+key (NVARCHAR), _meta/flow_truncated (BIT), boolWidenedToJson (BIT), fieldWithProjection (NVARCHAR), field_with_projection (NVARCHAR), flow_published_at (DATETIME2), int64ToNumber (NVARCHAR), multiple (NVARCHAR), nonScalarValue (NVARCHAR), optional (NVARCHAR), scalarValue (NVARCHAR), stringAddMaxLength (NVARCHAR), stringWidenedToJson (NVARCHAR), flow_document (NVARCHAR), dateValue (NVARCHAR), datetimeValue (NVARCHAR), int64 (NVARCHAR), intToNumber (FLOAT), intWidenedToJson (NVARCHAR), numericString (NVARCHAR), requiredNumeric (NVARCHAR), stringIncreaseMaxLength (NVARCHAR), timeValue (NVARCHAR)
+1, false, true, <nil>, <nil>, 2024-09-13T01:01:01Z, 10000000000000000000, <nil>, <nil>, <nil>, test, <nil>, hello, {}, 2024-01-01, 2024-01-01T01:01:01.1111111Z, 1, 9.223372036854776e+18, 999, 123, 456, <nil>, 01:01:01.0000000
 

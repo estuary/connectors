@@ -129,7 +129,7 @@ func TestBinaryPKColumn(t *testing.T) {
 	require.Equal(t, "varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL", mapped.DDL)
 }
 
-func TestTextType(t *testing.T) {
+func TestCompatibleTextType(t *testing.T) {
 	type CompatibleCheck struct {
 		existing   boilerplate.ExistingField
 		compatible bool
@@ -297,6 +297,140 @@ func TestTextType(t *testing.T) {
 				require.Equal(t, check.compatible, mapped.Compatible(check.existing), check)
 			}
 
+		})
+	}
+}
+
+func TestCanMigrateTextType(t *testing.T) {
+	type CheckExisting struct {
+		desc       string
+		existing   boilerplate.ExistingField
+		canMigrate bool
+	}
+	tests := []struct {
+		name       string
+		projection *sql.Projection
+		targetDDL  string
+		checks     []CheckExisting
+	}{
+		{
+			name: "no size info",
+			projection: &sql.Projection{
+				Projection: pf.Projection{
+					Inference: pf.Inference{
+						Types:   []string{"string"},
+						String_: &pf.Inference_String{},
+						Exists:  pf.Inference_MUST,
+					},
+				},
+			},
+			targetDDL: "varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL",
+			checks: []CheckExisting{
+				{
+					desc: "already max size",
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: -1,
+					},
+					canMigrate: true,
+				},
+				{
+					desc: "widen to max size is okay",
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: 64,
+					},
+					canMigrate: true,
+				},
+			},
+		},
+		{
+			name: "maxLength",
+			projection: &sql.Projection{
+				Projection: pf.Projection{
+					Inference: pf.Inference{
+						Types: []string{"string"},
+						String_: &pf.Inference_String{
+							MaxLength: 16,
+						},
+						Exists: pf.Inference_MUST,
+					},
+				},
+			},
+			targetDDL: "varchar(64) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL",
+			checks: []CheckExisting{
+				{
+					desc: "migrate should refuse to narrow MAX to a sized column",
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: -1,
+					},
+					canMigrate: false,
+				},
+				{
+					desc: "widen existing field is okay",
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: 63,
+					},
+					canMigrate: true,
+				},
+				{
+					desc: "exact existing field is okay",
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: 64,
+					},
+					canMigrate: true,
+				},
+				{
+					desc: "migrate should refuse to narrow existing field; could contain larger data",
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: 65,
+					},
+					canMigrate: false,
+				},
+			},
+		},
+		{
+			name: "maxLength must use max",
+			projection: &sql.Projection{
+				Projection: pf.Projection{
+					Inference: pf.Inference{
+						Types: []string{"string"},
+						String_: &pf.Inference_String{
+							MaxLength: 8001,
+						},
+						Exists: pf.Inference_MUST,
+					},
+				},
+			},
+			targetDDL: "varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL",
+			checks: []CheckExisting{
+				{
+					desc: "can migrate field from sized to max storage",
+					existing: boilerplate.ExistingField{
+						Type:               "VARCHAR",
+						CharacterMaxLength: 64,
+					},
+					canMigrate: true,
+				},
+			},
+		},
+	}
+
+	var dialect = testDialect
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var mapped = dialect.MapType(tt.projection, sql.FieldConfig{})
+			mapped.MigratableTypes = dialect.MigratableTypes
+
+			require.Equal(t, tt.targetDDL, mapped.DDL)
+
+			for _, check := range tt.checks {
+				require.Equal(t, check.canMigrate, mapped.CanMigrate(check.existing), check.desc)
+			}
 		})
 	}
 }

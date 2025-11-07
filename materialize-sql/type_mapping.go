@@ -158,6 +158,16 @@ func (s *CompatibleStringEqualFold) Compatible(existing boilerplate.ExistingFiel
 // case-insensitive.
 type CompatibleColumnTypes []CompatibleColumnType
 
+type DDLer interface {
+	DDL() string
+}
+
+type StringDDL string
+
+func (d StringDDL) DDL() string {
+	return string(d)
+}
+
 type MappedType struct {
 	// DDL is the "CREATE TABLE" DDL type for this mapping, suited for direct inclusion in raw SQL
 	// for new table creation.
@@ -174,6 +184,9 @@ type MappedType struct {
 	// If the column is using user-defined DDL or not. The selected field will
 	// always pass validation if this is true.
 	UserDefinedDDL bool
+	// Type that represents the desired data type, corresponds to the .DDL
+	// field but may be a type with structured data used for migration.
+	TargetType DDLer
 	// Complete list of migration specifications for the endpoint.
 	MigratableTypes MigrationSpecs
 }
@@ -196,12 +209,13 @@ func (m MappedType) Compatible(existing boilerplate.ExistingField) bool {
 }
 
 func (m MappedType) CanMigrate(existing boilerplate.ExistingField) bool {
-	return m.MigratableTypes.FindMigrationSpec(existing.Type, m.NullableDDL) != nil
+	res := m.MigratableTypes.FindMigrationSpec(existing, m) != nil
+	return res
 }
 
 // MapProjectionFn is a function that converts a Projection into the column DDL
 // and element converter for storing values into the column.
-type MapProjectionFn func(p *Projection) (string, CompatibleColumnTypes, ElementConverter)
+type MapProjectionFn func(p *Projection) (DDLer, CompatibleColumnTypes, ElementConverter)
 
 var _ TypeMapper = DDLMapper{}
 
@@ -291,8 +305,8 @@ func MapStatic(ddl string, opts ...MapStaticOption) MapProjectionFn {
 		o(&cfg)
 	}
 
-	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
-		return ddl, cfg.compatible, cfg.converter
+	return func(p *Projection) (DDLer, CompatibleColumnTypes, ElementConverter) {
+		return StringDDL(ddl), cfg.compatible, cfg.converter
 	}
 }
 
@@ -301,7 +315,7 @@ func MapStatic(ddl string, opts ...MapStaticOption) MapProjectionFn {
 // certain variations of a type for primary keys. For example, MySQL does not
 // accept TEXT as a primary key, but a VARCHAR with specified size works.
 func MapPrimaryKey(pkMapper, delegate MapProjectionFn) MapProjectionFn {
-	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
+	return func(p *Projection) (DDLer, CompatibleColumnTypes, ElementConverter) {
 		if p.IsPrimaryKey {
 			return pkMapper(p)
 		}
@@ -334,7 +348,7 @@ type StringMappings struct {
 // can take the format or content type into account when deciding how to handle
 // the column.
 func MapString(m StringMappings) MapProjectionFn {
-	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
+	return func(p *Projection) (DDLer, CompatibleColumnTypes, ElementConverter) {
 		delegate := m.Fallback
 
 		if p.Inference.String_ != nil {
@@ -352,7 +366,7 @@ func MapString(m StringMappings) MapProjectionFn {
 // MapStringMaxLen uses an alternate mapping for string fields where string
 // inference is available and the string is longer than the cutoff.
 func MapStringMaxLen(def, alt MapProjectionFn, cutoff uint32) MapProjectionFn {
-	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
+	return func(p *Projection) (DDLer, CompatibleColumnTypes, ElementConverter) {
 		if p.Inference.String_ != nil &&
 			p.Inference.String_.MaxLength > cutoff {
 			return alt(p)
@@ -366,7 +380,7 @@ func MapStringMaxLen(def, alt MapProjectionFn, cutoff uint32) MapProjectionFn {
 // inference is available and the minimum or maximum of the inferred range is
 // outside the bounds of what will fit in a signed 64 bit integer.
 func MapSignedInt64(def, alt MapProjectionFn) MapProjectionFn {
-	return func(p *Projection) (string, CompatibleColumnTypes, ElementConverter) {
+	return func(p *Projection) (DDLer, CompatibleColumnTypes, ElementConverter) {
 		if p.Inference.Numeric != nil &&
 			(p.Inference.Numeric.Minimum < math.MinInt64 || p.Inference.Numeric.Maximum > math.MaxInt64) {
 			// Numeric Minimum and Maximums are stated as powers of 10, so
@@ -426,15 +440,16 @@ func (d DDLMapper) MapType(p *Projection, fc FieldConfig) MappedType {
 
 	if fc.DDL != "" {
 		// User has specified a custom DDL, so use that.
-		ddl = fc.DDL
+		ddl = StringDDL(fc.DDL)
 	}
 
 	out := MappedType{
-		DDL:                   ddl,
-		NullableDDL:           ddl,
+		DDL:                   ddl.DDL(),
+		NullableDDL:           ddl.DDL(),
 		Converter:             converter,
 		CompatibleColumnTypes: compatibleTypes,
 		UserDefinedDDL:        fc.DDL != "",
+		TargetType:            ddl,
 	}
 
 	if mustExist && d.notNullText != "" {
