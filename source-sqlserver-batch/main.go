@@ -270,7 +270,7 @@ func translateSQLServerValue(cfg *Config, val any, databaseTypeName string) (any
 func translateSQLServerCursor(cfg *Config, val any, databaseTypeName string) (any, error) {
 	// Special cases where translateSQLServerValue is inappropriate
 	switch strings.ToUpper(databaseTypeName) {
-	case "DATETIME":
+	case "DATETIME", "DATETIME2", "SMALLDATETIME":
 		return val, nil
 	}
 
