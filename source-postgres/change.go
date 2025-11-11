@@ -360,13 +360,9 @@ func (db *postgresDatabase) constructJSONTranscoder(discoveredColumnType any, is
 	// This is the main value encoding logic used for most data types outside of special cases.
 	// We go the long way, first using PGX to decode the value and then translating it to another
 	// Go value and then finally serializing that as JSON.
-	var columnType postgresTypeDescription
+	var columnType postgresTypeDescription = unknownColumnType
 	if t, ok := discoveredColumnType.(postgresTypeDescription); ok {
 		columnType = t
-	} else {
-		return jsonTranscoderFunc(func(buf []byte, bs []byte) ([]byte, error) {
-			return nil, fmt.Errorf("invalid column type description %v", discoveredColumnType)
-		})
 	}
 	return jsonTranscoderFunc(func(buf []byte, bs []byte) ([]byte, error) {
 		var val any
@@ -383,6 +379,13 @@ func (db *postgresDatabase) constructJSONTranscoder(discoveredColumnType any, is
 		}
 	})
 }
+
+// unknownColumnType is the "discovered type" of a column which doesn't currently show up in discovery results.
+//
+// The fact that this is a situation which can occur (typically when a column is renamed or dropped) is why we
+// really ought to try and drive our value translation purely from type OIDs, but currently there are a few cases
+// where we still depend on discovery information.
+var unknownColumnType = postgresBasicType{Name: "unknown-column-type"}
 
 // constructFDBTranscoder returns an fdbTranscoder for a specific column value.
 func (db *postgresDatabase) constructFDBTranscoder(typeMap *pgtype.Map, fieldDescription *pgconn.FieldDescription) fdbTranscoder {
