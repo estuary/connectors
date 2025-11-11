@@ -229,6 +229,10 @@
             "type": "string",
             "title": "Feature Flags",
             "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+          },
+          "discover_only_published": {
+            "type": "boolean",
+            "x-hidden-field": true
           }
         },
         "additionalProperties": false,
