@@ -38,10 +38,6 @@ func buildInsertOrUpdateMutation(
 }
 
 // buildDeleteMutation creates a Spanner Delete mutation from a binding and key values.
-// TODO: Implement deletions using one of:
-//   - Option 1: spanner.Delete() mutation (simple, same batch)
-//   - Option 2: DML DELETE statement (for Partitioned DML support)
-//   - Option 3: Soft delete with flow_deleted column
 func buildDeleteMutation(
 	binding *binding,
 	keyValues []interface{},
@@ -180,8 +176,7 @@ const (
 	// Maximum mutations per commit (Spanner limit is 80,000)
 	// Note: Each insert/update/delete counts as (number of columns) mutations
 	// With indexes, the effective limit is lower (e.g., 1 index = 40,000 rows)
-	// We use a conservative limit to stay well under 80K
-	maxMutationsPerBatch = 10000
+	maxMutationsPerBatch = 80000
 
 	// Maximum byte size per batch (1-5 MB is recommended by Spanner)
 	maxBytesPerBatch = 4 * 1024 * 1024 // 4 MB

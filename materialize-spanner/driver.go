@@ -18,6 +18,7 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -534,41 +535,77 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 // Store implements the Store phase using Spanner mutations with optimal batching
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	storeStart := time.Now()
-	var storeMutationDuration time.Duration
 	var storeCount int
+	var storeBytes int
 
 	ctx := it.Context()
 
-	// Track all applied batches for error handling
-	var appliedBatches [][]*spanner.Mutation
 	var currentBatch mutationBatch
 	currentBatch.reset()
 
-	// Helper function to flush current batch
+	// Batch work item for parallel processing
+	type batchWork struct {
+		mutations     []*spanner.Mutation
+		mutationCount int
+		byteSize      int
+		batchNum      int
+	}
+
+
+	// Number of parallel workers
+	const numWorkers = 3
+
+	// Channel for sending batches to workers (buffered to allow queueing)
+	batchChan := make(chan batchWork, 5)
+
+	// Create errgroup for managing worker goroutines
+	g, gctx := errgroup.WithContext(ctx)
+
+	// Start worker goroutines
+	for i := 0; i < numWorkers; i++ {
+		g.Go(func() error {
+			for work := range batchChan {
+				start := time.Now()
+				_, err := t.client.Apply(gctx, work.mutations)
+				duration := time.Since(start)
+
+				if err != nil {
+					return fmt.Errorf("applying batch %d (%d mutations): %w", work.batchNum, work.mutationCount, err)
+				}
+
+				log.WithFields(log.Fields{
+					"operations":    len(work.mutations),
+					"mutationCount": work.mutationCount,
+					"bytes":         work.byteSize,
+					"batch":         work.batchNum,
+					"duration":      duration.Seconds(),
+				}).Info("store: applied mutation batch")
+			}
+			return nil
+		})
+	}
+
+	batchCounter := 0
+
+	// Helper function to flush current batch (sends to worker pool)
 	flushBatch := func() error {
 		if len(currentBatch.mutations) == 0 {
 			return nil
 		}
 
-		batchNum := len(appliedBatches) + 1
-		_, batchDuration, err := t.timedSpannerApply(ctx, currentBatch.mutations, fmt.Sprintf("store-apply-batch-%d", batchNum))
-		if err != nil {
-			return fmt.Errorf("applying batch %d (%d operations, %d mutations): %w", batchNum, len(currentBatch.mutations), currentBatch.mutationCount, err)
+		batchCounter++
+		storeBytes += currentBatch.byteSize
+		select {
+		case batchChan <- batchWork{
+			mutations:     currentBatch.mutations,
+			mutationCount: currentBatch.mutationCount,
+			byteSize:      currentBatch.byteSize,
+			batchNum:      batchCounter,
+		}:
+		case <-gctx.Done():
+			return gctx.Err()
 		}
 
-		storeMutationDuration += batchDuration
-
-		log.WithFields(log.Fields{
-			"operations":         len(currentBatch.mutations),
-			"mutationCount":      currentBatch.mutationCount,
-			"bytes":              currentBatch.byteSize,
-			"batch":              batchNum,
-			"batchDuration":      batchDuration.Seconds(),
-			"cumulativeDuration": storeMutationDuration.Seconds(),
-		}).Info("store: applying mutation batch")
-
-		// Track applied batch for checkpoint handling
-		appliedBatches = append(appliedBatches, currentBatch.mutations)
 		currentBatch.reset()
 		return nil
 	}
@@ -588,6 +625,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Convert only the key columns for deletion
 			keyValues, err := b.target.ConvertKey(it.Key)
 			if err != nil {
+				close(batchChan)
 				return nil, fmt.Errorf("converting delete keys: %w", err)
 			}
 
@@ -596,6 +634,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			for i, val := range keyValues {
 				spannerVal, err := toSpannerValue(val, b.columnNames[b.keyColumnIdxs[i]], b.columnTypes[b.keyColumnIdxs[i]])
 				if err != nil {
+					close(batchChan)
 					return nil, fmt.Errorf("converting key value for column %s: %w", b.columnNames[b.keyColumnIdxs[i]], err)
 				}
 				spannerKeyValues[i] = spannerVal
@@ -610,6 +649,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Flush if batch limits reached
 			if currentBatch.shouldFlush() {
 				if err := flushBatch(); err != nil {
+					close(batchChan)
 					return nil, err
 				}
 			}
@@ -619,6 +659,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Spanner's InsertOrUpdate handles both cases
 			values, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 			if err != nil {
+				close(batchChan)
 				return nil, fmt.Errorf("converting store values: %w", err)
 			}
 
@@ -627,6 +668,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			for i, val := range values {
 				spannerVal, err := toSpannerValue(val, b.columnNames[i], b.columnTypes[i])
 				if err != nil {
+					close(batchChan)
 					return nil, fmt.Errorf("converting value for column %s: %w", b.columnNames[i], err)
 				}
 				spannerValues[i] = spannerVal
@@ -639,6 +681,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Flush if batch limits reached
 			if currentBatch.shouldFlush() {
 				if err := flushBatch(); err != nil {
+					close(batchChan)
 					return nil, err
 				}
 			}
@@ -646,6 +689,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	if it.Err() != nil {
+		close(batchChan)
 		return nil, it.Err()
 	}
 
@@ -660,18 +704,19 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				commitDuration = time.Since(commitStart)
 
 				log.WithFields(log.Fields{
-					"totalDuration":         storeDuration.Seconds(),
-					"storePhaseDuration":    (storeDuration - commitDuration).Seconds(),
-					"commitPhaseDuration":   commitDuration.Seconds(),
-					"storeMutationDuration": storeMutationDuration.Seconds(),
-					"storeCount":            storeCount,
-					"numBatches":            len(appliedBatches),
+					"totalDuration":       storeDuration.Seconds(),
+					"storePhaseDuration":  (storeDuration - commitDuration).Seconds(),
+					"commitPhaseDuration": commitDuration.Seconds(),
+					"storeCount":          storeCount,
+					"storeBytes":          storeBytes,
+					"numBatches":          batchCounter,
 				}).Info("store: phase complete")
 			}()
 
 			// Marshal the checkpoint
 			checkpointBytes, err := runtimeCheckpoint.Marshal()
 			if err != nil {
+				close(batchChan)
 				return fmt.Errorf("marshalling checkpoint: %w", err)
 			}
 
@@ -696,10 +741,19 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			// Flush the final batch (includes fence mutation)
 			if err := flushBatch(); err != nil {
+				close(batchChan)
 				return err
 			}
 
-			log.WithField("batches", len(appliedBatches)).Info("store: completed all mutation batches")
+			// Close the batch channel to signal workers to finish
+			close(batchChan)
+
+			// Wait for all workers to complete
+			if err := g.Wait(); err != nil {
+				return err
+			}
+
+			log.WithField("batches", batchCounter).Info("store: completed all mutation batches")
 
 			return nil
 		})
