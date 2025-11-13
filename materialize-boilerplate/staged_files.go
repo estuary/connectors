@@ -7,6 +7,7 @@ import (
 
 	"github.com/estuary/connectors/go/blob"
 	"github.com/google/uuid"
+	log "github.com/sirupsen/logrus"
 )
 
 // Writer is any streaming writer that can be used to write rows to files.
@@ -222,9 +223,21 @@ func (f *stagedFile) flushFile() error {
 		return nil
 	}
 
+	fileSize := f.writer.Written()
 	if err := f.writer.Close(); err != nil {
 		return fmt.Errorf("closing writer: %w", err)
 	}
+
+	var fileName string
+	if len(f.uploaded) > 0 {
+		fileName = f.uploaded[len(f.uploaded)-1]
+	}
+
+	log.WithFields(log.Fields{
+		"file_size_bytes": fileSize,
+		"file_name":       fileName,
+	}).Debug("flushed staged file")
+
 	f.writer = nil
 
 	return nil
