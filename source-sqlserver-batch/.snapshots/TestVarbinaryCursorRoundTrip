@@ -1,0 +1,10 @@
+# ================================
+# Final State Checkpoint
+# ================================
+
+# ================================
+# Captures Terminated With Errors
+# ================================
+capture terminated with error: error polling binding "varbinarycursorroundtrip_296871": error translating cursor column "hash_value" value: binary column types (VARBINARY) cannot be used as cursor columns
+capture terminated with error: error polling binding "varbinarycursorroundtrip_296871": error translating cursor column "hash_value" value: binary column types (VARBINARY) cannot be used as cursor columns
+
