@@ -197,7 +197,7 @@ func (c *config) Validate() error {
 }
 
 // ToURI converts the Config to a DSN string.
-func (c *config) ToURI() string {
+func (c *config) ToURI() *url.URL {
 	var address = c.Address
 	var uri, err = url.Parse(address)
 
@@ -217,7 +217,7 @@ func (c *config) ToURI() string {
 		uri.Host = "localhost:27017"
 	}
 
-	return uri.String()
+	return uri
 }
 
 type driver struct{}
@@ -290,25 +290,38 @@ func (d *driver) Connect(ctx context.Context, cfg config) (*mongo.Client, error)
 		},
 	}
 
-	// Create a new client and connect to the server. "Majority" read concern is set to avoid
-	// reading data during backfills that may be rolled back in uncommon situations. This matches
-	// the behavior of change streams, which only represent data that has been majority committed.
-	// This read concern will overwrite any that is set in the connection string parameter
-	// "readConcernLevel".
-	//
-	// Snappy compression is used since it is widely supported and quite a bit faster than zlib.
-	// zstd would be even better, but as of right now it causes the connector to use an excessive
-	// amount of memory.
-	var opts = options.Client().ApplyURI(cfg.ToURI()).SetCompressors([]string{"snappy"}).SetReadConcern(readconcern.Majority()).SetPoolMonitor(poolMonitor)
+	var uri = cfg.ToURI()
+	var opts = options.Client()
+	opts = opts.ApplyURI(uri.String())
+	// Snappy compression is used since it is widely supported and quite a bit
+	// faster than zlib.  zstd would be even better, but as of right now it
+	// causes the connector to use an excessive amount of memory.
+	opts = opts.SetCompressors([]string{"snappy"})
+	// "Majority" read concern is set to avoid reading data during backfills
+	// that may be rolled back in uncommon situations. This matches the
+	// behavior of change streams, which only represent data that has been
+	// majority committed.  This read concern will overwrite any that is set in
+	// the connection string parameter "readConcernLevel".
+	opts = opts.SetReadConcern(readconcern.Majority())
+	opts = opts.SetPoolMonitor(poolMonitor)
+
 	if isDocDB {
-		tlsConfig, err := documentDBTLSConfig()
-		if err != nil {
-			return nil, fmt.Errorf("tlsConfig for documentDB: %w", err)
+		// The mongodb driver automatically enables TLS when a TLSConfig is set.
+		// Only override this if the user has specifically disabled TLS on the
+		// connection.  DocumentDB connections are always over a network tunnel
+		// so this is safe.
+		if uri.Query().Get("tls") != "false" {
+			tlsConfig, err := documentDBTLSConfig()
+			if err != nil {
+				return nil, fmt.Errorf("tlsConfig for documentDB: %w", err)
+			}
+			opts = opts.SetTLSConfig(tlsConfig)
 		}
-		// In addition to the TLS configuration, DocumentDB doesn't support
-		// connecting in replica set mode through an SSH tunnel, so the
-		// directConnection query parameter is required.
-		opts = opts.SetTLSConfig(tlsConfig).SetDirect(true)
+
+		// DocumentDB doesn't support connecting in replica set mode through an
+		// SSH tunnel, and a tunnel is always required, so the directConnection
+		// query parameter is required.
+		opts = opts.SetDirect(true)
 	}
 
 	client, err := mongo.Connect(ctx, opts)
