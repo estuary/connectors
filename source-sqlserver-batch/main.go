@@ -272,6 +272,8 @@ func translateSQLServerCursor(cfg *Config, val any, databaseTypeName string) (an
 	switch strings.ToUpper(databaseTypeName) {
 	case "DATETIME", "DATETIME2", "SMALLDATETIME":
 		return val, nil
+	case "BINARY", "VARBINARY", "IMAGE":
+		return nil, fmt.Errorf("binary column types (%s) cannot be used as cursor columns", databaseTypeName)
 	}
 
 	// Otherwise we defer to translateSQLServerValue

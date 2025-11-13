@@ -370,3 +370,47 @@ func TestUniqueIdentifierCursorRoundTrip(t *testing.T) {
 	cs.Capture(ctx, t, nil)
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+// TestVarbinaryCursorRoundTrip tests that VARBINARY column values used as cursors
+// are correctly round-tripped back to the database for incremental queries.
+func TestVarbinaryCursorRoundTrip(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+		id INTEGER PRIMARY KEY,
+		data NVARCHAR(MAX),
+		hash_value VARBINARY(32)
+	)`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "hash_value")
+	setShutdownAfterQuery(t, true)
+
+	// Generate some binary values that increase lexicographically
+	var testHashes = [][]byte{
+		{0x10, 0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80},
+		{0x20, 0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90},
+		{0x30, 0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0},
+		{0x40, 0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0},
+		{0x50, 0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0},
+		{0x60, 0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0},
+		{0x70, 0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0},
+		{0x80, 0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0},
+		{0x90, 0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0, 0xff},
+		{0xa0, 0xb0, 0xc0, 0xd0, 0xe0, 0xf0, 0xff, 0x00},
+	}
+
+	for i := range 5 {
+		executeControlQuery(t, control, fmt.Sprintf(
+			"INSERT INTO %s (id, data, hash_value) VALUES (@p1, @p2, @p3)", tableName),
+			i, fmt.Sprintf("Initial row %d", i), testHashes[i])
+	}
+	cs.Capture(ctx, t, nil)
+	for i := 5; i < 10; i++ {
+		executeControlQuery(t, control, fmt.Sprintf(
+			"INSERT INTO %s (id, data, hash_value) VALUES (@p1, @p2, @p3)", tableName),
+			i, fmt.Sprintf("Second batch row %d", i), testHashes[i])
+	}
+	cs.Capture(ctx, t, nil)
+	cupaloy.SnapshotT(t, cs.Summary())
+}
