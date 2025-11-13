@@ -36,6 +36,7 @@ from .api import (
     snapshot_resources,
     backfill_incremental_resources,
     fetch_incremental_resources,
+    fetch_object_fields,
 )
 from .auth import (
     SalesforceTokenSource,
@@ -60,34 +61,6 @@ async def _fetch_queryable_objects(log: Logger, http: HTTPMixin, instance_url: s
     )
 
     return [o.name for o in response.sobjects if o.queryable]
-
-
-async def _fetch_object_fields(
-    log: Logger,
-    http: HTTPMixin,
-    instance_url: str,
-    name: str,
-    additional_fields_to_include_in_refresh: list[str],
-) -> FieldDetailsDict:
-    url = f"{instance_url}/services/data/v{VERSION}/sobjects/{name}/describe"
-
-    response = SObject.model_validate_json(
-        await http.request(log, url)
-    )
-
-    fields = {}
-
-    for field in response.fields:
-        should_include_in_refresh = field.calculated or field.name in additional_fields_to_include_in_refresh
-
-        fields[field.name] = {
-            "soapType": field.soapType,
-            "calculated": field.calculated,
-            "custom": field.custom,
-            "should_include_in_refresh": should_include_in_refresh,
-        }
-
-    return FieldDetailsDict.model_validate(fields)
 
 
 def full_refresh_resource(
@@ -206,8 +179,6 @@ def incremental_resource(
                 rest_query_manager,
                 instance_url,
                 name,
-                fields,
-                model_cls,
                 config.advanced.window_size,
             ),
         )
@@ -281,7 +252,7 @@ async def _object_to_resource(
     assert isinstance(enable, bool)
     assert isinstance(is_supported_by_bulk_api, bool)
     assert isinstance(additional_fields_to_include_in_refresh, list)
-    fields = await _fetch_object_fields(log, http, instance_url, name, additional_fields_to_include_in_refresh) if should_fetch_fields else None
+    fields = await fetch_object_fields(log, http, instance_url, name, additional_fields_to_include_in_refresh) if should_fetch_fields else None
 
     if fields:
         field_soap_types = {fields[field].soapType for field in fields}

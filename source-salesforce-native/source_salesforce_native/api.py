@@ -15,12 +15,14 @@ from .bulk_job_manager import (
     MAX_BULK_QUERY_SET_SIZE,
 )
 from .rest_query_manager import RestQueryManager
-from .shared import dt_to_str, str_to_dt, now
+from .shared import dt_to_str, str_to_dt, now, VERSION
 from .models import (
     FieldDetails,
     FieldDetailsDict,
     SalesforceRecord,
     CursorFields,
+    SObject,
+    create_salesforce_model,
 )
 
 REST_CHECKPOINT_INTERVAL = 2_000
@@ -50,6 +52,34 @@ def _determine_cursor_field(
         return CursorFields.LOGIN_TIME
     else:
         raise RuntimeError("Attempted to find cursor field but no valid cursor field exists.")
+
+
+async def fetch_object_fields(
+    log: Logger,
+    http: HTTPSession,
+    instance_url: str,
+    name: str,
+    additional_fields_to_include_in_refresh: list[str],
+) -> FieldDetailsDict:
+    url = f"{instance_url}/services/data/v{VERSION}/sobjects/{name}/describe"
+
+    response = SObject.model_validate_json(
+        await http.request(log, url)
+    )
+
+    fields = {}
+
+    for field in response.fields:
+        should_include_in_refresh = field.calculated or field.name in additional_fields_to_include_in_refresh
+
+        fields[field.name] = {
+            "soapType": field.soapType,
+            "calculated": field.calculated,
+            "custom": field.custom,
+            "should_include_in_refresh": should_include_in_refresh,
+        }
+
+    return FieldDetailsDict.model_validate(fields)
 
 
 def _filter_to_only_refresh_fields(all_fields: FieldDetailsDict, cursor_field: str) -> tuple[bool, FieldDetailsDict]:
@@ -223,8 +253,6 @@ async def fetch_incremental_resources(
     rest_query_manager: RestQueryManager,
     instance_url: str,
     name: str,
-    fields: FieldDetailsDict,
-    model_cls: type[SalesforceRecord],
     window_size: int,
     log: Logger,
     log_cursor: LogCursor,
@@ -239,6 +267,14 @@ async def fetch_incremental_resources(
     # This is done to prevent repeatedly sending API requests for tiny date windows.
     if end < log_cursor or (end - log_cursor < MIN_INCREMENTAL_WINDOW_SIZE):
         return
+
+    # Fetch the object's current set of fields on each invocation of fetch_incremental_resources. This is done
+    # to detect when new custom fields are created on a Salesforce object while the connector is running & ensure
+    # those new fields are included in REST API queries. Otherwise, if we were only to fetch an object's fields
+    # at the beginning of a connector invocation, it's possible for `fetch_incremental_resources` to process incremental
+    # changes with an out-of-date list of object fields & end up omitting recently created fields in yielded documents.
+    fields = await fetch_object_fields(log, http, instance_url, name, additional_fields_to_include_in_refresh=[])
+    model_cls = create_salesforce_model(name, fields)
 
     cursor_field = _determine_cursor_field(fields)
 
