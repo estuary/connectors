@@ -23,6 +23,12 @@ import (
 	"google.golang.org/api/option"
 )
 
+const (
+	// Timeout for file upload operations across all cloud providers.
+	// This prevents uploads from hanging indefinitely due to network issues.
+	uploadTimeout = 30 * time.Minute
+)
+
 type AuthType string
 
 const (
@@ -182,7 +188,10 @@ func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
 }
 
 func (s *S3Store) PutStream(ctx context.Context, r io.Reader, key string) error {
-	_, err := s.uploader.Upload(ctx, &s3.PutObjectInput{
+	uploadCtx, cancel := context.WithTimeout(ctx, uploadTimeout)
+	defer cancel()
+
+	_, err := s.uploader.Upload(uploadCtx, &s3.PutObjectInput{
 		Bucket: aws.String(s.bucket),
 		Key:    aws.String(key),
 		Body:   r,
@@ -252,7 +261,10 @@ func NewGCSStore(ctx context.Context, cfg GCSStoreConfig) (*GCSStore, error) {
 }
 
 func (s *GCSStore) PutStream(ctx context.Context, r io.Reader, key string) error {
-	w := s.client.Bucket(s.bucket).Object(key).NewWriter(ctx)
+	uploadCtx, cancel := context.WithTimeout(ctx, uploadTimeout)
+	defer cancel()
+
+	w := s.client.Bucket(s.bucket).Object(key).NewWriter(uploadCtx)
 
 	if _, err := io.Copy(w, r); err != nil {
 		return fmt.Errorf("copying r to w: %w", err)
@@ -314,5 +326,8 @@ func NewAzureBlob(ctx context.Context, cfg AzureBlobConfig) (*AzureBlob, error) 
 }
 
 func (s *AzureBlob) PutStream(ctx context.Context, r io.Reader, key string) error {
-	return s.bucket.Upload(ctx, key, r)
+	uploadCtx, cancel := context.WithTimeout(ctx, uploadTimeout)
+	defer cancel()
+
+	return s.bucket.Upload(uploadCtx, key, r)
 }
