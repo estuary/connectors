@@ -1,11 +1,22 @@
----
+import:
+- acmeCo/flow.yaml
 captures:
   acmeCo/source-salesforce-native:
     endpoint:
       local:
         command:
-          - python
-          - "-m"
-          - source_salesforce_native
+        - python
+        - -m
+        - source_salesforce_native
         config: config.yaml
-    bindings: []
+    bindings:
+    - resource:
+        name: Account
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/Account
+    - resource:
+        name: User
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/User
