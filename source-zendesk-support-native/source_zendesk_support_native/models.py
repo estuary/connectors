@@ -8,7 +8,7 @@ from estuary_cdk.capture.common import (
     BaseDocument,
     LongLivedClientCredentialsOAuth2Credentials,
     RotatingOAuth2Credentials,
-    OAuth2RotatingTokenSpec,
+    OAuth2Spec,
     ResourceConfig,
     ResourceState,
 )
@@ -47,7 +47,7 @@ accessTokenBody = {
     "expires_in": MAX_VALID_ACCESS_TOKEN_DURATION,
 }
 
-OAUTH2_SPEC = OAuth2RotatingTokenSpec(
+OAUTH2_SPEC = OAuth2Spec(
     provider="zendesk",
     accessTokenBody=json.dumps(accessTokenBody),
     authUrlTemplate=(
