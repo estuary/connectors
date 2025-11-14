@@ -1,10 +1,10 @@
 from datetime import datetime
 from logging import Logger
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 from urllib.parse import urlparse, parse_qs
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPError, HTTPSession
 
 from .models import (
     OutreachResource,
@@ -18,6 +18,7 @@ DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 API = "https://api.outreach.io/api/v2"
 MAX_PAGE_SIZE = 1000
+MIN_PAGE_SIZE = 1
 
 
 def _dt_to_str(dt: datetime) -> str:
@@ -39,6 +40,48 @@ def _extract_page_cursor(links: OutreachResponse.Links | None) -> str | None:
     return cursor_list[0] if cursor_list else None
 
 
+def _should_retry_request(
+    status: int,
+    headers: dict[str, Any],
+    body: bytes,
+    attempt: int,
+) -> bool:
+    # If the response has a 502 status code, that could mean that
+    # too much data was requested and a timeout was reached before
+    # the API server sent a response. To get around these timeouts,
+    # the connector should make a new request for less data.
+    return status != 502
+
+
+async def _do_request(
+    http: HTTPSession,
+    url: str,
+    params: dict[str, str | int],
+    log: Logger,
+) -> OutreachResponse:
+    # params are copied to avoid mutating the passed in dictionary.
+    params = params.copy()
+
+    page_size = MAX_PAGE_SIZE
+    while page_size >= MIN_PAGE_SIZE:
+        params["page[size]"] = page_size
+        try:
+            return OutreachResponse.model_validate_json(
+                await http.request(log, url, params=params, should_retry=_should_retry_request)
+            )
+        except HTTPError as err:
+            if err.code == 502 and "Bad Gateway" in err.message:
+                log.debug("Received 502 Bad Gateway response (will retry with a smaller page size).", {
+                    "url": url,
+                    "params": params,
+                })
+                page_size = page_size // 2
+            else:
+                raise
+
+    raise Exception(f"Request to {url} failed with smallest possible page size. Query parameters were {params}")
+
+
 async def backfill_resources(
     http: HTTPSession,
     path: str,
@@ -57,7 +100,6 @@ async def backfill_resources(
         "sort": cursor_field,
         "newFilterSyntax": "true",
         f"filter[{cursor_field}][gte]": _dt_to_str(start_date),
-        "page[size]": MAX_PAGE_SIZE,
     }
 
     if extra_params:
@@ -67,9 +109,7 @@ async def backfill_resources(
         assert isinstance(page, str)
         params["page[after]"] = page
 
-    response = OutreachResponse.model_validate_json(
-        await http.request(log, url, params=params)
-    )
+    response = await _do_request(http, url, params, log)
 
     for resource in response.data:
         resource_dt = _str_to_dt(getattr(resource, 'attributes')[cursor_field])
@@ -102,7 +142,6 @@ async def fetch_resources(
         "sort": cursor_field,
         "newFilterSyntax": "true",
         f"filter[{cursor_field}][gte]": _dt_to_str(log_cursor),
-        "page[size]": MAX_PAGE_SIZE,
     }
 
     if extra_params:
@@ -111,9 +150,7 @@ async def fetch_resources(
     last_seen_dt = log_cursor
 
     while True:
-        response = OutreachResponse.model_validate_json(
-            await http.request(log, url, params=params)
-        )
+        response = await _do_request(http, url, params, log)
 
         if (
             last_seen_dt > log_cursor
