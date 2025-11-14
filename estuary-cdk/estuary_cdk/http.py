@@ -23,7 +23,6 @@ from .flow import (
     GoogleServiceAccount,
     GoogleServiceAccountSpec,
     LongLivedClientCredentialsOAuth2Credentials,
-    OAuth2RotatingTokenSpec,
     OAuth2Spec,
     OAuth2TokenFlowSpec,
     ResourceOwnerPasswordOAuth2Credentials,
@@ -221,7 +220,7 @@ class TokenSource:
         refresh_token: str = ""
         scope: str = ""
 
-    oauth_spec: OAuth2Spec | OAuth2TokenFlowSpec | OAuth2RotatingTokenSpec | None
+    oauth_spec: OAuth2Spec | OAuth2TokenFlowSpec | None
     credentials: (
         BaseOAuth2Credentials
         | RotatingOAuth2Credentials
@@ -368,26 +367,13 @@ class TokenSource:
                     f"Unsupported client credentials placement: {credentials.client_credentials_placement}."
                 )
 
-        match credentials:
-            case RotatingOAuth2Credentials():
-                assert isinstance(self.oauth_spec, OAuth2RotatingTokenSpec)
-                form["refresh_token"] = credentials.refresh_token
+        # Some providers require additional parameters within the form body, like
+        # an `expires_in` to configure how long the access token remains valid.
+        form.update(self.oauth_spec.additionalTokenExchangeBody)
 
-                # Some providers require additional parameters within the form body, like
-                # an `expires_in` to configure how long the access token remains valid.
-                if self.oauth_spec.additionalTokenExchangeBody:
-                    form.update(self.oauth_spec.additionalTokenExchangeBody)
-
-            case BaseOAuth2Credentials():
-                form["refresh_token"] = credentials.refresh_token
-            case (
-                ClientCredentialsOAuth2Credentials()
-                | AuthorizationCodeFlowOAuth2Credentials()
-                | ResourceOwnerPasswordOAuth2Credentials()
-            ):
-                pass
-            case _:
-                raise TypeError(f"Unsupported credentials type: {type(credentials)}.")
+        if isinstance(credentials, BaseOAuth2Credentials):
+            assert isinstance(self.oauth_spec, OAuth2Spec)
+            form["refresh_token"] = credentials.refresh_token
 
         response = await session.request(
             log,
