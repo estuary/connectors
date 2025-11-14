@@ -82,6 +82,7 @@ class Checkpoint(BaseModel):
 class OAuth2TokenFlowSpec(BaseModel):
     accessTokenResponseMap: dict[str, str]
     accessTokenUrlTemplate: str
+    additionalTokenExchangeBody: dict[str, str | int] = {}
 
 
 class OAuth2Spec(BaseModel):
@@ -92,9 +93,9 @@ class OAuth2Spec(BaseModel):
     accessTokenResponseMap: dict[str, str]
     accessTokenUrlTemplate: str
 
-
-class OAuth2RotatingTokenSpec(OAuth2Spec):
-    additionalTokenExchangeBody: dict[str, str | int] | None
+    # additionalTokenExchangeBody pertains to internal connector token exchanges
+    # and should be excluded from spec responses
+    additionalTokenExchangeBody: dict[str, str | int] = Field(default={}, exclude=True)
 
 
 class ConnectorSpec(BaseModel):
