@@ -153,7 +153,7 @@ class Task:
         SourcedSchema messages won't be emitted until checkpoint() is called."""
 
         b = Response(
-            sourcedSchema=response.SourcedSchema(binding=binding_index, schemaJson=schema)
+            sourcedSchema=response.SourcedSchema(binding=binding_index, schema_json=schema)
         ).model_dump_json(by_alias=True, exclude_unset=True).encode()
 
         self._buffer.write(b)
