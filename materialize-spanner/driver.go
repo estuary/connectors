@@ -2,15 +2,20 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"strings"
+	"sync"
 	"text/template"
 	"time"
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
 	databasepb "cloud.google.com/go/spanner/admin/database/apiv1/databasepb"
+	instance "cloud.google.com/go/spanner/admin/instance/apiv1"
+	instancepb "cloud.google.com/go/spanner/admin/instance/apiv1/instancepb"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -46,8 +51,9 @@ type config struct {
 }
 
 type advancedConfig struct {
-	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
-	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument              bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
+	KeyDistributionOptimization bool   `json:"key_distribution_optimization,omitempty" jsonschema:"title=Key Distribution Optimization,description=When enabled (default) a hash prefix is added to table keys to distribute writes across Spanner splits and avoid hotspots.,default=true"`
+	FeatureFlags                string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // Validate the configuration
@@ -147,7 +153,7 @@ func newSpannerDriver() *sql.Driver[config, tableConfig] {
 			}).Info("opening Spanner database")
 
 			dialect := createSpannerDialect(featureFlags)
-			templates := renderTemplates(dialect)
+			templates := renderTemplates(dialect, cfg.Advanced.KeyDistributionOptimization)
 
 			return &sql.Endpoint[config]{
 				Config:              cfg,
@@ -165,14 +171,15 @@ func newSpannerDriver() *sql.Driver[config, tableConfig] {
 
 // transactor implements the materialization transactor for Spanner using mutations
 type transactor struct {
-	client      *spanner.Client
-	adminClient *database.DatabaseAdminClient
-	dbPath      string
-	cfg         config
-	templates   templates
-	bindings    []*spannerBinding
-	fence       sql.Fence
-	be          *m.BindingEvents
+	client        *spanner.Client
+	adminClient   *database.DatabaseAdminClient
+	dbPath        string
+	cfg           config
+	templates     templates
+	bindings      []*spannerBinding
+	fence         sql.Fence
+	be            *m.BindingEvents
+	numPartitions int // Number of partitions for key distribution (nodes × 10)
 }
 
 // spannerBinding represents a materialized binding with its configuration
@@ -184,6 +191,101 @@ type spannerBinding struct {
 	columnNames        []string // Column names in order for mutations
 	columnTypes        []string // DDL types for each column (e.g., "TIMESTAMP", "DATE", "INT64")
 	keyColumnIdxs      []int    // Indexes of key columns within columnNames
+}
+
+// computeKeyHash computes a deterministic hash of the given key values using FNV-1a 64-bit algorithm.
+// The hash provides uniform distribution to avoid write hotspots in Spanner.
+func computeKeyHash(keyValues []interface{}) int64 {
+	h := fnv.New64a()
+
+	for _, val := range keyValues {
+		// Serialize each value deterministically to bytes
+		switch v := val.(type) {
+		case int64:
+			buf := make([]byte, 8)
+			binary.LittleEndian.PutUint64(buf, uint64(v))
+			h.Write(buf)
+		case float64:
+			buf := make([]byte, 8)
+			binary.LittleEndian.PutUint64(buf, uint64(v))
+			h.Write(buf)
+		case string:
+			h.Write([]byte(v))
+		case []byte:
+			h.Write(v)
+		case bool:
+			if v {
+				h.Write([]byte{1})
+			} else {
+				h.Write([]byte{0})
+			}
+		case nil:
+			h.Write([]byte{0})
+		default:
+			// For any other type, convert to JSON string for consistent serialization
+			jsonBytes, _ := json.Marshal(v)
+			h.Write(jsonBytes)
+		}
+	}
+
+	// Return the hash as int64 (Spanner's INT64 type)
+	return int64(h.Sum64())
+}
+
+// queryNodeCount queries the Spanner instance to determine the number of nodes.
+// This is used to calculate the number of partitions for key distribution.
+func queryNodeCount(ctx context.Context, projectID, instanceID string, opts []option.ClientOption) (int, error) {
+	// Create instance admin client
+	instanceAdminClient, err := instance.NewInstanceAdminClient(ctx, opts...)
+	if err != nil {
+		return 0, fmt.Errorf("creating instance admin client: %w", err)
+	}
+	defer instanceAdminClient.Close()
+
+	// Build instance path
+	instancePath := fmt.Sprintf("projects/%s/instances/%s", projectID, instanceID)
+
+	// Get instance information
+	req := &instancepb.GetInstanceRequest{
+		Name: instancePath,
+	}
+	inst, err := instanceAdminClient.GetInstance(ctx, req)
+	if err != nil {
+		return 0, fmt.Errorf("getting instance information for %s: %w", instancePath, err)
+	}
+
+	// Calculate node count based on instance configuration
+	// Spanner can have either NodeCount or ProcessingUnits configured
+	nodeCount := int(inst.GetNodeCount())
+	processingUnits := inst.GetProcessingUnits()
+
+	if nodeCount == 0 && processingUnits > 0 {
+		// Convert processing units to node count
+		// 1 node = 1000 processing units
+		nodeCount = int(processingUnits) / 1000
+		if nodeCount == 0 {
+			// If less than 1000 processing units, round up to 1 node
+			nodeCount = 1
+		}
+	}
+
+	if nodeCount == 0 {
+		// FIXME: should not have zero node count - defaulting to 1
+		log.WithFields(log.Fields{
+			"instance":        instancePath,
+			"nodeCount":       inst.GetNodeCount(),
+			"processingUnits": processingUnits,
+		}).Warn("unable to determine node count, defaulting to 1")
+		return 1, nil
+	}
+
+	log.WithFields(log.Fields{
+		"instance":        instancePath,
+		"nodeCount":       nodeCount,
+		"processingUnits": processingUnits,
+	}).Info("queried Spanner instance node count")
+
+	return nodeCount, nil
 }
 
 func newTransactor(
@@ -228,16 +330,34 @@ func newTransactor(
 		return nil, fmt.Errorf("creating Spanner admin client: %w", err)
 	}
 
-	templates := renderTemplates(ep.Dialect)
+	templates := renderTemplates(ep.Dialect, cfg.Advanced.KeyDistributionOptimization)
+
+	// Query node count and calculate partitions for key distribution optimization
+	var numPartitions int
+	if cfg.Advanced.KeyDistributionOptimization {
+		nodeCount, err := queryNodeCount(ctx, cfg.ProjectID, cfg.InstanceID, opts)
+		if err != nil {
+			adminClient.Close()
+			client.Close()
+			return nil, fmt.Errorf("querying node count for key distribution: %w", err)
+		}
+		// Number of partitions = nodes × 10
+		numPartitions = nodeCount * 10
+		log.WithFields(log.Fields{
+			"nodeCount":     nodeCount,
+			"numPartitions": numPartitions,
+		}).Info("calculated partitions for key distribution optimization")
+	}
 
 	t := &transactor{
-		client:      client,
-		adminClient: adminClient,
-		dbPath:      dbPath,
-		cfg:         cfg,
-		templates:   templates,
-		fence:       fence,
-		be:          be,
+		client:        client,
+		adminClient:   adminClient,
+		dbPath:        dbPath,
+		cfg:           cfg,
+		templates:     templates,
+		fence:         fence,
+		be:            be,
+		numPartitions: numPartitions,
 	}
 
 	// Setup bindings first to get the createLoadTableSQL for each
@@ -303,7 +423,12 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	b.dropLoadTableSQL = dropLoadTableSQL
 
 	// Build column names and types list for mutations
-	// Order: keys first, then values, then flow_document
+	// Order: [flow_key_hash (optional)], keys, values, flow_document
+	if t.cfg.Advanced.KeyDistributionOptimization {
+		b.columnNames = append(b.columnNames, "flow_key_hash")
+		b.columnTypes = append(b.columnTypes, "INT64 NOT NULL")
+	}
+
 	for _, key := range target.Keys {
 		b.columnNames = append(b.columnNames, key.Identifier)
 		b.columnTypes = append(b.columnTypes, key.DDL)
@@ -366,35 +491,105 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 	bindingStates := make(map[int]*bindingState)
 
-	var currentBatch mutationBatch
-	currentBatch.reset()
 	hadLoads := false
 	batchCount := 0
 
-	// Helper function to flush current batch
+	// Use partition-based batching if key distribution optimization is enabled
+	var currentBatch mutationBatch
+	var partitionedBatch *partitionedBatches
+	var flushMutex sync.Mutex
+	var durationMutex sync.Mutex
+
+	// Errgroup for managing all background flush operations
+	flushGroup, _ := errgroup.WithContext(ctx)
+	flushGroup.SetLimit(5) // Limit to 5 concurrent flush goroutines
+
+	if t.cfg.Advanced.KeyDistributionOptimization && t.numPartitions > 0 {
+		partitionedBatch = newPartitionedBatches(t.numPartitions)
+		log.WithField("partitions", t.numPartitions).Info("load: using partition-based batching")
+	} else {
+		currentBatch.reset()
+	}
+
+	// Helper function to flush a single batch (for both partitioned and non-partitioned)
+	flushSingleBatch := func(mutations []*spanner.Mutation, mutationCount int, byteSize int, batchNum int) (time.Duration, error) {
+		if len(mutations) == 0 {
+			return 0, nil
+		}
+
+		_, batchDuration, err := t.timedSpannerApply(ctx, mutations, fmt.Sprintf("load-insert-keys-batch-%d", batchNum))
+		if err != nil {
+			return 0, fmt.Errorf("applying load batch %d (%d operations, %d mutations): %w", batchNum, len(mutations), mutationCount, err)
+		}
+
+		log.WithFields(log.Fields{
+			"operations":    len(mutations),
+			"mutationCount": mutationCount,
+			"bytes":         byteSize,
+			"batch":         batchNum,
+			"duration":      batchDuration.Seconds(),
+		}).Info("load: inserted load keys batch")
+
+		return batchDuration, nil
+	}
+
+	// Helper function to launch async flushes for partitions (non-blocking)
+	flushPartitionsAsync := func(partitionIndices []int) {
+		if len(partitionIndices) == 0 {
+			return
+		}
+
+		for _, partIdx := range partitionIndices {
+			partIdx := partIdx // Capture loop variable
+			batch := partitionedBatch.getBatch(partIdx)
+
+			if len(batch.mutations) == 0 {
+				continue
+			}
+
+			// Make a copy of the mutations for this batch
+			mutations := make([]*spanner.Mutation, len(batch.mutations))
+			copy(mutations, batch.mutations)
+			mutationCount := batch.mutationCount
+			byteSize := batch.byteSize
+
+			// Reset the partition batch before launching goroutine
+			partitionedBatch.reset(partIdx)
+
+			// Launch async flush via the shared errgroup
+			flushGroup.Go(func() error {
+				flushMutex.Lock()
+				batchCount++
+				batchNum := batchCount
+				flushMutex.Unlock()
+
+				duration, err := flushSingleBatch(mutations, mutationCount, byteSize, batchNum)
+				if err != nil {
+					return err
+				}
+
+				durationMutex.Lock()
+				keyInsertionDuration += duration
+				durationMutex.Unlock()
+
+				return nil
+			})
+		}
+	}
+
+	// Helper function to flush current batch (non-partitioned mode)
 	flushBatch := func() error {
 		if len(currentBatch.mutations) == 0 {
 			return nil
 		}
 
 		batchCount++
-
-		_, batchDuration, err := t.timedSpannerApply(ctx, currentBatch.mutations, fmt.Sprintf("load-insert-keys-batch-%d", batchCount))
+		duration, err := flushSingleBatch(currentBatch.mutations, currentBatch.mutationCount, currentBatch.byteSize, batchCount)
 		if err != nil {
-			return fmt.Errorf("applying load batch %d (%d operations, %d mutations): %w", batchCount, len(currentBatch.mutations), currentBatch.mutationCount, err)
+			return err
 		}
 
-		keyInsertionDuration += batchDuration
-
-		log.WithFields(log.Fields{
-			"operations":         len(currentBatch.mutations),
-			"mutationCount":      currentBatch.mutationCount,
-			"bytes":              currentBatch.byteSize,
-			"batch":              batchCount,
-			"batchDuration":      batchDuration.Seconds(),
-			"cumulativeDuration": keyInsertionDuration.Seconds(),
-		}).Info("load: inserting load keys")
-
+		keyInsertionDuration += duration
 		currentBatch.reset()
 		return nil
 	}
@@ -419,9 +614,15 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 			keyInsertionDuration += clearDuration
 
-			keyColumnNames := make([]string, len(b.target.Keys))
-			for i, key := range b.target.Keys {
-				keyColumnNames[i] = key.Identifier
+			keyColumnNames := make([]string, 0, len(b.target.Keys)+1)
+
+			// If key distribution optimization is enabled, prepend flow_key_hash column
+			if t.cfg.Advanced.KeyDistributionOptimization {
+				keyColumnNames = append(keyColumnNames, "flow_key_hash")
+			}
+
+			for _, key := range b.target.Keys {
+				keyColumnNames = append(keyColumnNames, key.Identifier)
 			}
 
 			bindingStates[bindingIdx] = &bindingState{
@@ -440,24 +641,44 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 
 		// Convert key values to Spanner-compatible types
-		spannerKeyVals := make([]interface{}, len(converted))
+		spannerKeyVals := make([]interface{}, 0, len(converted)+1)
+
+		var keyHash int64
+		// If key distribution optimization is enabled, compute and prepend the hash
+		if t.cfg.Advanced.KeyDistributionOptimization {
+			keyHash = computeKeyHash(converted)
+			spannerKeyVals = append(spannerKeyVals, keyHash)
+		}
+
 		for i, keyVal := range converted {
 			spannerVal, err := toSpannerValue(keyVal, b.target.Keys[i].Identifier, b.target.Keys[i].DDL)
 			if err != nil {
 				return fmt.Errorf("converting key value for %s: %w", b.target.Keys[i].Identifier, err)
 			}
-			spannerKeyVals[i] = spannerVal
+			spannerKeyVals = append(spannerKeyVals, spannerVal)
 		}
 
 		// Add INSERT mutation for this key
 		// Note: Each column counts as one mutation in Spanner's mutation count
 		mutation := spanner.Insert(state.tempTableName, state.keyColumnNames, spannerKeyVals)
-		currentBatch.addMutation(mutation, len(converted))
 
-		// Flush if batch limits reached
-		if currentBatch.shouldFlush() {
-			if err := flushBatch(); err != nil {
-				return err
+		if partitionedBatch != nil {
+			// Route to partition based on hash
+			partitionIdx := partitionedBatch.getPartitionIndex(keyHash)
+			partitionedBatch.addMutation(partitionIdx, mutation, len(converted))
+
+			// Check if any partitions are ready to flush and launch async
+			readyPartitions := partitionedBatch.getReadyPartitions()
+			flushPartitionsAsync(readyPartitions)
+		} else {
+			// Non-partitioned mode
+			currentBatch.addMutation(mutation, len(converted))
+
+			// Flush if batch limits reached
+			if currentBatch.shouldFlush() {
+				if err := flushBatch(); err != nil {
+					return err
+				}
 			}
 		}
 	}
@@ -470,9 +691,20 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return nil
 	}
 
-	// Apply any remaining mutations
-	if err := flushBatch(); err != nil {
-		return err
+	// Flush any remaining mutations asynchronously
+	if partitionedBatch != nil {
+		// Launch async flushes for all non-empty partitions
+		nonEmptyPartitions := partitionedBatch.getNonEmptyPartitions()
+		flushPartitionsAsync(nonEmptyPartitions)
+	} else {
+		if err := flushBatch(); err != nil {
+			return err
+		}
+	}
+
+	// Wait for all flushes (both background and final) to complete
+	if err := flushGroup.Wait(); err != nil {
+		return fmt.Errorf("waiting for all flushes: %w", err)
 	}
 
 	log.WithField("batches", batchCount).Info("load: completed inserting all load keys")
@@ -537,73 +769,99 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	storeStart := time.Now()
 	var storeCount int
 	var storeBytes int
+	var storeByteMutex sync.Mutex
 
 	ctx := it.Context()
 
+	// Use partition-based batching if key distribution optimization is enabled
 	var currentBatch mutationBatch
-	currentBatch.reset()
+	var partitionedBatch *partitionedBatches
+	var flushMutex sync.Mutex
 
-	// Batch work item for parallel processing
-	type batchWork struct {
-		mutations     []*spanner.Mutation
-		mutationCount int
-		byteSize      int
-		batchNum      int
-	}
+	// Errgroup for managing all background flush operations
+	flushGroup, _ := errgroup.WithContext(ctx)
+	flushGroup.SetLimit(5) // Limit to 5 concurrent flush goroutines
 
-
-	// Number of parallel workers
-	const numWorkers = 3
-
-	// Channel for sending batches to workers (buffered to allow queueing)
-	batchChan := make(chan batchWork, 5)
-
-	// Create errgroup for managing worker goroutines
-	g, gctx := errgroup.WithContext(ctx)
-
-	// Start worker goroutines
-	for i := 0; i < numWorkers; i++ {
-		g.Go(func() error {
-			for work := range batchChan {
-				start := time.Now()
-				_, err := t.client.Apply(gctx, work.mutations)
-				duration := time.Since(start)
-
-				if err != nil {
-					return fmt.Errorf("applying batch %d (%d mutations): %w", work.batchNum, work.mutationCount, err)
-				}
-
-				log.WithFields(log.Fields{
-					"operations":    len(work.mutations),
-					"mutationCount": work.mutationCount,
-					"bytes":         work.byteSize,
-					"batch":         work.batchNum,
-					"duration":      duration.Seconds(),
-				}).Info("store: applied mutation batch")
-			}
-			return nil
-		})
+	if t.cfg.Advanced.KeyDistributionOptimization && t.numPartitions > 0 {
+		partitionedBatch = newPartitionedBatches(t.numPartitions)
+		log.WithField("partitions", t.numPartitions).Info("store: using partition-based batching")
+	} else {
+		currentBatch.reset()
 	}
 
 	batchCounter := 0
 
-	// Helper function to flush current batch (sends to worker pool)
+	// Helper function to flush a single batch
+	flushSingleBatch := func(mutations []*spanner.Mutation, mutationCount int, byteSize int, batchNum int) error {
+		if len(mutations) == 0 {
+			return nil
+		}
+
+		_, batchDuration, err := t.timedSpannerApply(ctx, mutations, fmt.Sprintf("store-batch-%d", batchNum))
+		if err != nil {
+			return fmt.Errorf("applying batch %d (%d mutations): %w", batchNum, mutationCount, err)
+		}
+
+		log.WithFields(log.Fields{
+			"operations":    len(mutations),
+			"mutationCount": mutationCount,
+			"bytes":         byteSize,
+			"batch":         batchNum,
+			"batchDuration": batchDuration.Seconds(),
+		}).Info("store: applied mutation batch")
+
+		storeByteMutex.Lock()
+		storeBytes += byteSize
+		storeByteMutex.Unlock()
+
+		return nil
+	}
+
+	// Helper function to launch async flushes for partitions (non-blocking)
+	flushPartitionsAsync := func(partitionIndices []int) {
+		if len(partitionIndices) == 0 {
+			return
+		}
+
+		for _, partIdx := range partitionIndices {
+			partIdx := partIdx // Capture loop variable
+			batch := partitionedBatch.getBatch(partIdx)
+
+			if len(batch.mutations) == 0 {
+				continue
+			}
+
+			// Make a copy of the mutations for this batch
+			mutations := make([]*spanner.Mutation, len(batch.mutations))
+			copy(mutations, batch.mutations)
+			mutationCount := batch.mutationCount
+			byteSize := batch.byteSize
+
+			// Reset the partition batch before launching goroutine
+			partitionedBatch.reset(partIdx)
+
+			// Launch async flush via the shared errgroup
+			flushGroup.Go(func() error {
+				flushMutex.Lock()
+				batchCounter++
+				batchNum := batchCounter
+				flushMutex.Unlock()
+
+				return flushSingleBatch(mutations, mutationCount, byteSize, batchNum)
+			})
+		}
+	}
+
+	// Helper function to flush current batch (non-partitioned mode)
 	flushBatch := func() error {
 		if len(currentBatch.mutations) == 0 {
 			return nil
 		}
 
 		batchCounter++
-		storeBytes += currentBatch.byteSize
-		select {
-		case batchChan <- batchWork{
-			mutations:     currentBatch.mutations,
-			mutationCount: currentBatch.mutationCount,
-			byteSize:      currentBatch.byteSize,
-			batchNum:      batchCounter,
-		}:
-		case <-gctx.Done():
-			return gctx.Err()
+		err := flushSingleBatch(currentBatch.mutations, currentBatch.mutationCount, currentBatch.byteSize, batchCounter)
+		if err != nil {
+			return err
 		}
 
 		currentBatch.reset()
@@ -625,32 +883,48 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Convert only the key columns for deletion
 			keyValues, err := b.target.ConvertKey(it.Key)
 			if err != nil {
-				close(batchChan)
 				return nil, fmt.Errorf("converting delete keys: %w", err)
 			}
 
 			// Convert key values to Spanner-compatible types
-			spannerKeyValues := make([]interface{}, len(keyValues))
+			spannerKeyValues := make([]interface{}, 0, len(keyValues)+1)
+
+			var keyHash int64
+			// If key distribution optimization is enabled, compute and prepend the hash
+			if t.cfg.Advanced.KeyDistributionOptimization {
+				keyHash = computeKeyHash(keyValues)
+				spannerKeyValues = append(spannerKeyValues, keyHash)
+			}
+
 			for i, val := range keyValues {
 				spannerVal, err := toSpannerValue(val, b.columnNames[b.keyColumnIdxs[i]], b.columnTypes[b.keyColumnIdxs[i]])
 				if err != nil {
-					close(batchChan)
 					return nil, fmt.Errorf("converting key value for column %s: %w", b.columnNames[b.keyColumnIdxs[i]], err)
 				}
-				spannerKeyValues[i] = spannerVal
+				spannerKeyValues = append(spannerKeyValues, spannerVal)
 			}
 
 			// Create a Delete mutation
 			key := spanner.Key(spannerKeyValues)
 			mutation = spanner.Delete(b.target.Identifier, spanner.KeySetFromKeys(key))
-			// Delete mutations affect only key columns
-			currentBatch.addMutation(mutation, len(keyValues))
 
-			// Flush if batch limits reached
-			if currentBatch.shouldFlush() {
-				if err := flushBatch(); err != nil {
-					close(batchChan)
-					return nil, err
+			if partitionedBatch != nil {
+				// Route to partition based on hash
+				partitionIdx := partitionedBatch.getPartitionIndex(keyHash)
+				partitionedBatch.addMutation(partitionIdx, mutation, len(keyValues))
+
+				// Check if any partitions are ready to flush and launch async
+				readyPartitions := partitionedBatch.getReadyPartitions()
+				flushPartitionsAsync(readyPartitions)
+			} else {
+				// Non-partitioned mode
+				currentBatch.addMutation(mutation, len(keyValues))
+
+				// Flush if batch limits reached
+				if currentBatch.shouldFlush() {
+					if err := flushBatch(); err != nil {
+						return nil, err
+					}
 				}
 			}
 			continue
@@ -659,37 +933,59 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Spanner's InsertOrUpdate handles both cases
 			values, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 			if err != nil {
-				close(batchChan)
 				return nil, fmt.Errorf("converting store values: %w", err)
 			}
 
 			// Convert values to Spanner-compatible types
-			spannerValues := make([]interface{}, len(values))
+			spannerValues := make([]interface{}, 0, len(values)+1)
+
+			var keyHash int64
+			// If key distribution optimization is enabled, compute and prepend the hash
+			// The hash is computed from the key columns (first len(b.target.Keys) values)
+			if t.cfg.Advanced.KeyDistributionOptimization {
+				keyValues := values[:len(b.target.Keys)]
+				keyHash = computeKeyHash(keyValues)
+				spannerValues = append(spannerValues, keyHash)
+			}
+
 			for i, val := range values {
-				spannerVal, err := toSpannerValue(val, b.columnNames[i], b.columnTypes[i])
-				if err != nil {
-					close(batchChan)
-					return nil, fmt.Errorf("converting value for column %s: %w", b.columnNames[i], err)
+				// When key distribution optimization is enabled, column indices are offset by 1
+				colIdx := i
+				if t.cfg.Advanced.KeyDistributionOptimization {
+					colIdx = i + 1
 				}
-				spannerValues[i] = spannerVal
+				spannerVal, err := toSpannerValue(val, b.columnNames[colIdx], b.columnTypes[colIdx])
+				if err != nil {
+					return nil, fmt.Errorf("converting value for column %s: %w", b.columnNames[colIdx], err)
+				}
+				spannerValues = append(spannerValues, spannerVal)
 			}
 
 			mutation = spanner.InsertOrUpdate(b.target.Identifier, b.columnNames, spannerValues)
-			// InsertOrUpdate mutations affect all columns
-			currentBatch.addMutation(mutation, len(values))
 
-			// Flush if batch limits reached
-			if currentBatch.shouldFlush() {
-				if err := flushBatch(); err != nil {
-					close(batchChan)
-					return nil, err
+			if partitionedBatch != nil {
+				// Route to partition based on hash
+				partitionIdx := partitionedBatch.getPartitionIndex(keyHash)
+				partitionedBatch.addMutation(partitionIdx, mutation, len(values))
+
+				// Check if any partitions are ready to flush and launch async
+				readyPartitions := partitionedBatch.getReadyPartitions()
+				flushPartitionsAsync(readyPartitions)
+			} else {
+				// Non-partitioned mode
+				currentBatch.addMutation(mutation, len(values))
+
+				// Flush if batch limits reached
+				if currentBatch.shouldFlush() {
+					if err := flushBatch(); err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
 	}
 
 	if it.Err() != nil {
-		close(batchChan)
 		return nil, it.Err()
 	}
 
@@ -716,7 +1012,6 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Marshal the checkpoint
 			checkpointBytes, err := runtimeCheckpoint.Marshal()
 			if err != nil {
-				close(batchChan)
 				return fmt.Errorf("marshalling checkpoint: %w", err)
 			}
 
@@ -736,21 +1031,29 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 					string(checkpointBytes),
 				},
 			)
-			// Fence mutation affects 5 columns
-			currentBatch.addMutation(fenceMutation, 5)
 
-			// Flush the final batch (includes fence mutation)
-			if err := flushBatch(); err != nil {
-				close(batchChan)
-				return err
+			// Add fence mutation to appropriate batch
+			if partitionedBatch != nil {
+				// For fence mutations, we can add to partition 0 (arbitrary choice)
+				// since fence checkpoints don't have a natural hash key
+				partitionedBatch.addMutation(0, fenceMutation, 5)
+
+				// Flush all non-empty partitions asynchronously (final flush with fence)
+				nonEmptyPartitions := partitionedBatch.getNonEmptyPartitions()
+				flushPartitionsAsync(nonEmptyPartitions)
+			} else {
+				// Non-partitioned mode
+				currentBatch.addMutation(fenceMutation, 5)
+
+				// Flush the final batch (includes fence mutation)
+				if err := flushBatch(); err != nil {
+					return err
+				}
 			}
 
-			// Close the batch channel to signal workers to finish
-			close(batchChan)
-
-			// Wait for all workers to complete
-			if err := g.Wait(); err != nil {
-				return err
+			// Wait for all flushes (both background and final) to complete
+			if err := flushGroup.Wait(); err != nil {
+				return fmt.Errorf("waiting for all flushes: %w", err)
 			}
 
 			log.WithField("batches", batchCounter).Info("store: completed all mutation batches")

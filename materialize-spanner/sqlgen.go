@@ -145,8 +145,16 @@ type templates struct {
 	updateFence             *template.Template
 }
 
-func renderTemplates(dialect sql.Dialect) templates {
-	var tplAll = sql.MustParseTemplate(dialect, "root", `
+func renderTemplates(dialect sql.Dialect, keyDistributionOptimization bool) templates {
+	// Conditionally add flow_key_hash column to schema definitions
+	hashColumnDef := ""
+	hashKeyPrefix := ""
+	if keyDistributionOptimization {
+		hashColumnDef = "flow_key_hash INT64 NOT NULL,"
+		hashKeyPrefix = "flow_key_hash, "
+	}
+
+	var tplAll = sql.MustParseTemplate(dialect, "root", fmt.Sprintf(`
 {{ define "temp_name" -}}
 flow_internal.flow_temp_table_{{ $.Binding }}
 {{- end }}
@@ -155,13 +163,14 @@ flow_internal.flow_temp_table_{{ $.Binding }}
 
 {{ define "createTargetTable" }}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
+	%s
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
 		{{$col.Identifier}} {{$col.DDL}}
 	{{- end }}
 	{{- if not $.DeltaUpdates }},
 
-		PRIMARY KEY (
+		PRIMARY KEY (%s
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{end -}}
 		{{$key.Identifier}}
@@ -189,12 +198,13 @@ ALTER TABLE {{$.Identifier}}
 
 {{ define "createLoadTable" }}
 CREATE TABLE {{ template "temp_name" . }} (
+	%s
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
 	{{- end }},
 
-	PRIMARY KEY (
+	PRIMARY KEY (%s
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{end -}}
 		{{$key.Identifier}}
@@ -240,7 +250,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 -- Templated query for no_flow_document feature - reconstructs JSON from root-level columns
 
 {{ define "uncast" -}}
-{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{ $ident := printf "%%s.%%s" $.Alias $.Identifier }}
 {{- if eq $.AsFlatType "string_integer" -}}
 	CAST({{ $ident }} AS STRING)
 {{- else if eq $.AsFlatType "string_number" -}}
@@ -248,7 +258,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "date") (not $.IsPrimaryKey) -}}
 	CAST({{ $ident }} AS STRING)
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
-	FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E6SZ', {{ $ident }}, 'UTC')
+	FORMAT_TIMESTAMP('%%Y-%%m-%%dT%%H:%%M:%%E6SZ', {{ $ident }}, 'UTC')
 {{- else -}}
 	{{ $ident }}
 {{- end -}}
@@ -321,7 +331,7 @@ UPDATE {{ Identifier $.TablePath }}
 -- Verify the update succeeded (Spanner doesn't have @@ROWCOUNT)
 -- We'll handle verification in the Go code instead
 {{ end }}
-`)
+`, hashColumnDef, hashKeyPrefix, hashColumnDef, hashKeyPrefix))
 
 	return templates{
 		createLoadTable:         tplAll.Lookup("createLoadTable"),

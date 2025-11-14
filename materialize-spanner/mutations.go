@@ -204,3 +204,81 @@ func (mb *mutationBatch) reset() {
 	mb.mutationCount = 0
 	mb.byteSize = 0
 }
+
+// partitionedBatches manages multiple mutation batches, one per partition.
+// This enables parallel flushing of mutations based on key hash distribution.
+type partitionedBatches struct {
+	batches       []*mutationBatch
+	numPartitions int
+}
+
+// newPartitionedBatches creates a new partitionedBatches with the specified number of partitions
+func newPartitionedBatches(numPartitions int) *partitionedBatches {
+	batches := make([]*mutationBatch, numPartitions)
+	for i := 0; i < numPartitions; i++ {
+		batches[i] = &mutationBatch{
+			mutations: make([]*spanner.Mutation, 0, 1000),
+		}
+	}
+	return &partitionedBatches{
+		batches:       batches,
+		numPartitions: numPartitions,
+	}
+}
+
+// getPartitionIndex calculates which partition a hash should be routed to.
+// Uses modulo to distribute hashes evenly across partitions.
+func (pb *partitionedBatches) getPartitionIndex(hash int64) int {
+	// Handle negative hashes by taking absolute value
+	if hash < 0 {
+		hash = -hash
+	}
+	return int(hash) % pb.numPartitions
+}
+
+// addMutation adds a mutation to the specified partition's batch
+func (pb *partitionedBatches) addMutation(partitionIdx int, m *spanner.Mutation, columnCount int) {
+	if partitionIdx < 0 || partitionIdx >= pb.numPartitions {
+		// This should never happen if getPartitionIndex is used correctly
+		panic(fmt.Sprintf("partition index out of bounds: %d (numPartitions: %d)", partitionIdx, pb.numPartitions))
+	}
+	pb.batches[partitionIdx].addMutation(m, columnCount)
+}
+
+// getReadyPartitions returns the indices of partitions that are ready to flush
+func (pb *partitionedBatches) getReadyPartitions() []int {
+	var ready []int
+	for i, batch := range pb.batches {
+		if batch.shouldFlush() {
+			ready = append(ready, i)
+		}
+	}
+	return ready
+}
+
+// getBatch returns the mutation batch for a specific partition
+func (pb *partitionedBatches) getBatch(partitionIdx int) *mutationBatch {
+	if partitionIdx < 0 || partitionIdx >= pb.numPartitions {
+		panic(fmt.Sprintf("partition index out of bounds: %d (numPartitions: %d)", partitionIdx, pb.numPartitions))
+	}
+	return pb.batches[partitionIdx]
+}
+
+// getNonEmptyPartitions returns the indices of all partitions that have mutations
+func (pb *partitionedBatches) getNonEmptyPartitions() []int {
+	var nonEmpty []int
+	for i, batch := range pb.batches {
+		if len(batch.mutations) > 0 {
+			nonEmpty = append(nonEmpty, i)
+		}
+	}
+	return nonEmpty
+}
+
+// reset clears the batch for a specific partition
+func (pb *partitionedBatches) reset(partitionIdx int) {
+	if partitionIdx < 0 || partitionIdx >= pb.numPartitions {
+		panic(fmt.Sprintf("partition index out of bounds: %d (numPartitions: %d)", partitionIdx, pb.numPartitions))
+	}
+	pb.batches[partitionIdx].reset()
+}

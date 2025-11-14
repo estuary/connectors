@@ -52,6 +52,12 @@
             "description": "When enabled the root document will not be required for standard updates.",
             "default": false
           },
+          "key_distribution_optimization": {
+            "type": "boolean",
+            "title": "Key Distribution Optimization",
+            "description": "When enabled (default) a hash prefix is added to table keys to distribute writes across Spanner splits and avoid hotspots.",
+            "default": true
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
