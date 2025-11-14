@@ -56,6 +56,33 @@
               "personal_access_token"
             ],
             "title": "Personal Access Token"
+          },
+          {
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "OAuth2 M2M",
+                "default": "OAuth2 M2M"
+              },
+              "client_id": {
+                "type": "string",
+                "title": "Client ID",
+                "description": "The OAuth2 client ID for your Databricks service principal",
+                "secret": true
+              },
+              "client_secret": {
+                "type": "string",
+                "title": "Client Secret",
+                "description": "The OAuth2 client secret for your Databricks service principal",
+                "secret": true
+              }
+            },
+            "required": [
+              "auth_type",
+              "client_id",
+              "client_secret"
+            ],
+            "title": "OAuth2 M2M"
           }
         ],
         "type": "object",

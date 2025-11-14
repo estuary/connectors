@@ -50,6 +50,30 @@ func TestDatabricksConfig(t *testing.T) {
 	var noSchema = validConfig
 	noSchema.SchemaName = ""
 	require.Error(t, noSchema.Validate(), "expected validation error")
+
+	// OAuth2 M2M tests
+	var validOAuthConfig = config{
+		Address:     "db-something.cloud.databricks.com:400",
+		CatalogName: "mycatalog",
+		HTTPPath:    "/sql/1.0/warehouses/someid",
+		Credentials: credentialConfig{
+			AuthType:     "OAuth2 M2M",
+			ClientID:     "my-client-id",
+			ClientSecret: "my-client-secret",
+		},
+		SchemaName: "default",
+	}
+	require.NoError(t, validOAuthConfig.Validate())
+	var oauthUri = validOAuthConfig.ToURI()
+	require.Equal(t, "db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?authType=OauthM2M&catalog=mycatalog&clientID=my-client-id&clientSecret=my-client-secret&schema=default&userAgentEntry=Estuary+Technologies+Flow", oauthUri)
+
+	var noClientID = validOAuthConfig
+	noClientID.Credentials.ClientID = ""
+	require.Error(t, noClientID.Validate(), "expected validation error for missing client_id")
+
+	var noClientSecret = validOAuthConfig
+	noClientSecret.Credentials.ClientSecret = ""
+	require.Error(t, noClientSecret.Validate(), "expected validation error for missing client_secret")
 }
 
 func TestSpecification(t *testing.T) {
