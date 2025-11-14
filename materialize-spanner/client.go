@@ -60,7 +60,7 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 		return nil, fmt.Errorf("creating Spanner data client: %w", err)
 	}
 
-	templates := renderTemplates(ep.Dialect)
+	templates := renderTemplates(ep.Dialect, ep.Config.Advanced.KeyDistributionOptimization)
 
 	return &client{
 		dataClient:  dataClient,
