@@ -3,10 +3,21 @@ package main
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 	"text/template"
 
 	sql "github.com/estuary/connectors/materialize-sql"
+)
+
+const (
+	// Maximum size of a JSON object in bytes.
+	//
+	// This determines the amount of memory that MotherDuck will allocate for
+	// processing a row when reading a newline_delimited JSON file. Since our
+	// documents are limited to less than 64MiB, it is expected that the
+	// encoded ndjson will be similar in size.
+	MAX_OBJECT_BYTES = 64 * 1024 * 1024 // 64MiB
 )
 
 func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
@@ -125,7 +136,7 @@ type queryParams struct {
 	Files  []string
 }
 
-const tplRoot = `
+var tplRoot = `
 -- Templated creation of a materialized table definition.
 
 {{ define "createTargetTable" }}
@@ -202,7 +213,7 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	],
 	format='newline_delimited',
 	compression='gzip',
-	maximum_object_size=1073741824,
+	maximum_object_size=` + strconv.FormatUint(MAX_OBJECT_BYTES, 10) + `,
 	columns={
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}

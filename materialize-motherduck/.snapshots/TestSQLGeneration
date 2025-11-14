@@ -141,7 +141,7 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
 	compression='gzip',
-	maximum_object_size=1073741824,
+	maximum_object_size=67108864,
 	columns={
 		key1: 'BIGINT NOT NULL',
 		key2: 'BOOLEAN NOT NULL',
@@ -175,7 +175,7 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
 	compression='gzip',
-	maximum_object_size=1073741824,
+	maximum_object_size=67108864,
 	columns={
 		"theKey": 'VARCHAR NOT NULL',
 		"aValue": 'BIGINT',
