@@ -36,20 +36,27 @@ type advancedConfig struct {
 }
 
 const (
-	// TODO: support Azure, GCP and OAuth authentication
-	PAT_AUTH_TYPE = "PAT" // personal access token
+	PAT_AUTH_TYPE       = "PAT"         // personal access token
+	OAUTH_M2M_AUTH_TYPE = "OAuth2 M2M" // OAuth2 machine-to-machine
 )
 
 type credentialConfig struct {
 	AuthType string `json:"auth_type"`
 
-	PersonalAccessToken string `json:"personal_access_token"`
+	// PAT fields
+	PersonalAccessToken string `json:"personal_access_token,omitempty"`
+
+	// OAuth2 M2M fields
+	ClientID     string `json:"client_id,omitempty"`
+	ClientSecret string `json:"client_secret,omitempty"`
 }
 
 func (c *credentialConfig) Validate() error {
 	switch c.AuthType {
 	case PAT_AUTH_TYPE:
 		return c.validatePATCreds()
+	case OAUTH_M2M_AUTH_TYPE:
+		return c.validateOAuthM2MCreds()
 	default:
 		return fmt.Errorf("invalid credentials auth type %q", c.AuthType)
 	}
@@ -58,6 +65,17 @@ func (c *credentialConfig) Validate() error {
 func (c *credentialConfig) validatePATCreds() error {
 	if c.PersonalAccessToken == "" {
 		return fmt.Errorf("missing personal_access_token")
+	}
+
+	return nil
+}
+
+func (c *credentialConfig) validateOAuthM2MCreds() error {
+	if c.ClientID == "" {
+		return fmt.Errorf("missing client_id")
+	}
+	if c.ClientSecret == "" {
+		return fmt.Errorf("missing client_secret")
 	}
 
 	return nil
@@ -82,6 +100,29 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 		},
 	})
 
+	oauthProps := orderedmap.New[string, *jsonschema.Schema]()
+	oauthProps.Set("auth_type", &jsonschema.Schema{
+		Type:    "string",
+		Default: OAUTH_M2M_AUTH_TYPE,
+		Const:   OAUTH_M2M_AUTH_TYPE,
+	})
+	oauthProps.Set("client_id", &jsonschema.Schema{
+		Title:       "Client ID",
+		Description: "The OAuth2 client ID for your Databricks service principal",
+		Type:        "string",
+		Extras: map[string]interface{}{
+			"secret": true,
+		},
+	})
+	oauthProps.Set("client_secret", &jsonschema.Schema{
+		Title:       "Client Secret",
+		Description: "The OAuth2 client secret for your Databricks service principal",
+		Type:        "string",
+		Extras: map[string]interface{}{
+			"secret": true,
+		},
+	})
+
 	return &jsonschema.Schema{
 		Title:       "Authentication",
 		Description: "Databricks Credentials",
@@ -91,6 +132,11 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 				Title:      "Personal Access Token",
 				Required:   []string{"auth_type", "personal_access_token"},
 				Properties: patProps,
+			},
+			{
+				Title:      "OAuth2 M2M",
+				Required:   []string{"auth_type", "client_id", "client_secret"},
+				Properties: oauthProps,
 			},
 		},
 		Extras: map[string]interface{}{
@@ -145,11 +191,26 @@ func (c config) ToURI() string {
 	params.Add("schema", c.SchemaName)
 	params.Add("userAgentEntry", "Estuary Technologies Flow")
 
-	var uri = url.URL{
-		Host:     address,
-		Path:     c.HTTPPath,
-		User:     url.UserPassword("token", c.Credentials.PersonalAccessToken),
-		RawQuery: params.Encode(),
+	var uri url.URL
+	switch c.Credentials.AuthType {
+	case OAUTH_M2M_AUTH_TYPE:
+		// For OAuth2 M2M, add auth parameters to query string
+		params.Add("authType", "OauthM2M")
+		params.Add("clientID", c.Credentials.ClientID)
+		params.Add("clientSecret", c.Credentials.ClientSecret)
+		uri = url.URL{
+			Host:     address,
+			Path:     c.HTTPPath,
+			RawQuery: params.Encode(),
+		}
+	default: // PAT_AUTH_TYPE
+		// For PAT, use token in user credentials
+		uri = url.URL{
+			Host:     address,
+			Path:     c.HTTPPath,
+			User:     url.UserPassword("token", c.Credentials.PersonalAccessToken),
+			RawQuery: params.Encode(),
+		}
 	}
 
 	return strings.TrimLeft(uri.String(), "/")
