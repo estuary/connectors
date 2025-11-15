@@ -21,9 +21,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// TODO(wgd): Contemplate https://github.com/debezium/debezium/blob/main/debezium-connector-sqlserver/src/main/java/io/debezium/connector/sqlserver/SqlServerStreamingChangeEventSource.java#L51
-// and the schema upgrade process described there.
-
 var replicationBufferSize = 4 * 1024 // Assuming change events average ~2kB then 4k * 2kB = 8MB
 
 const (
