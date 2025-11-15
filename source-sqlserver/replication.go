@@ -27,23 +27,6 @@ const (
 	cdcPollingWorkers     = 4                // Number of parallel worker threads to execute CDC polling operations
 	cdcCleanupWorkers     = 4                // Number of parallel worker threads to execute table cleanup operations
 	cdcManagementInterval = 30 * time.Second // How frequently to perform CDC instance management
-
-	// streamToFenceWatchdogTimeout is the length of time after which a stream-to-fence
-	// operation will error out if no further events are received when there ought to be
-	// some. This should never be hit in normal operation, and exists only so that certain
-	// rare failure modes produce an error rather than blocking forever.
-	streamToFenceWatchdogTimeout = 15 * time.Minute
-
-	// establishFenceTimeout is the length of time after with an establish-fence-position
-	// operation will error out. Since the CDC worker should be running on the database
-	// every 5 seconds by default, it should never take much longer than that for us to
-	// establish a valid fence position.
-	//
-	// Technically it's possible for the CDC agent polling interval to be manually set as
-	// high as 24 hours, so the logic might be more robust if we scaled our timeout based
-	// on the actual `pollinginterval` setting in `cdc.dbo_jobs`. I suspect this will never
-	// actually be an issue.
-	establishFenceTimeout = 15 * time.Minute
 )
 
 // Constants which need to be changed in tests
@@ -115,6 +98,27 @@ type sqlserverReplicationStream struct {
 
 	maxTransactionsPerScanSession int
 
+	// cdcPollingInterval is the parsed polling interval from the config, determining how
+	// frequently the connector polls for CDC changes.
+	cdcPollingInterval time.Duration
+
+	// streamToFenceWatchdogTimeout is the length of time after which a stream-to-fence
+	// operation will error out if no further events are received when there ought to be
+	// some. This should never be hit in normal operation, and exists only so that certain
+	// rare failure modes produce an error rather than blocking forever. This timeout scales
+	// with the CDC polling interval as max(15 minutes, 3 * pollingInterval).
+	streamToFenceWatchdogTimeout time.Duration
+
+	// establishFenceTimeout is the length of time after which an establish-fence-position
+	// operation will error out. Since the CDC worker should be running on the database
+	// every 5 seconds by default, it should never take much longer than that for us to
+	// establish a valid fence position. However, the CDC worker polling interval can be
+	// manually set as high as 24 hours, so this timeout scales with the configured polling
+	// interval as max(15 minutes, 3 * pollingInterval). Note that the polling interval we
+	// use for scaling is **not** the CDC worker interval, we're just using our own polling
+	// interval as a reasonable heuristic.
+	establishFenceTimeout time.Duration
+
 	tables struct {
 		sync.RWMutex
 		info map[sqlcapture.StreamID]*tableReplicationInfo
@@ -152,6 +156,16 @@ func (rs *sqlserverReplicationStream) open(ctx context.Context) error {
 		return fmt.Errorf("error determining if database is a replica: %w", err)
 	}
 	rs.isReplica = isReplica
+
+	// Parse the configured polling interval and initialize timeouts based on it.
+	pollingInterval, err := time.ParseDuration(rs.cfg.Advanced.PollingInterval)
+	if err != nil {
+		// Should never happen since we validated it earlier
+		return fmt.Errorf("internal error: failed to parse polling interval %q: %w", rs.cfg.Advanced.PollingInterval, err)
+	}
+	rs.cdcPollingInterval = pollingInterval
+	rs.streamToFenceWatchdogTimeout = max(15*time.Minute, 3*pollingInterval)
+	rs.establishFenceTimeout = max(15*time.Minute, 3*pollingInterval)
 
 	rs.errCh = make(chan error)
 	rs.events = make(chan sqlcapture.DatabaseEvent)
@@ -333,7 +347,7 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 	// us to read. Thus if we sit idle for a nontrivial length of time without reaching
 	// our fence position, something is wrong and we should error out instead of blocking
 	// forever.
-	var fenceWatchdog = time.NewTimer(streamToFenceWatchdogTimeout)
+	var fenceWatchdog = time.NewTimer(rs.streamToFenceWatchdogTimeout)
 
 	// Stream replication events until the fence is reached.
 	log.WithField("cursor", fmt.Sprintf("%X", latestFlushLSN)).WithField("target", fmt.Sprintf("%X", nextFenceLSN)).Debug("beginning fenced streaming phase")
@@ -344,7 +358,7 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 		case <-fenceWatchdog.C:
 			return fmt.Errorf("replication became idle while streaming from %X to an established fence at %X", latestFlushLSN, nextFenceLSN)
 		case event, ok := <-rs.events:
-			fenceWatchdog.Reset(streamToFenceWatchdogTimeout)
+			fenceWatchdog.Reset(rs.streamToFenceWatchdogTimeout)
 			if !ok {
 				return sqlcapture.ErrFenceNotReached
 			} else if err := callback(event); err != nil {
@@ -401,7 +415,7 @@ func (rs *sqlserverReplicationStream) streamToPositionalFence(ctx context.Contex
 	var nextFenceLSN LSN
 
 	var establishFenceTimer = time.NewTimer(fenceAfter)
-	var establishFenceDeadline = time.NewTimer(fenceAfter + establishFenceTimeout)
+	var establishFenceDeadline = time.NewTimer(fenceAfter + rs.establishFenceTimeout)
 	defer establishFenceTimer.Stop()
 	defer establishFenceDeadline.Stop()
 
@@ -413,7 +427,7 @@ loop:
 			return ctx.Err()
 		case <-establishFenceDeadline.C:
 			log.WithField("afterTime", mostRecentSession.EndTime.Format(time.RFC3339)).Error("failed to establish fence position")
-			return fmt.Errorf("failed to establish a valid fence position after %s, the CDC worker may not be running", establishFenceTimeout.String())
+			return fmt.Errorf("failed to establish a valid fence position after %s, the CDC worker may not be running", rs.establishFenceTimeout.String())
 		case <-establishFenceTimer.C:
 			// Try to establish a new fence LSN. If no error is encountered but a new LSN couldn't
 			// be established then both values will be nil and we'll retry after a short interval.
@@ -466,7 +480,7 @@ loop:
 	// us to read. Thus if we sit idle for a nontrivial length of time without reaching
 	// our fence position, something is wrong and we should error out instead of blocking
 	// forever.
-	var fenceWatchdog = time.NewTimer(streamToFenceWatchdogTimeout)
+	var fenceWatchdog = time.NewTimer(rs.streamToFenceWatchdogTimeout)
 
 	// Stream replication events until the fence is reached.
 	log.WithField("cursor", fmt.Sprintf("%X", latestFlushLSN)).WithField("target", fmt.Sprintf("%X", nextFenceLSN)).Debug("beginning fenced streaming phase")
@@ -477,7 +491,7 @@ loop:
 		case <-fenceWatchdog.C:
 			return fmt.Errorf("replication became idle while streaming from %X to an established fence at %X", latestFlushLSN, nextFenceLSN)
 		case event, ok := <-rs.events:
-			fenceWatchdog.Reset(streamToFenceWatchdogTimeout)
+			fenceWatchdog.Reset(rs.streamToFenceWatchdogTimeout)
 			if !ok {
 				return sqlcapture.ErrFenceNotReached
 			} else if err := callback(event); err != nil {
@@ -704,16 +718,7 @@ func (rs *sqlserverReplicationStream) run(ctx context.Context) error {
 		return fmt.Errorf("error managing capture instances: %w", err)
 	}
 
-	// Parse the configured polling interval.
-	var pollingInterval time.Duration
-	if parsedInterval, err := time.ParseDuration(rs.cfg.Advanced.PollingInterval); err != nil {
-		// Should never happen since we validated it earlier
-		return fmt.Errorf("internal error: failed to parse polling interval %q: %w", rs.cfg.Advanced.PollingInterval, err)
-	} else {
-		pollingInterval = parsedInterval
-	}
-
-	var poll = time.NewTicker(pollingInterval)
+	var poll = time.NewTicker(rs.cdcPollingInterval)
 	var cleanup = time.NewTicker(cdcCleanupInterval)
 	var manage = time.NewTicker(cdcManagementInterval)
 	defer poll.Stop()
