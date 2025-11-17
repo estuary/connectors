@@ -222,6 +222,10 @@ async def fetch_incremental_resources(
         if doc_cursor >= upper_bound:
             break
 
+        # Skip documents that were already captured in a previous sweep.
+        if doc_cursor <= lower_bound:
+            continue
+
         # If we see a document updated more recently than the previous
         # document we emitted, checkpoint the previous documents.
         if (
