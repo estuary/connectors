@@ -451,11 +451,34 @@ class ActivityLog(BaseModel, extra="allow"):
 
                     return ActivityLogEventType.ITEM_CHANGED, item_ids
             case _:
-                raise ActivityLogProcessingError(
-                    f"Unanticipated activity log event: {self.event}. Please reach out to Estuary support for help resolving this issue.",
-                    query=self.query,
-                    variables=self.query_variables,
+                log.warning(
+                    f"Unknown activity log event '{self.event}' - defaulting to full board refresh. "
+                    f"This event should be documented and handled explicitly. ",
+                    {
+                        "event": self.event,
+                        "stream": stream,
+                        "data": self.data.model_dump(),
+                    },
                 )
+
+                ids = []
+                if self.data.board_id:
+                    ids.append(str(self.data.board_id))
+
+                if not ids:
+                    raise ActivityLogProcessingError(
+                        f"Unknown activity log event '{self.event}' has no identifiable board ID and cannot be processed safely.",
+                        query=self.query,
+                        variables=self.query_variables,
+                    )
+
+                event_type = (
+                    ActivityLogEventType.FULL_BOARD_ITEM_REFRESH
+                    if stream == "items"
+                    else ActivityLogEventType.BOARD_CHANGED
+                )
+
+                return event_type, ids
 
 
 class FullRefreshResource(BaseDocument, extra="allow"):
