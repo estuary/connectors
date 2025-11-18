@@ -305,3 +305,26 @@ The UI can handle rendering several inputs as "nullable". The UI handles this if
 ```
 
 If you set `type` to an array outside of this then JSONForms will try to handle the rendering as best it can.
+
+### How to have the drop-down of `oneOf` to include `description`s
+
+The UI will render `oneOf`s in a dropdown. If _every_ option in the `oneOf` has `const`, `description`, and `title` the UI will use a renderer that shows the `description` on each option under the `title`.
+
+Example:
+```json
+    "select_with_description": {
+      "type": "string",
+      "oneOf": [
+        {
+          "const": "foo",
+          "title": "Foo Title",
+          "description": "foo description"
+        },
+        {
+          "const": "bar",
+          "title": "Bar Title",
+          "description": "bar description"
+        }
+      ]
+    }
+```
