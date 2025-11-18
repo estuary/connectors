@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/binary"
 	"fmt"
 	"slices"
@@ -296,4 +297,60 @@ func quoteColumnName(name string) string {
 	// escaping in a bracket delimited identifier, but for now adding brackets is strictly better
 	// than not adding brackets.
 	return `[` + name + `]`
+}
+
+type sqlserverTableStatistics struct {
+	RowCount int64 // Row count from sys.partitions
+	Err      error // Error from querying statistics, if any (cached to avoid performance concerns)
+}
+
+func (db *sqlserverDatabase) queryTableStatistics(ctx context.Context, schema, table string) (*sqlserverTableStatistics, error) {
+	var streamID = sqlcapture.JoinStreamID(schema, table)
+	if db.tableStatistics == nil {
+		db.tableStatistics = make(map[sqlcapture.StreamID]*sqlserverTableStatistics)
+	}
+
+	// Return cached result if available
+	if cached := db.tableStatistics[streamID]; cached != nil {
+		return cached, cached.Err
+	}
+
+	// Query sys.partitions for row count estimate
+	var query = `
+		SELECT SUM(P.ROWS)
+		FROM SYS.PARTITIONS P
+		JOIN SYS.TABLES T ON P.OBJECT_ID = T.OBJECT_ID
+		JOIN SYS.SCHEMAS S ON T.SCHEMA_ID = S.SCHEMA_ID
+		WHERE S.NAME = @p1 AND T.NAME = @p2
+		  AND P.INDEX_ID IN (0, 1)`
+	var rowCount sql.NullInt64
+	if err := db.conn.QueryRowContext(ctx, query, schema, table).Scan(&rowCount); err != nil {
+		var stats = &sqlserverTableStatistics{Err: fmt.Errorf("error querying table statistics for %q: %w", streamID, err)}
+		db.tableStatistics[streamID] = stats
+		return stats, stats.Err
+	}
+
+	var stats = &sqlserverTableStatistics{
+		RowCount: rowCount.Int64,
+	}
+
+	log.WithFields(log.Fields{
+		"stream":   streamID,
+		"rowCount": stats.RowCount,
+	}).Debug("queried table statistics")
+
+	db.tableStatistics[streamID] = stats
+	return stats, nil
+}
+
+func (db *sqlserverDatabase) EstimatedRowCounts(ctx context.Context, tables []sqlcapture.TableID) (map[sqlcapture.TableID]int, error) {
+	var result = make(map[sqlcapture.TableID]int)
+	for _, table := range tables {
+		var stats, err = db.queryTableStatistics(ctx, table.Schema, table.Table)
+		if err != nil {
+			return nil, err
+		}
+		result[table] = int(stats.RowCount)
+	}
+	return result, nil
 }

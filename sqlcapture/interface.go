@@ -3,11 +3,39 @@ package sqlcapture
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/invopop/jsonschema"
 	"github.com/segmentio/encoding/json"
 )
+
+type StreamID struct {
+	Schema string
+	Table  string
+}
+
+func (s StreamID) String() string {
+	return fmt.Sprintf("%s.%s", s.Schema, s.Table)
+}
+
+// This is a temporary hack to allow us to plumb through a feature flag setting for
+// the gradual rollout of the "no longer lowercase stream IDs" behavior. This will
+// eventually be the standard for all connectors if we can do it without breaking
+// anything, but for now we want to be cautious and make it an opt-in.
+//
+// In an abstract sense we shouldn't be using a global variable for this, but as a
+// practical matter there's only ever one capture running at a time so this is fine.
+var LowercaseStreamIDs = true
+
+// JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
+func JoinStreamID(namespace, stream string) StreamID {
+	if LowercaseStreamIDs {
+		namespace = strings.ToLower(namespace)
+		stream = strings.ToLower(stream)
+	}
+	return StreamID{Schema: namespace, Table: stream}
+}
 
 // ChangeOp encodes a change operation type.
 // It's compatible with Debezium's change event representation.
@@ -199,6 +227,15 @@ func (evt *MetadataEvent) String() string  { return fmt.Sprintf("MetadataEvent(%
 func (*KeepaliveEvent) String() string     { return "KeepaliveEvent" }
 func (evt *TableDropEvent) String() string { return fmt.Sprintf("TableDropEvent(%s)", evt.StreamID) }
 
+// A TableID represents the schema/table name of a table.
+//
+// Unlike a StreamID it is guaranteed to not to be normalized, meaning that it
+// can be given back to the database in queries as needed.
+type TableID struct {
+	Schema string
+	Table  string
+}
+
 // Database represents the operations which must be performed on a specific database
 // during the course of a capture in order to perform discovery, backfill preexisting
 // data, and process replicated change events.
@@ -253,6 +290,9 @@ type Database interface {
 	// Called periodically just so we can make sure everything looks good on the
 	// DB and log warnings as necessary.
 	PeriodicChecks(ctx context.Context) error
+
+	// Returns estimated sizes (in rows) for the specified tables. Handles caching internally.
+	EstimatedRowCounts(ctx context.Context, tables []TableID) (map[TableID]int, error)
 }
 
 // ReplicationStream represents the process of receiving change events

@@ -468,6 +468,7 @@ type postgresTableStatistics struct {
 	RelTuples      int64 // Approximate number of live tuples in the table
 	MaxPageID      int64 // Conservative upper bound for the maximum page ID
 	PartitionCount int   // Number of partitions for the table, including the parent table itself
+	Err            error // Error from querying statistics, if any (cached to avoid performance concerns)
 }
 
 const queryTableStatistics = `
@@ -493,13 +494,15 @@ func (db *postgresDatabase) queryTableStatistics(ctx context.Context, schema, ta
 	if db.tableStatistics == nil {
 		db.tableStatistics = make(map[sqlcapture.StreamID]*postgresTableStatistics)
 	}
-	if db.tableStatistics[streamID] != nil {
-		return db.tableStatistics[streamID], nil
+	if cached := db.tableStatistics[streamID]; cached != nil {
+		return cached, cached.Err
 	}
 
 	var stats = &postgresTableStatistics{}
 	if err := db.conn.QueryRow(ctx, queryTableStatistics, schema, table).Scan(&stats.RelPages, &stats.RelTuples, &stats.MaxPageID, &stats.PartitionCount); err != nil {
-		return nil, fmt.Errorf("error querying table statistics for %q: %w", streamID, err)
+		stats.Err = fmt.Errorf("error querying table statistics for %q: %w", streamID, err)
+		db.tableStatistics[streamID] = stats
+		return stats, stats.Err
 	}
 	logrus.WithFields(logrus.Fields{
 		"stream":     streamID,
@@ -507,7 +510,19 @@ func (db *postgresDatabase) queryTableStatistics(ctx context.Context, schema, ta
 		"relTuples":  stats.RelTuples,
 		"maxPageID":  stats.MaxPageID,
 		"partitions": stats.PartitionCount,
-	}).Info("queried table statistics")
+	}).Debug("queried table statistics")
 	db.tableStatistics[streamID] = stats
 	return stats, nil
+}
+
+func (db *postgresDatabase) EstimatedRowCounts(ctx context.Context, tables []sqlcapture.TableID) (map[sqlcapture.TableID]int, error) {
+	var result = make(map[sqlcapture.TableID]int)
+	for _, table := range tables {
+		var stats, err = db.queryTableStatistics(ctx, table.Schema, table.Table)
+		if err != nil {
+			return nil, err
+		}
+		result[table] = int(stats.RelTuples)
+	}
+	return result, nil
 }

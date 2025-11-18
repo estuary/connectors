@@ -94,6 +94,8 @@ type mysqlDatabase struct {
 	datetimeLocation *time.Location                   // The location in which to interpret DATETIME column values as timestamps.
 	includeTxIDs     map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata.
 
+	tableStatistics map[sqlcapture.StreamID]*mysqlTableStatistics // Cached table statistics for backfill progress tracking.
+
 	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
 	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
 	forceResetCursor      string          // When set, this cursor will be used instead of the checkpointed one regardless of backfilling. DO NOT USE unless you know exactly what you're doing.

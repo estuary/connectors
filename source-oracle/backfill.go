@@ -522,3 +522,11 @@ func (db *oracleDatabase) explainQuery(ctx context.Context, streamID sqlcapture.
 		"output":   strings.Join(outputLines, "\n"),
 	}).Info("explain backfill query")
 }
+
+func (db *oracleDatabase) EstimatedRowCounts(ctx context.Context, tables []sqlcapture.TableID) (map[sqlcapture.TableID]int, error) {
+	var result = make(map[sqlcapture.TableID]int)
+	for _, table := range tables {
+		result[table] = 0
+	}
+	return result, nil
+}

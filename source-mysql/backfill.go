@@ -307,3 +307,62 @@ func (db *mysqlDatabase) explainQuery(streamID sqlcapture.StreamID, query string
 		}).Info("explain backfill query")
 	}
 }
+
+type mysqlTableStatistics struct {
+	TableRows int64 // Estimated row count from information_schema.tables
+	Err       error // Error from querying statistics, if any (cached to avoid performance concerns)
+}
+
+func (db *mysqlDatabase) queryTableStatistics(ctx context.Context, schema, table string) (*mysqlTableStatistics, error) {
+	var streamID = sqlcapture.JoinStreamID(schema, table)
+
+	// Initialize cache if needed
+	if db.tableStatistics == nil {
+		db.tableStatistics = make(map[sqlcapture.StreamID]*mysqlTableStatistics)
+	}
+
+	// Return cached result if available
+	if cached := db.tableStatistics[streamID]; cached != nil {
+		return cached, cached.Err
+	}
+
+	// Query information_schema.tables for row count estimate
+	var query = `SELECT table_rows FROM information_schema.tables WHERE table_schema = ? AND table_name = ?`
+	var result, err = db.conn.Execute(query, schema, table)
+	if err != nil {
+		var stats = &mysqlTableStatistics{Err: fmt.Errorf("error querying table statistics for %q: %w", streamID, err)}
+		db.tableStatistics[streamID] = stats
+		return stats, stats.Err
+	}
+	defer result.Close()
+
+	if len(result.Values) == 0 {
+		var stats = &mysqlTableStatistics{Err: fmt.Errorf("table %q not found in information_schema.tables", streamID)}
+		db.tableStatistics[streamID] = stats
+		return stats, stats.Err
+	}
+
+	var stats = &mysqlTableStatistics{
+		TableRows: result.Values[0][0].AsInt64(),
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"stream":    streamID,
+		"tableRows": stats.TableRows,
+	}).Debug("queried table statistics")
+
+	db.tableStatistics[streamID] = stats
+	return stats, nil
+}
+
+func (db *mysqlDatabase) EstimatedRowCounts(ctx context.Context, tables []sqlcapture.TableID) (map[sqlcapture.TableID]int, error) {
+	var result = make(map[sqlcapture.TableID]int)
+	for _, table := range tables {
+		var stats, err = db.queryTableStatistics(ctx, table.Schema, table.Table)
+		if err != nil {
+			return nil, err
+		}
+		result[table] = int(stats.TableRows)
+	}
+	return result, nil
+}
