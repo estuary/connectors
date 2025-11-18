@@ -276,6 +276,8 @@ type sqlserverDatabase struct {
 	datetimeLocation      *time.Location  // The location in which to interpret DATETIME column values as timestamps.
 	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
 	forceResetCursor      string          // When set, this cursor will be used instead of the checkpointed one regardless of backfilling. DO NOT USE unless you know exactly what you're doing.
+
+	tableStatistics map[sqlcapture.StreamID]*sqlserverTableStatistics // Cached table statistics for backfill progress tracking
 }
 
 func (db *sqlserverDatabase) HistoryMode() bool {

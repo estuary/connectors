@@ -144,6 +144,8 @@ type Capture struct {
 	Output   *boilerplate.PullOutput // The encoder to which records and state updates are written
 	Database Database                // The database-specific interface which is operated by the generic Capture logic
 
+	lastStatus string // Last connectorStatus update. Used to suppress exact duplicates to reduce log noise.
+
 	reused struct {
 		emitChangeBuf []byte               // A reusable buffer used for serialized JSON documents in emitChange(). Note that this is not thread-safe, but since the capture is single-threaded we're okay for now.
 		emitChangeMsg pc.Response          // A reusable object for emitting change events. This is not thread-safe, but since it's single-threaded we're okay for now.
@@ -175,7 +177,6 @@ var (
 func (c *Capture) Run(ctx context.Context) (err error) {
 	// Perform discovery and log the full results for convenience. This info
 	// will be needed when activating all currently-active bindings below.
-	log.WithField("eventType", "connectorStatus").Info("Discovering database tables")
 	discovery, err := c.Database.DiscoverTables(ctx)
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
@@ -193,7 +194,6 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		return fmt.Errorf("error reconciling capture state with bindings: %w", err)
 	}
 
-	log.WithField("cursor", string(c.State.Cursor)).WithField("eventType", "connectorStatus").Info("Initializing replication")
 	replStream, err := c.Database.ReplicationStream(ctx, c.State.Cursor)
 	if err != nil {
 		return fmt.Errorf("error creating replication stream: %w", err)
@@ -225,7 +225,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	defer cancelAcknowledgeWorkerCtx()
 
 	// Perform an initial "catch-up" stream-to-fence before entering the main capture loop.
-	log.WithField("eventType", "connectorStatus").Info("Catching up on CDC history")
+	c.statusUpdate("Catching up on CDC history")
 	if err := c.streamToFence(ctx, replStream, 0, true); err != nil {
 		return fmt.Errorf("error streaming until fence: %w", err)
 	}
@@ -234,7 +234,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	var periodicChecksAfter time.Time
 	for ctx.Err() == nil {
 		if time.Now().After(rediscoverAfter) {
-			log.WithField("eventType", "connectorStatus").Info("Rediscovering database tables")
+			log.Debug("rediscovering database tables")
 			discovery, err = c.Database.DiscoverTables(ctx)
 			if err != nil {
 				return fmt.Errorf("error discovering database tables: %w", err)
@@ -259,10 +259,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 
 		// If any tables are currently backfilling, go perform another backfill iteration.
 		if c.BindingsCurrentlyBackfilling() != nil {
-			log.WithField("eventType", "connectorStatus").Infof("Backfilling %d out of %d tables",
-				len(c.BindingsCurrentlyBackfilling()),
-				len(c.BindingsCurrentlyActive()),
-			)
+			c.statusUpdate("Backfilling Tables")
 			if err := c.backfillStreams(ctx, discovery); err != nil {
 				return fmt.Errorf("error performing backfill: %w", err)
 			} else if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
@@ -290,9 +287,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		}
 
 		// Finally, since there's no other work to do right now, we just stream changes for a period of time.
-		log.WithField("eventType", "connectorStatus").Infof("Streaming CDC events (all %d tables are backfilled)",
-			len(c.BindingsCurrentlyActive()),
-		)
+		c.statusUpdate("Streaming CDC Events")
 		if err := c.streamToFence(ctx, replStream, StreamingFenceInterval, true); err != nil {
 			return err
 		}
@@ -989,29 +984,55 @@ func (c *Capture) handleAcknowledgement(ctx context.Context, count int, replStre
 	return replStream.Acknowledge(ctx, cursor)
 }
 
-type StreamID struct {
-	Schema string
-	Table  string
-}
+func (c *Capture) statusUpdate(status string) {
+	// Add backfill information with percentage progress
+	var backfillingBindings = c.BindingsCurrentlyBackfilling()
+	if len(backfillingBindings) > 0 {
+		// Build list of tables to query for estimated row counts
+		var tables []TableID
+		for _, binding := range backfillingBindings {
+			tables = append(tables, TableID{
+				Schema: binding.Resource.Namespace,
+				Table:  binding.Resource.Stream,
+			})
+		}
 
-func (s StreamID) String() string {
-	return fmt.Sprintf("%s.%s", s.Schema, s.Table)
-}
+		// Query estimated row counts for all backfilling tables
+		estimatedCounts, err := c.Database.EstimatedRowCounts(context.Background(), tables)
+		if err != nil {
+			log.WithError(err).Warn("error querying estimated row counts for backfill progress")
+			status += fmt.Sprintf(" (%d tables backfilling)", len(backfillingBindings))
+		} else {
+			// Sum up backfilled and estimated counts
+			var totalBackfilled, totalEstimated int
+			var allCountsKnown = true
+			for _, binding := range backfillingBindings {
+				var state = c.State.Streams[binding.StateKey]
+				var tableID = TableID{binding.Resource.Namespace, binding.Resource.Stream}
+				if estimated, ok := estimatedCounts[tableID]; ok && estimated > 0 {
+					totalBackfilled += state.BackfilledCount
+					totalEstimated += estimated
+				} else {
+					allCountsKnown = false
+				}
+			}
 
-// This is a temporary hack to allow us to plumb through a feature flag setting for
-// the gradual rollout of the "no longer lowercase stream IDs" behavior. This will
-// eventually be the standard for all connectors if we can do it without breaking
-// anything, but for now we want to be cautious and make it an opt-in.
-//
-// In an abstract sense we shouldn't be using a global variable for this, but as a
-// practical matter there's only ever one capture running at a time so this is fine.
-var LowercaseStreamIDs = true
-
-// JoinStreamID combines a namespace and a stream name into a dotted name like "public.foo_table".
-func JoinStreamID(namespace, stream string) StreamID {
-	if LowercaseStreamIDs {
-		namespace = strings.ToLower(namespace)
-		stream = strings.ToLower(stream)
+			if allCountsKnown {
+				// Calculate and display percentage, clamped to 99% since we're still backfilling.
+				var percentage = min(float64(totalBackfilled)/float64(totalEstimated)*100, 99)
+				status += fmt.Sprintf(" (backfilled %.0f%% of %d tables)", percentage, len(backfillingBindings))
+			} else {
+				// Fallback when some table sizes are unknown, to avoid giving bad data.
+				status += fmt.Sprintf(" (%d tables backfilling)", len(backfillingBindings))
+			}
+		}
 	}
-	return StreamID{Schema: namespace, Table: stream}
+
+	// TODO(wgd): Add replication backlog metrics if available
+
+	// Output new status text if different from prior status
+	if status != c.lastStatus {
+		log.WithField("eventType", "connectorStatus").Info(status)
+		c.lastStatus = status
+	}
 }
