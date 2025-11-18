@@ -201,8 +201,8 @@ async def fetch_transactions_disbursed_between(
     start_date = start.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = end.replace(hour=0, minute=0, second=0, microsecond=0)
     log.info(f"Fetching disbursed transactions.", {
-        "start": start_date,
-        "end": end_date,
+        "start_date": start_date,
+        "end_date": end_date,
     })
 
     earliest_created_at = end_date + timedelta(days=1)
@@ -210,11 +210,17 @@ async def fetch_transactions_disbursed_between(
         ids = await _fetch_transaction_ids_disbursed_between(
             http,
             base_url,
-            start,
-            end,
+            start_date,
+            end_date,
             earliest_created_at,
             log,
         )
+
+        log.info(f"Found {len(ids)} disbursed transactions.", {
+            "start_date": start_date,
+            "end_date": end_date,
+            "earliest_created_at": earliest_created_at,
+        })
 
         async for doc in fetch_by_ids(
             http,
@@ -277,8 +283,8 @@ async def fetch_transactions_disputed_between(
     start_date = start.replace(hour=0, minute=0, second=0, microsecond=0)
     end_date = end.replace(hour=0, minute=0, second=0, microsecond=0)
     log.info(f"Fetching disputed transactions.", {
-        "start": start_date,
-        "end": end_date,
+        "start_date": start_date,
+        "end_date": end_date,
     })
 
     earliest_created_at = end_date + timedelta(days=1)
@@ -286,11 +292,16 @@ async def fetch_transactions_disputed_between(
         ids = await _fetch_transaction_ids_disputed_between(
             http,
             base_url,
-            start,
-            end,
+            start_date,
+            end_date,
             earliest_created_at,
             log,
         )
+        log.info(f"Found {len(ids)} disputed transactions.", {
+            "start_date": start_date,
+            "end_date": end_date,
+            "earliest_created_at": earliest_created_at,
+        })
 
         async for doc in fetch_by_ids(
             http,
