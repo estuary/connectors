@@ -2,7 +2,7 @@ import itertools
 from logging import Logger
 from typing import AsyncGenerator
 
-from aiostream.stream import merge
+from estuary_cdk.async_streams import merge
 from estuary_cdk.http import HTTPSession
 from pydantic import AwareDatetime, BaseModel
 
