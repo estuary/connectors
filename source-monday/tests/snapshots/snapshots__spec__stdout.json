@@ -52,6 +52,7 @@
         "_meta": {
           "anyOf": [
             {
+              "additionalProperties": true,
               "type": "object"
             },
             {
