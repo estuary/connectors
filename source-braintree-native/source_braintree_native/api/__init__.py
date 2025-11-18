@@ -91,12 +91,17 @@ async def fetch_transactions(
     # more than a single day.
 
     if not _are_same_day(log_cursor, end):
-        yesterday = end - timedelta(days=1)
+        # It can take a few days for a transaction's disbursement details to be available
+        # in the API. These lookback window searches re-capture transactions from the
+        # past three days to avoid missing delayed updates to disbursed/disputed transactions.
+        three_days_ago = end - timedelta(days=3)
+        lookback_start = min(log_cursor, three_days_ago)
+
         async for doc in fetch_transactions_disbursed_between(
             http=http,
             base_url=base_url,
-            start=log_cursor,
-            end=yesterday,
+            start=lookback_start,
+            end=end,
             gateway=braintree_gateway,
             log=log,
         ):
@@ -105,8 +110,8 @@ async def fetch_transactions(
         async for doc in fetch_transactions_disputed_between(
             http=http,
             base_url=base_url,
-            start=log_cursor,
-            end=yesterday,
+            start=lookback_start,
+            end=end,
             gateway=braintree_gateway,
             log=log,
         ):
