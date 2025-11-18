@@ -1215,7 +1215,7 @@ func (s *replicationStream) sendStandbyStatusUpdate() error {
 	var ackLSN = pglogrepl.LSN(atomic.LoadUint64(&s.ackLSN))
 	if ackLSN != s.previousAckLSN {
 		// Log at info level whenever we're about to confirm a different LSN from last time.
-		logrus.WithField("ackLSN", ackLSN.String()).Info("advancing confirmed LSN")
+		logrus.WithField("ackLSN", ackLSN.String()).Debug("advancing confirmed LSN")
 		s.previousAckLSN = ackLSN
 	} else {
 		logrus.WithField("ackLSN", ackLSN.String()).Debug("sending Standby Status Update")

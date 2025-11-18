@@ -405,7 +405,7 @@ func (db *postgresDatabase) connect(ctx context.Context) error {
 		"user":     db.config.User,
 		"database": db.config.Database,
 		"slot":     db.config.Advanced.SlotName,
-	}).Info("initializing connector")
+	}).Info("connecting to database")
 
 	var connURI, err = db.config.ToURI(ctx)
 	if err != nil {

@@ -528,7 +528,7 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 // The fenceAfter argument is passed to the underlying replication stream, so that
 // it can make sure to stream changes for at least that length of time.
 func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStream, fenceAfter time.Duration, reportFlush bool) error {
-	log.WithField("fenceAfter", fenceAfter.String()).Info("streaming to fence")
+	log.WithField("fenceAfter", fenceAfter.String()).Debug("streaming to fence")
 
 	// Log a warning and perform replication diagnostics if we don't observe the next fence within a few minutes
 	var diagnosticsTimeout = time.AfterFunc(fenceAfter+automatedDiagnosticsTimeout, func() {
@@ -550,11 +550,11 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 		var streamingTime = time.Since(streamingStarted)
 		var throughputMBps = float64(changeBytes) / (1000000 * streamingTime.Seconds())
 		log.WithFields(log.Fields{
-			"change": changeCount,
-			"flush":  flushCount,
-			"other":  otherCount,
-			"time":   streamingTime.String(),
-			"rate":   fmt.Sprintf("%.02f MBps", throughputMBps),
+			"change":   changeCount,
+			"flush":    flushCount,
+			"other":    otherCount,
+			"duration": streamingTime.String(),
+			"rate":     fmt.Sprintf("%.02f MBps", throughputMBps),
 		}).Info("processed replication events")
 	}()
 
@@ -799,7 +799,7 @@ func (c *Capture) backfillStreams(ctx context.Context, discovery map[StreamID]*D
 		"atPriority": len(streams),  // Number of active bindings in the current priority band
 		"priority":   priority,      // Current priority band
 		"selected":   streamID,
-	}).Info("backfilling streams")
+	}).Debug("backfilling streams")
 
 	var discoveryInfo, ok = discovery[streamID]
 	if !ok {
@@ -860,10 +860,10 @@ func (c *Capture) backfillStream(ctx context.Context, streamID StreamID, discove
 
 	// Update stream state to reflect backfill results
 	log.WithFields(log.Fields{
-		"stream": streamID,
-		"rows":   eventCount,
-		"time":   backfillChunkTime.String(),
-		"rate":   fmt.Sprintf("%.02f MBps", throughputMBps),
+		"stream":   streamID,
+		"rows":     eventCount,
+		"duration": backfillChunkTime.String(),
+		"rate":     fmt.Sprintf("%.02f MBps", throughputMBps),
 	}).Info("processed backfill rows")
 	var state = c.State.Streams[stateKey]
 	state.BackfilledCount += eventCount

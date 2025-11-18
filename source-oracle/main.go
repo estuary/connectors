@@ -301,7 +301,7 @@ func (db *oracleDatabase) connect(_ context.Context) error {
 		"user":           db.config.User,
 		"database":       db.config.Database,
 		"dictionaryMode": db.config.Advanced.DictionaryMode,
-	}).Info("initializing connector")
+	}).Info("connecting to database")
 
 	var conn, err = sql.Open("oracle", db.config.ToURI(db.config.Advanced.BackfillChunkSize+1))
 	if err != nil {

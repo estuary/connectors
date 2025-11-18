@@ -239,7 +239,7 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		"dbName":   db.config.Advanced.DBName,
 		"user":     db.config.User,
 		"serverID": db.config.Advanced.NodeID,
-	}).Info("initializing connector")
+	}).Info("connecting to database")
 
 	var address = db.config.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:5432
