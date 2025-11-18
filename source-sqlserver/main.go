@@ -286,7 +286,7 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 	log.WithFields(log.Fields{
 		"address": db.config.Address,
 		"user":    db.config.User,
-	}).Info("initializing connector")
+	}).Info("connecting to database")
 
 	var conn, err = sql.Open("sqlserver", db.config.ToURI())
 	if err != nil {
