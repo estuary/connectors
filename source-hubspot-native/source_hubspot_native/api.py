@@ -248,7 +248,7 @@ async def fetch_page_with_associations(
     # cumulative byte lengths, we will issue multiple requests for different sets of properties and
     # combine the results together in the output documents.
     chunked_properties = _chunk_props(
-        [p.name for p in properties.results if not p.calculated],
+        [p.name for p in properties.results],
         5 * 1024,
     )
 
@@ -316,7 +316,7 @@ async def _fetch_batch(
 
     url = f"{HUB}/crm/v3/objects/{object_name}/batch/read"
     properties = await fetch_properties(log, http, object_name)
-    property_names = [p.name for p in properties.results if not p.calculated]
+    property_names = [p.name for p in properties.results]
 
     input = {
         "inputs": [{"id": id} for id in ids],
