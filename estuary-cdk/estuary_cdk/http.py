@@ -1,38 +1,36 @@
-from dataclasses import dataclass
-from logging import Logger
-from pydantic import BaseModel
-from typing import AsyncGenerator, Any, Awaitable, TypeVar, Callable, Protocol
-from multidict import CIMultiDict
 import abc
-import aiohttp
 import asyncio
 import base64
 import json
 import time
+from dataclasses import dataclass
+from logging import Logger
+from typing import Any, AsyncGenerator, Awaitable, Callable, Literal, Protocol, TypeVar
 
-
+import aiohttp
 from google.auth.credentials import TokenState as GoogleTokenState
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.oauth2.service_account import Credentials as GoogleServiceAccountCredentials
+from multidict import CIMultiDict
+from pydantic import BaseModel
 
 from . import Mixin
 from .flow import (
     AccessToken,
-    BasicAuth,
-    BaseOAuth2Credentials,
     AuthorizationCodeFlowOAuth2Credentials,
+    BaseOAuth2Credentials,
+    BasicAuth,
     ClientCredentialsOAuth2Credentials,
-    OAuth2TokenFlowSpec,
-    LongLivedClientCredentialsOAuth2Credentials,
-    ResourceOwnerPasswordOAuth2Credentials,
-    RotatingOAuth2Credentials,
-    OAuth2Spec,
-    OAuth2RotatingTokenSpec,
     GoogleServiceAccount,
     GoogleServiceAccountSpec,
+    LongLivedClientCredentialsOAuth2Credentials,
+    OAuth2RotatingTokenSpec,
+    OAuth2Spec,
+    OAuth2TokenFlowSpec,
+    ResourceOwnerPasswordOAuth2Credentials,
+    RotatingOAuth2Credentials,
 )
 from .utils import format_error_message
-
 
 DEFAULT_AUTHORIZATION_HEADER = "Authorization"
 DEFAULT_AUTHORIZATION_TOKEN_TYPE = "Bearer"
@@ -43,6 +41,7 @@ Headers = CIMultiDict[str]
 
 BodyGeneratorFunction = Callable[[], AsyncGenerator[bytes, None]]
 HeadersAndBodyGenerator = tuple[Headers, BodyGeneratorFunction]
+
 
 class ShouldRetryProtocol(Protocol):
     """
@@ -65,12 +64,9 @@ class ShouldRetryProtocol(Protocol):
                 return False
             return status >= 500
     """
+
     def __call__(
-        self,
-        status: int,
-        headers: Headers,
-        body: bytes,
-        attempt: int
+        self, status: int, headers: Headers, body: bytes, attempt: int
     ) -> bool: ...
 
 
@@ -120,7 +116,15 @@ class HTTPSession(abc.ABC):
 
         chunks: list[bytes] = []
         _, body_generator = await self._request_stream(
-            log, url, method, params, json, form, _with_token, headers, should_retry,
+            log,
+            url,
+            method,
+            params,
+            json,
+            form,
+            _with_token,
+            headers,
+            should_retry,
         )
 
         async for chunk in body_generator():
@@ -148,7 +152,15 @@ class HTTPSession(abc.ABC):
         """Request a url and return its response as streaming lines, as they arrive"""
 
         resp_headers, body = await self._request_stream(
-            log, url, method, params, json, form, True, headers, should_retry,
+            log,
+            url,
+            method,
+            params,
+            json,
+            form,
+            True,
+            headers,
+            should_retry,
         )
 
         async def gen() -> AsyncGenerator[bytes, None]:
@@ -178,8 +190,9 @@ class HTTPSession(abc.ABC):
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and and return the raw response as a stream of bytes"""
 
-        return await self._request_stream(log, url, method, params, json, form, _with_token, headers, should_retry)
-
+        return await self._request_stream(
+            log, url, method, params, json, form, _with_token, headers, should_retry
+        )
 
     @abc.abstractmethod
     async def _request_stream(
@@ -228,7 +241,9 @@ class TokenSource:
     _fetched_at: int = 0
 
     async def fetch_token(self, log: Logger, session: HTTPSession) -> tuple[str, str]:
-        if isinstance(self.credentials, (
+        if isinstance(
+            self.credentials,
+            (
                 AccessToken,
                 LongLivedClientCredentialsOAuth2Credentials,
                 # RotatingOAuth2Credentials are refreshed _only_ at connector startup.
@@ -237,7 +252,7 @@ class TokenSource:
                 # to keep valid tokens in the endpoint config, so we never attempt to
                 # exchange tokens in `fetch_token` for `RotatingOAuth2Credentials`.
                 RotatingOAuth2Credentials,
-            )
+            ),
         ):
             return (self.authorization_token_type, self.credentials.access_token)
         elif isinstance(self.credentials, BasicAuth):
@@ -250,9 +265,11 @@ class TokenSource:
         elif isinstance(self.credentials, GoogleServiceAccount):
             assert isinstance(self.google_spec, GoogleServiceAccountSpec)
             if self._access_token is None:
-                self._access_token = GoogleServiceAccountCredentials.from_service_account_info(
-                    json.loads(self.credentials.service_account),
-                    scopes=self.google_spec.scopes,
+                self._access_token = (
+                    GoogleServiceAccountCredentials.from_service_account_info(
+                        json.loads(self.credentials.service_account),
+                        scopes=self.google_spec.scopes,
+                    )
                 )
 
             assert isinstance(self._access_token, GoogleServiceAccountCredentials)
@@ -263,7 +280,9 @@ class TokenSource:
                 case GoogleTokenState.STALE | GoogleTokenState.INVALID:
                     self._access_token.refresh(GoogleAuthRequest())
                 case _:
-                    raise RuntimeError(f"Unknown GoogleTokenState: {self._access_token.token_state}")
+                    raise RuntimeError(
+                        f"Unknown GoogleTokenState: {self._access_token.token_state}"
+                    )
 
             return (self.authorization_token_type, self._access_token.token)
 
@@ -306,7 +325,9 @@ class TokenSource:
 
         self._fetched_at = int(time.time())
         response = await self._fetch_oauth2_token(
-            log, session, self.credentials,
+            log,
+            session,
+            self.credentials,
         )
         self._access_token = response
         return response
@@ -315,11 +336,13 @@ class TokenSource:
         self,
         log: Logger,
         session: HTTPSession,
-        credentials: BaseOAuth2Credentials
-        | ResourceOwnerPasswordOAuth2Credentials
-        | ClientCredentialsOAuth2Credentials
-        | AuthorizationCodeFlowOAuth2Credentials
-        | RotatingOAuth2Credentials,
+        credentials: (
+            BaseOAuth2Credentials
+            | ResourceOwnerPasswordOAuth2Credentials
+            | ClientCredentialsOAuth2Credentials
+            | AuthorizationCodeFlowOAuth2Credentials
+            | RotatingOAuth2Credentials
+        ),
     ) -> AccessTokenResponse:
         assert self.oauth_spec
 
@@ -404,7 +427,7 @@ class RateLimiter:
     """
 
     delay: float = 1.0
-    MAX_DELAY: float = 300.0 # 5 minutes
+    MAX_DELAY: float = 300.0  # 5 minutes
     gain: float = 0.01
 
     failed: int = 0
@@ -491,19 +514,24 @@ class HTTPMixin(Mixin, HTTPSession):
             try:
                 return await operation()
             except (
-                asyncio.TimeoutError,                # Connection timeouts
-                aiohttp.ClientConnectorError,        # DNS, SSL handshake, connection refused errors
-                aiohttp.ClientConnectorDNSError,     # DNS resolution failures
-                aiohttp.ConnectionTimeoutError,      # aiohttp connection timeouts (sock_connect, connect)
-                ConnectionResetError,                # TCP connection reset
-                aiohttp.ClientOSError,               # OS errors (like BrokenPipeError) during request sending
+                asyncio.TimeoutError,  # Connection timeouts
+                aiohttp.ClientConnectorError,  # DNS, SSL handshake, connection refused errors
+                aiohttp.ClientConnectorDNSError,  # DNS resolution failures
+                aiohttp.ConnectionTimeoutError,  # aiohttp connection timeouts (sock_connect, connect)
+                ConnectionResetError,  # TCP connection reset
+                aiohttp.ClientOSError,  # OS errors (like BrokenPipeError) during request sending
                 aiohttp.ClientConnectionResetError,  # Connection reset errors
-                aiohttp.ServerDisconnectedError,     # Server disconnections
+                aiohttp.ServerDisconnectedError,  # Server disconnections
             ) as e:
                 if attempt <= max_attempts:
                     log.warning(
                         f"Connection error occurred while establishing connection (will retry)",
-                        {"url": url, "method": method, "attempt": attempt, "error": format_error_message(e)}
+                        {
+                            "url": url,
+                            "method": method,
+                            "attempt": attempt,
+                            "error": format_error_message(e),
+                        },
                     )
                     attempt += 1
                 else:
@@ -531,10 +559,19 @@ class HTTPMixin(Mixin, HTTPSession):
 
             attempt += 1
             resp = await self._retry_on_connection_error(
-                log, url, method,
+                log,
+                url,
+                method,
                 lambda: self._establish_connection_and_get_response(
-                    log, url, method, params, json, form, _with_token, headers,
-                )
+                    log,
+                    url,
+                    method,
+                    params,
+                    json,
+                    form,
+                    _with_token,
+                    headers,
+                ),
             )
 
             should_release_response = True
@@ -555,9 +592,8 @@ class HTTPMixin(Mixin, HTTPSession):
                 elif resp.status >= 500 and resp.status < 600:
                     body = await resp.read()
 
-                    if (
-                        should_retry is None
-                        or should_retry(resp.status, resp.headers, body, attempt)
+                    if should_retry is None or should_retry(
+                        resp.status, resp.headers, body, attempt
                     ):
                         log.warning(
                             "server internal error (will retry)",
@@ -591,5 +627,3 @@ class HTTPMixin(Mixin, HTTPSession):
             finally:
                 if should_release_response:
                     await resp.release()
-
-
