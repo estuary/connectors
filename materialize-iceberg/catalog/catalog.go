@@ -280,7 +280,7 @@ func (c *Catalog) ListNamespaces(ctx context.Context) ([]string, error) {
 			params = append(params, []string{"pageToken", pageToken})
 		}
 
-		res, err := doGet[resp](ctx, c, "/namespaces")
+		res, err := doGet[resp](ctx, c, "/namespaces", params)
 		if err != nil {
 			return nil, err
 		}
