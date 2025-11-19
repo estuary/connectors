@@ -228,6 +228,7 @@ async def fetch_page_with_associations(
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
+    is_connector_initiated: bool,
 ) -> AsyncGenerator[CRMObject | str, None]:
 
     assert isinstance(cutoff, datetime)
@@ -235,6 +236,14 @@ async def fetch_page_with_associations(
     url = f"{HUB}/crm/v3/objects/{object_name}"
     output: list[CRMObject] = []
     properties = await fetch_properties(log, http, object_name)
+
+    # On connector initiated backfills, only capture calculated properties and rely
+    # on the merge reduction strategies to merge in partial documents containing
+    # updated calculated properties.
+    property_names: list[str] = [
+        p.name for p in properties.results
+        if not is_connector_initiated or p.calculated
+    ]
 
     # There is a limit on how large a URL can be when making a GET request to HubSpot. Exactly what
     # this limit is is a bit mysterious to me. Empirical testing indicates that a single property
@@ -248,7 +257,7 @@ async def fetch_page_with_associations(
     # cumulative byte lengths, we will issue multiple requests for different sets of properties and
     # combine the results together in the output documents.
     chunked_properties = _chunk_props(
-        [p.name for p in properties.results],
+        property_names,
         5 * 1024,
     )
 
