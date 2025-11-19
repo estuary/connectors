@@ -335,6 +335,66 @@ func TestBasicDatatypes(t *testing.T) {
 	})
 }
 
+func TestTemporalTypes(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        date_col DATE,
+        ts_col TIMESTAMP,
+        tstz_col TIMESTAMP WITH TIME ZONE,
+        time_col TIME,
+        timetz_col TIME WITH TIME ZONE
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		var tokyo, _ = time.LoadLocation("Asia/Tokyo")
+		for _, row := range [][]any{
+			{0, "2025-02-14", "2025-02-14 14:44:29",
+				time.Date(2025, 2, 14, 14, 44, 29, 0, tokyo),
+				"14:44:29", "14:44:29-05:00"},
+			{1, "1969-07-20", "1969-07-20 20:17:00",
+				time.Date(1969, 7, 20, 20, 17, 0, 0, time.UTC),
+				"20:17:00", "20:17:00-04:00"},
+			{2, "2077-07-20", "2077-07-20 15:30:00",
+				time.Date(2077, 7, 20, 15, 30, 0, 0, tokyo),
+				"15:30:00", "15:30:00+09:00"},
+			{3, "0001-01-01", "0001-01-01 00:00:00",
+				time.Date(1, 1, 1, 0, 0, 0, 0, time.UTC),
+				"00:00:00", "00:00:00Z"},
+			{4, "9999-12-31", "9999-12-31 23:59:59.999999",
+				time.Date(9999, 12, 31, 23, 59, 59, 999999000, time.UTC),
+				"23:59:59.999999", "23:59:59.999999Z"},
+			{5, "2024-02-14", "2024-02-14 15:30:45",
+				time.Date(2024, 2, 14, 15, 30, 45, 0, time.UTC),
+				"15:30:45", "15:30:45Z"},
+			{6, "2024-02-14", "2024-02-14 15:30:45.123456",
+				time.Date(2024, 2, 14, 15, 30, 45, 123456000, time.UTC),
+				"15:30:45.123456", "15:30:45.123456Z"},
+			{7, nil, nil, nil, nil, nil},
+			{8, "22024-02-14", "22024-02-14 15:30:45",
+				time.Date(22024, 2, 14, 15, 30, 45, 0, time.UTC),
+				nil, nil},
+			{9, "500-02-14 BC", "500-02-14 BC 15:30:45",
+				time.Date(-499, 2, 14, 15, 30, 45, 0, time.UTC),
+				nil, nil},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf(`
+                INSERT INTO %s (
+                    id, date_col, ts_col, tstz_col, time_col,
+                    timetz_col
+                ) VALUES ($1, $2, $3, $4, $5, $6)`, tableName),
+				row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
 func TestFloatNaNs(t *testing.T) {
 	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
 	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
