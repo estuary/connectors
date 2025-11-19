@@ -21,6 +21,7 @@
         "createdate": "2024-12-18T20:40:46.664Z",
         "currentlyinworkflow": null,
         "date_of_birth": null,
+        "days_to_close": null,
         "degree": null,
         "email": "bh@hubspot.com",
         "engagements_last_meeting_booked": null,
@@ -29,6 +30,8 @@
         "engagements_last_meeting_booked_source": null,
         "fax": null,
         "field_of_study": null,
+        "first_conversion_date": null,
+        "first_conversion_event_name": null,
         "first_deal_created_date": null,
         "firstname": "Brian",
         "followercount": null,
@@ -37,6 +40,7 @@
         "hs_additional_emails": null,
         "hs_all_accessible_team_ids": null,
         "hs_all_assigned_business_unit_ids": null,
+        "hs_all_contact_vids": "86000071941",
         "hs_all_owner_ids": null,
         "hs_all_team_ids": null,
         "hs_analytics_average_page_views": "0",
@@ -60,6 +64,13 @@
         "hs_associated_target_accounts": "0",
         "hs_avatar_filemanager_key": null,
         "hs_buying_role": null,
+        "hs_calculated_form_submissions": null,
+        "hs_calculated_merged_vids": null,
+        "hs_calculated_mobile_number": null,
+        "hs_calculated_phone_number": null,
+        "hs_calculated_phone_number_area_code": null,
+        "hs_calculated_phone_number_country_code": null,
+        "hs_calculated_phone_number_region_code": null,
         "hs_clicked_linkedin_ad": null,
         "hs_contact_creation_legal_basis_source_instance_id": null,
         "hs_contact_enrichment_opt_out": null,
@@ -80,6 +91,7 @@
         "hs_created_by_user_id": null,
         "hs_createdate": null,
         "hs_cross_sell_opportunity": null,
+        "hs_currently_enrolled_in_prospecting_agent": "false",
         "hs_customer_agent_lead_status": null,
         "hs_data_privacy_ads_consent": null,
         "hs_document_last_revisited": null,
@@ -88,6 +100,7 @@
         "hs_email_click": null,
         "hs_email_customer_quarantined_reason": null,
         "hs_email_delivered": null,
+        "hs_email_domain": "hubspot.com",
         "hs_email_first_click_date": null,
         "hs_email_first_open_date": null,
         "hs_email_first_reply_date": null,
@@ -130,8 +143,11 @@
         "hs_feedback_last_survey_date": null,
         "hs_feedback_show_nps_web_survey": null,
         "hs_first_closed_order_id": null,
+        "hs_first_engagement_object_id": null,
         "hs_first_order_closed_date": null,
+        "hs_first_outreach_date": null,
         "hs_first_subscription_create_date": null,
+        "hs_full_name_or_email": "Brian Halligan (Sample Contact)",
         "hs_google_click_id": null,
         "hs_googleplusid": null,
         "hs_gps_error": null,
@@ -142,6 +158,7 @@
         "hs_intent_paid_up_to_date": null,
         "hs_intent_signals_enabled": null,
         "hs_ip_timezone": null,
+        "hs_is_contact": "true",
         "hs_is_enriched": null,
         "hs_is_merge_revertible": null,
         "hs_is_unworked": "true",
@@ -155,7 +172,11 @@
         "hs_last_sms_send_date": null,
         "hs_last_sms_send_name": null,
         "hs_lastmodifieddate": null,
+        "hs_latest_disqualified_lead_date": null,
         "hs_latest_meeting_activity": null,
+        "hs_latest_open_lead_date": null,
+        "hs_latest_qualified_lead_date": null,
+        "hs_latest_sequence_ended_date": null,
         "hs_latest_sequence_enrolled": null,
         "hs_latest_sequence_enrolled_date": null,
         "hs_latest_sequence_finished_date": null,
@@ -173,10 +194,12 @@
         "hs_linkedinid": null,
         "hs_live_enrichment_deadline": null,
         "hs_longitude": null,
+        "hs_manual_campaign_ids": null,
         "hs_marketable_reason_id": "Sample Contact",
         "hs_marketable_reason_type": "SAMPLE_CONTACT",
         "hs_marketable_status": "true",
         "hs_marketable_until_renewal": "true",
+        "hs_membership_has_accessed_private_content": "0",
         "hs_membership_last_private_content_access_date": null,
         "hs_merged_object_ids": null,
         "hs_messaging_engagement_score": null,
@@ -206,16 +229,24 @@
         "hs_quarantined_emails": null,
         "hs_read_only": null,
         "hs_recent_closed_order_date": null,
+        "hs_registered_member": "0",
         "hs_registration_method": null,
         "hs_returning_to_office_detected_date": null,
         "hs_role": null,
         "hs_sa_first_engagement_date": null,
+        "hs_sa_first_engagement_descr": null,
+        "hs_sa_first_engagement_object_type": null,
         "hs_sales_email_last_clicked": null,
         "hs_sales_email_last_opened": null,
         "hs_sales_email_last_replied": null,
+        "hs_searchable_calculated_international_mobile_number": null,
+        "hs_searchable_calculated_international_phone_number": null,
+        "hs_searchable_calculated_mobile_number": null,
+        "hs_searchable_calculated_phone_number": null,
         "hs_seniority": null,
         "hs_sequences_actively_enrolled_count": "0",
         "hs_sequences_enrolled_count": null,
+        "hs_sequences_is_enrolled": null,
         "hs_shared_team_ids": null,
         "hs_shared_user_ids": null,
         "hs_social_facebook_clicks": "0",
@@ -232,6 +263,7 @@
         "hs_testrollback": null,
         "hs_time_between_contact_creation_and_deal_close": null,
         "hs_time_between_contact_creation_and_deal_creation": null,
+        "hs_time_to_first_engagement": null,
         "hs_time_to_move_from_lead_to_customer": null,
         "hs_time_to_move_from_marketingqualifiedlead_to_customer": null,
         "hs_time_to_move_from_opportunity_to_customer": null,
@@ -307,12 +339,16 @@
         "notes_next_activity_date": null,
         "num_associated_deals": null,
         "num_contacted_notes": null,
+        "num_conversion_events": "0",
         "num_notes": null,
+        "num_unique_conversion_events": "0",
         "numemployees": null,
         "owneremail": null,
         "ownername": null,
         "phone": null,
         "photo": null,
+        "recent_conversion_date": null,
+        "recent_conversion_event_name": null,
         "recent_deal_amount": null,
         "recent_deal_close_date": null,
         "relationship_status": null,
@@ -370,6 +406,14 @@
             "sourceType": "INTERNAL_PROCESSING",
             "timestamp": "2024-12-18T20:40:45.833000Z",
             "value": "Brian"
+          }
+        ],
+        "hs_all_contact_vids": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-12-18T20:40:46.664000Z",
+            "value": "86000071941"
           }
         ],
         "hs_analytics_average_page_views": [
@@ -450,6 +494,36 @@
             "sourceType": "CALCULATED",
             "timestamp": "2024-12-18T20:40:47.771000Z",
             "value": "0"
+          }
+        ],
+        "hs_currently_enrolled_in_prospecting_agent": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:46.664000Z",
+            "value": "false"
+          }
+        ],
+        "hs_email_domain": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:46.664000Z",
+            "value": "hubspot.com"
+          }
+        ],
+        "hs_full_name_or_email": [
+          {
+            "sourceId": "RecalculateCalculatedPropertiesHelper",
+            "sourceType": "MIGRATION",
+            "timestamp": "2025-03-21T11:33:00Z",
+            "value": "Brian Halligan (Sample Contact)"
+          }
+        ],
+        "hs_is_contact": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:46.664000Z",
+            "value": "true"
           }
         ],
         "hs_is_unworked": [
@@ -536,6 +610,14 @@
             "value": "false"
           }
         ],
+        "hs_membership_has_accessed_private_content": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:46.664000Z",
+            "value": "0"
+          }
+        ],
         "hs_object_id": [
           {
             "sourceId": "sample-contact",
@@ -589,6 +671,14 @@
             "sourceId": "RollupProperties",
             "sourceType": "CALCULATED",
             "timestamp": "2024-12-18T20:40:47.772000Z",
+            "value": "0"
+          }
+        ],
+        "hs_registered_member": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:46.664000Z",
             "value": "0"
           }
         ],
@@ -706,6 +796,20 @@
             "value": "lead"
           }
         ],
+        "num_conversion_events": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:47.645000Z",
+            "value": "0"
+          }
+        ],
+        "num_unique_conversion_events": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:47.645000Z",
+            "value": "0"
+          }
+        ],
         "twitterhandle": [
           {
             "sourceId": "sample-contact",
@@ -757,6 +861,7 @@
         "createdate": "2024-12-18T20:40:46.031Z",
         "currentlyinworkflow": null,
         "date_of_birth": null,
+        "days_to_close": null,
         "degree": null,
         "email": "emailmaria@hubspot.com",
         "engagements_last_meeting_booked": null,
@@ -765,6 +870,8 @@
         "engagements_last_meeting_booked_source": null,
         "fax": null,
         "field_of_study": null,
+        "first_conversion_date": null,
+        "first_conversion_event_name": null,
         "first_deal_created_date": null,
         "firstname": "Maria",
         "followercount": null,
@@ -773,6 +880,7 @@
         "hs_additional_emails": null,
         "hs_all_accessible_team_ids": null,
         "hs_all_assigned_business_unit_ids": null,
+        "hs_all_contact_vids": "86013551115",
         "hs_all_owner_ids": null,
         "hs_all_team_ids": null,
         "hs_analytics_average_page_views": "0",
@@ -796,6 +904,13 @@
         "hs_associated_target_accounts": "0",
         "hs_avatar_filemanager_key": null,
         "hs_buying_role": null,
+        "hs_calculated_form_submissions": null,
+        "hs_calculated_merged_vids": null,
+        "hs_calculated_mobile_number": null,
+        "hs_calculated_phone_number": null,
+        "hs_calculated_phone_number_area_code": null,
+        "hs_calculated_phone_number_country_code": null,
+        "hs_calculated_phone_number_region_code": null,
         "hs_clicked_linkedin_ad": null,
         "hs_contact_creation_legal_basis_source_instance_id": null,
         "hs_contact_enrichment_opt_out": null,
@@ -816,6 +931,7 @@
         "hs_created_by_user_id": null,
         "hs_createdate": null,
         "hs_cross_sell_opportunity": null,
+        "hs_currently_enrolled_in_prospecting_agent": "false",
         "hs_customer_agent_lead_status": null,
         "hs_data_privacy_ads_consent": null,
         "hs_document_last_revisited": null,
@@ -824,6 +940,7 @@
         "hs_email_click": null,
         "hs_email_customer_quarantined_reason": null,
         "hs_email_delivered": null,
+        "hs_email_domain": "hubspot.com",
         "hs_email_first_click_date": null,
         "hs_email_first_open_date": null,
         "hs_email_first_reply_date": null,
@@ -866,8 +983,11 @@
         "hs_feedback_last_survey_date": null,
         "hs_feedback_show_nps_web_survey": null,
         "hs_first_closed_order_id": null,
+        "hs_first_engagement_object_id": null,
         "hs_first_order_closed_date": null,
+        "hs_first_outreach_date": null,
         "hs_first_subscription_create_date": null,
+        "hs_full_name_or_email": "Maria Johnson (Sample Contact)",
         "hs_google_click_id": null,
         "hs_googleplusid": null,
         "hs_gps_error": null,
@@ -878,6 +998,7 @@
         "hs_intent_paid_up_to_date": null,
         "hs_intent_signals_enabled": null,
         "hs_ip_timezone": null,
+        "hs_is_contact": "true",
         "hs_is_enriched": null,
         "hs_is_merge_revertible": null,
         "hs_is_unworked": "true",
@@ -891,7 +1012,11 @@
         "hs_last_sms_send_date": null,
         "hs_last_sms_send_name": null,
         "hs_lastmodifieddate": null,
+        "hs_latest_disqualified_lead_date": null,
         "hs_latest_meeting_activity": null,
+        "hs_latest_open_lead_date": null,
+        "hs_latest_qualified_lead_date": null,
+        "hs_latest_sequence_ended_date": null,
         "hs_latest_sequence_enrolled": null,
         "hs_latest_sequence_enrolled_date": null,
         "hs_latest_sequence_finished_date": null,
@@ -909,10 +1034,12 @@
         "hs_linkedinid": null,
         "hs_live_enrichment_deadline": null,
         "hs_longitude": null,
+        "hs_manual_campaign_ids": null,
         "hs_marketable_reason_id": "Sample Contact",
         "hs_marketable_reason_type": "SAMPLE_CONTACT",
         "hs_marketable_status": "true",
         "hs_marketable_until_renewal": "true",
+        "hs_membership_has_accessed_private_content": "0",
         "hs_membership_last_private_content_access_date": null,
         "hs_merged_object_ids": null,
         "hs_messaging_engagement_score": null,
@@ -942,16 +1069,24 @@
         "hs_quarantined_emails": null,
         "hs_read_only": null,
         "hs_recent_closed_order_date": null,
+        "hs_registered_member": "0",
         "hs_registration_method": null,
         "hs_returning_to_office_detected_date": null,
         "hs_role": null,
         "hs_sa_first_engagement_date": null,
+        "hs_sa_first_engagement_descr": null,
+        "hs_sa_first_engagement_object_type": null,
         "hs_sales_email_last_clicked": null,
         "hs_sales_email_last_opened": null,
         "hs_sales_email_last_replied": null,
+        "hs_searchable_calculated_international_mobile_number": null,
+        "hs_searchable_calculated_international_phone_number": null,
+        "hs_searchable_calculated_mobile_number": null,
+        "hs_searchable_calculated_phone_number": null,
         "hs_seniority": null,
         "hs_sequences_actively_enrolled_count": "0",
         "hs_sequences_enrolled_count": null,
+        "hs_sequences_is_enrolled": null,
         "hs_shared_team_ids": null,
         "hs_shared_user_ids": null,
         "hs_social_facebook_clicks": "0",
@@ -968,6 +1103,7 @@
         "hs_testrollback": null,
         "hs_time_between_contact_creation_and_deal_close": null,
         "hs_time_between_contact_creation_and_deal_creation": null,
+        "hs_time_to_first_engagement": null,
         "hs_time_to_move_from_lead_to_customer": null,
         "hs_time_to_move_from_marketingqualifiedlead_to_customer": null,
         "hs_time_to_move_from_opportunity_to_customer": null,
@@ -1043,12 +1179,16 @@
         "notes_next_activity_date": null,
         "num_associated_deals": null,
         "num_contacted_notes": null,
+        "num_conversion_events": "0",
         "num_notes": null,
+        "num_unique_conversion_events": "0",
         "numemployees": null,
         "owneremail": null,
         "ownername": null,
         "phone": null,
         "photo": null,
+        "recent_conversion_date": null,
+        "recent_conversion_event_name": null,
         "recent_deal_amount": null,
         "recent_deal_close_date": null,
         "relationship_status": null,
@@ -1106,6 +1246,14 @@
             "sourceType": "INTERNAL_PROCESSING",
             "timestamp": "2024-12-18T20:40:45.833000Z",
             "value": "Maria"
+          }
+        ],
+        "hs_all_contact_vids": [
+          {
+            "sourceId": "sample-contact",
+            "sourceType": "API",
+            "timestamp": "2024-12-18T20:40:46.031000Z",
+            "value": "86013551115"
           }
         ],
         "hs_analytics_average_page_views": [
@@ -1186,6 +1334,36 @@
             "sourceType": "CALCULATED",
             "timestamp": "2024-12-18T20:40:47.012000Z",
             "value": "0"
+          }
+        ],
+        "hs_currently_enrolled_in_prospecting_agent": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:46.031000Z",
+            "value": "false"
+          }
+        ],
+        "hs_email_domain": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:46.031000Z",
+            "value": "hubspot.com"
+          }
+        ],
+        "hs_full_name_or_email": [
+          {
+            "sourceId": "RecalculateCalculatedPropertiesHelper",
+            "sourceType": "MIGRATION",
+            "timestamp": "2025-03-21T11:33:00Z",
+            "value": "Maria Johnson (Sample Contact)"
+          }
+        ],
+        "hs_is_contact": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:46.031000Z",
+            "value": "true"
           }
         ],
         "hs_is_unworked": [
@@ -1272,6 +1450,14 @@
             "value": "false"
           }
         ],
+        "hs_membership_has_accessed_private_content": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:46.031000Z",
+            "value": "0"
+          }
+        ],
         "hs_object_id": [
           {
             "sourceId": "sample-contact",
@@ -1325,6 +1511,14 @@
             "sourceId": "RollupProperties",
             "sourceType": "CALCULATED",
             "timestamp": "2024-12-18T20:40:47.015000Z",
+            "value": "0"
+          }
+        ],
+        "hs_registered_member": [
+          {
+            "sourceId": "CalculatedPropertyComputer",
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:46.031000Z",
             "value": "0"
           }
         ],
@@ -1440,6 +1634,20 @@
             "sourceType": "INTERNAL_PROCESSING",
             "timestamp": "2024-12-18T20:40:45.833000Z",
             "value": "lead"
+          }
+        ],
+        "num_conversion_events": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:46.765000Z",
+            "value": "0"
+          }
+        ],
+        "num_unique_conversion_events": [
+          {
+            "sourceType": "CALCULATED",
+            "timestamp": "2024-12-18T20:40:46.765000Z",
+            "value": "0"
           }
         ],
         "website": [
