@@ -127,6 +127,9 @@
               }
             ]
           },
+          "reduce": {
+            "strategy": "merge"
+          },
           "title": "Properties"
         },
         "propertiesWithHistory": {
@@ -145,6 +148,14 @@
             }
           ],
           "default": null,
+          "if": {
+            "type": "object"
+          },
+          "then": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "title": "Propertieswithhistory"
         },
         "associations": {
@@ -179,7 +190,10 @@
       ],
       "title": "Company",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
     },
     "key": [
       "/id"
@@ -313,6 +327,9 @@
               }
             ]
           },
+          "reduce": {
+            "strategy": "merge"
+          },
           "title": "Properties"
         },
         "propertiesWithHistory": {
@@ -331,6 +348,14 @@
             }
           ],
           "default": null,
+          "if": {
+            "type": "object"
+          },
+          "then": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "title": "Propertieswithhistory"
         },
         "associations": {
@@ -357,7 +382,10 @@
       ],
       "title": "Contact",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
     },
     "key": [
       "/id"
@@ -491,6 +519,9 @@
               }
             ]
           },
+          "reduce": {
+            "strategy": "merge"
+          },
           "title": "Properties"
         },
         "propertiesWithHistory": {
@@ -509,6 +540,14 @@
             }
           ],
           "default": null,
+          "if": {
+            "type": "object"
+          },
+          "then": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "title": "Propertieswithhistory"
         },
         "associations": {
@@ -551,7 +590,10 @@
       ],
       "title": "Deal",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
     },
     "key": [
       "/id"
@@ -685,6 +727,9 @@
               }
             ]
           },
+          "reduce": {
+            "strategy": "merge"
+          },
           "title": "Properties"
         },
         "propertiesWithHistory": {
@@ -703,6 +748,14 @@
             }
           ],
           "default": null,
+          "if": {
+            "type": "object"
+          },
+          "then": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "title": "Propertieswithhistory"
         },
         "associations": {
@@ -833,7 +886,10 @@
       ],
       "title": "Engagement",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
     },
     "key": [
       "/id"
@@ -967,6 +1023,9 @@
               }
             ]
           },
+          "reduce": {
+            "strategy": "merge"
+          },
           "title": "Properties"
         },
         "propertiesWithHistory": {
@@ -985,6 +1044,14 @@
             }
           ],
           "default": null,
+          "if": {
+            "type": "object"
+          },
+          "then": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "title": "Propertieswithhistory"
         },
         "associations": {
@@ -1027,7 +1094,10 @@
       ],
       "title": "Ticket",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
     },
     "key": [
       "/id"
@@ -1161,6 +1231,9 @@
               }
             ]
           },
+          "reduce": {
+            "strategy": "merge"
+          },
           "title": "Properties"
         },
         "propertiesWithHistory": {
@@ -1179,6 +1252,14 @@
             }
           ],
           "default": null,
+          "if": {
+            "type": "object"
+          },
+          "then": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "title": "Propertieswithhistory"
         },
         "associations": {
@@ -1197,7 +1278,10 @@
       ],
       "title": "Product",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
     },
     "key": [
       "/id"
@@ -1331,6 +1415,9 @@
               }
             ]
           },
+          "reduce": {
+            "strategy": "merge"
+          },
           "title": "Properties"
         },
         "propertiesWithHistory": {
@@ -1349,6 +1436,14 @@
             }
           ],
           "default": null,
+          "if": {
+            "type": "object"
+          },
+          "then": {
+            "reduce": {
+              "strategy": "merge"
+            }
+          },
           "title": "Propertieswithhistory"
         },
         "associations": {
@@ -1415,7 +1510,10 @@
       ],
       "title": "LineItem",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
     },
     "key": [
       "/id"

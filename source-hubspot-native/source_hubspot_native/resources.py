@@ -6,7 +6,7 @@ import re
 from typing import AsyncGenerator, Iterable
 
 from estuary_cdk.capture import Task
-from estuary_cdk.capture.common import Resource, open_binding
+from estuary_cdk.capture.common import Resource, open_binding, ReductionStrategy
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
@@ -351,6 +351,7 @@ def crm_object_with_associations(
         ),
         initial_config=ResourceConfig(name=object_name),
         schema_inference=True,
+        reduction_strategy=ReductionStrategy.MERGE,
     )
 
 

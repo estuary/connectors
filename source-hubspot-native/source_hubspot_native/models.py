@@ -18,6 +18,7 @@ from estuary_cdk.capture.common import (
     BaseDocument,
     BaseOAuth2Credentials,
     OAuth2Spec,
+    ReductionStrategy,
     ResourceConfig,
     ResourceState,
 )
@@ -243,8 +244,20 @@ class BaseCRMObject(BaseDocument, extra="allow"):
     updatedAt: AwareDatetime
     archived: bool
 
-    properties: dict[str, str | None]
-    propertiesWithHistory: dict[str, list[History]] | None = None
+    # During calculated properties refreshes, partial documents containing only calculated properties
+    # are emitted. In order to merge the properties and histories of these partial documents into the
+    # previously captured data, merge reduction strategies need specified for the `properties` and
+    # `propertiesWithHistory` fields.
+    properties: Annotated[
+        dict[str, str | None],
+        Field(json_schema_extra={"reduce": {"strategy": ReductionStrategy.MERGE}}),
+    ]
+    propertiesWithHistory: Annotated[
+        dict[str, list[History]] | None,
+        # The merge reduction strategy is only allowed for objects and arrays. Since propertiesWithHistory can be null,
+        # we use a conditional to only apply the reduce annotation when the field is an object.
+        Field(json_schema_extra={"if": {"type": "object"}, "then": {"reduce": {"strategy": ReductionStrategy.MERGE}}}),
+    ] = None
 
     class InlineAssociations(BaseModel):
         class Entry(BaseModel):
