@@ -199,9 +199,6 @@ class ResourceOwnerPasswordOAuth2Credentials(_BaseOAuth2CredentialsData):
 
 class ClientCredentialsOAuth2Credentials(_BaseOAuth2CredentialsData):
     grant_type: ClassVar[str] = "client_credentials"
-    client_credentials_placement: ClassVar[OAuth2ClientCredentialsPlacement] = (
-        OAuth2ClientCredentialsPlacement.HEADERS
-    )
 
     # This configuration provides a "title" annotation for the UI to display
     # instead of the class name.
