@@ -297,19 +297,34 @@ func (c *Catalog) ListTables(ctx context.Context, ns string) ([]string, error) {
 		Identifiers []struct {
 			Name string `json:"name"`
 		} `json:"identifiers"`
+		NextPageToken string `json:"next-page-token"`
 	}
 
-	res, err := doGet[resp](ctx, c, fmt.Sprintf("/namespaces/%s/tables", ns))
-	if err != nil {
-		return nil, err
+	pageSize := "100"
+	pageToken := ""
+
+	var names []string
+	for {
+		params := [][]string{{"pageSize", pageSize}}
+		if pageToken != "" {
+			params = append(params, []string{"pageToken", pageToken})
+		}
+
+		res, err := doGet[resp](ctx, c, fmt.Sprintf("/namespaces/%s/tables", ns), params)
+		if err != nil {
+			return nil, err
+		}
+		for _, table := range res.Identifiers {
+			names = append(names, table.Name)
+		}
+
+		if res.NextPageToken == "" {
+			break
+		}
+		pageToken = res.NextPageToken
 	}
 
-	out := make([]string, 0, len(res.Identifiers))
-	for _, table := range res.Identifiers {
-		out = append(out, table.Name)
-	}
-
-	return out, nil
+	return names, nil
 }
 
 func (c *Catalog) GetTable(ctx context.Context, ns string, name string) (*Table, error) {
