@@ -17,9 +17,10 @@ from estuary_cdk.capture.common import (
     AccessToken,
     BaseDocument,
     BaseOAuth2Credentials,
+    CRON_REGEX,
     OAuth2Spec,
     ReductionStrategy,
-    ResourceConfig,
+    ResourceConfigWithSchedule,
     ResourceState,
 )
 from estuary_cdk.capture.common import (
@@ -84,6 +85,15 @@ if TYPE_CHECKING:
     OAuth2Credentials = BaseOAuth2Credentials
 else:
     OAuth2Credentials = BaseOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
+
+
+class HubspotResourceConfigWithSchedule(ResourceConfigWithSchedule):
+    schedule: str = Field(
+        default="",
+        title="Calculated Property Refresh Schedule",
+        description="Schedule to automatically refresh calculated properties. Accepts a cron expression.",
+        pattern=CRON_REGEX
+    )
 
 
 class EndpointConfig(BaseModel):
