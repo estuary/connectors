@@ -1,16 +1,19 @@
 from datetime import datetime, timezone, timedelta
 from enum import StrEnum
 from pydantic import AwareDatetime, BaseModel, Field
-from typing import ClassVar, Literal, Optional
+from typing import TYPE_CHECKING, ClassVar, Literal, Optional
 
 
 from estuary_cdk.capture.common import (
     BaseDocument,
     ConnectorState as GenericConnectorState,
-    ClientCredentialsOAuth2Credentials,
-    OAuth2TokenFlowSpec,
     ResourceConfig,
     ResourceState,
+)
+from estuary_cdk.flow import (
+    ClientCredentialsOAuth2Credentials,
+    OAuth2ClientCredentialsPlacement,
+    OAuth2TokenFlowSpec,
 )
 
 
@@ -23,6 +26,14 @@ OAUTH2_SPEC = OAuth2TokenFlowSpec(
     }
 )
 
+if TYPE_CHECKING:
+    OAuth2Credentials = ClientCredentialsOAuth2Credentials
+else:
+    OAuth2Credentials = (
+        ClientCredentialsOAuth2Credentials.with_client_credentials_placement(
+            OAuth2ClientCredentialsPlacement.HEADERS
+        )
+    )
 
 def default_start_date():
     dt = datetime.now(timezone.utc) - timedelta(days=30)
@@ -54,7 +65,7 @@ class EndpointConfig(BaseModel):
     ] = Field(
         title="Genesys Cloud Domain"
     )
-    credentials: ClientCredentialsOAuth2Credentials = Field(
+    credentials: OAuth2Credentials = Field(
         title="Authentication",
         discriminator="credentials_title"
     )
