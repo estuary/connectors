@@ -1,7 +1,8 @@
 import abc
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Generic, Literal, TypeVar
+from enum import StrEnum, auto
+from typing import Any, ClassVar, Generic, Literal, TypeVar, override
 
 from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt
 
@@ -12,6 +13,16 @@ ConnectorType = Literal[
     "IMAGE",  # We're running with the context of a container image.
     "LOCAL",  # We're running directly on the host as a local process.
 ]
+
+
+class OAuth2ClientCredentialsPlacement(StrEnum):
+    """
+    Placement of client id and client secret during the OAuth2 token exchange step.
+    """
+
+    HEADERS = auto()
+    FORM = auto()
+
 
 # Generic type of a connector's endpoint configuration.
 EndpointConfig = TypeVar("EndpointConfig")
@@ -131,7 +142,12 @@ class ValidationError(Exception):
     errors: list[str]
 
 
-class ResourceOwnerPasswordOAuth2Credentials(abc.ABC, BaseModel):
+class ResourceOwnerPasswordOAuth2Credentials(BaseModel):
+    grant_type: ClassVar[str] = "password"
+    client_credentials_placement: ClassVar[OAuth2ClientCredentialsPlacement] = (
+        OAuth2ClientCredentialsPlacement.FORM
+    )
+
     credentials_title: Literal["OAuth Credentials"] = Field(
         default="OAuth Credentials", json_schema_extra={"type": "string"}
     )
@@ -144,8 +160,24 @@ class ResourceOwnerPasswordOAuth2Credentials(abc.ABC, BaseModel):
         json_schema_extra={"secret": True},
     )
 
+    @classmethod
+    def with_client_credentials_placement(
+        cls,
+        placement: OAuth2ClientCredentialsPlacement,
+    ) -> type["ResourceOwnerPasswordOAuth2Credentials"]:
+        """
+        Returns a subclass with a custom client credentials placement.
+        """
 
-class ClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
+        return type(cls.__name__, (cls,), {"client_credentials_placement": placement})
+
+
+class ClientCredentialsOAuth2Credentials(BaseModel):
+    grant_type: ClassVar[str] = "client_credentials"
+    client_credentials_placement: ClassVar[OAuth2ClientCredentialsPlacement] = (
+        OAuth2ClientCredentialsPlacement.HEADERS
+    )
+
     # This configuration provides a "title" annotation for the UI to display
     # instead of the class name.
     model_config = ConfigDict(
@@ -164,8 +196,24 @@ class ClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
         json_schema_extra={"secret": True},
     )
 
+    @classmethod
+    def with_client_credentials_placement(
+        cls,
+        placement: OAuth2ClientCredentialsPlacement,
+    ) -> type["ClientCredentialsOAuth2Credentials"]:
+        """
+        Returns a subclass with a custom client credentials placement.
+        """
 
-class AuthorizationCodeFlowOAuth2Credentials(abc.ABC, BaseModel):
+        return type(cls.__name__, (cls,), {"client_credentials_placement": placement})
+
+
+class AuthorizationCodeFlowOAuth2Credentials(BaseModel, metaclass=abc.ABCMeta):
+    grant_type: ClassVar[str] = "authorization_code"
+    client_credentials_placement: ClassVar[OAuth2ClientCredentialsPlacement] = (
+        OAuth2ClientCredentialsPlacement.FORM
+    )
+
     credentials_title: Literal["OAuth Credentials"] = Field(
         default="OAuth Credentials", json_schema_extra={"type": "string"}
     )
@@ -181,8 +229,20 @@ class AuthorizationCodeFlowOAuth2Credentials(abc.ABC, BaseModel):
     @abc.abstractmethod
     def _you_must_build_oauth2_credentials_for_a_provider(self): ...
 
-    @staticmethod
+    @classmethod
+    def with_client_credentials_placement(
+        cls,
+        placement: OAuth2ClientCredentialsPlacement,
+    ) -> type["AuthorizationCodeFlowOAuth2Credentials"]:
+        """
+        Returns a subclass with a custom client credentials placement.
+        """
+
+        return type(cls.__name__, (cls,), {"client_credentials_placement": placement})
+
+    @classmethod
     def for_provider(
+        cls,
         provider: str,
     ) -> type["AuthorizationCodeFlowOAuth2Credentials"]:
         """
@@ -191,18 +251,20 @@ class AuthorizationCodeFlowOAuth2Credentials(abc.ABC, BaseModel):
         """
         from pydantic import ConfigDict
 
-        class _OAuth2Credentials(AuthorizationCodeFlowOAuth2Credentials):
-            model_config = ConfigDict(
-                json_schema_extra={"x-oauth2-provider": provider},
-                title="OAuth",
-            )
+        return type(
+            cls.__name__,
+            (cls,),
+            {
+                "model_config": ConfigDict(
+                    json_schema_extra={"x-oauth2-provider": provider},
+                    title="OAuth",
+                ),
+                "_you_must_build_oauth2_credentials_for_a_provider": lambda _: None,
+            },
+        )
 
-            def _you_must_build_oauth2_credentials_for_a_provider(self): ...
 
-        return _OAuth2Credentials
-
-
-class LongLivedClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
+class LongLivedClientCredentialsOAuth2Credentials(BaseModel, metaclass=abc.ABCMeta):
     # This configuration provides a "title" annotation for the UI to display
     # instead of the class name.
     model_config = ConfigDict(
@@ -225,8 +287,9 @@ class LongLivedClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
     @abc.abstractmethod
     def _you_must_build_oauth2_credentials_for_a_provider(self): ...
 
-    @staticmethod
+    @classmethod
     def for_provider(
+        cls,
         provider: str,
     ) -> type["LongLivedClientCredentialsOAuth2Credentials"]:
         """
@@ -235,18 +298,25 @@ class LongLivedClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
         """
         from pydantic import ConfigDict
 
-        class _OAuth2Credentials(LongLivedClientCredentialsOAuth2Credentials):
-            model_config = ConfigDict(
-                json_schema_extra={"x-oauth2-provider": provider},
-                title="OAuth",
-            )
+        return type(
+            cls.__name__,
+            (cls,),
+            {
+                "model_config": ConfigDict(
+                    json_schema_extra={"x-oauth2-provider": provider},
+                    title="OAuth",
+                ),
+                "_you_must_build_oauth2_credentials_for_a_provider": lambda _: None,
+            },
+        )
 
-            def _you_must_build_oauth2_credentials_for_a_provider(self): ...
 
-        return _OAuth2Credentials
+class BaseOAuth2Credentials(BaseModel, metaclass=abc.ABCMeta):
+    grant_type: ClassVar[str] = "refresh_token"
+    client_credentials_placement: ClassVar[OAuth2ClientCredentialsPlacement] = (
+        OAuth2ClientCredentialsPlacement.FORM
+    )
 
-
-class BaseOAuth2Credentials(abc.ABC, BaseModel):
     credentials_title: Literal["OAuth Credentials"] = Field(
         default="OAuth Credentials", json_schema_extra={"type": "string"}
     )
@@ -263,51 +333,67 @@ class BaseOAuth2Credentials(abc.ABC, BaseModel):
         json_schema_extra={"secret": True},
     )
 
+    @classmethod
+    def with_client_credentials_placement(
+        cls,
+        placement: OAuth2ClientCredentialsPlacement,
+    ) -> type["BaseOAuth2Credentials"]:
+        """
+        Returns a subclass with a custom client credentials placement.
+        """
+
+        return type(cls.__name__, (cls,), {"client_credentials_placement": placement})
+
     @abc.abstractmethod
     def _you_must_build_oauth2_credentials_for_a_provider(self): ...
 
-    @staticmethod
-    def for_provider(provider: str) -> type["BaseOAuth2Credentials"]:
+    @classmethod
+    def for_provider(cls, provider: str) -> type["BaseOAuth2Credentials"]:
         """
         Builds an OAuth2Credentials model for the given OAuth2 `provider`.
         This routine is only available in Pydantic V2 environments.
         """
         from pydantic import ConfigDict
 
-        class _OAuth2Credentials(BaseOAuth2Credentials):
-            model_config = ConfigDict(
-                json_schema_extra={"x-oauth2-provider": provider},
-                title="OAuth",
-            )
+        return type(
+            cls.__name__,
+            (cls,),
+            {
+                "model_config": ConfigDict(
+                    json_schema_extra={"x-oauth2-provider": provider},
+                    title="OAuth",
+                ),
+                "_you_must_build_oauth2_credentials_for_a_provider": lambda _: None,
+            },
+        )
 
-            def _you_must_build_oauth2_credentials_for_a_provider(self): ...
 
-        return _OAuth2Credentials
-
-
-class RotatingOAuth2Credentials(BaseOAuth2Credentials):
+class RotatingOAuth2Credentials(BaseOAuth2Credentials, metaclass=abc.ABCMeta):
     access_token: str = Field(title="Access Token", json_schema_extra={"secret": True})
     access_token_expires_at: datetime = Field(
         title="Access token expiration time.",
     )
 
-    @staticmethod
-    def for_provider(provider: str) -> type["RotatingOAuth2Credentials"]:
+    @classmethod
+    @override
+    def for_provider(cls, provider: str) -> type["RotatingOAuth2Credentials"]:
         """
         Builds an OAuth2Credentials model for the given OAuth2 `provider`.
         This routine is only available in Pydantic V2 environments.
         """
         from pydantic import ConfigDict
 
-        class _OAuth2Credentials(RotatingOAuth2Credentials):
-            model_config = ConfigDict(
-                json_schema_extra={"x-oauth2-provider": provider},
-                title="OAuth",
-            )
-
-            def _you_must_build_oauth2_credentials_for_a_provider(self): ...
-
-        return _OAuth2Credentials
+        return type(
+            cls.__name__,
+            (cls,),
+            {
+                "model_config": ConfigDict(
+                    json_schema_extra={"x-oauth2-provider": provider},
+                    title="OAuth",
+                ),
+                "_you_must_build_oauth2_credentials_for_a_provider": lambda _: None,
+            },
+        )
 
 
 class GoogleServiceAccountSpec(BaseModel):
