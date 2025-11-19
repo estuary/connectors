@@ -1,8 +1,9 @@
 import abc
 from dataclasses import dataclass
 from datetime import datetime
-from pydantic import BaseModel, NonNegativeInt, PositiveInt, Field, ConfigDict
-from typing import Any, Literal, TypeVar, Generic, Literal
+from typing import Any, Generic, Literal, TypeVar
+
+from pydantic import BaseModel, ConfigDict, Field, NonNegativeInt, PositiveInt
 
 from .pydantic_polyfill import GenericModel
 
@@ -101,8 +102,7 @@ class ConnectorStateUpdate(GenericModel, Generic[ConnectorState]):
 
 class AccessToken(BaseModel):
     credentials_title: Literal["Private App Credentials"] = Field(
-        default="Private App Credentials",
-        json_schema_extra={"type": "string"}
+        default="Private App Credentials", json_schema_extra={"type": "string"}
     )
     access_token: str = Field(
         title="Access Token",
@@ -112,8 +112,7 @@ class AccessToken(BaseModel):
 
 class BasicAuth(BaseModel):
     credentials_title: Literal["Username & Password"] = Field(
-        default="Username & Password",
-        json_schema_extra={"type": "string"}
+        default="Username & Password", json_schema_extra={"type": "string"}
     )
     username: str
     password: str = Field(
@@ -134,8 +133,7 @@ class ValidationError(Exception):
 
 class ResourceOwnerPasswordOAuth2Credentials(abc.ABC, BaseModel):
     credentials_title: Literal["OAuth Credentials"] = Field(
-        default="OAuth Credentials",
-        json_schema_extra={"type": "string"}
+        default="OAuth Credentials", json_schema_extra={"type": "string"}
     )
     client_id: str = Field(
         title="Client Id",
@@ -155,8 +153,7 @@ class ClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
     )
 
     credentials_title: Literal["OAuth Credentials"] = Field(
-        default="OAuth Credentials",
-        json_schema_extra={"type": "string"}
+        default="OAuth Credentials", json_schema_extra={"type": "string"}
     )
     client_id: str = Field(
         title="Client Id",
@@ -213,8 +210,7 @@ class LongLivedClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
     )
 
     credentials_title: Literal["OAuth Credentials"] = Field(
-        default="OAuth Credentials",
-        json_schema_extra={"type": "string"}
+        default="OAuth Credentials", json_schema_extra={"type": "string"}
     )
     client_id: str = Field(
         title="Client Id",
@@ -224,15 +220,15 @@ class LongLivedClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
         title="Client Secret",
         json_schema_extra={"secret": True},
     )
-    access_token: str = Field(
-        title="Access Token",
-        json_schema_extra={"secret": True}
-    )
+    access_token: str = Field(title="Access Token", json_schema_extra={"secret": True})
+
     @abc.abstractmethod
     def _you_must_build_oauth2_credentials_for_a_provider(self): ...
 
     @staticmethod
-    def for_provider(provider: str) -> type["LongLivedClientCredentialsOAuth2Credentials"]:
+    def for_provider(
+        provider: str,
+    ) -> type["LongLivedClientCredentialsOAuth2Credentials"]:
         """
         Builds an OAuth2Credentials model for the given OAuth2 `provider`.
         This routine is only available in Pydantic V2 environments.
@@ -252,8 +248,7 @@ class LongLivedClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
 
 class BaseOAuth2Credentials(abc.ABC, BaseModel):
     credentials_title: Literal["OAuth Credentials"] = Field(
-        default="OAuth Credentials",
-        json_schema_extra={"type": "string"}
+        default="OAuth Credentials", json_schema_extra={"type": "string"}
     )
     client_id: str = Field(
         title="Client Id",
@@ -291,13 +286,11 @@ class BaseOAuth2Credentials(abc.ABC, BaseModel):
 
 
 class RotatingOAuth2Credentials(BaseOAuth2Credentials):
-    access_token: str = Field(
-        title="Access Token",
-        json_schema_extra={"secret": True}
-    )
+    access_token: str = Field(title="Access Token", json_schema_extra={"secret": True})
     access_token_expires_at: datetime = Field(
         title="Access token expiration time.",
     )
+
     @staticmethod
     def for_provider(provider: str) -> type["RotatingOAuth2Credentials"]:
         """
@@ -324,11 +317,10 @@ class GoogleServiceAccountSpec(BaseModel):
 class GoogleServiceAccount(BaseModel):
     credentials_title: Literal["Google Service Account"] = Field(
         default="Google Service Account",
-        json_schema_extra={"type": "string", "order": 0}
+        json_schema_extra={"type": "string", "order": 0},
     )
     service_account: str = Field(
         title="Google Service Account",
         description="Service account JSON key",
         json_schema_extra={"secret": True, "multiline": True, "order": 1},
     )
-
