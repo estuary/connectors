@@ -5,7 +5,7 @@ import json
 import time
 from dataclasses import dataclass
 from logging import Logger
-from typing import Any, AsyncGenerator, Awaitable, Callable, Literal, Protocol, TypeVar
+from typing import Any, AsyncGenerator, Awaitable, Callable, Protocol, TypeVar
 
 import aiohttp
 from google.auth.credentials import TokenState as GoogleTokenState
@@ -23,6 +23,7 @@ from .flow import (
     GoogleServiceAccount,
     GoogleServiceAccountSpec,
     LongLivedClientCredentialsOAuth2Credentials,
+    OAuth2ClientCredentialsPlacement,
     OAuth2RotatingTokenSpec,
     OAuth2Spec,
     OAuth2TokenFlowSpec,
@@ -345,18 +346,29 @@ class TokenSource:
     ) -> AccessTokenResponse:
         assert self.oauth_spec
 
-        headers = {}
-        form = {}
+        headers: dict[str, str | int] = {}
+        form: dict[str, str | int] = {"grant_type": credentials.grant_type}
+
+        match credentials.client_credentials_placement:
+            case OAuth2ClientCredentialsPlacement.HEADERS:
+                headers["Authorization"] = (
+                    "Basic "
+                    + base64.b64encode(
+                        f"{credentials.client_id}:{credentials.client_secret}".encode()
+                    ).decode()
+                )
+            case OAuth2ClientCredentialsPlacement.FORM:
+                form.update(
+                    {
+                        "client_id": credentials.client_id,
+                        "client_secret": credentials.client_secret,
+                    }
+                )
 
         match credentials:
             case RotatingOAuth2Credentials():
                 assert isinstance(self.oauth_spec, OAuth2RotatingTokenSpec)
-                form: dict[str, str | int] = {
-                    "grant_type": "refresh_token",
-                    "client_id": credentials.client_id,
-                    "client_secret": credentials.client_secret,
-                    "refresh_token": credentials.refresh_token,
-                }
+                form["refresh_token"] = credentials.refresh_token
 
                 # Some providers require additional parameters within the form body, like
                 # an `expires_in` to configure how long the access token remains valid.
@@ -364,34 +376,13 @@ class TokenSource:
                     form.update(self.oauth_spec.additionalTokenExchangeBody)
 
             case BaseOAuth2Credentials():
-                form = {
-                    "grant_type": "refresh_token",
-                    "client_id": credentials.client_id,
-                    "client_secret": credentials.client_secret,
-                    "refresh_token": credentials.refresh_token,
-                }
-            case ClientCredentialsOAuth2Credentials():
-                form = {
-                    "grant_type": "client_credentials",
-                }
-                headers = {
-                    "Authorization": "Basic "
-                    + base64.b64encode(
-                        f"{credentials.client_id}:{credentials.client_secret}".encode()
-                    ).decode()
-                }
-            case AuthorizationCodeFlowOAuth2Credentials():
-                form = {
-                    "grant_type": "authorization_code",
-                    "client_id": credentials.client_id,
-                    "client_secret": credentials.client_secret,
-                }
-            case ResourceOwnerPasswordOAuth2Credentials():
-                form = {
-                    "grant_type": "password",
-                    "client_id": credentials.client_id,
-                    "client_secret": credentials.client_secret,
-                }
+                form["refresh_token"] = credentials.refresh_token
+            case (
+                ClientCredentialsOAuth2Credentials()
+                | AuthorizationCodeFlowOAuth2Credentials()
+                | ResourceOwnerPasswordOAuth2Credentials()
+            ):
+                pass
             case _:
                 raise TypeError(f"Unsupported credentials type: {type(credentials)}.")
 

@@ -36,7 +36,7 @@
           "title": "Advanced",
           "type": "object"
         },
-        "_OAuth2Credentials": {
+        "LongLivedClientCredentialsOAuth2Credentials": {
           "properties": {
             "credentials_title": {
               "const": "OAuth Credentials",
@@ -79,7 +79,7 @@
         "credentials": {
           "discriminator": {
             "mapping": {
-              "OAuth Credentials": "#/$defs/_OAuth2Credentials",
+              "OAuth Credentials": "#/$defs/LongLivedClientCredentialsOAuth2Credentials",
               "Private App Credentials": "#/$defs/AccessToken"
             },
             "propertyName": "credentials_title"
@@ -89,7 +89,7 @@
               "$ref": "#/$defs/AccessToken"
             },
             {
-              "$ref": "#/$defs/_OAuth2Credentials"
+              "$ref": "#/$defs/LongLivedClientCredentialsOAuth2Credentials"
             }
           ],
           "title": "Authentication"
