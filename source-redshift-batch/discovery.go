@@ -554,7 +554,7 @@ var databaseTypeToJSON = map[string]basicColumnType{
 	"date":        {jsonTypes: []string{"string"}, format: "date-time"},
 	"timestamp":   {jsonTypes: []string{"string"}, format: "date-time"},
 	"timestamptz": {jsonTypes: []string{"string"}, format: "date-time"},
-	"time":        {jsonTypes: []string{"integer"}},
+	"time":        {jsonTypes: []string{"string"}}, // Not 'format: time' because it has no time zone.
 	"timetz":      {jsonTypes: []string{"string"}, format: "time"},
 	"interval":    {jsonTypes: []string{"string"}},
 	"money":       {jsonTypes: []string{"string"}},
