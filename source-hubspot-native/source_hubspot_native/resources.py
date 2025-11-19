@@ -6,7 +6,7 @@ import re
 from typing import AsyncGenerator, Iterable
 
 from estuary_cdk.capture import Task
-from estuary_cdk.capture.common import Resource, open_binding, ReductionStrategy
+from estuary_cdk.capture.common import Resource, open_binding, ReductionStrategy, ResourceConfig
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
@@ -80,7 +80,7 @@ from .models import (
     Owner,
     Product,
     Property,
-    ResourceConfig,
+    HubspotResourceConfigWithSchedule,
     ResourceState,
     Ticket,
     Workflow,
@@ -314,7 +314,7 @@ def crm_object_with_associations(
 ) -> Resource:
 
     def open(
-        binding: CaptureBinding[ResourceConfig],
+        binding: CaptureBinding[HubspotResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
@@ -349,7 +349,8 @@ def crm_object_with_associations(
             inc=ResourceState.Incremental(cursor=started_at),
             backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
         ),
-        initial_config=ResourceConfig(name=object_name),
+        # Default to performing a calculated properties refresh at 23:55 UTC every day for enabled CRM object bindings.
+        initial_config=HubspotResourceConfigWithSchedule(name=object_name, schedule="55 23 * * *"),
         schema_inference=True,
         reduction_strategy=ReductionStrategy.MERGE,
     )

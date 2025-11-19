@@ -2,7 +2,8 @@
   {
     "recommendedName": "companies",
     "resourceConfig": {
-      "name": "companies"
+      "name": "companies",
+      "schedule": "55 23 * * *"
     },
     "documentSchema": {
       "$defs": {
@@ -202,7 +203,8 @@
   {
     "recommendedName": "contacts",
     "resourceConfig": {
-      "name": "contacts"
+      "name": "contacts",
+      "schedule": "55 23 * * *"
     },
     "documentSchema": {
       "$defs": {
@@ -394,7 +396,8 @@
   {
     "recommendedName": "deals",
     "resourceConfig": {
-      "name": "deals"
+      "name": "deals",
+      "schedule": "55 23 * * *"
     },
     "documentSchema": {
       "$defs": {
@@ -602,7 +605,8 @@
   {
     "recommendedName": "engagements",
     "resourceConfig": {
-      "name": "engagements"
+      "name": "engagements",
+      "schedule": "55 23 * * *"
     },
     "documentSchema": {
       "$defs": {
@@ -898,7 +902,8 @@
   {
     "recommendedName": "tickets",
     "resourceConfig": {
-      "name": "tickets"
+      "name": "tickets",
+      "schedule": "55 23 * * *"
     },
     "documentSchema": {
       "$defs": {
@@ -1106,7 +1111,8 @@
   {
     "recommendedName": "products",
     "resourceConfig": {
-      "name": "products"
+      "name": "products",
+      "schedule": "55 23 * * *"
     },
     "documentSchema": {
       "$defs": {
@@ -1290,7 +1296,8 @@
   {
     "recommendedName": "line_items",
     "resourceConfig": {
-      "name": "line_items"
+      "name": "line_items",
+      "schedule": "55 23 * * *"
     },
     "documentSchema": {
       "$defs": {
