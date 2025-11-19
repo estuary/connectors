@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -325,12 +326,17 @@ func (v Validator) constraintForExistingField(
 			return nil, fmt.Errorf("getting description for field %q of bound collection %q: %w", p.Field, boundCollection.Name.String(), err)
 		}
 
+		existingType := strings.ToUpper(existingField.Type)
+		if existingField.CharacterMaxLength > 0 {
+			existingType += fmt.Sprintf("(%d)", existingField.CharacterMaxLength)
+		}
+
 		out = &pm.Response_Validated_Constraint{
 			Type: pm.Response_Validated_Constraint_INCOMPATIBLE,
 			Reason: fmt.Sprintf(
 				"Field '%s' is already being materialized as endpoint type '%s' but endpoint type '%s' is required by its schema '%s'",
 				p.Field,
-				strings.ToUpper(existingField.Type),
+				existingType,
 				strings.ToUpper(newDesc),
 				fieldSchema(p),
 			),
@@ -440,6 +446,9 @@ func fieldSchema(p pf.Projection) string {
 		}
 		if p.Inference.String_.ContentEncoding != "" {
 			out.WriteString(", content-encoding: " + p.Inference.String_.ContentEncoding)
+		}
+		if p.Inference.String_.MaxLength > 0 {
+			out.WriteString(", maxLength: " + strconv.FormatUint(uint64(p.Inference.String_.MaxLength), 10))
 		}
 	}
 
