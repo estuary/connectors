@@ -23,7 +23,7 @@
           "title": "AccessToken",
           "type": "object"
         },
-        "_OAuth2Credentials": {
+        "BaseOAuth2Credentials": {
           "properties": {
             "credentials_title": {
               "const": "OAuth Credentials",
@@ -61,14 +61,14 @@
         "credentials": {
           "discriminator": {
             "mapping": {
-              "OAuth Credentials": "#/$defs/_OAuth2Credentials",
+              "OAuth Credentials": "#/$defs/BaseOAuth2Credentials",
               "Private App Credentials": "#/$defs/AccessToken"
             },
             "propertyName": "credentials_title"
           },
           "oneOf": [
             {
-              "$ref": "#/$defs/_OAuth2Credentials"
+              "$ref": "#/$defs/BaseOAuth2Credentials"
             }
           ],
           "title": "Authentication"

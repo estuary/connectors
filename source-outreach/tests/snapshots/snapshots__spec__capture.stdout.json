@@ -3,7 +3,7 @@
     "protocol": 3032023,
     "configSchema": {
       "$defs": {
-        "_OAuth2Credentials": {
+        "RotatingOAuth2Credentials": {
           "properties": {
             "credentials_title": {
               "const": "OAuth Credentials",
@@ -59,13 +59,13 @@
         "credentials": {
           "discriminator": {
             "mapping": {
-              "OAuth Credentials": "#/$defs/_OAuth2Credentials"
+              "OAuth Credentials": "#/$defs/RotatingOAuth2Credentials"
             },
             "propertyName": "credentials_title"
           },
           "oneOf": [
             {
-              "$ref": "#/$defs/_OAuth2Credentials"
+              "$ref": "#/$defs/RotatingOAuth2Credentials"
             }
           ],
           "title": "Authentication"
