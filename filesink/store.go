@@ -12,6 +12,7 @@ import (
 
 	storage "cloud.google.com/go/storage"
 	"github.com/aws/aws-sdk-go-v2/aws"
+	awsHttp "github.com/aws/aws-sdk-go-v2/aws/transport/http"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
@@ -158,6 +159,7 @@ func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
 	opts := []func(*awsConfig.LoadOptions) error{
 		awsConfig.WithCredentialsProvider(credProvider),
 		awsConfig.WithRegion(cfg.Region),
+		awsConfig.WithHTTPClient(awsHttp.NewBuildableClient().WithTimeout(uploadTimeout)),
 	}
 
 	if cfg.Endpoint != "" {
