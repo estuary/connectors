@@ -266,20 +266,36 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 
 func (c *Catalog) ListNamespaces(ctx context.Context) ([]string, error) {
 	type resp struct {
-		Namespaces [][]string `json:"namespaces"`
+		Namespaces    [][]string `json:"namespaces"`
+		NextPageToken string     `json:"next-page-token"`
 	}
 
-	res, err := doGet[resp](ctx, c, "/namespaces")
-	if err != nil {
-		return nil, err
+	pageSize := "100"
+	pageToken := ""
+
+	var names []string
+	for {
+		params := [][]string{{"pageSize", pageSize}}
+		if pageToken != "" {
+			params = append(params, []string{"pageToken", pageToken})
+		}
+
+		res, err := doGet[resp](ctx, c, "/namespaces")
+		if err != nil {
+			return nil, err
+		}
+
+		for _, ns := range res.Namespaces {
+			names = append(names, ns[0])
+		}
+
+		if res.NextPageToken == "" {
+			break
+		}
+		pageToken = res.NextPageToken
 	}
 
-	out := make([]string, 0, len(res.Namespaces))
-	for _, ns := range res.Namespaces {
-		out = append(out, ns[0])
-	}
-
-	return out, nil
+	return names, nil
 }
 
 func (c *Catalog) CreateNamespace(ctx context.Context, ns string) error {
