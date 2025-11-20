@@ -1,4 +1,5 @@
 from typing import (
+    TYPE_CHECKING,
     Generic,
     TypeVar,
 )
@@ -12,6 +13,7 @@ from estuary_cdk.capture.common import (
 )
 from estuary_cdk.flow import (
     ClientCredentialsOAuth2Credentials,
+    OAuth2ClientCredentialsPlacement,
     OAuth2TokenFlowSpec,
 )
 from pydantic import (
@@ -28,9 +30,17 @@ OAUTH2_SPEC = OAuth2TokenFlowSpec(
     accessTokenResponseMap={"access_token": "/access_token"},
 )
 
+if TYPE_CHECKING:
+    OAuth2Credentials = ClientCredentialsOAuth2Credentials
+else:
+    OAuth2Credentials = (
+        ClientCredentialsOAuth2Credentials.with_client_credentials_placement(
+            OAuth2ClientCredentialsPlacement.HEADERS
+        )
+    )
 
 class EndpointConfig(BaseModel):
-    credentials: ClientCredentialsOAuth2Credentials = Field(
+    credentials: OAuth2Credentials = Field(
         title="Authentication",
         description="See https://app.navan.com/app/helpcenter/articles/travel/admin/other-integrations/booking-data-integration",
     )
