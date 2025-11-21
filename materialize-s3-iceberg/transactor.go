@@ -151,17 +151,10 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		states[b.stateKey].FileKeys = append(states[b.stateKey].FileKeys, s3Path)
 
 		group.Go(func() error {
-			ll := log.WithFields(log.Fields{
-				"path":  s3Path,
-				"table": pathToFQN(b.path),
-			})
-
-			ll.Info("started uploading file")
 			if err := t.store.PutStream(ctx, r, key); err != nil {
 				r.CloseWithError(err)
 				return fmt.Errorf("uploading file: %w", err)
 			}
-			ll.Info("finished uploading file")
 
 			return nil
 		})
