@@ -3,24 +3,84 @@
     "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://github.com/estuary/connectors/source-dynamodb/config",
     "properties": {
-      "awsAccessKeyId": {
-        "type": "string",
-        "title": "Access Key ID",
-        "description": "AWS Access Key ID for capturing from the DynamoDB table.",
-        "order": 1
-      },
-      "awsSecretAccessKey": {
-        "type": "string",
-        "title": "Secret Access Key",
-        "description": "AWS Secret Access Key for capturing from the DynamoDB table.",
-        "order": 2,
-        "secret": true
-      },
       "region": {
         "type": "string",
         "title": "Region",
         "description": "Region of the DynamoDB table.",
-        "order": 3
+        "order": 1
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-dynamodb/access-key-credentials",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSAccessKey",
+                "default": "AWSAccessKey",
+                "order": 0
+              },
+              "aws_access_key_id": {
+                "type": "string",
+                "title": "AWS Access Key ID",
+                "description": "AWS Access Key ID for capturing from the DynamoDB table.",
+                "order": 1
+              },
+              "aws_secret_access_key": {
+                "type": "string",
+                "title": "AWS Secret Access key",
+                "description": "AWS Access Key ID for capturing from the DynamoDB table.",
+                "order": 2,
+                "secret": true
+              }
+            },
+            "type": "object",
+            "required": [
+              "aws_access_key_id",
+              "aws_secret_access_key"
+            ],
+            "title": "Access Key"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/aws-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSIAM",
+                "default": "AWSIAM",
+                "order": 0
+              },
+              "aws_region": {
+                "type": "string",
+                "title": "AWS Region",
+                "description": "AWS Region of your resource"
+              },
+              "aws_role_arn": {
+                "type": "string",
+                "title": "AWS Role ARN",
+                "description": "AWS Role which has access to the resource which will be assumed by Flow"
+              }
+            },
+            "type": "object",
+            "required": [
+              "aws_region",
+              "aws_role_arn"
+            ],
+            "title": "AWS IAM"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "default": {
+          "auth_type": "AWSAccessKey"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
+        "order": 2,
+        "x-iam-auth": true
       },
       "advanced": {
         "properties": {
@@ -48,9 +108,8 @@
     },
     "type": "object",
     "required": [
-      "awsAccessKeyId",
-      "awsSecretAccessKey",
-      "region"
+      "region",
+      "credentials"
     ],
     "title": "Source DynamoDB Spec"
   },
