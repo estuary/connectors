@@ -264,7 +264,15 @@ class BaseCRMObject(BaseDocument, extra="allow"):
     @model_validator(mode="after")
     def _post_init(self) -> Self:
         # Clear properties and history which don't have current values.
-        self.properties = {k: v for k, v in self.properties.items() if v}
+        #
+        # Only remove properties that are empty strings. Hubspot sometimes returns empty strings 
+        # for formmatted string fields, like a date, number, or email. An empty string
+        # causes the inferred format to get dropped from the collection's inferred schema.
+        # We want to maintain those formats. Omitting properties that are empty strings
+        # is a little broad - we'd ideally only do so for string fields that have an expected
+        # format - but that more precise removal requires a larger effort than I'd like to
+        # take on right now.
+        self.properties = {k: v for k, v in self.properties.items() if v != ""}
         if self.propertiesWithHistory:
             self.propertiesWithHistory = {
                 k: v for k, v in self.propertiesWithHistory.items() if len(v)
