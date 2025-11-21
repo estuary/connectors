@@ -265,10 +265,10 @@ func (col anyColumn) String() string {
 // schema.
 func StdGetSchema(ctx context.Context, db *sql.DB, catalog string, schema string, name string) (string, error) {
 	q := fmt.Sprintf(`
-	select column_name, is_nullable, data_type
+	select column_name, is_nullable, data_type, character_maximum_length
 	from information_schema.columns
-	where 
-		table_catalog = '%s' 
+	where
+		table_catalog = '%s'
 		and table_schema = '%s'
 		and table_name = '%s';
 `,
@@ -284,15 +284,16 @@ func StdGetSchema(ctx context.Context, db *sql.DB, catalog string, schema string
 	defer rows.Close()
 
 	type foundColumn struct {
-		Name     string
-		Nullable string // string "YES" or "NO"
-		Type     string
+		Name               string
+		Nullable           string // string "YES" or "NO"
+		Type               string
+		CharacterMaxLength *int `json:",omitempty"`
 	}
 
 	cols := []foundColumn{}
 	for rows.Next() {
 		var c foundColumn
-		if err := rows.Scan(&c.Name, &c.Nullable, &c.Type); err != nil {
+		if err := rows.Scan(&c.Name, &c.Nullable, &c.Type, &c.CharacterMaxLength); err != nil {
 			return "", err
 		}
 		cols = append(cols, c)

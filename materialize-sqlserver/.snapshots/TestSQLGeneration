@@ -120,7 +120,7 @@ END;
 
 --- Begin key_value directCopy ---
 
-	INSERT INTO key_value 
+	INSERT INTO key_value
 		(
 			key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
 		)
@@ -131,7 +131,7 @@ END;
 
 --- Begin delta_updates directCopy ---
 
-	INSERT INTO delta_updates 
+	INSERT INTO delta_updates
 		(
 			"theKey", "aValue", flow_published_at
 		)
@@ -203,7 +203,7 @@ SELECT TOP 0 -1, NULL
 
 --- Begin key_value loadQueryNoFlowDocument ---
 
-SELECT 0, 
+SELECT 0,
 (
 	SELECT
 		'key1' = r.key1,

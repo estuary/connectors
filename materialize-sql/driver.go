@@ -330,7 +330,7 @@ func (s *sqlMaterialization[EC, RC]) UpdateResource(
 			return "", nil, err
 		}
 
-		migrationSpec := s.endpoint.Dialect.MigratableTypes.FindMigrationSpec(migrate.From.Type, migrate.To.Mapped.NullableDDL)
+		migrationSpec := s.endpoint.Dialect.MigratableTypes.FindMigrationSpec(migrate.From, migrate.To.Mapped)
 		var m = ColumnTypeMigration{
 			Column:               col,
 			MigrationSpec:        *migrationSpec,
