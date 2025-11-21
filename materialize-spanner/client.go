@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -171,7 +173,8 @@ func (c *client) FlushDDL(ctx context.Context) error {
 	return nil
 }
 
-// addTableSplitPoints adds pre-split points to a table for key distribution optimization
+// addTableSplitPoints adds pre-split points to a table for key distribution optimization.
+// Uses hierarchical splitting (binary tree) to ensure best distribution even if rate limits are hit.
 func (c *client) addTableSplitPoints(ctx context.Context, tableName string) error {
 	// Query node count to calculate number of split points
 	var opts []option.ClientOption
@@ -195,25 +198,15 @@ func (c *client) addTableSplitPoints(ctx context.Context, tableName string) erro
 		"table":       tableName,
 		"nodeCount":   nodeCount,
 		"splitPoints": numSplits,
-	}).Info("adding pre-split points to table")
+	}).Info("adding pre-split points to table using hierarchical splitting")
 
-	// Calculate evenly distributed INT64 split points across the hash range
-	// INT64 range: -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807
-	// Divide into (numSplits + 1) equal segments
+	// Generate split points in hierarchical order (binary tree)
+	// This ensures best distribution even if we hit rate limits partway through
+	splitValues := generateHierarchicalSplitPoints(numSplits)
 
-	// Calculate step size for even distribution
-	// Using float64 for calculation to avoid overflow
-	rangeSize := float64(math.MaxInt64) - float64(math.MinInt64)
-	step := rangeSize / float64(numSplits+1)
-
-	// Create separate SplitPoints object for each split point
-	// Each SplitPoints object should contain only 1 key
-	splitPointsList := make([]*databasepb.SplitPoints, 0, numSplits)
-
-	for i := 1; i <= numSplits; i++ {
-		// Calculate split point value
-		keyValue := float64(math.MinInt64) + (step * float64(i))
-
+	// Create SplitPoints objects for all splits
+	splitPointsList := make([]*databasepb.SplitPoints, 0, len(splitValues))
+	for _, keyValue := range splitValues {
 		splitKey := &databasepb.SplitPoints_Key{
 			KeyParts: &structpb.ListValue{
 				Values: []*structpb.Value{
@@ -222,7 +215,6 @@ func (c *client) addTableSplitPoints(ctx context.Context, tableName string) erro
 			},
 		}
 
-		// Create a SplitPoints object with a single key
 		splitPoints := &databasepb.SplitPoints{
 			Table:      tableName,
 			Keys:       []*databasepb.SplitPoints_Key{splitKey},
@@ -231,22 +223,129 @@ func (c *client) addTableSplitPoints(ctx context.Context, tableName string) erro
 		splitPointsList = append(splitPointsList, splitPoints)
 	}
 
+	// Try to add all split points in one request first
 	req := &databasepb.AddSplitPointsRequest{
 		Database:    c.dbPath,
 		SplitPoints: splitPointsList,
 	}
 
 	_, err = c.adminClient.AddSplitPoints(ctx, req)
-	if err != nil {
-		return fmt.Errorf("adding split points: %w", err)
+	if err == nil {
+		log.WithFields(log.Fields{
+			"table":       tableName,
+			"splitPoints": len(splitPointsList),
+		}).Info("successfully added all pre-split points to table")
+		return nil
 	}
 
-	log.WithFields(log.Fields{
-		"table":       tableName,
-		"splitPoints": numSplits,
-	}).Info("successfully added pre-split points to table")
+	// If we got a rate limit error, parse it and retry with allowed number
+	if strings.Contains(err.Error(), "ResourceExhausted") || strings.Contains(err.Error(), "limit") {
+		allowedSplits := parseRateLimitFromError(err.Error())
 
-	return nil
+		if allowedSplits > 0 && allowedSplits < len(splitPointsList) {
+			log.WithFields(log.Fields{
+				"table":         tableName,
+				"allowedSplits": allowedSplits,
+				"requestedSplits": len(splitPointsList),
+			}).Info("hit rate limit, retrying with allowed number of most important splits")
+
+			// Take only the first N splits (most important due to hierarchical ordering)
+			limitedSplits := splitPointsList[:allowedSplits]
+
+			req := &databasepb.AddSplitPointsRequest{
+				Database:    c.dbPath,
+				SplitPoints: limitedSplits,
+			}
+
+			_, err = c.adminClient.AddSplitPoints(ctx, req)
+			if err != nil {
+				return fmt.Errorf("adding limited split points: %w", err)
+			}
+
+			log.WithFields(log.Fields{
+				"table":       tableName,
+				"splitPoints": len(limitedSplits),
+			}).Info("successfully added limited pre-split points to table")
+			return nil
+		}
+
+		// If we couldn't parse the limit or it's 0, just log and return
+		log.WithFields(log.Fields{
+			"table": tableName,
+			"error": err,
+		}).Warn("hit rate limit but couldn't determine allowed splits, skipping pre-splitting")
+		return nil
+	}
+
+	// For non-rate-limit errors, return the error
+	return fmt.Errorf("adding split points: %w", err)
+}
+
+// parseRateLimitFromError attempts to extract the allowed split count from a rate limit error message.
+// Example error: "Total user split point count processed per minute limit is 1..."
+func parseRateLimitFromError(errMsg string) int {
+	// Look for patterns like "limit is N"
+	// Example: "Total user split point count processed per minute limit is 1"
+	re := regexp.MustCompile(`limit is (\d+)`)
+	matches := re.FindStringSubmatch(errMsg)
+	if len(matches) > 1 {
+		if limit, err := strconv.Atoi(matches[1]); err == nil {
+			return limit
+		}
+	}
+
+	return 0
+}
+
+// generateHierarchicalSplitPoints generates split points in hierarchical order
+// using a binary tree approach. Splits that divide the range in half come first,
+// then splits that divide quarters, then eighths, etc.
+func generateHierarchicalSplitPoints(numSplits int) []float64 {
+	if numSplits <= 0 {
+		return nil
+	}
+
+	// INT64 range
+	minVal := float64(math.MinInt64)
+	maxVal := float64(math.MaxInt64)
+
+	// Generate all split positions first (evenly distributed)
+	positions := make([]float64, numSplits)
+	rangeSize := maxVal - minVal
+	step := rangeSize / float64(numSplits+1)
+
+	for i := 0; i < numSplits; i++ {
+		positions[i] = minVal + step*float64(i+1)
+	}
+
+	// Reorder positions using binary tree hierarchy
+	// Use a queue-based approach to generate splits level by level
+	ordered := make([]float64, 0, numSplits)
+
+	// Track ranges to split using a queue: [start_index, end_index]
+	type rangeToSplit struct {
+		start, end int
+	}
+	queue := []rangeToSplit{{0, numSplits - 1}}
+
+	for len(queue) > 0 && len(ordered) < numSplits {
+		r := queue[0]
+		queue = queue[1:]
+
+		// Find the midpoint of this range
+		mid := (r.start + r.end) / 2
+		ordered = append(ordered, positions[mid])
+
+		// Add left and right sub-ranges to queue if they exist
+		if mid > r.start {
+			queue = append(queue, rangeToSplit{r.start, mid - 1})
+		}
+		if mid < r.end {
+			queue = append(queue, rangeToSplit{mid + 1, r.end})
+		}
+	}
+
+	return ordered
 }
 
 func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
