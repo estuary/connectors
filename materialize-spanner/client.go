@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"sync"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -14,6 +16,8 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"google.golang.org/protobuf/types/known/structpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -26,8 +30,9 @@ type client struct {
 	dbPath      string // Full database path: projects/{project}/instances/{instance}/databases/{database}
 
 	// DDL batching
-	pendingDDL []string
-	ddlMutex   sync.Mutex
+	pendingDDL         []string
+	pendingTableSplits []string // Tables that need pre-splitting after DDL execution
+	ddlMutex           sync.Mutex
 }
 
 func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
@@ -147,6 +152,100 @@ func (c *client) FlushDDL(ctx context.Context) error {
 
 	log.Info("successfully executed batched DDL")
 	c.pendingDDL = nil
+
+	// Add split points to tables if key distribution optimization is enabled
+	if len(c.pendingTableSplits) > 0 {
+		for _, tableName := range c.pendingTableSplits {
+			if err := c.addTableSplitPoints(ctx, tableName); err != nil {
+				log.WithFields(log.Fields{
+					"table": tableName,
+					"error": err,
+				}).Warn("failed to add split points to table, continuing anyway")
+				// Don't fail the entire operation if split points fail
+				// The table is still usable, just not pre-split
+			}
+		}
+		c.pendingTableSplits = nil
+	}
+
+	return nil
+}
+
+// addTableSplitPoints adds pre-split points to a table for key distribution optimization
+func (c *client) addTableSplitPoints(ctx context.Context, tableName string) error {
+	// Query node count to calculate number of split points
+	var opts []option.ClientOption
+	if c.cfg.Credentials != nil && c.cfg.Credentials.ServiceAccountJSON != "" {
+		opts = append(opts, option.WithCredentialsJSON([]byte(c.cfg.Credentials.ServiceAccountJSON)))
+	}
+
+	nodeCount, err := queryNodeCount(ctx, c.cfg.ProjectID, c.cfg.InstanceID, opts)
+	if err != nil {
+		return fmt.Errorf("querying node count: %w", err)
+	}
+
+	// Calculate number of split points: nodes × 10
+	numSplits := nodeCount * 10
+
+	if numSplits <= 0 {
+		return nil
+	}
+
+	log.WithFields(log.Fields{
+		"table":       tableName,
+		"nodeCount":   nodeCount,
+		"splitPoints": numSplits,
+	}).Info("adding pre-split points to table")
+
+	// Calculate evenly distributed INT64 split points across the hash range
+	// INT64 range: -9,223,372,036,854,775,808 to 9,223,372,036,854,775,807
+	// Divide into (numSplits + 1) equal segments
+
+	// Calculate step size for even distribution
+	// Using float64 for calculation to avoid overflow
+	rangeSize := float64(math.MaxInt64) - float64(math.MinInt64)
+	step := rangeSize / float64(numSplits+1)
+
+	// Create separate SplitPoints object for each split point
+	// Each SplitPoints object should contain only 1 key
+	splitPointsList := make([]*databasepb.SplitPoints, 0, numSplits)
+
+	for i := 1; i <= numSplits; i++ {
+		// Calculate split point value
+		keyValue := float64(math.MinInt64) + (step * float64(i))
+
+		splitKey := &databasepb.SplitPoints_Key{
+			KeyParts: &structpb.ListValue{
+				Values: []*structpb.Value{
+					structpb.NewNumberValue(keyValue),
+				},
+			},
+		}
+
+		// Create a SplitPoints object with a single key
+		splitPoints := &databasepb.SplitPoints{
+			Table:      tableName,
+			Keys:       []*databasepb.SplitPoints_Key{splitKey},
+			ExpireTime: timestamppb.New(time.Now().Add(10 * 24 * time.Hour)),
+		}
+		splitPointsList = append(splitPointsList, splitPoints)
+	}
+
+	req := &databasepb.AddSplitPointsRequest{
+		Database:    c.dbPath,
+		SplitPoints: splitPointsList,
+	}
+
+	_, err = c.adminClient.AddSplitPoints(ctx, req)
+	if err != nil {
+		return fmt.Errorf("adding split points: %w", err)
+	}
+
+	log.WithFields(log.Fields{
+		"table":       tableName,
+		"splitPoints": numSplits,
+	}).Info("successfully added pre-split points to table")
+
 	return nil
 }
 
@@ -241,6 +340,13 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 			"table": tc.Identifier,
 			"query": res.AdditionalSql,
 		}).Info("queuing AdditionalSql for batched DDL")
+	}
+
+	// Track table for pre-splitting if key distribution optimization is enabled
+	if c.cfg.Advanced.KeyDistributionOptimization {
+		c.ddlMutex.Lock()
+		c.pendingTableSplits = append(c.pendingTableSplits, tc.Identifier)
+		c.ddlMutex.Unlock()
 	}
 
 	log.WithField("name", tc.Identifier).Info("client: queued table creation")
