@@ -89,7 +89,8 @@ from .models import (
 
 MISSING_SCOPE_REGEX = (
     r"This app hasn't been granted all required scopes to make this call.|"
-    r"auth request is missing required '.+' scope"
+    r"auth request is missing required '.+' scope|"
+    r"does not have proper permissions"
 )
 
 
