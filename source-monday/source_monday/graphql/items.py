@@ -35,10 +35,9 @@ ItemsPageRemainder = GraphQLResponseRemainder[ItemsPageRemainderData]
 # that often, but we still limit it to avoid overwhelming the API even though the maximum concurrent requests
 # to Monday can go higher based on the account's plan.
 MAX_CONCURRENT_ITEM_FETCHES = 5
-# These limits combined use ~1.8 Million API complexity units per request.
-# The max per request is 5 million and 10 million per minute.
-BOARDS_PER_PAGE = 4
-ITEMS_PER_BOARD = 20
+# The max complexity budget per request is 5 million and 10 million total per minute.
+BOARDS_PER_PAGE = 2
+ITEMS_PER_BOARD = 10
 ITEMS_LIMIT_BY_ID = 100
 
 
