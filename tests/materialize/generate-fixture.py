@@ -83,19 +83,10 @@ def load_flow_config(flow_json_path: str) -> Dict:
         print(f"Error loading flow.json: {e}", file=sys.stderr)
         sys.exit(1)
 
-def write_json_array_start(f):
-    """Write the start of a JSON array."""
-    f.write('[\n')
-
-def write_json_array_end(f):
-    """Write the end of a JSON array."""
-    f.write('\n]\n')
-
 def write_phase_documents(f, collection: str, schema: Dict, properties: List[str],
-                         start_idx: int, count: int, is_first_doc: bool) -> bool:
+                         start_idx: int, count: int) -> None:
     """
-    Write documents for a phase in batches.
-    Returns whether this was the first document written.
+    Write documents for a phase, one per line.
     """
     batch = []
 
@@ -106,11 +97,8 @@ def write_phase_documents(f, collection: str, schema: Dict, properties: List[str
 
         # Write batch when it's full
         if len(batch) >= BATCH_SIZE:
-            for j, entry in enumerate(batch):
-                if not is_first_doc or j > 0:
-                    f.write(',\n')
-                f.write('    ' + json.dumps(entry, separators=(',', ':')))
-                is_first_doc = False
+            for entry in batch:
+                f.write(json.dumps(entry, separators=(',', ':')) + '\n')
             batch = []
 
         # Progress indicator
@@ -118,13 +106,12 @@ def write_phase_documents(f, collection: str, schema: Dict, properties: List[str
             print(f"  Generated {i - start_idx}/{count} documents for {collection}...", file=sys.stderr)
 
     # Write remaining documents
-    for j, entry in enumerate(batch):
-        if not is_first_doc or j > 0:
-            f.write(',\n')
-        f.write('    ' + json.dumps(entry, separators=(',', ':')))
-        is_first_doc = False
+    for entry in batch:
+        f.write(json.dumps(entry, separators=(',', ':')) + '\n')
 
-    return is_first_doc
+def write_ack(f):
+    """Write an ack marker to indicate end of transaction."""
+    f.write('{"ack":true}\n')
 
 def main():
     if len(sys.argv) != 3:
@@ -175,36 +162,28 @@ def main():
     update_count = PERF_DOC_COUNT // 10
 
     with open(output_fixture_path, 'w', buffering=8192*16) as f:  # 128KB buffer
-        write_json_array_start(f)
-
-        # Phase 0: Empty
-        f.write('  []')
+        # Phase 0: Empty (just ack)
+        write_ack(f)
 
         # Phase 1: Initial bulk load
-        f.write(',\n  [\n')
-        is_first = True
         for collection in sorted(collection_info.keys()):
             info = collection_info[collection]
             print(f"Generating {PERF_DOC_COUNT} documents for {collection}...", file=sys.stderr)
-            is_first = write_phase_documents(
+            write_phase_documents(
                 f, collection, info['schema'], info['properties'],
-                0, PERF_DOC_COUNT, is_first
+                0, PERF_DOC_COUNT
             )
-        f.write('\n  ]')
+        write_ack(f)
 
         # Phase 2: Update batch (10% of documents)
-        f.write(',\n  [\n')
-        is_first = True
         for collection in sorted(collection_info.keys()):
             info = collection_info[collection]
             print(f"Generating {update_count} update documents for {collection}...", file=sys.stderr)
-            is_first = write_phase_documents(
+            write_phase_documents(
                 f, collection, info['schema'], info['properties'],
-                0, update_count, is_first
+                0, update_count
             )
-        f.write('\n  ]')
-
-        write_json_array_end(f)
+        write_ack(f)
 
     print(f"Generated fixture with {PERF_DOC_COUNT} documents per collection", file=sys.stderr)
     print(f"Output: {output_fixture_path}", file=sys.stderr)
