@@ -103,10 +103,16 @@ function drive_connector {
     local source=$1;
     local fixture=$2;
 
-    # Drive the connector, writing its output into the snapshot.
-    RUST_LOG=info flowctl preview --source ${source} --fixture ${fixture} --output-state --output-apply --network flow-test \
-      | jq '.' >> ${SNAPSHOT} \
-      || bail "connector invocation failed"
+    if [[ "${PERF_MODE}" != "true" ]]; then
+        # Drive the connector, writing its output into the snapshot.
+        RUST_LOG=info flowctl preview --source ${source} --fixture ${fixture} --streaming-fixture --output-state --output-apply --network flow-test \
+        || bail "connector invocation failed"
+    else
+        # Drive the connector, writing its output into the snapshot.
+        RUST_LOG=info flowctl preview --source ${source} --fixture ${fixture} --output-state --output-apply --network flow-test \
+        | jq '.' >> ${SNAPSHOT} \
+        || bail "connector invocation failed"
+    fi
 }
 
 # Drive the connector with the fixture.
@@ -125,7 +131,11 @@ else
 fi
 
 # Drive it again to excercise any cleanup behavior when bindings are removed.
-drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.fixture.json
+if [[ "${PERF_MODE}" != "true" ]]; then
+    drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.streaming_fixture.json
+else
+    drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.fixture.json
+fi
 
 if [[ -f "$CONNECTOR_TEST_DIR/checks.sh" ]]; then
   # Run connector-specific checks
