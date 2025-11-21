@@ -36,8 +36,8 @@ ItemsPageRemainder = GraphQLResponseRemainder[ItemsPageRemainderData]
 # to Monday can go higher based on the account's plan.
 MAX_CONCURRENT_ITEM_FETCHES = 5
 # The max complexity budget per request is 5 million and 10 million total per minute.
-BOARDS_PER_PAGE = 2
-ITEMS_PER_BOARD = 10
+BOARDS_PER_PAGE = 1
+ITEMS_PER_BOARD = 5
 ITEMS_LIMIT_BY_ID = 100
 
 

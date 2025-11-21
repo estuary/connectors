@@ -31,7 +31,7 @@ DEFAULT_BOARDS_PAGE_SIZE = 100
 # This is the number of boards we will fetch items for in a single fetch_page call.
 # However, the underlying GraphQL query will fetch items in smaller batches to balance
 # complexity and other API limitations.
-BOARDS_PER_ITEMS_PAGE = 15
+BOARDS_PER_ITEMS_PAGE = 10
 # Monday may be eventual consistency based on observed delays around 5-30 seconds seen in API responses
 # following batch updates. This is an estimated delay that hopefully covers the possible delay in updates.
 INCREMENTAL_SYNC_DELAY = timedelta(minutes=5)
