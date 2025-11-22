@@ -28,6 +28,7 @@ type property struct {
 	Coerce      bool                `json:"coerce,omitempty"`
 	Index       *bool               `json:"index,omitempty"`
 	IgnoreAbove int                 `json:"ignore_above,omitempty"`
+	Format      string              `json:"format,omitempty"`
 }
 
 func (p property) String() string {
@@ -35,7 +36,8 @@ func (p property) String() string {
 }
 
 func (p property) Compatible(existing boilerplate.ExistingField) bool {
-	return strings.EqualFold(existing.Type, string(p.Type))
+	return strings.EqualFold(existing.Type, string(p.Type)) &&
+		strings.EqualFold(existing.Format, string(p.Format))
 }
 
 func (p property) CanMigrate(existing boilerplate.ExistingField) bool {
@@ -48,9 +50,15 @@ var numericStringTypes = map[m.StringWithNumericFormat]elasticPropertyType{
 	m.StringFormatNumber:  elasticTypeDouble,
 }
 
+type mapping struct {
+	Type   elasticPropertyType `json:"type"`
+	Format string              `json:"format,omitempty"`
+}
+
 type fieldConfig struct {
-	Keyword bool `json:"keyword"`
-	Routing bool `json:"routing"`
+	Keyword bool     `json:"keyword"`
+	Routing bool     `json:"routing"`
+	Mapping *mapping `json:"mapping,omitempty"`
 }
 
 func (fc fieldConfig) Validate() error {
@@ -65,6 +73,10 @@ func (fc fieldConfig) CastToString() bool {
 func propForProjection(p *pf.Projection, types []string, fc fieldConfig) property {
 	if mustWrapAndFlatten(p) {
 		return objProp()
+	}
+
+	if fc.Mapping != nil {
+		return property{Type: fc.Mapping.Type, Format: fc.Mapping.Format}
 	}
 
 	if numericString, ok := m.AsFormattedNumeric(p); ok {
