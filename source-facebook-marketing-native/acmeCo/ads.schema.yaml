@@ -1,0 +1,37 @@
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+description: |-
+  Facebook Ads resource.
+
+  Ads are the individual ad units within an ad set.
+  Schema matches Airbyte source-facebook-marketing/schemas/ads.json
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  id:
+    title: Id
+    type: string
+required:
+- id
+title: Ads
+type: object
+x-infer-schema: true

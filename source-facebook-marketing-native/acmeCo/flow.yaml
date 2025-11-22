@@ -1,0 +1,98 @@
+collections:
+  acmeCo/activities:
+    schema: activities.schema.yaml
+    key:
+    - /object_id
+    - /actor_id
+    - /application_id
+    - /event_time
+    - /event_type
+  acmeCo/ad_account:
+    schema: ad_account.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/ad_creatives:
+    schema: ad_creatives.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/ad_sets:
+    schema: ad_sets.schema.yaml
+    key:
+    - /id
+  acmeCo/ads:
+    schema: ads.schema.yaml
+    key:
+    - /id
+  acmeCo/ads_insights:
+    schema: ads_insights.schema.yaml
+    key:
+    - /account_id
+    - /ad_id
+    - /date_start
+  acmeCo/ads_insights_action_type:
+    schema: ads_insights_action_type.schema.yaml
+    key:
+    - /account_id
+    - /ad_id
+    - /date_start
+  acmeCo/ads_insights_age_and_gender:
+    schema: ads_insights_age_and_gender.schema.yaml
+    key:
+    - /account_id
+    - /ad_id
+    - /age
+    - /date_start
+    - /gender
+  acmeCo/ads_insights_country:
+    schema: ads_insights_country.schema.yaml
+    key:
+    - /account_id
+    - /ad_id
+    - /country
+    - /date_start
+  acmeCo/ads_insights_dma:
+    schema: ads_insights_dma.schema.yaml
+    key:
+    - /account_id
+    - /ad_id
+    - /date_start
+    - /dma
+  acmeCo/ads_insights_platform_and_device:
+    schema: ads_insights_platform_and_device.schema.yaml
+    key:
+    - /account_id
+    - /ad_id
+    - /date_start
+    - /impression_device
+    - /platform_position
+    - /publisher_platform
+  acmeCo/ads_insights_region:
+    schema: ads_insights_region.schema.yaml
+    key:
+    - /account_id
+    - /ad_id
+    - /date_start
+    - /region
+  acmeCo/campaigns:
+    schema: campaigns.schema.yaml
+    key:
+    - /id
+  acmeCo/custom_ads_insights_publisher_platform:
+    schema: custom_ads_insights_publisher_platform.schema.yaml
+    key:
+    - /account_id
+    - /ad_id
+    - /date_start
+    - /publisher_platform
+  acmeCo/custom_conversions:
+    schema: custom_conversions.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/images:
+    schema: images.schema.yaml
+    key:
+    - /id
+  acmeCo/videos:
+    schema: videos.schema.yaml
+    key:
+    - /id

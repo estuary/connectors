@@ -133,6 +133,12 @@ class ValidationError(Exception):
 
 
 class ResourceOwnerPasswordOAuth2Credentials(abc.ABC, BaseModel):
+    # This configuration provides a "title" annotation for the UI to display
+    # instead of the class name.
+    model_config = ConfigDict(
+        title="OAuth",
+    )
+
     credentials_title: Literal["OAuth Credentials"] = Field(
         default="OAuth Credentials",
         json_schema_extra={"type": "string"}
@@ -169,6 +175,12 @@ class ClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
 
 
 class AuthorizationCodeFlowOAuth2Credentials(abc.ABC, BaseModel):
+    # This configuration provides a "title" annotation for the UI to display
+    # instead of the class name.
+    model_config = ConfigDict(
+        title="OAuth",
+    )
+
     credentials_title: Literal["OAuth Credentials"] = Field(
         default="OAuth Credentials", json_schema_extra={"type": "string"}
     )
@@ -206,6 +218,12 @@ class AuthorizationCodeFlowOAuth2Credentials(abc.ABC, BaseModel):
 
 
 class LongLivedClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
+    # This configuration provides a "title" annotation for the UI to display
+    # instead of the class name.
+    model_config = ConfigDict(
+        title="OAuth",
+    )
+
     credentials_title: Literal["OAuth Credentials"] = Field(
         default="OAuth Credentials",
         json_schema_extra={"type": "string"}
@@ -245,6 +263,12 @@ class LongLivedClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
 
 
 class BaseOAuth2Credentials(abc.ABC, BaseModel):
+    # This configuration provides a "title" annotation for the UI to display
+    # instead of the class name.
+    model_config = ConfigDict(
+        title="OAuth",
+    )
+
     credentials_title: Literal["OAuth Credentials"] = Field(
         default="OAuth Credentials",
         json_schema_extra={"type": "string"}
@@ -285,6 +309,12 @@ class BaseOAuth2Credentials(abc.ABC, BaseModel):
 
 
 class RotatingOAuth2Credentials(BaseOAuth2Credentials):
+    # This configuration provides a "title" annotation for the UI to display
+    # instead of the class name.
+    model_config = ConfigDict(
+        title="OAuth",
+    )
+    
     access_token: str = Field(
         title="Access Token",
         json_schema_extra={"secret": True}
