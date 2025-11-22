@@ -17,6 +17,7 @@ type ExistingField struct {
 	Type               string
 	CharacterMaxLength int
 	HasDefault         bool
+	Format             string
 }
 
 // Existing resource contains information about a materialized resource in an
