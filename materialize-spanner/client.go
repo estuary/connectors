@@ -442,7 +442,8 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	}
 
 	// Track table for pre-splitting if key distribution optimization is enabled
-	if c.cfg.Advanced.KeyDistributionOptimization {
+	// Skip flow_checkpoints_v1 as it's an internal table that doesn't need pre-splitting
+	if c.cfg.Advanced.KeyDistributionOptimization && !strings.Contains(tc.Identifier, sql.DefaultFlowCheckpoints) {
 		c.ddlMutex.Lock()
 		c.pendingTableSplits = append(c.pendingTableSplits, tc.Identifier)
 		c.ddlMutex.Unlock()
