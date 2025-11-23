@@ -194,10 +194,22 @@ func (c *client) addTableSplitPoints(ctx context.Context, tableName string) erro
 		return nil
 	}
 
+	// Query the primary key columns and their types for this table
+	pkColumns, err := c.getTablePrimaryKeyColumns(ctx, tableName)
+	if err != nil {
+		return fmt.Errorf("querying primary key columns: %w", err)
+	}
+
+	if len(pkColumns) == 0 {
+		log.WithField("table", tableName).Warn("table has no primary key, skipping pre-splitting")
+		return nil
+	}
+
 	log.WithFields(log.Fields{
-		"table":       tableName,
-		"nodeCount":   nodeCount,
-		"splitPoints": numSplits,
+		"table":         tableName,
+		"nodeCount":     nodeCount,
+		"splitPoints":   numSplits,
+		"keyColumns":    len(pkColumns),
 	}).Info("adding pre-split points to table using hierarchical splitting")
 
 	// Generate split points in hierarchical order (binary tree)
@@ -207,11 +219,22 @@ func (c *client) addTableSplitPoints(ctx context.Context, tableName string) erro
 	// Create SplitPoints objects for all splits
 	splitPointsList := make([]*databasepb.SplitPoints, 0, len(splitValues))
 	for _, keyValue := range splitValues {
+		// Create key parts: first is flow_key_hash, rest are zero values based on column type
+		keyParts := make([]*structpb.Value, len(pkColumns))
+
+		// Convert float64 to int64 and then to string for INT64 column type
+		// Spanner expects INT64 values as strings in split points
+		int64Value := int64(keyValue)
+		keyParts[0] = structpb.NewStringValue(strconv.FormatInt(int64Value, 10))
+
+		// Fill remaining key columns with zero values based on their types
+		for i := 1; i < len(pkColumns); i++ {
+			keyParts[i] = getZeroValueForSpannerType(pkColumns[i].spannerType)
+		}
+
 		splitKey := &databasepb.SplitPoints_Key{
 			KeyParts: &structpb.ListValue{
-				Values: []*structpb.Value{
-					structpb.NewNumberValue(keyValue),
-				},
+				Values: keyParts,
 			},
 		}
 
@@ -279,6 +302,95 @@ func (c *client) addTableSplitPoints(ctx context.Context, tableName string) erro
 
 	// For non-rate-limit errors, return the error
 	return fmt.Errorf("adding split points: %w", err)
+}
+
+// primaryKeyColumn represents a primary key column with its type information
+type primaryKeyColumn struct {
+	name       string
+	spannerType string
+	ordinalPosition int64
+}
+
+// getTablePrimaryKeyColumns queries INFORMATION_SCHEMA to get primary key column information
+func (c *client) getTablePrimaryKeyColumns(ctx context.Context, tableName string) ([]primaryKeyColumn, error) {
+	// Extract the raw table name without quotes/escaping for the query
+	// tableName might be quoted like `schema.table` or `table`, we need just the table name
+	rawTableName := strings.Trim(tableName, "`\"")
+	if strings.Contains(rawTableName, ".") {
+		parts := strings.Split(rawTableName, ".")
+		rawTableName = strings.Trim(parts[len(parts)-1], "`\"")
+	}
+
+	stmt := spanner.Statement{
+		SQL: `SELECT ic.COLUMN_NAME, c.SPANNER_TYPE, ic.ORDINAL_POSITION
+		      FROM INFORMATION_SCHEMA.INDEX_COLUMNS ic
+		      JOIN INFORMATION_SCHEMA.COLUMNS c
+		        ON ic.TABLE_NAME = c.TABLE_NAME
+		        AND ic.COLUMN_NAME = c.COLUMN_NAME
+		      WHERE ic.TABLE_NAME = @tableName
+		      AND ic.INDEX_NAME = 'PRIMARY_KEY'
+		      ORDER BY ic.ORDINAL_POSITION`,
+		Params: map[string]interface{}{
+			"tableName": rawTableName,
+		},
+	}
+
+	iter := c.dataClient.Single().Query(ctx, stmt)
+	defer iter.Stop()
+
+	var columns []primaryKeyColumn
+	for {
+		row, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("querying primary key columns: %w", err)
+		}
+
+		var col primaryKeyColumn
+		if err := row.Columns(&col.name, &col.spannerType, &col.ordinalPosition); err != nil {
+			return nil, fmt.Errorf("scanning primary key column: %w", err)
+		}
+		columns = append(columns, col)
+	}
+
+	return columns, nil
+}
+
+// getZeroValueForSpannerType returns an appropriate zero value for a Spanner column type
+func getZeroValueForSpannerType(spannerType string) *structpb.Value {
+	// Normalize the type string (uppercase, remove size/length specifications)
+	upperType := strings.ToUpper(spannerType)
+
+	// Handle types with parentheses like STRING(MAX), BYTES(1024), etc.
+	if idx := strings.Index(upperType, "("); idx != -1 {
+		upperType = upperType[:idx]
+	}
+
+	switch upperType {
+	case "INT64":
+		return structpb.NewStringValue("0")
+	case "FLOAT64", "FLOAT32":
+		return structpb.NewNumberValue(0.0)
+	case "STRING":
+		return structpb.NewStringValue("")
+	case "BYTES":
+		return structpb.NewStringValue("") // Empty base64 string
+	case "BOOL":
+		return structpb.NewBoolValue(false)
+	case "DATE":
+		return structpb.NewStringValue("0001-01-01") // Minimum date
+	case "TIMESTAMP":
+		return structpb.NewStringValue("0001-01-01T00:00:00Z") // Minimum timestamp
+	case "NUMERIC", "DECIMAL":
+		return structpb.NewStringValue("0")
+	case "JSON":
+		return structpb.NewStringValue("{}")
+	default:
+		// For array types or unknown types, use NULL as fallback
+		return structpb.NewNullValue()
+	}
 }
 
 // parseRateLimitFromError attempts to extract the allowed split count from a rate limit error message.
