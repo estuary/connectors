@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from logging import Logger
 from pydantic import BaseModel
 from typing import AsyncGenerator, Any, Awaitable, TypeVar, Callable, Protocol
+from multidict import CIMultiDict
 import abc
 import aiohttp
 import asyncio
@@ -38,7 +39,7 @@ DEFAULT_AUTHORIZATION_TOKEN_TYPE = "Bearer"
 
 T = TypeVar("T")
 
-Headers = dict[str, Any]
+Headers = CIMultiDict[str]
 
 BodyGeneratorFunction = Callable[[], AsyncGenerator[bytes, None]]
 HeadersAndBodyGenerator = tuple[Headers, BodyGeneratorFunction]
@@ -54,7 +55,7 @@ class ShouldRetryProtocol(Protocol):
 
     Parameters:
      * `status` is the HTTP status code of the response
-     * `headers` are the HTTP response headers as a dict
+     * `headers` are the HTTP response headers as a CIMultiDict
      * `body` is the response body as bytes
      * `attempt` is the current attempt number (starts at 1)
 
@@ -556,7 +557,7 @@ class HTTPMixin(Mixin, HTTPSession):
 
                     if (
                         should_retry is None
-                        or should_retry(resp.status, dict(resp.headers), body, attempt)
+                        or should_retry(resp.status, resp.headers, body, attempt)
                     ):
                         log.warning(
                             "server internal error (will retry)",
@@ -583,7 +584,7 @@ class HTTPMixin(Mixin, HTTPSession):
                         finally:
                             await resp.release()
 
-                    response_headers = dict(resp.headers)
+                    response_headers = resp.headers
                     should_release_response = False
                     return (response_headers, body_generator)
 
