@@ -502,7 +502,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Errgroup for managing all background flush operations
 	flushGroup, _ := errgroup.WithContext(ctx)
-	flushGroup.SetLimit(5) // Limit to 5 concurrent flush goroutines
+	flushGroup.SetLimit(t.numPartitions) // Limit to 5 concurrent flush goroutines
 
 	if t.cfg.Advanced.KeyDistributionOptimization && t.numPartitions > 0 {
 		partitionedBatch = newPartitionedBatches(t.numPartitions)
@@ -780,7 +780,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	// Errgroup for managing all background flush operations
 	flushGroup, _ := errgroup.WithContext(ctx)
-	flushGroup.SetLimit(5) // Limit to 5 concurrent flush goroutines
+	flushGroup.SetLimit(t.numPartitions) // Limit to 5 concurrent flush goroutines
 
 	if t.cfg.Advanced.KeyDistributionOptimization && t.numPartitions > 0 {
 		partitionedBatch = newPartitionedBatches(t.numPartitions)
