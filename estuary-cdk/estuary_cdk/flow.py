@@ -206,6 +206,12 @@ class AuthorizationCodeFlowOAuth2Credentials(abc.ABC, BaseModel):
 
 
 class LongLivedClientCredentialsOAuth2Credentials(abc.ABC, BaseModel):
+    # This configuration provides a "title" annotation for the UI to display
+    # instead of the class name.
+    model_config = ConfigDict(
+        title="OAuth",
+    )
+
     credentials_title: Literal["OAuth Credentials"] = Field(
         default="OAuth Credentials",
         json_schema_extra={"type": "string"}
