@@ -1,0 +1,19 @@
+account_ids: "111111111111111"
+credentials:
+    credentials_title: OAuth Credentials
+    client_id: placeholder_client_id
+    client_secret: placeholder_client_secret
+    access_token: placeholder_access_token
+start_date: "2023-03-24T00:00:00Z"
+custom_insights:
+    - action_breakdowns: ""
+      breakdowns: publisher_platform
+      fields: "ad_id,ad_name,account_id,account_name,adset_id,adset_name,campaign_id,campaign_name,date_start,date_stop,clicks,impressions,reach,inline_link_clicks,outbound_clicks"
+      insights_lookback_window: 28
+      level: ad
+      name: ads_insights_publisher_platform
+      start_date: "2023-03-23T00:00:00Z"
+insights_lookback_window: 28
+advanced:
+  fetch_thumbnail_images: false
+  include_deleted: false
