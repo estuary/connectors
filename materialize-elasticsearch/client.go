@@ -140,6 +140,7 @@ func (c *client) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 				Nullable:           true,
 				Type:               string(prop.Type),
 				CharacterMaxLength: 0,
+				Format:             prop.Format,
 			})
 		}
 	}
