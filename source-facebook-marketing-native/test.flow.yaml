@@ -1,0 +1,12 @@
+captures:
+  acmeCo/source-facebook-marketing-native:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_facebook_marketing_native
+        config: config.yaml
+    bindings: []
+    shards:
+      logLevel: debug

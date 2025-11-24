@@ -1,0 +1,1106 @@
+[
+  {
+    "recommendedName": "activities",
+    "resourceConfig": {
+      "name": "activities",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Facebook Activities resource.\n\nActivity log for account, showing changes made to campaigns, ad sets, and ads.\nSchema matches Airbyte source-facebook-marketing/schemas/activities.json\n\nNote: Activities do not have an 'id' field, so we use a composite primary key.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "object_id": {
+          "title": "Object Id",
+          "type": "string"
+        },
+        "actor_id": {
+          "title": "Actor Id",
+          "type": "string"
+        },
+        "application_id": {
+          "title": "Application Id",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_type": {
+          "title": "Event Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "object_id",
+        "actor_id",
+        "application_id",
+        "event_time",
+        "event_type"
+      ],
+      "title": "Activities",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/object_id",
+      "/actor_id",
+      "/application_id",
+      "/event_time",
+      "/event_type"
+    ]
+  },
+  {
+    "recommendedName": "ad_account",
+    "resourceConfig": {
+      "name": "ad_account",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "AdAccount",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "ad_creatives",
+    "resourceConfig": {
+      "name": "ad_creatives",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "AdCreative",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "ad_sets",
+    "resourceConfig": {
+      "name": "ad_sets",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Facebook Ad Sets resource.\n\nAd Sets define the targeting, budget, and schedule for a group of ads.\nSchema matches Airbyte source-facebook-marketing/schemas/ad_sets.json",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "AdSets",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "ads",
+    "resourceConfig": {
+      "name": "ads",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Facebook Ads resource.\n\nAds are the individual ad units within an ad set.\nSchema matches Airbyte source-facebook-marketing/schemas/ads.json",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Ads",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "ads_insights",
+    "resourceConfig": {
+      "name": "ads_insights",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "account_id": {
+          "title": "Account Id",
+          "type": "string"
+        },
+        "date_start": {
+          "title": "Date Start",
+          "type": "string"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_id",
+        "date_start",
+        "ad_id"
+      ],
+      "title": "AdsInsights",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/account_id",
+      "/ad_id",
+      "/date_start"
+    ]
+  },
+  {
+    "recommendedName": "ads_insights_action_type",
+    "resourceConfig": {
+      "name": "ads_insights_action_type",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "account_id": {
+          "title": "Account Id",
+          "type": "string"
+        },
+        "date_start": {
+          "title": "Date Start",
+          "type": "string"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_id",
+        "date_start",
+        "ad_id"
+      ],
+      "title": "AdsInsightsActionType",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/account_id",
+      "/ad_id",
+      "/date_start"
+    ]
+  },
+  {
+    "recommendedName": "ads_insights_age_and_gender",
+    "resourceConfig": {
+      "name": "ads_insights_age_and_gender",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "account_id": {
+          "title": "Account Id",
+          "type": "string"
+        },
+        "date_start": {
+          "title": "Date Start",
+          "type": "string"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "age": {
+          "title": "Age",
+          "type": "string"
+        },
+        "gender": {
+          "title": "Gender",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_id",
+        "date_start",
+        "ad_id",
+        "age",
+        "gender"
+      ],
+      "title": "AdsInsightsAgeAndGender",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/account_id",
+      "/ad_id",
+      "/age",
+      "/date_start",
+      "/gender"
+    ]
+  },
+  {
+    "recommendedName": "ads_insights_country",
+    "resourceConfig": {
+      "name": "ads_insights_country",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "account_id": {
+          "title": "Account Id",
+          "type": "string"
+        },
+        "date_start": {
+          "title": "Date Start",
+          "type": "string"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "country": {
+          "title": "Country",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_id",
+        "date_start",
+        "ad_id",
+        "country"
+      ],
+      "title": "AdsInsightsCountry",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/account_id",
+      "/ad_id",
+      "/country",
+      "/date_start"
+    ]
+  },
+  {
+    "recommendedName": "ads_insights_dma",
+    "resourceConfig": {
+      "name": "ads_insights_dma",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "account_id": {
+          "title": "Account Id",
+          "type": "string"
+        },
+        "date_start": {
+          "title": "Date Start",
+          "type": "string"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "dma": {
+          "title": "Dma",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_id",
+        "date_start",
+        "ad_id",
+        "dma"
+      ],
+      "title": "AdsInsightsDma",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/account_id",
+      "/ad_id",
+      "/date_start",
+      "/dma"
+    ]
+  },
+  {
+    "recommendedName": "ads_insights_platform_and_device",
+    "resourceConfig": {
+      "name": "ads_insights_platform_and_device",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "account_id": {
+          "title": "Account Id",
+          "type": "string"
+        },
+        "date_start": {
+          "title": "Date Start",
+          "type": "string"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "publisher_platform": {
+          "title": "Publisher Platform",
+          "type": "string"
+        },
+        "platform_position": {
+          "title": "Platform Position",
+          "type": "string"
+        },
+        "impression_device": {
+          "title": "Impression Device",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_id",
+        "date_start",
+        "ad_id",
+        "publisher_platform",
+        "platform_position",
+        "impression_device"
+      ],
+      "title": "AdsInsightsPlatformAndDevice",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/account_id",
+      "/ad_id",
+      "/date_start",
+      "/impression_device",
+      "/platform_position",
+      "/publisher_platform"
+    ]
+  },
+  {
+    "recommendedName": "ads_insights_region",
+    "resourceConfig": {
+      "name": "ads_insights_region",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "account_id": {
+          "title": "Account Id",
+          "type": "string"
+        },
+        "date_start": {
+          "title": "Date Start",
+          "type": "string"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "region": {
+          "title": "Region",
+          "type": "string"
+        }
+      },
+      "required": [
+        "account_id",
+        "date_start",
+        "ad_id",
+        "region"
+      ],
+      "title": "AdsInsightsRegion",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/account_id",
+      "/ad_id",
+      "/date_start",
+      "/region"
+    ]
+  },
+  {
+    "recommendedName": "campaigns",
+    "resourceConfig": {
+      "name": "campaigns",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Campaigns",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "custom_conversions",
+    "resourceConfig": {
+      "name": "custom_conversions",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "CustomConversions",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "customads_insights_publisher_platform",
+    "resourceConfig": {
+      "name": "customads_insights_publisher_platform",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "account_id": {
+          "title": "Account Id",
+          "type": "string"
+        },
+        "date_start": {
+          "title": "Date Start",
+          "type": "string"
+        },
+        "ad_id": {
+          "title": "Ad Id",
+          "type": "string"
+        },
+        "publisher_platform": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Publisher Platform"
+        }
+      },
+      "required": [
+        "account_id",
+        "date_start",
+        "ad_id"
+      ],
+      "title": "AdsInsightsPublisherPlatform",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/account_id",
+      "/ad_id",
+      "/date_start",
+      "/publisher_platform"
+    ]
+  },
+  {
+    "recommendedName": "images",
+    "resourceConfig": {
+      "name": "images",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Facebook Ad Images resource.\n\nImages used in ad creatives.\nSchema matches Airbyte source-facebook-marketing/schemas/images.json",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Images",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "videos",
+    "resourceConfig": {
+      "name": "videos",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Facebook Ad Videos resource.\n\nVideos used in ad creatives.\nSchema matches Airbyte source-facebook-marketing/schemas/videos.json",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Videos",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  }
+]

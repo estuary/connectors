@@ -1,0 +1,256 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "include_deleted": {
+              "default": false,
+              "description": "Set to active if you want to include data from deleted entities for resources that support it.",
+              "title": "Include Deleted Records",
+              "type": "boolean"
+            },
+            "fetch_thumbnail_images": {
+              "default": false,
+              "description": "Set to active if you want to fetch the thumbnail_url and store the result in thumbnail_data_url for each Ad Creative.",
+              "title": "Fetch Thumbnail Images from Ad Creative",
+              "type": "boolean"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "ApiLevel": {
+          "description": "API levels for insights queries.",
+          "enum": [
+            "ad",
+            "adset",
+            "campaign",
+            "account"
+          ],
+          "title": "ApiLevel",
+          "type": "string"
+        },
+        "InsightsConfig": {
+          "additionalProperties": true,
+          "properties": {
+            "start_date": {
+              "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data before this date will not be replicated.",
+              "examples": [
+                "2017-01-25T00:00:00Z"
+              ],
+              "format": "date-time",
+              "title": "Start Date",
+              "type": "string"
+            },
+            "insights_lookback_window": {
+              "default": 28,
+              "description": "The attribution window. Facebook freezes insight data 28 days after it was generated, which means that all data from the past 28 days may have changed since we last emitted it, so you can retrieve refreshed insights from the past by setting this parameter. If you set a custom lookback window value in Facebook account, please provide the same value here.",
+              "exclusiveMinimum": 0,
+              "title": "Insights Lookback Window",
+              "type": "integer"
+            },
+            "name": {
+              "description": "The name value of insight",
+              "order": 0,
+              "title": "Name",
+              "type": "string"
+            },
+            "level": {
+              "$ref": "#/$defs/ApiLevel",
+              "default": "ad",
+              "description": "Chosen level for API",
+              "order": 1,
+              "title": "Level"
+            },
+            "fields": {
+              "description": "A comma-separated list of chosen fields",
+              "examples": [
+                "account_id,ad_id,impressions,clicks,spend"
+              ],
+              "order": 2,
+              "title": "Fields",
+              "type": "string"
+            },
+            "breakdowns": {
+              "description": "A comma-separated list of chosen breakdowns",
+              "examples": [
+                "age,gender,region"
+              ],
+              "order": 3,
+              "title": "Breakdowns",
+              "type": "string"
+            },
+            "action_breakdowns": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "A comma-separated list of chosen action breakdowns",
+              "examples": [
+                "action_type"
+              ],
+              "order": 4,
+              "title": "Action Breakdowns"
+            }
+          },
+          "required": [
+            "name",
+            "fields",
+            "breakdowns"
+          ],
+          "title": "InsightsConfig",
+          "type": "object"
+        },
+        "_OAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret",
+            "access_token"
+          ],
+          "title": "OAuth",
+          "type": "object",
+          "x-oauth2-provider": "facebook"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data before this date will not be replicated.",
+          "examples": [
+            "2017-01-25T00:00:00Z"
+          ],
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "insights_lookback_window": {
+          "default": 28,
+          "description": "The attribution window. Facebook freezes insight data 28 days after it was generated, which means that all data from the past 28 days may have changed since we last emitted it, so you can retrieve refreshed insights from the past by setting this parameter. If you set a custom lookback window value in Facebook account, please provide the same value here.",
+          "exclusiveMinimum": 0,
+          "title": "Insights Lookback Window",
+          "type": "integer"
+        },
+        "account_ids": {
+          "description": "Comma-separated list of Facebook Ad Account IDs (e.g., 123456789,987654321)",
+          "order": 0,
+          "pattern": "^\\d[\\d,]+\\d$",
+          "title": "Account IDs",
+          "type": "string"
+        },
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "OAuth Credentials": "#/$defs/_OAuth2Credentials"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/_OAuth2Credentials"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "custom_insights": {
+          "default": [],
+          "description": "A list which contains ad statistics entries, each entry must have a name and can contains fields, breakdowns or action_breakdowns. Click on \"add\" to fill this field.",
+          "items": {
+            "$ref": "#/$defs/InsightsConfig"
+          },
+          "title": "Custom Insights",
+          "type": "array"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "account_ids",
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-facebook-marketing-native",
+    "oauth2": {
+      "provider": "facebook",
+      "authUrlTemplate": "https://www.facebook.com/v23.0/dialog/oauth?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&scope=ads_management,ads_read,read_insights,business_management&state={{#urlencode}}{{{  state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://graph.facebook.com/v23.0/oauth/access_token?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}",
+      "accessTokenResponseMap": {
+        "access_token": "/access_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
