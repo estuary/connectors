@@ -17,7 +17,8 @@ type streamBackfillCoordinator struct {
 	mu               sync.Mutex
 	opTimeWatermark  primitive.Timestamp
 	streamsInCatchup map[string]bool
-	catchupDone      chan struct{}
+	started          bool
+	waiters          []chan struct{}
 	getClusterOpTime getOpTimeFn
 }
 
@@ -37,7 +38,8 @@ func newBatchStreamCoordinator(changeStreamBindings []bindingInfo, getOpTime get
 	out := &streamBackfillCoordinator{
 		opTimeWatermark:  primitive.Timestamp{},
 		streamsInCatchup: map[string]bool{},
-		catchupDone:      make(chan struct{}),
+		started:          false,
+		waiters:          make([]chan struct{}, concurrentBackfillLimit),
 		getClusterOpTime: getOpTime,
 	}
 
@@ -45,7 +47,7 @@ func newBatchStreamCoordinator(changeStreamBindings []bindingInfo, getOpTime get
 	for _, db := range databasesForBindings(changeStreamBindings) {
 		out.streamsInCatchup[db] = false
 	}
-	close(out.catchupDone)
+	out.waiters = make([]chan struct{}, 0, concurrentBackfillLimit)
 
 	return out
 }
@@ -66,8 +68,8 @@ func (b *streamBackfillCoordinator) startCatchingUp(ctx context.Context) error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	b.catchupDone = make(chan struct{})
 	b.opTimeWatermark = latestOpTime
+	b.started = true
 	for db := range b.streamsInCatchup {
 		b.streamsInCatchup[db] = true
 	}
@@ -108,7 +110,11 @@ func (b *streamBackfillCoordinator) gotCaughtUp(db string, latest primitive.Time
 	}
 
 	if allStreamsCaughtUp {
-		close(b.catchupDone)
+		for _, waiter := range b.waiters {
+			close(waiter)
+		}
+		b.started = false
+		b.waiters = make([]chan struct{}, 0, concurrentBackfillLimit)
 		log.Info("finished catching up streams")
 	}
 
@@ -117,14 +123,14 @@ func (b *streamBackfillCoordinator) gotCaughtUp(db string, latest primitive.Time
 
 func (b *streamBackfillCoordinator) streamsCaughtUp() <-chan struct{} {
 	b.mu.Lock()
-	// This will either be a closed channel if no streams are catching up, or an
-	// open channel that will eventually be closed in gotCaughtUp if streams are
-	// catching up. It may be re-assigned in startCatchingUp, so a reference is
-	// obtained here under lock.
-	catchupDone := b.catchupDone
+	waiter := make(chan struct{})
+	if b.started {
+		b.waiters = append(b.waiters, waiter)
+	} else {
+		close(waiter)
+	}
 	b.mu.Unlock()
-
-	return catchupDone
+	return waiter
 }
 
 func (b *streamBackfillCoordinator) startRepeatingStreamCatchups(ctx context.Context) error {

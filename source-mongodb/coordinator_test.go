@@ -26,14 +26,14 @@ func TestBatchStreamCoordinator(t *testing.T) {
 	select {
 	case <-coord.streamsCaughtUp():
 	default:
-		t.Error("expected streams to be caught up on initialization")
+		require.Fail(t, "expected streams to be caught up on initialization")
 	}
 
 	require.NoError(t, coord.startCatchingUp(ctx))
 
 	select {
 	case <-coord.streamsCaughtUp():
-		t.Error("expected streams to not be caught up after starting catch up")
+		require.Fail(t, "expected streams to not be caught up after starting catch up")
 	default:
 	}
 
@@ -43,7 +43,7 @@ func TestBatchStreamCoordinator(t *testing.T) {
 
 	select {
 	case <-coord.streamsCaughtUp():
-		t.Error("expected streams to not be caught up after only one stream got caught up")
+		require.Fail(t, "expected streams to not be caught up after only one stream got caught up")
 	default:
 	}
 
@@ -53,14 +53,39 @@ func TestBatchStreamCoordinator(t *testing.T) {
 	select {
 	case <-coord.streamsCaughtUp():
 	default:
-		t.Error("expected streams to be caught up after all streams got caught up")
+		require.Fail(t, "expected streams to be caught up after all streams got caught up")
 	}
 
 	require.NoError(t, coord.startCatchingUp(ctx))
 
 	select {
 	case <-coord.streamsCaughtUp():
-		t.Error("expected streams to not be caught up after starting catch up for the second time")
+		require.Fail(t, "expected streams to not be caught up after starting catch up for the second time")
 	default:
+	}
+}
+
+func TestBatchStreamCoordinatorWaitRace(t *testing.T) {
+	ctx := context.Background()
+
+	getOpTime := func(_ context.Context) (primitive.Timestamp, error) {
+		return primitive.Timestamp{T: 1000}, nil
+	}
+
+	bindings := []bindingInfo{
+		{resource: resource{Database: "first"}},
+	}
+
+	coord := newBatchStreamCoordinator(bindings, getOpTime)
+
+	require.NoError(t, coord.startCatchingUp(ctx))
+	doneChan := coord.streamsCaughtUp()
+	require.NoError(t, coord.startCatchingUp(ctx))
+	require.True(t, coord.gotCaughtUp("first", primitive.Timestamp{T: 1001}))
+
+	select {
+	case <-doneChan:
+	default:
+		require.FailNow(t, "channel not closed")
 	}
 }
