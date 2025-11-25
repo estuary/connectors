@@ -21,6 +21,8 @@ collections:
         intToNumber: { type: number }
         int64ToNumber: { type: number, maximum: 10000000000000000000}
         fieldWithProjection: { type: string }
+        stringAddMaxLength: { type: string, maxLength: 16 }
+        stringIncreaseMaxLength: { type: string, maxLength: 32 }
       required: [key, scalarValue, requiredNumeric]
     key: [/key]
     projections:

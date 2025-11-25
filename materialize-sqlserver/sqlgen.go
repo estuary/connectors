@@ -87,8 +87,8 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 					// stored in the column, not the character count.
 					// see https://learn.microsoft.com/en-us/sql/t-sql/data-types/char-and-varchar-transact-sql?view=sql-server-2017#remarks
 					// and https://learn.microsoft.com/en-us/sql/sql-server/maximum-capacity-specifications-for-sql-server?view=sql-server-2017
-					sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)),
-					sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
+					MapSizedText(stringType, MaxPKStringSize, collation),
+					MapSizedText(stringType, MaxStringSize, collation),
 				),
 				WithFormat: map[string]sql.MapProjectionFn{
 					"date":      dateMapping,
@@ -109,6 +109,7 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 			"date":      {sql.NewMigrationSpec([]string{textType}, nocast)},
 			"time":      {sql.NewMigrationSpec([]string{textType}, nocast)},
 			"datetime2": {sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(datetimeToStringCast))},
+			"varchar":   {sql.NewMigrationSpecTarget(&StringSizeMigrationTarget{}, nocast)},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -337,9 +338,9 @@ SELECT TOP 0 -1, NULL
 
 {{ define "loadQueryNoFlowDocument" }}
 {{ if not $.DeltaUpdates -}}
-SELECT {{ $.Binding }}, 
+SELECT {{ $.Binding }},
 (
-	SELECT 
+	SELECT
 		{{- range $i, $col := $.RootLevelColumns}}
 			{{- if $i}},{{end}}
 		{{Literal $col.Field}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
@@ -360,7 +361,7 @@ SELECT TOP 0 -1, NULL
 -- If there are no updates to a table, we can just do a direct copy from temporary table into target table
 
 {{ define "directCopy" }}
-	INSERT INTO {{ $.Identifier }} 
+	INSERT INTO {{ $.Identifier }}
 		(
 			{{ range $ind, $key := $.Columns }}
 				{{- if $ind }}, {{ end -}}
