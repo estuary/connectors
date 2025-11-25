@@ -13,6 +13,9 @@ import (
 // Valid characters are: letters (a-z, A-Z), numbers (0-9), and underscores (_).
 var identifierSanitizerRegexp = regexp.MustCompile(`[^_0-9a-zA-Z]`)
 
+// Regex to check if identifier starts with a letter
+var identifierStartsWithLetterRegexp = regexp.MustCompile(`^[a-zA-Z]`)
+
 // sanitizeSpannerIdentifier normalizes an identifier to meet Spanner's rules:
 // - Replaces invalid characters with underscores
 // - Ensures it starts with a letter (prefixes with 'c_' if it starts with a digit or underscore)
@@ -25,7 +28,7 @@ func sanitizeSpannerIdentifier(identifier string) string {
 	sanitized := identifierSanitizerRegexp.ReplaceAllString(identifier, "_")
 
 	// Ensure it starts with a letter (Spanner requirement)
-	if !regexp.MustCompile(`^[a-zA-Z]`).MatchString(sanitized) {
+	if !identifierStartsWithLetterRegexp.MatchString(sanitized) {
 		sanitized = "c_" + sanitized
 	}
 
