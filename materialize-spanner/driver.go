@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"strings"
-	"sync"
 	"text/template"
 	"time"
 
@@ -23,7 +22,6 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
-	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 )
@@ -332,7 +330,9 @@ func newTransactor(
 
 	templates := renderTemplates(ep.Dialect, cfg.Advanced.KeyDistributionOptimization)
 
-	// Query node count and calculate partitions for key distribution optimization
+	// Calculate number of partitions for parallel flushing
+	// When key distribution optimization is enabled, use nodes × 10
+	// When disabled, use a minimum of 2 partitions for parallelism
 	var numPartitions int
 	if cfg.Advanced.KeyDistributionOptimization {
 		nodeCount, err := queryNodeCount(ctx, cfg.ProjectID, cfg.InstanceID, opts)
@@ -347,6 +347,10 @@ func newTransactor(
 			"nodeCount":     nodeCount,
 			"numPartitions": numPartitions,
 		}).Info("calculated partitions for key distribution optimization")
+	} else {
+		// Use 2 partitions for parallel flushing even without key distribution optimization
+		numPartitions = 2
+		log.WithField("numPartitions", numPartitions).Info("using default partitions for parallel flushing")
 	}
 
 	t := &transactor{
@@ -468,10 +472,17 @@ func (t *transactor) timedSpannerApply(ctx context.Context, mutations []*spanner
 // Load implements the Load phase using temporary tables with optimal batching
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	loadStart := time.Now()
-	var keyInsertionDuration, queryDuration time.Duration
+	var clearDuration, queryDuration time.Duration
 	var loadedCount int
 
+	ctx := it.Context()
+
+	// Create async batch flusher for parallel mutation flushes
+	flusher := newAsyncBatchFlusher(ctx, t, "load-insert-keys")
+	log.WithField("partitions", t.numPartitions).Info("load: using partition-based batching")
+
 	defer func() {
+		keyInsertionDuration := clearDuration + flusher.getTotalDuration()
 		log.WithFields(log.Fields{
 			"totalDuration":        time.Since(loadStart).Seconds(),
 			"keyInsertionDuration": keyInsertionDuration.Seconds(),
@@ -480,8 +491,6 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			"loadedDocs":           loadedCount,
 		}).Info("load: phase complete")
 	}()
-
-	ctx := it.Context()
 
 	// Track which bindings have keys and prepare for mutation batching
 	type bindingState struct {
@@ -492,107 +501,6 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	bindingStates := make(map[int]*bindingState)
 
 	hadLoads := false
-	batchCount := 0
-
-	// Use partition-based batching if key distribution optimization is enabled
-	var currentBatch mutationBatch
-	var partitionedBatch *partitionedBatches
-	var flushMutex sync.Mutex
-	var durationMutex sync.Mutex
-
-	// Errgroup for managing all background flush operations
-	flushGroup, _ := errgroup.WithContext(ctx)
-	flushGroup.SetLimit(t.numPartitions) // Limit to 5 concurrent flush goroutines
-
-	if t.cfg.Advanced.KeyDistributionOptimization && t.numPartitions > 0 {
-		partitionedBatch = newPartitionedBatches(t.numPartitions)
-		log.WithField("partitions", t.numPartitions).Info("load: using partition-based batching")
-	} else {
-		currentBatch.reset()
-	}
-
-	// Helper function to flush a single batch (for both partitioned and non-partitioned)
-	flushSingleBatch := func(mutations []*spanner.Mutation, mutationCount int, byteSize int, batchNum int) (time.Duration, error) {
-		if len(mutations) == 0 {
-			return 0, nil
-		}
-
-		_, batchDuration, err := t.timedSpannerApply(ctx, mutations, fmt.Sprintf("load-insert-keys-batch-%d", batchNum))
-		if err != nil {
-			return 0, fmt.Errorf("applying load batch %d (%d operations, %d mutations): %w", batchNum, len(mutations), mutationCount, err)
-		}
-
-		log.WithFields(log.Fields{
-			"operations":    len(mutations),
-			"mutationCount": mutationCount,
-			"bytes":         byteSize,
-			"batch":         batchNum,
-			"duration":      batchDuration.Seconds(),
-		}).Info("load: inserted load keys batch")
-
-		return batchDuration, nil
-	}
-
-	// Helper function to launch async flushes for partitions (non-blocking)
-	flushPartitionsAsync := func(partitionIndices []int) {
-		if len(partitionIndices) == 0 {
-			return
-		}
-
-		for _, partIdx := range partitionIndices {
-			partIdx := partIdx // Capture loop variable
-			batch := partitionedBatch.getBatch(partIdx)
-
-			if len(batch.mutations) == 0 {
-				continue
-			}
-
-			// Make a copy of the mutations for this batch
-			mutations := make([]*spanner.Mutation, len(batch.mutations))
-			copy(mutations, batch.mutations)
-			mutationCount := batch.mutationCount
-			byteSize := batch.byteSize
-
-			// Reset the partition batch before launching goroutine
-			partitionedBatch.reset(partIdx)
-
-			// Launch async flush via the shared errgroup
-			flushGroup.Go(func() error {
-				flushMutex.Lock()
-				batchCount++
-				batchNum := batchCount
-				flushMutex.Unlock()
-
-				duration, err := flushSingleBatch(mutations, mutationCount, byteSize, batchNum)
-				if err != nil {
-					return err
-				}
-
-				durationMutex.Lock()
-				keyInsertionDuration += duration
-				durationMutex.Unlock()
-
-				return nil
-			})
-		}
-	}
-
-	// Helper function to flush current batch (non-partitioned mode)
-	flushBatch := func() error {
-		if len(currentBatch.mutations) == 0 {
-			return nil
-		}
-
-		batchCount++
-		duration, err := flushSingleBatch(currentBatch.mutations, currentBatch.mutationCount, currentBatch.byteSize, batchCount)
-		if err != nil {
-			return err
-		}
-
-		keyInsertionDuration += duration
-		currentBatch.reset()
-		return nil
-	}
 
 	// Step 1: Iterate through keys, create temp tables, and insert keys with optimal batching
 	for it.Next() {
@@ -608,11 +516,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// Clear any existing data from the table using a mutation
 			// Load tables are persistent and pre-created, so we need to delete old data
 			deleteMutation := spanner.Delete(tempTableName, spanner.AllKeys())
-			_, clearDuration, err := t.timedSpannerApply(ctx, []*spanner.Mutation{deleteMutation}, "load-clear-temp-table")
+			_, duration, err := t.timedSpannerApply(ctx, []*spanner.Mutation{deleteMutation}, "load-clear-temp-table")
 			if err != nil {
 				return fmt.Errorf("clearing temporary load table for binding %d: %w", bindingIdx, err)
 			}
-			keyInsertionDuration += clearDuration
+			clearDuration += duration
 
 			keyColumnNames := make([]string, 0, len(b.target.Keys)+1)
 
@@ -643,10 +551,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		// Convert key values to Spanner-compatible types
 		spannerKeyVals := make([]interface{}, 0, len(converted)+1)
 
-		var keyHash int64
-		// If key distribution optimization is enabled, compute and prepend the hash
+		// Compute key hash for partition routing (always computed for distribution)
+		keyHash := computeKeyHash(converted)
+
+		// If key distribution optimization is enabled, prepend the hash to the values
 		if t.cfg.Advanced.KeyDistributionOptimization {
-			keyHash = computeKeyHash(converted)
 			spannerKeyVals = append(spannerKeyVals, keyHash)
 		}
 
@@ -662,25 +571,13 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		// Note: Each column counts as one mutation in Spanner's mutation count
 		mutation := spanner.Insert(state.tempTableName, state.keyColumnNames, spannerKeyVals)
 
-		if partitionedBatch != nil {
-			// Route to partition based on hash
-			partitionIdx := partitionedBatch.getPartitionIndex(keyHash)
-			partitionedBatch.addMutation(partitionIdx, mutation, len(converted))
+		// Route to partition based on hash
+		partitionIdx := flusher.partitionedBatch.getPartitionIndex(keyHash)
+		flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(spannerKeyVals))
 
-			// Check if any partitions are ready to flush and launch async
-			readyPartitions := partitionedBatch.getReadyPartitions()
-			flushPartitionsAsync(readyPartitions)
-		} else {
-			// Non-partitioned mode
-			currentBatch.addMutation(mutation, len(converted))
-
-			// Flush if batch limits reached
-			if currentBatch.shouldFlush() {
-				if err := flushBatch(); err != nil {
-					return err
-				}
-			}
-		}
+		// Check if any partitions are ready to flush and launch async
+		readyPartitions := flusher.partitionedBatch.getReadyPartitions()
+		flusher.flushPartitionsAsync(readyPartitions)
 	}
 
 	if it.Err() != nil {
@@ -692,22 +589,15 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	// Flush any remaining mutations asynchronously
-	if partitionedBatch != nil {
-		// Launch async flushes for all non-empty partitions
-		nonEmptyPartitions := partitionedBatch.getNonEmptyPartitions()
-		flushPartitionsAsync(nonEmptyPartitions)
-	} else {
-		if err := flushBatch(); err != nil {
-			return err
-		}
-	}
+	nonEmptyPartitions := flusher.partitionedBatch.getNonEmptyPartitions()
+	flusher.flushPartitionsAsync(nonEmptyPartitions)
 
 	// Wait for all flushes (both background and final) to complete
-	if err := flushGroup.Wait(); err != nil {
+	if err := flusher.wait(); err != nil {
 		return fmt.Errorf("waiting for all flushes: %w", err)
 	}
 
-	log.WithField("batches", batchCount).Info("load: completed inserting all load keys")
+	log.WithField("batches", flusher.getBatchCount()).Info("load: completed inserting all load keys")
 
 	// Step 2: Build and execute single UNION ALL query to fetch all documents
 	t.be.StartedEvaluatingLoads()
@@ -768,105 +658,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	storeStart := time.Now()
 	var storeCount int
-	var storeBytes int
-	var storeByteMutex sync.Mutex
 
 	ctx := it.Context()
 
-	// Use partition-based batching if key distribution optimization is enabled
-	var currentBatch mutationBatch
-	var partitionedBatch *partitionedBatches
-	var flushMutex sync.Mutex
-
-	// Errgroup for managing all background flush operations
-	flushGroup, _ := errgroup.WithContext(ctx)
-	flushGroup.SetLimit(t.numPartitions) // Limit to 5 concurrent flush goroutines
-
-	if t.cfg.Advanced.KeyDistributionOptimization && t.numPartitions > 0 {
-		partitionedBatch = newPartitionedBatches(t.numPartitions)
-		log.WithField("partitions", t.numPartitions).Info("store: using partition-based batching")
-	} else {
-		currentBatch.reset()
-	}
-
-	batchCounter := 0
-
-	// Helper function to flush a single batch
-	flushSingleBatch := func(mutations []*spanner.Mutation, mutationCount int, byteSize int, batchNum int) error {
-		if len(mutations) == 0 {
-			return nil
-		}
-
-		_, batchDuration, err := t.timedSpannerApply(ctx, mutations, fmt.Sprintf("store-batch-%d", batchNum))
-		if err != nil {
-			return fmt.Errorf("applying batch %d (%d mutations): %w", batchNum, mutationCount, err)
-		}
-
-		log.WithFields(log.Fields{
-			"operations":    len(mutations),
-			"mutationCount": mutationCount,
-			"bytes":         byteSize,
-			"batch":         batchNum,
-			"batchDuration": batchDuration.Seconds(),
-		}).Info("store: applied mutation batch")
-
-		storeByteMutex.Lock()
-		storeBytes += byteSize
-		storeByteMutex.Unlock()
-
-		return nil
-	}
-
-	// Helper function to launch async flushes for partitions (non-blocking)
-	flushPartitionsAsync := func(partitionIndices []int) {
-		if len(partitionIndices) == 0 {
-			return
-		}
-
-		for _, partIdx := range partitionIndices {
-			partIdx := partIdx // Capture loop variable
-			batch := partitionedBatch.getBatch(partIdx)
-
-			if len(batch.mutations) == 0 {
-				continue
-			}
-
-			// Make a copy of the mutations for this batch
-			mutations := make([]*spanner.Mutation, len(batch.mutations))
-			copy(mutations, batch.mutations)
-			mutationCount := batch.mutationCount
-			byteSize := batch.byteSize
-
-			// Reset the partition batch before launching goroutine
-			partitionedBatch.reset(partIdx)
-
-			// Launch async flush via the shared errgroup
-			flushGroup.Go(func() error {
-				flushMutex.Lock()
-				batchCounter++
-				batchNum := batchCounter
-				flushMutex.Unlock()
-
-				return flushSingleBatch(mutations, mutationCount, byteSize, batchNum)
-			})
-		}
-	}
-
-	// Helper function to flush current batch (non-partitioned mode)
-	flushBatch := func() error {
-		if len(currentBatch.mutations) == 0 {
-			return nil
-		}
-
-		batchCounter++
-		err := flushSingleBatch(currentBatch.mutations, currentBatch.mutationCount, currentBatch.byteSize, batchCounter)
-		if err != nil {
-			return err
-		}
-
-		currentBatch.reset()
-		return nil
-	}
+	// Create async batch flusher for parallel mutation flushes
+	flusher := newAsyncBatchFlusher(ctx, t, "store")
+	log.WithField("partitions", t.numPartitions).Info("store: using partition-based batching")
 
 	// Process all store operations
 	for it.Next() {
@@ -889,10 +686,11 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Convert key values to Spanner-compatible types
 			spannerKeyValues := make([]interface{}, 0, len(keyValues)+1)
 
-			var keyHash int64
-			// If key distribution optimization is enabled, compute and prepend the hash
+			// Compute key hash for partition routing (always computed for distribution)
+			keyHash := computeKeyHash(keyValues)
+
+			// If key distribution optimization is enabled, prepend the hash to the values
 			if t.cfg.Advanced.KeyDistributionOptimization {
-				keyHash = computeKeyHash(keyValues)
 				spannerKeyValues = append(spannerKeyValues, keyHash)
 			}
 
@@ -908,25 +706,13 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			key := spanner.Key(spannerKeyValues)
 			mutation = spanner.Delete(b.target.Identifier, spanner.KeySetFromKeys(key))
 
-			if partitionedBatch != nil {
-				// Route to partition based on hash
-				partitionIdx := partitionedBatch.getPartitionIndex(keyHash)
-				partitionedBatch.addMutation(partitionIdx, mutation, len(keyValues))
+			// Route to partition based on hash
+			partitionIdx := flusher.partitionedBatch.getPartitionIndex(keyHash)
+			flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(keyValues))
 
-				// Check if any partitions are ready to flush and launch async
-				readyPartitions := partitionedBatch.getReadyPartitions()
-				flushPartitionsAsync(readyPartitions)
-			} else {
-				// Non-partitioned mode
-				currentBatch.addMutation(mutation, len(keyValues))
-
-				// Flush if batch limits reached
-				if currentBatch.shouldFlush() {
-					if err := flushBatch(); err != nil {
-						return nil, err
-					}
-				}
-			}
+			// Check if any partitions are ready to flush and launch async
+			readyPartitions := flusher.partitionedBatch.getReadyPartitions()
+			flusher.flushPartitionsAsync(readyPartitions)
 			continue
 		} else {
 			// Build mutation for insert or update
@@ -939,12 +725,13 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Convert values to Spanner-compatible types
 			spannerValues := make([]interface{}, 0, len(values)+1)
 
-			var keyHash int64
-			// If key distribution optimization is enabled, compute and prepend the hash
+			// Compute key hash for partition routing (always computed for distribution)
 			// The hash is computed from the key columns (first len(b.target.Keys) values)
+			keyValues := values[:len(b.target.Keys)]
+			keyHash := computeKeyHash(keyValues)
+
+			// If key distribution optimization is enabled, prepend the hash to the values
 			if t.cfg.Advanced.KeyDistributionOptimization {
-				keyValues := values[:len(b.target.Keys)]
-				keyHash = computeKeyHash(keyValues)
 				spannerValues = append(spannerValues, keyHash)
 			}
 
@@ -963,25 +750,13 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			mutation = spanner.InsertOrUpdate(b.target.Identifier, b.columnNames, spannerValues)
 
-			if partitionedBatch != nil {
-				// Route to partition based on hash
-				partitionIdx := partitionedBatch.getPartitionIndex(keyHash)
-				partitionedBatch.addMutation(partitionIdx, mutation, len(values))
+			// Route to partition based on hash
+			partitionIdx := flusher.partitionedBatch.getPartitionIndex(keyHash)
+			flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(values))
 
-				// Check if any partitions are ready to flush and launch async
-				readyPartitions := partitionedBatch.getReadyPartitions()
-				flushPartitionsAsync(readyPartitions)
-			} else {
-				// Non-partitioned mode
-				currentBatch.addMutation(mutation, len(values))
-
-				// Flush if batch limits reached
-				if currentBatch.shouldFlush() {
-					if err := flushBatch(); err != nil {
-						return nil, err
-					}
-				}
-			}
+			// Check if any partitions are ready to flush and launch async
+			readyPartitions := flusher.partitionedBatch.getReadyPartitions()
+			flusher.flushPartitionsAsync(readyPartitions)
 		}
 	}
 
@@ -999,13 +774,20 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				storeDuration := time.Since(storeStart)
 				commitDuration = time.Since(commitStart)
 
+				// Calculate total bytes from all flushed batches
+				storeBytes := 0
+				for i := 0; i < t.numPartitions; i++ {
+					batch := flusher.partitionedBatch.getBatch(i)
+					storeBytes += batch.byteSize
+				}
+
 				log.WithFields(log.Fields{
 					"totalDuration":       storeDuration.Seconds(),
 					"storePhaseDuration":  (storeDuration - commitDuration).Seconds(),
 					"commitPhaseDuration": commitDuration.Seconds(),
 					"storeCount":          storeCount,
 					"storeBytes":          storeBytes,
-					"numBatches":          batchCounter,
+					"numBatches":          flusher.getBatchCount(),
 				}).Info("store: phase complete")
 			}()
 
@@ -1032,31 +814,20 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				},
 			)
 
-			// Add fence mutation to appropriate batch
-			if partitionedBatch != nil {
-				// For fence mutations, we can add to partition 0 (arbitrary choice)
-				// since fence checkpoints don't have a natural hash key
-				partitionedBatch.addMutation(0, fenceMutation, 5)
+			// Add fence mutation to partition 0 (arbitrary choice)
+			// since fence checkpoints don't have a natural hash key
+			flusher.partitionedBatch.addMutation(0, fenceMutation, 5)
 
-				// Flush all non-empty partitions asynchronously (final flush with fence)
-				nonEmptyPartitions := partitionedBatch.getNonEmptyPartitions()
-				flushPartitionsAsync(nonEmptyPartitions)
-			} else {
-				// Non-partitioned mode
-				currentBatch.addMutation(fenceMutation, 5)
-
-				// Flush the final batch (includes fence mutation)
-				if err := flushBatch(); err != nil {
-					return err
-				}
-			}
+			// Flush all non-empty partitions asynchronously (final flush with fence)
+			nonEmptyPartitions := flusher.partitionedBatch.getNonEmptyPartitions()
+			flusher.flushPartitionsAsync(nonEmptyPartitions)
 
 			// Wait for all flushes (both background and final) to complete
-			if err := flushGroup.Wait(); err != nil {
+			if err := flusher.wait(); err != nil {
 				return fmt.Errorf("waiting for all flushes: %w", err)
 			}
 
-			log.WithField("batches", batchCounter).Info("store: completed all mutation batches")
+			log.WithField("batches", flusher.getBatchCount()).Info("store: completed all mutation batches")
 
 			return nil
 		})
