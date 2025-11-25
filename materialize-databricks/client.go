@@ -349,11 +349,6 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 	return sql.Fence{}, nil
 }
 
-func (c *client) FlushDDL(ctx context.Context) error {
-	// Databricks executes DDL immediately, no batching needed
-	return nil
-}
-
 func (c *client) Close() {
 	c.db.Close()
 }

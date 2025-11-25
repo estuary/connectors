@@ -443,11 +443,6 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 	return fence, nil
 }
 
-func (c *client) FlushDDL(ctx context.Context) error {
-	// Azure Fabric Warehouse executes DDL immediately, no batching needed
-	return nil
-}
-
 func (c *client) Close() {
 	c.db.Close()
 }

@@ -116,9 +116,7 @@ func (c *client) addPendingDDL(statements ...string) {
 	c.ddlMutex.Lock()
 	defer c.ddlMutex.Unlock()
 	for _, stmt := range statements {
-		if stmt != "" {
-			c.pendingDDL = append(c.pendingDDL, stmt)
-		}
+		c.pendingDDL = append(c.pendingDDL, stmt)
 	}
 }
 
@@ -232,7 +230,6 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		res = tc.Resource.(tableConfig)
 	}
 
-	// Accumulate DDL statements for batch execution
 	c.addPendingDDL(tc.TableCreateSql)
 
 	if res.AdditionalSql != "" {
@@ -251,7 +248,6 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 	stmt := fmt.Sprintf("DROP TABLE %s", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		// Accumulate for batched DDL execution
 		c.addPendingDDL(stmt)
 		return nil
 	}, nil
@@ -259,11 +255,10 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 
 func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
 	// Spanner doesn't have TRUNCATE TABLE, so we use DELETE FROM without WHERE clause
-	// Note: For large tables, this can be slow. Consider using Partitioned DML in the future.
+	// For large tables, this can be slow.
 	stmt := fmt.Sprintf("DELETE FROM %s WHERE TRUE", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		// Use DML to delete all rows
 		_, err := c.dataClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
 			_, err := txn.Update(ctx, spanner.Statement{SQL: stmt})
 			return err
@@ -275,7 +270,6 @@ func (c *client) TruncateTable(ctx context.Context, path []string) (string, boil
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var ddlStatements []string
 
-	// Spanner only supports adding columns, not dropping NOT NULL constraints after creation
 	if len(ta.AddColumns) > 0 {
 		var alterColumnStmtBuilder strings.Builder
 		if err := c.templates.alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
@@ -294,8 +288,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		// Spanner has limited support for column type changes
-		// For now, we'll try to generate migration steps, but many won't work
+		// TODO: test migrations
 		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges); err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		} else {
@@ -308,7 +301,6 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 			return nil
 		}
 
-		// Accumulate for batched DDL execution
 		c.addPendingDDL(ddlStatements...)
 		return nil
 	}, nil
@@ -346,7 +338,6 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, error) {
 	stmt := fmt.Sprintf("CREATE SCHEMA IF NOT EXISTS %s", c.ep.Dialect.Identifier(schemaName))
 
-	// Accumulate for batched DDL execution
 	c.addPendingDDL(stmt)
 
 	return stmt, nil
@@ -370,7 +361,6 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 }
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	log.Info("client: installing fence")
 	// First, ensure the checkpoints table exists
 	createTableStmt := fmt.Sprintf(`
 		CREATE TABLE IF NOT EXISTS %s (
@@ -391,10 +381,7 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 	}
 
 	if err := op.Wait(ctx); err != nil {
-		// Ignore "already exists" errors
-		if !strings.Contains(err.Error(), "already exists") {
-			return sql.Fence{}, fmt.Errorf("waiting for checkpoints table creation: %w", err)
-		}
+		return sql.Fence{}, fmt.Errorf("waiting for checkpoints table creation: %w", err)
 	}
 
 	// Now install/update the fence using the template

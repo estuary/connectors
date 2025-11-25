@@ -184,11 +184,6 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 	return sql.StdInstallFence(ctx, c.db, checkpoints, fence)
 }
 
-func (c *client) FlushDDL(ctx context.Context) error {
-	// CrateDB executes DDL immediately, no batching needed
-	return nil
-}
-
 func (c *client) Close() {
 	c.db.Close()
 }

@@ -187,11 +187,6 @@ func (c *client) InstallFence(_ context.Context, _ sql.Table, _ sql.Fence) (sql.
 	return sql.Fence{}, nil
 }
 
-func (c *client) FlushDDL(ctx context.Context) error {
-	// Starburst executes DDL immediately, no batching needed
-	return nil
-}
-
 func (c *client) Close() {
 	c.db.Close()
 }

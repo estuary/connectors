@@ -419,10 +419,6 @@ func (c *checkpointRecoverer) RecoverCheckpoint(context.Context, pf.Materializat
 	return c.cp, nil
 }
 
-func (s *sqlMaterialization[EC, RC]) FlushDDL(ctx context.Context) error {
-	return s.client.FlushDDL(ctx)
-}
-
 func (s *sqlMaterialization[EC, RC]) Close(ctx context.Context) {
 	s.client.Close()
 }

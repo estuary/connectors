@@ -157,7 +157,7 @@ func newSpannerDriver() *sql.Driver[config, tableConfig] {
 			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
-				MetaCheckpoints:     sql.FlowCheckpointsTable(sql.TablePath{}),
+				MetaCheckpoints:     sql.FlowCheckpointsTable(nil),
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
