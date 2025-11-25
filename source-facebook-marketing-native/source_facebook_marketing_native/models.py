@@ -680,7 +680,7 @@ InsightsFetchChangesFn = Callable[
 class AdAccount(FacebookResource):
     name: ClassVar[str] = ResourceName.AD_ACCOUNT
     primary_keys: ClassVar[list[str]] = ["/id"]
-    endpoint: ClassVar[str] = "/"
+    endpoint: ClassVar[str] = ""
     fields: ClassVar[list[str]] = [
         F.ID,
         F.ACCOUNT_ID,
@@ -704,7 +704,6 @@ class AdAccount(FacebookResource):
         F.END_ADVERTISER,
         F.END_ADVERTISER_NAME,
         F.EXTENDED_CREDIT_INVOICE_GROUP,
-        F.FAILED_DELIVERY_CHECKS,
         F.FB_ENTITY,
         F.FUNDING_SOURCE,
         F.FUNDING_SOURCE_DETAILS,
