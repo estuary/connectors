@@ -6,7 +6,7 @@ from enum import Enum
 from logging import Logger
 from typing import AsyncGenerator, Generic, TypeVar
 
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPSession, Headers
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -22,6 +22,8 @@ from .permissions import PermissionManager
 from .fields import DELIVERY_INFO_FIELDS
 from .enums import Field
 
+
+MAX_500_ERROR_RETRY_ATTEMPTS = 5
 DEFAULT_PAGE_SIZE = 100
 UNSUPPORTED_FIELDS = {
     Field.UNIQUE_CONVERSIONS,
@@ -39,6 +41,7 @@ UNSUPPORTED_FIELDS = {
 
 # Permission error codes defined by Facebook API
 PERMISSION_ERROR_CODES = {100, 200, 10}
+
 
 class FacebookPermissionErrorType(Enum):
     BUSINESS_MANAGEMENT = "business_management"
@@ -203,6 +206,21 @@ class FacebookRequestParams(BaseModel):
         return {k: v for k, v in data.items() if v is not None}
 
 
+def _should_retry_request(
+    status: int,
+    headers: Headers,
+    body: bytes,
+    attempt: int,
+) -> bool:
+    # Facebook's Ads Insights API can return transient 500 errors under load or when
+    # requesting large amounts of data. We should retry these requests, but only a limited
+    # number of times to avoid a connector deadlock.
+    if status >= 500 and attempt < MAX_500_ERROR_RETRY_ATTEMPTS:
+        return True
+
+    return False
+
+
 # Although Facebook already has a Python client SDK, it is not asynchronous. We could use asyncio.to_thread to
 # run the synchronous methods in a thread, but we've seen that approach lead to performance issues in high-load scenarios.
 # So we've implemented a minimal async client with only the functionality we need.
@@ -247,6 +265,7 @@ class FacebookAPIClient:
                 self.log,
                 url,
                 params=request_params,
+                should_retry=_should_retry_request,
             )
         )
 
@@ -272,7 +291,7 @@ class FacebookAPIClient:
         url = f"{self.base_url}/{resource_model.endpoint}"
         if account_id:
             url = f"{self.base_url}/act_{account_id}/{resource_model.endpoint}"
-        
+
         self.log.debug(f"Built URL for {resource_model.name}: {url}")
 
         return url
@@ -338,7 +357,12 @@ class FacebookAPIClient:
 
         while True:
             response: FacebookResourceType = await self._fetch_with_error_handling(
-                resource_model, adapter, url, request_params, include_deleted, account_id
+                resource_model,
+                adapter,
+                url,
+                request_params,
+                include_deleted,
+                account_id,
             )
 
             if isinstance(response, FacebookSingleResponse):
@@ -381,7 +405,7 @@ class FacebookAPIClient:
             case FacebookPaginatedResponse():
                 for item in response.data:
                     yield item
-                
+
                 yield FacebookCursor(cursor=response.next_cursor)
             case FacebookSingleResponse():
                 if response.resource is not None:
@@ -402,7 +426,11 @@ class FacebookAPIClient:
 
     async def fetch_thumbnail_data_url(self, url: str) -> str | None:
         try:
-            headers, body = await self.http.request_stream(self.log, url)
+            headers, body = await self.http.request_stream(
+                self.log,
+                url,
+                should_retry=_should_retry_request,
+            )
             content_type = headers.get("Content-Type")
             if not content_type:
                 raise KeyError("Content-Type header not found in response")
@@ -455,9 +483,7 @@ class FacebookAPIClient:
             f"Removing field '{field_to_remove}' due to permission error: {error.error.message}"
         )
 
-        updated_fields = [
-            f for f in request_params.fields if f != field_to_remove
-        ]
+        updated_fields = [f for f in request_params.fields if f != field_to_remove]
         request_params.fields = updated_fields
 
         return await self._fetch_resource_data(
