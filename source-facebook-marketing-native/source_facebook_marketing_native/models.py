@@ -340,7 +340,10 @@ class InsightsConfig(CommonConfigMixin):
 
     @field_validator("action_breakdowns")
     @classmethod
-    def validate_action_breakdowns(cls, v: str) -> str:
+    def validate_action_breakdowns(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+
         fields = str_to_list(v)
         invalid = [ab for ab in fields if ab not in AD_INSIGHTS_VALID_ACTION_BREAKDOWNS]
         if invalid:
