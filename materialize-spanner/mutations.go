@@ -1,15 +1,19 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/big"
 	"strings"
+	"sync"
 	"time"
 
 	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 	sql "github.com/estuary/connectors/materialize-sql"
+	log "github.com/sirupsen/logrus"
+	"golang.org/x/sync/errgroup"
 )
 
 // buildInsertOrUpdateMutation creates a Spanner InsertOrUpdate mutation from a binding and values.
@@ -281,4 +285,119 @@ func (pb *partitionedBatches) reset(partitionIdx int) {
 		panic(fmt.Sprintf("partition index out of bounds: %d (numPartitions: %d)", partitionIdx, pb.numPartitions))
 	}
 	pb.batches[partitionIdx].reset()
+}
+
+// asyncBatchFlusher manages asynchronous parallel flushing of partitioned mutation batches.
+// It provides unified flush logic used by both Load and Store operations.
+type asyncBatchFlusher struct {
+	partitionedBatch *partitionedBatches
+	flushGroup       *errgroup.Group
+	batchCounter     int
+	counterMutex     sync.Mutex
+	t                *transactor
+	ctx              context.Context
+	operation        string // "load" or "store" for logging
+	durationMutex    sync.Mutex
+	totalDuration    time.Duration
+}
+
+// newAsyncBatchFlusher creates a new asyncBatchFlusher for managing parallel mutation flushes
+func newAsyncBatchFlusher(ctx context.Context, t *transactor, operation string) *asyncBatchFlusher {
+	flushGroup, _ := errgroup.WithContext(ctx)
+	flushGroup.SetLimit(t.numPartitions)
+
+	return &asyncBatchFlusher{
+		partitionedBatch: newPartitionedBatches(t.numPartitions),
+		flushGroup:       flushGroup,
+		batchCounter:     0,
+		t:                t,
+		ctx:              ctx,
+		operation:        operation,
+	}
+}
+
+// flushSingleBatch flushes a single batch of mutations to Spanner
+func (f *asyncBatchFlusher) flushSingleBatch(mutations []*spanner.Mutation, mutationCount int, byteSize int, batchNum int) (time.Duration, error) {
+	if len(mutations) == 0 {
+		return 0, nil
+	}
+
+	_, batchDuration, err := f.t.timedSpannerApply(f.ctx, mutations, fmt.Sprintf("%s-batch-%d", f.operation, batchNum))
+	if err != nil {
+		return 0, fmt.Errorf("applying %s batch %d (%d operations, %d mutations): %w", f.operation, batchNum, len(mutations), mutationCount, err)
+	}
+
+	log.WithFields(log.Fields{
+		"operation":     f.operation,
+		"operations":    len(mutations),
+		"mutationCount": mutationCount,
+		"bytes":         byteSize,
+		"batch":         batchNum,
+		"duration":      batchDuration.Seconds(),
+	}).Info(fmt.Sprintf("%s: applied mutation batch", f.operation))
+
+	return batchDuration, nil
+}
+
+// flushPartitionsAsync launches async flushes for the specified partition indices
+func (f *asyncBatchFlusher) flushPartitionsAsync(partitionIndices []int) {
+	if len(partitionIndices) == 0 {
+		return
+	}
+
+	for _, partIdx := range partitionIndices {
+		partIdx := partIdx // Capture loop variable
+		batch := f.partitionedBatch.getBatch(partIdx)
+
+		if len(batch.mutations) == 0 {
+			continue
+		}
+
+		// Make a copy of the mutations for this batch
+		mutations := make([]*spanner.Mutation, len(batch.mutations))
+		copy(mutations, batch.mutations)
+		mutationCount := batch.mutationCount
+		byteSize := batch.byteSize
+
+		// Reset the partition batch before launching goroutine
+		f.partitionedBatch.reset(partIdx)
+
+		// Launch async flush via the shared errgroup
+		f.flushGroup.Go(func() error {
+			f.counterMutex.Lock()
+			f.batchCounter++
+			batchNum := f.batchCounter
+			f.counterMutex.Unlock()
+
+			duration, err := f.flushSingleBatch(mutations, mutationCount, byteSize, batchNum)
+			if err != nil {
+				return err
+			}
+
+			f.durationMutex.Lock()
+			f.totalDuration += duration
+			f.durationMutex.Unlock()
+
+			return nil
+		})
+	}
+}
+
+// wait waits for all pending flush operations to complete
+func (f *asyncBatchFlusher) wait() error {
+	return f.flushGroup.Wait()
+}
+
+// getTotalDuration returns the cumulative duration of all flush operations
+func (f *asyncBatchFlusher) getTotalDuration() time.Duration {
+	f.durationMutex.Lock()
+	defer f.durationMutex.Unlock()
+	return f.totalDuration
+}
+
+// getBatchCount returns the total number of batches flushed
+func (f *asyncBatchFlusher) getBatchCount() int {
+	f.counterMutex.Lock()
+	defer f.counterMutex.Unlock()
+	return f.batchCounter
 }
