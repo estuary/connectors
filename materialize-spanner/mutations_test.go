@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"math"
 	"testing"
+	"time"
 
+	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -72,7 +75,9 @@ func TestToSpannerValue_Uint64Overflow(t *testing.T) {
 
 func TestPartitionedBatches_AddMutation_BoundsChecking(t *testing.T) {
 	pb := newPartitionedBatches(5)
-	mutation := spanner.Insert("test_table", []string{"col1"}, []interface{}{123})
+	values := []interface{}{int64(123)}
+	mutation := spanner.Insert("test_table", []string{"col1"}, values)
+	mutationSize := calculateMutationByteSize(values)
 
 	tests := []struct {
 		name          string
@@ -90,7 +95,7 @@ func TestPartitionedBatches_AddMutation_BoundsChecking(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := pb.addMutation(tt.partitionIdx, mutation, 1)
+			err := pb.addMutation(tt.partitionIdx, mutation, 1, mutationSize)
 			if tt.expectError {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), tt.errorContains)
@@ -134,11 +139,13 @@ func TestPartitionedBatches_GetBatch_BoundsChecking(t *testing.T) {
 
 func TestPartitionedBatches_Reset_BoundsChecking(t *testing.T) {
 	pb := newPartitionedBatches(5)
-	mutation := spanner.Insert("test_table", []string{"col1"}, []interface{}{123})
+	values := []interface{}{int64(123)}
+	mutation := spanner.Insert("test_table", []string{"col1"}, values)
+	mutationSize := calculateMutationByteSize(values)
 
 	// Add some mutations first
-	require.NoError(t, pb.addMutation(0, mutation, 1))
-	require.NoError(t, pb.addMutation(2, mutation, 1))
+	require.NoError(t, pb.addMutation(0, mutation, 1, mutationSize))
+	require.NoError(t, pb.addMutation(2, mutation, 1, mutationSize))
 
 	tests := []struct {
 		name          string
@@ -187,6 +194,200 @@ func TestPartitionedBatches_GetPartitionIndex(t *testing.T) {
 			// Verify result is always in valid range
 			assert.GreaterOrEqual(t, result, 0)
 			assert.Less(t, result, pb.numPartitions)
+		})
+	}
+}
+
+func TestCalculateValueSize(t *testing.T) {
+	tests := []struct {
+		name     string
+		value    interface{}
+		expected int
+	}{
+		// Nil values
+		{"nil", nil, 1},
+
+		// Primitives
+		{"int64", int64(123), 8},
+		{"float64", float64(123.456), 8},
+		{"bool", true, 1},
+
+		// Variable-length types
+		{"empty string", "", 0},
+		{"short string", "hello", 5},
+		{"long string", "hello world with more text", 26},
+		{"empty bytes", []byte{}, 0},
+		{"bytes", []byte{1, 2, 3, 4, 5}, 5},
+
+		// Time types
+		{"time.Time", time.Now(), 24},
+		{"civil.Date", civil.Date{Year: 2024, Month: 1, Day: 15}, 12},
+
+		// Spanner Null types - invalid
+		{"NullInt64 invalid", spanner.NullInt64{Valid: false}, 1},
+		{"NullFloat64 invalid", spanner.NullFloat64{Valid: false}, 1},
+		{"NullBool invalid", spanner.NullBool{Valid: false}, 1},
+		{"NullString invalid", spanner.NullString{Valid: false}, 1},
+		{"NullTime invalid", spanner.NullTime{Valid: false}, 1},
+		{"NullDate invalid", spanner.NullDate{Valid: false}, 1},
+		{"NullJSON invalid", spanner.NullJSON{Valid: false}, 1},
+
+		// Spanner Null types - valid
+		{"NullInt64 valid", spanner.NullInt64{Valid: true, Int64: 123}, 9},
+		{"NullFloat64 valid", spanner.NullFloat64{Valid: true, Float64: 123.456}, 9},
+		{"NullBool valid", spanner.NullBool{Valid: true, Bool: true}, 2},
+		{"NullString valid", spanner.NullString{Valid: true, StringVal: "test"}, 5},
+		{"NullTime valid", spanner.NullTime{Valid: true, Time: time.Now()}, 25},
+		{"NullDate valid", spanner.NullDate{Valid: true, Date: civil.Date{Year: 2024, Month: 1, Day: 15}}, 13},
+
+		// JSON types
+		{"json.RawMessage empty", json.RawMessage(""), 0},
+		{"json.RawMessage small", json.RawMessage(`{"key":"value"}`), 15},
+		{"json.RawMessage large", json.RawMessage(`{"name":"John","age":30,"city":"New York"}`), 42},
+		{"NullJSON with bytes", spanner.NullJSON{Valid: true, Value: []byte(`{"test":123}`)}, 13},
+		{"NullJSON with string", spanner.NullJSON{Valid: true, Value: "test"}, 5},
+		{"NullJSON with RawMessage", spanner.NullJSON{Valid: true, Value: json.RawMessage(`{"a":1}`)}, 8},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := calculateValueSize(tt.value)
+			assert.Equal(t, tt.expected, result, "Size mismatch for %s", tt.name)
+		})
+	}
+}
+
+func TestCalculateValueSize_UnknownType(t *testing.T) {
+	// Test that unknown types fallback to conservative estimate
+	type unknownType struct {
+		field string
+	}
+	result := calculateValueSize(unknownType{field: "test"})
+	assert.Equal(t, 100, result, "Unknown types should return 100 byte estimate")
+}
+
+func TestCalculateMutationByteSize(t *testing.T) {
+	tests := []struct {
+		name     string
+		values   []interface{}
+		expected int
+	}{
+		{
+			name:     "empty values",
+			values:   []interface{}{},
+			expected: 0,
+		},
+		{
+			name:     "single int64",
+			values:   []interface{}{int64(123)},
+			expected: 8,
+		},
+		{
+			name:     "multiple primitives",
+			values:   []interface{}{int64(123), float64(456.789), true},
+			expected: 8 + 8 + 1,
+		},
+		{
+			name:     "with strings",
+			values:   []interface{}{int64(1), "hello", "world"},
+			expected: 8 + 5 + 5,
+		},
+		{
+			name:     "with nil values",
+			values:   []interface{}{int64(1), nil, "test"},
+			expected: 8 + 1 + 4,
+		},
+		{
+			name:     "with JSON",
+			values:   []interface{}{int64(1), json.RawMessage(`{"key":"value"}`), "test"},
+			expected: 8 + 15 + 4,
+		},
+		{
+			name: "complex mutation",
+			values: []interface{}{
+				int64(123),                    // 8
+				"user@example.com",            // 16
+				true,                          // 1
+				json.RawMessage(`{"age":30}`), // 10
+				time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), // 24
+			},
+			expected: 8 + 16 + 1 + 10 + 24,
+		},
+		{
+			name: "with Spanner null types",
+			values: []interface{}{
+				spanner.NullInt64{Valid: true, Int64: 100},     // 9
+				spanner.NullString{Valid: true, StringVal: "x"}, // 2
+				spanner.NullBool{Valid: false},                 // 1
+			},
+			expected: 9 + 2 + 1,
+		},
+		{
+			name: "large document",
+			values: []interface{}{
+				int64(1),
+				"key",
+				json.RawMessage(`{"name":"John Doe","email":"john@example.com","address":{"street":"123 Main St","city":"New York","zip":"10001"},"tags":["user","active","premium"]}`),
+			},
+			expected: 8 + 3 + 148,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := calculateMutationByteSize(tt.values)
+			assert.Equal(t, tt.expected, result, "Size mismatch for %s", tt.name)
+		})
+	}
+}
+
+func TestCalculateMutationByteSize_AccuracyVsEstimate(t *testing.T) {
+	// This test demonstrates that the actual calculation is more accurate than
+	// the old fixed estimate of 100 bytes per column
+
+	tests := []struct {
+		name              string
+		values            []interface{}
+		oldEstimate       int // numColumns * 100
+		actualSize        int
+		accuracyImproved bool
+	}{
+		{
+			name:              "small values - old estimate too high",
+			values:            []interface{}{int64(1), int64(2), int64(3)},
+			oldEstimate:       3 * 100, // 300
+			actualSize:        3 * 8,   // 24
+			accuracyImproved: true,
+		},
+		{
+			name:              "mixed small and medium - old estimate still too high",
+			values:            []interface{}{int64(1), "test", true, float64(1.5)},
+			oldEstimate:       4 * 100,    // 400
+			actualSize:        8 + 4 + 1 + 8, // 21
+			accuracyImproved: true,
+		},
+		{
+			name: "large JSON - old estimate too low",
+			values: []interface{}{
+				int64(1),
+				json.RawMessage(`{"very":"large","json":"document","with":"many","fields":"and","nested":{"objects":"here","array":[1,2,3,4,5]}}`),
+			},
+			oldEstimate:       2 * 100, // 200
+			actualSize:        8 + 111, // 119
+			accuracyImproved: false, // Old estimate was actually closer in this case
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := calculateMutationByteSize(tt.values)
+			assert.Equal(t, tt.actualSize, result)
+
+			// The new calculation is different from the old estimate
+			assert.NotEqual(t, tt.oldEstimate, result)
+
+			t.Logf("Old estimate: %d bytes, Actual: %d bytes, Difference: %d bytes",
+				tt.oldEstimate, result, tt.oldEstimate-result)
 		})
 	}
 }

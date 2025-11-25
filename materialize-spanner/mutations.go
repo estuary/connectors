@@ -117,6 +117,93 @@ func toSpannerValue(val interface{}, columnName string, columnType string) (inte
 	}
 }
 
+// calculateValueSize calculates the approximate byte size of a value.
+// This is used to track mutation batch sizes more accurately than the fixed estimate.
+func calculateValueSize(val interface{}) int {
+	if val == nil {
+		return 1 // Just the validity flag
+	}
+
+	switch v := val.(type) {
+	case int64:
+		return 8
+	case float64:
+		return 8
+	case bool:
+		return 1
+	case string:
+		return len(v)
+	case []byte:
+		return len(v)
+	case time.Time:
+		return 24 // Time struct has 3 int64 fields
+	case civil.Date:
+		return 12 // Year(4) + Month(1) + Day(1) + padding
+	case spanner.NullInt64:
+		if !v.Valid {
+			return 1
+		}
+		return 9 // 8 for int64 + 1 for Valid flag
+	case spanner.NullFloat64:
+		if !v.Valid {
+			return 1
+		}
+		return 9 // 8 for float64 + 1 for Valid flag
+	case spanner.NullBool:
+		if !v.Valid {
+			return 1
+		}
+		return 2 // 1 for bool + 1 for Valid flag
+	case spanner.NullString:
+		if !v.Valid {
+			return 1
+		}
+		return len(v.StringVal) + 1
+	case spanner.NullTime:
+		if !v.Valid {
+			return 1
+		}
+		return 25 // 24 for Time + 1 for Valid flag
+	case spanner.NullDate:
+		if !v.Valid {
+			return 1
+		}
+		return 13 // 12 for Date + 1 for Valid flag
+	case spanner.NullJSON:
+		if !v.Valid {
+			return 1
+		}
+		// JSON is stored as []byte, string, or json.RawMessage
+		switch jsonVal := v.Value.(type) {
+		case []byte:
+			return len(jsonVal) + 1
+		case string:
+			return len(jsonVal) + 1
+		case json.RawMessage:
+			return len(jsonVal) + 1
+		default:
+			// Fallback: estimate for complex JSON
+			return 100
+		}
+	case json.RawMessage:
+		return len(v)
+	default:
+		// For unknown types, use a conservative estimate
+		return 100
+	}
+}
+
+// calculateMutationByteSize calculates the approximate byte size of a mutation
+// based on the values that will be used to create it. Only counts data values,
+// not metadata like table names or column names.
+func calculateMutationByteSize(values []interface{}) int {
+	size := 0
+	for _, val := range values {
+		size += calculateValueSize(val)
+	}
+	return size
+}
+
 // mutationBatch accumulates mutations for efficient batching
 type mutationBatch struct {
 	mutations    []*spanner.Mutation
@@ -127,7 +214,8 @@ type mutationBatch struct {
 const (
 	// Maximum mutations per commit (Spanner limit is 80,000)
 	// Note: Each column counts as one mutation, e.g. an insert of 5 columns = 5 mutations
-	maxMutationsPerBatch = 80000
+	// We use 75,000 to provide a safety margin since we check after adding mutations
+	maxMutationsPerBatch = 75000
 
 	// Maximum byte size per batch (1-5 MB is recommended by Spanner)
 	maxBytesPerBatch = 4 * 1024 * 1024 // 4 MB
@@ -135,10 +223,11 @@ const (
 
 // addMutation adds a mutation to the batch
 // columnCount is the number of columns affected (each column counts as one mutation in Spanner)
-func (mb *mutationBatch) addMutation(m *spanner.Mutation, columnCount int) {
+// actualByteSize is the calculated byte size of the mutation values
+func (mb *mutationBatch) addMutation(m *spanner.Mutation, columnCount int, actualByteSize int) {
 	mb.mutations = append(mb.mutations, m)
 	mb.mutationCount += columnCount
-	mb.byteSize += columnCount * estimatedBytesPerColumn
+	mb.byteSize += actualByteSize
 }
 
 // shouldFlush returns true if the batch should be flushed
@@ -186,11 +275,11 @@ func (pb *partitionedBatches) getPartitionIndex(hash int64) int {
 }
 
 // addMutation adds a mutation to the specified partition's batch
-func (pb *partitionedBatches) addMutation(partitionIdx int, m *spanner.Mutation, columnCount int) error {
+func (pb *partitionedBatches) addMutation(partitionIdx int, m *spanner.Mutation, columnCount int, actualByteSize int) error {
 	if partitionIdx < 0 || partitionIdx >= pb.numPartitions {
 		return fmt.Errorf("partition index out of bounds: %d (numPartitions: %d)", partitionIdx, pb.numPartitions)
 	}
-	pb.batches[partitionIdx].addMutation(m, columnCount)
+	pb.batches[partitionIdx].addMutation(m, columnCount, actualByteSize)
 	return nil
 }
 

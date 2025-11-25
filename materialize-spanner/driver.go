@@ -574,9 +574,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		// Note: Each column counts as one mutation in Spanner's mutation count
 		mutation := spanner.Insert(state.tempTableName, state.keyColumnNames, spannerKeyVals)
 
+		// Calculate actual byte size of the mutation values
+		mutationSize := calculateMutationByteSize(spannerKeyVals)
+
 		// Route to partition based on hash
 		partitionIdx := flusher.partitionedBatch.getPartitionIndex(keyHash)
-		if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(spannerKeyVals)); err != nil {
+		if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(spannerKeyVals), mutationSize); err != nil {
 			return fmt.Errorf("adding load mutation: %w", err)
 		}
 
@@ -663,6 +666,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	storeStart := time.Now()
 	var storeCount int
+	var storeBytes int
 
 	ctx := it.Context()
 
@@ -724,9 +728,13 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			key := spanner.Key(spannerKeyValues)
 			mutation = spanner.Delete(b.target.Identifier, spanner.KeySetFromKeys(key))
 
+			// Calculate actual byte size of the mutation values
+			mutationSize := calculateMutationByteSize(spannerKeyValues)
+			storeBytes += mutationSize
+
 			// Route to partition based on hash
 			partitionIdx := flusher.partitionedBatch.getPartitionIndex(keyHash)
-			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(keyValues)); err != nil {
+			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(keyValues), mutationSize); err != nil {
 				return nil, fmt.Errorf("adding delete mutation: %w", err)
 			}
 
@@ -773,9 +781,13 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			mutation = spanner.InsertOrUpdate(b.target.Identifier, b.columnNames, spannerValues)
 
+			// Calculate actual byte size of the mutation values
+			mutationSize := calculateMutationByteSize(spannerValues)
+			storeBytes += mutationSize
+
 			// Route to partition based on hash
 			partitionIdx := flusher.partitionedBatch.getPartitionIndex(keyHash)
-			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(values)); err != nil {
+			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(values), mutationSize); err != nil {
 				return nil, fmt.Errorf("adding store mutation: %w", err)
 			}
 
@@ -799,17 +811,6 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				storeDuration := time.Since(storeStart)
 				commitDuration = time.Since(commitStart)
 
-				// Calculate total bytes from all flushed batches
-				storeBytes := 0
-				for i := 0; i < t.numPartitions; i++ {
-					batch, err := flusher.partitionedBatch.getBatch(i)
-					if err != nil {
-						log.WithError(err).Error("error getting batch for stats calculation")
-						continue
-					}
-					storeBytes += batch.byteSize
-				}
-
 				log.WithFields(log.Fields{
 					"totalDuration":       storeDuration.Seconds(),
 					"storePhaseDuration":  (storeDuration - commitDuration).Seconds(),
@@ -831,21 +832,26 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			// Add fence update mutation to the current batch
 			// Use the standard checkpoint table name
+			fenceValues := []interface{}{
+				t.fence.Materialization.String(),
+				int64(t.fence.KeyBegin), // Convert uint32 to int64
+				int64(t.fence.KeyEnd),   // Convert uint32 to int64
+				int64(t.fence.Fence),    // Convert uint64 to int64
+				string(checkpointBytes),
+			}
 			fenceMutation := spanner.InsertOrUpdate(
 				sql.DefaultFlowCheckpoints,
 				[]string{"materialization", "key_begin", "key_end", "fence", "checkpoint"},
-				[]interface{}{
-					t.fence.Materialization.String(),
-					int64(t.fence.KeyBegin), // Convert uint32 to int64
-					int64(t.fence.KeyEnd),   // Convert uint32 to int64
-					int64(t.fence.Fence),    // Convert uint64 to int64
-					string(checkpointBytes),
-				},
+				fenceValues,
 			)
+
+			// Calculate actual byte size of the fence mutation values
+			mutationSize := calculateMutationByteSize(fenceValues)
+			storeBytes += mutationSize
 
 			// Add fence mutation to partition 0 (arbitrary choice)
 			// since fence checkpoints don't have a natural hash key
-			if err := flusher.partitionedBatch.addMutation(0, fenceMutation, 5); err != nil {
+			if err := flusher.partitionedBatch.addMutation(0, fenceMutation, 5, mutationSize); err != nil {
 				return fmt.Errorf("adding fence mutation: %w", err)
 			}
 
