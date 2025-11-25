@@ -270,7 +270,61 @@ func (c *client) TruncateTable(ctx context.Context, path []string) (string, boil
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var ddlStatements []string
 
-	if len(ta.AddColumns) > 0 {
+	if len(ta.DropNotNulls) > 0 {
+		// Query information_schema to get full column definitions
+		colDDL := make(map[string]string)
+
+		stmt := spanner.Statement{
+			SQL: `SELECT column_name, spanner_type, column_default
+			      FROM information_schema.columns
+			      WHERE table_schema = @schema AND table_name = @table`,
+			Params: map[string]interface{}{
+				"schema": ta.InfoLocation.TableSchema,
+				"table":  ta.InfoLocation.TableName,
+			},
+		}
+
+		iter := c.dataClient.Single().Query(ctx, stmt)
+		defer iter.Stop()
+
+		for {
+			row, err := iter.Next()
+			if err == iterator.Done {
+				break
+			}
+			if err != nil {
+				return "", nil, fmt.Errorf("querying columns for table %q in schema %q: %w",
+					ta.InfoLocation.TableName, ta.InfoLocation.TableSchema, err)
+			}
+
+			var columnName, spannerType string
+			var columnDefault spanner.NullString
+
+			if err := row.Columns(&columnName, &spannerType, &columnDefault); err != nil {
+				return "", nil, fmt.Errorf("scanning column row: %w", err)
+			}
+
+			// Build the DDL: spanner_type [DEFAULT (expression)]
+			ddl := spannerType
+			if columnDefault.Valid {
+				ddl += " DEFAULT " + columnDefault.StringVal
+			}
+
+			colDDL[columnName] = ddl
+		}
+
+		// Update the Type field with the complete DDL (without NOT NULL)
+		for idx := range ta.DropNotNulls {
+			col := ta.DropNotNulls[idx].Name
+			ddl, ok := colDDL[col]
+			if !ok {
+				return "", nil, fmt.Errorf("could not determine DDL for column %q", col)
+			}
+			ta.DropNotNulls[idx].Type = ddl
+		}
+	}
+
+	if len(ta.AddColumns) > 0 || len(ta.DropNotNulls) > 0 {
 		var alterColumnStmtBuilder strings.Builder
 		if err := c.templates.alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
@@ -280,11 +334,6 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		if alterColumnStmt != "" {
 			ddlStatements = append(ddlStatements, alterColumnStmt)
 		}
-	}
-
-	if len(ta.DropNotNulls) > 0 {
-		// Spanner does not support dropping NOT NULL constraints
-		return "", nil, fmt.Errorf("Spanner does not support dropping NOT NULL constraints on existing columns")
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {

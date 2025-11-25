@@ -183,17 +183,20 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 )
 {{ end }}
 
--- Templated query which performs table alterations by adding columns.
--- Note: Spanner does NOT support dropping NOT NULL constraints after table creation,
--- so we only handle adding columns here.
+-- Templated query which performs table alterations by adding columns and/or
+-- dropping nullability constraints. All table modifications are done in a
+-- single statement for efficiency.
 
 {{ define "alterTableColumns" }}
-{{- if $.AddColumns }}
 ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
 	ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}}
 {{- end }}
+{{- if and $.DropNotNulls $.AddColumns}},{{ end }}
+{{- range $ind, $col := $.DropNotNulls }}
+	{{- if $ind }},{{ end }}
+	ALTER COLUMN {{ ColumnIdentifier $col.Name }} {{$col.Type}}
 {{- end }}
 {{ end }}
 

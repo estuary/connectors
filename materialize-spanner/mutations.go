@@ -44,15 +44,8 @@ func toSpannerValue(val interface{}, columnName string, columnType string) (inte
 
 	switch v := val.(type) {
 	case json.RawMessage:
-		// JSON data - Spanner expects spanner.NullJSON for JSON columns
 		return spanner.NullJSON{Value: v, Valid: len(v) > 0}, nil
 	case []byte:
-		// Check if this might be JSON data (common for arrays/objects)
-		// If it starts with [ or {, treat it as JSON
-		if len(v) > 0 && (v[0] == '[' || v[0] == '{' || v[0] == '"') {
-			return spanner.NullJSON{Value: v, Valid: true}, nil
-		}
-		// Otherwise, binary data - store as BYTES
 		return v, nil
 	case string:
 		// Check column type to determine how to handle strings
@@ -133,15 +126,11 @@ type mutationBatch struct {
 
 const (
 	// Maximum mutations per commit (Spanner limit is 80,000)
-	// Note: Each insert/update/delete counts as (number of columns) mutations
-	// With indexes, the effective limit is lower (e.g., 1 index = 40,000 rows)
+	// Note: Each column counts as one mutation, e.g. an insert of 5 columns = 5 mutations
 	maxMutationsPerBatch = 80000
 
 	// Maximum byte size per batch (1-5 MB is recommended by Spanner)
 	maxBytesPerBatch = 4 * 1024 * 1024 // 4 MB
-
-	// Estimated average bytes per column mutation (conservative estimate)
-	estimatedBytesPerColumn = 100
 )
 
 // addMutation adds a mutation to the batch
