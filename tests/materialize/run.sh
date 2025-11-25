@@ -103,7 +103,7 @@ function drive_connector {
     local source=$1;
     local fixture=$2;
 
-    if [[ "${PERF_MODE}" != "true" ]]; then
+    if [[ "${PERF_MODE}" == "true" ]]; then
         # Drive the connector, writing its output into the snapshot.
         RUST_LOG=info flowctl preview --source ${source} --fixture ${fixture} --streaming-fixture --output-state --output-apply --network flow-test \
         || bail "connector invocation failed"
@@ -131,7 +131,7 @@ else
 fi
 
 # Drive it again to excercise any cleanup behavior when bindings are removed.
-if [[ "${PERF_MODE}" != "true" ]]; then
+if [[ "${PERF_MODE}" == "true" ]]; then
     drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.streaming_fixture.json
 else
     drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.fixture.json

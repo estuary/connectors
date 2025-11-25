@@ -1,5 +1,5 @@
 project_id: estuary-theatre
-instance_id: connectors-integration-test
+instance_id: connectors-test
 database: cymbal
 hardDelete: true
 advanced:
@@ -12,7 +12,7 @@ sops:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2024-02-01T17:08:49Z"
           enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
-    lastmodified: "2025-11-14T15:53:44Z"
-    mac: ENC[AES256_GCM,data:tt/Hcq/9fwuw4Yj9IqQLJsbXLcMIihFibMv/x4Ot0pfzZ3PPOgvq4MxRAT6pD8P5x7ujHIjQrv8BegGpDwoHi7OVyuTrl/KEenuabcbGQ0+N2yN0dRmQPh4risZz5Oomz5aKtgMqhDTC0M/ePGFDsuJvYSpS+eAZbzsW0wYc4c8=,iv:ovgK9I4sKyC0efisIUZkNQYSXRsE6Hgj4tfarD31ajM=,tag:RvXppwc7TDC6L1wLNZ0WWQ==,type:str]
+    lastmodified: "2025-11-25T11:10:42Z"
+    mac: ENC[AES256_GCM,data:I9nFWKN4FhuUmZhscf+p6cN9T0gVLNilCkc4ZTZNqtO1wDlHoHNmpML5E66qn28m+Dnr9ev/L6BgrwRswntHUzdWVrz4Hw7DimssKjf0Mv2F+vJvoPa3BedoG5svtKy+Slx0edfyH1tDuDdkYB9SEtx2kIzuhi06xMJBOz+4ZvU=,iv:0xIU3sdh2qkKpJ7AabeAnTE//tL40fYWe5Pex82l6eA=,tag:aZze6nWR/xq64V3efPLkDw==,type:str]
     encrypted_suffix: _sops
     version: 3.10.2

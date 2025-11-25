@@ -11,67 +11,35 @@ import (
 
 	"cloud.google.com/go/civil"
 	"cloud.google.com/go/spanner"
-	sql "github.com/estuary/connectors/materialize-sql"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
-
-// buildInsertOrUpdateMutation creates a Spanner InsertOrUpdate mutation from a binding and values.
-// InsertOrUpdate will insert a new row if the primary key doesn't exist, or update if it does.
-func buildInsertOrUpdateMutation(
-	binding *binding,
-	values []interface{},
-) (*spanner.Mutation, error) {
-	if len(values) != len(binding.columns) {
-		return nil, fmt.Errorf("value count mismatch: expected %d, got %d", len(binding.columns), len(values))
-	}
-
-	// Convert values to Spanner-compatible types
-	spannerValues := make([]interface{}, len(values))
-	for i, val := range values {
-		// Note: This function is not currently used. Column type is unknown here.
-		spannerVal, err := toSpannerValue(val, binding.columns[i], "")
-		if err != nil {
-			return nil, fmt.Errorf("converting value for column %s: %w", binding.columns[i], err)
-		}
-		spannerValues[i] = spannerVal
-	}
-
-	mutation := spanner.InsertOrUpdate(binding.target.Identifier, binding.columns, spannerValues)
-	return mutation, nil
-}
-
-// buildDeleteMutation creates a Spanner Delete mutation from a binding and key values.
-func buildDeleteMutation(
-	binding *binding,
-	keyValues []interface{},
-) (*spanner.Mutation, error) {
-	// Convert key values to Spanner key
-	spannerKeyValues := make([]interface{}, len(keyValues))
-	for i, val := range keyValues {
-		// Keys are at the beginning of the columns list
-		if i >= len(binding.columns) {
-			return nil, fmt.Errorf("key index out of bounds: %d >= %d", i, len(binding.columns))
-		}
-		// Note: This function is not currently used. Column type is unknown here.
-		spannerVal, err := toSpannerValue(val, binding.columns[i], "")
-		if err != nil {
-			return nil, fmt.Errorf("converting key value for column %s: %w", binding.columns[i], err)
-		}
-		spannerKeyValues[i] = spannerVal
-	}
-
-	key := spanner.Key(spannerKeyValues)
-	mutation := spanner.Delete(binding.target.Identifier, spanner.KeySetFromKeys(key))
-	return mutation, nil
-}
 
 // toSpannerValue converts a Go value to a Spanner-compatible value.
 // This handles type conversions needed for Spanner's type system.
 // columnType is the DDL type (e.g., "TIMESTAMP", "DATE", "INT64", "JSON")
 func toSpannerValue(val interface{}, columnName string, columnType string) (interface{}, error) {
 	if val == nil {
-		return spanner.NullString{Valid: false}, nil
+		// Return appropriate null type based on column type
+		switch {
+		case strings.Contains(columnType, "INT64"):
+			return spanner.NullInt64{Valid: false}, nil
+		case strings.Contains(columnType, "FLOAT64"):
+			return spanner.NullFloat64{Valid: false}, nil
+		case strings.Contains(columnType, "BOOL"):
+			return spanner.NullBool{Valid: false}, nil
+		case strings.Contains(columnType, "TIMESTAMP"):
+			return spanner.NullTime{Valid: false}, nil
+		case strings.Contains(columnType, "DATE"):
+			return spanner.NullDate{Valid: false}, nil
+		case strings.Contains(columnType, "JSON"):
+			return spanner.NullJSON{Valid: false}, nil
+		case strings.Contains(columnType, "BYTES"):
+			return []byte(nil), nil
+		default:
+			// STRING or unknown types
+			return spanner.NullString{Valid: false}, nil
+		}
 	}
 
 	switch v := val.(type) {
@@ -136,9 +104,10 @@ func toSpannerValue(val interface{}, columnName string, columnType string) (inte
 	case uint32:
 		return int64(v), nil
 	case uint64:
-		// uint64 needs careful handling to avoid overflow
+		// Spanner's INT64 type only supports -2^63 to 2^63-1
 		if v > 9223372036854775807 { // math.MaxInt64
-			return fmt.Sprintf("%d", v), nil // Store as string if too large
+			return nil, fmt.Errorf("uint64 value %d exceeds Spanner INT64 maximum (9223372036854775807) for column %s - consider using NUMERIC or STRING column type",
+				v, columnName)
 		}
 		return int64(v), nil
 	case float32:
@@ -153,20 +122,6 @@ func toSpannerValue(val interface{}, columnName string, columnType string) (inte
 		// For unknown types, pass through as-is
 		return v, nil
 	}
-}
-
-// binding represents a materialized binding with its target table and columns
-type binding struct {
-	target  sql.Table
-	columns []string
-}
-
-// storeOperation represents a single store operation (insert, update, or delete)
-// Note: This type is currently unused but kept for future enhancements
-type storeOperation struct {
-	binding   int
-	values    []interface{}
-	keyValues []interface{}
 }
 
 // mutationBatch accumulates mutations for efficient batching
@@ -232,21 +187,22 @@ func newPartitionedBatches(numPartitions int) *partitionedBatches {
 
 // getPartitionIndex calculates which partition a hash should be routed to.
 // Uses modulo to distribute hashes evenly across partitions.
+// Negative and positive hashes map to different partitions to preserve distribution properties.
 func (pb *partitionedBatches) getPartitionIndex(hash int64) int {
-	// Handle negative hashes by taking absolute value
-	if hash < 0 {
-		hash = -hash
+	idx := hash % int64(pb.numPartitions)
+	if idx < 0 {
+		idx += int64(pb.numPartitions)
 	}
-	return int(hash) % pb.numPartitions
+	return int(idx)
 }
 
 // addMutation adds a mutation to the specified partition's batch
-func (pb *partitionedBatches) addMutation(partitionIdx int, m *spanner.Mutation, columnCount int) {
+func (pb *partitionedBatches) addMutation(partitionIdx int, m *spanner.Mutation, columnCount int) error {
 	if partitionIdx < 0 || partitionIdx >= pb.numPartitions {
-		// This should never happen if getPartitionIndex is used correctly
-		panic(fmt.Sprintf("partition index out of bounds: %d (numPartitions: %d)", partitionIdx, pb.numPartitions))
+		return fmt.Errorf("partition index out of bounds: %d (numPartitions: %d)", partitionIdx, pb.numPartitions)
 	}
 	pb.batches[partitionIdx].addMutation(m, columnCount)
+	return nil
 }
 
 // getReadyPartitions returns the indices of partitions that are ready to flush
@@ -261,11 +217,11 @@ func (pb *partitionedBatches) getReadyPartitions() []int {
 }
 
 // getBatch returns the mutation batch for a specific partition
-func (pb *partitionedBatches) getBatch(partitionIdx int) *mutationBatch {
+func (pb *partitionedBatches) getBatch(partitionIdx int) (*mutationBatch, error) {
 	if partitionIdx < 0 || partitionIdx >= pb.numPartitions {
-		panic(fmt.Sprintf("partition index out of bounds: %d (numPartitions: %d)", partitionIdx, pb.numPartitions))
+		return nil, fmt.Errorf("partition index out of bounds: %d (numPartitions: %d)", partitionIdx, pb.numPartitions)
 	}
-	return pb.batches[partitionIdx]
+	return pb.batches[partitionIdx], nil
 }
 
 // getNonEmptyPartitions returns the indices of all partitions that have mutations
@@ -280,11 +236,12 @@ func (pb *partitionedBatches) getNonEmptyPartitions() []int {
 }
 
 // reset clears the batch for a specific partition
-func (pb *partitionedBatches) reset(partitionIdx int) {
+func (pb *partitionedBatches) reset(partitionIdx int) error {
 	if partitionIdx < 0 || partitionIdx >= pb.numPartitions {
-		panic(fmt.Sprintf("partition index out of bounds: %d (numPartitions: %d)", partitionIdx, pb.numPartitions))
+		return fmt.Errorf("partition index out of bounds: %d (numPartitions: %d)", partitionIdx, pb.numPartitions)
 	}
 	pb.batches[partitionIdx].reset()
+	return nil
 }
 
 // asyncBatchFlusher manages asynchronous parallel flushing of partitioned mutation batches.
@@ -303,7 +260,7 @@ type asyncBatchFlusher struct {
 
 // newAsyncBatchFlusher creates a new asyncBatchFlusher for managing parallel mutation flushes
 func newAsyncBatchFlusher(ctx context.Context, t *transactor, operation string) *asyncBatchFlusher {
-	flushGroup, _ := errgroup.WithContext(ctx)
+	flushGroup, groupCtx := errgroup.WithContext(ctx)
 	flushGroup.SetLimit(t.numPartitions)
 
 	return &asyncBatchFlusher{
@@ -311,7 +268,7 @@ func newAsyncBatchFlusher(ctx context.Context, t *transactor, operation string) 
 		flushGroup:       flushGroup,
 		batchCounter:     0,
 		t:                t,
-		ctx:              ctx,
+		ctx:              groupCtx,
 		operation:        operation,
 	}
 }
@@ -347,7 +304,11 @@ func (f *asyncBatchFlusher) flushPartitionsAsync(partitionIndices []int) {
 
 	for _, partIdx := range partitionIndices {
 		partIdx := partIdx // Capture loop variable
-		batch := f.partitionedBatch.getBatch(partIdx)
+		batch, err := f.partitionedBatch.getBatch(partIdx)
+		if err != nil {
+			log.WithError(err).WithField("partitionIdx", partIdx).Error("error getting batch for flush")
+			continue
+		}
 
 		if len(batch.mutations) == 0 {
 			continue
@@ -360,7 +321,10 @@ func (f *asyncBatchFlusher) flushPartitionsAsync(partitionIndices []int) {
 		byteSize := batch.byteSize
 
 		// Reset the partition batch before launching goroutine
-		f.partitionedBatch.reset(partIdx)
+		if err := f.partitionedBatch.reset(partIdx); err != nil {
+			log.WithError(err).WithField("partitionIdx", partIdx).Error("error resetting batch")
+			continue
+		}
 
 		// Launch async flush via the shared errgroup
 		f.flushGroup.Go(func() error {

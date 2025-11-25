@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"math"
 	"strings"
 	"text/template"
 	"time"
@@ -193,7 +194,7 @@ type spannerBinding struct {
 
 // computeKeyHash computes a deterministic hash of the given key values using FNV-1a 64-bit algorithm.
 // The hash provides uniform distribution to avoid write hotspots in Spanner.
-func computeKeyHash(keyValues []interface{}) int64 {
+func computeKeyHash(keyValues []interface{}) (int64, error) {
 	h := fnv.New64a()
 
 	for _, val := range keyValues {
@@ -205,7 +206,7 @@ func computeKeyHash(keyValues []interface{}) int64 {
 			h.Write(buf)
 		case float64:
 			buf := make([]byte, 8)
-			binary.LittleEndian.PutUint64(buf, uint64(v))
+			binary.LittleEndian.PutUint64(buf, math.Float64bits(v))
 			h.Write(buf)
 		case string:
 			h.Write([]byte(v))
@@ -221,13 +222,16 @@ func computeKeyHash(keyValues []interface{}) int64 {
 			h.Write([]byte{0})
 		default:
 			// For any other type, convert to JSON string for consistent serialization
-			jsonBytes, _ := json.Marshal(v)
+			jsonBytes, err := json.Marshal(v)
+			if err != nil {
+				return 0, fmt.Errorf("marshaling key value of type %T for hashing: %w", v, err)
+			}
 			h.Write(jsonBytes)
 		}
 	}
 
 	// Return the hash as int64 (Spanner's INT64 type)
-	return int64(h.Sum64())
+	return int64(h.Sum64()), nil
 }
 
 // queryNodeCount queries the Spanner instance to determine the number of nodes.
@@ -268,13 +272,9 @@ func queryNodeCount(ctx context.Context, projectID, instanceID string, opts []op
 	}
 
 	if nodeCount == 0 {
-		// FIXME: should not have zero node count - defaulting to 1
-		log.WithFields(log.Fields{
-			"instance":        instancePath,
-			"nodeCount":       inst.GetNodeCount(),
-			"processingUnits": processingUnits,
-		}).Warn("unable to determine node count, defaulting to 1")
-		return 1, nil
+		// Zero node count indicates configuration issue or insufficient permissions
+		return 0, fmt.Errorf("unable to determine node count for instance %s: nodeCount=%d, processingUnits=%d (verify instance configuration and spanner.instances.get IAM permission)",
+			instancePath, inst.GetNodeCount(), processingUnits)
 	}
 
 	log.WithFields(log.Fields{
@@ -552,7 +552,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		spannerKeyVals := make([]interface{}, 0, len(converted)+1)
 
 		// Compute key hash for partition routing (always computed for distribution)
-		keyHash := computeKeyHash(converted)
+		keyHash, err := computeKeyHash(converted)
+		if err != nil {
+			return fmt.Errorf("computing key hash for load: %w", err)
+		}
 
 		// If key distribution optimization is enabled, prepend the hash to the values
 		if t.cfg.Advanced.KeyDistributionOptimization {
@@ -573,7 +576,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		// Route to partition based on hash
 		partitionIdx := flusher.partitionedBatch.getPartitionIndex(keyHash)
-		flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(spannerKeyVals))
+		if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(spannerKeyVals)); err != nil {
+			return fmt.Errorf("adding load mutation: %w", err)
+		}
 
 		// Check if any partitions are ready to flush and launch async
 		readyPartitions := flusher.partitionedBatch.getReadyPartitions()
@@ -665,6 +670,16 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	flusher := newAsyncBatchFlusher(ctx, t, "store")
 	log.WithField("partitions", t.numPartitions).Info("store: using partition-based batching")
 
+	// Ensure flusher is cleaned up on error paths
+	defer func() {
+		if err != nil {
+			// Wait for any pending flushes to complete before returning error
+			if waitErr := flusher.wait(); waitErr != nil {
+				log.WithError(waitErr).Error("error waiting for flusher cleanup on error path")
+			}
+		}
+	}()
+
 	// Process all store operations
 	for it.Next() {
 		storeCount++
@@ -687,7 +702,10 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			spannerKeyValues := make([]interface{}, 0, len(keyValues)+1)
 
 			// Compute key hash for partition routing (always computed for distribution)
-			keyHash := computeKeyHash(keyValues)
+			keyHash, err := computeKeyHash(keyValues)
+			if err != nil {
+				return nil, fmt.Errorf("computing key hash for delete: %w", err)
+			}
 
 			// If key distribution optimization is enabled, prepend the hash to the values
 			if t.cfg.Advanced.KeyDistributionOptimization {
@@ -708,7 +726,9 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			// Route to partition based on hash
 			partitionIdx := flusher.partitionedBatch.getPartitionIndex(keyHash)
-			flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(keyValues))
+			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(keyValues)); err != nil {
+				return nil, fmt.Errorf("adding delete mutation: %w", err)
+			}
 
 			// Check if any partitions are ready to flush and launch async
 			readyPartitions := flusher.partitionedBatch.getReadyPartitions()
@@ -728,7 +748,10 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Compute key hash for partition routing (always computed for distribution)
 			// The hash is computed from the key columns (first len(b.target.Keys) values)
 			keyValues := values[:len(b.target.Keys)]
-			keyHash := computeKeyHash(keyValues)
+			keyHash, err := computeKeyHash(keyValues)
+			if err != nil {
+				return nil, fmt.Errorf("computing key hash for store: %w", err)
+			}
 
 			// If key distribution optimization is enabled, prepend the hash to the values
 			if t.cfg.Advanced.KeyDistributionOptimization {
@@ -752,7 +775,9 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			// Route to partition based on hash
 			partitionIdx := flusher.partitionedBatch.getPartitionIndex(keyHash)
-			flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(values))
+			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(values)); err != nil {
+				return nil, fmt.Errorf("adding store mutation: %w", err)
+			}
 
 			// Check if any partitions are ready to flush and launch async
 			readyPartitions := flusher.partitionedBatch.getReadyPartitions()
@@ -777,7 +802,11 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				// Calculate total bytes from all flushed batches
 				storeBytes := 0
 				for i := 0; i < t.numPartitions; i++ {
-					batch := flusher.partitionedBatch.getBatch(i)
+					batch, err := flusher.partitionedBatch.getBatch(i)
+					if err != nil {
+						log.WithError(err).Error("error getting batch for stats calculation")
+						continue
+					}
 					storeBytes += batch.byteSize
 				}
 
@@ -801,9 +830,9 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			t.fence.Checkpoint = checkpointBytes
 
 			// Add fence update mutation to the current batch
-			fenceTableName := "flow_checkpoints_v1" // Default checkpoint table name
+			// Use the standard checkpoint table name
 			fenceMutation := spanner.InsertOrUpdate(
-				fenceTableName,
+				sql.DefaultFlowCheckpoints,
 				[]string{"materialization", "key_begin", "key_end", "fence", "checkpoint"},
 				[]interface{}{
 					t.fence.Materialization.String(),
@@ -816,7 +845,9 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 			// Add fence mutation to partition 0 (arbitrary choice)
 			// since fence checkpoints don't have a natural hash key
-			flusher.partitionedBatch.addMutation(0, fenceMutation, 5)
+			if err := flusher.partitionedBatch.addMutation(0, fenceMutation, 5); err != nil {
+				return fmt.Errorf("adding fence mutation: %w", err)
+			}
 
 			// Flush all non-empty partitions asynchronously (final flush with fence)
 			nonEmptyPartitions := flusher.partitionedBatch.getNonEmptyPartitions()
