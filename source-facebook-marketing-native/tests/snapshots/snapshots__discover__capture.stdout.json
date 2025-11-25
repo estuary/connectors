@@ -479,10 +479,12 @@
           "type": "string"
         },
         "age": {
+          "default": "",
           "title": "Age",
           "type": "string"
         },
         "gender": {
+          "default": "",
           "title": "Gender",
           "type": "string"
         }
@@ -557,6 +559,7 @@
           "type": "string"
         },
         "country": {
+          "default": "",
           "title": "Country",
           "type": "string"
         }
@@ -629,6 +632,7 @@
           "type": "string"
         },
         "dma": {
+          "default": "",
           "title": "Dma",
           "type": "string"
         }
@@ -701,14 +705,17 @@
           "type": "string"
         },
         "publisher_platform": {
+          "default": "",
           "title": "Publisher Platform",
           "type": "string"
         },
         "platform_position": {
+          "default": "",
           "title": "Platform Position",
           "type": "string"
         },
         "impression_device": {
+          "default": "",
           "title": "Impression Device",
           "type": "string"
         }
@@ -785,6 +792,7 @@
           "type": "string"
         },
         "region": {
+          "default": "",
           "title": "Region",
           "type": "string"
         }

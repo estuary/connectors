@@ -20,6 +20,7 @@ from pydantic import (
     field_validator,
     create_model,
 )
+from pydantic.json_schema import JsonSchemaMode
 
 
 from estuary_cdk.capture.common import (
@@ -1210,29 +1211,86 @@ class AdsInsightsAgeAndGender(AdsInsights):
     primary_keys: ClassVar[list[str]] = sorted(
         AdsInsights.primary_keys + ["/age", "/gender"]
     )
-    age: str
-    gender: str
+    # Airbyte allows these fields to be nullable, so we need to have a default value
+    # to allow these collections to be materialized. Otherwise, the validation will fail.
+    age: str = Field(default="")
+    gender: str = Field(default="")
 
+    @classmethod
+    def model_json_schema(  # type: ignore
+        cls, by_alias: bool = True, ref_template: str = "#/$defs/{model}", **kwargs
+    ) -> dict:
+        schema = super().model_json_schema(by_alias, ref_template, **kwargs)
+        # Ensure age and gender remain required even though they have default values
+        if "required" not in schema:
+            schema["required"] = []
+        if "age" not in schema["required"]:
+            schema["required"].append("age")
+        if "gender" not in schema["required"]:
+            schema["required"].append("gender")
+        return schema
 
 class AdsInsightsCountry(AdsInsights):
     name: ClassVar[str] = ResourceName.ADS_INSIGHTS_COUNTRY
     breakdowns: ClassVar[list[Breakdown]] = [Breakdown.COUNTRY]
     primary_keys: ClassVar[list[str]] = sorted(AdsInsights.primary_keys + ["/country"])
-    country: str
+    # Airbyte allows this field to be nullable, so we need to have a default value
+    # to allow this collection to be materialized. Otherwise, the validation will fail.
+    country: str = Field(default="")
+
+    @classmethod
+    def model_json_schema(  # type: ignore
+        cls, by_alias: bool = True, ref_template: str = "#/$defs/{model}", **kwargs
+    ) -> dict:
+        schema = super().model_json_schema(by_alias, ref_template, **kwargs)
+        # Ensure country remains required even though it has a default value
+        if "required" not in schema:
+            schema["required"] = []
+        if "country" not in schema["required"]:
+            schema["required"].append("country")
+        return schema
 
 
 class AdsInsightsRegion(AdsInsights):
     name: ClassVar[str] = ResourceName.ADS_INSIGHTS_REGION
     breakdowns: ClassVar[list[Breakdown]] = [Breakdown.REGION]
     primary_keys: ClassVar[list[str]] = sorted(AdsInsights.primary_keys + ["/region"])
-    region: str
+    # Airbyte allows this field to be nullable, so we need to have a default value
+    # to allow this collection to be materialized. Otherwise, the validation will fail.
+    region: str = Field(default="")
+
+    @classmethod
+    def model_json_schema(  # type: ignore
+        cls, by_alias: bool = True, ref_template: str = "#/$defs/{model}", **kwargs
+    ) -> dict:
+        schema = super().model_json_schema(by_alias, ref_template, **kwargs)
+        # Ensure region remains required even though it has a default value
+        if "required" not in schema:
+            schema["required"] = []
+        if "region" not in schema["required"]:
+            schema["required"].append("region")
+        return schema
 
 
 class AdsInsightsDma(AdsInsights):
     name: ClassVar[str] = ResourceName.ADS_INSIGHTS_DMA
     breakdowns: ClassVar[list[Breakdown]] = [Breakdown.DMA]
     primary_keys: ClassVar[list[str]] = sorted(AdsInsights.primary_keys + ["/dma"])
-    dma: str
+    # Airbyte allows this field to be nullable, so we need to have a default value
+    # to allow this collection to be materialized. Otherwise, the validation will fail.
+    dma: str = Field(default="")
+
+    @classmethod
+    def model_json_schema(  # type: ignore
+        cls, by_alias: bool = True, ref_template: str = "#/$defs/{model}", **kwargs
+    ) -> dict:
+        schema = super().model_json_schema(by_alias, ref_template, **kwargs)
+        # Ensure dma remains required even though it has a default value
+        if "required" not in schema:
+            schema["required"] = []
+        if "dma" not in schema["required"]:
+            schema["required"].append("dma")
+        return schema
 
 
 class AdsInsightsPlatformAndDevice(AdsInsights):
@@ -1247,9 +1305,28 @@ class AdsInsightsPlatformAndDevice(AdsInsights):
         AdsInsights.primary_keys
         + ["/publisher_platform", "/platform_position", "/impression_device"]
     )
-    publisher_platform: str
-    platform_position: str
-    impression_device: str
+    # Airbyte allows these fields to be nullable, so we need to have a default value
+    # to allow these collections to be materialized. Otherwise, the validation will fail.
+    publisher_platform: str = Field(default="")
+    platform_position: str = Field(default="")
+    impression_device: str = Field(default="")
+
+    @classmethod
+    def model_json_schema(  # type: ignore
+        cls, by_alias: bool = True, ref_template: str = "#/$defs/{model}", **kwargs
+    ) -> dict:
+        schema = super().model_json_schema(by_alias, ref_template, **kwargs)
+        # Ensure publisher_platform, platform_position, impression_device remain required
+        # even though they have default values
+        if "required" not in schema:
+            schema["required"] = []
+        if "publisher_platform" not in schema["required"]:
+            schema["required"].append("publisher_platform")
+        if "platform_position" not in schema["required"]:
+            schema["required"].append("platform_position")
+        if "impression_device" not in schema["required"]:
+            schema["required"].append("impression_device")
+        return schema
 
 
 class AdsInsightsActionType(AdsInsights):
