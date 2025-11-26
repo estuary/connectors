@@ -253,9 +253,9 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		}
 
 		ll := log.WithFields(log.Fields{
-			"table":             pathToFQN(b.path),
-			"previousCheckoint": bindingState.PreviousCheckpoint,
-			"currentCheckpoint": bindingState.CurrentCheckpoint,
+			"table":              pathToFQN(b.path),
+			"previousCheckpoint": bindingState.PreviousCheckpoint,
+			"currentCheckpoint":  bindingState.CurrentCheckpoint,
 		})
 
 		ll.Info("starting appendFiles for table")
