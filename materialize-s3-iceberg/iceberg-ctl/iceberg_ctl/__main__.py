@@ -10,6 +10,7 @@ from click import Context
 from iceberg_ctl.models import EndpointConfig, GlueCatalogConfig, RestCatalogConfig
 from pydantic import BaseModel, TypeAdapter
 from pyiceberg.catalog import Catalog
+from pyiceberg.table import TableProperties
 from pyiceberg.catalog.glue import GlueCatalog
 from pyiceberg.catalog.rest import RestCatalog
 from pyiceberg.io import PY_IO_IMPL
@@ -246,7 +247,12 @@ def create_table(
         for idx, f in enumerate(table_create.fields)
     ]
 
-    catalog.create_table(table, Schema(*columns), table_create.location)
+    schema = Schema(*columns)
+    catalog.create_table(table, schema, table_create.location,
+        properties={
+            TableProperties.DEFAULT_NAME_MAPPING: schema.name_mapping.model_dump_json()
+        },
+    )
     log(f"create_table: created table {table}")
 
 
