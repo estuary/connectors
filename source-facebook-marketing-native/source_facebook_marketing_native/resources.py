@@ -57,6 +57,7 @@ from .models import (
     AdsInsightsPlatformAndDevice,
     AdsInsightsActionType,
     InsightsConfig,
+    FeatureFlag,
     build_custom_ads_insights_model,
     DEFAULT_LOOKBACK_WINDOW,
 )
@@ -254,6 +255,7 @@ def full_refresh_resource(
     client: FacebookAPIClient,
     accounts: list[str],
     snapshot_fn: FullRefreshFetchFn,
+    use_sourced_schemas: bool = False,
 ) -> Resource:
     def open(
         binding: CaptureBinding[ResourceConfig],
@@ -262,7 +264,12 @@ def full_refresh_resource(
         task: Task,
         all_bindings,
         snapshot_fn: FetchSnapshotFn,
+        use_sourced_schemas: bool,
     ):
+        if use_sourced_schemas and hasattr(model, 'sourced_schema'):
+            task.sourced_schema(binding_index, model.sourced_schema())
+            task.checkpoint(state=ConnectorState())
+
         open_binding(
             binding,
             binding_index,
@@ -284,6 +291,7 @@ def full_refresh_resource(
                 model,
                 accounts,
             ),
+            use_sourced_schemas=use_sourced_schemas,
         ),
         initial_state=ResourceState(),
         initial_config=ResourceConfig(
@@ -298,6 +306,7 @@ def full_refresh_resources(
     client: FacebookAPIClient,
     accounts: list[str],
     include_deleted: bool,
+    use_sourced_schemas: bool = False,
 ) -> list[Resource]:
     resources = []
 
@@ -320,6 +329,7 @@ def full_refresh_resources(
                 client,
                 accounts,
                 snapshot_fn,
+                use_sourced_schemas=use_sourced_schemas,
             )
         )
 
@@ -507,6 +517,7 @@ async def all_resources(
             client=client,
             accounts=config.accounts,
             include_deleted=config.advanced.include_deleted,
+            use_sourced_schemas=config.advanced.has_feature_flag(FeatureFlag.SOURCED_SCHEMAS),
         ),
         *incremental_resources(
             client=client,
