@@ -302,7 +302,7 @@ async def fetch_changes_reverse_order(
                 )
 
                 # Since data is in DESC order, stop when we reach items older than cursor
-                if doc_cursor < log_cursor:
+                if doc_cursor <= log_cursor:
                     break
 
                 has_results = True
