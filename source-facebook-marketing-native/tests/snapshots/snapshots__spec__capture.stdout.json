@@ -16,6 +16,12 @@
               "description": "Set to active if you want to fetch the thumbnail_url and store the result in thumbnail_data_url for each Ad Creative.",
               "title": "Fetch Thumbnail Images from Ad Creative",
               "type": "boolean"
+            },
+            "feature_flags": {
+              "default": "",
+              "description": "Comma-separated list of experimental feature flags to enable.",
+              "title": "Feature Flags",
+              "type": "string"
             }
           },
           "title": "Advanced",

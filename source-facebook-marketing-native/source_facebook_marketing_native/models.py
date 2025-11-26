@@ -1,4 +1,5 @@
 import builtins
+from enum import StrEnum
 from logging import Logger, getLogger
 from datetime import timedelta, datetime, UTC
 from dateutil.relativedelta import relativedelta
@@ -34,7 +35,11 @@ from estuary_cdk.flow import (
     LongLivedClientCredentialsOAuth2Credentials,
     ValidationError,
 )
-from .constants import API_VERSION
+from .constants import (
+    API_VERSION,
+    AD_ACCOUNT_SOURCED_SCHEMA,
+    AD_CREATIVE_SOURCED_SCHEMA,
+)
 from .enums import (
     ActionBreakdown,
     ApiLevel,
@@ -54,6 +59,13 @@ from .utils import str_to_list
 
 logger: Logger = getLogger(__name__)
 ConnectorState = GenericConnectorState[ResourceState]
+
+
+class FeatureFlag(StrEnum):
+    """Available feature flags for the connector."""
+
+    SOURCED_SCHEMAS = "sourced_schemas"
+
 
 # Facebook store metrics maximum of 37 months old. Any time range that
 # older that 37 months from current date would result in 400 Bad request
@@ -385,6 +397,16 @@ class EndpointConfig(CommonConfigMixin):
             description="Set to active if you want to fetch the thumbnail_url and store the result in thumbnail_data_url for each Ad Creative.",
             default=False,
         )
+        feature_flags: str = Field(
+            title="Feature Flags",
+            description="Comma-separated list of experimental feature flags to enable.",
+            default="",
+        )
+
+        def has_feature_flag(self, flag: FeatureFlag) -> bool:
+            """Check if a feature flag is enabled."""
+            flags = [f.strip() for f in self.feature_flags.split(",") if f.strip()]
+            return flag.value in flags
 
     advanced: Advanced = Field(
         default_factory=Advanced,  # type: ignore
@@ -739,6 +761,11 @@ class AdAccount(FacebookResource):
 
     id: str
 
+    @classmethod
+    def sourced_schema(cls) -> dict[str, Any]:
+        """Return explicit sourced schema matching legacy connector format."""
+        return AD_ACCOUNT_SOURCED_SCHEMA
+
 
 class AdCreative(FacebookResource):
     name: ClassVar[str] = ResourceName.AD_CREATIVES
@@ -781,6 +808,11 @@ class AdCreative(FacebookResource):
     ]
 
     id: str
+
+    @classmethod
+    def sourced_schema(cls) -> dict[str, Any]:
+        """Return explicit sourced schema matching legacy connector format."""
+        return AD_CREATIVE_SOURCED_SCHEMA
 
 
 class CustomConversions(FacebookResource):
