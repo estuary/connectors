@@ -78,21 +78,7 @@ func (c *capture) initializeStreams(
 	for _, db := range databasesForBindings(changeStreamBindings) {
 		logEntry := log.WithField("db", db)
 
-		// Use a pipeline to project the fields we need from the change stream. Importantly, this
-		// suppresses fields like `updateDescription`, which contain a list of fields in the document
-		// that were updated. If a large field is updated, it will appear both in the `fullDocument` and
-		// `updateDescription`, which can cause the change stream total BSON document size to exceed the
-		// 16MB limit.
-		pl := mongo.Pipeline{
-			{{Key: "$project", Value: bson.M{
-				"documentKey":              1,
-				"operationType":            1,
-				"fullDocument":             1,
-				"ns":                       1,
-				"fullDocumentBeforeChange": 1,
-				"splitEvent":               1,
-			}}},
-		}
+		pl := mongo.Pipeline{}
 
 		if exclusiveCollectionFilter {
 			// Build a filter that only matches documents in MongoDB collections for the enabled
@@ -117,6 +103,21 @@ func (c *capture) initializeStreams(
 				Value: bson.D{{Key: "$nin", Value: exclude}},
 			}}}})
 		}
+
+
+		// Use a pipeline to project the fields we need from the change stream. Importantly, this
+		// suppresses fields like `updateDescription`, which contain a list of fields in the document
+		// that were updated. If a large field is updated, it will appear both in the `fullDocument` and
+		// `updateDescription`, which can cause the change stream total BSON document size to exceed the
+		// 16MB limit.
+		pl = append(pl, bson.D{{Key: "$project", Value: bson.M{
+				"documentKey":              1,
+				"operationType":            1,
+				"fullDocument":             1,
+				"ns":                       1,
+				"fullDocumentBeforeChange": 1,
+				"splitEvent":               1,
+			}}})
 
 		opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
 		if maxAwaitTime != nil {
