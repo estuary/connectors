@@ -88,7 +88,6 @@
     },
     "resourceConfigSchema": {
       "additionalProperties": false,
-      "description": "ResourceConfig is a common resource configuration shape.",
       "properties": {
         "_meta": {
           "anyOf": [
@@ -114,12 +113,19 @@
           "format": "duration",
           "title": "Interval",
           "type": "string"
+        },
+        "schedule": {
+          "default": "",
+          "description": "Schedule to automatically refresh calculated properties. Accepts a cron expression.",
+          "pattern": "^((?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?)(?:,(?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?))*)\\s+((?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?)(?:,(?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?))*)\\s+((?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?)(?:,(?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?))*)\\s+((?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?)(?:,(?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?))*)\\s+((?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?)(?:,(?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?))*)$|^$",
+          "title": "Calculated Property Refresh Schedule",
+          "type": "string"
         }
       },
       "required": [
         "name"
       ],
-      "title": "ResourceConfig",
+      "title": "HubspotResourceConfigWithSchedule",
       "type": "object"
     },
     "documentationUrl": "https://go.estuary.dev/hubspot-real-time",
