@@ -93,6 +93,7 @@ jobs:
           - source-redshift-batch
           - source-s3
           - source-sftp
+          - source-sharepoint
           - source-snowflake
           - source-sqlserver
           - source-sqlserver-batch
