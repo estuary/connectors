@@ -75,7 +75,7 @@
           "type": "object",
           "x-oauth2-provider": "zendesk"
         },
-        "_OAuth2Credentials": {
+        "RotatingOAuth2Credentials": {
           "properties": {
             "credentials_title": {
               "const": "OAuth Credentials",
@@ -139,13 +139,13 @@
             "mapping": {
               "Deprecated OAuth Credentials": "#/$defs/DeprecatedOAuthCredentials",
               "Email & API Token": "#/$defs/ApiToken",
-              "OAuth Credentials": "#/$defs/_OAuth2Credentials"
+              "OAuth Credentials": "#/$defs/RotatingOAuth2Credentials"
             },
             "propertyName": "credentials_title"
           },
           "oneOf": [
             {
-              "$ref": "#/$defs/_OAuth2Credentials"
+              "$ref": "#/$defs/RotatingOAuth2Credentials"
             },
             {
               "$ref": "#/$defs/ApiToken"
