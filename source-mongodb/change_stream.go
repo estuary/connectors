@@ -32,6 +32,20 @@ type changeStream struct {
 	lastPbrtCheckpoint time.Time
 }
 
+// streamEvent represents a single raw event from the change stream with its metadata.
+type streamEvent struct {
+	raw         bson.Raw // Copied from cursor (cursor reuses buffers!)
+	resumeToken bson.Raw // Resume token after this event
+	isSplit     bool     // Whether this is a split event fragment
+}
+
+// streamBatch represents a batch of events to be processed together.
+type streamBatch struct {
+	events     []streamEvent // Events in this batch
+	finalToken bson.Raw      // Final resume token for the batch (for pbrt checkpointing)
+	err        error         // Non-nil if producer encountered error
+}
+
 type docKey struct {
 	Id interface{} `bson:"_id"`
 }
@@ -50,10 +64,11 @@ type bsonFields struct {
 }
 
 type changeEvent struct {
-	fields     bsonFields
-	fragments  int
-	binding    bindingInfo
-	isDocument bool
+	fields      bsonFields
+	fragments   int
+	binding     bindingInfo
+	isDocument  bool
+	resumeToken bson.Raw // Resume token for this event (for checkpointing)
 }
 
 // initializeStreams starts change streams for the capture. Streams are started from any prior
@@ -170,16 +185,44 @@ func (c *capture) streamChanges(
 	group, groupCtx := errgroup.WithContext(ctx)
 
 	for _, s := range streams {
+		s := s // Capture loop variable for goroutine
+
 		group.Go(func() error {
 			defer s.ms.Close(groupCtx)
 
-			for {
-				if opTime, err := c.pullStream(groupCtx, s); err != nil {
-					return fmt.Errorf("change stream for %q: %w", s.db, err)
-				} else if coordinator.gotCaughtUp(s.db, opTime) && catchup {
+			// Create channel for producer-consumer communication
+			batches := make(chan *streamBatch, 2) // Buffer 2 batches
+
+			// Start producer in separate goroutine
+			producerCtx, cancelProducer := context.WithCancel(groupCtx)
+			defer cancelProducer()
+
+			producerDone := make(chan struct{})
+			go func() {
+				defer close(producerDone)
+				c.produceStreamBatches(producerCtx, s, batches)
+			}()
+
+			// Consumer runs in this goroutine
+			for batch := range batches {
+				if batch.err != nil {
+					return fmt.Errorf("change stream for %q: %w", s.db, batch.err)
+				}
+
+				opTime, err := c.processBatch(groupCtx, s, batch)
+				if err != nil {
+					return fmt.Errorf("processing batch for %q: %w", s.db, err)
+				}
+
+				if catchup && coordinator.gotCaughtUp(s.db, opTime) {
+					cancelProducer() // Stop producer
+					<-producerDone   // Wait for producer to finish
 					return nil
 				}
 			}
+
+			<-producerDone // Wait for producer
+			return nil
 		})
 	}
 
@@ -245,62 +288,168 @@ func getToken(s *changeStream) bson.Raw {
 	return tok
 }
 
-// pullStream pulls a new batch of documents for the change stream and processes
-// them, returning the latest cluster time of any observed event. A zero-valued
-// returned timestamp indicates that no documents were available for the change
-// stream.
-func (c *capture) pullStream(ctx context.Context, s *changeStream) (primitive.Timestamp, error) {
+// produceStreamBatches fetches events from the change stream cursor and sends them through the
+// channel to be processed by a consumer. It handles split event fragment assembly by detecting
+// split events and calling Next() to fetch all fragments before sending the batch.
+func (c *capture) produceStreamBatches(ctx context.Context, s *changeStream, batches chan<- *streamBatch) {
+	defer close(batches)
+
+	for {
+		batch := &streamBatch{events: make([]streamEvent, 0, 16)}
+
+		for s.ms.TryNext(ctx) {
+			// must copy as cursor reuses internal buffer
+			rawCopy := make(bson.Raw, len(s.ms.Current))
+			copy(rawCopy, s.ms.Current)
+
+			tokenCopy := make(bson.Raw, len(getToken(s)))
+			copy(tokenCopy, getToken(s))
+
+			event := streamEvent{
+				raw:         rawCopy,
+				resumeToken: tokenCopy,
+				isSplit:     !s.ms.Current.Lookup("splitEvent").IsZero(),
+			}
+			batch.events = append(batch.events, event)
+
+			// If this is a split event, fetch ALL fragments now
+			if event.isSplit {
+				var se splitEvent
+				if err := s.ms.Current.Lookup("splitEvent").Unmarshal(&se); err != nil {
+					batch.err = fmt.Errorf("unmarshaling splitEvent: %w", err)
+					select {
+					case batches <- batch:
+					case <-ctx.Done():
+					}
+					return
+				}
+
+				// Keep fetching fragments until we have all of them
+				for se.Fragment != se.Of {
+					if !s.ms.Next(ctx) {
+						batch.err = fmt.Errorf("fetching split event fragment: %w", s.ms.Err())
+						select {
+						case batches <- batch:
+						case <-ctx.Done():
+						}
+						return
+					}
+
+					// Add this fragment to the batch (copy the data)
+					fragRawCopy := make(bson.Raw, len(s.ms.Current))
+					copy(fragRawCopy, s.ms.Current)
+
+					fragTokenCopy := make(bson.Raw, len(getToken(s)))
+					copy(fragTokenCopy, getToken(s))
+
+					fragment := streamEvent{
+						raw:         fragRawCopy,
+						resumeToken: fragTokenCopy,
+						isSplit:     true,
+					}
+					batch.events = append(batch.events, fragment)
+
+					// Check if this is the last fragment
+					if err := s.ms.Current.Lookup("splitEvent").Unmarshal(&se); err != nil {
+						batch.err = fmt.Errorf("unmarshaling splitEvent fragment: %w", err)
+						select {
+						case batches <- batch:
+						case <-ctx.Done():
+						}
+						return
+					}
+				}
+			}
+
+			// End of batch from MongoDB
+			if s.ms.RemainingBatchLength() == 0 {
+				break
+			}
+		}
+
+		// Check for cursor errors
+		if err := s.ms.Err(); err != nil {
+			batch.err = fmt.Errorf("change stream error: %w", err)
+			select {
+			case batches <- batch:
+			case <-ctx.Done():
+			}
+			return
+		}
+
+		// Capture the final token for this batch (for pbrt checkpointing)
+		token := getToken(s)
+		finalTokenCopy := make(bson.Raw, len(token))
+		copy(finalTokenCopy, token)
+		batch.finalToken = finalTokenCopy
+
+		// Send batch to consumer (respect context cancellation)
+		select {
+		case batches <- batch:
+		case <-ctx.Done():
+			return
+		}
+
+		// If we sent an error, exit
+		if batch.err != nil {
+			return
+		}
+
+		// Idle handling: small sleep when no events to avoid busy-waiting
+		if len(batch.events) == 0 {
+			select {
+			case <-time.After(10 * time.Millisecond):
+			case <-ctx.Done():
+				return
+			}
+		}
+	}
+}
+
+// processBatch processes a batch of events from the producer, emitting documents and checkpoints.
+// It returns the latest cluster time of any observed event in the batch.
+func (c *capture) processBatch(
+	ctx context.Context,
+	s *changeStream,
+	batch *streamBatch,
+) (primitive.Timestamp, error) {
 	var lastToken bson.Raw
 	events := 0
 	docs := 0
-	for s.ms.TryNext(ctx) {
-		var ev changeEvent
-		requestedAnotherBatch, err := c.readEvent(ctx, s, &ev)
-		if err != nil {
-			return primitive.Timestamp{}, fmt.Errorf("reading change stream event: %w", err)
-		}
-		events += ev.fragments
 
-		if ev.isDocument {
-			lastToken = getToken(s)
+	// Process each event in the batch
+	for i := 0; i < len(batch.events); {
+		ev := &batch.events[i]
+
+		var changeEv changeEvent
+		fragmentCount, err := c.processEvent(ev, batch.events[i+1:], s.db, &changeEv)
+		if err != nil {
+			return primitive.Timestamp{}, fmt.Errorf("processing event: %w", err)
+		}
+
+		i += fragmentCount
+		events += fragmentCount
+
+		if changeEv.isDocument {
+			lastToken = changeEv.resumeToken
 			docs += 1
 
 			stateUpdate := captureState{
 				DatabaseResumeTokens: map[string]bson.Raw{s.db: lastToken},
 			}
 
-			if doc, err := makeEventDocument(ev, s.db, ev.binding.resource.Collection); err != nil {
+			if doc, err := makeEventDocument(changeEv, s.db, changeEv.binding.resource.Collection); err != nil {
 				return primitive.Timestamp{}, fmt.Errorf("making change event document: %w", err)
 			} else if cpJson, err := json.Marshal(stateUpdate); err != nil {
 				return primitive.Timestamp{}, fmt.Errorf("serializing stream checkpoint: %w", err)
-			} else if err := c.output.DocumentsAndCheckpoint(cpJson, true, ev.binding.index, doc); err != nil {
+			} else if err := c.output.DocumentsAndCheckpoint(cpJson, true, changeEv.binding.index, doc); err != nil {
 				return primitive.Timestamp{}, fmt.Errorf("outputting document and checkpoint: %w", err)
 			}
 		}
-
-		if s.ms.RemainingBatchLength() == 0 || requestedAnotherBatch {
-			// Yield control back to the caller once this batch of documents has
-			// been fully read, or an additional batch of documents was needed
-			// to complete a split event document.
-			if s.ms.RemainingBatchLength() != 0 {
-				log.WithFields(log.Fields{
-					"remainingBatchLength": s.ms.RemainingBatchLength(),
-				}).Debug("pullStream is returning with a partial batch requested from readFragments")
-			}
-			break
-		}
-	}
-	if err := s.ms.Err(); err != nil {
-		return primitive.Timestamp{}, fmt.Errorf("change stream ended with error: %w", err)
 	}
 
-	// Checkpoint the final resume token from the change stream, which may correspond to the last
-	// event received, but will often also be a "post batch resume token", which does not correspond
-	// to an event for this stream, but is rather a resumable token representing the oplog entry the
-	// change stream has scanned up to on the server (not necessarily a matching change). This will
-	// be present even if TryNext returned no documents and allows us to keep the position of the
-	// change stream fresh even if we are watching a database that has infrequent events.
-	finalToken := getToken(s)
+	// Post-batch resume token (pbrt) checkpoint
+	finalToken := batch.finalToken
 	if !bytes.Equal(finalToken, lastToken) && time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
 		stateUpdate := captureState{
 			DatabaseResumeTokens: map[string]bson.Raw{s.db: finalToken},
@@ -319,6 +468,7 @@ func (c *capture) pullStream(ctx context.Context, s *changeStream) (primitive.Ti
 		return primitive.Timestamp{}, fmt.Errorf("extracting timestamp from resume token: %w", err)
 	}
 
+	// Update in-memory state
 	c.mu.Lock()
 	c.state.DatabaseResumeTokens[s.db] = finalToken
 	c.processedStreamEvents += events
@@ -331,72 +481,68 @@ func (c *capture) pullStream(ctx context.Context, s *changeStream) (primitive.Ti
 	return lastOpTime, nil
 }
 
-type splitEvent struct {
-	Fragment int `bson:"fragment"`
-	Of       int `bson:"of"`
-}
-
-func (c *capture) readEvent(
-	ctx context.Context,
-	s *changeStream,
+// processEvent processes a single event (or split event sequence) from the batch.
+// It returns the number of fragments consumed from the batch.
+func (c *capture) processEvent(
+	firstEvent *streamEvent,
+	remainingEvents []streamEvent,
+	db string,
 	ev *changeEvent,
-) (requestedAnotherBatch bool, err error) {
+) (fragmentCount int, err error) {
+	ev.resumeToken = firstEvent.resumeToken
+
 	var binding bindingInfo
 	var trackedBinding bool
 
-	splitRaw := s.ms.Current.Lookup("splitEvent")
-	if !splitRaw.IsZero() {
-		// This change event is split across multiple change stream event
-		// "fragments". Each of the fragments in the sequence must be read
-		// and combined. This will require reading at least 1 additional
-		// event from the change stream, which may involve requesting a new
-		// batch.
-		ev.fragments, requestedAnotherBatch, err = readFragments(ctx, s, ev)
+	if firstEvent.isSplit {
+		// Assemble from multiple events in the batch
+		fragmentCount, err = c.assembleFragments(firstEvent, remainingEvents, ev)
 		if err != nil {
-			return false, fmt.Errorf("assembling event from change stream event segments: %w", err)
+			return 0, fmt.Errorf("assembling fragments: %w", err)
 		}
 
-		if binding, trackedBinding = c.trackedChangeStreamBindings[resourceId(s.db, ev.fields.Ns.Collection)]; !trackedBinding {
+		// Check if this collection is tracked
+		if binding, trackedBinding = c.trackedChangeStreamBindings[resourceId(db, ev.fields.Ns.Collection)]; !trackedBinding {
 			// Assembled event is not for a tracked collection. This is
 			// difficult to check prior to reading all the fragments for the
 			// event, since which fragment will contain the 'ns' field is
 			// unknown.
-			return
+			return fragmentCount, nil
 		}
 	} else {
-		// This change event is not split.
-		ev.fragments = 1
+		// Single event
+		fragmentCount = 1
 
-		// Quick check to avoid fully decoding events for collections that are
-		// not being captured.
-		if collRaw, lookupErr := s.ms.Current.LookupErr("ns", "coll"); lookupErr == nil {
+		// Quick check if collection is tracked
+		if collRaw, lookupErr := firstEvent.raw.LookupErr("ns", "coll"); lookupErr == nil {
 			// LookupErr will only error if the `ns.coll` field is missing,
 			// which is only known to happen with dropDatabase and invalidate
 			// events, which are handled specifically a little further down.
-			if binding, trackedBinding = c.trackedChangeStreamBindings[resourceId(s.db, collRaw.StringValue())]; !trackedBinding {
-				return
+			if binding, trackedBinding = c.trackedChangeStreamBindings[resourceId(db, collRaw.StringValue())]; !trackedBinding {
+				return 1, nil
 			}
 		}
 
-		if err := s.ms.Decode(&ev.fields); err != nil {
-			return false, fmt.Errorf("change stream decoding document: %w", err)
+		if err := bson.Unmarshal(firstEvent.raw, &ev.fields); err != nil {
+			return 0, fmt.Errorf("unmarshaling event: %w", err)
 		}
 	}
 
+	// Handle operation types
 	switch ev.fields.OperationType {
 	case "drop", "rename":
 		log.WithFields(log.Fields{
-			"database":   s.db,
+			"database":   db,
 			"collection": ev.fields.Ns.Collection,
 			"opType":     ev.fields.OperationType,
 		}).Warn("received collection-level event for tracked collection")
-		return
+		return fragmentCount, nil
 	case "dropDatabase", "invalidate": // An invalidate event will always follow a dropDatabase event.
 		log.WithFields(log.Fields{
-			"database": s.db,
+			"database": db,
 			"opType":   ev.fields.OperationType,
 		}).Warn("received database-level event for tracked database")
-		return
+		return fragmentCount, nil
 	case "insert", "update", "replace", "delete":
 		if ev.fields.OperationType != "delete" && ev.fields.FullDocument == nil {
 			// FullDocument can be "null" for non-deletion events if another
@@ -407,67 +553,86 @@ func (c *capture) readEvent(
 			// or different from the deltas in the update event. We ignore
 			// events where FullDocument is null. Another change event of type
 			// delete will eventually come and delete the document.
-			log.WithFields(log.Fields{"database": s.db, "collection": ev.fields.Ns.Collection}).Debug("discarding event with no FullDocument")
-			return
+			log.WithFields(log.Fields{"database": db, "collection": ev.fields.Ns.Collection}).Debug("discarding event with no FullDocument")
+			return fragmentCount, nil
 		}
 	default:
 		log.WithFields(log.Fields{
-			"database":      s.db,
+			"database":      db,
 			"collection":    ev.fields.Ns.Collection,
 			"operationType": ev.fields.OperationType,
 		}).Debug("discarding event with un-tracked operation")
-		return
+		return fragmentCount, nil
 	}
 
 	ev.isDocument = true
 	ev.binding = binding
-	return
+	ev.fragments = fragmentCount
+	return fragmentCount, nil
 }
 
-func readFragments(
-	ctx context.Context,
-	s *changeStream,
+// assembleFragments assembles a split event from multiple streamEvents in the batch.
+// Fragments are repeatedly unmarshalled into a single change event since no two fragments
+// have overlapping top-level properties - MongoDB only splits on top-level document fields.
+// Returns the number of fragments consumed.
+func (c *capture) assembleFragments(
+	firstEvent *streamEvent,
+	remainingEvents []streamEvent,
 	ev *changeEvent,
-) (numSplitEvents int, requestedAnotherBatch bool, _ error) {
-	// Fragments are repeatedly unmarshalled into a single change event since no
-	// two fragments have overlapping top-level properties - MongoDB only splits
-	// on top-level document fields.
+) (int, error) {
 	lastFragment := 0
+	fragmentIdx := 0
+
 	for {
-		// Upon entering this loop, the change stream must already have been
-		// advanced to a split change event. For the duration of the loop it is
-		// an error if an event is not split, since we only want to read to
-		// "end" of the current set of fragments.
+		if fragmentIdx > len(remainingEvents) {
+			return 0, fmt.Errorf("ran out of fragments in batch (expected more fragments)")
+		}
+
+		var current *streamEvent
+		if fragmentIdx == 0 {
+			current = firstEvent
+		} else {
+			current = &remainingEvents[fragmentIdx-1]
+		}
+
 		var se splitEvent
-		if splitRaw, err := s.ms.Current.LookupErr("splitEvent"); err != nil {
-			return 0, false, fmt.Errorf("finding splitEvent in document fragment: %w", err)
+		if splitRaw, err := current.raw.LookupErr("splitEvent"); err != nil {
+			return 0, fmt.Errorf("finding splitEvent in document fragment: %w", err)
 		} else if err := splitRaw.Unmarshal(&se); err != nil {
-			return 0, false, err
+			return 0, fmt.Errorf("unmarshaling splitEvent: %w", err)
 		} else if lastFragment += 1; lastFragment != se.Fragment { // cheap sanity check
-			return 0, false, fmt.Errorf("expected fragment %d but got %d", lastFragment, se.Fragment)
-		} else if err := s.ms.Decode(&ev.fields); err != nil {
-			return 0, false, fmt.Errorf("decoding fragment: %w", err)
-		} else if se.Fragment == se.Of { // done reading fragments
+			return 0, fmt.Errorf("expected fragment %d but got %d", lastFragment, se.Fragment)
+		}
+
+		// Decode this fragment into the changeEvent (fields accumulate)
+		if err := bson.Unmarshal(current.raw, &ev.fields); err != nil {
+			return 0, fmt.Errorf("decoding fragment: %w", err)
+		}
+
+		if se.Fragment == se.Of {
+			// Done reading fragments
 			break
 		}
 
-		// Advance to the next fragment, blocking until it is available. This
-		// may involve requesting a new batch of documents from the network.
-		if s.ms.RemainingBatchLength() == 0 {
-			requestedAnotherBatch = true
-		}
-		if !s.ms.Next(ctx) {
-			return 0, false, fmt.Errorf("advancing change stream: %w", s.ms.Err())
-		}
+		fragmentIdx++
 	}
 
 	if ev.fields.Ns.Collection == "" {
 		// This should never happen, since split events should always be
 		// collection documents.
-		return 0, false, fmt.Errorf("reading fragments produced an event with no collection")
+		return 0, fmt.Errorf("assembling fragments produced an event with no collection")
 	}
 
-	return lastFragment, requestedAnotherBatch, nil
+	return fragmentIdx + 1, nil
+}
+
+// pullStream pulls a new batch of documents for the change stream and processes
+// them, returning the latest cluster time of any observed event. A zero-valued
+// returned timestamp indicates that no documents were available for the change
+// stream.
+type splitEvent struct {
+	Fragment int `bson:"fragment"`
+	Of       int `bson:"of"`
 }
 
 // makeEventDocument processes a change event and returns a document if the change event is for a
