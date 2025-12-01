@@ -16,6 +16,9 @@ from source_chargebee_native.models import (
     AssociationConfig,
 )
 
+# We cannot send a request with start and end dates that are the same, so
+# we enforce a minimum interval of 1 second between them.
+MIN_INCREMENTAL_INTERVAL = timedelta(seconds=1)
 
 ChargebeeResourceType = TypeVar("ChargebeeResourceType", bound=ChargebeeResource)
 
@@ -210,6 +213,9 @@ async def fetch_resource_changes(
     has_results = False
     offset = None
 
+    if (end_date - start_date) < MIN_INCREMENTAL_INTERVAL:
+        return
+
     while True:
         resource_data, next_offset = await _fetch_resource_data(
             http=http,
@@ -387,6 +393,9 @@ async def fetch_associated_resource_changes(
     end_date = min(start_date + timedelta(days=30), datetime.now(tz=UTC))
     max_updated_at = start_date
     has_results = False
+
+    if (end_date - start_date) < MIN_INCREMENTAL_INTERVAL:
+        return
 
     parent_ids = await _get_parent_ids(
         http=http,
