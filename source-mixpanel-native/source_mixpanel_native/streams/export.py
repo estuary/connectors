@@ -225,10 +225,13 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
     ) -> MutableMapping[str, Any]:
         params = super().request_params(stream_state, stream_slice, next_page_token)
         # additional filter by timestamp because required start date and end date only allow to filter by date
+        # Only apply this filter when not re-capturing events in the attribution window.
         cursor_param = stream_slice.get(self.cursor_field)
-        if cursor_param:
+        use_attribution_window = stream_slice.get("use_attribution_window")
+        if not use_attribution_window and cursor_param:
             timestamp = int(pendulum.parse(cursor_param).timestamp())
             params["where"] = f'properties["$time"]>=datetime({timestamp})'
+
         return params
 
     def request_kwargs(

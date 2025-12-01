@@ -207,11 +207,27 @@ class DateSlicesMixin:
             stream_state_date = pendulum.parse(stream_state[self.cursor_field]).date()
             start_date = max(start_date, stream_state_date)
 
-        # move start_date back <attribution_window> days to sync data since that time as well
-        start_date = start_date - timedelta(days=self.attribution_window)
+        today = pendulum.today(tz=self.project_timezone).date()
+
+        assert isinstance(start_date, pendulum.Date)
+
+        # Should the attribution window be used? We only want to apply the
+        # attribution window once per day when the stream is caught up &
+        # replicating incrementally to avoid constantly emitting duplicate
+        # data.
+        should_use_attribution_window = today - start_date <= timedelta(days=1)
+
+        if should_use_attribution_window:
+            start_date = start_date - timedelta(days=self.attribution_window)
 
         # end_date cannot be later than today
-        end_date = min(self.end_date, pendulum.today(tz=self.project_timezone).date())
+        end_date = min(self.end_date, today)
+
+        self.logger.info("Creating stream slices", {
+            "start_date": start_date,
+            "end_date": end_date,
+            "should_use_attribution_window": should_use_attribution_window,
+        })
 
         while start_date <= end_date:
             if self._timezone_mismatch:
@@ -220,6 +236,7 @@ class DateSlicesMixin:
             stream_slice = {
                 "start_date": str(start_date),
                 "end_date": str(min(current_end_date, end_date)),
+                "use_attribution_window": should_use_attribution_window,
             }
             if cursor_value:
                 stream_slice[self.cursor_field] = cursor_value
