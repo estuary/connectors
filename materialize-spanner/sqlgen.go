@@ -144,7 +144,6 @@ type templates struct {
 	loadQuery               *template.Template
 	loadQueryNoFlowDocument *template.Template
 	dropLoadTable           *template.Template
-	installFence            *template.Template
 	updateFence             *template.Template
 }
 
@@ -292,40 +291,6 @@ JOIN {{ $.Identifier}} AS r
 DROP TABLE {{ template "temp_name" . }}
 {{ end }}
 
--- Templated fence installation for checkpoints table:
-
-{{ define "installFence" }}
--- Insert or update checkpoint fence for Spanner
-MERGE INTO {{ Identifier $.TablePath }} AS target
-USING (
-	SELECT
-		{{ Literal $.Materialization.String }} AS materialization,
-		{{ $.KeyBegin }} AS key_begin,
-		{{ $.KeyEnd }} AS key_end
-) AS source
-ON target.materialization = source.materialization
-	AND target.key_begin = source.key_begin
-	AND target.key_end = source.key_end
-WHEN MATCHED THEN
-	UPDATE SET fence = target.fence + 1
-WHEN NOT MATCHED THEN
-	INSERT (materialization, key_begin, key_end, fence, checkpoint)
-	VALUES (
-		{{ Literal $.Materialization.String }},
-		{{ $.KeyBegin }},
-		{{ $.KeyEnd }},
-		{{ $.Fence }},
-		{{ Literal (Base64Std $.Checkpoint) }}
-	)
-
--- Return the fence and checkpoint
-SELECT fence, FROM_BASE64(checkpoint) AS checkpoint
-FROM {{ Identifier $.TablePath }}
-WHERE materialization = {{ Literal $.Materialization.String }}
-	AND key_begin = {{ $.KeyBegin }}
-	AND key_end = {{ $.KeyEnd }}
-{{ end }}
-
 {{ define "updateFence" }}
 UPDATE {{ Identifier $.TablePath }}
 	SET checkpoint = {{ Literal (Base64Std $.Checkpoint) }}
@@ -347,7 +312,6 @@ UPDATE {{ Identifier $.TablePath }}
 		loadQuery:               tplAll.Lookup("loadQuery"),
 		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
 		dropLoadTable:           tplAll.Lookup("dropLoadTable"),
-		installFence:            tplAll.Lookup("installFence"),
 		updateFence:             tplAll.Lookup("updateFence"),
 	}
 }

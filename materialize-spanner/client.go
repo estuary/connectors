@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 	"strings"
 	"sync"
@@ -397,10 +398,16 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 		return nil
 	}
 
+	// Strip trailing semicolons from statements (Spanner DDL API doesn't accept them)
+	cleanedStatements := make([]string, len(statements))
+	for i, stmt := range statements {
+		cleanedStatements[i] = strings.TrimSuffix(strings.TrimSpace(stmt), ";")
+	}
+
 	// Execute DDL statements
 	op, err := c.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
 		Database:   c.dbPath,
-		Statements: statements,
+		Statements: cleanedStatements,
 	})
 	if err != nil {
 		return fmt.Errorf("submitting DDL statements: %w", err)
@@ -410,88 +417,97 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 }
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {
-	// First, ensure the checkpoints table exists
-	createTableStmt := fmt.Sprintf(`
-		CREATE TABLE IF NOT EXISTS %s (
-			materialization STRING(MAX) NOT NULL,
-			key_begin INT64 NOT NULL,
-			key_end INT64 NOT NULL,
-			fence INT64 NOT NULL,
-			checkpoint STRING(MAX)
-		) PRIMARY KEY (materialization, key_begin, key_end)
-	`, c.ep.Dialect.Identifier(checkpoints.Path...))
+	// The checkpoints table is created by CreateTable during Apply, not here.
+	tableName := checkpoints.Identifier
 
-	op, err := c.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
-		Database:   c.dbPath,
-		Statements: []string{createTableStmt},
-	})
-	if err != nil {
-		return sql.Fence{}, fmt.Errorf("creating checkpoints table: %w", err)
-	}
-
-	if err := op.Wait(ctx); err != nil {
-		return sql.Fence{}, fmt.Errorf("waiting for checkpoints table creation: %w", err)
-	}
-
-	// Now install/update the fence using the template
-	var fenceStmtBuilder strings.Builder
-	if err := c.templates.installFence.Execute(&fenceStmtBuilder, fence); err != nil {
-		return sql.Fence{}, fmt.Errorf("rendering install fence statement: %w", err)
-	}
-	fenceStmt := fenceStmtBuilder.String()
-
-	// Execute the fence installation/update
-	// This is a multi-statement operation, so we need to split it
-	statements := strings.Split(fenceStmt, ";")
-	var mergeStmt, selectStmt string
-	for _, stmt := range statements {
-		stmt = strings.TrimSpace(stmt)
-		if stmt == "" {
-			continue
+	// Use a read-write transaction to implement fencing logic
+	var resultFence sql.Fence
+	_, err := c.dataClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		// Step 1: Increment fence of ANY checkpoint that overlaps our key range
+		// This uses DML UPDATE since mutations don't support conditional updates
+		updateStmt := spanner.Statement{
+			SQL: fmt.Sprintf(`UPDATE %s SET fence = fence + 1
+				WHERE materialization = @materialization
+				AND key_end >= @key_begin
+				AND key_begin <= @key_end`, tableName),
+			Params: map[string]interface{}{
+				"materialization": fence.Materialization.String(),
+				"key_begin":       int64(fence.KeyBegin),
+				"key_end":         int64(fence.KeyEnd),
+			},
 		}
-		if strings.HasPrefix(strings.ToUpper(stmt), "MERGE") {
-			mergeStmt = stmt
-		} else if strings.HasPrefix(strings.ToUpper(stmt), "SELECT") {
-			selectStmt = stmt
+		if _, err := txn.Update(ctx, updateStmt); err != nil {
+			return fmt.Errorf("incrementing overlapping fences: %w", err)
 		}
-	}
 
-	// Execute merge in a transaction
-	_, err = c.dataClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
-		if mergeStmt != "" {
-			_, err := txn.Update(ctx, spanner.Statement{SQL: mergeStmt})
-			if err != nil {
-				return fmt.Errorf("executing MERGE: %w", err)
+		// Step 2: Read the checkpoint with the narrowest range that fully contains our range
+		selectStmt := spanner.Statement{
+			SQL: fmt.Sprintf(`SELECT fence, key_begin, key_end, checkpoint FROM %s
+				WHERE materialization = @materialization
+				AND key_begin <= @key_begin
+				AND key_end >= @key_end
+				ORDER BY (key_end - key_begin) ASC
+				LIMIT 1`, tableName),
+			Params: map[string]interface{}{
+				"materialization": fence.Materialization.String(),
+				"key_begin":       int64(fence.KeyBegin),
+				"key_end":         int64(fence.KeyEnd),
+			},
+		}
+
+		iter := txn.Query(ctx, selectStmt)
+		defer iter.Stop()
+
+		row, err := iter.Next()
+		var readFence int64
+		var readBegin, readEnd int64
+		var checkpoint spanner.NullString
+
+		if err == iterator.Done {
+			// No overlapping row found - set invalid range to trigger insertion
+			readBegin, readEnd = 1, 0
+		} else if err != nil {
+			return fmt.Errorf("reading narrowest overlapping fence: %w", err)
+		} else {
+			if err := row.Columns(&readFence, &readBegin, &readEnd, &checkpoint); err != nil {
+				return fmt.Errorf("scanning fence row: %w", err)
+			}
+			fence.Fence = readFence
+			if checkpoint.Valid {
+				fence.Checkpoint, _ = base64.StdEncoding.DecodeString(checkpoint.StringVal)
 			}
 		}
+
+		// Step 3: If no exact match exists, insert a new row for this key range
+		if readBegin == int64(fence.KeyBegin) && readEnd == int64(fence.KeyEnd) {
+			// Exact match exists, no need to insert
+		} else {
+			// Insert new row using mutation
+			mutation := spanner.Insert(
+				tableName,
+				[]string{"materialization", "key_begin", "key_end", "fence", "checkpoint"},
+				[]interface{}{
+					fence.Materialization.String(),
+					int64(fence.KeyBegin),
+					int64(fence.KeyEnd),
+					fence.Fence,
+					base64.StdEncoding.EncodeToString(fence.Checkpoint),
+				},
+			)
+			if err := txn.BufferWrite([]*spanner.Mutation{mutation}); err != nil {
+				return fmt.Errorf("inserting new fence: %w", err)
+			}
+		}
+
+		resultFence = fence
 		return nil
 	})
 	if err != nil {
 		return sql.Fence{}, fmt.Errorf("installing fence: %w", err)
 	}
 
-	// Read back the fence value
-	if selectStmt != "" {
-		iter := c.dataClient.Single().Query(ctx, spanner.Statement{SQL: selectStmt})
-		defer iter.Stop()
-
-		row, err := iter.Next()
-		if err != nil {
-			return sql.Fence{}, fmt.Errorf("reading fence value: %w", err)
-		}
-
-		var fenceValue int64
-		var checkpoint []byte
-		if err := row.Columns(&fenceValue, &checkpoint); err != nil {
-			return sql.Fence{}, fmt.Errorf("scanning fence row: %w", err)
-		}
-
-		fence.Fence = fenceValue
-		fence.Checkpoint = checkpoint
-	}
-
 	log.Info("client: installed fence")
-	return fence, nil
+	return resultFence, nil
 }
 
 func (c *client) Close() {
