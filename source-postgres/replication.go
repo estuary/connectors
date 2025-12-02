@@ -416,7 +416,7 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 	s.standbyStatusWorker.done = make(chan struct{})
 	go func() {
 		defer close(s.standbyStatusWorker.done)
-		if err := s.sendStandbyStatusUpdate(); err != nil {
+		if err := s.sendStandbyStatusUpdate(true); err != nil {
 			logrus.WithError(err).Fatal("failed to send standby status update")
 		}
 		var ticker = time.NewTicker(standbyStatusInterval)
@@ -426,7 +426,7 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 			case <-s.standbyStatusWorker.ctx.Done():
 				return
 			case <-ticker.C:
-				if err := s.sendStandbyStatusUpdate(); err != nil {
+				if err := s.sendStandbyStatusUpdate(true); err != nil {
 					logrus.WithError(err).Fatal("failed to send standby status update")
 				}
 			}
@@ -522,7 +522,7 @@ func (s *replicationStream) relayChanges(ctx context.Context, callback func(even
 			if pkm, err := pglogrepl.ParsePrimaryKeepaliveMessage(data[1:]); err != nil {
 				return fmt.Errorf("error parsing keepalive: %w", err)
 			} else if pkm.ReplyRequested {
-				if err := s.sendStandbyStatusUpdate(); err != nil {
+				if err := s.sendStandbyStatusUpdate(false); err != nil {
 					return fmt.Errorf("error sending standby status update: %w", err)
 				}
 			}
@@ -1211,7 +1211,7 @@ func (s *replicationStream) Acknowledge(ctx context.Context, cursorJSON json.Raw
 	return nil
 }
 
-func (s *replicationStream) sendStandbyStatusUpdate() error {
+func (s *replicationStream) sendStandbyStatusUpdate(replyRequested bool) error {
 	var ackLSN = pglogrepl.LSN(atomic.LoadUint64(&s.ackLSN))
 	if ackLSN != s.previousAckLSN {
 		// Log at info level whenever we're about to confirm a different LSN from last time.
@@ -1226,7 +1226,6 @@ func (s *replicationStream) sendStandbyStatusUpdate() error {
 	var walFlushPosition = ackLSN
 	var walApplyPosition = ackLSN
 	var clientTime = time.Now()
-	var replyRequested = false
 
 	// Convert client time to microseconds since the Y2K epoch, since that's what the protocol message uses.
 	const microsecFromUnixEpochToY2K = 946684800 * 1000000
