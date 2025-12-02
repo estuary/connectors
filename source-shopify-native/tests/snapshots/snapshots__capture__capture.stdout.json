@@ -596,6 +596,7 @@
         {
           "__parentId": "gid://shopify/Order/5714619858989",
           "currentQuantity": 1,
+          "customAttributes": [],
           "discountAllocations": [],
           "discountedTotalSet": {
             "presentmentMoney": {
@@ -707,6 +708,7 @@
         {
           "__parentId": "gid://shopify/Order/5714619858989",
           "currentQuantity": 1,
+          "customAttributes": [],
           "discountAllocations": [],
           "discountedTotalSet": {
             "presentmentMoney": {
