@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"slices"
 	"testing"
 
 	"cloud.google.com/go/spanner"
@@ -133,6 +134,8 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 			t.Helper()
 
 			var keys = make([]string, len(cols))
+			numericKey := slices.Index(cols, "int64ToNumber")
+			values[numericKey] = fmt.Sprintf("NUMERIC '%s'", values[numericKey])
 			for i, col := range cols {
 				keys[i] = testDialect.Identifier(col)
 			}
