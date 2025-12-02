@@ -20,6 +20,8 @@ Base Initial Constraints:
 {"Field":"requiredNumeric","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"Required root-level properties must be present when flow_document is disabled"}
 {"Field":"scalarValue","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"Required root-level properties must be present when flow_document is disabled"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Only a single root document projection can be materialized for standard updates"}
+{"Field":"stringAddMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIncreaseMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"stringWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
@@ -43,13 +45,15 @@ Migratable Changes Before Apply Schema:
 {"Name":"optional","Nullable":"YES","Type":"JSON"}
 {"Name":"requiredNumeric","Nullable":"NO","Type":"BIGNUMERIC(38)"}
 {"Name":"scalarValue","Nullable":"NO","Type":"STRING"}
+{"Name":"stringAddMaxLength","Nullable":"YES","Type":"STRING"}
+{"Name":"stringIncreaseMaxLength","Nullable":"YES","Type":"STRING"}
 {"Name":"stringWidenedToJson","Nullable":"YES","Type":"STRING"}
 {"Name":"timeValue","Nullable":"YES","Type":"STRING"}
 
 
 Migratable Changes Before Apply Data:
-key (STRING), _meta_flow_truncated (BOOLEAN), boolWidenedToJson (BOOLEAN), dateValue (DATE), datetimeValue (TIMESTAMP), fieldWithProjection (STRING), field_with_projection (STRING), flow_published_at (TIMESTAMP), int64 (INTEGER), int64ToNumber (BIGNUMERIC), intToNumber (INTEGER), intWidenedToJson (INTEGER), multiple (JSON), nonScalarValue (JSON), numericString (BIGNUMERIC), optional (JSON), requiredNumeric (BIGNUMERIC), scalarValue (STRING), stringWidenedToJson (STRING), timeValue (STRING), flow_document (JSON)
-1, false, true, 2024-01-01, 2024-01-01 01:01:01.111111 +0000 UTC, <nil>, <nil>, 2024-09-13 01:01:01 +0000 UTC, 1, 10000000000000000000/1, 9223372036854775807, 999, <nil>, <nil>, 123/1, <nil>, 456/1, test, hello, 01:01:01, {}
+key (STRING), _meta_flow_truncated (BOOLEAN), boolWidenedToJson (BOOLEAN), dateValue (DATE), datetimeValue (TIMESTAMP), fieldWithProjection (STRING), field_with_projection (STRING), flow_published_at (TIMESTAMP), int64 (INTEGER), int64ToNumber (BIGNUMERIC), intToNumber (INTEGER), intWidenedToJson (INTEGER), multiple (JSON), nonScalarValue (JSON), numericString (BIGNUMERIC), optional (JSON), requiredNumeric (BIGNUMERIC), scalarValue (STRING), stringAddMaxLength (STRING), stringIncreaseMaxLength (STRING), stringWidenedToJson (STRING), timeValue (STRING), flow_document (JSON)
+1, false, true, 2024-01-01, 2024-01-01 01:01:01.111111 +0000 UTC, <nil>, <nil>, 2024-09-13 01:01:01 +0000 UTC, 1, 10000000000000000000/1, 9223372036854775807, 999, <nil>, <nil>, 123/1, <nil>, 456/1, test, <nil>, <nil>, hello, 01:01:01, {}
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -73,6 +77,8 @@ Migratable Changes Constraints:
 {"Field":"requiredNumeric","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
+{"Field":"stringAddMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIncreaseMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
@@ -96,11 +102,13 @@ Migratable Changes Applied Schema:
 {"Name":"optional","Nullable":"YES","Type":"JSON"}
 {"Name":"requiredNumeric","Nullable":"YES","Type":"STRING"}
 {"Name":"scalarValue","Nullable":"NO","Type":"STRING"}
+{"Name":"stringAddMaxLength","Nullable":"YES","Type":"STRING"}
+{"Name":"stringIncreaseMaxLength","Nullable":"YES","Type":"STRING"}
 {"Name":"stringWidenedToJson","Nullable":"YES","Type":"JSON"}
 {"Name":"timeValue","Nullable":"YES","Type":"STRING"}
 
 
 Migratable Changes Applied Data:
-key (STRING), _meta_flow_truncated (BOOLEAN), fieldWithProjection (STRING), field_with_projection (STRING), flow_published_at (TIMESTAMP), int64ToNumber (BIGNUMERIC), multiple (JSON), nonScalarValue (JSON), optional (JSON), scalarValue (STRING), timeValue (STRING), flow_document (JSON), boolWidenedToJson (JSON), dateValue (STRING), datetimeValue (STRING), int64 (BIGNUMERIC), intToNumber (FLOAT), intWidenedToJson (JSON), numericString (STRING), requiredNumeric (STRING), stringWidenedToJson (JSON)
-1, false, <nil>, <nil>, 2024-09-13 01:01:01 +0000 UTC, 10000000000000000000/1, <nil>, <nil>, <nil>, test, 01:01:01, {}, true, 2024-01-01, 2024-01-01T01:01:01.111111Z, 1/1, 9.223372036854776e+18, 999, 123, 456, "hello"
+key (STRING), _meta_flow_truncated (BOOLEAN), fieldWithProjection (STRING), field_with_projection (STRING), flow_published_at (TIMESTAMP), int64ToNumber (BIGNUMERIC), multiple (JSON), nonScalarValue (JSON), optional (JSON), scalarValue (STRING), stringAddMaxLength (STRING), stringIncreaseMaxLength (STRING), timeValue (STRING), flow_document (JSON), boolWidenedToJson (JSON), dateValue (STRING), datetimeValue (STRING), int64 (BIGNUMERIC), intToNumber (FLOAT), intWidenedToJson (JSON), numericString (STRING), requiredNumeric (STRING), stringWidenedToJson (JSON)
+1, false, <nil>, <nil>, 2024-09-13 01:01:01 +0000 UTC, 10000000000000000000/1, <nil>, <nil>, <nil>, test, <nil>, <nil>, 01:01:01, {}, true, 2024-01-01, 2024-01-01T01:01:01.111111Z, 1/1, 9.223372036854776e+18, 999, 123, 456, "hello"
 

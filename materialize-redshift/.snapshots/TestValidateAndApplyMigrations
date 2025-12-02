@@ -20,6 +20,8 @@ Base Initial Constraints:
 {"Field":"requiredNumeric","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"Required root-level properties must be present when flow_document is disabled"}
 {"Field":"scalarValue","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"Required root-level properties must be present when flow_document is disabled"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Only a single root document projection can be materialized for standard updates"}
+{"Field":"stringAddMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIncreaseMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"stringWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
@@ -28,28 +30,30 @@ Migratable Changes Before Apply Schema:
 {"Name":"boolwidenedtojson","Nullable":"YES","Type":"boolean"}
 {"Name":"datetimevalue","Nullable":"YES","Type":"timestamp with time zone"}
 {"Name":"datevalue","Nullable":"YES","Type":"date"}
-{"Name":"field_with_projection","Nullable":"YES","Type":"character varying"}
-{"Name":"fieldwithprojection","Nullable":"YES","Type":"character varying"}
+{"Name":"field_with_projection","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"fieldwithprojection","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"flow_document","Nullable":"YES","Type":"super"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"timestamp with time zone"}
 {"Name":"int64","Nullable":"YES","Type":"bigint"}
 {"Name":"int64tonumber","Nullable":"YES","Type":"numeric"}
 {"Name":"inttonumber","Nullable":"YES","Type":"bigint"}
 {"Name":"intwidenedtojson","Nullable":"YES","Type":"bigint"}
-{"Name":"key","Nullable":"YES","Type":"character varying"}
+{"Name":"key","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"multiple","Nullable":"YES","Type":"super"}
 {"Name":"nonscalarvalue","Nullable":"YES","Type":"super"}
 {"Name":"numericstring","Nullable":"YES","Type":"numeric"}
 {"Name":"optional","Nullable":"YES","Type":"super"}
 {"Name":"requirednumeric","Nullable":"YES","Type":"numeric"}
-{"Name":"scalarvalue","Nullable":"YES","Type":"character varying"}
-{"Name":"stringwidenedtojson","Nullable":"YES","Type":"character varying"}
-{"Name":"timevalue","Nullable":"YES","Type":"character varying"}
+{"Name":"scalarvalue","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringaddmaxlength","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringincreasemaxlength","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringwidenedtojson","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"timevalue","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 
 
 Migratable Changes Before Apply Data:
-key (VARCHAR), _meta/flow_truncated (BOOL), boolwidenedtojson (BOOL), datevalue (DATE), datetimevalue (TIMESTAMPTZ), fieldwithprojection (VARCHAR), field_with_projection (VARCHAR), flow_published_at (TIMESTAMPTZ), int64 (INT8), int64tonumber (NUMERIC), inttonumber (INT8), intwidenedtojson (INT8), multiple (4000), nonscalarvalue (4000), numericstring (NUMERIC), optional (4000), requirednumeric (NUMERIC), scalarvalue (VARCHAR), stringwidenedtojson (VARCHAR), timevalue (VARCHAR), flow_document (4000)
-1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T01:01:01.111111Z, <nil>, <nil>, 2024-09-13T01:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, hello, 01:01:01, "{}"
+key (VARCHAR), _meta/flow_truncated (BOOL), boolwidenedtojson (BOOL), datevalue (DATE), datetimevalue (TIMESTAMPTZ), fieldwithprojection (VARCHAR), field_with_projection (VARCHAR), flow_published_at (TIMESTAMPTZ), int64 (INT8), int64tonumber (NUMERIC), inttonumber (INT8), intwidenedtojson (INT8), multiple (4000), nonscalarvalue (4000), numericstring (NUMERIC), optional (4000), requirednumeric (NUMERIC), scalarvalue (VARCHAR), stringaddmaxlength (VARCHAR), stringincreasemaxlength (VARCHAR), stringwidenedtojson (VARCHAR), timevalue (VARCHAR), flow_document (4000)
+1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T01:01:01.111111Z, <nil>, <nil>, 2024-09-13T01:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, <nil>, <nil>, hello, 01:01:01, "{}"
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -73,34 +77,38 @@ Migratable Changes Constraints:
 {"Field":"requiredNumeric","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
+{"Field":"stringAddMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIncreaseMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Migratable Changes Applied Schema:
 {"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
 {"Name":"boolwidenedtojson","Nullable":"YES","Type":"super"}
-{"Name":"datetimevalue","Nullable":"YES","Type":"character varying"}
-{"Name":"datevalue","Nullable":"YES","Type":"character varying"}
-{"Name":"field_with_projection","Nullable":"YES","Type":"character varying"}
-{"Name":"fieldwithprojection","Nullable":"YES","Type":"character varying"}
+{"Name":"datetimevalue","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"datevalue","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"field_with_projection","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"fieldwithprojection","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"flow_document","Nullable":"YES","Type":"super"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"timestamp with time zone"}
 {"Name":"int64","Nullable":"YES","Type":"numeric"}
 {"Name":"int64tonumber","Nullable":"YES","Type":"double precision"}
 {"Name":"inttonumber","Nullable":"YES","Type":"double precision"}
 {"Name":"intwidenedtojson","Nullable":"YES","Type":"super"}
-{"Name":"key","Nullable":"YES","Type":"character varying"}
+{"Name":"key","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"multiple","Nullable":"YES","Type":"super"}
 {"Name":"nonscalarvalue","Nullable":"YES","Type":"super"}
-{"Name":"numericstring","Nullable":"YES","Type":"character varying"}
+{"Name":"numericstring","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"optional","Nullable":"YES","Type":"super"}
-{"Name":"requirednumeric","Nullable":"YES","Type":"character varying"}
-{"Name":"scalarvalue","Nullable":"YES","Type":"character varying"}
+{"Name":"requirednumeric","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"scalarvalue","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringaddmaxlength","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringincreasemaxlength","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"stringwidenedtojson","Nullable":"YES","Type":"super"}
-{"Name":"timevalue","Nullable":"YES","Type":"character varying"}
+{"Name":"timevalue","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 
 
 Migratable Changes Applied Data:
-key (VARCHAR), _meta/flow_truncated (BOOL), boolwidenedtojson (VARCHAR), datevalue (VARCHAR), datetimevalue (TIMESTAMPTZ), fieldwithprojection (4000), field_with_projection (4000), flow_published_at (4000), int64 (VARCHAR), int64tonumber (VARCHAR), inttonumber (4000), intwidenedtojson (4000), multiple (VARCHAR), nonscalarvalue (VARCHAR), numericstring (NUMERIC), optional (FLOAT8), requirednumeric (FLOAT8), scalarvalue (4000), stringwidenedtojson (VARCHAR), timevalue (VARCHAR), flow_document (4000)
-1, false, <nil>, <nil>, 2024-09-13T01:01:01Z, <nil>, <nil>, <nil>, test, 01:01:01, "{}", true, 2024-01-01, 2024-01-01T01:01:01.111111Z, 1, 1e+19, 9.22337203685478e+18, 999, 123, 456, "hello"
+key (VARCHAR), _meta/flow_truncated (BOOL), boolwidenedtojson (VARCHAR), datevalue (VARCHAR), datetimevalue (TIMESTAMPTZ), fieldwithprojection (4000), field_with_projection (4000), flow_published_at (4000), int64 (VARCHAR), int64tonumber (VARCHAR), inttonumber (VARCHAR), intwidenedtojson (VARCHAR), multiple (4000), nonscalarvalue (4000), numericstring (VARCHAR), optional (VARCHAR), requirednumeric (NUMERIC), scalarvalue (FLOAT8), stringaddmaxlength (FLOAT8), stringincreasemaxlength (4000), stringwidenedtojson (VARCHAR), timevalue (VARCHAR), flow_document (4000)
+1, false, <nil>, <nil>, 2024-09-13T01:01:01Z, <nil>, <nil>, <nil>, test, <nil>, <nil>, 01:01:01, "{}", true, 2024-01-01, 2024-01-01T01:01:01.111111Z, 1, 1e+19, 9.22337203685478e+18, 999, 123, 456, "hello"
 

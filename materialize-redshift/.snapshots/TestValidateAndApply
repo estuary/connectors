@@ -92,7 +92,7 @@ Big Schema Changed Types Constraints:
 {"Field":"stringDateTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'CHARACTER VARYING' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
+{"Field":"stringField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'CHARACTER VARYING(256)' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
 {"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -122,36 +122,36 @@ Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"flow_document","Nullable":"YES","Type":"super"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"timestamp with time zone"}
 {"Name":"intfield","Nullable":"YES","Type":"bigint"}
-{"Name":"key","Nullable":"YES","Type":"character varying"}
+{"Name":"key","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"multiplefield","Nullable":"YES","Type":"super"}
 {"Name":"numfield","Nullable":"YES","Type":"double precision"}
 {"Name":"objfield","Nullable":"YES","Type":"super"}
 {"Name":"stringdatefield","Nullable":"YES","Type":"date"}
 {"Name":"stringdatetimefield","Nullable":"YES","Type":"timestamp with time zone"}
-{"Name":"stringdurationfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringemailfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringhostnamefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringidnemailfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringidnhostnamefield","Nullable":"YES","Type":"character varying"}
+{"Name":"stringdurationfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringemailfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringhostnamefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringidnemailfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringidnhostnamefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"stringintegerfield","Nullable":"YES","Type":"numeric"}
-{"Name":"stringipv4field","Nullable":"YES","Type":"character varying"}
-{"Name":"stringipv6field","Nullable":"YES","Type":"character varying"}
-{"Name":"stringirifield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringirireferencefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringjsonpointerfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringmacaddr8field","Nullable":"YES","Type":"character varying"}
-{"Name":"stringmacaddrfield","Nullable":"YES","Type":"character varying"}
+{"Name":"stringipv4field","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringipv6field","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringirifield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringirireferencefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringjsonpointerfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringmacaddr8field","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringmacaddrfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"stringnumberfield","Nullable":"YES","Type":"double precision"}
-{"Name":"stringregexfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringrelativejsonpointerfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringtimefield","Nullable":"YES","Type":"character varying"}
+{"Name":"stringregexfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringrelativejsonpointerfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringtimefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"stringuint32field","Nullable":"YES","Type":"numeric"}
 {"Name":"stringuint64field","Nullable":"YES","Type":"numeric"}
-{"Name":"stringurifield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringurireferencefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringuritemplatefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringuuidfield","Nullable":"YES","Type":"character varying"}
+{"Name":"stringurifield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringurireferencefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringuritemplatefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringuuidfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 
 Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
@@ -160,36 +160,36 @@ Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"flow_document","Nullable":"YES","Type":"super"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"timestamp with time zone"}
 {"Name":"intfield","Nullable":"YES","Type":"bigint"}
-{"Name":"key","Nullable":"YES","Type":"character varying"}
+{"Name":"key","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"multiplefield","Nullable":"YES","Type":"super"}
 {"Name":"numfield","Nullable":"YES","Type":"double precision"}
 {"Name":"objfield","Nullable":"YES","Type":"super"}
 {"Name":"stringdatefield","Nullable":"YES","Type":"date"}
 {"Name":"stringdatetimefield","Nullable":"YES","Type":"timestamp with time zone"}
-{"Name":"stringdurationfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringemailfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringhostnamefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringidnemailfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringidnhostnamefield","Nullable":"YES","Type":"character varying"}
+{"Name":"stringdurationfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringemailfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringhostnamefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringidnemailfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringidnhostnamefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"stringintegerfield","Nullable":"YES","Type":"numeric"}
-{"Name":"stringipv4field","Nullable":"YES","Type":"character varying"}
-{"Name":"stringipv6field","Nullable":"YES","Type":"character varying"}
-{"Name":"stringirifield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringirireferencefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringjsonpointerfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringmacaddr8field","Nullable":"YES","Type":"character varying"}
-{"Name":"stringmacaddrfield","Nullable":"YES","Type":"character varying"}
+{"Name":"stringipv4field","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringipv6field","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringirifield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringirireferencefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringjsonpointerfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringmacaddr8field","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringmacaddrfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"stringnumberfield","Nullable":"YES","Type":"double precision"}
-{"Name":"stringregexfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringrelativejsonpointerfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringtimefield","Nullable":"YES","Type":"character varying"}
+{"Name":"stringregexfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringrelativejsonpointerfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringtimefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"stringuint32field","Nullable":"YES","Type":"numeric"}
 {"Name":"stringuint64field","Nullable":"YES","Type":"numeric"}
-{"Name":"stringurifield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringurireferencefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringuritemplatefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringuuidfield","Nullable":"YES","Type":"character varying"}
+{"Name":"stringurifield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringurireferencefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringuritemplatefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringuuidfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 
 Big Schema Changed Types With Table Replacement Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
@@ -236,111 +236,111 @@ Big Schema Materialized Resource Schema Changed Types With Table Replacement:
 {"Name":"boolfield","Nullable":"YES","Type":"bigint"}
 {"Name":"flow_document","Nullable":"YES","Type":"super"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"timestamp with time zone"}
-{"Name":"intfield","Nullable":"YES","Type":"character varying"}
-{"Name":"key","Nullable":"YES","Type":"character varying"}
+{"Name":"intfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"key","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"multiplefield","Nullable":"YES","Type":"super"}
 {"Name":"nullfield","Nullable":"YES","Type":"super"}
 {"Name":"numfield","Nullable":"YES","Type":"boolean"}
-{"Name":"objfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringdatefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringdatetimefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringdurationfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringemailfield","Nullable":"YES","Type":"character varying"}
+{"Name":"objfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringdatefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringdatetimefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringdurationfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringemailfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"stringfield","Nullable":"YES","Type":"bigint"}
-{"Name":"stringhostnamefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringidnemailfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringidnhostnamefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringintegerfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringipv4field","Nullable":"YES","Type":"character varying"}
-{"Name":"stringipv6field","Nullable":"YES","Type":"character varying"}
-{"Name":"stringirifield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringirireferencefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringjsonpointerfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringmacaddr8field","Nullable":"YES","Type":"character varying"}
-{"Name":"stringmacaddrfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringnumberfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringregexfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringrelativejsonpointerfield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringtimefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringuint32field","Nullable":"YES","Type":"character varying"}
-{"Name":"stringuint64field","Nullable":"YES","Type":"character varying"}
-{"Name":"stringurifield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringurireferencefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringuritemplatefield","Nullable":"YES","Type":"character varying"}
-{"Name":"stringuuidfield","Nullable":"YES","Type":"character varying"}
+{"Name":"stringhostnamefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringidnemailfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringidnhostnamefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringintegerfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringipv4field","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringipv6field","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringirifield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringirireferencefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringjsonpointerfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringmacaddr8field","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringmacaddrfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringnumberfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringregexfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringrelativejsonpointerfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringtimefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringuint32field","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringuint64field","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringurifield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringurireferencefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringuritemplatefield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"stringuuidfield","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 
 add a single field:
 {"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
-{"Name":"addedoptionalstring","Nullable":"YES","Type":"character varying"}
+{"Name":"addedoptionalstring","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"flow_document","Nullable":"YES","Type":"super"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"timestamp with time zone"}
-{"Name":"key","Nullable":"YES","Type":"character varying"}
+{"Name":"key","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"optionalboolean","Nullable":"YES","Type":"boolean"}
 {"Name":"optionalinteger","Nullable":"YES","Type":"bigint"}
 {"Name":"optionalobject","Nullable":"YES","Type":"super"}
-{"Name":"optionalstring","Nullable":"YES","Type":"character varying"}
+{"Name":"optionalstring","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"requiredboolean","Nullable":"YES","Type":"boolean"}
 {"Name":"requiredinteger","Nullable":"YES","Type":"bigint"}
 {"Name":"requiredobject","Nullable":"YES","Type":"super"}
-{"Name":"requiredstring","Nullable":"YES","Type":"character varying"}
+{"Name":"requiredstring","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 
 remove a single optional field:
 {"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
 {"Name":"flow_document","Nullable":"YES","Type":"super"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"timestamp with time zone"}
-{"Name":"key","Nullable":"YES","Type":"character varying"}
+{"Name":"key","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"optionalboolean","Nullable":"YES","Type":"boolean"}
 {"Name":"optionalinteger","Nullable":"YES","Type":"bigint"}
 {"Name":"optionalobject","Nullable":"YES","Type":"super"}
-{"Name":"optionalstring","Nullable":"YES","Type":"character varying"}
+{"Name":"optionalstring","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"requiredboolean","Nullable":"YES","Type":"boolean"}
 {"Name":"requiredinteger","Nullable":"YES","Type":"bigint"}
 {"Name":"requiredobject","Nullable":"YES","Type":"super"}
-{"Name":"requiredstring","Nullable":"YES","Type":"character varying"}
+{"Name":"requiredstring","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 
 remove a single required field:
 {"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
 {"Name":"flow_document","Nullable":"YES","Type":"super"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"timestamp with time zone"}
-{"Name":"key","Nullable":"YES","Type":"character varying"}
+{"Name":"key","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"optionalboolean","Nullable":"YES","Type":"boolean"}
 {"Name":"optionalinteger","Nullable":"YES","Type":"bigint"}
 {"Name":"optionalobject","Nullable":"YES","Type":"super"}
-{"Name":"optionalstring","Nullable":"YES","Type":"character varying"}
+{"Name":"optionalstring","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"requiredboolean","Nullable":"YES","Type":"boolean"}
 {"Name":"requiredinteger","Nullable":"YES","Type":"bigint"}
 {"Name":"requiredobject","Nullable":"YES","Type":"super"}
-{"Name":"requiredstring","Nullable":"YES","Type":"character varying"}
+{"Name":"requiredstring","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 
 add and remove many fields:
 {"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
-{"Name":"addedoptionalstring","Nullable":"YES","Type":"character varying"}
-{"Name":"addedrequiredstring","Nullable":"YES","Type":"character varying"}
+{"Name":"addedoptionalstring","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"addedrequiredstring","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"flow_document","Nullable":"YES","Type":"super"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"timestamp with time zone"}
-{"Name":"key","Nullable":"YES","Type":"character varying"}
+{"Name":"key","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"optionalboolean","Nullable":"YES","Type":"boolean"}
 {"Name":"optionalinteger","Nullable":"YES","Type":"bigint"}
 {"Name":"optionalobject","Nullable":"YES","Type":"super"}
-{"Name":"optionalstring","Nullable":"YES","Type":"character varying"}
+{"Name":"optionalstring","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"requiredboolean","Nullable":"YES","Type":"boolean"}
 {"Name":"requiredinteger","Nullable":"YES","Type":"bigint"}
 {"Name":"requiredobject","Nullable":"YES","Type":"super"}
-{"Name":"requiredstring","Nullable":"YES","Type":"character varying"}
+{"Name":"requiredstring","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 
 Challenging Field Names Materialized Columns:
-{"Name":" ,;{}().- problematickey � 𐀀 嶲 ","Nullable":"YES","Type":"character varying"}
-{"Name":" ,;{}().- problematicvalue � 𐀀 嶲 ","Nullable":"YES","Type":"character varying"}
-{"Name":"$dollar$signs","Nullable":"YES","Type":"character varying"}
-{"Name":"123","Nullable":"YES","Type":"character varying"}
-{"Name":"123startswithdigits","Nullable":"YES","Type":"character varying"}
-{"Name":"_id","Nullable":"YES","Type":"character varying"}
-{"Name":"a\"string`with`quote'characters","Nullable":"YES","Type":"character varying"}
+{"Name":" ,;{}().- problematickey � 𐀀 嶲 ","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":" ,;{}().- problematicvalue � 𐀀 嶲 ","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"$dollar$signs","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"123","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"123startswithdigits","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"_id","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"a\"string`with`quote'characters","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 {"Name":"flow_document","Nullable":"YES","Type":"super"}
 {"Name":"flow_published_at","Nullable":"YES","Type":"timestamp with time zone"}
-{"Name":"value with separated words","Nullable":"YES","Type":"character varying"}
-{"Name":"value-with-separated-words","Nullable":"YES","Type":"character varying"}
-{"Name":"value.with-separated_words","Nullable":"YES","Type":"character varying"}
-{"Name":"value.with.separated.words","Nullable":"YES","Type":"character varying"}
-{"Name":"value_with_separated_words","Nullable":"YES","Type":"character varying"}
+{"Name":"value with separated words","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"value-with-separated-words","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"value.with-separated_words","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"value.with.separated.words","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
+{"Name":"value_with_separated_words","Nullable":"YES","Type":"character varying","CharacterMaxLength":256}
 
