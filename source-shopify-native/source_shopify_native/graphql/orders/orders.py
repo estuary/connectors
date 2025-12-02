@@ -281,6 +281,10 @@ class Orders(ShopifyGraphQLResource):
                     id
                     legacyResourceId
                 }
+                customAttributes {
+                    key
+                    value
+                }
             }
         }
     }
