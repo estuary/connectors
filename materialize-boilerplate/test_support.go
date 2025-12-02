@@ -188,8 +188,19 @@ func RunValidateAndApplyTestCases(
 		for idx := 0; idx < 2; idx++ {
 			validateRes, err := driver.Validate(ctx, ValidateReq(fixture, nil, configJson, resourceConfigJson))
 			require.NoError(t, err)
+
+			// With the updates to Flow runtime to handle duplicate column names, we may get
+			// errors on the apply here. It depends on the connector: whether it has sanitisation of column names
+			// or not. We log the error so that we know whether a connector errors or not, and if the error is
+			// a duplicate column error, that is fine, since the runtime will handle that scenario normally.
+			// It is still useful to keep the tests in place to catch any other unexpected errors
 			_, err = driver.Apply(ctx, ApplyReq(fixture, nil, configJson, resourceConfigJson, validateRes, false))
-			require.NoError(t, err)
+			if err != nil {
+				if idx == 0 {
+					snap.WriteString("Error on challenging field names apply:\n")
+					snap.WriteString(err.Error() + "\n")
+				}
+			}
 		}
 
 		snap.WriteString("Challenging Field Names Materialized Columns:\n")
