@@ -1097,9 +1097,94 @@ class FacebookInsightsResource(FacebookResource):
         return required
 
 
-class AdsInsights(FacebookInsightsResource):
-    name: ClassVar[str] = ResourceName.ADS_INSIGHTS
+class BaseAdsInsights(FacebookInsightsResource):
+    """
+    Base class for all Ads Insights streams.
+
+    Contains universal fields, helper methods, and level hierarchy logic.
+    Subclasses define specific levels (AD, ADSET, CAMPAIGN, ACCOUNT) with
+    appropriate primary keys and required instance fields.
+    """
+
     endpoint: ClassVar[str] = "insights"
+
+    # Level field constants for hierarchy logic
+    LEVEL_ACCOUNT_FIELDS: ClassVar[list[str]] = [F.ACCOUNT_ID, F.ACCOUNT_NAME]
+    LEVEL_CAMPAIGN_FIELDS: ClassVar[list[str]] = [F.CAMPAIGN_ID, F.CAMPAIGN_NAME]
+    LEVEL_ADSET_FIELDS: ClassVar[list[str]] = [F.ADSET_ID, F.ADSET_NAME]
+    LEVEL_AD_FIELDS: ClassVar[list[str]] = [F.AD_ID, F.AD_NAME]
+
+    action_attribution_windows: ClassVar[list[AttributionWindow]] = [
+        AttributionWindow.ONE_DAY_CLICK,
+        AttributionWindow.SEVEN_DAY_CLICK,
+        AttributionWindow.TWENTY_EIGHT_DAY_CLICK,
+        AttributionWindow.ONE_DAY_VIEW,
+        AttributionWindow.SEVEN_DAY_VIEW,
+        AttributionWindow.TWENTY_EIGHT_DAY_VIEW,
+    ]
+    # Facebook store metrics maximum of 37 months old. Any time range that
+    # older that 37 months from current date would result in 400 Bad request
+    # HTTP response.
+    # https://developers.facebook.com/docs/marketing-api/reference/ad-account/insights/#overview
+    insights_retention_period: ClassVar[relativedelta] = relativedelta(months=37)
+
+    # Universal instance fields required at all levels
+    account_id: str
+    date_start: str
+
+    @classmethod
+    def resource_name(cls) -> str:
+        return "ads_insights"
+
+    @classmethod
+    def get_excluded_fields_for_level(cls, level: ApiLevel) -> set[str]:
+        """
+        Get the set of fields that are NOT available for the configured level.
+
+        Facebook API hierarchy is: Account → Campaign → Ad Set → Ad
+        You can look UP the hierarchy (to parents), but cannot look DOWN (to children).
+
+        - At 'account' level: only account fields available
+        - At 'campaign' level: account + campaign fields available
+        - At 'adset' level: account + campaign + adset fields available
+        - At 'ad' level: all fields available
+        """
+        excluded_fields: set[str] = set()
+
+        if level != ApiLevel.AD:
+            excluded_fields.update(cls.LEVEL_AD_FIELDS)
+        if level not in [ApiLevel.AD, ApiLevel.ADSET]:
+            excluded_fields.update(cls.LEVEL_ADSET_FIELDS)
+        if level not in [ApiLevel.AD, ApiLevel.ADSET, ApiLevel.CAMPAIGN]:
+            excluded_fields.update(cls.LEVEL_CAMPAIGN_FIELDS)
+
+        return excluded_fields
+
+    @classmethod
+    def level_specific_fields(cls) -> list[str]:
+        fields = list(cls.LEVEL_ACCOUNT_FIELDS)
+
+        if cls.level in [ApiLevel.CAMPAIGN, ApiLevel.ADSET, ApiLevel.AD]:
+            fields.extend(cls.LEVEL_CAMPAIGN_FIELDS)
+
+        if cls.level in [ApiLevel.ADSET, ApiLevel.AD]:
+            fields.extend(cls.LEVEL_ADSET_FIELDS)
+
+        if cls.level == ApiLevel.AD:
+            fields.extend(cls.LEVEL_AD_FIELDS)
+
+        return fields
+
+    @property
+    def minimum_date_start(self) -> datetime:
+        """Calculate the minimum allowed start date based on the retention period."""
+        now = datetime.now(tz=UTC)
+        return now - self.insights_retention_period
+
+
+class AdsInsights(BaseAdsInsights):
+    name: ClassVar[str] = ResourceName.ADS_INSIGHTS
+    level: ClassVar[ApiLevel] = ApiLevel.AD
 
     fields: ClassVar[list[str]] = [
         # Required fields
@@ -1107,7 +1192,11 @@ class AdsInsights(FacebookInsightsResource):
         F.ACCOUNT_NAME,
         F.DATE_START,
         F.DATE_STOP,
-        # Level-specific ID fields (for ad level - default)
+        # Level-specific ID fields - full hierarchy for ad level
+        F.CAMPAIGN_ID,
+        F.CAMPAIGN_NAME,
+        F.ADSET_ID,
+        F.ADSET_NAME,
         F.AD_ID,
         F.AD_NAME,
         # Core performance metrics
@@ -1165,75 +1254,14 @@ class AdsInsights(FacebookInsightsResource):
         ]
     )
 
-    level: ClassVar[ApiLevel] = ApiLevel.AD
     breakdowns: ClassVar[list[Breakdown]] = []
     action_breakdowns: ClassVar[list[ActionBreakdown]] = [
         ActionBreakdown.ACTION_TYPE,
         ActionBreakdown.ACTION_TARGET_ID,
         ActionBreakdown.ACTION_DESTINATION,
     ]
-    action_attribution_windows: ClassVar[list[AttributionWindow]] = [
-        AttributionWindow.ONE_DAY_CLICK,
-        AttributionWindow.SEVEN_DAY_CLICK,
-        AttributionWindow.TWENTY_EIGHT_DAY_CLICK,
-        AttributionWindow.ONE_DAY_VIEW,
-        AttributionWindow.SEVEN_DAY_VIEW,
-        AttributionWindow.TWENTY_EIGHT_DAY_VIEW,
-    ]
-    # Facebook store metrics maximum of 37 months old. Any time range that
-    # older that 37 months from current date would result in 400 Bad request
-    # HTTP response.
-    # https://developers.facebook.com/docs/marketing-api/reference/ad-account/insights/#overview
-    insights_retention_period: ClassVar[relativedelta] = relativedelta(months=37)
 
-    account_id: str
-    date_start: str
     ad_id: str
-
-    @classmethod
-    def resource_name(cls) -> str:
-        return "ads_insights"
-
-    @property
-    def minimum_date_start(self) -> datetime:
-        """Calculate the minimum allowed start date based on the retention period."""
-        now = datetime.now(tz=UTC)
-        return now - self.insights_retention_period
-
-    _ACCOUNT_FIELDS: list[str] = [F.ACCOUNT_ID, F.ACCOUNT_NAME]
-    _CAMPAIGN_FIELDS: list[str] = [F.CAMPAIGN_ID, F.CAMPAIGN_NAME]
-    _ADSET_FIELDS: list[str] = [F.ADSET_ID, F.ADSET_NAME]
-    _AD_FIELDS: list[str] = [F.AD_ID, F.AD_NAME]
-
-    @property
-    def level_id_field(self) -> str:
-        if self.level == ApiLevel.AD:
-            return F.AD_ID
-        elif self.level == ApiLevel.ADSET:
-            return F.ADSET_ID
-        elif self.level == ApiLevel.CAMPAIGN:
-            return F.CAMPAIGN_ID
-        else:
-            raise RuntimeError(
-                f"Unexpected level {self.level} for AdsInsights stream. "
-                f"Expected one of: campaign, adset, ad. "
-                f"Please check your configuration."
-            )
-
-    def level_specific_fields(self) -> list[str]:
-        common_fields = self._ACCOUNT_FIELDS + self._CAMPAIGN_FIELDS
-        if self.level == ApiLevel.CAMPAIGN:
-            return common_fields
-        elif self.level == ApiLevel.ADSET:
-            return common_fields + self._ADSET_FIELDS
-        elif self.level == ApiLevel.AD:
-            return common_fields + self._ADSET_FIELDS + self._AD_FIELDS
-        else:
-            raise RuntimeError(
-                f"Unexpected level {self.level} for AdsInsights stream. "
-                f"Expected one of: campaign, adset, ad. "
-                f"Please check your configuration."
-            )
 
 
 class AdsInsightsAgeAndGender(AdsInsights):
@@ -1292,21 +1320,43 @@ class AdsInsightsActionType(AdsInsights):
 
 def build_custom_ads_insights_model(
     config: InsightsConfig,
-) -> type[AdsInsights]:
+) -> type[BaseAdsInsights]:
     """Build a dynamic model for custom insights.
+
+    Inherits from BaseAdsInsights and dynamically adds the appropriate
+    level-specific ID field as a required instance field.
 
     Key considerations:
     - Breakdown fields are optional (Facebook may not return them if no data exists)
     - Only base required fields (account_id, date_start, level-specific ID) are mandatory
     - Primary keys include breakdowns, but the fields themselves can be None
     - This matches Airbyte's behavior where breakdowns are part of the composite key
+    - Fields are validated based on level hierarchy:
+      - Account level: only account fields
+      - Campaign level: account + campaign fields
+      - Adset level: account + campaign + adset fields
+      - Ad level: all fields
     """
-    field_defs: dict[str, Any] = {}
     fields = str_to_list(config.fields) if config.fields else []
     breakdowns = str_to_list(config.breakdowns) if config.breakdowns else []
     action_breakdowns = (
         str_to_list(config.action_breakdowns) if config.action_breakdowns else []
     )
+
+    # Check if user specified any fields that aren't available at this level
+    # and raise a validation error if so (do this early before building model)
+    excluded_fields = BaseAdsInsights.get_excluded_fields_for_level(config.level)
+    user_excluded_fields = [f for f in fields if f in excluded_fields]
+
+    if user_excluded_fields:
+        errors = [
+            f"Field '{field}' is not available at the '{config.level}' level. "
+            f"Facebook's API hierarchy is Account → Campaign → Ad Set → Ad. "
+            f"You can only access fields from your configured level and its parents (levels above), "
+            f"not from child levels (levels below)."
+            for field in user_excluded_fields
+        ]
+        raise ValidationError(errors)
 
     level_id_field: str | None = None
     if config.level == ApiLevel.AD:
@@ -1321,12 +1371,15 @@ def build_custom_ads_insights_model(
     if level_id_field:
         base_required_fields.add(level_id_field)
 
-    # Build primary keys: base fields + breakdown fields
+    # Build primary keys: base fields + level ID + breakdown fields
     primary_keys = ["/account_id", "/date_start"]
     if level_id_field:
         primary_keys.append(f"/{level_id_field}")
     primary_keys.extend([f"/{b}" for b in breakdowns])
     primary_keys = sorted(set(primary_keys))
+
+    # Build field definitions for the dynamic model
+    field_defs: dict[str, Any] = {}
 
     for pk in primary_keys:
         field_name_str = pk.lstrip("/")
@@ -1362,16 +1415,21 @@ def build_custom_ads_insights_model(
     camel_case_name = "".join(word.capitalize() for word in config.name.split("_"))
     model = create_model(
         camel_case_name,
-        __base__=(AdsInsights,),
+        __base__=(BaseAdsInsights,),
         **field_defs,
     )
 
-    # Set ClassVars for the model
-    setattr(model, "fields", fields)
+    # Set ClassVars for the model - set level first so level_specific_fields() works
+    setattr(model, "level", config.level)
     setattr(model, "primary_keys", primary_keys)
     setattr(model, "name", "custom" + config.name)
-    setattr(model, "level", config.level)
     setattr(model, "breakdowns", breakdowns)
     setattr(model, "action_breakdowns", action_breakdowns)
+
+    # Combine user fields with level-specific required fields
+    level_fields = model.level_specific_fields()
+    final_fields = list(dict.fromkeys(fields + level_fields))
+
+    setattr(model, "fields", final_fields)
 
     return model
