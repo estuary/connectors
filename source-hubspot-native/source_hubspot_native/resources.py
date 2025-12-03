@@ -164,6 +164,13 @@ async def _remove_permission_blocked_resources(
     return resources
 
 
+def _resolve_custom_object_resource_name(
+    name: str,
+    useLegacyNaming: bool,
+) -> str:
+    return name if useLegacyNaming else f"custom_{name}"
+
+
 async def all_resources(
     log: Logger,
     http: HTTPMixin,
@@ -194,7 +201,7 @@ async def all_resources(
     custom_object_resources = [
         crm_object_with_associations(
             CustomObject,
-            n,
+            _resolve_custom_object_resource_name(n, config.useLegacyNamingForCustomObjects),
             custom_object_path_components[index],
             http,
             with_history,
@@ -301,7 +308,7 @@ async def all_resources(
 
 
     # Resource names must be unique in the list of returned resources, but it's possible for a custom object
-    # and a standard object to use the same resource name.
+    # and a standard object to use the same resource name if the useLegacyNamingForCustomObjects flag is set.
     # If that happens, omit the standard object resource from the returned resource list.
     for custom_object_resource in custom_object_resources:
         standard_object_resources = [r for r in standard_object_resources if r.name != custom_object_resource.name]
