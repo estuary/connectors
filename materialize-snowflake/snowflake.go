@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"slices"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/cespare/xxhash/v2"
@@ -387,6 +387,11 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 
 const MaxConcurrentQueries = 5
 
+type loadDoc struct {
+	binding  int
+	document json.RawMessage
+}
+
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (returnErr error) {
 	var ctx = it.Context()
 
@@ -442,13 +447,19 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return nil // Nothing to load.
 	}
 
-	// NB: Not using errgroup.WithContext() here since the Go Snowflake driver
-	// retains contexts internally, and the group context is cancelled after
-	// group.Wait() returns.
-	var group errgroup.Group
+	loadCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	var loadCh = make(chan *loadDoc)
+
+	loadGroup, loadGroupCtx := errgroup.WithContext(loadCtx)
+	loadGroup.Go(func() error {
+		defer cancel()
+		return d.loadDocuments(loadGroupCtx, loadCh, loaded)
+	})
+
+	group, groupCtx := errgroup.WithContext(loadCtx)
 	group.SetLimit(MaxConcurrentQueries)
-	// Used to ensure we have no data-interleaving when calling |loaded|
-	var mutex sync.Mutex
 
 	// In order for the concurrent requests below to be actually run concurrently we need
 	// a separate connection for each
@@ -456,7 +467,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		var query = queryLoop
 		group.Go(func() error {
 			// Issue a join of the target table and (now staged) load keys,
-			// and send results to the |loaded| callback.
+			// and send results to the load channel.
+			//
+			// NB: Not using groupCtx here since the Go Snowflake driver
+			// retains contexts internally, and the group context is cancelled
+			// after group.Wait() returns.
 			rows, err := d.db.QueryContext(sf.WithStreamDownloader(ctx), query)
 			if err != nil {
 				return fmt.Errorf("querying Load documents: %w", err)
@@ -466,16 +481,20 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			var binding int
 			var document stdsql.RawBytes
 
-			mutex.Lock()
-			defer mutex.Unlock()
 			log.WithFields(log.Fields{
 				"query": query,
 			}).Debug("sending Loaded documents from query")
 			for rows.Next() {
 				if err = rows.Scan(&binding, &document); err != nil {
 					return fmt.Errorf("scanning Load document: %w", err)
-				} else if err = loaded(binding, json.RawMessage(document)); err != nil {
-					return fmt.Errorf("sending loaded document for table %q: %w", d.bindings[binding].target.Identifier, err)
+				}
+
+				message := slices.Clone(document)
+				doc := &loadDoc{binding: binding, document: json.RawMessage(message)}
+				select {
+				case <-groupCtx.Done():
+					return groupCtx.Err()
+				case loadCh <- doc:
 				}
 			}
 
@@ -486,11 +505,33 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return nil
 		})
 	}
+
 	if err := group.Wait(); err != nil {
+		return err
+	}
+	close(loadCh)
+
+	if err := loadGroup.Wait(); err != nil {
 		return err
 	}
 
 	return returnErr
+}
+
+func (d *transactor) loadDocuments(ctx context.Context, ch chan *loadDoc, loaded func(int, json.RawMessage) error) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case doc, ok := <-ch:
+			if !ok {
+				return nil
+			}
+			if err := loaded(doc.binding, doc.document); err != nil {
+				return fmt.Errorf("sending loaded document for table %q: %w", d.bindings[doc.binding].target.Identifier, err)
+			}
+		}
+	}
 }
 
 func (d *transactor) pipeExists(ctx context.Context, pipeName string) (bool, error) {
