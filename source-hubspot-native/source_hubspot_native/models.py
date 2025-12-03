@@ -95,6 +95,12 @@ class EndpointConfig(BaseModel):
         description="Include historical data for changes to properties of HubSpot objects in captured documents.",
         default=False,
     )
+    useLegacyNamingForCustomObjects: bool = Field(
+        title="Use Legacy Naming for Custom Objects",
+        description="If selected, the legacy naming convention for custom objects is used. Otherwise, all discovered bindings for custom objects will have 'custom_' prepended to their names.",
+        default=True,
+        json_schema_extra={"x-hidden-field": True},
+    )
 
     # In order to publish this connector in the HubSpot marketplace, HubSpot requires
     # that "setup documentation [and] in platform experience should not include an app that

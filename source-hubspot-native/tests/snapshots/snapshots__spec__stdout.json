@@ -78,6 +78,13 @@
           "description": "Include historical data for changes to properties of HubSpot objects in captured documents.",
           "title": "Capture Property History",
           "type": "boolean"
+        },
+        "useLegacyNamingForCustomObjects": {
+          "default": true,
+          "description": "If selected, the legacy naming convention for custom objects is used. Otherwise, all discovered bindings for custom objects will have 'custom_' prepended to their names.",
+          "title": "Use Legacy Naming for Custom Objects",
+          "type": "boolean",
+          "x-hidden-field": true
         }
       },
       "required": [
