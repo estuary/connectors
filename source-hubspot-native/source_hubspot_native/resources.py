@@ -208,7 +208,7 @@ async def all_resources(
         for index, n in enumerate(custom_object_names)
     ]
 
-    resources = [
+    standard_object_resources = [
         crm_object_with_associations(
             Company,
             Names.companies,
@@ -286,7 +286,6 @@ async def all_resources(
         ),
         deal_pipelines(http),
         owners(http),
-        *custom_object_resources,
         email_events(http),
         forms(http),
         form_submissions(http),
@@ -298,9 +297,19 @@ async def all_resources(
     ]
 
     if should_check_permissions:
-        return await _remove_permission_blocked_resources(log, http, resources)
-    else:
-        return resources
+        standard_object_resources = await _remove_permission_blocked_resources(log, http, standard_object_resources)
+
+
+    # Resource names must be unique in the list of returned resources, but it's possible for a custom object
+    # and a standard object to use the same resource name.
+    # If that happens, omit the standard object resource from the returned resource list.
+    for custom_object_resource in custom_object_resources:
+        standard_object_resources = [r for r in standard_object_resources if r.name != custom_object_resource.name]
+
+    return [
+        *custom_object_resources,
+        *standard_object_resources,
+    ]
 
 
 def crm_object_with_associations(
