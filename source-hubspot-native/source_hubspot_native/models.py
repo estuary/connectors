@@ -98,7 +98,7 @@ class EndpointConfig(BaseModel):
     useLegacyNamingForCustomObjects: bool = Field(
         title="Use Legacy Naming for Custom Objects",
         description="If selected, the legacy naming convention for custom objects is used. Otherwise, all discovered bindings for custom objects will have 'custom_' prepended to their names.",
-        default=True,
+        default=False,
         json_schema_extra={"x-hidden-field": True},
     )
 

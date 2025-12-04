@@ -80,7 +80,7 @@
           "type": "boolean"
         },
         "useLegacyNamingForCustomObjects": {
-          "default": true,
+          "default": false,
           "description": "If selected, the legacy naming convention for custom objects is used. Otherwise, all discovered bindings for custom objects will have 'custom_' prepended to their names.",
           "title": "Use Legacy Naming for Custom Objects",
           "type": "boolean",
