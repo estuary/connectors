@@ -1,0 +1,57 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-zoho:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_zoho
+        config: config.yaml
+    bindings:
+    - resource:
+        name: Leads
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/Leads
+    - resource:
+        name: Contacts
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/Contacts
+    - resource:
+        name: Accounts
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/Accounts
+    - resource:
+        name: Deals
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/Deals
+    - resource:
+        name: Tasks
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/Tasks
+    - resource:
+        name: Events
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/Events
+    - resource:
+        name: Calls
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/Calls
+    - resource:
+        name: Campaigns
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/Campaigns
+    - resource:
+        name: DealHistory
+        interval: PT5M
+        schedule: 55 23 * * *
+      target: acmeCo/DealHistory
