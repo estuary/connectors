@@ -1,0 +1,37 @@
+collections:
+  acmeCo/Accounts:
+    schema: Accounts.schema.yaml
+    key:
+    - /id
+  acmeCo/Calls:
+    schema: Calls.schema.yaml
+    key:
+    - /id
+  acmeCo/Campaigns:
+    schema: Campaigns.schema.yaml
+    key:
+    - /id
+  acmeCo/Contacts:
+    schema: Contacts.schema.yaml
+    key:
+    - /id
+  acmeCo/DealHistory:
+    schema: DealHistory.schema.yaml
+    key:
+    - /id
+  acmeCo/Deals:
+    schema: Deals.schema.yaml
+    key:
+    - /id
+  acmeCo/Events:
+    schema: Events.schema.yaml
+    key:
+    - /id
+  acmeCo/Leads:
+    schema: Leads.schema.yaml
+    key:
+    - /id
+  acmeCo/Tasks:
+    schema: Tasks.schema.yaml
+    key:
+    - /id
