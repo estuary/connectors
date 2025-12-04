@@ -1,0 +1,16 @@
+credentials:
+    client_id_sops: ENC[AES256_GCM,data:kUhhnO+LNwzezY2wEWepFzR0Twz8sN13lqmlCaT2LKwTqe0=,iv:MZ6NdOs9s9uT97lAzzmDUgk4LlglezI2o12VOZdAx5k=,tag:CpaaBoIBAFJ7YQzyin8e9A==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:XtkkRkPyBJmQa/vA1czbhj2OqnP3mjM1Lh1hZuW5g8kGlVTcMrz22XBC,iv:xbwwKqr+cA1PdhSMTFmj7S35e7zDPQrkQBu5T2qU4Po=,tag:JYUvAC2Qq/Vn81X9/6y4wA==,type:str]
+    credentials_title: OAuth Credentials
+    refresh_token_sops: ENC[AES256_GCM,data:yb4s9nBFVeMLqxGwjPStk+MGuSo5Cql4lY14F55ltbdJNKcWkNo07rrBCvk32HG7U1aA0+C5EdxOqTj9hoKdTdCKaUpyiA==,iv:+hxT1/C1PVsv5Kw7dI2+a9nur1PE5vaMjBiQLnSBXQM=,tag:4lxK8cVx7jLg97QDJ0KHQA==,type:str]
+    api_domain: https://www.zohoapis.com
+sops:
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2025-12-05T12:49:27Z"
+          enc: CiQAdmEdwkrsBT4OSsKMzry3WhWvoCGBauWiq/A2hhbAiW2/34kSSQC7zGi8cncRJbQcEf3z31I4KyVhB8jeRFym98sgybnF0/boF1QRUKJBkGYJg6GwtuZTmGZY+7U3o04mvazMGKfBPn/jmGGOWgI=
+    lastmodified: "2026-01-06T13:18:10Z"
+    mac: ENC[AES256_GCM,data:GTAi+3mZbco8UVuVwnF8tEIePpvA3rGAD82kahn7F+AK/+Mh8/DJCh+yWCrFYxkU09xsNnApUJQG3wZTa3u8hUUgxH3ElOZ+rX2w5i8RareG4TRngEaN/KhPuCqjAWrJIwkhzdDYMLF3XnuBYw/8iag2vY2uGKzZ/iUiyIOsVis=,iv:jwyeycDq0pd58oEVH/t8HYpnC6p0HSC473UPnstrmU4=,tag:TvpUjErAvNIbsL9uoFxxxQ==,type:str]
+    encrypted_suffix: _sops
+    mac_only_encrypted: true
+    version: 3.10.2
