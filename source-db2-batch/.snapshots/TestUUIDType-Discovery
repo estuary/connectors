@@ -1,0 +1,109 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "test/uuidtype_694251",
+      "schema": "TEST",
+      "table": "UUIDTYPE_694251",
+      "cursor": [
+        "ID"
+      ]
+    },
+    "resource_path": [
+      "test/uuidtype_694251"
+    ],
+    "collection": {
+      "name": "acmeCo/test/test/uuidtype_694251",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "ID",
+          "_meta"
+        ],
+        "properties": {
+          "ID": {
+            "type": "integer",
+            "description": "(source type: non-nullable INTEGER)"
+          },
+          "UUID_COL": {
+            "maxLength": 36,
+            "description": "(source type: CHARACTER)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "_meta": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document was executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              },
+              "row_id": {
+                "type": "integer",
+                "title": "Row ID",
+                "description": "Row ID of the Document"
+              },
+              "op": {
+                "type": "string",
+                "enum": [
+                  "c",
+                  "u",
+                  "d"
+                ],
+                "title": "Change Operation",
+                "description": "Operation type (c: Create / u: Update / d: Delete)",
+                "default": "u"
+              },
+              "source": {
+                "properties": {
+                  "resource": {
+                    "type": "string",
+                    "description": "Resource name of the binding from which this document was captured."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema from which the document was read."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table from which the document was read."
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "resource"
+                ]
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index",
+              "row_id",
+              "source"
+            ]
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/ID"
+      ],
+      "projections": null
+    },
+    "state_key": "test/uuidtype_694251"
+  }
+

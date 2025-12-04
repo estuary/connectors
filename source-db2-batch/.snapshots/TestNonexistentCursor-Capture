@@ -1,0 +1,10 @@
+# ================================
+# Final State Checkpoint
+# ================================
+
+# ================================
+# Captures Terminated With Errors
+# ================================
+capture terminated with error: error polling binding "test/nonexistentcursor_140869": error executing query: SQLExecDirectW: {42S22} [IBM][CLI Driver][DB2/LINUXX8664] SQL0206N  "UPDATED_AT" is not valid in the context where it is used.  SQLSTATE=42703
+
+

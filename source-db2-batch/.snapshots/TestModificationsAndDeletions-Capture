@@ -1,0 +1,747 @@
+# ================================
+# Collection "acmeCo/test/test/modificationsanddeletions_172811": 19 Documents
+# ================================
+{
+  "type": "object",
+  "required": [
+    "DESCRIPTION",
+    "ID",
+    "UPDATED_AT",
+    "VERSION",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "DESCRIPTION": {
+      "description": "(source type: CLOB)",
+      "type": [
+        "string"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "UPDATED_AT": {
+      "format": "date-time",
+      "description": "(source type: TIMESTAMP)",
+      "type": [
+        "string"
+      ]
+    },
+    "VERSION": {
+      "description": "(source type: INTEGER)",
+      "type": [
+        "integer"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "DESCRIPTION": "Initial version of row 0",
+  "ID": 0,
+  "UPDATED_AT": "2025-02-13T12:00:00Z",
+  "VERSION": 1,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "DESCRIPTION": "Initial version of row 1",
+  "ID": 1,
+  "UPDATED_AT": "2025-02-13T12:01:00Z",
+  "VERSION": 1,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "DESCRIPTION": "Initial version of row 2",
+  "ID": 2,
+  "UPDATED_AT": "2025-02-13T12:02:00Z",
+  "VERSION": 1,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "DESCRIPTION": "Initial version of row 3",
+  "ID": 3,
+  "UPDATED_AT": "2025-02-13T12:03:00Z",
+  "VERSION": 1,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "DESCRIPTION": "Initial version of row 4",
+  "ID": 4,
+  "UPDATED_AT": "2025-02-13T12:04:00Z",
+  "VERSION": 1,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "type": "object",
+  "required": [
+    "DESCRIPTION",
+    "ID",
+    "UPDATED_AT",
+    "VERSION",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "DESCRIPTION": {
+      "description": "(source type: CLOB)",
+      "type": [
+        "string"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "UPDATED_AT": {
+      "format": "date-time",
+      "description": "(source type: TIMESTAMP)",
+      "type": [
+        "string"
+      ]
+    },
+    "VERSION": {
+      "description": "(source type: INTEGER)",
+      "type": [
+        "integer"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "DESCRIPTION": "Initial version of row 1 (updated)",
+  "ID": 1,
+  "UPDATED_AT": "2025-02-13T12:05:00Z",
+  "VERSION": 2,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 5,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "DESCRIPTION": "Initial version of row 3 (updated)",
+  "ID": 3,
+  "UPDATED_AT": "2025-02-13T12:05:00Z",
+  "VERSION": 2,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 6,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "type": "object",
+  "required": [
+    "DESCRIPTION",
+    "ID",
+    "UPDATED_AT",
+    "VERSION",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "DESCRIPTION": {
+      "description": "(source type: CLOB)",
+      "type": [
+        "string"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "UPDATED_AT": {
+      "format": "date-time",
+      "description": "(source type: TIMESTAMP)",
+      "type": [
+        "string"
+      ]
+    },
+    "VERSION": {
+      "description": "(source type: INTEGER)",
+      "type": [
+        "integer"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "type": "object",
+  "required": [
+    "DESCRIPTION",
+    "ID",
+    "UPDATED_AT",
+    "VERSION",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "DESCRIPTION": {
+      "description": "(source type: CLOB)",
+      "type": [
+        "string"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "UPDATED_AT": {
+      "format": "date-time",
+      "description": "(source type: TIMESTAMP)",
+      "type": [
+        "string"
+      ]
+    },
+    "VERSION": {
+      "description": "(source type: INTEGER)",
+      "type": [
+        "integer"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "DESCRIPTION": "Reused ID 2",
+  "ID": 2,
+  "UPDATED_AT": "2025-02-13T12:06:00Z",
+  "VERSION": 1,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 7,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "DESCRIPTION": "Reused ID 4",
+  "ID": 4,
+  "UPDATED_AT": "2025-02-13T12:06:00Z",
+  "VERSION": 1,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 8,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "type": "object",
+  "required": [
+    "DESCRIPTION",
+    "ID",
+    "UPDATED_AT",
+    "VERSION",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "DESCRIPTION": {
+      "description": "(source type: CLOB)",
+      "type": [
+        "string"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "UPDATED_AT": {
+      "format": "date-time",
+      "description": "(source type: TIMESTAMP)",
+      "type": [
+        "string"
+      ]
+    },
+    "VERSION": {
+      "description": "(source type: INTEGER)",
+      "type": [
+        "integer"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "DESCRIPTION": "Initial version of row 0 (final update)",
+  "ID": 0,
+  "UPDATED_AT": "2025-02-13T12:07:00Z",
+  "VERSION": 2,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 9,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "DESCRIPTION": "Initial version of row 1 (updated) (final update)",
+  "ID": 1,
+  "UPDATED_AT": "2025-02-13T12:07:00Z",
+  "VERSION": 3,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 10,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "DESCRIPTION": "Reused ID 2 (final update)",
+  "ID": 2,
+  "UPDATED_AT": "2025-02-13T12:07:00Z",
+  "VERSION": 2,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 11,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "DESCRIPTION": "Initial version of row 3 (updated) (final update)",
+  "ID": 3,
+  "UPDATED_AT": "2025-02-13T12:07:00Z",
+  "VERSION": 3,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 12,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+{
+  "DESCRIPTION": "Reused ID 4 (final update)",
+  "ID": 4,
+  "UPDATED_AT": "2025-02-13T12:07:00Z",
+  "VERSION": 2,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 13,
+    "source": {
+      "resource": "test/modificationsanddeletions_172811",
+      "schema": "TEST",
+      "table": "MODIFICATIONSANDDELETIONS_172811"
+    }
+  }
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test/modificationsanddeletions_172811":{"CursorNames":["UPDATED_AT"],"CursorValues":["2025-02-13 12:07:00.000000"],"DocumentCount":14,"LastPolled":"<TIMESTAMP>"}}}
+
