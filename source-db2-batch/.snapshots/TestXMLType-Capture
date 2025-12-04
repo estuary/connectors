@@ -1,0 +1,250 @@
+# ================================
+# Collection "acmeCo/test/test/xmltype_831740": 12 Documents
+# ================================
+{
+  "type": "object",
+  "required": [
+    "ID",
+    "XML_COL",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "XML_COL": {
+      "description": "(source type: XML)",
+      "type": [
+        "string"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "ID": 0,
+  "XML_COL": "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" ?\u003e\u003croot\u003e\u003celement\u003eHello\u003c/element\u003e\u003c/root\u003e",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test/xmltype_831740",
+      "schema": "TEST",
+      "table": "XMLTYPE_831740"
+    }
+  }
+}
+{
+  "ID": 1,
+  "XML_COL": "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" ?\u003e\u003clibrary\u003e\u003cbook id=\"1\"\u003e\u003ctitle\u003eSample Book\u003c/title\u003e\u003cauthor\u003eJohn Doe\u003c/author\u003e\u003cpublished\u003e2024\u003c/published\u003e\u003cgenres\u003e\u003cgenre\u003eFiction\u003c/genre\u003e\u003cgenre\u003eAdventure\u003c/genre\u003e\u003c/genres\u003e\u003c/book\u003e\u003c/library\u003e",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test/xmltype_831740",
+      "schema": "TEST",
+      "table": "XMLTYPE_831740"
+    }
+  }
+}
+{
+  "ID": 2,
+  "XML_COL": "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" ?\u003e\u003cuser id=\"123\" active=\"true\"\u003e\u003cname\u003eAlice\u003c/name\u003e\u003cemail\u003ealice@example.com\u003c/email\u003e\u003c/user\u003e",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test/xmltype_831740",
+      "schema": "TEST",
+      "table": "XMLTYPE_831740"
+    }
+  }
+}
+{
+  "ID": 3,
+  "XML_COL": "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" ?\u003e\u003ctext\u003eSpecial \u0026amp; \u0026lt;characters\u0026gt; \" ' in CDATA\u003c/text\u003e",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test/xmltype_831740",
+      "schema": "TEST",
+      "table": "XMLTYPE_831740"
+    }
+  }
+}
+{
+  "ID": 4,
+  "XML_COL": "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" ?\u003e\u003csoap:Envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\"\u003e\u003csoap:Header\u003e\u003cauth\u003etoken123\u003c/auth\u003e\u003c/soap:Header\u003e\u003csoap:Body\u003e\u003cmessage\u003eHello World\u003c/message\u003e\u003c/soap:Body\u003e\u003c/soap:Envelope\u003e",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "test/xmltype_831740",
+      "schema": "TEST",
+      "table": "XMLTYPE_831740"
+    }
+  }
+}
+{
+  "ID": 5,
+  "XML_COL": "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" ?\u003e\u003cgreeting language=\"multi\"\u003eHello 世界 🌍\u003c/greeting\u003e",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 5,
+    "row_id": 5,
+    "source": {
+      "resource": "test/xmltype_831740",
+      "schema": "TEST",
+      "table": "XMLTYPE_831740"
+    }
+  }
+}
+{
+  "ID": 6,
+  "XML_COL": "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" ?\u003e\u003cempty/\u003e",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 6,
+    "row_id": 6,
+    "source": {
+      "resource": "test/xmltype_831740",
+      "schema": "TEST",
+      "table": "XMLTYPE_831740"
+    }
+  }
+}
+{
+  "ID": 7,
+  "XML_COL": "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" ?\u003e\u003cdocument\u003e\u003cheader/\u003e\u003cbody/\u003e\u003cfooter/\u003e\u003c/document\u003e",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 7,
+    "row_id": 7,
+    "source": {
+      "resource": "test/xmltype_831740",
+      "schema": "TEST",
+      "table": "XMLTYPE_831740"
+    }
+  }
+}
+{
+  "ID": 8,
+  "XML_COL": "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" ?\u003e\u003croot\u003e\u003ccontent\u003eThis is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. This is a long text content. \u003c/content\u003e\u003c/root\u003e",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 8,
+    "row_id": 8,
+    "source": {
+      "resource": "test/xmltype_831740",
+      "schema": "TEST",
+      "table": "XMLTYPE_831740"
+    }
+  }
+}
+{
+  "ID": 9,
+  "XML_COL": "\u003c?xml version=\"1.0\" encoding=\"UTF-8\" ?\u003e\u003carticle\u003e\u003ctitle\u003eMixed Content\u003c/title\u003e\u003cpara\u003eThis is \u003cemphasis\u003eimportant\u003c/emphasis\u003e text with \u003clink href=\"#ref\"\u003elinks\u003c/link\u003e.\u003c/para\u003e\u003c/article\u003e",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 9,
+    "row_id": 9,
+    "source": {
+      "resource": "test/xmltype_831740",
+      "schema": "TEST",
+      "table": "XMLTYPE_831740"
+    }
+  }
+}
+{
+  "ID": 10,
+  "XML_COL": null,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 10,
+    "row_id": 10,
+    "source": {
+      "resource": "test/xmltype_831740",
+      "schema": "TEST",
+      "table": "XMLTYPE_831740"
+    }
+  }
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test/xmltype_831740":{"CursorNames":["ID"],"CursorValues":[10],"DocumentCount":11,"LastPolled":"<TIMESTAMP>"}}}
+

@@ -1,0 +1,257 @@
+# ================================
+# Collection "acmeCo/test/test/binarytypes_537491": 10 Documents
+# ================================
+{
+  "type": "object",
+  "required": [
+    "BINARY_COL",
+    "BLOB_COL",
+    "ID",
+    "VARBINARY_COL",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "BINARY_COL": {
+      "description": "(source type: BINARY)",
+      "contentEncoding": "base64",
+      "type": [
+        "string"
+      ]
+    },
+    "BLOB_COL": {
+      "description": "(source type: BLOB)",
+      "contentEncoding": "base64",
+      "type": [
+        "string"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "VARBINARY_COL": {
+      "description": "(source type: VARBINARY)",
+      "contentEncoding": "base64",
+      "type": [
+        "string"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "BINARY_COL": "SGVsbG8=",
+  "BLOB_COL": "SGVsbG8=",
+  "ID": 0,
+  "VARBINARY_COL": "SGVsbG8=",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test/binarytypes_537491",
+      "schema": "TEST",
+      "table": "BINARYTYPES_537491"
+    }
+  }
+}
+{
+  "BINARY_COL": "AAAAAAA=",
+  "BLOB_COL": "AAAA",
+  "ID": 1,
+  "VARBINARY_COL": "AAAA",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test/binarytypes_537491",
+      "schema": "TEST",
+      "table": "BINARYTYPES_537491"
+    }
+  }
+}
+{
+  "BINARY_COL": "//////8=",
+  "BLOB_COL": "////",
+  "ID": 2,
+  "VARBINARY_COL": "////",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test/binarytypes_537491",
+      "schema": "TEST",
+      "table": "BINARYTYPES_537491"
+    }
+  }
+}
+{
+  "BINARY_COL": "qrvM3e4=",
+  "BLOB_COL": "qrvM",
+  "ID": 3,
+  "VARBINARY_COL": "qrvM",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test/binarytypes_537491",
+      "schema": "TEST",
+      "table": "BINARYTYPES_537491"
+    }
+  }
+}
+{
+  "BINARY_COL": "AAAAAAA=",
+  "BLOB_COL": "",
+  "ID": 4,
+  "VARBINARY_COL": "",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "test/binarytypes_537491",
+      "schema": "TEST",
+      "table": "BINARYTYPES_537491"
+    }
+  }
+}
+{
+  "BINARY_COL": "AAAAAAA=",
+  "BLOB_COL": "",
+  "ID": 5,
+  "VARBINARY_COL": "",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 5,
+    "row_id": 5,
+    "source": {
+      "resource": "test/binarytypes_537491",
+      "schema": "TEST",
+      "table": "BINARYTYPES_537491"
+    }
+  }
+}
+{
+  "BINARY_COL": "AAECAwQ=",
+  "BLOB_COL": "AAECAwQF/w==",
+  "ID": 6,
+  "VARBINARY_COL": "AAECAwQF/w==",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 6,
+    "row_id": 6,
+    "source": {
+      "resource": "test/binarytypes_537491",
+      "schema": "TEST",
+      "table": "BINARYTYPES_537491"
+    }
+  }
+}
+{
+  "BINARY_COL": "SGVsbG8=",
+  "BLOB_COL": "SGVsbG8g5LiW55WM",
+  "ID": 7,
+  "VARBINARY_COL": "SGVsbG8g5LiW",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 7,
+    "row_id": 7,
+    "source": {
+      "resource": "test/binarytypes_537491",
+      "schema": "TEST",
+      "table": "BINARYTYPES_537491"
+    }
+  }
+}
+{
+  "BINARY_COL": "AP9/gAE=",
+  "BLOB_COL": "AP9/gAEjRWeJq83v",
+  "ID": 8,
+  "VARBINARY_COL": "AP9/gAEjRWeJqw==",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 8,
+    "row_id": 8,
+    "source": {
+      "resource": "test/binarytypes_537491",
+      "schema": "TEST",
+      "table": "BINARYTYPES_537491"
+    }
+  }
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test/binarytypes_537491":{"CursorNames":["ID"],"CursorValues":[8],"DocumentCount":9,"LastPolled":"<TIMESTAMP>"}}}
+

@@ -1,0 +1,287 @@
+# ================================
+# Collection "acmeCo/test/test/numerictypes_559424": 9 Documents
+# ================================
+{
+  "type": "object",
+  "required": [
+    "DECFLOAT16_COL",
+    "DECFLOAT34_COL",
+    "DECIMAL_COL",
+    "DECIMAL_PRECISE_COL",
+    "DOUBLE_COL",
+    "ID",
+    "REAL_COL",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "DECFLOAT16_COL": {
+      "format": "number",
+      "description": "(source type: DECFLOAT)",
+      "type": [
+        "string"
+      ]
+    },
+    "DECFLOAT34_COL": {
+      "format": "number",
+      "description": "(source type: DECFLOAT)",
+      "type": [
+        "string"
+      ]
+    },
+    "DECIMAL_COL": {
+      "format": "number",
+      "description": "(source type: DECIMAL)",
+      "type": [
+        "string"
+      ]
+    },
+    "DECIMAL_PRECISE_COL": {
+      "format": "number",
+      "description": "(source type: DECIMAL)",
+      "type": [
+        "string"
+      ]
+    },
+    "DOUBLE_COL": {
+      "description": "(source type: DOUBLE)",
+      "type": [
+        "number"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "REAL_COL": {
+      "description": "(source type: REAL)",
+      "type": [
+        "number"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "DECFLOAT16_COL": "123.456",
+  "DECFLOAT34_COL": "123.456",
+  "DECIMAL_COL": "123.45",
+  "DECIMAL_PRECISE_COL": "123.45678901",
+  "DOUBLE_COL": 123.456,
+  "ID": 0,
+  "REAL_COL": 123.45600128173828,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test/numerictypes_559424",
+      "schema": "TEST",
+      "table": "NUMERICTYPES_559424"
+    }
+  }
+}
+{
+  "DECFLOAT16_COL": "0.0",
+  "DECFLOAT34_COL": "0.0",
+  "DECIMAL_COL": "0.00",
+  "DECIMAL_PRECISE_COL": "0.00000000",
+  "DOUBLE_COL": 0,
+  "ID": 1,
+  "REAL_COL": 0,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test/numerictypes_559424",
+      "schema": "TEST",
+      "table": "NUMERICTYPES_559424"
+    }
+  }
+}
+{
+  "DECFLOAT16_COL": null,
+  "DECFLOAT34_COL": null,
+  "DECIMAL_COL": null,
+  "DECIMAL_PRECISE_COL": null,
+  "DOUBLE_COL": null,
+  "ID": 2,
+  "REAL_COL": null,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test/numerictypes_559424",
+      "schema": "TEST",
+      "table": "NUMERICTYPES_559424"
+    }
+  }
+}
+{
+  "DECFLOAT16_COL": "-9.900000000000000E+384",
+  "DECFLOAT34_COL": "-9.900000000000000000000000000000000E+6144",
+  "DECIMAL_COL": "-99999999.99",
+  "DECIMAL_PRECISE_COL": "-99999999999999999999999.99999999",
+  "DOUBLE_COL": -1.7e+308,
+  "ID": 3,
+  "REAL_COL": -3.3999999521443642e+38,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test/numerictypes_559424",
+      "schema": "TEST",
+      "table": "NUMERICTYPES_559424"
+    }
+  }
+}
+{
+  "DECFLOAT16_COL": "9.900000000000000E+384",
+  "DECFLOAT34_COL": "9.900000000000000000000000000000000E+6144",
+  "DECIMAL_COL": "99999999.99",
+  "DECIMAL_PRECISE_COL": "99999999999999999999999.99999999",
+  "DOUBLE_COL": 1.7e+308,
+  "ID": 4,
+  "REAL_COL": 3.3999999521443642e+38,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "test/numerictypes_559424",
+      "schema": "TEST",
+      "table": "NUMERICTYPES_559424"
+    }
+  }
+}
+{
+  "DECFLOAT16_COL": "1E-383",
+  "DECFLOAT34_COL": "1E-6143",
+  "DECIMAL_COL": "0.01",
+  "DECIMAL_PRECISE_COL": "0.00000001",
+  "DOUBLE_COL": 2.2250738585072014e-308,
+  "ID": 5,
+  "REAL_COL": 1.1754943508222875e-38,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 5,
+    "row_id": 5,
+    "source": {
+      "resource": "test/numerictypes_559424",
+      "schema": "TEST",
+      "table": "NUMERICTYPES_559424"
+    }
+  }
+}
+{
+  "DECFLOAT16_COL": "Infinity",
+  "DECFLOAT34_COL": "-Infinity",
+  "DECIMAL_COL": "0.00",
+  "DECIMAL_PRECISE_COL": "0.00000000",
+  "DOUBLE_COL": 0,
+  "ID": 6,
+  "REAL_COL": 0,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 6,
+    "row_id": 6,
+    "source": {
+      "resource": "test/numerictypes_559424",
+      "schema": "TEST",
+      "table": "NUMERICTYPES_559424"
+    }
+  }
+}
+{
+  "DECFLOAT16_COL": "NaN",
+  "DECFLOAT34_COL": "NaN",
+  "DECIMAL_COL": "0.00",
+  "DECIMAL_PRECISE_COL": "0.00000000",
+  "DOUBLE_COL": 0,
+  "ID": 7,
+  "REAL_COL": 0,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 7,
+    "row_id": 7,
+    "source": {
+      "resource": "test/numerictypes_559424",
+      "schema": "TEST",
+      "table": "NUMERICTYPES_559424"
+    }
+  }
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test/numerictypes_559424":{"CursorNames":["ID"],"CursorValues":[7],"DocumentCount":8,"LastPolled":"<TIMESTAMP>"}}}
+

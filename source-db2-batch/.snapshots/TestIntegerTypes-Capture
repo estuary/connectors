@@ -1,0 +1,202 @@
+# ================================
+# Collection "acmeCo/test/test/integertypes_795898": 6 Documents
+# ================================
+{
+  "type": "object",
+  "required": [
+    "BIGINT_COL",
+    "BOOLEAN_COL",
+    "ID",
+    "INTEGER_COL",
+    "SMALLINT_COL",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "BIGINT_COL": {
+      "description": "(source type: BIGINT)",
+      "type": [
+        "integer"
+      ]
+    },
+    "BOOLEAN_COL": {
+      "description": "(source type: BOOLEAN)",
+      "type": [
+        "boolean"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "INTEGER_COL": {
+      "description": "(source type: INTEGER)",
+      "type": [
+        "integer"
+      ]
+    },
+    "SMALLINT_COL": {
+      "description": "(source type: SMALLINT)",
+      "type": [
+        "integer"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "BIGINT_COL": 42,
+  "BOOLEAN_COL": true,
+  "ID": 0,
+  "INTEGER_COL": 42,
+  "SMALLINT_COL": 42,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test/integertypes_795898",
+      "schema": "TEST",
+      "table": "INTEGERTYPES_795898"
+    }
+  }
+}
+{
+  "BIGINT_COL": -9223372036854775808,
+  "BOOLEAN_COL": false,
+  "ID": 1,
+  "INTEGER_COL": -2147483648,
+  "SMALLINT_COL": -32768,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test/integertypes_795898",
+      "schema": "TEST",
+      "table": "INTEGERTYPES_795898"
+    }
+  }
+}
+{
+  "BIGINT_COL": 9223372036854775807,
+  "BOOLEAN_COL": true,
+  "ID": 2,
+  "INTEGER_COL": 2147483647,
+  "SMALLINT_COL": 32767,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test/integertypes_795898",
+      "schema": "TEST",
+      "table": "INTEGERTYPES_795898"
+    }
+  }
+}
+{
+  "BIGINT_COL": 0,
+  "BOOLEAN_COL": false,
+  "ID": 3,
+  "INTEGER_COL": 0,
+  "SMALLINT_COL": 0,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test/integertypes_795898",
+      "schema": "TEST",
+      "table": "INTEGERTYPES_795898"
+    }
+  }
+}
+{
+  "BIGINT_COL": null,
+  "BOOLEAN_COL": null,
+  "ID": 4,
+  "INTEGER_COL": null,
+  "SMALLINT_COL": null,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "test/integertypes_795898",
+      "schema": "TEST",
+      "table": "INTEGERTYPES_795898"
+    }
+  }
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test/integertypes_795898":{"CursorNames":["ID"],"CursorValues":[4],"DocumentCount":5,"LastPolled":"<TIMESTAMP>"}}}
+

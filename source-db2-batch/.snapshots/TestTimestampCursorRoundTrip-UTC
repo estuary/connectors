@@ -1,0 +1,352 @@
+# ================================
+# Collection "acmeCo/test/test/timestampcursorroundtrip_503555": 12 Documents
+# ================================
+{
+  "type": "object",
+  "required": [
+    "DATA",
+    "ID",
+    "UPDATED_AT",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "DATA": {
+      "maxLength": 100,
+      "description": "(source type: VARCHAR)",
+      "type": [
+        "string"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "UPDATED_AT": {
+      "format": "date-time",
+      "description": "(source type: TIMESTAMP)",
+      "type": [
+        "string"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "DATA": "Initial row 0",
+  "ID": 0,
+  "UPDATED_AT": "2025-01-01T12:00:00Z",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test/timestampcursorroundtrip_503555",
+      "schema": "TEST",
+      "table": "TIMESTAMPCURSORROUNDTRIP_503555"
+    }
+  }
+}
+{
+  "DATA": "Initial row 1",
+  "ID": 1,
+  "UPDATED_AT": "2025-01-01T12:01:00Z",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test/timestampcursorroundtrip_503555",
+      "schema": "TEST",
+      "table": "TIMESTAMPCURSORROUNDTRIP_503555"
+    }
+  }
+}
+{
+  "DATA": "Initial row 2",
+  "ID": 2,
+  "UPDATED_AT": "2025-01-01T12:02:00Z",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test/timestampcursorroundtrip_503555",
+      "schema": "TEST",
+      "table": "TIMESTAMPCURSORROUNDTRIP_503555"
+    }
+  }
+}
+{
+  "DATA": "Initial row 3",
+  "ID": 3,
+  "UPDATED_AT": "2025-01-01T12:03:00Z",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test/timestampcursorroundtrip_503555",
+      "schema": "TEST",
+      "table": "TIMESTAMPCURSORROUNDTRIP_503555"
+    }
+  }
+}
+{
+  "DATA": "Initial row 4",
+  "ID": 4,
+  "UPDATED_AT": "2025-01-01T12:04:00Z",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "test/timestampcursorroundtrip_503555",
+      "schema": "TEST",
+      "table": "TIMESTAMPCURSORROUNDTRIP_503555"
+    }
+  }
+}
+{
+  "type": "object",
+  "required": [
+    "DATA",
+    "ID",
+    "UPDATED_AT",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "DATA": {
+      "maxLength": 100,
+      "description": "(source type: VARCHAR)",
+      "type": [
+        "string"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "UPDATED_AT": {
+      "format": "date-time",
+      "description": "(source type: TIMESTAMP)",
+      "type": [
+        "string"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "DATA": "Second batch row 5",
+  "ID": 5,
+  "UPDATED_AT": "2025-01-01T12:05:00Z",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 5,
+    "source": {
+      "resource": "test/timestampcursorroundtrip_503555",
+      "schema": "TEST",
+      "table": "TIMESTAMPCURSORROUNDTRIP_503555"
+    }
+  }
+}
+{
+  "DATA": "Second batch row 6",
+  "ID": 6,
+  "UPDATED_AT": "2025-01-01T12:06:00Z",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 6,
+    "source": {
+      "resource": "test/timestampcursorroundtrip_503555",
+      "schema": "TEST",
+      "table": "TIMESTAMPCURSORROUNDTRIP_503555"
+    }
+  }
+}
+{
+  "DATA": "Second batch row 7",
+  "ID": 7,
+  "UPDATED_AT": "2025-01-01T12:07:00Z",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 7,
+    "source": {
+      "resource": "test/timestampcursorroundtrip_503555",
+      "schema": "TEST",
+      "table": "TIMESTAMPCURSORROUNDTRIP_503555"
+    }
+  }
+}
+{
+  "DATA": "Second batch row 8",
+  "ID": 8,
+  "UPDATED_AT": "2025-01-01T12:08:00Z",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 8,
+    "source": {
+      "resource": "test/timestampcursorroundtrip_503555",
+      "schema": "TEST",
+      "table": "TIMESTAMPCURSORROUNDTRIP_503555"
+    }
+  }
+}
+{
+  "DATA": "Second batch row 9",
+  "ID": 9,
+  "UPDATED_AT": "2025-01-01T12:09:00Z",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 9,
+    "source": {
+      "resource": "test/timestampcursorroundtrip_503555",
+      "schema": "TEST",
+      "table": "TIMESTAMPCURSORROUNDTRIP_503555"
+    }
+  }
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test/timestampcursorroundtrip_503555":{"CursorNames":["UPDATED_AT"],"CursorValues":["2025-01-01 12:09:00.000000"],"DocumentCount":10,"LastPolled":"<TIMESTAMP>"}}}
+
