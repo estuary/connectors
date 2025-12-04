@@ -101,7 +101,7 @@ type config struct {
 	Region             string             `json:"region" jsonschema:"title=Region,description=Region of the materialized tables." jsonschema_extras:"order=1"`
 	Credentials        *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=2"`
 
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 type advancedConfig struct {

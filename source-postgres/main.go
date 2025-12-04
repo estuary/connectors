@@ -120,7 +120,7 @@ type Config struct {
 	Database    string            `json:"database" jsonschema:"default=postgres,description=Logical database name to capture from." jsonschema_extras:"order=2"`
 	HistoryMode bool              `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=3"`
 	Credentials *credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=4,x-iam-auth=true"`
-	Advanced    advancedConfig    `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	Advanced    advancedConfig    `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }

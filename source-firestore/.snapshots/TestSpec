@@ -40,7 +40,8 @@
         "additionalProperties": false,
         "type": "object",
         "title": "Advanced Options",
-        "description": "Options for advanced users. You should not typically need to modify these."
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
       }
     },
     "type": "object",

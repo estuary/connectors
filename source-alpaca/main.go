@@ -39,7 +39,7 @@ type config struct {
 	Feed         string         `json:"feed" jsonschema:"title=Feed,description=The feed to pull market data from.,enum=iex,enum=sip"`
 	Symbols      string         `json:"symbols" jsonschema:"title=Symbols,description=Comma separated list of symbols to monitor." jsonschema_extras:"multiline=true"`
 	StartDate    time.Time      `json:"start_date" jsonschema:"title=Start Date,description=Get trades starting at this date. Has no effect if changed after the capture has started. Must be no earlier than 2016-01-01T00:00:00Z."`
-	Advanced     advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	Advanced     advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	effectiveMaxBackfillInterval time.Duration
 	effectiveMinBackfillInterval time.Duration

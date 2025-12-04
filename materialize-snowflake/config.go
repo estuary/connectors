@@ -83,7 +83,7 @@ type config struct {
 	Credentials       *snowflake_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
 	Schedule          m.ScheduleConfig                 `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 	DBTJobTrigger     dbt.JobConfig                    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
-	Advanced          advancedConfig                   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extra:"advanced=true"`
+	Advanced          advancedConfig                   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 type advancedConfig struct {
