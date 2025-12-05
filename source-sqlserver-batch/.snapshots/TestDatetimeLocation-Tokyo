@@ -1,15 +1,224 @@
 # ================================
 # Collection "acmeCo/test/dbo/datetimelocation_967996": 9 Documents
 # ================================
-{"type":"object","required":["_meta","datetime2_col","datetime_col","id"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-sqlserver-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"},"source":{"properties":{"resource":{"type":"string","description":"Resource name of the binding from which this document was captured."},"schema":{"type":"string","description":"Database schema from which the document was read."},"table":{"type":"string","description":"Database table from which the document was read."},"tag":{"type":"string","description":"Optional 'Source Tag' property as defined in the endpoint configuration."}},"additionalProperties":false,"type":"object","required":["resource"]}},"additionalProperties":false,"type":"object","required":["polled","index","row_id","source"],"additionalProperties":false},"datetime2_col":{"format":"date-time","description":"(source type: datetime2)","type":["string"]},"datetime_col":{"format":"date-time","description":"(source type: datetime)","type":["string"]},"id":{"type":"integer","description":"(source type: non-nullable int)"}},"x-infer-schema":true}
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"source":{"resource":"datetimelocation_967996","schema":"dbo","table":"datetimelocation_967996"}},"datetime2_col":null,"datetime_col":null,"id":0}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1,"source":{"resource":"datetimelocation_967996","schema":"dbo","table":"datetimelocation_967996"}},"datetime2_col":"2025-02-27T14:30:00+09:00","datetime_col":"2025-02-27T14:30:00+09:00","id":1}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2,"source":{"resource":"datetimelocation_967996","schema":"dbo","table":"datetimelocation_967996"}},"datetime2_col":"0001-01-01T00:00:00+09:18","datetime_col":"1753-01-01T00:00:00+09:18","id":2}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3,"source":{"resource":"datetimelocation_967996","schema":"dbo","table":"datetimelocation_967996"}},"datetime2_col":"9999-12-31T23:59:59.9999999+09:00","datetime_col":"9999-12-31T23:59:59+09:00","id":3}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4,"source":{"resource":"datetimelocation_967996","schema":"dbo","table":"datetimelocation_967996"}},"datetime2_col":"2025-02-27T14:30:45.1234567+09:00","datetime_col":"2025-02-27T14:30:45.123+09:00","id":4}
-{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5,"source":{"resource":"datetimelocation_967996","schema":"dbo","table":"datetimelocation_967996"}},"datetime2_col":"2000-01-01T00:00:00+09:00","datetime_col":"2000-01-01T00:00:00+09:00","id":5}
-{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6,"source":{"resource":"datetimelocation_967996","schema":"dbo","table":"datetimelocation_967996"}},"datetime2_col":"2025-12-31T23:59:59+09:00","datetime_col":"2025-12-31T23:59:59+09:00","id":6}
-{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7,"source":{"resource":"datetimelocation_967996","schema":"dbo","table":"datetimelocation_967996"}},"datetime2_col":"2025-03-09T03:30:00+09:00","datetime_col":"2025-03-09T03:30:00+09:00","id":7}
+{
+  "type": "object",
+  "required": [
+    "_meta",
+    "datetime2_col",
+    "datetime_col",
+    "id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-sqlserver-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document as executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "datetime2_col": {
+      "format": "date-time",
+      "description": "(source type: datetime2)",
+      "type": [
+        "string"
+      ]
+    },
+    "datetime_col": {
+      "format": "date-time",
+      "description": "(source type: datetime)",
+      "type": [
+        "string"
+      ]
+    },
+    "id": {
+      "type": "integer",
+      "description": "(source type: non-nullable int)"
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "datetimelocation_967996",
+      "schema": "dbo",
+      "table": "datetimelocation_967996"
+    }
+  },
+  "datetime2_col": null,
+  "datetime_col": null,
+  "id": 0
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "datetimelocation_967996",
+      "schema": "dbo",
+      "table": "datetimelocation_967996"
+    }
+  },
+  "datetime2_col": "2025-02-27T14:30:00+09:00",
+  "datetime_col": "2025-02-27T14:30:00+09:00",
+  "id": 1
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "datetimelocation_967996",
+      "schema": "dbo",
+      "table": "datetimelocation_967996"
+    }
+  },
+  "datetime2_col": "0001-01-01T00:00:00+09:18",
+  "datetime_col": "1753-01-01T00:00:00+09:18",
+  "id": 2
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "datetimelocation_967996",
+      "schema": "dbo",
+      "table": "datetimelocation_967996"
+    }
+  },
+  "datetime2_col": "9999-12-31T23:59:59.9999999+09:00",
+  "datetime_col": "9999-12-31T23:59:59+09:00",
+  "id": 3
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "datetimelocation_967996",
+      "schema": "dbo",
+      "table": "datetimelocation_967996"
+    }
+  },
+  "datetime2_col": "2025-02-27T14:30:45.1234567+09:00",
+  "datetime_col": "2025-02-27T14:30:45.123+09:00",
+  "id": 4
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 5,
+    "row_id": 5,
+    "source": {
+      "resource": "datetimelocation_967996",
+      "schema": "dbo",
+      "table": "datetimelocation_967996"
+    }
+  },
+  "datetime2_col": "2000-01-01T00:00:00+09:00",
+  "datetime_col": "2000-01-01T00:00:00+09:00",
+  "id": 5
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 6,
+    "row_id": 6,
+    "source": {
+      "resource": "datetimelocation_967996",
+      "schema": "dbo",
+      "table": "datetimelocation_967996"
+    }
+  },
+  "datetime2_col": "2025-12-31T23:59:59+09:00",
+  "datetime_col": "2025-12-31T23:59:59+09:00",
+  "id": 6
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 7,
+    "row_id": 7,
+    "source": {
+      "resource": "datetimelocation_967996",
+      "schema": "dbo",
+      "table": "datetimelocation_967996"
+    }
+  },
+  "datetime2_col": "2025-03-09T03:30:00+09:00",
+  "datetime_col": "2025-03-09T03:30:00+09:00",
+  "id": 7
+}
 # ================================
 # Final State Checkpoint
 # ================================
