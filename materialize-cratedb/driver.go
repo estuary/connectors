@@ -445,17 +445,42 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return nil
 }
 
+// TxDefuser.MaybeRollback calls Rollback on a Tx, unless Defuse has previously
+// been called.
+type TxDefuser struct {
+	defused bool
+	txn     pgx.Tx
+}
+
+func NewTxDefuser(txn pgx.Tx) *TxDefuser {
+	return &TxDefuser{
+		defused: false,
+		txn:     txn,
+	}
+}
+
+func (t *TxDefuser) MaybeRollback() {
+	if t.defused {
+		return
+	}
+	t.txn.Rollback(context.Background())
+}
+
+func (t *TxDefuser) Defuse() {
+	t.defused = true
+}
+
 func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
 	txn, err := d.store.conn.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return nil, fmt.Errorf("DB.BeginTx: %w", err)
 	}
-	defer func() {
-		if err != nil {
-			txn.Rollback(ctx)
-		}
-	}()
+
+	// All transactions must be complete before closing the database.  This
+	// handles the case of both an error or a panic occurring.
+	defuser := NewTxDefuser(txn)
+	defer defuser.MaybeRollback()
 
 	var batch pgx.Batch
 	batchBytes := 0
@@ -497,6 +522,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 	}
 
+	defuser.Defuse()
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		return nil, m.RunAsyncOperation(func() error {
 			defer txn.Rollback(ctx)
