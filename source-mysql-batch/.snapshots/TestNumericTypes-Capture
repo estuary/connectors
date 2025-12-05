@@ -1,11 +1,196 @@
 # ================================
 # Collection "acmeCo/test/test/numerictypes_559424": 5 Documents
 # ================================
-{"type":"object","required":["_meta","bit_col","boolean_col","decimal_col","double_col","float_col","id"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-mysql-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"},"source":{"properties":{"resource":{"type":"string","description":"Resource name of the binding from which this document was captured."},"schema":{"type":"string","description":"Database schema from which the document was read."},"table":{"type":"string","description":"Database table from which the document was read."},"tag":{"type":"string","description":"Optional 'Source Tag' property as defined in the endpoint configuration."}},"additionalProperties":false,"type":"object","required":["resource"]}},"additionalProperties":false,"type":"object","required":["polled","index","row_id","source"],"additionalProperties":false},"bit_col":{"description":"(source type: bit)","type":["integer"]},"boolean_col":{"description":"(source type: tinyint)","type":["integer"]},"decimal_col":{"format":"number","description":"(source type: decimal)","type":["string"]},"double_col":{"description":"(source type: double)","type":["number"]},"float_col":{"description":"(source type: float)","type":["number"]},"id":{"type":"integer","description":"(source type: non-nullable int)"}},"x-infer-schema":true}
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"bit_col":"\u0001","boolean_col":1,"decimal_col":"123.45","double_col":2.34,"float_col":1.2300000190734863,"id":0}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"bit_col":"\u0000","boolean_col":0,"decimal_col":"-123.45","double_col":-2.34,"float_col":-1.2300000190734863,"id":1}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"bit_col":"\u0001","boolean_col":1,"decimal_col":"0.00","double_col":0,"float_col":0,"id":2}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"bit_col":null,"boolean_col":null,"decimal_col":null,"double_col":null,"float_col":null,"id":3}
+{
+  "type": "object",
+  "required": [
+    "_meta",
+    "bit_col",
+    "boolean_col",
+    "decimal_col",
+    "double_col",
+    "float_col",
+    "id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-mysql-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document as executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "bit_col": {
+      "description": "(source type: bit)",
+      "type": [
+        "integer"
+      ]
+    },
+    "boolean_col": {
+      "description": "(source type: tinyint)",
+      "type": [
+        "integer"
+      ]
+    },
+    "decimal_col": {
+      "format": "number",
+      "description": "(source type: decimal)",
+      "type": [
+        "string"
+      ]
+    },
+    "double_col": {
+      "description": "(source type: double)",
+      "type": [
+        "number"
+      ]
+    },
+    "float_col": {
+      "description": "(source type: float)",
+      "type": [
+        "number"
+      ]
+    },
+    "id": {
+      "type": "integer",
+      "description": "(source type: non-nullable int)"
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "bit_col": "\u0001",
+  "boolean_col": 1,
+  "decimal_col": "123.45",
+  "double_col": 2.34,
+  "float_col": 1.2300000190734863,
+  "id": 0
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "bit_col": "\u0000",
+  "boolean_col": 0,
+  "decimal_col": "-123.45",
+  "double_col": -2.34,
+  "float_col": -1.2300000190734863,
+  "id": 1
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "bit_col": "\u0001",
+  "boolean_col": 1,
+  "decimal_col": "0.00",
+  "double_col": 0,
+  "float_col": 0,
+  "id": 2
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "bit_col": null,
+  "boolean_col": null,
+  "decimal_col": null,
+  "double_col": null,
+  "float_col": null,
+  "id": 3
+}
 # ================================
 # Final State Checkpoint
 # ================================
