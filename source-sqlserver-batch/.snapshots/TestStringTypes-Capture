@@ -1,17 +1,324 @@
 # ================================
 # Collection "acmeCo/test/dbo/stringtypes_339419": 11 Documents
 # ================================
-{"type":"object","required":["_meta","char_col","id","nchar_col","ntext_col","nvarchar_col","text_col","varchar_col"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-sqlserver-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"},"source":{"properties":{"resource":{"type":"string","description":"Resource name of the binding from which this document was captured."},"schema":{"type":"string","description":"Database schema from which the document was read."},"table":{"type":"string","description":"Database table from which the document was read."},"tag":{"type":"string","description":"Optional 'Source Tag' property as defined in the endpoint configuration."}},"additionalProperties":false,"type":"object","required":["resource"]}},"additionalProperties":false,"type":"object","required":["polled","index","row_id","source"],"additionalProperties":false},"char_col":{"maxLength":16,"description":"(source type: char)","type":["string"]},"id":{"type":"integer","description":"(source type: non-nullable int)"},"nchar_col":{"maxLength":16,"description":"(source type: nchar)","type":["string"]},"ntext_col":{"description":"(source type: ntext)","type":["string"]},"nvarchar_col":{"maxLength":16,"description":"(source type: nvarchar)","type":["string"]},"text_col":{"description":"(source type: text)","type":["string"]},"varchar_col":{"maxLength":16,"description":"(source type: varchar)","type":["string"]}},"x-infer-schema":true}
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"source":{"resource":"stringtypes_339419","schema":"dbo","table":"stringtypes_339419"}},"char_col":"Hello           ","id":0,"nchar_col":"Hello           ","ntext_col":"Hello","nvarchar_col":"Hello","text_col":"Hello","varchar_col":"Hello"}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1,"source":{"resource":"stringtypes_339419","schema":"dbo","table":"stringtypes_339419"}},"char_col":"B               ","id":1,"nchar_col":"D               ","ntext_col":"F","nvarchar_col":"C","text_col":"E","varchar_col":"A"}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2,"source":{"resource":"stringtypes_339419","schema":"dbo","table":"stringtypes_339419"}},"char_col":"1234567890123456","id":2,"nchar_col":"1234567890123456","ntext_col":"1234567890123456","nvarchar_col":"1234567890123456","text_col":"1234567890123456","varchar_col":"1234567890123456"}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3,"source":{"resource":"stringtypes_339419","schema":"dbo","table":"stringtypes_339419"}},"char_col":"Hello world     ","id":3,"nchar_col":"Hello 世界        ","ntext_col":"Hello 世界","nvarchar_col":"Hello 世界","text_col":"Hello world","varchar_col":"Hello world"}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4,"source":{"resource":"stringtypes_339419","schema":"dbo","table":"stringtypes_339419"}},"char_col":"Tab\tNewline\n    ","id":4,"nchar_col":"Tab\tNewline\n    ","ntext_col":"Tab\tNewline\n","nvarchar_col":"Tab\tNewline\n","text_col":"Tab\tNewline\n","varchar_col":"Tab\tNewline\n"}
-{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5,"source":{"resource":"stringtypes_339419","schema":"dbo","table":"stringtypes_339419"}},"char_col":"                ","id":5,"nchar_col":"                ","ntext_col":"","nvarchar_col":"","text_col":"","varchar_col":""}
-{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6,"source":{"resource":"stringtypes_339419","schema":"dbo","table":"stringtypes_339419"}},"char_col":null,"id":6,"nchar_col":null,"ntext_col":null,"nvarchar_col":null,"text_col":null,"varchar_col":null}
-{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7,"source":{"resource":"stringtypes_339419","schema":"dbo","table":"stringtypes_339419"}},"char_col":"  trim test     ","id":7,"nchar_col":"  trim test     ","ntext_col":"  trim test  ","nvarchar_col":"  trim test  ","text_col":"  trim test  ","varchar_col":"  trim test  "}
-{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8,"source":{"resource":"stringtypes_339419","schema":"dbo","table":"stringtypes_339419"}},"char_col":"Short           ","id":8,"nchar_col":"Short           ","ntext_col":"Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text ","nvarchar_col":"Short","text_col":"Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text ","varchar_col":"Short"}
-{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9,"source":{"resource":"stringtypes_339419","schema":"dbo","table":"stringtypes_339419"}},"char_col":"Special \"quotes\"","id":9,"nchar_col":"Special \"quotes\"","ntext_col":"Special \"quotes\" and \\backslashes\\","nvarchar_col":"Special \"quotes\"","text_col":"Special \"quotes\" and \\backslashes\\","varchar_col":"Special \"quotes\""}
+{
+  "type": "object",
+  "required": [
+    "_meta",
+    "char_col",
+    "id",
+    "nchar_col",
+    "ntext_col",
+    "nvarchar_col",
+    "text_col",
+    "varchar_col"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-sqlserver-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document as executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "char_col": {
+      "maxLength": 16,
+      "description": "(source type: char)",
+      "type": [
+        "string"
+      ]
+    },
+    "id": {
+      "type": "integer",
+      "description": "(source type: non-nullable int)"
+    },
+    "nchar_col": {
+      "maxLength": 16,
+      "description": "(source type: nchar)",
+      "type": [
+        "string"
+      ]
+    },
+    "ntext_col": {
+      "description": "(source type: ntext)",
+      "type": [
+        "string"
+      ]
+    },
+    "nvarchar_col": {
+      "maxLength": 16,
+      "description": "(source type: nvarchar)",
+      "type": [
+        "string"
+      ]
+    },
+    "text_col": {
+      "description": "(source type: text)",
+      "type": [
+        "string"
+      ]
+    },
+    "varchar_col": {
+      "maxLength": 16,
+      "description": "(source type: varchar)",
+      "type": [
+        "string"
+      ]
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "stringtypes_339419",
+      "schema": "dbo",
+      "table": "stringtypes_339419"
+    }
+  },
+  "char_col": "Hello           ",
+  "id": 0,
+  "nchar_col": "Hello           ",
+  "ntext_col": "Hello",
+  "nvarchar_col": "Hello",
+  "text_col": "Hello",
+  "varchar_col": "Hello"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "stringtypes_339419",
+      "schema": "dbo",
+      "table": "stringtypes_339419"
+    }
+  },
+  "char_col": "B               ",
+  "id": 1,
+  "nchar_col": "D               ",
+  "ntext_col": "F",
+  "nvarchar_col": "C",
+  "text_col": "E",
+  "varchar_col": "A"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "stringtypes_339419",
+      "schema": "dbo",
+      "table": "stringtypes_339419"
+    }
+  },
+  "char_col": "1234567890123456",
+  "id": 2,
+  "nchar_col": "1234567890123456",
+  "ntext_col": "1234567890123456",
+  "nvarchar_col": "1234567890123456",
+  "text_col": "1234567890123456",
+  "varchar_col": "1234567890123456"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "stringtypes_339419",
+      "schema": "dbo",
+      "table": "stringtypes_339419"
+    }
+  },
+  "char_col": "Hello world     ",
+  "id": 3,
+  "nchar_col": "Hello 世界        ",
+  "ntext_col": "Hello 世界",
+  "nvarchar_col": "Hello 世界",
+  "text_col": "Hello world",
+  "varchar_col": "Hello world"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "stringtypes_339419",
+      "schema": "dbo",
+      "table": "stringtypes_339419"
+    }
+  },
+  "char_col": "Tab\tNewline\n    ",
+  "id": 4,
+  "nchar_col": "Tab\tNewline\n    ",
+  "ntext_col": "Tab\tNewline\n",
+  "nvarchar_col": "Tab\tNewline\n",
+  "text_col": "Tab\tNewline\n",
+  "varchar_col": "Tab\tNewline\n"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 5,
+    "row_id": 5,
+    "source": {
+      "resource": "stringtypes_339419",
+      "schema": "dbo",
+      "table": "stringtypes_339419"
+    }
+  },
+  "char_col": "                ",
+  "id": 5,
+  "nchar_col": "                ",
+  "ntext_col": "",
+  "nvarchar_col": "",
+  "text_col": "",
+  "varchar_col": ""
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 6,
+    "row_id": 6,
+    "source": {
+      "resource": "stringtypes_339419",
+      "schema": "dbo",
+      "table": "stringtypes_339419"
+    }
+  },
+  "char_col": null,
+  "id": 6,
+  "nchar_col": null,
+  "ntext_col": null,
+  "nvarchar_col": null,
+  "text_col": null,
+  "varchar_col": null
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 7,
+    "row_id": 7,
+    "source": {
+      "resource": "stringtypes_339419",
+      "schema": "dbo",
+      "table": "stringtypes_339419"
+    }
+  },
+  "char_col": "  trim test     ",
+  "id": 7,
+  "nchar_col": "  trim test     ",
+  "ntext_col": "  trim test  ",
+  "nvarchar_col": "  trim test  ",
+  "text_col": "  trim test  ",
+  "varchar_col": "  trim test  "
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 8,
+    "row_id": 8,
+    "source": {
+      "resource": "stringtypes_339419",
+      "schema": "dbo",
+      "table": "stringtypes_339419"
+    }
+  },
+  "char_col": "Short           ",
+  "id": 8,
+  "nchar_col": "Short           ",
+  "ntext_col": "Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text ",
+  "nvarchar_col": "Short",
+  "text_col": "Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text Long text ",
+  "varchar_col": "Short"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 9,
+    "row_id": 9,
+    "source": {
+      "resource": "stringtypes_339419",
+      "schema": "dbo",
+      "table": "stringtypes_339419"
+    }
+  },
+  "char_col": "Special \"quotes\"",
+  "id": 9,
+  "nchar_col": "Special \"quotes\"",
+  "ntext_col": "Special \"quotes\" and \\backslashes\\",
+  "nvarchar_col": "Special \"quotes\"",
+  "text_col": "Special \"quotes\" and \\backslashes\\",
+  "varchar_col": "Special \"quotes\""
+}
 # ================================
 # Final State Checkpoint
 # ================================
