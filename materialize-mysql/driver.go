@@ -783,19 +783,21 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		for idx, c := range converted {
 			varcharMeta := b.varcharColumnMetas[idx]
 			if varcharMeta.identifier != "" {
-				l := len(c.(string))
+				if v, ok := c.(string); ok {
+					l := len(v)
 
-				if l > varcharMeta.maxLength {
-					log.WithFields(log.Fields{
-						"table":               b.target.Identifier,
-						"column":              varcharMeta.identifier,
-						"currentColumnLength": varcharMeta.maxLength,
-						"stringValueLength":   l,
-					}).Info("column will be altered to VARCHAR(stringLength) to accommodate large string value")
-					b.varcharColumnMetas[idx].maxLength = l
+					if l > varcharMeta.maxLength {
+						log.WithFields(log.Fields{
+							"table":               b.target.Identifier,
+							"column":              varcharMeta.identifier,
+							"currentColumnLength": varcharMeta.maxLength,
+							"stringValueLength":   l,
+						}).Info("column will be altered to VARCHAR(stringLength) to accommodate large string value")
+						b.varcharColumnMetas[idx].maxLength = l
 
-					if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf(varcharTableAlter, b.target.Identifier, varcharMeta.identifier, l)); err != nil {
-						return nil, fmt.Errorf("altering size for column %s of table %s: %w", varcharMeta.identifier, b.target.Identifier, err)
+						if _, err := d.store.conn.ExecContext(ctx, fmt.Sprintf(varcharTableAlter, b.target.Identifier, varcharMeta.identifier, l)); err != nil {
+							return nil, fmt.Errorf("altering size for column %s of table %s: %w", varcharMeta.identifier, b.target.Identifier, err)
+						}
 					}
 				}
 			}
