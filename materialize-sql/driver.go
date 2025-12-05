@@ -2,6 +2,7 @@ package sql
 
 import (
 	"context"
+	stdsql "database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -430,4 +431,29 @@ func getTable[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]]
 	}
 	tableShape := BuildTableShape(materializationName, &binding.MaterializationSpec_Binding, binding.Index, path, delta)
 	return ResolveTable(tableShape, endpoint.Dialect)
+}
+
+// TxDefuser.MaybeRollback calls Rollback on a Tx, unless Defuse has previously
+// been called.
+type TxDefuser struct {
+	defused bool
+	txn     *stdsql.Tx
+}
+
+func NewTxDefuser(txn *stdsql.Tx) *TxDefuser {
+	return &TxDefuser{
+		defused: false,
+		txn:     txn,
+	}
+}
+
+func (t *TxDefuser) MaybeRollback() {
+	if t.defused {
+		return
+	}
+	t.txn.Rollback()
+}
+
+func (t *TxDefuser) Defuse() {
+	t.defused = true
 }

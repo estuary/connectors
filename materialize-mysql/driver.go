@@ -28,7 +28,7 @@ import (
 )
 
 var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string": true,
+	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
 }
 
@@ -722,11 +722,11 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	if err != nil {
 		return nil, fmt.Errorf("DB.BeginTx: %w", err)
 	}
-	defer func() {
-		if err != nil {
-			txn.Rollback()
-		}
-	}()
+
+	// If a Tx is open and you attempt to close the connection, msqldb will
+	// deadlock.  This handles the case of both an error or a panic occurring.
+	defuser := sql.NewTxDefuser(txn)
+	defer defuser.MaybeRollback()
 
 	drainBinding := func(b *binding) error {
 		if err := d.store.insertInfile.drain(ctx, txn, b.storeInsertSQL); err != nil {
@@ -829,6 +829,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 	}
 
+	defuser.Defuse()
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
 		return nil, m.RunAsyncOperation(func() error {
 			defer txn.Rollback()
