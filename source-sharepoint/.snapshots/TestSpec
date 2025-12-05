@@ -90,7 +90,7 @@
             "site_id": {
               "type": "string",
               "title": "Site ID",
-              "description": "The SharePoint site ID (GUID).",
+              "description": "The SharePoint site identifier. Accepts: (1) Full ID from Microsoft Graph API (e.g., \"contoso.sharepoint.com,2C712604-1370-44E7-A1F5-426573FDA80A,2D2244C3-251A-49EA-93A8-39E1C3A060FE\") or (2) Hostname with path (e.g., \"contoso.sharepoint.com:/sites/Marketing\").",
               "order": 1
             },
             "drive_id": {
