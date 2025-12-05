@@ -1,0 +1,223 @@
+# ================================
+# Collection "acmeCo/test/test/datetimelocation_967996": 10 Documents
+# ================================
+{
+  "type": "object",
+  "required": [
+    "ID",
+    "TIMESTAMP_COL",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "TIMESTAMP_COL": {
+      "format": "date-time",
+      "description": "(source type: TIMESTAMP)",
+      "type": [
+        "string"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "ID": 0,
+  "TIMESTAMP_COL": null,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test/datetimelocation_967996",
+      "schema": "TEST",
+      "table": "DATETIMELOCATION_967996"
+    }
+  }
+}
+{
+  "ID": 1,
+  "TIMESTAMP_COL": "2025-02-27T14:30:00-05:00",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test/datetimelocation_967996",
+      "schema": "TEST",
+      "table": "DATETIMELOCATION_967996"
+    }
+  }
+}
+{
+  "ID": 2,
+  "TIMESTAMP_COL": "0001-01-01T00:00:00-05:00",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test/datetimelocation_967996",
+      "schema": "TEST",
+      "table": "DATETIMELOCATION_967996"
+    }
+  }
+}
+{
+  "ID": 3,
+  "TIMESTAMP_COL": "9999-12-31T23:59:59.999999-05:00",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test/datetimelocation_967996",
+      "schema": "TEST",
+      "table": "DATETIMELOCATION_967996"
+    }
+  }
+}
+{
+  "ID": 4,
+  "TIMESTAMP_COL": "2025-02-27T14:30:45.123456-05:00",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "test/datetimelocation_967996",
+      "schema": "TEST",
+      "table": "DATETIMELOCATION_967996"
+    }
+  }
+}
+{
+  "ID": 5,
+  "TIMESTAMP_COL": "2000-01-01T00:00:00-05:00",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 5,
+    "row_id": 5,
+    "source": {
+      "resource": "test/datetimelocation_967996",
+      "schema": "TEST",
+      "table": "DATETIMELOCATION_967996"
+    }
+  }
+}
+{
+  "ID": 6,
+  "TIMESTAMP_COL": "2025-12-31T23:59:59-05:00",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 6,
+    "row_id": 6,
+    "source": {
+      "resource": "test/datetimelocation_967996",
+      "schema": "TEST",
+      "table": "DATETIMELOCATION_967996"
+    }
+  }
+}
+{
+  "ID": 7,
+  "TIMESTAMP_COL": "2025-03-09T03:30:00-05:00",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 7,
+    "row_id": 7,
+    "source": {
+      "resource": "test/datetimelocation_967996",
+      "schema": "TEST",
+      "table": "DATETIMELOCATION_967996"
+    }
+  }
+}
+{
+  "ID": 8,
+  "TIMESTAMP_COL": "1883-11-18T12:00:00-05:00",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 8,
+    "row_id": 8,
+    "source": {
+      "resource": "test/datetimelocation_967996",
+      "schema": "TEST",
+      "table": "DATETIMELOCATION_967996"
+    }
+  }
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test/datetimelocation_967996":{"DocumentCount":9,"LastPolled":"<TIMESTAMP>"}}}
+

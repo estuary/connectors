@@ -1,0 +1,406 @@
+# ================================
+# Collection "acmeCo/test/test/capturewithtwocolumncursor_321285": 14 Documents
+# ================================
+{
+  "type": "object",
+  "required": [
+    "DATA",
+    "ID",
+    "MAJOR",
+    "MINOR",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "DATA": {
+      "maxLength": 100,
+      "description": "(source type: VARCHAR)",
+      "type": [
+        "string"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "MAJOR": {
+      "description": "(source type: INTEGER)",
+      "type": [
+        "integer"
+      ]
+    },
+    "MINOR": {
+      "description": "(source type: INTEGER)",
+      "type": [
+        "integer"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "DATA": "v1.1",
+  "ID": 0,
+  "MAJOR": 1,
+  "MINOR": 1,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test/capturewithtwocolumncursor_321285",
+      "schema": "TEST",
+      "table": "CAPTUREWITHTWOCOLUMNCURSOR_321285"
+    }
+  }
+}
+{
+  "DATA": "v1.2",
+  "ID": 1,
+  "MAJOR": 1,
+  "MINOR": 2,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test/capturewithtwocolumncursor_321285",
+      "schema": "TEST",
+      "table": "CAPTUREWITHTWOCOLUMNCURSOR_321285"
+    }
+  }
+}
+{
+  "DATA": "v1.3",
+  "ID": 2,
+  "MAJOR": 1,
+  "MINOR": 3,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test/capturewithtwocolumncursor_321285",
+      "schema": "TEST",
+      "table": "CAPTUREWITHTWOCOLUMNCURSOR_321285"
+    }
+  }
+}
+{
+  "DATA": "v2.1",
+  "ID": 3,
+  "MAJOR": 2,
+  "MINOR": 1,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test/capturewithtwocolumncursor_321285",
+      "schema": "TEST",
+      "table": "CAPTUREWITHTWOCOLUMNCURSOR_321285"
+    }
+  }
+}
+{
+  "DATA": "v2.2",
+  "ID": 4,
+  "MAJOR": 2,
+  "MINOR": 2,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "test/capturewithtwocolumncursor_321285",
+      "schema": "TEST",
+      "table": "CAPTUREWITHTWOCOLUMNCURSOR_321285"
+    }
+  }
+}
+{
+  "DATA": "v2.3",
+  "ID": 5,
+  "MAJOR": 2,
+  "MINOR": 3,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 5,
+    "row_id": 5,
+    "source": {
+      "resource": "test/capturewithtwocolumncursor_321285",
+      "schema": "TEST",
+      "table": "CAPTUREWITHTWOCOLUMNCURSOR_321285"
+    }
+  }
+}
+{
+  "type": "object",
+  "required": [
+    "DATA",
+    "ID",
+    "MAJOR",
+    "MINOR",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "DATA": {
+      "maxLength": 100,
+      "description": "(source type: VARCHAR)",
+      "type": [
+        "string"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "MAJOR": {
+      "description": "(source type: INTEGER)",
+      "type": [
+        "integer"
+      ]
+    },
+    "MINOR": {
+      "description": "(source type: INTEGER)",
+      "type": [
+        "integer"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "DATA": "v3.1",
+  "ID": 8,
+  "MAJOR": 3,
+  "MINOR": 1,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 6,
+    "source": {
+      "resource": "test/capturewithtwocolumncursor_321285",
+      "schema": "TEST",
+      "table": "CAPTUREWITHTWOCOLUMNCURSOR_321285"
+    }
+  }
+}
+{
+  "DATA": "v3.2",
+  "ID": 9,
+  "MAJOR": 3,
+  "MINOR": 2,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 7,
+    "source": {
+      "resource": "test/capturewithtwocolumncursor_321285",
+      "schema": "TEST",
+      "table": "CAPTUREWITHTWOCOLUMNCURSOR_321285"
+    }
+  }
+}
+{
+  "DATA": "v3.3",
+  "ID": 10,
+  "MAJOR": 3,
+  "MINOR": 3,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 8,
+    "source": {
+      "resource": "test/capturewithtwocolumncursor_321285",
+      "schema": "TEST",
+      "table": "CAPTUREWITHTWOCOLUMNCURSOR_321285"
+    }
+  }
+}
+{
+  "DATA": "v4.1",
+  "ID": 11,
+  "MAJOR": 4,
+  "MINOR": 1,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 9,
+    "source": {
+      "resource": "test/capturewithtwocolumncursor_321285",
+      "schema": "TEST",
+      "table": "CAPTUREWITHTWOCOLUMNCURSOR_321285"
+    }
+  }
+}
+{
+  "DATA": "v4.2",
+  "ID": 12,
+  "MAJOR": 4,
+  "MINOR": 2,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 10,
+    "source": {
+      "resource": "test/capturewithtwocolumncursor_321285",
+      "schema": "TEST",
+      "table": "CAPTUREWITHTWOCOLUMNCURSOR_321285"
+    }
+  }
+}
+{
+  "DATA": "v4.3",
+  "ID": 13,
+  "MAJOR": 4,
+  "MINOR": 3,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 5,
+    "row_id": 11,
+    "source": {
+      "resource": "test/capturewithtwocolumncursor_321285",
+      "schema": "TEST",
+      "table": "CAPTUREWITHTWOCOLUMNCURSOR_321285"
+    }
+  }
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test/capturewithtwocolumncursor_321285":{"CursorNames":["MAJOR","MINOR"],"CursorValues":[4,3],"DocumentCount":12,"LastPolled":"<TIMESTAMP>"}}}
+

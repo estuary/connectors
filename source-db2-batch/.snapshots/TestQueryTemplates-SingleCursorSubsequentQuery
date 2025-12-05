@@ -1,0 +1,1 @@
+SELECT * FROM "test"."foobar" WHERE ("updated_at" > @flow_cursor_value[0]) ORDER BY "updated_at";
