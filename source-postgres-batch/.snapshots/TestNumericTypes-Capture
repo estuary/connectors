@@ -1,16 +1,317 @@
 # ================================
 # Collection "acmeCo/test/test/numerictypes_559424": 10 Documents
 # ================================
-{"type":"object","required":["_meta","decimal_col","double_col","id","money_col","numeric_col","numeric_large_col","real_col"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-postgres-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"},"source":{"properties":{"resource":{"type":"string","description":"Resource name of the binding from which this document was captured."},"schema":{"type":"string","description":"Database schema from which the document was read."},"table":{"type":"string","description":"Database table from which the document was read."},"tag":{"type":"string","description":"Optional 'Source Tag' property as defined in the endpoint configuration."}},"additionalProperties":false,"type":"object","required":["resource"]}},"additionalProperties":false,"type":"object","required":["polled","index","row_id","source"],"additionalProperties":false},"decimal_col":{"format":"number","description":"(source type: numeric)","type":["string"]},"double_col":{"format":"number","description":"(source type: float8)","type":["number","string"]},"id":{"type":"integer","description":"(source type: non-nullable int4)"},"money_col":{"description":"(source type: money)","type":["string"]},"numeric_col":{"format":"number","description":"(source type: numeric)","type":["string"]},"numeric_large_col":{"format":"number","description":"(source type: numeric)","type":["string"]},"real_col":{"format":"number","description":"(source type: float4)","type":["number","string"]}},"x-infer-schema":true}
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"decimal_col":"123.45","double_col":123.456,"id":0,"money_col":"$123.45","numeric_col":"123.45","numeric_large_col":"123.4500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","real_col":123.45600128173828,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"decimal_col":"-999999.99","double_col":-1.7e+308,"id":1,"money_col":"-$92,233,720,368,547,758.08","numeric_col":"-999999.99","numeric_large_col":"-9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999000.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","real_col":-3.3999999521443642e+38,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"decimal_col":"999999.99","double_col":1.7e+308,"id":2,"money_col":"$92,233,720,368,547,758.07","numeric_col":"999999.99","numeric_large_col":"9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999000.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","real_col":3.3999999521443642e+38,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"decimal_col":"0.00","double_col":"NaN","id":3,"money_col":"$0.00","numeric_col":"0.00","numeric_large_col":"0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","real_col":"NaN","txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"decimal_col":"1.00","double_col":"Infinity","id":4,"money_col":"$1.00","numeric_col":"1.00","numeric_large_col":"1.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","real_col":"Infinity","txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"decimal_col":"-1.00","double_col":"-Infinity","id":5,"money_col":"-$1.00","numeric_col":"-1.00","numeric_large_col":"-1.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","real_col":"-Infinity","txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"decimal_col":"0.00","double_col":0,"id":6,"money_col":"$0.00","numeric_col":"0.00","numeric_large_col":"0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","real_col":0,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"decimal_col":null,"double_col":null,"id":7,"money_col":null,"numeric_col":null,"numeric_large_col":null,"real_col":null,"txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8,"source":{"resource":"test_numerictypes_559424","schema":"test","table":"numerictypes_559424"}},"decimal_col":"0.00","double_col":0,"id":8,"money_col":"$0.00","numeric_col":"0.00","numeric_large_col":"9876543210987654321098765432109876543210987654321098765432109876543210987654321098765432109876543210.0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789","real_col":0,"txid":999999}
+{
+  "type": "object",
+  "required": [
+    "_meta",
+    "decimal_col",
+    "double_col",
+    "id",
+    "money_col",
+    "numeric_col",
+    "numeric_large_col",
+    "real_col"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-postgres-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document as executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "decimal_col": {
+      "format": "number",
+      "description": "(source type: numeric)",
+      "type": [
+        "string"
+      ]
+    },
+    "double_col": {
+      "format": "number",
+      "description": "(source type: float8)",
+      "type": [
+        "number",
+        "string"
+      ]
+    },
+    "id": {
+      "type": "integer",
+      "description": "(source type: non-nullable int4)"
+    },
+    "money_col": {
+      "description": "(source type: money)",
+      "type": [
+        "string"
+      ]
+    },
+    "numeric_col": {
+      "format": "number",
+      "description": "(source type: numeric)",
+      "type": [
+        "string"
+      ]
+    },
+    "numeric_large_col": {
+      "format": "number",
+      "description": "(source type: numeric)",
+      "type": [
+        "string"
+      ]
+    },
+    "real_col": {
+      "format": "number",
+      "description": "(source type: float4)",
+      "type": [
+        "number",
+        "string"
+      ]
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "decimal_col": "123.45",
+  "double_col": 123.456,
+  "id": 0,
+  "money_col": "$123.45",
+  "numeric_col": "123.45",
+  "numeric_large_col": "123.4500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "real_col": 123.45600128173828,
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "decimal_col": "-999999.99",
+  "double_col": -1.7e+308,
+  "id": 1,
+  "money_col": "-$92,233,720,368,547,758.08",
+  "numeric_col": "-999999.99",
+  "numeric_large_col": "-9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999000.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "real_col": -3.3999999521443642e+38,
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "decimal_col": "999999.99",
+  "double_col": 1.7e+308,
+  "id": 2,
+  "money_col": "$92,233,720,368,547,758.07",
+  "numeric_col": "999999.99",
+  "numeric_large_col": "9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999000.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "real_col": 3.3999999521443642e+38,
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "decimal_col": "0.00",
+  "double_col": "NaN",
+  "id": 3,
+  "money_col": "$0.00",
+  "numeric_col": "0.00",
+  "numeric_large_col": "0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "real_col": "NaN",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "decimal_col": "1.00",
+  "double_col": "Infinity",
+  "id": 4,
+  "money_col": "$1.00",
+  "numeric_col": "1.00",
+  "numeric_large_col": "1.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "real_col": "Infinity",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 5,
+    "row_id": 5,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "decimal_col": "-1.00",
+  "double_col": "-Infinity",
+  "id": 5,
+  "money_col": "-$1.00",
+  "numeric_col": "-1.00",
+  "numeric_large_col": "-1.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "real_col": "-Infinity",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 6,
+    "row_id": 6,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "decimal_col": "0.00",
+  "double_col": 0,
+  "id": 6,
+  "money_col": "$0.00",
+  "numeric_col": "0.00",
+  "numeric_large_col": "0.0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+  "real_col": 0,
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 7,
+    "row_id": 7,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "decimal_col": null,
+  "double_col": null,
+  "id": 7,
+  "money_col": null,
+  "numeric_col": null,
+  "numeric_large_col": null,
+  "real_col": null,
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 8,
+    "row_id": 8,
+    "source": {
+      "resource": "test_numerictypes_559424",
+      "schema": "test",
+      "table": "numerictypes_559424"
+    }
+  },
+  "decimal_col": "0.00",
+  "double_col": 0,
+  "id": 8,
+  "money_col": "$0.00",
+  "numeric_col": "0.00",
+  "numeric_large_col": "9876543210987654321098765432109876543210987654321098765432109876543210987654321098765432109876543210.0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789",
+  "real_col": 0,
+  "txid": 999999
+}
 # ================================
 # Final State Checkpoint
 # ================================
