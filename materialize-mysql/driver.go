@@ -642,8 +642,9 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		// See if we need to increase any VARCHAR column lengths
 		for idx, c := range converted {
 			varcharMeta := b.tempVarcharMetas[idx]
-			if varcharMeta.identifier != "" {
-				l := len(c.(string))
+			// `c` may be `string` or `nil` (if nullable).
+			if cs, ok := c.(string); varcharMeta.identifier != "" && ok {
+				var l = len(cs)
 
 				if l > varcharMeta.maxLength {
 					log.WithFields(log.Fields{
@@ -782,8 +783,9 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		// See if we need to increase any VARCHAR column lengths
 		for idx, c := range converted {
 			varcharMeta := b.varcharColumnMetas[idx]
-			if varcharMeta.identifier != "" {
-				l := len(c.(string))
+			// `c` may be `string` or `nil` (if nullable).
+			if cs, ok := c.(string); varcharMeta.identifier != "" && ok {
+				var l = len(cs)
 
 				if l > varcharMeta.maxLength {
 					log.WithFields(log.Fields{
