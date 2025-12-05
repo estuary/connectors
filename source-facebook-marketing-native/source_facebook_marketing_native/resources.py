@@ -49,7 +49,7 @@ from .models import (
     Activities,
     Images,
     Videos,
-    BaseAdsInsights,
+    FacebookInsightsResource,
     AdsInsights,
     AdsInsightsAgeAndGender,
     AdsInsightsCountry,
@@ -431,7 +431,7 @@ def incremental_resources(
         )
 
     def create_insights_resource(model: type[FacebookResource]) -> Resource:
-        assert issubclass(model, BaseAdsInsights), "Model must be a subclass of BaseAdsInsights"
+        assert issubclass(model, FacebookInsightsResource), "Model must be a subclass of FacebookInsightsResource"
 
         def create_fetch_page(account_id: str) -> Callable:
             return functools.partial(
