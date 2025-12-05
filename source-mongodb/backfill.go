@@ -249,9 +249,9 @@ func (c *capture) doBackfill(
 		opts = options.Find().SetSort(bson.D{{Key: cursorField, Value: 1}})
 	}
 
+	var v any
 	var filter = bson.D{}
 	if lastCursorValue != nil {
-		var v any
 		if err := lastCursorValue.Unmarshal(&v); err != nil {
 			return fmt.Errorf("unmarshalling last_id: %w", err)
 		}
@@ -264,7 +264,7 @@ func (c *capture) doBackfill(
 	}
 	defer cursor.Close(ctx)
 
-	logEntry.Info("starting backfill for collection")
+	logEntry.WithField("gt", v).Info("starting backfill for collection")
 
 	for {
 		select {
