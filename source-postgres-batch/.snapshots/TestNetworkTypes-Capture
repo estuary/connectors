@@ -1,17 +1,296 @@
 # ================================
 # Collection "acmeCo/test/test/networktypes_297765": 11 Documents
 # ================================
-{"type":"object","required":["_meta","cidr_col","id","inet_col","macaddr8_col","macaddr_col"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-postgres-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"},"source":{"properties":{"resource":{"type":"string","description":"Resource name of the binding from which this document was captured."},"schema":{"type":"string","description":"Database schema from which the document was read."},"table":{"type":"string","description":"Database table from which the document was read."},"tag":{"type":"string","description":"Optional 'Source Tag' property as defined in the endpoint configuration."}},"additionalProperties":false,"type":"object","required":["resource"]}},"additionalProperties":false,"type":"object","required":["polled","index","row_id","source"],"additionalProperties":false},"cidr_col":{"description":"(source type: cidr)","type":["string"]},"id":{"type":"integer","description":"(source type: non-nullable int4)"},"inet_col":{"description":"(source type: inet)","type":["string"]},"macaddr8_col":{"description":"(source type: macaddr8)","type":["string"]},"macaddr_col":{"description":"(source type: macaddr)","type":["string"]}},"x-infer-schema":true}
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"source":{"resource":"test_networktypes_297765","schema":"test","table":"networktypes_297765"}},"cidr_col":"192.168.1.0/24","id":0,"inet_col":"192.168.1.1","macaddr8_col":"08:00:2b:01:02:03:04:05","macaddr_col":"08:00:2b:01:02:03","txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":1,"row_id":1,"source":{"resource":"test_networktypes_297765","schema":"test","table":"networktypes_297765"}},"cidr_col":"127.0.0.1/32","id":1,"inet_col":"127.0.0.1","macaddr8_col":"00:00:00:00:00:00:00:00","macaddr_col":"00:00:00:00:00:00","txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":2,"row_id":2,"source":{"resource":"test_networktypes_297765","schema":"test","table":"networktypes_297765"}},"cidr_col":"0.0.0.0/0","id":2,"inet_col":"0.0.0.0","macaddr8_col":"ff:ff:ff:ff:ff:ff:ff:ff","macaddr_col":"ff:ff:ff:ff:ff:ff","txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":3,"row_id":3,"source":{"resource":"test_networktypes_297765","schema":"test","table":"networktypes_297765"}},"cidr_col":"255.255.255.0/24","id":3,"inet_col":"255.255.255.255","macaddr8_col":"02:42:ac:11:00:02:00:00","macaddr_col":"02:42:ac:11:00:02","txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":4,"row_id":4,"source":{"resource":"test_networktypes_297765","schema":"test","table":"networktypes_297765"}},"cidr_col":"::/128","id":4,"inet_col":"::1","macaddr8_col":"08:00:2b:01:02:03:04:05","macaddr_col":"08:00:2b:01:02:03","txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":5,"row_id":5,"source":{"resource":"test_networktypes_297765","schema":"test","table":"networktypes_297765"}},"cidr_col":"2001:db8::/32","id":5,"inet_col":"2001:db8::1","macaddr8_col":"00:11:22:33:44:55:66:77","macaddr_col":"00:11:22:33:44:55","txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":6,"row_id":6,"source":{"resource":"test_networktypes_297765","schema":"test","table":"networktypes_297765"}},"cidr_col":"fe80::/10","id":6,"inet_col":"fe80::1","macaddr8_col":"52:54:00:ff:fe:01:00:00","macaddr_col":"52:54:00:ff:fe:01","txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":7,"row_id":7,"source":{"resource":"test_networktypes_297765","schema":"test","table":"networktypes_297765"}},"cidr_col":"10.0.0.0/8","id":7,"inet_col":"192.168.1.5/24","macaddr8_col":"aa:bb:cc:dd:ee:ff:00:11","macaddr_col":"aa:bb:cc:dd:ee:ff","txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":8,"row_id":8,"source":{"resource":"test_networktypes_297765","schema":"test","table":"networktypes_297765"}},"cidr_col":"172.16.0.0/12","id":8,"inet_col":"2001:db8::1/64","macaddr8_col":"f0:0d:ca:fe:be:ef:00:00","macaddr_col":"f0:0d:ca:fe:be:ef","txid":999999}
-{"_meta":{"polled":"<TIMESTAMP>","index":9,"row_id":9,"source":{"resource":"test_networktypes_297765","schema":"test","table":"networktypes_297765"}},"cidr_col":null,"id":9,"inet_col":null,"macaddr8_col":null,"macaddr_col":null,"txid":999999}
+{
+  "type": "object",
+  "required": [
+    "_meta",
+    "cidr_col",
+    "id",
+    "inet_col",
+    "macaddr8_col",
+    "macaddr_col"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-postgres-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document as executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "cidr_col": {
+      "description": "(source type: cidr)",
+      "type": [
+        "string"
+      ]
+    },
+    "id": {
+      "type": "integer",
+      "description": "(source type: non-nullable int4)"
+    },
+    "inet_col": {
+      "description": "(source type: inet)",
+      "type": [
+        "string"
+      ]
+    },
+    "macaddr8_col": {
+      "description": "(source type: macaddr8)",
+      "type": [
+        "string"
+      ]
+    },
+    "macaddr_col": {
+      "description": "(source type: macaddr)",
+      "type": [
+        "string"
+      ]
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test_networktypes_297765",
+      "schema": "test",
+      "table": "networktypes_297765"
+    }
+  },
+  "cidr_col": "192.168.1.0/24",
+  "id": 0,
+  "inet_col": "192.168.1.1",
+  "macaddr8_col": "08:00:2b:01:02:03:04:05",
+  "macaddr_col": "08:00:2b:01:02:03",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test_networktypes_297765",
+      "schema": "test",
+      "table": "networktypes_297765"
+    }
+  },
+  "cidr_col": "127.0.0.1/32",
+  "id": 1,
+  "inet_col": "127.0.0.1",
+  "macaddr8_col": "00:00:00:00:00:00:00:00",
+  "macaddr_col": "00:00:00:00:00:00",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test_networktypes_297765",
+      "schema": "test",
+      "table": "networktypes_297765"
+    }
+  },
+  "cidr_col": "0.0.0.0/0",
+  "id": 2,
+  "inet_col": "0.0.0.0",
+  "macaddr8_col": "ff:ff:ff:ff:ff:ff:ff:ff",
+  "macaddr_col": "ff:ff:ff:ff:ff:ff",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test_networktypes_297765",
+      "schema": "test",
+      "table": "networktypes_297765"
+    }
+  },
+  "cidr_col": "255.255.255.0/24",
+  "id": 3,
+  "inet_col": "255.255.255.255",
+  "macaddr8_col": "02:42:ac:11:00:02:00:00",
+  "macaddr_col": "02:42:ac:11:00:02",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "test_networktypes_297765",
+      "schema": "test",
+      "table": "networktypes_297765"
+    }
+  },
+  "cidr_col": "::/128",
+  "id": 4,
+  "inet_col": "::1",
+  "macaddr8_col": "08:00:2b:01:02:03:04:05",
+  "macaddr_col": "08:00:2b:01:02:03",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 5,
+    "row_id": 5,
+    "source": {
+      "resource": "test_networktypes_297765",
+      "schema": "test",
+      "table": "networktypes_297765"
+    }
+  },
+  "cidr_col": "2001:db8::/32",
+  "id": 5,
+  "inet_col": "2001:db8::1",
+  "macaddr8_col": "00:11:22:33:44:55:66:77",
+  "macaddr_col": "00:11:22:33:44:55",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 6,
+    "row_id": 6,
+    "source": {
+      "resource": "test_networktypes_297765",
+      "schema": "test",
+      "table": "networktypes_297765"
+    }
+  },
+  "cidr_col": "fe80::/10",
+  "id": 6,
+  "inet_col": "fe80::1",
+  "macaddr8_col": "52:54:00:ff:fe:01:00:00",
+  "macaddr_col": "52:54:00:ff:fe:01",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 7,
+    "row_id": 7,
+    "source": {
+      "resource": "test_networktypes_297765",
+      "schema": "test",
+      "table": "networktypes_297765"
+    }
+  },
+  "cidr_col": "10.0.0.0/8",
+  "id": 7,
+  "inet_col": "192.168.1.5/24",
+  "macaddr8_col": "aa:bb:cc:dd:ee:ff:00:11",
+  "macaddr_col": "aa:bb:cc:dd:ee:ff",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 8,
+    "row_id": 8,
+    "source": {
+      "resource": "test_networktypes_297765",
+      "schema": "test",
+      "table": "networktypes_297765"
+    }
+  },
+  "cidr_col": "172.16.0.0/12",
+  "id": 8,
+  "inet_col": "2001:db8::1/64",
+  "macaddr8_col": "f0:0d:ca:fe:be:ef:00:00",
+  "macaddr_col": "f0:0d:ca:fe:be:ef",
+  "txid": 999999
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 9,
+    "row_id": 9,
+    "source": {
+      "resource": "test_networktypes_297765",
+      "schema": "test",
+      "table": "networktypes_297765"
+    }
+  },
+  "cidr_col": null,
+  "id": 9,
+  "inet_col": null,
+  "macaddr8_col": null,
+  "macaddr_col": null,
+  "txid": 999999
+}
 # ================================
 # Final State Checkpoint
 # ================================
