@@ -1,8 +1,146 @@
 # ================================
 # Collection "acmeCo/test/public/basicdatatypes_261881": 2 Documents
 # ================================
-{"type":"object","required":["_meta","a_bool","a_date","a_real","a_ts","a_tstz","id"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-redshift-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"},"source":{"properties":{"resource":{"type":"string","description":"Resource name of the binding from which this document was captured."},"schema":{"type":"string","description":"Database schema from which the document was read."},"table":{"type":"string","description":"Database table from which the document was read."},"tag":{"type":"string","description":"Optional 'Source Tag' property as defined in the endpoint configuration."}},"additionalProperties":false,"type":"object","required":["resource"]}},"additionalProperties":false,"type":"object","required":["polled","index","row_id","source"],"additionalProperties":false},"a_bool":{"description":"(source type: bool)","type":["boolean"]},"a_date":{"format":"date-time","description":"(source type: date)","type":["string"]},"a_real":{"format":"number","description":"(source type: float4)","type":["number","string"]},"a_ts":{"format":"date-time","description":"(source type: timestamp)","type":["string"]},"a_tstz":{"format":"date-time","description":"(source type: timestamptz)","type":["string"]},"id":{"type":"integer","description":"(source type: non-nullable int4)"}},"x-infer-schema":true}
-{"_meta":{"polled":"<TIMESTAMP>","index":0,"row_id":0,"source":{"resource":"basicdatatypes_261881","schema":"public","table":"basicdatatypes_261881"}},"a_bool":true,"a_date":"2024-02-26T00:00:00Z","a_real":-12.34000015258789,"a_ts":"2024-02-26T12:34:56Z","a_tstz":"2024-02-26T07:34:56-05:00","id":100}
+{
+  "type": "object",
+  "required": [
+    "_meta",
+    "a_bool",
+    "a_date",
+    "a_real",
+    "a_ts",
+    "a_tstz",
+    "id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-redshift-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document as executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "a_bool": {
+      "description": "(source type: bool)",
+      "type": [
+        "boolean"
+      ]
+    },
+    "a_date": {
+      "format": "date-time",
+      "description": "(source type: date)",
+      "type": [
+        "string"
+      ]
+    },
+    "a_real": {
+      "format": "number",
+      "description": "(source type: float4)",
+      "type": [
+        "number",
+        "string"
+      ]
+    },
+    "a_ts": {
+      "format": "date-time",
+      "description": "(source type: timestamp)",
+      "type": [
+        "string"
+      ]
+    },
+    "a_tstz": {
+      "format": "date-time",
+      "description": "(source type: timestamptz)",
+      "type": [
+        "string"
+      ]
+    },
+    "id": {
+      "type": "integer",
+      "description": "(source type: non-nullable int4)"
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "basicdatatypes_261881",
+      "schema": "public",
+      "table": "basicdatatypes_261881"
+    }
+  },
+  "a_bool": true,
+  "a_date": "2024-02-26T00:00:00Z",
+  "a_real": -12.34000015258789,
+  "a_ts": "2024-02-26T12:34:56Z",
+  "a_tstz": "2024-02-26T07:34:56-05:00",
+  "id": 100
+}
 # ================================
 # Final State Checkpoint
 # ================================
