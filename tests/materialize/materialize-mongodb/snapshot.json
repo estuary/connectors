@@ -367,6 +367,10 @@
 ]
 [
   "connectorState",
+  {}
+]
+[
+  "connectorState",
   {
     "updated": {}
   }

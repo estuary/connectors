@@ -2032,6 +2032,10 @@
 ]
 [
   "connectorState",
+  {}
+]
+[
+  "connectorState",
   {
     "updated": {}
   }
