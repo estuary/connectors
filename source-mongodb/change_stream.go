@@ -32,30 +32,6 @@ type changeStream struct {
 	lastPbrtCheckpoint time.Time
 }
 
-type docKey struct {
-	Id interface{} `bson:"_id"`
-}
-
-type namespace struct {
-	Database   string `bson:"db"`
-	Collection string `bson:"coll"`
-}
-
-type bsonFields struct {
-	DocumentKey              docKey    `bson:"documentKey"`
-	OperationType            string    `bson:"operationType"`
-	FullDocument             bson.M    `bson:"fullDocument"`
-	FullDocumentBeforeChange bson.M    `bson:"fullDocumentBeforeChange"`
-	Ns                       namespace `bson:"ns"`
-}
-
-type changeEvent struct {
-	fields     bsonFields
-	fragments  int
-	binding    bindingInfo
-	isDocument bool
-}
-
 // initializeStreams starts change streams for the capture. Streams are started from any prior
 // resume tokens stored in the capture's state.
 func (c *capture) initializeStreams(
@@ -254,39 +230,49 @@ func (c *capture) pullStream(ctx context.Context, s *changeStream) (primitive.Ti
 	events := 0
 	docs := 0
 	for s.ms.TryNext(ctx) {
-		var ev changeEvent
-		requestedAnotherBatch, err := c.readEvent(ctx, s, &ev)
+		events += 1
+
+		// Transcode raw BSON to JSON - the transcoder handles split events internally.
+		resp, err := c.transcoder.Transcode(s.ms.Current)
 		if err != nil {
-			return primitive.Timestamp{}, fmt.Errorf("reading change stream event: %w", err)
-		}
-		events += ev.fragments
-
-		if ev.isDocument {
-			lastToken = getToken(s)
-			docs += 1
-
-			stateUpdate := captureState{
-				DatabaseResumeTokens: map[string]bson.Raw{s.db: lastToken},
-			}
-
-			if doc, err := makeEventDocument(ev, s.db, ev.binding.resource.Collection); err != nil {
-				return primitive.Timestamp{}, fmt.Errorf("making change event document: %w", err)
-			} else if cpJson, err := json.Marshal(stateUpdate); err != nil {
-				return primitive.Timestamp{}, fmt.Errorf("serializing stream checkpoint: %w", err)
-			} else if err := c.output.DocumentsAndCheckpoint(cpJson, true, ev.binding.index, doc); err != nil {
-				return primitive.Timestamp{}, fmt.Errorf("outputting document and checkpoint: %w", err)
-			}
+			return primitive.Timestamp{}, fmt.Errorf("transcoding event: %w", err)
 		}
 
-		if s.ms.RemainingBatchLength() == 0 || requestedAnotherBatch {
+		// Check if this was a skipped event.
+		if resp.IsSkip {
+			log.WithFields(log.Fields{
+				"database":   resp.Database,
+				"collection": resp.Collection,
+				"reason":     resp.Reason,
+			}).Debug("transcoder skipped event")
+			continue
+		}
+
+		// Look up binding for this collection.
+		binding, tracked := c.trackedChangeStreamBindings[resourceId(resp.Database, resp.Collection)]
+		if !tracked {
+			continue
+		}
+
+		lastToken = getToken(s)
+		docs += 1
+
+		stateUpdate := captureState{
+			DatabaseResumeTokens: map[string]bson.Raw{s.db: lastToken},
+		}
+
+		cpJson, err := json.Marshal(stateUpdate)
+		if err != nil {
+			return primitive.Timestamp{}, fmt.Errorf("serializing stream checkpoint: %w", err)
+		}
+		if err := c.output.DocumentsAndCheckpoint(cpJson, true, binding.index, resp.Document); err != nil {
+			return primitive.Timestamp{}, fmt.Errorf("outputting document and checkpoint: %w", err)
+		}
+
+		if s.ms.RemainingBatchLength() == 0 || resp.CompletedSplitEvent {
 			// Yield control back to the caller once this batch of documents has
-			// been fully read, or an additional batch of documents was needed
-			// to complete a split event document.
-			if s.ms.RemainingBatchLength() != 0 {
-				log.WithFields(log.Fields{
-					"remainingBatchLength": s.ms.RemainingBatchLength(),
-				}).Debug("pullStream is returning with a partial batch requested from readFragments")
-			}
+			// been fully read, or when we've just completed a split event (which
+			// may have required fetching additional batches for the fragments).
 			break
 		}
 	}
@@ -329,188 +315,6 @@ func (c *capture) pullStream(ctx context.Context, s *changeStream) (primitive.Ti
 	c.mu.Unlock()
 
 	return lastOpTime, nil
-}
-
-type splitEvent struct {
-	Fragment int `bson:"fragment"`
-	Of       int `bson:"of"`
-}
-
-func (c *capture) readEvent(
-	ctx context.Context,
-	s *changeStream,
-	ev *changeEvent,
-) (requestedAnotherBatch bool, err error) {
-	var binding bindingInfo
-	var trackedBinding bool
-
-	splitRaw := s.ms.Current.Lookup("splitEvent")
-	if !splitRaw.IsZero() {
-		// This change event is split across multiple change stream event
-		// "fragments". Each of the fragments in the sequence must be read
-		// and combined. This will require reading at least 1 additional
-		// event from the change stream, which may involve requesting a new
-		// batch.
-		ev.fragments, requestedAnotherBatch, err = readFragments(ctx, s, ev)
-		if err != nil {
-			return false, fmt.Errorf("assembling event from change stream event segments: %w", err)
-		}
-
-		if binding, trackedBinding = c.trackedChangeStreamBindings[resourceId(s.db, ev.fields.Ns.Collection)]; !trackedBinding {
-			// Assembled event is not for a tracked collection. This is
-			// difficult to check prior to reading all the fragments for the
-			// event, since which fragment will contain the 'ns' field is
-			// unknown.
-			return
-		}
-	} else {
-		// This change event is not split.
-		ev.fragments = 1
-
-		// Quick check to avoid fully decoding events for collections that are
-		// not being captured.
-		if collRaw, lookupErr := s.ms.Current.LookupErr("ns", "coll"); lookupErr == nil {
-			// LookupErr will only error if the `ns.coll` field is missing,
-			// which is only known to happen with dropDatabase and invalidate
-			// events, which are handled specifically a little further down.
-			if binding, trackedBinding = c.trackedChangeStreamBindings[resourceId(s.db, collRaw.StringValue())]; !trackedBinding {
-				return
-			}
-		}
-
-		if err := s.ms.Decode(&ev.fields); err != nil {
-			return false, fmt.Errorf("change stream decoding document: %w", err)
-		}
-	}
-
-	switch ev.fields.OperationType {
-	case "drop", "rename":
-		log.WithFields(log.Fields{
-			"database":   s.db,
-			"collection": ev.fields.Ns.Collection,
-			"opType":     ev.fields.OperationType,
-		}).Warn("received collection-level event for tracked collection")
-		return
-	case "dropDatabase", "invalidate": // An invalidate event will always follow a dropDatabase event.
-		log.WithFields(log.Fields{
-			"database": s.db,
-			"opType":   ev.fields.OperationType,
-		}).Warn("received database-level event for tracked database")
-		return
-	case "insert", "update", "replace", "delete":
-		if ev.fields.OperationType != "delete" && ev.fields.FullDocument == nil {
-			// FullDocument can be "null" for non-deletion events if another
-			// operation has deleted the document. This happens because update
-			// change events do not hold a copy of the full document, but rather
-			// it is at query time that the full document is looked up, and in
-			// these cases, the FullDocument can end up being null (if deleted)
-			// or different from the deltas in the update event. We ignore
-			// events where FullDocument is null. Another change event of type
-			// delete will eventually come and delete the document.
-			log.WithFields(log.Fields{"database": s.db, "collection": ev.fields.Ns.Collection}).Debug("discarding event with no FullDocument")
-			return
-		}
-	default:
-		log.WithFields(log.Fields{
-			"database":      s.db,
-			"collection":    ev.fields.Ns.Collection,
-			"operationType": ev.fields.OperationType,
-		}).Debug("discarding event with un-tracked operation")
-		return
-	}
-
-	ev.isDocument = true
-	ev.binding = binding
-	return
-}
-
-func readFragments(
-	ctx context.Context,
-	s *changeStream,
-	ev *changeEvent,
-) (numSplitEvents int, requestedAnotherBatch bool, _ error) {
-	// Fragments are repeatedly unmarshalled into a single change event since no
-	// two fragments have overlapping top-level properties - MongoDB only splits
-	// on top-level document fields.
-	lastFragment := 0
-	for {
-		// Upon entering this loop, the change stream must already have been
-		// advanced to a split change event. For the duration of the loop it is
-		// an error if an event is not split, since we only want to read to
-		// "end" of the current set of fragments.
-		var se splitEvent
-		if splitRaw, err := s.ms.Current.LookupErr("splitEvent"); err != nil {
-			return 0, false, fmt.Errorf("finding splitEvent in document fragment: %w", err)
-		} else if err := splitRaw.Unmarshal(&se); err != nil {
-			return 0, false, err
-		} else if lastFragment += 1; lastFragment != se.Fragment { // cheap sanity check
-			return 0, false, fmt.Errorf("expected fragment %d but got %d", lastFragment, se.Fragment)
-		} else if err := s.ms.Decode(&ev.fields); err != nil {
-			return 0, false, fmt.Errorf("decoding fragment: %w", err)
-		} else if se.Fragment == se.Of { // done reading fragments
-			break
-		}
-
-		// Advance to the next fragment, blocking until it is available. This
-		// may involve requesting a new batch of documents from the network.
-		if s.ms.RemainingBatchLength() == 0 {
-			requestedAnotherBatch = true
-		}
-		if !s.ms.Next(ctx) {
-			return 0, false, fmt.Errorf("advancing change stream: %w", s.ms.Err())
-		}
-	}
-
-	if ev.fields.Ns.Collection == "" {
-		// This should never happen, since split events should always be
-		// collection documents.
-		return 0, false, fmt.Errorf("reading fragments produced an event with no collection")
-	}
-
-	return lastFragment, requestedAnotherBatch, nil
-}
-
-// makeEventDocument processes a change event and returns a document if the change event is for a
-// tracked collection and operation type. The binding index is also returned if a document is
-// available from the change event. If no document is applicable to the change event, the returned
-// map will be `nil`.
-func makeEventDocument(ev changeEvent, database string, collection string) (json.RawMessage, error) {
-	var fields = ev.fields
-
-	var doc map[string]any
-	meta := map[string]any{
-		sourceProperty: sourceMeta{
-			DB:         database,
-			Collection: collection,
-		},
-	}
-	if fields.FullDocumentBeforeChange != nil {
-		meta[beforeProperty] = fields.FullDocumentBeforeChange
-	}
-
-	switch fields.OperationType {
-	case "insert", "update", "replace":
-		if fields.OperationType == "update" || fields.OperationType == "replace" {
-			meta[opProperty] = "u"
-		} else if fields.OperationType == "insert" {
-			meta[opProperty] = "c"
-		}
-		doc = fields.FullDocument
-	case "delete":
-		meta[opProperty] = "d"
-		doc = map[string]any{idProperty: fields.DocumentKey.Id}
-	default:
-		return nil, fmt.Errorf("unknown operation: %q", fields.OperationType)
-	}
-
-	doc[metaProperty] = meta
-
-	docBytes, err := json.Marshal(sanitizeDocument(doc))
-	if err != nil {
-		return nil, fmt.Errorf("serializing document: %w", err)
-	}
-
-	return docBytes, nil
 }
 
 func (c *capture) changeStreamProgress() (int, int, map[string]primitive.Timestamp) {

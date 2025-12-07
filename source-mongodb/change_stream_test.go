@@ -130,10 +130,15 @@ func TestPullStream(t *testing.T) {
 			cleanup()
 			t.Cleanup(cleanup)
 
+			transcoder, err := NewTranscoder(ctx)
+			require.NoError(t, err)
+			t.Cleanup(func() { transcoder.Stop() })
+
 			srv := &testServer{}
 			c := capture{
-				client: client,
-				output: &boilerplate.PullOutput{Connector_CaptureServer: srv},
+				client:     client,
+				output:     &boilerplate.PullOutput{Connector_CaptureServer: srv},
+				transcoder: transcoder,
 				trackedChangeStreamBindings: map[string]bindingInfo{
 					resourceId(testDb, testColl1): bindings[0],
 					resourceId(testDb, testColl2): bindings[1],

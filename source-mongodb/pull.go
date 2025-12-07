@@ -156,6 +156,16 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		lastEventClusterTime:        make(map[string]primitive.Timestamp),
 	}
 
+	// Start transcoder for change stream bindings.
+	if len(changeStreamBindings) > 0 {
+		transcoder, err := NewTranscoder(ctx)
+		if err != nil {
+			return fmt.Errorf("starting transcoder: %w", err)
+		}
+		defer transcoder.Stop()
+		c.transcoder = transcoder
+	}
+
 	if err := c.output.Ready(false); err != nil {
 		return err
 	}
@@ -261,6 +271,7 @@ type capture struct {
 	client                      *mongo.Client
 	output                      *boilerplate.PullOutput
 	trackedChangeStreamBindings map[string]bindingInfo
+	transcoder                  *Transcoder
 
 	// mu provides synchronization for values that are accessed by concurrent backfill and change
 	// stream goroutines.
