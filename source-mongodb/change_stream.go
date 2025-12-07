@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/binary"
 	"encoding/hex"
@@ -30,6 +29,15 @@ type changeStream struct {
 	ms                 *mongo.ChangeStream
 	db                 string
 	lastPbrtCheckpoint time.Time
+}
+
+// streamEvent represents a single raw event copied from the cursor.
+// The raw bytes must be copied because the MongoDB cursor reuses its internal buffer.
+type streamEvent struct {
+	raw           bson.Raw // Copied raw BSON from cursor
+	resumeToken   bson.Raw // Resume token after this event
+	batchComplete bool     // True when this is the last event in a MongoDB cursor batch
+	err           error    // Non-nil if producer encountered an error
 }
 
 // initializeStreams starts change streams for the capture. Streams are started from any prior
@@ -146,16 +154,44 @@ func (c *capture) streamChanges(
 	group, groupCtx := errgroup.WithContext(ctx)
 
 	for _, s := range streams {
+		s := s // Capture loop variable for goroutine
+
 		group.Go(func() error {
 			defer s.ms.Close(groupCtx)
 
-			for {
-				if opTime, err := c.pullStream(groupCtx, s); err != nil {
-					return fmt.Errorf("change stream for %q: %w", s.db, err)
-				} else if coordinator.gotCaughtUp(s.db, opTime) && catchup {
+			// Create channel for producer-consumer communication
+			events := make(chan streamEvent, 32) // Buffer events for prefetching
+
+			// Start producer in separate goroutine
+			producerCtx, cancelProducer := context.WithCancel(groupCtx)
+			defer cancelProducer()
+
+			producerDone := make(chan struct{})
+			go func() {
+				defer close(producerDone)
+				c.produceStreamEvents(producerCtx, s, events)
+			}()
+
+			// Consumer loop
+			for ev := range events {
+				if ev.err != nil {
+					return fmt.Errorf("change stream for %q: %w", s.db, ev.err)
+				}
+
+				opTime, _, err := c.processEvent(groupCtx, s, ev)
+				if err != nil {
+					return fmt.Errorf("processing event for %q: %w", s.db, err)
+				}
+
+				if catchup && coordinator.gotCaughtUp(s.db, opTime) {
+					cancelProducer() // Stop producer
+					<-producerDone   // Wait for producer to finish
 					return nil
 				}
 			}
+
+			<-producerDone // Wait for producer
+			return nil
 		})
 	}
 
@@ -221,100 +257,181 @@ func getToken(s *changeStream) bson.Raw {
 	return tok
 }
 
-// pullStream pulls a new batch of documents for the change stream and processes
-// them, returning the latest cluster time of any observed event. A zero-valued
-// returned timestamp indicates that no documents were available for the change
-// stream.
-func (c *capture) pullStream(ctx context.Context, s *changeStream) (primitive.Timestamp, error) {
-	var lastToken bson.Raw
-	events := 0
-	docs := 0
-	for s.ms.TryNext(ctx) {
-		events += 1
+// produceStreamEvents fetches events from the change stream cursor and sends them through
+// the channel to be processed by a consumer. This allows prefetching events from
+// MongoDB while the current event is being processed.
+func (c *capture) produceStreamEvents(ctx context.Context, s *changeStream, events chan<- streamEvent) {
+	defer close(events)
 
-		// Transcode raw BSON to JSON - the transcoder handles split events internally.
-		resp, err := c.transcoder.Transcode(s.ms.Current)
-		if err != nil {
-			return primitive.Timestamp{}, fmt.Errorf("transcoding event: %w", err)
+	for {
+		hasEvents := false
+
+		for s.ms.TryNext(ctx) {
+			hasEvents = true
+
+			// IMPORTANT: Copy raw bytes - cursor reuses internal buffer
+			rawCopy := make(bson.Raw, len(s.ms.Current))
+			copy(rawCopy, s.ms.Current)
+
+			tokenCopy := make(bson.Raw, len(getToken(s)))
+			copy(tokenCopy, getToken(s))
+
+			ev := streamEvent{
+				raw:           rawCopy,
+				resumeToken:   tokenCopy,
+				batchComplete: s.ms.RemainingBatchLength() == 0,
+			}
+
+			select {
+			case events <- ev:
+			case <-ctx.Done():
+				return
+			}
 		}
 
-		// Check if this was a skipped event.
-		if resp.IsSkip {
-			log.WithFields(log.Fields{
-				"database":   resp.Database,
-				"collection": resp.Collection,
-				"reason":     resp.Reason,
-			}).Debug("transcoder skipped event")
-			continue
+		// Check for cursor errors
+		if err := s.ms.Err(); err != nil {
+			select {
+			case events <- streamEvent{err: fmt.Errorf("change stream error: %w", err)}:
+			case <-ctx.Done():
+			}
+			return
 		}
 
-		// Look up binding for this collection.
-		binding, tracked := c.trackedChangeStreamBindings[resourceId(resp.Database, resp.Collection)]
-		if !tracked {
-			continue
-		}
+		// When idle (no events), send an empty batch-complete signal with the current resume token.
+		// This allows consumers waiting for batch completion to proceed.
+		if !hasEvents {
+			tokenCopy := make(bson.Raw, len(getToken(s)))
+			copy(tokenCopy, getToken(s))
 
-		lastToken = getToken(s)
-		docs += 1
+			select {
+			case events <- streamEvent{resumeToken: tokenCopy, batchComplete: true}:
+			case <-ctx.Done():
+				return
+			}
 
-		stateUpdate := captureState{
-			DatabaseResumeTokens: map[string]bson.Raw{s.db: lastToken},
-		}
-
-		cpJson, err := json.Marshal(stateUpdate)
-		if err != nil {
-			return primitive.Timestamp{}, fmt.Errorf("serializing stream checkpoint: %w", err)
-		}
-		if err := c.output.DocumentsAndCheckpoint(cpJson, true, binding.index, resp.Document); err != nil {
-			return primitive.Timestamp{}, fmt.Errorf("outputting document and checkpoint: %w", err)
-		}
-
-		if s.ms.RemainingBatchLength() == 0 || resp.CompletedSplitEvent {
-			// Yield control back to the caller once this batch of documents has
-			// been fully read, or when we've just completed a split event (which
-			// may have required fetching additional batches for the fragments).
-			break
+			// Small sleep to avoid busy-waiting
+			select {
+			case <-time.After(10 * time.Millisecond):
+			case <-ctx.Done():
+				return
+			}
 		}
 	}
-	if err := s.ms.Err(); err != nil {
-		return primitive.Timestamp{}, fmt.Errorf("change stream ended with error: %w", err)
+}
+
+// processEvent processes a single event from the producer, transcoding and emitting the document.
+// It returns the latest cluster time of the event and whether a logical batch boundary was reached.
+// A batch boundary is reached when either the MongoDB cursor batch is exhausted OR a split event
+// was completed (all fragments merged).
+func (c *capture) processEvent(
+	ctx context.Context,
+	s *changeStream,
+	ev streamEvent,
+) (primitive.Timestamp, bool, error) {
+	// Empty event (idle batch-complete signal) - emit PBRT checkpoint if conditions are met
+	if ev.raw == nil {
+		if ev.resumeToken != nil && ev.batchComplete && time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
+			if err := c.emitPbrtCheckpoint(s, ev.resumeToken); err != nil {
+				return primitive.Timestamp{}, false, err
+			}
+		}
+		return primitive.Timestamp{}, true, nil
 	}
 
-	// Checkpoint the final resume token from the change stream, which may correspond to the last
-	// event received, but will often also be a "post batch resume token", which does not correspond
-	// to an event for this stream, but is rather a resumable token representing the oplog entry the
-	// change stream has scanned up to on the server (not necessarily a matching change). This will
-	// be present even if TryNext returned no documents and allows us to keep the position of the
-	// change stream fresh even if we are watching a database that has infrequent events.
-	finalToken := getToken(s)
-	if !bytes.Equal(finalToken, lastToken) && time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
-		stateUpdate := captureState{
-			DatabaseResumeTokens: map[string]bson.Raw{s.db: finalToken},
-		}
-
-		if cpJson, err := json.Marshal(stateUpdate); err != nil {
-			return primitive.Timestamp{}, fmt.Errorf("serializing pbrt stream checkpoint: %w", err)
-		} else if err := c.output.Checkpoint(cpJson, true); err != nil {
-			return primitive.Timestamp{}, fmt.Errorf("outputting pbrt stream checkpoint: %w", err)
-		}
-		s.lastPbrtCheckpoint = time.Now()
-	}
-
-	lastOpTime, err := extractTimestamp(finalToken)
+	// Transcode through the Rust subprocess
+	resp, err := c.transcoder.Transcode(ev.raw)
 	if err != nil {
-		return primitive.Timestamp{}, fmt.Errorf("extracting timestamp from resume token: %w", err)
+		return primitive.Timestamp{}, false, fmt.Errorf("transcoding event: %w", err)
+	}
+
+	// A logical batch boundary is reached when either the MongoDB cursor batch is exhausted
+	// OR a split event was completed (all fragments merged).
+	batchComplete := ev.batchComplete || resp.CompletedSplitEvent
+
+	c.mu.Lock()
+	c.processedStreamEvents++
+	c.mu.Unlock()
+
+	if resp.IsSkip {
+		log.WithFields(log.Fields{
+			"database":   resp.Database,
+			"collection": resp.Collection,
+			"reason":     resp.Reason,
+		}).Debug("transcoder skipped event")
+		// If this is the last event in a batch, emit PBRT checkpoint if conditions are met
+		if ev.batchComplete && time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
+			if err := c.emitPbrtCheckpoint(s, ev.resumeToken); err != nil {
+				return primitive.Timestamp{}, false, err
+			}
+		}
+		// For skip events (e.g., intermediate split fragments), don't signal a batch
+		// completion since no document was emitted.
+		return primitive.Timestamp{}, false, nil
+	}
+
+	binding, tracked := c.trackedChangeStreamBindings[resourceId(resp.Database, resp.Collection)]
+	if !tracked {
+		// If this is the last event in a batch, emit PBRT checkpoint if conditions are met
+		if ev.batchComplete && time.Since(s.lastPbrtCheckpoint) > pbrtCheckpointInterval {
+			if err := c.emitPbrtCheckpoint(s, ev.resumeToken); err != nil {
+				return primitive.Timestamp{}, false, err
+			}
+		}
+		// For untracked bindings, don't signal a batch completion since no document was emitted.
+		return primitive.Timestamp{}, false, nil
+	}
+
+	stateUpdate := captureState{
+		DatabaseResumeTokens: map[string]bson.Raw{s.db: ev.resumeToken},
+	}
+
+	cpJson, err := json.Marshal(stateUpdate)
+	if err != nil {
+		return primitive.Timestamp{}, false, fmt.Errorf("serializing stream checkpoint: %w", err)
+	}
+	if err := c.output.DocumentsAndCheckpoint(cpJson, true, binding.index, resp.Document); err != nil {
+		return primitive.Timestamp{}, false, fmt.Errorf("outputting document and checkpoint: %w", err)
 	}
 
 	c.mu.Lock()
-	c.state.DatabaseResumeTokens[s.db] = finalToken
-	c.processedStreamEvents += events
-	c.emittedStreamDocs += docs
+	c.emittedStreamDocs++
+	c.state.DatabaseResumeTokens[s.db] = ev.resumeToken
+	c.mu.Unlock()
+
+	lastOpTime, err := extractTimestamp(ev.resumeToken)
+	if err != nil {
+		return primitive.Timestamp{}, false, fmt.Errorf("extracting timestamp from resume token: %w", err)
+	}
+
+	c.mu.Lock()
 	if !lastOpTime.IsZero() {
 		c.lastEventClusterTime[s.db] = lastOpTime
 	}
 	c.mu.Unlock()
 
-	return lastOpTime, nil
+	return lastOpTime, batchComplete, nil
+}
+
+// emitPbrtCheckpoint emits a post-batch resume token checkpoint.
+func (c *capture) emitPbrtCheckpoint(s *changeStream, token bson.Raw) error {
+	stateUpdate := captureState{
+		DatabaseResumeTokens: map[string]bson.Raw{s.db: token},
+	}
+	cpJson, err := json.Marshal(stateUpdate)
+	if err != nil {
+		return fmt.Errorf("serializing pbrt stream checkpoint: %w", err)
+	}
+	if err := c.output.Checkpoint(cpJson, true); err != nil {
+		return fmt.Errorf("outputting pbrt stream checkpoint: %w", err)
+	}
+	s.lastPbrtCheckpoint = time.Now()
+
+	c.mu.Lock()
+	c.state.DatabaseResumeTokens[s.db] = token
+	c.mu.Unlock()
+
+	return nil
 }
 
 func (c *capture) changeStreamProgress() (int, int, map[string]primitive.Timestamp) {
