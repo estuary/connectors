@@ -520,4 +520,439 @@ Binding 5:
       "/_id"
     ]
   }
+Binding 6:
+{
+    "recommended_name": "stressdb1/stressdb1collection1",
+    "resource_config_json": {
+      "database": "stressdb1",
+      "collection": "stressdb1collection1",
+      "captureMode": "Change Stream Incremental"
+    },
+    "document_schema_json": {
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "required": [
+        "_id"
+      ],
+      "properties": {
+        "_id": {
+          "type": "string"
+        },
+        "_meta": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/source-mongodb/document-metadata",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Change Operation",
+              "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
+            },
+            "source": {
+              "properties": {
+                "db": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB database."
+                },
+                "collection": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB collection."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "db",
+                "collection"
+              ],
+              "title": "Source",
+              "description": "Document source metadata."
+            }
+          },
+          "type": "object"
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_id"
+    ]
+  }
+Binding 7:
+{
+    "recommended_name": "stressdb1/stressdb1collection2",
+    "resource_config_json": {
+      "database": "stressdb1",
+      "collection": "stressdb1collection2",
+      "captureMode": "Change Stream Incremental"
+    },
+    "document_schema_json": {
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "required": [
+        "_id"
+      ],
+      "properties": {
+        "_id": {
+          "type": "string"
+        },
+        "_meta": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/source-mongodb/document-metadata",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Change Operation",
+              "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
+            },
+            "source": {
+              "properties": {
+                "db": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB database."
+                },
+                "collection": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB collection."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "db",
+                "collection"
+              ],
+              "title": "Source",
+              "description": "Document source metadata."
+            }
+          },
+          "type": "object"
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_id"
+    ]
+  }
+Binding 8:
+{
+    "recommended_name": "stressdb2/stressdb2collection1",
+    "resource_config_json": {
+      "database": "stressdb2",
+      "collection": "stressdb2collection1",
+      "captureMode": "Change Stream Incremental"
+    },
+    "document_schema_json": {
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "required": [
+        "_id"
+      ],
+      "properties": {
+        "_id": {
+          "type": "string"
+        },
+        "_meta": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/source-mongodb/document-metadata",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Change Operation",
+              "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
+            },
+            "source": {
+              "properties": {
+                "db": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB database."
+                },
+                "collection": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB collection."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "db",
+                "collection"
+              ],
+              "title": "Source",
+              "description": "Document source metadata."
+            }
+          },
+          "type": "object"
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_id"
+    ]
+  }
+Binding 9:
+{
+    "recommended_name": "stressdb2/stressdb2collection2",
+    "resource_config_json": {
+      "database": "stressdb2",
+      "collection": "stressdb2collection2",
+      "captureMode": "Change Stream Incremental"
+    },
+    "document_schema_json": {
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "required": [
+        "_id"
+      ],
+      "properties": {
+        "_id": {
+          "type": "string"
+        },
+        "_meta": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/source-mongodb/document-metadata",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Change Operation",
+              "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
+            },
+            "source": {
+              "properties": {
+                "db": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB database."
+                },
+                "collection": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB collection."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "db",
+                "collection"
+              ],
+              "title": "Source",
+              "description": "Document source metadata."
+            }
+          },
+          "type": "object"
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_id"
+    ]
+  }
+Binding 10:
+{
+    "recommended_name": "stressdb3/stressdb3collection1",
+    "resource_config_json": {
+      "database": "stressdb3",
+      "collection": "stressdb3collection1",
+      "captureMode": "Change Stream Incremental"
+    },
+    "document_schema_json": {
+      "if": {
+        "properties": {
+          "_meta": {
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "delete": true,
+          "strategy": "merge"
+        }
+      },
+      "type": "object",
+      "required": [
+        "_id"
+      ],
+      "properties": {
+        "_id": {
+          "type": "string"
+        },
+        "_meta": {
+          "$schema": "https://json-schema.org/draft/2020-12/schema",
+          "$id": "https://github.com/estuary/connectors/source-mongodb/document-metadata",
+          "properties": {
+            "op": {
+              "type": "string",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Change Operation",
+              "description": "Change operation type: 'c' Create/Insert 'u' Update 'd' Delete."
+            },
+            "before": {
+              "type": "object",
+              "title": "Before Document",
+              "description": "Record state immediately before this change was applied. Available if pre-images are enabled for the MongoDB collection."
+            },
+            "source": {
+              "properties": {
+                "db": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB database."
+                },
+                "collection": {
+                  "type": "string",
+                  "description": "Name of the source MongoDB collection."
+                },
+                "snapshot": {
+                  "type": "boolean",
+                  "description": "Snapshot is true if the record was produced from an initial backfill and unset if produced from the change stream."
+                }
+              },
+              "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "db",
+                "collection"
+              ],
+              "title": "Source",
+              "description": "Document source metadata."
+            }
+          },
+          "type": "object"
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_id"
+    ]
+  }
 
