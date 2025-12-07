@@ -108,6 +108,21 @@ func (c config) Validate() error {
 		} else if _, err := base64.StdEncoding.DecodeString(c.StagingBucket.GCSHMACSecret); err != nil {
 			return fmt.Errorf("invalid gcsHMACSecret: must be base64 encoded")
 		}
+	case stagingBucketTypeAzure:
+		for _, req := range [][]string{
+			{"storageAccountName", c.StagingBucket.StorageAccountName},
+			{"storageAccountKey", c.StagingBucket.StorageAccountKey},
+			{"containerName", c.StagingBucket.ContainerName},
+		} {
+			if req[1] == "" {
+				return fmt.Errorf("missing '%s'", req[0])
+			}
+		}
+
+		// Azure storage account key is base64 encoded
+		if _, err := base64.StdEncoding.DecodeString(c.StagingBucket.StorageAccountKey); err != nil {
+			return fmt.Errorf("invalid storageAccountKey: must be base64 encoded")
+		}
 	case "":
 		return fmt.Errorf("missing 'stagingBucketType'")
 	default:
@@ -128,8 +143,9 @@ func (c config) FeatureFlags() (string, map[string]bool) {
 type stagingBucketType string
 
 const (
-	stagingBucketTypeS3  stagingBucketType = "S3"
-	stagingBucketTypeGCS stagingBucketType = "GCS"
+	stagingBucketTypeS3    stagingBucketType = "S3"
+	stagingBucketTypeGCS   stagingBucketType = "GCS"
+	stagingBucketTypeAzure stagingBucketType = "Azure"
 )
 
 type stagingBucketConfig struct {
@@ -137,12 +153,14 @@ type stagingBucketConfig struct {
 
 	stagingBucketS3Config
 	stagingBucketGCSConfig
+	stagingBucketAzureConfig
 }
 
 func (stagingBucketConfig) JSONSchema() *jsonschema.Schema {
 	return schemagen.OneOfSchema("Staging Bucket Configuration", "Staging Bucket Configuration", "stagingBucketType", string(stagingBucketTypeS3),
 		schemagen.OneOfSubSchema("S3", stagingBucketS3Config{}, string(stagingBucketTypeS3)),
 		schemagen.OneOfSubSchema("GCS", stagingBucketGCSConfig{}, string(stagingBucketTypeGCS)),
+		schemagen.OneOfSubSchema("Azure", stagingBucketAzureConfig{}, string(stagingBucketTypeAzure)),
 	)
 }
 
@@ -161,6 +179,13 @@ type stagingBucketGCSConfig struct {
 	GCSHMACAccessID string `json:"gcsHMACAccessID" jsonschema:"title=HMAC Access ID,description=HMAC access ID for the service account." jsonschema_extras:"order=2"`
 	GCSHMACSecret   string `json:"gcsHMACSecret" jsonschema:"title=HMAC Secret,description=HMAC secret for the service account." jsonschema_extras:"secret=true,order=3"`
 	BucketPathGCS   string `json:"bucketPathGCS,omitempty" jsonschema:"title=Bucket Path,description=An optional prefix that will be used to store objects in the staging bucket." jsonschema_extras:"order=4"`
+}
+
+type stagingBucketAzureConfig struct {
+	StorageAccountName string `json:"storageAccountName" jsonschema:"title=Storage Account Name,description=Name of the Azure storage account." jsonschema_extras:"order=0"`
+	StorageAccountKey  string `json:"storageAccountKey" jsonschema:"title=Storage Account Key,description=Storage account key for authentication." jsonschema_extras:"secret=true,order=1"`
+	ContainerName      string `json:"containerName" jsonschema:"title=Container Name,description=Name of the Azure Blob container to use for staging data loads." jsonschema_extras:"order=2"`
+	BucketPathAzure    string `json:"bucketPathAzure,omitempty" jsonschema:"title=Bucket Path,description=An optional prefix that will be used to store objects in the staging container." jsonschema_extras:"order=3"`
 }
 
 func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
@@ -221,6 +246,22 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 			FROM which_secret('gs://%s', 'gcs'
 		);`, c.StagingBucket.BucketGCS)
 		tempSecretName = "__default_gcs"
+	case stagingBucketTypeAzure:
+		// Build Azure connection string from account name and key
+		connectionString := fmt.Sprintf(
+			"DefaultEndpointsProtocol=https;AccountName=%s;AccountKey=%s;EndpointSuffix=core.windows.net",
+			c.StagingBucket.StorageAccountName,
+			c.StagingBucket.StorageAccountKey,
+		)
+		createTempSecret = fmt.Sprintf(`CREATE SECRET IF NOT EXISTS (
+			TYPE AZURE,
+			CONNECTION_STRING '%s',
+			SCOPE 'az://%s'
+		);`, connectionString, c.StagingBucket.ContainerName)
+		checkTempSecret = fmt.Sprintf(`SELECT name, persistent
+			FROM which_secret('az://%s', 'azure'
+		);`, c.StagingBucket.ContainerName)
+		tempSecretName = "__default_azure"
 	}
 
 	for idx, c := range []string{
@@ -295,6 +336,20 @@ func (c *config) toBucketAndPath(ctx context.Context) (blob.Bucket, string, erro
 			return nil, "", fmt.Errorf("creating GCS bucket: %w", err)
 		}
 		path = c.StagingBucket.BucketPathGCS
+	case stagingBucketTypeAzure:
+		azureBucket, err := blob.NewAzureBlobBucket(ctx,
+			c.StagingBucket.ContainerName,
+			c.StagingBucket.StorageAccountName,
+			blob.WithAzureStorageAccountKey(c.StagingBucket.StorageAccountKey),
+		)
+		if err != nil {
+			return nil, "", fmt.Errorf("creating Azure blob bucket: %w", err)
+		}
+		bucket = &azureBucketWrapper{
+			AzureBlobBucket: azureBucket,
+			container:       c.StagingBucket.ContainerName,
+		}
+		path = c.StagingBucket.BucketPathAzure
 	}
 
 	// If BucketPath starts with a /, trim it so we don't end up with repeated /
