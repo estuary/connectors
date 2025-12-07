@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -122,6 +123,28 @@ func (c config) Validate() error {
 		// Azure storage account key is base64 encoded
 		if _, err := base64.StdEncoding.DecodeString(c.StagingBucket.StorageAccountKey); err != nil {
 			return fmt.Errorf("invalid storageAccountKey: must be base64 encoded")
+		}
+
+		// Azure storage account name: 3-24 characters, lowercase letters and numbers only
+		storageAccountName := c.StagingBucket.StorageAccountName
+		if len(storageAccountName) < 3 || len(storageAccountName) > 24 {
+			return fmt.Errorf("invalid storageAccountName: must be between 3 and 24 characters")
+		}
+		if !regexp.MustCompile(`^[a-z0-9]+$`).MatchString(storageAccountName) {
+			return fmt.Errorf("invalid storageAccountName: must contain only lowercase letters and numbers")
+		}
+
+		// Azure container name: 3-63 characters, lowercase letters/numbers/hyphens,
+		// must start and end with letter or number, no consecutive hyphens
+		containerName := c.StagingBucket.ContainerName
+		if len(containerName) < 3 || len(containerName) > 63 {
+			return fmt.Errorf("invalid containerName: must be between 3 and 63 characters")
+		}
+		if !regexp.MustCompile(`^[a-z0-9][a-z0-9-]*[a-z0-9]$`).MatchString(containerName) {
+			return fmt.Errorf("invalid containerName: must start and end with a lowercase letter or number, and contain only lowercase letters, numbers, and hyphens")
+		}
+		if strings.Contains(containerName, "--") {
+			return fmt.Errorf("invalid containerName: must not contain consecutive hyphens")
 		}
 	case "":
 		return fmt.Errorf("missing 'stagingBucketType'")
