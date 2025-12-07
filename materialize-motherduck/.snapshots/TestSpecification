@@ -142,6 +142,50 @@
               "gcsHMACSecret"
             ],
             "title": "GCS"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/materialize-motherduck/staging-bucket-azure-config",
+            "properties": {
+              "stagingBucketType": {
+                "type": "string",
+                "const": "Azure",
+                "default": "Azure",
+                "order": 0
+              },
+              "storageAccountName": {
+                "type": "string",
+                "title": "Storage Account Name",
+                "description": "Name of the Azure storage account.",
+                "order": 0
+              },
+              "storageAccountKey": {
+                "type": "string",
+                "title": "Storage Account Key",
+                "description": "Storage account key for authentication.",
+                "order": 1,
+                "secret": true
+              },
+              "containerName": {
+                "type": "string",
+                "title": "Container Name",
+                "description": "Name of the Azure Blob container to use for staging data loads.",
+                "order": 2
+              },
+              "bucketPathAzure": {
+                "type": "string",
+                "title": "Bucket Path",
+                "description": "An optional prefix that will be used to store objects in the staging container.",
+                "order": 3
+              }
+            },
+            "type": "object",
+            "required": [
+              "storageAccountName",
+              "storageAccountKey",
+              "containerName"
+            ],
+            "title": "Azure"
           }
         ],
         "type": "object",
