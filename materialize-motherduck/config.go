@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/estuary/connectors/go/blob"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -146,6 +147,7 @@ type stagingBucketS3Config struct {
 	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=Secret Access Key,description=AWS Secret Access Key for the S3 staging bucket." jsonschema_extras:"secret=true,order=2"`
 	Region             string `json:"region" jsonschema:"title=S3 Bucket Region,description=Region of the S3 staging bucket." jsonschema_extras:"order=3"`
 	BucketPathS3       string `json:"bucketPathS3,omitempty" jsonschema:"title=Bucket Path,description=An optional prefix that will be used to store objects in the staging bucket." jsonschema_extras:"order=4"`
+	Endpoint           string `json:"endpoint,omitempty" jsonschema:"title=Custom Endpoint,description=Custom endpoint for S3-compatible storage (e.g. Cloudflare R2). For R2 use the format: https://<account-id>.r2.cloudflarestorage.com" jsonschema_extras:"order=5"`
 }
 
 type stagingBucketGCSConfig struct {
@@ -173,13 +175,27 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 	var tempSecretName string
 	switch c.StagingBucket.StagingBucketType {
 	case stagingBucketTypeS3:
-		createTempSecret = fmt.Sprintf(`CREATE SECRET IF NOT EXISTS (
-			TYPE S3,
-			KEY_ID '%s',
-			SECRET '%s',
-			REGION '%s',
-			SCOPE 's3://%s'
-		);`, c.StagingBucket.AWSAccessKeyID, c.StagingBucket.AWSSecretAccessKey, c.StagingBucket.Region, c.StagingBucket.BucketS3)
+		if c.StagingBucket.Endpoint != "" {
+			// Custom endpoint for S3-compatible storage (e.g. Cloudflare R2).
+			// Use path-style URLs since most S3-compatible services require this.
+			createTempSecret = fmt.Sprintf(`CREATE SECRET IF NOT EXISTS (
+				TYPE S3,
+				KEY_ID '%s',
+				SECRET '%s',
+				REGION '%s',
+				ENDPOINT '%s',
+				URL_STYLE 'path',
+				SCOPE 's3://%s'
+			);`, c.StagingBucket.AWSAccessKeyID, c.StagingBucket.AWSSecretAccessKey, c.StagingBucket.Region, c.StagingBucket.Endpoint, c.StagingBucket.BucketS3)
+		} else {
+			createTempSecret = fmt.Sprintf(`CREATE SECRET IF NOT EXISTS (
+				TYPE S3,
+				KEY_ID '%s',
+				SECRET '%s',
+				REGION '%s',
+				SCOPE 's3://%s'
+			);`, c.StagingBucket.AWSAccessKeyID, c.StagingBucket.AWSSecretAccessKey, c.StagingBucket.Region, c.StagingBucket.BucketS3)
+		}
 		checkTempSecret = fmt.Sprintf(`SELECT name, persistent
 			FROM which_secret('s3://%s', 's3'
 		);`, c.StagingBucket.BucketS3)
@@ -251,7 +267,15 @@ func (c *config) toBucketAndPath(ctx context.Context) (blob.Bucket, string, erro
 			c.StagingBucket.AWSSecretAccessKey,
 			"",
 		)
-		if bucket, err = blob.NewS3Bucket(ctx, c.StagingBucket.BucketS3, creds); err != nil {
+		var s3Opts []func(*s3.Options)
+		if c.StagingBucket.Endpoint != "" {
+			s3Opts = append(s3Opts, func(o *s3.Options) {
+				o.BaseEndpoint = &c.StagingBucket.Endpoint
+				o.UsePathStyle = true
+				o.Region = c.StagingBucket.Region
+			})
+		}
+		if bucket, err = blob.NewS3Bucket(ctx, c.StagingBucket.BucketS3, creds, s3Opts...); err != nil {
 			return nil, "", fmt.Errorf("creating S3 bucket: %w", err)
 		}
 		path = c.StagingBucket.BucketPathS3

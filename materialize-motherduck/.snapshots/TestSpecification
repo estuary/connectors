@@ -73,6 +73,12 @@
                 "title": "Bucket Path",
                 "description": "An optional prefix that will be used to store objects in the staging bucket.",
                 "order": 4
+              },
+              "endpoint": {
+                "type": "string",
+                "title": "Custom Endpoint",
+                "description": "Custom endpoint for S3-compatible storage (e.g. Cloudflare R2). For R2 use the format: https://\u003caccount-id\u003e.r2.cloudflarestorage.com",
+                "order": 5
               }
             },
             "type": "object",
