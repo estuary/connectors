@@ -140,12 +140,12 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 	if !cfg.Advanced.parsedFeatureFlags["keyless_row_id"] { // Don't include row_id as required on old captures with keyless_row_id off
 		metadataSchema.Required = slices.DeleteFunc(metadataSchema.Required, func(s string) bool { return s == "row_id" })
 	}
+	metadataSchema.AdditionalProperties = nil
 	metadataSchema.Definitions = nil
 	if metadataSchema.Extras == nil {
 		metadataSchema.Extras = make(map[string]any)
 	}
 	if fullWriteSchema {
-		metadataSchema.AdditionalProperties = nil
 		if sourceSchema, ok := metadataSchema.Properties.Get("source"); ok {
 			sourceSchema.AdditionalProperties = nil
 		}
