@@ -412,12 +412,19 @@ class MacrosResponse(ClientSideIncrementalCursorPaginatedResponse):
 class OrganizationMembershipsResponse(ClientSideIncrementalCursorPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="organization_memberships")
 
+
 class Article(TimestampedResource):
     pass
 
+
 class ArticleResponse(IncrementalCursorPaginatedResponse):
     resources: list[Article] = Field(alias="articles")
-    
+
+
+class CategoriesResponse(ClientSideIncrementalCursorPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="categories")
+
+
 class Post(TimestampedResource):
     comment_count: int
     vote_count: int
@@ -444,6 +451,7 @@ CLIENT_SIDE_FILTERED_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, dict[str, 
     ("ticket_fields", "ticket_fields", None, TicketFieldsResponse),
     ("topics", "community/topics", None, TopicsResponse),
     ("articles", "help_center/articles", None, ArticleResponse),
+    ("categories", "help_center/categories", None, CategoriesResponse),
 ]
 
 
