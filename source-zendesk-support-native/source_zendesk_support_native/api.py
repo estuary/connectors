@@ -25,7 +25,6 @@ from .models import (
     SatisfactionRatingsResponse,
     AuditLog,
     AuditLogsResponse,
-    ArticleResponse,
     Post,
     PostsResponse,
     PostComment,
