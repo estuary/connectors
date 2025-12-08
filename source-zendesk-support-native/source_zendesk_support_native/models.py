@@ -413,12 +413,8 @@ class OrganizationMembershipsResponse(ClientSideIncrementalCursorPaginatedRespon
     resources: list[TimestampedResource] = Field(alias="organization_memberships")
 
 
-class Article(TimestampedResource):
-    pass
-
-
-class ArticleResponse(IncrementalCursorPaginatedResponse):
-    resources: list[Article] = Field(alias="articles")
+class ArticlesResponse(ClientSideIncrementalCursorPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="articles")
 
 
 class CategoriesResponse(ClientSideIncrementalCursorPaginatedResponse):
@@ -450,7 +446,7 @@ CLIENT_SIDE_FILTERED_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, dict[str, 
     ("posts", "community/posts", None, PostsResponse),
     ("ticket_fields", "ticket_fields", None, TicketFieldsResponse),
     ("topics", "community/topics", None, TopicsResponse),
-    ("articles", "help_center/articles", None, ArticleResponse),
+    ("articles", "help_center/articles", None, ArticlesResponse),
     ("categories", "help_center/categories", None, CategoriesResponse),
 ]
 
