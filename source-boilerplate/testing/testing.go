@@ -285,6 +285,8 @@ func (a *pullAdapter) Recv() (*pc.Request, error) {
 	return nil, io.EOF // Always return io.EOF when the context expires
 }
 
+// normalizeJSON recursively normalizes a JSON document by unmarshaling and re-marshaling.
+// This ensures consistent key ordering since Go's json.Marshal sorts map keys alphabetically.
 func normalizeJSON(bs json.RawMessage) (json.RawMessage, error) {
 	var x interface{}
 	if err := json.Unmarshal(bs, &x); err != nil {
@@ -403,8 +405,13 @@ func (v *SortedCaptureValidator) Output(collection string, data json.RawMessage)
 	if v.documents == nil {
 		v.documents = make(map[string][]json.RawMessage)
 	}
-	data = append([]byte(nil), data...) // Ensure we have our own copy of the data
-	v.documents[collection] = append(v.documents[collection], data)
+	// Normalize the JSON to ensure consistent key ordering for snapshots
+	normalized, err := normalizeJSON(data)
+	if err != nil {
+		// If normalization fails, use the original data
+		normalized = append([]byte(nil), data...)
+	}
+	v.documents[collection] = append(v.documents[collection], normalized)
 }
 
 // Summarize writes a human-readable / snapshottable summary of the documents observed by the CaptureValidator.
@@ -488,8 +495,13 @@ func (v *OrderedCaptureValidator) Output(collection string, data json.RawMessage
 	if v.documents == nil {
 		v.documents = make(map[string][]json.RawMessage)
 	}
-	data = append([]byte(nil), data...) // Ensure we have our own copy of the data
-	v.documents[collection] = append(v.documents[collection], data)
+	// Normalize the JSON to ensure consistent key ordering for snapshots
+	normalized, err := normalizeJSON(data)
+	if err != nil {
+		// If normalization fails, use the original data
+		normalized = append([]byte(nil), data...)
+	}
+	v.documents[collection] = append(v.documents[collection], normalized)
 }
 
 // Summarize writes a human-readable / snapshottable summary of the documents observed by the CaptureValidator.
