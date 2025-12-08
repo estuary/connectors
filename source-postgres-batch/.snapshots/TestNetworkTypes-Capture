@@ -70,7 +70,6 @@
           ]
         }
       },
-      "additionalProperties": false,
       "type": "object",
       "required": [
         "polled",

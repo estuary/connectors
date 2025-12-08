@@ -68,7 +68,6 @@
           ]
         }
       },
-      "additionalProperties": false,
       "type": "object",
       "required": [
         "polled",
@@ -239,7 +238,6 @@
           ]
         }
       },
-      "additionalProperties": false,
       "type": "object",
       "required": [
         "polled",
@@ -335,7 +333,6 @@
           ]
         }
       },
-      "additionalProperties": false,
       "type": "object",
       "required": [
         "polled",
