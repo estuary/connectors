@@ -19,6 +19,10 @@ collections:
     schema: brands.schema.yaml
     key:
     - /id
+  acmeCo/categories:
+    schema: categories.schema.yaml
+    key:
+    - /id
   acmeCo/custom_roles:
     schema: custom_roles.schema.yaml
     key:
