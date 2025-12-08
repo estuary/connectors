@@ -229,6 +229,8 @@ class DateSlicesMixin:
             "should_use_attribution_window": should_use_attribution_window,
         })
 
+        slices: list[dict] = []
+
         while start_date <= end_date:
             if self._timezone_mismatch:
                 return
@@ -237,12 +239,19 @@ class DateSlicesMixin:
                 "start_date": str(start_date),
                 "end_date": str(min(current_end_date, end_date)),
                 "use_attribution_window": should_use_attribution_window,
+                "is_last_slice": False
             }
             if cursor_value:
                 stream_slice[self.cursor_field] = cursor_value
-            yield stream_slice
+            slices.append(stream_slice)
             # add 1 additional day because date range is inclusive
             start_date = current_end_date + timedelta(days=1)
+
+        if len(slices) > 0:
+            slices[-1]["is_last_slice"] = True
+
+        for slice in slices:
+            yield slice
 
     def request_params(
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, any] = None, next_page_token: Mapping[str, Any] = None
