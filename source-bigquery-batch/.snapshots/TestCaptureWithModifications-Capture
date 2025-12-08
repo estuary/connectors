@@ -1,18 +1,354 @@
 # ================================
 # Collection "acmeCo/test/capturewithmodifications_786099": 10 Documents
 # ================================
-{"type":"object","required":["_meta","data","id","updated_at"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-bigquery-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"},"source":{"properties":{"resource":{"type":"string","description":"Resource name of the binding from which this document was captured."},"schema":{"type":"string","description":"Database schema from which the document was read."},"table":{"type":"string","description":"Database table from which the document was read."},"tag":{"type":"string","description":"Optional 'Source Tag' property as defined in the endpoint configuration."}},"additionalProperties":false,"type":"object","required":["resource"]}},"additionalProperties":false,"type":"object","required":["polled","index","row_id","source"],"additionalProperties":false},"data":{"description":"(source type: STRING)","type":["string"]},"id":{"description":"(source type: INT64)","type":["integer"]},"updated_at":{"format":"date-time","description":"(source type: TIMESTAMP)","type":["string"]}},"x-infer-schema":true}
-{"type":"object","required":["_meta","data","id","updated_at"],"additionalProperties":false,"properties":{"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-bigquery-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."},"row_id":{"type":"integer","title":"Row ID","description":"Row ID of the Document"},"op":{"type":"string","enum":["c","u","d"],"title":"Change Operation","description":"Operation type (c: Create / u: Update / d: Delete)","default":"u"},"source":{"properties":{"resource":{"type":"string","description":"Resource name of the binding from which this document was captured."},"schema":{"type":"string","description":"Database schema from which the document was read."},"table":{"type":"string","description":"Database table from which the document was read."},"tag":{"type":"string","description":"Optional 'Source Tag' property as defined in the endpoint configuration."}},"additionalProperties":false,"type":"object","required":["resource"]}},"additionalProperties":false,"type":"object","required":["polled","index","row_id","source"],"additionalProperties":false},"data":{"description":"(source type: STRING)","type":["string"]},"id":{"description":"(source type: INT64)","type":["integer"]},"updated_at":{"format":"date-time","description":"(source type: TIMESTAMP)","type":["string"]}},"x-infer-schema":true}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithmodifications_786099","schema":"testdata","table":"capturewithmodifications_786099"}},"data":"Initial value for row 0","id":0,"updated_at":"2025-02-13T12:00:00Z"}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithmodifications_786099","schema":"testdata","table":"capturewithmodifications_786099"}},"data":"Initial value for row 1","id":1,"updated_at":"2025-02-13T12:01:00Z"}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithmodifications_786099","schema":"testdata","table":"capturewithmodifications_786099"}},"data":"Initial value for row 2","id":2,"updated_at":"2025-02-13T12:02:00Z"}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithmodifications_786099","schema":"testdata","table":"capturewithmodifications_786099"}},"data":"Initial value for row 3","id":3,"updated_at":"2025-02-13T12:03:00Z"}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithmodifications_786099","schema":"testdata","table":"capturewithmodifications_786099"}},"data":"Initial value for row 4","id":4,"updated_at":"2025-02-13T12:04:00Z"}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithmodifications_786099","schema":"testdata","table":"capturewithmodifications_786099"}},"data":"Modified value for row 3","id":3,"updated_at":"2025-02-13T12:15:00Z"}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithmodifications_786099","schema":"testdata","table":"capturewithmodifications_786099"}},"data":"Modified value for row 4","id":4,"updated_at":"2025-02-13T12:16:00Z"}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithmodifications_786099","schema":"testdata","table":"capturewithmodifications_786099"}},"data":"Value for row 5","id":5,"updated_at":"2025-02-13T12:20:00Z"}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithmodifications_786099","schema":"testdata","table":"capturewithmodifications_786099"}},"data":"Value for row 6","id":6,"updated_at":"2025-02-13T12:21:00Z"}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithmodifications_786099","schema":"testdata","table":"capturewithmodifications_786099"}},"data":"Value for row 7","id":7,"updated_at":"2025-02-13T12:22:00Z"}
+{
+  "type": "object",
+  "required": [
+    "_meta",
+    "data",
+    "id",
+    "updated_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-bigquery-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document as executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "data": {
+      "description": "(source type: STRING)",
+      "type": [
+        "string"
+      ]
+    },
+    "id": {
+      "description": "(source type: INT64)",
+      "type": [
+        "integer"
+      ]
+    },
+    "updated_at": {
+      "format": "date-time",
+      "description": "(source type: TIMESTAMP)",
+      "type": [
+        "string"
+      ]
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "type": "object",
+  "required": [
+    "_meta",
+    "data",
+    "id",
+    "updated_at"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-bigquery-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document as executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "additionalProperties": false,
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "data": {
+      "description": "(source type: STRING)",
+      "type": [
+        "string"
+      ]
+    },
+    "id": {
+      "description": "(source type: INT64)",
+      "type": [
+        "integer"
+      ]
+    },
+    "updated_at": {
+      "format": "date-time",
+      "description": "(source type: TIMESTAMP)",
+      "type": [
+        "string"
+      ]
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithmodifications_786099",
+      "schema": "testdata",
+      "table": "capturewithmodifications_786099"
+    }
+  },
+  "data": "Initial value for row 0",
+  "id": 0,
+  "updated_at": "2025-02-13T12:00:00Z"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithmodifications_786099",
+      "schema": "testdata",
+      "table": "capturewithmodifications_786099"
+    }
+  },
+  "data": "Initial value for row 1",
+  "id": 1,
+  "updated_at": "2025-02-13T12:01:00Z"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithmodifications_786099",
+      "schema": "testdata",
+      "table": "capturewithmodifications_786099"
+    }
+  },
+  "data": "Initial value for row 2",
+  "id": 2,
+  "updated_at": "2025-02-13T12:02:00Z"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithmodifications_786099",
+      "schema": "testdata",
+      "table": "capturewithmodifications_786099"
+    }
+  },
+  "data": "Initial value for row 3",
+  "id": 3,
+  "updated_at": "2025-02-13T12:03:00Z"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithmodifications_786099",
+      "schema": "testdata",
+      "table": "capturewithmodifications_786099"
+    }
+  },
+  "data": "Initial value for row 4",
+  "id": 4,
+  "updated_at": "2025-02-13T12:04:00Z"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithmodifications_786099",
+      "schema": "testdata",
+      "table": "capturewithmodifications_786099"
+    }
+  },
+  "data": "Modified value for row 3",
+  "id": 3,
+  "updated_at": "2025-02-13T12:15:00Z"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithmodifications_786099",
+      "schema": "testdata",
+      "table": "capturewithmodifications_786099"
+    }
+  },
+  "data": "Modified value for row 4",
+  "id": 4,
+  "updated_at": "2025-02-13T12:16:00Z"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithmodifications_786099",
+      "schema": "testdata",
+      "table": "capturewithmodifications_786099"
+    }
+  },
+  "data": "Value for row 5",
+  "id": 5,
+  "updated_at": "2025-02-13T12:20:00Z"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithmodifications_786099",
+      "schema": "testdata",
+      "table": "capturewithmodifications_786099"
+    }
+  },
+  "data": "Value for row 6",
+  "id": 6,
+  "updated_at": "2025-02-13T12:21:00Z"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithmodifications_786099",
+      "schema": "testdata",
+      "table": "capturewithmodifications_786099"
+    }
+  },
+  "data": "Value for row 7",
+  "id": 7,
+  "updated_at": "2025-02-13T12:22:00Z"
+}
 # ================================
 # Final State Checkpoint
 # ================================
