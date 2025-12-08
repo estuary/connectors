@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"sync"
 	"time"
@@ -156,8 +155,9 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		lastEventClusterTime:        make(map[string]primitive.Timestamp),
 	}
 
-	// Start transcoder for change stream bindings.
-	if len(changeStreamBindings) > 0 {
+	// Start transcoder for processing BSON documents.
+	// This is needed for both change stream events and backfill documents.
+	if len(allBindings) > 0 {
 		transcoder, err := NewTranscoder(ctx)
 		if err != nil {
 			return fmt.Errorf("starting transcoder: %w", err)
@@ -280,6 +280,11 @@ type capture struct {
 	processedStreamEvents int
 	emittedStreamDocs     int
 	lastEventClusterTime  map[string]primitive.Timestamp
+
+	// Throughput instrumentation metrics (protected by mu)
+	totalMongoReadTime time.Duration
+	totalTranscodeTime time.Duration
+	totalBytesRead     int64
 }
 
 func getClusterOpTime(ctx context.Context, client *mongo.Client) (primitive.Timestamp, error) {
@@ -398,77 +403,6 @@ func makePtr[T any](in T) *T {
 
 type resourceState struct {
 	Backfill backfillState `json:"backfill"`
-}
-
-// MongoDB considers datetimes outside of the 0-9999 year range to be _unsafe_
-// so we enforce this constraint in our connector.
-// see https://www.mongodb.com/docs/manual/reference/method/Date/#behavior
-const maxTimeMilli = 253402300799999
-const minTimeMilli = -62167219200000
-
-func sanitizePrimitive(input interface{}) interface{} {
-	switch v := input.(type) {
-	case primitive.DateTime:
-		if v < minTimeMilli {
-			return primitive.DateTime(minTimeMilli)
-		} else if v > maxTimeMilli {
-			return primitive.DateTime(maxTimeMilli)
-		}
-	case float64:
-		if math.IsNaN(v) {
-			return "NaN"
-		} else if math.IsInf(v, +1) {
-			return "Infinity"
-		} else if math.IsInf(v, -1) {
-			return "-Infinity"
-		}
-	case map[string]interface{}:
-		return sanitizeDocument(v)
-	case primitive.M:
-		return sanitizeDocument(v)
-	case []interface{}:
-		return sanitizeArray(v)
-	case primitive.A:
-		return sanitizeArray(v)
-	}
-
-	return input
-}
-
-func sanitizeDocument(doc map[string]interface{}) map[string]interface{} {
-	for key, value := range doc {
-		// Make sure `_id` is always captured as string
-		if key == idProperty {
-			doc[key] = idToString(value)
-		} else {
-			doc[key] = sanitizePrimitive(value)
-		}
-	}
-
-	return doc
-}
-
-func sanitizeArray(arr []interface{}) []interface{} {
-	for i, value := range arr {
-		arr[i] = sanitizePrimitive(value)
-	}
-
-	return arr
-}
-
-func idToString(value interface{}) string {
-	switch v := value.(type) {
-	case string:
-		return v
-	case primitive.ObjectID:
-		return v.Hex()
-	}
-
-	var j, err = json.Marshal(value)
-	if err != nil {
-		panic(fmt.Sprintf("could not marshal interface{} to json: %s", err))
-	}
-	return string(j)
 }
 
 type serverInfo struct {

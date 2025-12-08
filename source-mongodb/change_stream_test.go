@@ -73,7 +73,7 @@ func TestPullStream(t *testing.T) {
 				insertDocs(t, testColl1, 1, 2, 3)
 			},
 			pullTimes:      1,
-			wantSent:       []string{cp, "1", cp, "2", cp, "3", cp},
+			wantSent:       []string{cp, "1", "2", "3", cp},
 			wantEventCount: 3,
 		},
 		{
@@ -84,7 +84,7 @@ func TestPullStream(t *testing.T) {
 				insertDoc(t, testColl3, 3) // not a captured collection
 			},
 			pullTimes:      3,
-			wantSent:       []string{cp, "1", cp, "2", cp},
+			wantSent:       []string{cp, "1", "2", cp},
 			wantEventCount: 3,
 		},
 		{
@@ -93,11 +93,11 @@ func TestPullStream(t *testing.T) {
 				insertDocs(t, testColl1, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 			},
 			pullTimes:      1,
-			wantSent:       []string{cp, "1", cp, "2", cp, "3", cp, "4", cp, "5", cp},
+			wantSent:       []string{cp, "1", "2", "3", "4", "5", cp},
 			wantEventCount: 5,
 		},
 		{
-			name: "split fragments with a partial batch",
+			name: "split fragments",
 			setup: func(t *testing.T) {
 				require.NoError(t, client.Database(testDb).CreateCollection(ctx, testColl1, &options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}))
 
@@ -124,9 +124,9 @@ func TestPullStream(t *testing.T) {
 
 				insertDoc(t, testColl1, 2)
 			},
-			pullTimes:      2,
-			wantSent:       []string{cp, "hugeDocument", cp, "hugeDocument", cp},
-			wantEventCount: 3,
+			pullTimes:      3,
+			wantSent:       []string{cp, "hugeDocument", cp, "hugeDocument", "2", cp},
+			wantEventCount: 4, // insert + 2 split fragments (skipped) + update (emitted) + insert
 		},
 	}
 
@@ -159,8 +159,8 @@ func TestPullStream(t *testing.T) {
 			stream := streams[0]
 			stream.ms.SetBatchSize(testChangeStreamBatchSize)
 
-			// Create channel for producer-consumer
-			events := make(chan streamEvent, 32)
+			// Create channel for batches with buffer size 4
+			batches := make(chan streamBatch, 4)
 
 			// Start producer
 			producerCtx, cancelProducer := context.WithCancel(ctx)
@@ -169,17 +169,15 @@ func TestPullStream(t *testing.T) {
 			producerDone := make(chan struct{})
 			go func() {
 				defer close(producerDone)
-				c.produceStreamEvents(producerCtx, stream, events)
+				c.produceStreamBatches(producerCtx, stream, batches)
 			}()
 
 			// Wait for initial batch to complete (establishes resume token).
-			for ev := range events {
-				require.NoError(t, ev.err)
-				_, _, err := c.processEvent(ctx, stream, ev)
+			for batch := range batches {
+				require.NoError(t, batch.err)
+				_, err := c.processBatch(ctx, stream, batch)
 				require.NoError(t, err)
-				if ev.batchComplete {
-					break
-				}
+				break // First batch establishes resume token
 			}
 
 			c.processedStreamEvents = 0
@@ -188,21 +186,17 @@ func TestPullStream(t *testing.T) {
 			// Run test setup (insert documents)
 			tt.setup(t)
 
-			// Pull and process events until we've seen pullTimes batch completions.
-			// A batch is complete when either the MongoDB cursor batch is exhausted
-			// OR a split event was completed (all fragments merged).
+			// Pull and process batches until we've seen pullTimes batch completions.
 			batchesCompleted := 0
-			for ev := range events {
-				require.NoError(t, ev.err)
+			for batch := range batches {
+				require.NoError(t, batch.err)
 
-				_, batchComplete, err := c.processEvent(ctx, stream, ev)
+				_, err := c.processBatch(ctx, stream, batch)
 				require.NoError(t, err)
 
-				if batchComplete {
-					batchesCompleted++
-					if batchesCompleted >= tt.pullTimes {
-						break
-					}
+				batchesCompleted++
+				if batchesCompleted >= tt.pullTimes {
+					break
 				}
 			}
 
