@@ -420,6 +420,16 @@ func (c *checkpointRecoverer) RecoverCheckpoint(context.Context, pf.Materializat
 	return c.cp, nil
 }
 
+func (s *sqlMaterialization[EC, RC]) FlushDDL(ctx context.Context) error {
+	if flusher, ok := s.client.(boilerplate.DDLFlusher); ok {
+		if err := flusher.FlushDDL(ctx); err != nil {
+			return fmt.Errorf("flushing batched DDL: %w", err)
+		}
+	}
+
+	return nil
+}
+
 func (s *sqlMaterialization[EC, RC]) Close(ctx context.Context) {
 	s.client.Close()
 }
