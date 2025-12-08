@@ -215,7 +215,10 @@ class DateSlicesMixin:
         # attribution window once per day when the stream is caught up &
         # replicating incrementally to avoid constantly emitting duplicate
         # data.
-        should_use_attribution_window = today - start_date == timedelta(days=1)
+        should_use_attribution_window = (
+            self.attribution_window > 0
+            and today - start_date == timedelta(days=1)
+        )
 
         if should_use_attribution_window:
             start_date = start_date - timedelta(days=self.attribution_window)
