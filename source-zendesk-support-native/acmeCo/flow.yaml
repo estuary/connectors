@@ -1,126 +1,121 @@
----
 collections:
   acmeCo/account_attributes:
     schema: account_attributes.schema.yaml
     key:
-      - /_meta/row_id
+    - /_meta/row_id
   acmeCo/articles:
     schema: articles.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/audit_logs:
     schema: audit_logs.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/automations:
     schema: automations.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/brands:
     schema: brands.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/custom_roles:
     schema: custom_roles.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/group_memberships:
     schema: group_memberships.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/groups:
     schema: groups.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/macros:
     schema: macros.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/organization_memberships:
     schema: organization_memberships.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/organizations:
     schema: organizations.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/post_comment_votes:
     schema: post_comment_votes.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/post_comments:
     schema: post_comments.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/post_votes:
     schema: post_votes.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/posts:
     schema: posts.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/satisfaction_ratings:
     schema: satisfaction_ratings.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/schedules:
     schema: schedules.schema.yaml
     key:
-      - /_meta/row_id
+    - /_meta/row_id
   acmeCo/sla_policies:
     schema: sla_policies.schema.yaml
     key:
-      - /_meta/row_id
+    - /_meta/row_id
   acmeCo/tags:
     schema: tags.schema.yaml
     key:
-      - /_meta/row_id
+    - /_meta/row_id
   acmeCo/ticket_activities:
     schema: ticket_activities.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/ticket_audits:
     schema: ticket_audits.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/ticket_comments:
     schema: ticket_comments.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/ticket_fields:
     schema: ticket_fields.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/ticket_forms:
     schema: ticket_forms.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/ticket_metric_events:
     schema: ticket_metric_events.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/ticket_metrics:
     schema: ticket_metrics.schema.yaml
     key:
-      - /id
-  acmeCo/ticket_metrics_events:
-    schema: ticket_metrics_events.schema.yaml
-    key:
-      - /id
+    - /id
   acmeCo/ticket_skips:
     schema: ticket_skips.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/tickets:
     schema: tickets.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/topics:
     schema: topics.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/users:
     schema: users.schema.yaml
     key:
-      - /id
+    - /id
