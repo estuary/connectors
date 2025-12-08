@@ -1,11 +1,81 @@
 # ================================
 # Collection "acmeCo/test/capturewithnullcursor_662607": 5 Documents
 # ================================
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithnullcursor_662607","schema":"testdata","table":"capturewithnullcursor_662607"}},"data":"Another NULL cursor","id":2,"sort_col":null}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithnullcursor_662607","schema":"testdata","table":"capturewithnullcursor_662607"}},"data":"Third NULL cursor","id":4,"sort_col":null}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithnullcursor_662607","schema":"testdata","table":"capturewithnullcursor_662607"}},"data":"Value with NULL cursor","id":0,"sort_col":null}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithnullcursor_662607","schema":"testdata","table":"capturewithnullcursor_662607"}},"data":"Value with cursor 10","id":1,"sort_col":10}
-{"_meta":{"polled":"<TIMESTAMP>","index":99,"row_id":99,"source":{"resource":"capturewithnullcursor_662607","schema":"testdata","table":"capturewithnullcursor_662607"}},"data":"Value with cursor 20","id":3,"sort_col":20}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithnullcursor_662607",
+      "schema": "testdata",
+      "table": "capturewithnullcursor_662607"
+    }
+  },
+  "data": "Another NULL cursor",
+  "id": 2,
+  "sort_col": null
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithnullcursor_662607",
+      "schema": "testdata",
+      "table": "capturewithnullcursor_662607"
+    }
+  },
+  "data": "Third NULL cursor",
+  "id": 4,
+  "sort_col": null
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithnullcursor_662607",
+      "schema": "testdata",
+      "table": "capturewithnullcursor_662607"
+    }
+  },
+  "data": "Value with NULL cursor",
+  "id": 0,
+  "sort_col": null
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithnullcursor_662607",
+      "schema": "testdata",
+      "table": "capturewithnullcursor_662607"
+    }
+  },
+  "data": "Value with cursor 10",
+  "id": 1,
+  "sort_col": 10
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "capturewithnullcursor_662607",
+      "schema": "testdata",
+      "table": "capturewithnullcursor_662607"
+    }
+  },
+  "data": "Value with cursor 20",
+  "id": 3,
+  "sort_col": 20
+}
 # ================================
 # Final State Checkpoint
 # ================================
