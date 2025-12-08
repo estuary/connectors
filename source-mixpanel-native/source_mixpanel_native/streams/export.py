@@ -5,13 +5,14 @@
 import json
 import re
 from functools import cache
-from typing import Any, Iterable, Mapping, MutableMapping
+from typing import Any, Iterable, List, Mapping, MutableMapping, Optional
 
 import pendulum
 import requests
 from pendulum import Date
 
 from airbyte_cdk.models import SyncMode
+from airbyte_cdk.sources.streams.core import IncrementalMixin, StreamData
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
 from airbyte_cdk.sources.streams.http.auth import HttpAuthenticator
 
@@ -74,7 +75,7 @@ class ExportSchema(MixpanelStream):
             yield property_name
 
 
-class Export(DateSlicesMixin, IncrementalMixpanelStream):
+class Export(DateSlicesMixin, MixpanelStream, IncrementalMixin):
     """Export event data as it is received and stored within Mixpanel, complete with all event properties
      (including distinct_id) and the exact timestamp the event was fired.
 
@@ -88,6 +89,7 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
 
     primary_key: str = "insert_id"
     cursor_field: str = "time"
+    _cursor_value = ""
 
     transformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
 
@@ -122,6 +124,13 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
             **kwargs,
         )
 
+    @property
+    def state(self) -> Mapping[str, Any]:
+        return {self.cursor_field: self._cursor_value}
+
+    @state.setter
+    def state(self, value: Mapping[str, Any]):
+        self._cursor_value = value[self.cursor_field]
 
     @property
     def url_base(self):
@@ -238,3 +247,22 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None
     ) -> Mapping[str, Any]:
         return {"stream": True}
+
+    def read_records(
+        self,
+        sync_mode: SyncMode,
+        cursor_field: Optional[List[str]] = None,
+        stream_slice: Optional[Mapping[str, Any]] = None,
+        stream_state: Optional[Mapping[str, Any]] = None,
+    ) -> Iterable[StreamData]:
+        most_recent_cursor = self.state.get(self.cursor_field, None)
+
+        for record in super().read_records(sync_mode, cursor_field, stream_slice, stream_state):
+            yield record
+
+            record_cursor_value = record.get(self.cursor_field)
+
+            if record_cursor_value:
+                most_recent_cursor = max(record_cursor_value, most_recent_cursor)
+
+            self.state = {self.cursor_field: most_recent_cursor}

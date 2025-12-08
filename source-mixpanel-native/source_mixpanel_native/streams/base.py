@@ -200,7 +200,7 @@ class DateSlicesMixin:
         start_date = self.start_date
         cursor_value = None
 
-        if stream_state and self.cursor_field and self.cursor_field in stream_state:
+        if stream_state and self.cursor_field and self.cursor_field in stream_state and stream_state[self.cursor_field]:
             # Remove time part from state because API accept 'from_date' param in date format only ('YYYY-MM-DD')
             # It also means that sync returns duplicated entries for the date from the state (date range is inclusive)
             cursor_value = stream_state[self.cursor_field]
