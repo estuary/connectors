@@ -1002,6 +1002,7 @@ func (c *Capture) statusUpdate(status string) {
 		if err != nil {
 			log.WithError(err).Warn("error querying estimated row counts for backfill progress")
 			status += fmt.Sprintf(" (%d tables backfilling)", len(backfillingBindings))
+			status += fmt.Sprintf("\n\n<progress style=\"width:80%%\"></progress>")
 		} else {
 			// Sum up backfilled and estimated counts
 			var totalBackfilled, totalEstimated int
@@ -1021,9 +1022,11 @@ func (c *Capture) statusUpdate(status string) {
 				// Calculate and display percentage, clamped to 99% since we're still backfilling.
 				var percentage = min(float64(totalBackfilled)/float64(totalEstimated)*100, 99)
 				status += fmt.Sprintf(" (backfilled %.0f%% of %d tables)", percentage, len(backfillingBindings))
+				status += fmt.Sprintf("\n\n<progress value=\"%.0f\" max=\"100\" style=\"width:80%%\"></progress>", percentage)
 			} else {
 				// Fallback when some table sizes are unknown, to avoid giving bad data.
 				status += fmt.Sprintf(" (%d tables backfilling)", len(backfillingBindings))
+				status += fmt.Sprintf("\n\n<progress style=\"width:80%%\"></progress>")
 			}
 		}
 	}
