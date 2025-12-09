@@ -359,6 +359,10 @@ async def fetch_items_page(
     1. Initial: ItemsBackfillCursor(boards={"board1": False, "board2": False})
     2. After processing board1: {"board1": null} (merge patch to remove)
     3. Remaining state: ItemsBackfillCursor(boards={"board2": False})
+
+    If boards in the cursor are missing from the API (e.g., deleted or access removed),
+    this function will log a warning and skip them to ensure backfill completion. The log message
+    will include the IDs of the skipped boards for visibility.
     """
 
     assert page is None or isinstance(page, dict)
@@ -366,8 +370,11 @@ async def fetch_items_page(
 
     total_items_count = 0
     emitted_items_count = 0
+    filtered_items: list[dict] = []
+    items_per_board: dict[str, int] = {}
 
     if page is None:
+        log.info("Starting items backfill - enumerating all boards")
         board_ids = []
         async for board in fetch_boards_minimal(http, log):
             # Cannot query items for deleted boards, so we skip them
@@ -376,43 +383,56 @@ async def fetch_items_page(
                 board_ids.append(board.id)
 
         if not board_ids:
-            log.debug("No boards found for items backfill")
+            log.info("No boards found for items backfill - backfill complete")
             return
+
+        log.info(f"Items backfill initialized with {len(board_ids)} boards", {
+            "total_boards": len(board_ids),
+            "cutoff": cutoff.isoformat(),
+        })
 
         cursor = ItemsBackfillCursor.from_board_ids(board_ids)
         # Emit a cursor to checkpoint the complete dictionary of boards
         yield cursor.create_initial_cursor()
     else:
+        remaining = len(ItemsBackfillCursor.from_cursor_dict(page).boards)
+        log.info(f"Resuming items backfill with {remaining} boards remaining")
+
         temp_cursor = ItemsBackfillCursor.from_cursor_dict(page)
 
         # Only emit deletion patches when we actually have boards left to process.
         # Otherwise, we will never "complete" backfill and the UI will show 1 binding
         # is still backfilling since the function will be yielding a cursor before returning.
         if temp_cursor.get_next_boards(BOARDS_PER_ITEMS_PAGE):
-            # Identify deleted boards to exclude from processing since they can be deleted between
-            # invocation of the fetch_items_page and will cause continuous INTERNAL_SERVER_ERROR issues if not handled properly
-            deleted_board_ids = []
-            current_board_ids = set()
+            current_board_ids: set[str] = set()
+            deleted_board_ids: list[str] = []
+
             async for board in fetch_boards_minimal(http, log):
                 current_board_ids.add(board.id)
                 if board.state == "deleted" and board.id in page.keys():
                     deleted_board_ids.append(board.id)
 
-            # Also check for boards that existed in cursor but no longer exist at all.
-            # This has not happened yet, but might happen in the future if a board is deleted before being processed
-            # and the capture is disabled for 30+ days and Monday removes the board from the "Recycle Bin" which might
-            # mean the ID is no longer returned in the API response.
+            # Check for boards that existed in cursor but no longer exist in API
+            missing_board_ids: list[str] = []
             for board_id in page.keys():
                 if board_id not in current_board_ids:
-                    deleted_board_ids.append(board_id)
+                    missing_board_ids.append(board_id)
 
-            # Emit completion patch for deleted boards to mark them as done
-            if deleted_board_ids:
-                deleted_completion_patch = temp_cursor.create_completion_patch(deleted_board_ids)
-                yield deleted_completion_patch
-                log.debug(f"Marked {len(deleted_board_ids)} deleted boards as completed", {
-                    "deleted_board_ids": deleted_board_ids
+            # Log warnings for visibility when boards are being skipped
+            if missing_board_ids:
+                log.warning(f"Skipping {len(missing_board_ids)} boards no longer visible in API", {
+                    "missing_board_ids": missing_board_ids,
                 })
+                deleted_board_ids.extend(missing_board_ids)
+
+            if deleted_board_ids:
+                log.warning(f"Skipping {len(deleted_board_ids)} boards (missing or deleted)", {
+                    "skipped_board_ids": deleted_board_ids,
+                })
+                deleted_completion_patch = temp_cursor.create_completion_patch(
+                    deleted_board_ids
+                )
+                yield deleted_completion_patch
 
                 for board_id in deleted_board_ids:
                     page.pop(board_id, None)
@@ -425,34 +445,46 @@ async def fetch_items_page(
         log.debug("No boards to process for items backfill")
         return
 
-    log.debug(
-        f"{len(cursor.boards)} boards to process for items backfill. Backfilling items for {len(board_ids)} boards.",
-        {
-            "cutoff": cutoff.isoformat(),
-            "board_ids_for_page": board_ids,
-        },
-    )
+    total_boards = len(cursor.boards)
+    batch_size = len(board_ids)
+    log.info(f"Items backfill: processing batch of {batch_size} boards ({total_boards} total remaining)", {
+        "batch_board_ids": board_ids,
+        "total_remaining": total_boards,
+        "cutoff": cutoff.isoformat(),
+    })
 
     async for item in get_items_from_boards(http, log, board_ids):
         total_items_count += 1
+        board_id = item.board.id if item.board else "unknown"
+        items_per_board[board_id] = items_per_board.get(board_id, 0) + 1
+
         if item.updated_at <= cutoff and item.state != "deleted":
             emitted_items_count += 1
             yield item
+        else:
+            filtered_items.append({
+                "item_id": item.id,
+                "board_id": board_id,
+                "updated_at": item.updated_at.isoformat(),
+                "reason": "updated_at > cutoff" if item.updated_at > cutoff else f"state={item.state}",
+            })
 
-    log.debug(
-        f"Items backfill completed for {len(board_ids)} boards with {emitted_items_count} items out of {total_items_count} total items.",
-        {
-            "completed_boards": board_ids,
-            "remaining_boards": len(cursor.boards) - len(board_ids),
-            "emitted_items_count": emitted_items_count,
-            "total_items_count": total_items_count,
-        },
-    )
+    if filtered_items:
+        log.info(f"Filtered {len(filtered_items)} items with updated_at > cutoff or deleted state")
+
+    log.info("Items backfill batch complete", {
+        "processed_boards": board_ids,
+        "emitted_items": emitted_items_count,
+        "total_items_seen": total_items_count,
+        "filtered_items": len(filtered_items),
+        "remaining_boards": total_boards - batch_size,
+    })
 
     completion_patch = cursor.create_completion_patch(board_ids)
     yield completion_patch
 
     if len(cursor.boards) <= len(board_ids):
+        log.debug("Items backfill complete - all boards processed")
         return
 
 
