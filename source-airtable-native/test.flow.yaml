@@ -1,0 +1,13 @@
+captures:
+  acmeCo/source-airtable-native:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_airtable_native
+        config: 
+          credentials:
+            access_token_sops: placeholder
+            credentials_title: Private App Credentials
+    bindings: []
