@@ -1,0 +1,160 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AccessToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "AccessToken",
+          "type": "object"
+        },
+        "RotatingOAuth2Credentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "OAuth Credentials",
+              "default": "OAuth Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "refresh_token": {
+              "secret": true,
+              "title": "Refresh Token",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            },
+            "access_token_expires_at": {
+              "format": "date-time",
+              "title": "Access token expiration time.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret",
+            "refresh_token",
+            "access_token",
+            "access_token_expires_at"
+          ],
+          "title": "OAuth",
+          "type": "object",
+          "x-oauth2-provider": "airtable"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "OAuth Credentials": "#/$defs/RotatingOAuth2Credentials",
+              "Private App Credentials": "#/$defs/AccessToken"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/RotatingOAuth2Credentials"
+            },
+            {
+              "$ref": "#/$defs/AccessToken"
+            }
+          ],
+          "title": "Authentication"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        },
+        "schedule": {
+          "default": "",
+          "description": "Schedule to automatically refresh formula fields. Accepts a cron expression.",
+          "pattern": "^((?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?)(?:,(?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?))*)\\s+((?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?)(?:,(?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?))*)\\s+((?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?)(?:,(?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?))*)\\s+((?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?)(?:,(?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?))*)\\s+((?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?)(?:,(?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?))*)$|^$",
+          "title": "Formula Field Refresh Schedule",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "AirtableResourceConfigWithSchedule",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-airtable-native",
+    "oauth2": {
+      "provider": "airtable",
+      "authUrlTemplate": "https://airtable.com/oauth2/v1/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}&scope=data.records:read%20data.recordComments:read%20schema.bases:read&code_challenge={{#urlencode}}{{{ code_challenge }}}{{/urlencode}}&code_challenge_method=S256",
+      "accessTokenUrlTemplate": "https://airtable.com/oauth2/v1/token",
+      "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}&code_verifier={{#urlencode}}{{{ code_verifier }}}{{/urlencode}}",
+      "accessTokenHeaders": {
+        "Authorization": "Basic {{#basicauth}}{{{ client_id }}}:{{{ client_secret }}}{{/basicauth}}",
+        "content-type": "application/x-www-form-urlencoded"
+      },
+      "accessTokenResponseMap": {
+        "access_token": "/access_token",
+        "access_token_expires_at": "{{#now_plus}}{{ expires_in }}{{/now_plus}}",
+        "refresh_token": "/refresh_token"
+      }
+    },
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
