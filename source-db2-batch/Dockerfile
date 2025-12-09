@@ -4,6 +4,8 @@ ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 ################################################################################
 FROM golang:1.25-bookworm AS builder
 
+RUN apt-get update && apt-get install -y --no-install-recommends libxml2
+
 WORKDIR /builder
 
 # Download & compile dependencies early. Doing this separately allows for layer
@@ -26,8 +28,16 @@ COPY source-boilerplate ./source-boilerplate
 RUN go install -v ./go/...
 RUN go install -v ./source-boilerplate/...
 
-# Build the connector
 COPY source-db2-batch ./source-db2-batch
+
+# Run automated tests. To skip tests which interact with an external database,
+# specify `--build-arg TEST_DATABASE=no` in the Docker command line.
+ARG TEST_DATABASE=yes
+ENV TEST_DATABASE=$TEST_DATABASE
+ENV CI_BUILD=yes
+RUN go test -short -failfast ./source-db2-batch/...
+
+# Build the connector
 RUN go build -o ./connector -v ./source-db2-batch/...
 
 # Runtime Stage
@@ -39,7 +49,7 @@ ENV PATH="/connector:$PATH"
 
 # Install runtime dependencies for the DB2 clidriver
 USER root
-RUN apt-get update && apt-get install -y --no-install-recommends libxml2 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends libxml2
 
 # Copy the DB2 clidriver files needed at runtime
 COPY --from=builder /go/pkg/mod/github.com/ibmdb/clidriver /opt/ibm/clidriver

@@ -26,11 +26,11 @@ import (
 var (
 	dbName = flag.String("db_name", "testdb", "Connect to the named database for tests")
 
-	dbControlAddress = flag.String("db_control_addr", "127.0.0.1:50000", "The database server address to use for test setup/control operations")
+	dbControlAddress = flag.String("db_control_addr", "localhost:50000", "The database server address to use for test setup/control operations")
 	dbControlUser    = flag.String("db_control_user", "db2inst1", "The user for test setup/control operations")
 	dbControlPass    = flag.String("db_control_pass", "gf6w6dkD", "The password the the test setup/control user")
 
-	dbCaptureAddress = flag.String("db_capture_addr", "127.0.0.1:50000", "The database server address to use for test captures")
+	dbCaptureAddress = flag.String("db_capture_addr", "localhost:50000", "The database server address to use for test captures")
 	dbCaptureUser    = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
 	dbCapturePass    = flag.String("db_capture_pass", "secret1234", "The password for the capture user")
 
