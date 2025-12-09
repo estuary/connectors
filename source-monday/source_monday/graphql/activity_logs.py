@@ -90,14 +90,17 @@ async def _fetch_activity_logs_for_board_batch(
 ) -> AsyncGenerator[ActivityLog, None]:
     """
     Fetch activity logs for a batch of boards with null detection.
-    
+
     This function uses a two-pass approach:
     1. First pass: detect boards with null activity_logs (authorization issues)
     2. Second pass: stream actual activity logs from accessible boards
-    
+
     Note: Monday.com's limit is per-board, allowing efficient bulk requests.
     """
     page = 1
+    total_logs_processed = 0
+    total_parse_failures = 0
+    boards_with_null_logs: list[str] = []
 
     while True:
         variables: dict[str, Any] = {
@@ -125,19 +128,19 @@ async def _fetch_activity_logs_for_board_batch(
         ):
             if board.activity_logs is None:
                 null_tracker.track_board_with_null_field(board.id, "activity_logs")
+                boards_with_null_logs.append(board.id)
             elif board.activity_logs:
                 for activity_log in board.activity_logs:
                     try:
                         logs_in_page += 1
+                        total_logs_processed += 1
                         activity_log.query = ACTIVITY_LOGS
                         activity_log.query_variables = variables
                         yield activity_log
 
                     except (ValueError, TypeError) as e:
-                        if activity_log.created_at is not None:
-                            log.warning(
-                                f"Failed to parse activity log timestamp {activity_log.created_at}: {e}"
-                            )
+                        total_parse_failures += 1
+                        log.warning(f"Failed to parse activity log: {e}")
                         continue
 
         if logs_in_page == 0:
@@ -147,7 +150,12 @@ async def _fetch_activity_logs_for_board_batch(
             break
 
         page += 1
-        log.debug(f"Page {page - 1}: processed {logs_in_page} activity logs")
+
+    if total_parse_failures > 0:
+        log.warning(f"Activity log processing had {total_parse_failures} parse failures out of {total_logs_processed}")
+
+    if boards_with_null_logs:
+        log.warning(f"Activity logs inaccessible for {len(boards_with_null_logs)} boards (authorization issue)")
 
 
 ACTIVITY_LOGS = """
