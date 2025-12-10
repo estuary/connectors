@@ -61,7 +61,7 @@ async fn test_http_request_processing() -> Result<(), anyhow::Error> {
         // This is just easier than having it listen on a random port and then
         // needing to figure out what it is by parsing log output.
         .env("SOURCE_HTTP_INGEST_PORT", "27172")
-        .env("LOG_LEVEL", "debug")
+        .env("LOG_LEVEL", "info")
         .env("RUST_BACKTRACE", "1")
         .spawn()?;
 
@@ -155,9 +155,7 @@ async fn run_http_request_processing(
                 } else if *binding == 1 {
                     b_docs += 1;
                 } else {
-                    anyhow::bail!(
-                        "got document with unexpected binding {binding}: {doc_json:?}",
-                    );
+                    anyhow::bail!("got document with unexpected binding {binding}: {doc_json:?}",);
                 }
             }
             _ => {
