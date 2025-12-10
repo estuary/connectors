@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, Callable, Generic, List, TypeVar
+from typing import Any, AsyncGenerator, Callable, Generic, List, Optional, TypeVar
 
 import ijson
 from pydantic import BaseModel
@@ -73,11 +73,13 @@ class IncrementalJsonProcessor(Generic[StreamedItem, Remainder]):
         prefix: str,
         streamed_item_cls: type[StreamedItem],
         remainder_cls: type[Remainder] = _NoopRemainder,
+        validation_context: Optional[object] = None,
     ):
         self.input = input
         self.prefix = prefix
         self.streamed_item_cls = streamed_item_cls
         self.remainder_cls = remainder_cls
+        self.validation_context = validation_context
         self.parser = ijson.parse_async(
             _AsyncStreamWrapper(input),
             multiple_values=True,
@@ -102,7 +104,7 @@ class IncrementalJsonProcessor(Generic[StreamedItem, Remainder]):
             self.remainder_builder.event(event, value)
 
         if event not in ("start_map", "start_array"):
-            return self.streamed_item_cls.model_validate(value)
+            return self.streamed_item_cls.model_validate(value, context=self.validation_context)
 
         depth = 1
         obj = _ObjectBuilder()
@@ -118,7 +120,7 @@ class IncrementalJsonProcessor(Generic[StreamedItem, Remainder]):
             elif event in ("end_map", "end_array"):
                 depth -= 1
 
-        return self.streamed_item_cls.model_validate(obj.get_value())
+        return self.streamed_item_cls.model_validate(obj.get_value(), context=self.validation_context)
 
     def get_remainder(self) -> Remainder:
         if not self.done:
