@@ -4,6 +4,7 @@ import (
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -235,6 +236,68 @@ func TestValidHost(t *testing.T) {
 	} {
 		t.Run(tt.host, func(t *testing.T) {
 			require.Equal(t, tt.want, validHost(tt.host))
+		})
+	}
+}
+
+func TestRetry(t *testing.T) {
+	var ErrTemporary = errors.New("temporary error")
+	var ErrPermanent = errors.New("permenant error")
+	tests := []struct {
+		name         string
+		succeedAfter int
+		returnError  error
+		attempts     int
+		err          bool
+	}{
+		{
+			name:         "success",
+			succeedAfter: 1,
+			returnError:  &TemporaryError{ErrTemporary},
+			attempts:     1,
+			err:          false,
+		},
+		{
+			name:         "eventual success",
+			succeedAfter: 3,
+			returnError:  &TemporaryError{ErrTemporary},
+			attempts:     3,
+			err:          false,
+		},
+		{
+			name:         "failure",
+			succeedAfter: 6,
+			returnError:  &TemporaryError{ErrTemporary},
+			attempts:     5,
+			err:          true,
+		},
+		{
+			name:         "permanent-failure",
+			succeedAfter: 6,
+			returnError:  ErrPermanent,
+			attempts:     1,
+			err:          true,
+		},
+	}
+	var testDelays = []float64{0.0, 0.0, 0.0, 0.0, 0.0}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			attempts := 0
+			err := Retry[*TemporaryError](testDelays, func() error {
+				attempts++
+				if attempts >= tt.succeedAfter {
+					return nil
+				}
+				return tt.returnError
+			})
+
+			if tt.err {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
+			require.Equal(t, tt.attempts, attempts)
 		})
 	}
 }

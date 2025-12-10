@@ -252,7 +252,12 @@ ALTER TABLE {{$.Identifier}} ALTER COLUMN
 
 {{ define "loadQuery" }}
 {{ if $.Table.Document -}}
-SELECT {{ $.Table.Binding }}, TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }})
+SELECT {{ $.Table.Binding }},
+	ROW_NUMBER() OVER (ORDER BY {{range $ind, $key := $.Table.Keys }}
+	{{- if $ind }}, {{end -}}
+	{{ $.Table.Identifier }}.{{ $key.Identifier }}
+	{{- end}}) AS row_number,
+	TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Document.Identifier }})
 	FROM {{ $.Table.Identifier }}
 	JOIN (
 		SELECT {{ range $ind, $bound := $.Bounds }}
@@ -266,6 +271,10 @@ SELECT {{ $.Table.Binding }}, TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Docume
 	{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 	{{- end }}
+	ORDER BY {{range $ind, $key := $.Table.Keys }}
+	{{- if $ind }}, {{end -}}
+	{{ $.Table.Identifier }}.{{ $key.Identifier }}
+	{{- end}}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{ end -}}
@@ -289,7 +298,11 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 {{- end }}
 
 {{ define "loadQueryNoFlowDocument" }}
-SELECT {{ $.Table.Binding }}, 
+SELECT {{ $.Table.Binding }},
+ROW_NUMBER() OVER (ORDER BY {{range $ind, $key := $.Table.Keys }}
+{{- if $ind }}, {{end -}}
+{{ $.Table.Identifier }}.{{ $key.Identifier }}
+{{- end}}) AS row_number,
 OBJECT_CONSTRUCT(
 {{- range $i, $col := $.Table.RootLevelColumns}}
 	{{- if $i}},{{end}}
@@ -309,6 +322,10 @@ JOIN (
 {{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 {{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
+ORDER BY {{range $ind, $key := $.Table.Keys }}
+{{- if $ind }}, {{end -}}
+{{ $.Table.Identifier }}.{{ $key.Identifier }}
+{{- end}}
 {{ end }}
 
 {{ define "createPipe" }}
