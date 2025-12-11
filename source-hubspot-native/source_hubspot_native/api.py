@@ -1861,14 +1861,14 @@ async def _request_all_contact_list_memberships(
 
         async def dispatcher() -> None:
             for contact_list in all_lists:
-                await control.task_slots.acquire()
-                tg.create_task(
+                _ = await control.task_slots.acquire()
+                _ = tg.create_task(
                     _list_memberships_worker(
                         http, log, contact_list, control, start, end
                     )
                 )
 
-        tg.create_task(dispatcher())
+        _ = tg.create_task(dispatcher())
 
         while True:
             item = await control.results.get()
