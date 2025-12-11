@@ -1856,6 +1856,8 @@ async def _request_all_contact_list_memberships(
             end,
         )
     ]
+    if not all_lists:
+        return
 
     async with asyncio.TaskGroup() as tg:
 
