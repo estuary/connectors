@@ -765,7 +765,6 @@ mod tests {
         String::from_utf8(buf).unwrap()
     }
 
-    /// Test integration with actual BSON transcoding
     fn transcode_bson_to_sanitized_json(doc: &bson::Document, is_root: bool) -> String {
         let bson_bytes = doc.to_vec().unwrap();
         let raw_doc = bson::raw::RawDocument::from_bytes(&bson_bytes).unwrap();
@@ -886,8 +885,6 @@ mod tests {
         });
         let result = serialize_to_string(&value, false);
         let parsed: serde_json::Value = serde_json::from_str(&result).unwrap();
-        // When not root, _id should remain as extended JSON (but $oid itself gets sanitized)
-        // Actually, the nested {"$oid": ...} will be sanitized anyway
         assert_eq!(parsed["_id"], "507f1f77bcf86cd799439011");
     }
 
@@ -1028,10 +1025,6 @@ mod tests {
         assert_eq!(parsed["refs"][0], "507f1f77bcf86cd799439011");
         assert_eq!(parsed["refs"][1], "507f1f77bcf86cd799439012");
     }
-
-    // ==========================================================================
-    // id_to_string tests (moved from sanitize.rs)
-    // ==========================================================================
 
     #[test]
     fn test_id_to_string_string() {
