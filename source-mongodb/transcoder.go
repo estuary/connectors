@@ -116,6 +116,9 @@ func (t *Transcoder) writeChangeEvent(raw bson.Raw) error {
 	if _, err := t.stdin.Write(raw); err != nil {
 		return err
 	}
+	if err := t.stdin.Flush(); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -149,6 +152,9 @@ func (t *Transcoder) writeRawDocument(raw bson.Raw, database, collection string)
 		return err
 	}
 	if _, err := t.stdin.Write(raw); err != nil {
+		return err
+	}
+	if err := t.stdin.Flush(); err != nil {
 		return err
 	}
 	return nil
