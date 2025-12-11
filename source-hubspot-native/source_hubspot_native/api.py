@@ -1729,12 +1729,13 @@ async def fetch_contact_lists(
     now = datetime.now(tz=UTC)
 
     async for item in _request_contact_lists_in_time_range(http, log, True, start_date):
-        log.info("Processing contact list", {"listId": item.listId})
+        log.debug("processing contact list", {"listId": item.listId})
         timestamp = _ms_to_dt(int(item.additionalProperties["hs_lastmodifieddate"]))
 
         if cache.should_yield(Names.contact_lists, item.listId, timestamp):
             yield item
 
+    log.info("fetched all contact lists")
     yield now
 
 
@@ -1794,8 +1795,8 @@ async def _list_memberships_worker(
         ):
             await context.results.put(item)
 
-        log.info(
-            "Finished fetching memberships for list",
+        log.debug(
+            "finished fetching memberships for list",
             {"listId": contact_list.listId},
         )
         await context.results.put(None)
@@ -1835,7 +1836,7 @@ async def _request_all_contact_list_memberships(
     http: HTTPSession, log: Logger, start: datetime, end: datetime | None = None
 ) -> AsyncGenerator[ContactListMembership, None]:
     log.info(
-        "Fetching contact list memberships",
+        "fetching contact list memberships",
         {
             "start": start.isoformat(),
             "end": end.isoformat() if end else None,
@@ -1880,6 +1881,8 @@ async def _request_all_contact_list_memberships(
                     break
             else:
                 yield item
+
+        log.info("fetched all list memberships")
 
 
 async def fetch_contact_list_memberships_page(
