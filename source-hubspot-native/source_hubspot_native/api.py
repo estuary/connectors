@@ -1749,18 +1749,19 @@ async def _request_contact_list_memberships(
     url = f"{HUB}/crm/v3/lists/{contact_list.listId}/memberships"
     params = {"limit": 250}
 
-    response = ContactListMembershipResponse.model_validate_json(
-        await http.request(log, url, params=params),
-        context=contact_list,
-    )
+    while True:
+        response = ContactListMembershipResponse.model_validate_json(
+            await http.request(log, url, params=params),
+            context=contact_list,
+        )
 
-    for item in response.results:
-        if item.membershipTimestamp < start:
-            continue
-        if end and item.membershipTimestamp >= end:
-            continue
+        for item in response.results:
+            if item.membershipTimestamp < start:
+                continue
+            if end and item.membershipTimestamp >= end:
+                continue
 
-        yield item
+            yield item
 
         if (next_cursor := response.get_next_cursor()) is None:
             break
