@@ -555,6 +555,26 @@ def validated(
     )
 
 
+def _get_min_incremental_cursor(state: ResourceState) -> datetime | None:
+    """Extract the minimum incremental cursor from a ResourceState.
+
+    Returns the minimum datetime cursor if a valid one can be determined, None otherwise.
+    Handles both single incremental task (state.inc is ResourceState.Incremental)
+    and multiple incremental tasks (state.inc is a dict).
+    """
+    if isinstance(state.inc, ResourceState.Incremental):
+        if isinstance(state.inc.cursor, datetime):
+            return state.inc.cursor
+    elif isinstance(state.inc, dict):
+        min_cursor: datetime | None = None
+        for inc_state in state.inc.values():
+            if isinstance(inc_state, ResourceState.Incremental) and isinstance(inc_state.cursor, datetime):
+                if min_cursor is None or inc_state.cursor < min_cursor:
+                    min_cursor = inc_state.cursor
+        return min_cursor
+    return None
+
+
 def open(
     open: request.Open[Any, _ResourceConfig, _ConnectorState],
     resolved_bindings: list[
@@ -619,18 +639,21 @@ def open(
 
             if should_initialize:
                 if is_connector_initiated:
-                # In the most commmon case of a single fetch_changes and a single fetch_pages,
-                # coordinate the initialized backfill's cutoff with the current incremental state's cursor.
+                    # Attempt to coordinate the initialized backfill's cutoff with the current incremental
+                    # state's cursor(s), preserving the incremental cursor position(s).
+                    min_cursor = _get_min_incremental_cursor(state) if state else None
+                    initial_backfill_state = resource.initial_state.backfill
+
+                    # Check if we can coordinate the backfill cutoff with the incremental cursor.
+                    # We currently only perform this coordination when there's a single backfill task.
                     if (
-                        isinstance(resource.initial_state.backfill, ResourceState.Backfill) and
-                        isinstance(resource.initial_state.backfill.cutoff, datetime) and
                         state and
-                        isinstance(state.inc, ResourceState.Incremental) and
-                        isinstance(state.inc.cursor, datetime)
+                        min_cursor is not None and
+                        isinstance(initial_backfill_state, ResourceState.Backfill) and
+                        isinstance(initial_backfill_state.cutoff, datetime)
                     ):
-                        initialized_backfill_state = resource.initial_state.backfill
-                        initialized_backfill_state.cutoff = state.inc.cursor
-                        state.backfill = initialized_backfill_state.model_copy(deep=True)
+                        state.backfill = initial_backfill_state.model_copy(deep=True)
+                        state.backfill.cutoff = min_cursor
                     # In all other cases, wipe the state back to the initial state.
                     else:
                         state = resource.initial_state.model_copy(deep=True)
