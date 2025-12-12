@@ -27,7 +27,7 @@ const (
 )
 
 // SizedText is compatible with any column with the same
-// ColumnType and has at least SizeByte reserved for the string.
+// ColumnType and has at least Size reserved for the string.
 type SizedText struct {
 	// Type of the column, varchar or nvarchar
 	ColumnType string
@@ -60,6 +60,11 @@ func (s *SizedText) Compatible(existing boilerplate.ExistingField) bool {
 	// 2^31-1 bytes for storage.
 	if existing.CharacterMaxLength == MaxStringSize {
 		return true
+	}
+
+	// If we need a MAX size column then the existing column must also be MAX size.
+	if s.Size == MaxStringSize {
+		return existing.CharacterMaxLength == MaxStringSize
 	}
 
 	return existing.CharacterMaxLength >= s.Size
