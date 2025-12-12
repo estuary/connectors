@@ -1774,7 +1774,9 @@ class ContactListMembershipControl:
 
     # We expect users to have tens of thousands of lists to fetch.
     # This semaphore limits the number of tasks we keep in memory at any given time
-    task_slots: asyncio.Semaphore = field(default_factory=lambda: asyncio.Semaphore(5))
+    task_slots: asyncio.Semaphore = field(
+        default_factory=lambda: asyncio.Semaphore(300)
+    )
     results: asyncio.Queue[ContactListMembership | None] = field(
         default_factory=lambda: asyncio.Queue(1)
     )
