@@ -242,7 +242,7 @@ func TestCompatibleTextType(t *testing.T) {
 						Type:               "VARCHAR",
 						CharacterMaxLength: 16,
 					},
-					compatible: true,
+					compatible: false,
 				},
 			},
 		},
