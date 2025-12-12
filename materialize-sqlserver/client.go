@@ -122,7 +122,7 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 				queries,
 				fmt.Sprintf(
 					"EXEC sp_rename '%s.%s', '%s', 'COLUMN';",
-					table.Path[0],
+					table.Identifier,
 					tempColumn,
 					ins.TypeMigration.Field,
 				),
