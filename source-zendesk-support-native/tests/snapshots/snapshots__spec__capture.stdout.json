@@ -3,20 +3,6 @@
     "protocol": 3032023,
     "configSchema": {
       "$defs": {
-        "Advanced": {
-          "properties": {
-            "incremental_export_page_size": {
-              "default": 1000,
-              "description": "Page size for incremental export streams. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
-              "exclusiveMinimum": 0,
-              "maximum": 1000,
-              "title": "Incremental Export Streams' Page Size",
-              "type": "integer"
-            }
-          },
-          "title": "Advanced",
-          "type": "object"
-        },
         "ApiToken": {
           "properties": {
             "credentials_title": {
@@ -152,12 +138,6 @@
             }
           ],
           "title": "Authentication"
-        },
-        "advanced": {
-          "$ref": "#/$defs/Advanced",
-          "advanced": true,
-          "description": "Advanced settings for the connector.",
-          "title": "Advanced Config"
         }
       },
       "required": [
