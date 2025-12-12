@@ -5,7 +5,7 @@ from logging import Logger
 from typing import Any, AsyncGenerator
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import Headers, HeadersAndBodyGenerator, HTTPSession, HTTPError
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from .models import (
@@ -37,7 +37,9 @@ from .models import (
 
 CHECKPOINT_INTERVAL = 1000
 CURSOR_PAGINATION_PAGE_SIZE = 100
+MAX_INCREMENTAL_EXPORT_PAGE_SIZE = 1000
 MAX_SATISFACTION_RATINGS_WINDOW_SIZE = timedelta(days=30)
+MIN_PAGE_SIZE = 1
 # Zendesk errors out if a start or end time parameter is 60 seconds or less in the past. 
 TIME_PARAMETER_DELAY = timedelta(seconds=61)
 
@@ -551,12 +553,59 @@ async def backfill_incremental_time_export_resources(
             yield result
 
 
+def _is_upstream_timeout(
+    status: int,
+    body: str
+) -> bool:
+    return status == 504 and "upstream request timeout" in body
+
+
+def _should_retry_incremental_cursor_export_response(
+    status: int,
+    headers: Headers,
+    body: bytes,
+    attempt: int,
+) -> bool:
+    # If the response has a 504 status code and a body stating
+    # an upstream timeout was reached, that usually means that
+    # too much data was requested and a timeout was reached before
+    # the API server sent a response. To get around these timeouts,
+    # the connector should make a new request for less data.
+    return not _is_upstream_timeout(status, str(body))
+
+
+async def _do_incremental_cursor_export_request(
+    http: HTTPSession,
+    url: str,
+    params: dict[str, str | int],
+    log: Logger,
+) -> HeadersAndBodyGenerator:
+    params = params.copy()
+
+    page_size = MAX_INCREMENTAL_EXPORT_PAGE_SIZE
+    while page_size >= MIN_PAGE_SIZE:
+        params["per_page"] = page_size
+
+        try:
+            return await http.request_stream(log, url, params=params, should_retry=_should_retry_incremental_cursor_export_response)
+        except HTTPError as err:
+            if _is_upstream_timeout(err.code, err.message):
+                log.debug("Received 504 upstream timeout response (will retry with a smaller page size)", {
+                    "url": url,
+                    "params": params,
+                })
+                page_size = page_size // 2
+            else:
+                raise
+
+    raise Exception(f"Request to {url} failed with smallest possible page size. Query parameters were {params}")
+
+
 async def _fetch_incremental_cursor_export_resources(
     http: HTTPSession,
     subdomain: str,
     name: INCREMENTAL_CURSOR_EXPORT_TYPES,
     start_date: datetime | None,
-    page_size: int,
     cursor: str | None,
     log: Logger,
     sideload_params: dict[str, str] | None = None,
@@ -572,9 +621,7 @@ async def _fetch_incremental_cursor_export_resources(
         case _:
             raise RuntimeError(f"Unknown incremental cursor pagination resource type {name}.")
 
-    params: dict[str, str | int] = {
-        "per_page": page_size,
-    }
+    params: dict[str, str | int] = {}
 
     if sideload_params:
         params.update(sideload_params)
@@ -586,7 +633,7 @@ async def _fetch_incremental_cursor_export_resources(
         params["cursor"] = _base64_encode(cursor)
 
     while True:
-        _, body = await http.request_stream(log, url, params=params)
+        _, body = await _do_incremental_cursor_export_request(http, url, params, log)
         processor = IncrementalJsonProcessor(
             body(),
             f"{name}.item",
@@ -618,7 +665,6 @@ async def fetch_incremental_cursor_export_resources(
     http: HTTPSession,
     subdomain: str,
     name: INCREMENTAL_CURSOR_EXPORT_TYPES,
-    page_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -632,7 +678,7 @@ async def fetch_incremental_cursor_export_resources(
         start_date = _s_to_dt(int(cursor))
         cursor = None
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, page_size, cursor, log)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, cursor, log)
 
     async for result in generator:
         if isinstance(result, str):
@@ -646,7 +692,6 @@ async def backfill_incremental_cursor_export_resources(
     subdomain: str,
     name: INCREMENTAL_CURSOR_EXPORT_TYPES,
     start_date: datetime,
-    page_size: int,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
@@ -655,7 +700,7 @@ async def backfill_incremental_cursor_export_resources(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, page_size, page, log)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, name, start_date, page, log)
 
     async for result in generator:
         if isinstance(result, str) or result.updated_at < cutoff:
@@ -699,7 +744,6 @@ async def fetch_ticket_child_resources(
     subdomain: str,
     path: str,
     response_model: type[IncrementalCursorPaginatedResponse],
-    page_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ZendeskResource | LogCursor, None]:
@@ -713,7 +757,7 @@ async def fetch_ticket_child_resources(
         start_date = _s_to_dt(int(cursor))
         cursor = None
 
-    tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page_size, cursor, log)
+    tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, cursor, log)
 
     tickets: list[AbbreviatedTicket] = []
 
@@ -754,7 +798,6 @@ async def backfill_ticket_child_resources(
     path: str,
     response_model: type[IncrementalCursorPaginatedResponse],
     start_date: datetime,
-    page_size: int,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
@@ -763,7 +806,7 @@ async def backfill_ticket_child_resources(
         assert isinstance(page, str)
     assert isinstance(cutoff, datetime)
 
-    tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page_size, page, log)
+    tickets_generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log)
 
     tickets: list[AbbreviatedTicket] = []
 
@@ -888,7 +931,6 @@ async def backfill_audit_logs(
 async def fetch_ticket_metrics(
     http: HTTPSession,
     subdomain: str,
-    page_size: int,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ZendeskResource | LogCursor, None]:
@@ -906,7 +948,7 @@ async def fetch_ticket_metrics(
         "include": "metric_sets"
     }
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page_size, cursor, log, sideload_params)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, cursor, log, sideload_params)
 
     async for result in generator:
         if isinstance(result, str):
@@ -922,7 +964,6 @@ async def backfill_ticket_metrics(
     http: HTTPSession,
     subdomain: str,
     start_date: datetime,
-    page_size: int,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
@@ -935,7 +976,7 @@ async def backfill_ticket_metrics(
         "include": "metric_sets"
     }
 
-    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page_size, page, log, sideload_params)
+    generator = _fetch_incremental_cursor_export_resources(http, subdomain, "tickets", start_date, page, log, sideload_params)
 
     async for result in generator:
 
