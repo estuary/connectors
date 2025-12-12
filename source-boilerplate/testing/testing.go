@@ -382,6 +382,7 @@ type CaptureValidator interface {
 type SortedCaptureValidator struct {
 	IncludeSourcedSchemas bool // When true, collection data includes sourced schema updates
 	PrettyDocuments       bool // When true, pretty-prints output documents
+	NormalizeJSON         bool // When true, sorts JSON object keys in output documents
 
 	sourcedSchemas map[string][]json.RawMessage // Map from collection name to list of sourced schemas
 	documents      map[string][]json.RawMessage // Map from collection name to list of documents
@@ -405,13 +406,8 @@ func (v *SortedCaptureValidator) Output(collection string, data json.RawMessage)
 	if v.documents == nil {
 		v.documents = make(map[string][]json.RawMessage)
 	}
-	// Normalize the JSON to ensure consistent key ordering for snapshots
-	normalized, err := normalizeJSON(data)
-	if err != nil {
-		// If normalization fails, use the original data
-		normalized = append([]byte(nil), data...)
-	}
-	v.documents[collection] = append(v.documents[collection], normalized)
+	data = append([]byte(nil), data...) // Ensure we have our own copy of the data
+	v.documents[collection] = append(v.documents[collection], data)
 }
 
 // Summarize writes a human-readable / snapshottable summary of the documents observed by the CaptureValidator.
@@ -449,6 +445,13 @@ func (v *SortedCaptureValidator) Summarize(w io.Writer) error {
 				}
 			}
 			for _, doc := range sortedDocs {
+				if v.NormalizeJSON {
+					normalized, err := normalizeJSON(json.RawMessage(doc))
+					if err != nil {
+						return err
+					}
+					doc = string(normalized)
+				}
 				if err := enc.Encode(json.RawMessage(doc)); err != nil {
 					return err
 				}
@@ -458,6 +461,13 @@ func (v *SortedCaptureValidator) Summarize(w io.Writer) error {
 				fmt.Fprintf(w, "%s\n", schema)
 			}
 			for _, doc := range sortedDocs {
+				if v.NormalizeJSON {
+					normalized, err := normalizeJSON(json.RawMessage(doc))
+					if err != nil {
+						return err
+					}
+					doc = string(normalized)
+				}
 				fmt.Fprintf(w, "%s\n", doc)
 			}
 		}
@@ -476,6 +486,7 @@ func (v *SortedCaptureValidator) Reset() {
 type OrderedCaptureValidator struct {
 	IncludeSourcedSchemas bool // When true, collection data includes sourced schema updates
 	PrettyDocuments       bool // When true, pretty-prints output documents
+	NormalizeJSON         bool // When true, sorts JSON object keys in output documents
 
 	documents map[string][]json.RawMessage // Map from collection name to list of documents
 }
@@ -495,13 +506,8 @@ func (v *OrderedCaptureValidator) Output(collection string, data json.RawMessage
 	if v.documents == nil {
 		v.documents = make(map[string][]json.RawMessage)
 	}
-	// Normalize the JSON to ensure consistent key ordering for snapshots
-	normalized, err := normalizeJSON(data)
-	if err != nil {
-		// If normalization fails, use the original data
-		normalized = append([]byte(nil), data...)
-	}
-	v.documents[collection] = append(v.documents[collection], normalized)
+	data = append([]byte(nil), data...) // Ensure we have our own copy of the data
+	v.documents[collection] = append(v.documents[collection], data)
 }
 
 // Summarize writes a human-readable / snapshottable summary of the documents observed by the CaptureValidator.
@@ -521,12 +527,26 @@ func (v *OrderedCaptureValidator) Summarize(w io.Writer) error {
 			enc.SetEscapeHTML(false)
 			enc.SetIndent("", "  ")
 			for _, doc := range v.documents[collection] {
+				if v.NormalizeJSON {
+					normalized, err := normalizeJSON(json.RawMessage(doc))
+					if err != nil {
+						return err
+					}
+					doc = normalized
+				}
 				if err := enc.Encode(doc); err != nil {
 					return err
 				}
 			}
 		} else {
 			for _, doc := range v.documents[collection] {
+				if v.NormalizeJSON {
+					normalized, err := normalizeJSON(json.RawMessage(doc))
+					if err != nil {
+						return err
+					}
+					doc = json.RawMessage(normalized)
+				}
 				fmt.Fprintf(w, "%s\n", doc)
 			}
 		}
