@@ -158,7 +158,7 @@
           "ticket_access_selected_brands": [],
           "ticket_access_selected_groups": []
         },
-        "export_views": false,
+        "export_views": true,
         "forum_access": "readonly",
         "forum_access_restricted_content": false,
         "group_access": false,
