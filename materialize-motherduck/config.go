@@ -77,6 +77,10 @@ func (c config) Validate() error {
 			}
 		}
 
+		if _, err := url.Parse(c.StagingBucket.Endpoint); err != nil {
+			return fmt.Errorf("unable to parse endpoint: %w", err)
+		}
+
 		// The bucket name must not contain any dots, since this breaks server
 		// certificate validation on MotherDuck's side.
 		if strings.Contains(c.StagingBucket.BucketS3, ".") {
@@ -180,6 +184,7 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
             if err != nil {
                 return nil, err
             }
+			
 			// Custom endpoint for S3-compatible storage (e.g. Cloudflare R2).
 			// Use path-style URLs since most S3-compatible services require this.
 			createTempSecret = fmt.Sprintf(`CREATE SECRET IF NOT EXISTS (
