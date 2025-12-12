@@ -1170,7 +1170,7 @@ async def _binding_incremental_task(
 
         if pending:
             raise RuntimeError(
-                "Implementation error: FetchChangesFn yielded a documents without a final LogCursor",
+                "Implementation error: FetchChangesFn yielded documents without a final LogCursor",
             )
 
         if not checkpoints:
