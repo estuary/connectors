@@ -144,10 +144,10 @@ func (s captureState) Validate() error {
 }
 
 type streamState struct {
-	Disabled       bool   `json:"disabled,omitempty"` // True when there is no longer a binding corresponding to this table
-	UniqueID       string `json:"uid"`                // The unique identifier for staging resources of this stream.
-	SequenceNumber int    `json:"seq"`                // The sequence number of the current/next staging table to capture.
-	TableOffset    int    `json:"off"`                // The offset within the current staging table.
+	Disabled       bool   `json:"disabled"` // True when there is no longer a binding corresponding to this table
+	UniqueID       string `json:"uid"`      // The unique identifier for staging resources of this stream.
+	SequenceNumber int    `json:"seq"`      // The sequence number of the current/next staging table to capture.
+	TableOffset    int    `json:"off"`      // The offset within the current staging table.
 }
 
 func (c *capture) Run(ctx context.Context) error {
