@@ -1,16 +1,16 @@
 # ================================
 # Collection "acmeCo/test/incrementalView": 10 Documents
 # ================================
-{"_id":"0","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 0"}
-{"_id":"1","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 1"}
-{"_id":"2","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 2"}
-{"_id":"3","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 3"}
-{"_id":"4","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 4"}
-{"_id":"5","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 5"}
-{"_id":"6","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 6"}
-{"_id":"7","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 7"}
-{"_id":"8","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 8"}
-{"_id":"9","_meta":{"op":"c","source":{"db":"testDb","collection":"incrementalView","snapshot":true}},"value":"value 9"}
+{"_id":"0","_meta":{"op":"c","snapshot":true,"source":{"collection":"incrementalView","db":"testDb"}},"value":"value 0"}
+{"_id":"1","_meta":{"op":"c","snapshot":true,"source":{"collection":"incrementalView","db":"testDb"}},"value":"value 1"}
+{"_id":"2","_meta":{"op":"c","snapshot":true,"source":{"collection":"incrementalView","db":"testDb"}},"value":"value 2"}
+{"_id":"3","_meta":{"op":"c","snapshot":true,"source":{"collection":"incrementalView","db":"testDb"}},"value":"value 3"}
+{"_id":"4","_meta":{"op":"c","snapshot":true,"source":{"collection":"incrementalView","db":"testDb"}},"value":"value 4"}
+{"_id":"5","_meta":{"op":"c","snapshot":true,"source":{"collection":"incrementalView","db":"testDb"}},"value":"value 5"}
+{"_id":"6","_meta":{"op":"c","snapshot":true,"source":{"collection":"incrementalView","db":"testDb"}},"value":"value 6"}
+{"_id":"7","_meta":{"op":"c","snapshot":true,"source":{"collection":"incrementalView","db":"testDb"}},"value":"value 7"}
+{"_id":"8","_meta":{"op":"c","snapshot":true,"source":{"collection":"incrementalView","db":"testDb"}},"value":"value 8"}
+{"_id":"9","_meta":{"op":"c","snapshot":true,"source":{"collection":"incrementalView","db":"testDb"}},"value":"value 9"}
 # ================================
 # Final State Checkpoint
 # ================================

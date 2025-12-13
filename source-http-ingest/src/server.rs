@@ -6,19 +6,14 @@ use axum::{
     extract::{DefaultBodyLimit, Json, Path, Query, State},
     routing, Router,
 };
-use doc::Annotation;
+use doc::Validator;
 use http::{header::InvalidHeaderValue, status::StatusCode, HeaderValue};
-use json::validator::Validator;
-use models::RawValue;
 use serde_json::Value;
 use tower_http::{cors, decompression::RequestDecompressionLayer};
 use utoipa::openapi::{self, schema, security, OpenApi, OpenApiBuilder, Type};
 use utoipa_swagger_ui::SwaggerUi;
 
-use std::{
-    collections::{BTreeMap, HashMap},
-    sync::Arc,
-};
+use std::{collections::HashMap, sync::Arc};
 use tokio::io;
 use tokio::sync::Mutex;
 
@@ -170,8 +165,7 @@ async fn handle_webhook(
 }
 
 struct CollectionHandler {
-    schema_url: url::Url,
-    schema_index: json::schema::index::Index<'static, doc::Annotation>,
+    validator: Validator,
     binding_index: u32,
     id_header: Option<String>,
     /// The path from the resource configuration for this binding, which will be
@@ -198,7 +192,7 @@ fn required_string_header<'a>(
 
 /// Known locations where we populate metadata in the documents we capture.
 mod pointers {
-    use doc::Pointer;
+    use json::Pointer;
 
     lazy_static::lazy_static! {
         pub static ref ID: Pointer = Pointer::from_str("/_meta/webhookId");
@@ -228,14 +222,16 @@ impl CollectionHandler {
         headers: serde_json::Map<String, Value>,
         query_params: serde_json::Map<String, Value>,
         ts: String,
-    ) -> anyhow::Result<(u32, String)> {
-        // If the object already contains a _meta property, parse it so that we can add to it.
-        let mut meta: serde_json::Map<String, Value> = if object.contains_key(properties::META) {
-            let val = object.remove(properties::META).unwrap();
-            serde_json::from_str(val.get()).context("parsing existing _meta property")?
-        } else {
-            serde_json::Map::with_capacity(4)
-        };
+    ) -> anyhow::Result<(u32, Value)> {
+        let meta_val = object
+            .entry(properties::META.to_string())
+            .or_insert_with(|| Value::Object(JsonObj::with_capacity(4)));
+        let meta = meta_val.as_object_mut().ok_or_else(|| {
+            anyhow::anyhow!(
+                "request object contains a non-object '{}' property, which is forbidden",
+                properties::META
+            )
+        })?;
 
         meta.insert(properties::ID.to_string(), Value::String(id));
         meta.insert(properties::TS.to_string(), Value::String(ts));
@@ -255,12 +251,7 @@ impl CollectionHandler {
             meta.insert(properties::QUERY.to_string(), Value::Object(query_params));
         }
 
-        let meta_value = models::RawValue::from_value(&Value::Object(meta));
-        object.insert(properties::META.to_string(), meta_value);
-
-        let serialized = serde_json::to_string(&object).context("serializing prepared document")?;
-
-        Ok((self.binding_index, serialized))
+        Ok((self.binding_index, Value::Object(object)))
     }
 
     /// Turns a JSON request body into an array of one or more documents, along with
@@ -268,10 +259,10 @@ impl CollectionHandler {
     fn prepare_documents(
         &self,
         body: JsonBody,
-        path_params: serde_json::Map<String, serde_json::Value>,
+        path_params: JsonObj,
         request_headers: axum::http::header::HeaderMap,
-        query_params: serde_json::Map<String, serde_json::Value>,
-    ) -> anyhow::Result<Vec<(u32, String)>> {
+        query_params: JsonObj,
+    ) -> anyhow::Result<Vec<(u32, Value)>> {
         let header_id = if let Some(header_key) = self.id_header.as_ref() {
             // If the config specified a header to use as the id, then require it to be present.
             Some(required_string_header(&request_headers, header_key.as_str())?.to_owned())
@@ -366,30 +357,16 @@ impl Handler {
 
             tracing::info!(%configured_path, collection = %binding.collection.name, "binding http url path to collection");
 
-            let schema_value = serde_json::from_slice::<Value>(&binding.collection.write_schema_json)
-                .context("parsing write_schema_json")?;
-            let schema = json::schema::build::build_schema(schema_uri(), &schema_value)?;
-            // We must get the resolved uri after building the schema, since the one we pass in is
-            // only used for schemas that don't already have an absolute url as their `$id`.
-            let schema_url = schema.curi.clone();
-
-            // We intentionally leak the memory here in order to get a `&'static Schema`, because
-            // the schema index only works with references. The workaround would be to add a
-            // function to `doc::Validator` to allow it to validate a `&str` instead of requiring
-            // a parsed document.
-            let schema_box = Box::new(schema);
-            let schema_ref: &'static json::schema::Schema<Annotation> = Box::leak(schema_box);
-            let mut index_builder = json::schema::index::IndexBuilder::new();
-            index_builder
-                .add(schema_ref)
-                .context("adding schema to index")?;
-            let index = index_builder.into_index();
+            let schema_value =
+                serde_json::from_slice::<Value>(&binding.collection.write_schema_json)
+                    .context("parsing write_schema_json")?;
+            let schema = json::schema::build::build_schema(&schema_uri(), &schema_value)?;
+            let validator = Validator::new(schema)?;
 
             collections_by_path.insert(
                 configured_path.clone(),
                 CollectionHandler {
-                    schema_url,
-                    schema_index: index,
+                    validator,
                     binding_index,
                     id_header: binding.resource_config.id_from_header,
                     configured_path,
@@ -482,42 +459,33 @@ impl Handler {
                 Err(err) => return Ok(err_response(StatusCode::BAD_REQUEST, err, &matched_path)),
             };
 
+        let mut serialized: Vec<(u32, String)> = Vec::with_capacity(enhanced_docs.len());
         // It's important that we validate all the documents before publishing
         // any of them. We don't have the ability to "roll back" a partial
         // publish apart from exiting with an error, which would potentially
         // impact other requests. So this ensures that each request is all-or-
         // nothing, which is probably simpler for users to reason about anyway.
-        for (_, doc) in enhanced_docs.iter() {
-            let CollectionHandler {
-                schema_index,
-                schema_url,
-                ..
-            } = &collection;
-            let mut validator: Validator<doc::Annotation, json::validator::SpanContext> =
-                Validator::new(schema_index);
-            validator
-                .prepare(schema_url)
-                .context("preparing validator")?;
+        for (i, doc) in enhanced_docs {
+            let validation_result = collection
+                .validator
+                .validate(&doc, |_ignore_annotations| None);
 
-            let mut deserializer = serde_json::Deserializer::from_str(&doc);
-            json::de::walk(&mut deserializer, &mut validator).context("validating document")?;
-
-            if validator.invalid() {
-                let basic_output = json::validator::build_basic_output(validator.outcomes());
-                tracing::info!(%basic_output, uri_path = %matched_path, "request document failed validation");
+            if let Err(failure) = validation_result {
+                tracing::info!(basic_output = %failure.basic_output, uri_path = %matched_path, "request document failed validation");
                 return Ok((
                     StatusCode::BAD_REQUEST,
                     Json(
-                        serde_json::json!({"error": "request body failed validation", "basicOutput": basic_output }),
+                        serde_json::json!({"error": "request body failed validation", "basicOutput": failure.basic_output }),
                     ),
                 ));
             }
+            serialized.push((i, doc.to_string()));
         }
         std::mem::drop(handlers_guard);
 
-        let n_docs = enhanced_docs.len();
+        let n_docs = serialized.len();
         tracing::debug!(%n_docs, elapsed_ms = %start.elapsed().as_millis(), "documents are valid and ready to publish");
-        self.io.publish(enhanced_docs).await?;
+        self.io.publish(serialized).await?;
         tracing::Span::current().record("published", n_docs);
         Ok((
             StatusCode::OK,
@@ -719,9 +687,9 @@ pub fn openapi_spec<'a>(
 fn parse_collection_schema(write_schema_json: &[u8]) -> anyhow::Result<openapi::Schema> {
     let parsed_schema: serde_json::Value = serde_json::from_slice(write_schema_json)?;
 
-    let schema = json::schema::build::build_schema::<Annotation>(schema_uri(), &parsed_schema)?;
+    let schema = json::schema::build::build_schema(&schema_uri(), &parsed_schema)?;
 
-    let mut index = json::schema::index::IndexBuilder::new();
+    let mut index = json::schema::index::Builder::new();
     index.add(&schema)?;
     index.verify_references()?;
     let index = index.into_index();
@@ -730,7 +698,8 @@ fn parse_collection_schema(write_schema_json: &[u8]) -> anyhow::Result<openapi::
     let simplified_schema = doc::shape::schema::to_schema(shape);
     let simplified_value = serde_json::to_value(simplified_schema)?;
 
-    let parsed: openapi::schema::Object = serde_json::from_value(simplified_value).context("parsing openapi schema object")?;
+    let parsed: openapi::schema::Object =
+        serde_json::from_value(simplified_value).context("parsing openapi schema object")?;
     Ok(openapi::Schema::Object(parsed))
 }
 
@@ -981,7 +950,7 @@ fn new_uuid() -> String {
     uuid::Uuid::new_v4().to_string()
 }
 
-type JsonObj = BTreeMap<String, RawValue>;
+type JsonObj = serde_json::Map<String, Value>;
 
 #[derive(serde::Deserialize)]
 #[serde(untagged)]

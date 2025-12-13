@@ -14,7 +14,6 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	log "github.com/sirupsen/logrus"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"golang.org/x/sync/errgroup"
@@ -318,9 +317,8 @@ func (c *capture) pullCursor(
 	// LookupErr expects individual field components, unlike collection.Find filters
 	// which use dot notation, so we split the cursor field path here.
 	var cursorField = strings.Split(binding.resource.getCursorField(), ".")
-	// TODO(whb): Revisit this batching strategy as part of a more holistic
-	// memory optimization effort.
-	var docBatch []json.RawMessage
+	// Accumulate raw BSON documents for batch transcoding
+	var rawDocBatch []RawDocumentInput
 	var lastCursor bson.RawValue
 	var batchBytes int
 	var docsRead int
@@ -340,6 +338,20 @@ func (c *capture) pullCursor(
 	c.mu.Unlock()
 
 	emitDocs := func() error {
+		// Transcode all raw documents through the transcoder
+		responses, err := c.transcoder.TranscodeRawDocuments(rawDocBatch)
+		if err != nil {
+			return fmt.Errorf("transcoding backfill documents: %w", err)
+		}
+
+		// Convert responses to json.RawMessage slice
+		docBatch := make([]json.RawMessage, 0, len(responses))
+		for _, resp := range responses {
+			if !resp.IsSkip {
+				docBatch = append(docBatch, resp.Document)
+			}
+		}
+
 		c.mu.Lock()
 		state := c.state.Resources[sk]
 		state.Backfill.LastCursorValue = &lastCursor
@@ -360,7 +372,7 @@ func (c *capture) pullCursor(
 
 		docsRead += len(docBatch)
 		// Reset for the next batch.
-		docBatch = nil
+		rawDocBatch = nil
 		batchBytes = 0
 
 		return nil
@@ -368,23 +380,23 @@ func (c *capture) pullCursor(
 
 	done := true
 	for cursor.Next(ctx) {
-		var doc bson.M
 		var err error
 		if lastCursor, err = cursor.Current.LookupErr(cursorField...); err != nil {
 			return 0, fmt.Errorf("looking up cursor field '%s': %w", strings.Join(cursorField, "."), err)
-		} else if err = cursor.Decode(&doc); err != nil {
-			return 0, fmt.Errorf("backfill decoding document: %w", err)
 		}
 
-		docJson, err := makeBackfillDocument(binding, doc)
-		if err != nil {
-			return 0, fmt.Errorf("making backfill document: %w", err)
-		}
+		// Copy cursor.Current since it's reused by the cursor
+		rawCopy := make(bson.Raw, len(cursor.Current))
+		copy(rawCopy, cursor.Current)
 
-		docBatch = append(docBatch, docJson)
-		batchBytes += len(docJson)
+		rawDocBatch = append(rawDocBatch, RawDocumentInput{
+			Raw:        rawCopy,
+			Database:   binding.resource.Database,
+			Collection: binding.resource.Collection,
+		})
+		batchBytes += len(rawCopy)
 
-		if len(docBatch) > backfillCheckpointSize || batchBytes > backfillBytesSize {
+		if len(rawDocBatch) > backfillCheckpointSize || batchBytes > backfillBytesSize {
 			if err := emitDocs(); err != nil {
 				return 0, fmt.Errorf("emitting backfill batch: %w", err)
 			}
@@ -399,7 +411,7 @@ func (c *capture) pullCursor(
 		return 0, fmt.Errorf("backfill cursor error: %w", err)
 	}
 
-	if len(docBatch) > 0 {
+	if len(rawDocBatch) > 0 {
 		if err := emitDocs(); err != nil {
 			return 0, fmt.Errorf("emitting final backfill batch: %w", err)
 		}
@@ -424,25 +436,6 @@ func (c *capture) pullCursor(
 	}
 
 	return docsRead, nil
-}
-
-func makeBackfillDocument(binding bindingInfo, doc primitive.M) (json.RawMessage, error) {
-	doc[metaProperty] = map[string]any{
-		opProperty: "c",
-		sourceProperty: sourceMeta{
-			DB:         binding.resource.Database,
-			Collection: binding.resource.Collection,
-			Snapshot:   true,
-		},
-	}
-	doc = sanitizeDocument(doc)
-
-	docJson, err := json.Marshal(doc)
-	if err != nil {
-		return nil, fmt.Errorf("serializing document: %w", err)
-	}
-
-	return docJson, err
 }
 
 // isShardedCollection checks if a collection is sharded by running a $collStats aggregation.

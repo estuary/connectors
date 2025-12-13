@@ -37,8 +37,8 @@ REPORT_MAPPING = {
     "keyword_report": "keyword_view",
 }
 API_VERSION = "v19"
-GRPC_TIMEOUT = 120.0
-REQUEST_TIMEOUT = 300.0
+GRPC_TIMEOUT = 300.0
+REQUEST_TIMEOUT = 420.0
 logger = logging.getLogger("airbyte")
 
 

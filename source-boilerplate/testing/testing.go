@@ -285,6 +285,8 @@ func (a *pullAdapter) Recv() (*pc.Request, error) {
 	return nil, io.EOF // Always return io.EOF when the context expires
 }
 
+// normalizeJSON recursively normalizes a JSON document by unmarshaling and re-marshaling.
+// This ensures consistent key ordering since Go's json.Marshal sorts map keys alphabetically.
 func normalizeJSON(bs json.RawMessage) (json.RawMessage, error) {
 	var x interface{}
 	if err := json.Unmarshal(bs, &x); err != nil {
@@ -379,6 +381,8 @@ type CaptureValidator interface {
 // collection, and returns the list in sorted order upon request.
 type SortedCaptureValidator struct {
 	IncludeSourcedSchemas bool // When true, collection data includes sourced schema updates
+	PrettyDocuments       bool // When true, pretty-prints output documents
+	NormalizeJSON         bool // When true, sorts JSON object keys in output documents
 
 	sourcedSchemas map[string][]json.RawMessage // Map from collection name to list of sourced schemas
 	documents      map[string][]json.RawMessage // Map from collection name to list of documents
@@ -431,11 +435,41 @@ func (v *SortedCaptureValidator) Summarize(w io.Writer) error {
 		fmt.Fprintf(w, "# ================================\n")
 		fmt.Fprintf(w, "# Collection %q: %d Documents\n", collection, len(sortedDocs))
 		fmt.Fprintf(w, "# ================================\n")
-		for _, schema := range v.sourcedSchemas[collection] {
-			fmt.Fprintf(w, "%s\n", schema)
-		}
-		for _, doc := range sortedDocs {
-			fmt.Fprintf(w, "%s\n", doc)
+		if v.PrettyDocuments {
+			var enc = json.NewEncoder(w)
+			enc.SetEscapeHTML(false)
+			enc.SetIndent("", "  ")
+			for _, schema := range v.sourcedSchemas[collection] {
+				if err := enc.Encode(schema); err != nil {
+					return err
+				}
+			}
+			for _, doc := range sortedDocs {
+				if v.NormalizeJSON {
+					normalized, err := normalizeJSON(json.RawMessage(doc))
+					if err != nil {
+						return err
+					}
+					doc = string(normalized)
+				}
+				if err := enc.Encode(json.RawMessage(doc)); err != nil {
+					return err
+				}
+			}
+		} else {
+			for _, schema := range v.sourcedSchemas[collection] {
+				fmt.Fprintf(w, "%s\n", schema)
+			}
+			for _, doc := range sortedDocs {
+				if v.NormalizeJSON {
+					normalized, err := normalizeJSON(json.RawMessage(doc))
+					if err != nil {
+						return err
+					}
+					doc = string(normalized)
+				}
+				fmt.Fprintf(w, "%s\n", doc)
+			}
 		}
 	}
 	return nil
@@ -451,6 +485,8 @@ func (v *SortedCaptureValidator) Reset() {
 // collection in the order they were emitted.
 type OrderedCaptureValidator struct {
 	IncludeSourcedSchemas bool // When true, collection data includes sourced schema updates
+	PrettyDocuments       bool // When true, pretty-prints output documents
+	NormalizeJSON         bool // When true, sorts JSON object keys in output documents
 
 	documents map[string][]json.RawMessage // Map from collection name to list of documents
 }
@@ -486,8 +522,33 @@ func (v *OrderedCaptureValidator) Summarize(w io.Writer) error {
 		fmt.Fprintf(w, "# ================================\n")
 		fmt.Fprintf(w, "# Collection %q: %d Documents\n", collection, len(v.documents[collection]))
 		fmt.Fprintf(w, "# ================================\n")
-		for _, doc := range v.documents[collection] {
-			fmt.Fprintf(w, "%s\n", doc)
+		if v.PrettyDocuments {
+			var enc = json.NewEncoder(w)
+			enc.SetEscapeHTML(false)
+			enc.SetIndent("", "  ")
+			for _, doc := range v.documents[collection] {
+				if v.NormalizeJSON {
+					normalized, err := normalizeJSON(json.RawMessage(doc))
+					if err != nil {
+						return err
+					}
+					doc = normalized
+				}
+				if err := enc.Encode(doc); err != nil {
+					return err
+				}
+			}
+		} else {
+			for _, doc := range v.documents[collection] {
+				if v.NormalizeJSON {
+					normalized, err := normalizeJSON(json.RawMessage(doc))
+					if err != nil {
+						return err
+					}
+					doc = json.RawMessage(normalized)
+				}
+				fmt.Fprintf(w, "%s\n", doc)
+			}
 		}
 	}
 	return nil

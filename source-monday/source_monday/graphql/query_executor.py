@@ -355,8 +355,20 @@ async def execute_query(
                         if other_errors:
                             raise GraphQLQueryError(other_errors)
                         else:
-                            log.debug(
-                                "All GraphQL errors were USER_UNAUTHORIZED and handled via null tracking"
+                            log.warning(
+                                "All GraphQL errors were USER_UNAUTHORIZED - data may be missing from results",
+                                {
+                                    "error_count": len(auth_errors),
+                                    "errors": [
+                                        {
+                                            "message": err.message,
+                                            "path": err.path,
+                                            "extensions": err.extensions.model_dump() if err.extensions else None,
+                                        }
+                                        for err in auth_errors
+                                    ],
+                                    "query": modified_query
+                                }
                             )
                             return
                     else:

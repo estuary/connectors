@@ -244,7 +244,7 @@ def create_table(
             field_type=_field_to_type(f.type),
             required=not f.nullable,
         )
-        for idx, f in enumerate(table_create.fields)
+        for idx, f in enumerate(table_create.fields, 1)
     ]
 
     schema = Schema(*columns)

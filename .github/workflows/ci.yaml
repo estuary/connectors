@@ -71,6 +71,7 @@ jobs:
         connector:
           - source-alpaca
           - source-bigquery-batch
+          - source-db2-batch
           - source-dropbox
           - source-dynamodb
           - source-firestore
@@ -183,6 +184,7 @@ jobs:
             "materialize-dynamodb",
             "materialize-elasticsearch",
             "materialize-kafka",
+            "source-db2-batch",
             "source-dynamodb",
             "source-kafka",
             "source-kinesis",

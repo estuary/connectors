@@ -81,7 +81,7 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 	return &st.CaptureSpec{
 		Driver:       postgresDriver,
 		EndpointSpec: endpointSpec,
-		Validator:    &st.OrderedCaptureValidator{IncludeSourcedSchemas: true},
+		Validator:    &st.OrderedCaptureValidator{IncludeSourcedSchemas: true, PrettyDocuments: true},
 		Sanitizers:   sanitizers,
 	}
 }
@@ -241,7 +241,7 @@ func TestAsyncCapture(t *testing.T) {
 
 	// Ignore SourcedSchema updates as their precise position in the change stream is
 	// unpredictable when we're restarting the capture in parallel with changes.
-	cs.Validator = &st.OrderedCaptureValidator{IncludeSourcedSchemas: false}
+	cs.Validator = &st.OrderedCaptureValidator{IncludeSourcedSchemas: false, PrettyDocuments: true}
 
 	// Have to sanitize the index within the polling interval because we're running
 	// the capture in parallel with changes.

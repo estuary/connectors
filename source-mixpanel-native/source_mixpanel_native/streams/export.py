@@ -4,14 +4,16 @@
 
 import json
 import re
+from datetime import date
 from functools import cache
-from typing import Any, Iterable, Mapping, MutableMapping
+from typing import Any, Iterable, List, Mapping, MutableMapping, Optional
 
 import pendulum
 import requests
 from pendulum import Date
 
 from airbyte_cdk.models import SyncMode
+from airbyte_cdk.sources.streams.core import IncrementalMixin, StreamData
 from airbyte_cdk.sources.utils.transform import TransformConfig, TypeTransformer
 from airbyte_cdk.sources.streams.http.auth import HttpAuthenticator
 
@@ -74,7 +76,7 @@ class ExportSchema(MixpanelStream):
             yield property_name
 
 
-class Export(DateSlicesMixin, IncrementalMixpanelStream):
+class Export(DateSlicesMixin, MixpanelStream, IncrementalMixin):
     """Export event data as it is received and stored within Mixpanel, complete with all event properties
      (including distinct_id) and the exact timestamp the event was fired.
 
@@ -88,6 +90,7 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
 
     primary_key: str = "insert_id"
     cursor_field: str = "time"
+    _cursor_value = ""
 
     transformer = TypeTransformer(TransformConfig.DefaultSchemaNormalization)
 
@@ -122,6 +125,13 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
             **kwargs,
         )
 
+    @property
+    def state(self) -> Mapping[str, Any]:
+        return {self.cursor_field: self._cursor_value}
+
+    @state.setter
+    def state(self, value: Mapping[str, Any]):
+        self._cursor_value = value[self.cursor_field]
 
     @property
     def url_base(self):
@@ -238,3 +248,44 @@ class Export(DateSlicesMixin, IncrementalMixpanelStream):
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None
     ) -> Mapping[str, Any]:
         return {"stream": True}
+
+    def read_records(
+        self,
+        sync_mode: SyncMode,
+        cursor_field: Optional[List[str]] = None,
+        stream_slice: Optional[Mapping[str, Any]] = None,
+        stream_state: Optional[Mapping[str, Any]] = None,
+    ) -> Iterable[StreamData]:
+        most_recent_cursor = self.state.get(self.cursor_field, None)
+
+        for record in super().read_records(sync_mode, cursor_field, stream_slice, stream_state):
+            yield record
+
+            record_cursor_value = record.get(self.cursor_field)
+
+            if record_cursor_value:
+                most_recent_cursor = max(record_cursor_value, most_recent_cursor)
+
+            self.state = {self.cursor_field: most_recent_cursor}
+
+        # After re-capturing all events in the attribution window, we need to ensure the persisted cursor
+        # is in the current day to avoid re-capturing all those events in the attribution window again
+        # when the connector starts back up. We do this by comparing the most_recent_cursor value against
+        # the earliest possible cursor value still in stream_slice["end_date"].
+        is_last_slice = stream_slice.get("is_last_slice", None)
+        use_attribution_window = stream_slice.get('use_attribution_window', None)
+
+        if (
+            is_last_slice
+            and use_attribution_window
+        ):
+            window_end_date = date.fromisoformat(stream_slice["end_date"])
+            window_end = f"{window_end_date.isoformat()}T00:00:00Z"
+
+            self.logger.info("Processed the last slice in attribution window.", {
+                "window_end": window_end,
+                "most_recent_cursor": most_recent_cursor,
+            })
+
+            if most_recent_cursor < window_end:
+                self.state = {self.cursor_field: window_end}

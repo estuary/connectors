@@ -32,10 +32,14 @@ def test_get_json_schema():
         'b': Obj(data_type=Obj(name='ENUM'), is_repeated=True,  enum_values=['b', 'bb']),
         'c': Obj(data_type=Obj(name='MESSAGE'), is_repeated=False),
         'd': Obj(data_type=Obj(name='MESSAGE'), is_repeated=True),
-        'e': Obj(data_type=Obj(name='STRING')),
-        'f': Obj(data_type=Obj(name='DATE')),
+        'e': Obj(data_type=Obj(name='STRING'), is_repeated=False),
+        'f': Obj(data_type=Obj(name='DATE'), is_repeated=False),
+        'g': Obj(data_type=Obj(name='STRING'), is_repeated=True),
+        'h': Obj(data_type=Obj(name='INT64'), is_repeated=True),
+        'i': Obj(data_type=Obj(name='DOUBLE'), is_repeated=True),
+        'j': Obj(data_type=Obj(name='BOOLEAN'), is_repeated=True),
     })
-    instance = CustomQueryMixin(config={'query': Obj(fields=['a', 'b', 'c', 'd', 'e', 'f'])})
+    instance = CustomQueryMixin(config={'query': Obj(fields=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'])})
     instance.cursor_field = None
     instance.google_ads_client = Obj(get_fields_metadata=query_object)
     schema = instance.get_json_schema()
@@ -51,5 +55,9 @@ def test_get_json_schema():
             'd': {'type': ['array', 'null'], 'protobuf_message': True},
             'e': {'type': ['string', 'null']},
             'f': {'type': ['string', 'null'], 'format': 'date'},
+            'g': {'type': ['null', 'array'], 'items': {'type': 'string'}},
+            'h': {'type': ['null', 'array'], 'items': {'type': 'integer'}},
+            'i': {'type': ['null', 'array'], 'items': {'type': 'number'}},
+            'j': {'type': ['null', 'array'], 'items': {'type': 'boolean'}},
         }
     }

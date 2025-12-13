@@ -80,10 +80,19 @@ class CustomQueryMixin:
                     output_type = ["string", "null"]
                 field_value = {"type": output_type, "protobuf_message": True}
             else:
-                output_type = [google_datatype_mapping.get(google_data_type, "string"), "null"]
-                field_value = {"type": output_type}
-                if google_data_type == "DATE" and field not in NON_DATE_FORMATTED_FIELDS:
-                    field_value["format"] = "date"
+                base_type = google_datatype_mapping.get(google_data_type, "string")
+                if node.is_repeated:
+                    field_value = {
+                        "type": ["null", "array"],
+                        "items": {"type": base_type}
+                    }
+                    if google_data_type == "DATE" and field not in NON_DATE_FORMATTED_FIELDS:
+                        field_value["items"]["format"] = "date"
+                else:
+                    output_type = [base_type, "null"]
+                    field_value = {"type": output_type}
+                    if google_data_type == "DATE" and field not in NON_DATE_FORMATTED_FIELDS:
+                        field_value["format"] = "date"
 
             local_json_schema["properties"][field] = field_value
 

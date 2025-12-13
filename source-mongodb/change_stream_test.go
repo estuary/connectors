@@ -42,6 +42,15 @@ func TestPullStream(t *testing.T) {
 		require.NoError(t, err)
 	}
 
+	insertDocs := func(t *testing.T, collection string, ids ...int) {
+		docs := make([]interface{}, len(ids))
+		for i, id := range ids {
+			docs[i] = bson.D{{Key: "_id", Value: id}}
+		}
+		_, err := client.Database(testDb).Collection(collection).InsertMany(ctx, docs)
+		require.NoError(t, err)
+	}
+
 	tests := []struct {
 		name           string
 		setup          func(t *testing.T)
@@ -61,12 +70,10 @@ func TestPullStream(t *testing.T) {
 		{
 			name: "multiple documents",
 			setup: func(t *testing.T) {
-				for idx := 1; idx < 4; idx++ {
-					insertDoc(t, testColl1, idx)
-				}
+				insertDocs(t, testColl1, 1, 2, 3)
 			},
 			pullTimes:      1,
-			wantSent:       []string{cp, "1", cp, "2", cp, "3", cp},
+			wantSent:       []string{cp, "1", "2", "3", cp},
 			wantEventCount: 3,
 		},
 		{
@@ -76,23 +83,21 @@ func TestPullStream(t *testing.T) {
 				insertDoc(t, testColl2, 2)
 				insertDoc(t, testColl3, 3) // not a captured collection
 			},
-			pullTimes:      1,
-			wantSent:       []string{cp, "1", cp, "2", cp},
+			pullTimes:      3,
+			wantSent:       []string{cp, "1", "2", cp},
 			wantEventCount: 3,
 		},
 		{
 			name: "multiple batches - only one is retrieved",
 			setup: func(t *testing.T) {
-				for idx := 1; idx < 10; idx++ {
-					insertDoc(t, testColl1, idx)
-				}
+				insertDocs(t, testColl1, 1, 2, 3, 4, 5, 6, 7, 8, 9)
 			},
 			pullTimes:      1,
-			wantSent:       []string{cp, "1", cp, "2", cp, "3", cp, "4", cp, "5", cp},
+			wantSent:       []string{cp, "1", "2", "3", "4", "5", cp},
 			wantEventCount: 5,
 		},
 		{
-			name: "split fragments with a partial batch",
+			name: "split fragments",
 			setup: func(t *testing.T) {
 				require.NoError(t, client.Database(testDb).CreateCollection(ctx, testColl1, &options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}))
 
@@ -117,11 +122,11 @@ func TestPullStream(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, 1, int(res.ModifiedCount))
 
-				insertDoc(t, testColl1, 2) // not captured since it is in a "partial" batch
+				insertDoc(t, testColl1, 2)
 			},
-			pullTimes:      2,
-			wantSent:       []string{cp, "hugeDocument", cp, "hugeDocument", cp},
-			wantEventCount: 3,
+			pullTimes:      3,
+			wantSent:       []string{cp, "hugeDocument", cp, "hugeDocument", "2", cp},
+			wantEventCount: 4, // insert + 2 split fragments (skipped) + update (emitted) + insert
 		},
 	}
 
@@ -130,10 +135,15 @@ func TestPullStream(t *testing.T) {
 			cleanup()
 			t.Cleanup(cleanup)
 
+			transcoder, err := NewTranscoder(ctx)
+			require.NoError(t, err)
+			t.Cleanup(func() { transcoder.Stop() })
+
 			srv := &testServer{}
 			c := capture{
-				client: client,
-				output: &boilerplate.PullOutput{Connector_CaptureServer: srv},
+				client:     client,
+				output:     &boilerplate.PullOutput{Connector_CaptureServer: srv},
+				transcoder: transcoder,
 				trackedChangeStreamBindings: map[string]bindingInfo{
 					resourceId(testDb, testColl1): bindings[0],
 					resourceId(testDb, testColl2): bindings[1],
@@ -149,17 +159,50 @@ func TestPullStream(t *testing.T) {
 			stream := streams[0]
 			stream.ms.SetBatchSize(testChangeStreamBatchSize)
 
-			ts, err := c.pullStream(ctx, stream)
-			require.NoError(t, err)
-			require.False(t, ts.IsZero())
+			// Create channel for batches with buffer size 4
+			batches := make(chan streamBatch, 4)
 
+			// Start producer
+			producerCtx, cancelProducer := context.WithCancel(ctx)
+			defer cancelProducer()
+
+			producerDone := make(chan struct{})
+			go func() {
+				defer close(producerDone)
+				c.produceStreamBatches(producerCtx, stream, batches)
+			}()
+
+			// Wait for initial batch to complete (establishes resume token).
+			for batch := range batches {
+				require.NoError(t, batch.err)
+				_, err := c.processBatch(ctx, stream, batch)
+				require.NoError(t, err)
+				break // First batch establishes resume token
+			}
+
+			c.processedStreamEvents = 0
+			c.emittedStreamDocs = 0
+
+			// Run test setup (insert documents)
 			tt.setup(t)
 
-			for i := 0; i < tt.pullTimes; i++ {
-				ts, err = c.pullStream(ctx, stream)
+			// Pull and process batches until we've seen pullTimes batch completions.
+			batchesCompleted := 0
+			for batch := range batches {
+				require.NoError(t, batch.err)
+
+				_, err := c.processBatch(ctx, stream, batch)
 				require.NoError(t, err)
-				require.False(t, ts.IsZero())
+
+				batchesCompleted++
+				if batchesCompleted >= tt.pullTimes {
+					break
+				}
 			}
+
+			// Stop producer
+			cancelProducer()
+			<-producerDone
 
 			require.Equal(t, tt.wantSent, srv.sent)
 			require.Equal(t, tt.wantEventCount, c.processedStreamEvents)

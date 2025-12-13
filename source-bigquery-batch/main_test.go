@@ -91,7 +91,7 @@ func testCaptureSpec(t testing.TB) *st.CaptureSpec {
 	return &st.CaptureSpec{
 		Driver:       bigqueryDriver,
 		EndpointSpec: endpointSpec,
-		Validator:    &st.SortedCaptureValidator{IncludeSourcedSchemas: true},
+		Validator:    &st.SortedCaptureValidator{IncludeSourcedSchemas: true, PrettyDocuments: true},
 		Sanitizers:   sanitizers,
 	}
 }
@@ -681,7 +681,7 @@ func TestFullRefresh(t *testing.T) {
 
 	// Sorting is required for test stability because full-refresh captures are unordered.
 	// The multiset of row-captures will be the same across all runs, so this works.
-	cs.Validator = &st.SortedCaptureValidator{}
+	cs.Validator = &st.SortedCaptureValidator{PrettyDocuments: true}
 
 	require.NoError(t, parallelSetupQueries(ctx, t, control,
 		fmt.Sprintf("INSERT INTO %s VALUES (@p0, @p1)", tableName), [][]any{
@@ -943,7 +943,7 @@ func TestCaptureWithNullCursor(t *testing.T) {
 	setShutdownAfterQuery(t, true)
 
 	// Sorting is required for test stability because null-cursored rows are unordered.
-	cs.Validator = &st.SortedCaptureValidator{}
+	cs.Validator = &st.SortedCaptureValidator{PrettyDocuments: true}
 
 	// First batch with mix of NULL and non-NULL cursor values
 	require.NoError(t, parallelSetupQueries(ctx, t, control,

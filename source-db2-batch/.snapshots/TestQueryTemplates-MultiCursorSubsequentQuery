@@ -1,0 +1,1 @@
+SELECT * FROM "test"."foobar" WHERE ("major" > @flow_cursor_value[0]) OR ("major" = @flow_cursor_value[0] AND "minor" > @flow_cursor_value[1]) ORDER BY "major", "minor";

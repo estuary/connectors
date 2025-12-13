@@ -123,12 +123,12 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 		DoNotReference: true,
 	}
 	var metadataSchema = reflector.ReflectFromType(reflect.TypeOf(documentMetadata{}))
+	metadataSchema.AdditionalProperties = nil
 	metadataSchema.Definitions = nil
 	if metadataSchema.Extras == nil {
 		metadataSchema.Extras = make(map[string]any)
 	}
 	if fullWriteSchema {
-		metadataSchema.AdditionalProperties = nil
 		if sourceSchema, ok := metadataSchema.Properties.Get("source"); ok {
 			sourceSchema.AdditionalProperties = nil
 		}

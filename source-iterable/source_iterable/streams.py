@@ -518,14 +518,18 @@ class Events(IterableStream):
         Put common event fields at the top level.
         Put the rest of the fields in the `data` subobject.
         """
-        jsonl_records = StringIO(response.text)
-        for record in jsonl_records:
+        for record in response.iter_lines():
             record_dict = json.loads(record)
             record_dict_common_fields = {}
             for field in self.common_fields:
                 record_dict_common_fields[field] = record_dict.pop(field, None)
 
             yield {**record_dict_common_fields, "data": record_dict}
+
+    def request_kwargs(
+        self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None
+    ) -> Mapping[str, Any]:
+        return {"stream": True}
 
 
 class EmailBounce(IterableExportStreamAdjustableRange):

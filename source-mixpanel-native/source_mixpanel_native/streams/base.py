@@ -200,7 +200,7 @@ class DateSlicesMixin:
         start_date = self.start_date
         cursor_value = None
 
-        if stream_state and self.cursor_field and self.cursor_field in stream_state:
+        if stream_state and self.cursor_field and self.cursor_field in stream_state and stream_state[self.cursor_field]:
             # Remove time part from state because API accept 'from_date' param in date format only ('YYYY-MM-DD')
             # It also means that sync returns duplicated entries for the date from the state (date range is inclusive)
             cursor_value = stream_state[self.cursor_field]
@@ -215,7 +215,10 @@ class DateSlicesMixin:
         # attribution window once per day when the stream is caught up &
         # replicating incrementally to avoid constantly emitting duplicate
         # data.
-        should_use_attribution_window = today - start_date == timedelta(days=1)
+        should_use_attribution_window = (
+            self.attribution_window > 0
+            and today - start_date == timedelta(days=1)
+        )
 
         if should_use_attribution_window:
             start_date = start_date - timedelta(days=self.attribution_window)
@@ -229,6 +232,8 @@ class DateSlicesMixin:
             "should_use_attribution_window": should_use_attribution_window,
         })
 
+        slices: list[dict] = []
+
         while start_date <= end_date:
             if self._timezone_mismatch:
                 return
@@ -237,12 +242,19 @@ class DateSlicesMixin:
                 "start_date": str(start_date),
                 "end_date": str(min(current_end_date, end_date)),
                 "use_attribution_window": should_use_attribution_window,
+                "is_last_slice": False
             }
             if cursor_value:
                 stream_slice[self.cursor_field] = cursor_value
-            yield stream_slice
+            slices.append(stream_slice)
             # add 1 additional day because date range is inclusive
             start_date = current_end_date + timedelta(days=1)
+
+        if len(slices) > 0:
+            slices[-1]["is_last_slice"] = True
+
+        for slice in slices:
+            yield slice
 
     def request_params(
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, any] = None, next_page_token: Mapping[str, Any] = None

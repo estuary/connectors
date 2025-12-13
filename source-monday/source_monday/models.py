@@ -208,6 +208,7 @@ class ActivityLogEvents(StrEnum):
     RESTORE_COLUMN = "restore_column"
     RESTORE_GROUP = "restore_group"
     RESTORE_PULSE = "restore_pulse"
+    SET_ENTITY_BOARD_ROLE = "set_entity_board_role"
     SUBSCRIBE = "subscribe"
     UPDATE_BOARD_NAME = "update_board_name"
     UPDATE_BOARD_NICKNAME = "update_board_nickname"
@@ -296,6 +297,7 @@ class ActivityLog(BaseModel, extra="allow"):
                 | ActivityLogEvents.UPDATE_BOARD_GRANULAR_PERMISSIONS
                 | ActivityLogEvents.UPDATE_BOARD_PERMISSIONS
                 | ActivityLogEvents.RESTORE_GROUP
+                | ActivityLogEvents.SET_ENTITY_BOARD_ROLE
             ):
                 log.debug(f"Board change event: {self.event}")
                 ids = []

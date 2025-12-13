@@ -55,7 +55,7 @@ func TestCaptureFromView(t *testing.T) {
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
-		Validator:    &st.OrderedCaptureValidator{},
+		Validator:    &st.OrderedCaptureValidator{NormalizeJSON: true},
 		Sanitizers:   commonSanitizers(),
 		Bindings:     []*flow.CaptureSpec_Binding{binding},
 	}
@@ -117,7 +117,7 @@ func TestCaptureFromViewIncremental(t *testing.T) {
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
-		Validator:    &st.OrderedCaptureValidator{},
+		Validator:    &st.OrderedCaptureValidator{NormalizeJSON: true},
 		Sanitizers:   commonSanitizers(),
 		Bindings:     []*flow.CaptureSpec_Binding{binding},
 	}
@@ -211,7 +211,7 @@ func TestCaptureFromViewWithMultipleSources(t *testing.T) {
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
-		Validator:    &st.OrderedCaptureValidator{},
+		Validator:    &st.OrderedCaptureValidator{NormalizeJSON: true},
 		Sanitizers:   commonSanitizers(),
 		Bindings:     []*flow.CaptureSpec_Binding{binding},
 	}

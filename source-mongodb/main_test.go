@@ -54,7 +54,7 @@ func TestCapture(t *testing.T) {
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
-		Validator:    &st.SortedCaptureValidator{},
+		Validator:    &st.SortedCaptureValidator{NormalizeJSON: true},
 		Sanitizers:   commonSanitizers(),
 		Bindings: []*flow.CaptureSpec_Binding{
 			makeBinding(t, database1, col1, "", ""), // empty mode defaults to captureModeChangeStream
@@ -127,7 +127,7 @@ func TestCaptureBatchSnapshotResumption(t *testing.T) {
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
-		Validator:    &st.OrderedCaptureValidator{},
+		Validator:    &st.OrderedCaptureValidator{NormalizeJSON: true},
 		Sanitizers:   commonSanitizers(),
 		Bindings:     []*flow.CaptureSpec_Binding{binding},
 	}
@@ -172,7 +172,7 @@ func TestBatchIncrementalResumption(t *testing.T) {
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
-		Validator:    &st.OrderedCaptureValidator{},
+		Validator:    &st.OrderedCaptureValidator{NormalizeJSON: true},
 		Sanitizers:   commonSanitizers(),
 		Bindings:     []*flow.CaptureSpec_Binding{defaultBinding, customBinding, timeseriesBinding},
 	}
@@ -286,7 +286,7 @@ func TestCaptureSplitLargeDocuments(t *testing.T) {
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
-		Validator:    &st.OrderedCaptureValidator{},
+		Validator:    &st.OrderedCaptureValidator{NormalizeJSON: true},
 		Sanitizers:   commonSanitizers(),
 		Bindings:     []*flow.CaptureSpec_Binding{makeBinding(t, database, col, captureModeChangeStream, "")},
 	}
@@ -381,7 +381,7 @@ func TestCaptureExclusiveCollectionFilter(t *testing.T) {
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
-		Validator:    &st.SortedCaptureValidator{},
+		Validator:    &st.SortedCaptureValidator{NormalizeJSON: true},
 		Sanitizers:   commonSanitizers(),
 		Bindings: []*flow.CaptureSpec_Binding{
 			makeBinding(t, database1, col1, captureModeChangeStream, ""),
@@ -827,7 +827,7 @@ func TestNestedCursorFields(t *testing.T) {
 		Driver:       &driver{},
 		EndpointSpec: &cfg,
 		Checkpoint:   []byte("{}"),
-		Validator:    &st.OrderedCaptureValidator{},
+		Validator:    &st.OrderedCaptureValidator{NormalizeJSON: true},
 		Sanitizers:   commonSanitizers(),
 		Bindings:     []*flow.CaptureSpec_Binding{binding},
 	}

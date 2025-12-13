@@ -23,7 +23,6 @@ from pydantic import AfterValidator, AwareDatetime, BaseModel, Field, Validation
 
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
-MAX_INCREMENTAL_EXPORT_PAGE_SIZE = 1000
 
 # Valid subdomains are between 3-63 characters long, start with a
 # lowercase letter, and only contain lowercase letters, digits, or dashes.
@@ -126,21 +125,6 @@ class EndpointConfig(BaseModel):
     credentials: OAuth2Credentials | ApiToken | DeprecatedOAuthCredentials = Field(
         discriminator="credentials_title",
         title="Authentication",
-    )
-    class Advanced(BaseModel):
-        incremental_export_page_size: Annotated[int, Field(
-            description="Page size for incremental export streams. Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
-            title="Incremental Export Streams' Page Size",
-            default=MAX_INCREMENTAL_EXPORT_PAGE_SIZE,
-            le=MAX_INCREMENTAL_EXPORT_PAGE_SIZE,
-            gt=0,
-        )]
-
-    advanced: Advanced = Field(
-        default_factory=Advanced, #type: ignore
-        title="Advanced Config",
-        description="Advanced settings for the connector.",
-        json_schema_extra={"advanced": True},
     )
 
     # Zendesk is updating their OAuth to expire access tokens, meaning this connector
@@ -412,12 +396,15 @@ class MacrosResponse(ClientSideIncrementalCursorPaginatedResponse):
 class OrganizationMembershipsResponse(ClientSideIncrementalCursorPaginatedResponse):
     resources: list[TimestampedResource] = Field(alias="organization_memberships")
 
-class Article(TimestampedResource):
-    pass
 
-class ArticleResponse(IncrementalCursorPaginatedResponse):
-    resources: list[Article] = Field(alias="articles")
-    
+class ArticlesResponse(ClientSideIncrementalCursorPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="articles")
+
+
+class CategoriesResponse(ClientSideIncrementalCursorPaginatedResponse):
+    resources: list[TimestampedResource] = Field(alias="categories")
+
+
 class Post(TimestampedResource):
     comment_count: int
     vote_count: int
@@ -443,7 +430,8 @@ CLIENT_SIDE_FILTERED_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, dict[str, 
     ("posts", "community/posts", None, PostsResponse),
     ("ticket_fields", "ticket_fields", None, TicketFieldsResponse),
     ("topics", "community/topics", None, TopicsResponse),
-    ("articles", "help_center/articles", None, ArticleResponse),
+    ("articles", "help_center/articles", None, ArticlesResponse),
+    ("categories", "help_center/categories", None, CategoriesResponse),
 ]
 
 

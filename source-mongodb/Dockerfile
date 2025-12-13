@@ -1,4 +1,14 @@
-# Build Stage
+# Rust Build Stage
+################################################################################
+FROM rust:1-slim-bookworm AS rust-builder
+
+WORKDIR /builder
+
+COPY bson-transcoder ./bson-transcoder
+
+RUN cargo build --release --manifest-path bson-transcoder/Cargo.toml
+
+# Go Build Stage
 ################################################################################
 FROM golang:1.25-bookworm AS builder
 
@@ -16,6 +26,7 @@ COPY source-mongodb     ./source-mongodb
 # Run the unit tests.
 ARG TEST_DATABASE=yes
 ENV TEST_DATABASE=$TEST_DATABASE
+COPY --from=rust-builder /builder/bson-transcoder/target/release/bson-transcoder /usr/bin/bson-transcoder
 RUN go test -short -v ./source-mongodb/...
 
 # Build the connector.
@@ -30,6 +41,7 @@ ENV PATH="/connector:$PATH"
 
 # Bring in the compiled connector artifact from the builder.
 COPY --from=builder /builder/connector ./source-mongodb
+COPY --from=rust-builder /builder/bson-transcoder/target/release/bson-transcoder /usr/bin/bson-transcoder
 COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
 LABEL FLOW_RUNTIME_PROTOCOL=capture

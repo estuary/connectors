@@ -2,12 +2,12 @@
 # Collection "acmeCo/test/test_dynamictable_99720399": 5 Documents
 # ================================
 {"DATA":"F","ID":6,"_meta":{"op":"c","source":{"schema":"PUBLIC","table":"test_DynamicTable_99720399","seq":2,"off":0}}}
-{"DATA":"11","ID":10,"_meta":{"op":"c","source":{"schema":"PUBLIC","table":"test_DynamicTable_99720399","seq":2,"off":1}}}
+{"DATA":"QRSTUVWXYZ","ID":8,"_meta":{"op":"c","source":{"schema":"PUBLIC","table":"test_DynamicTable_99720399","seq":2,"off":1}}}
 {"DATA":"Ten","ID":9,"_meta":{"op":"c","source":{"schema":"PUBLIC","table":"test_DynamicTable_99720399","seq":2,"off":2}}}
-{"DATA":"QRSTUVWXYZ","ID":8,"_meta":{"op":"c","source":{"schema":"PUBLIC","table":"test_DynamicTable_99720399","seq":2,"off":3}}}
+{"DATA":"11","ID":10,"_meta":{"op":"c","source":{"schema":"PUBLIC","table":"test_DynamicTable_99720399","seq":2,"off":3}}}
 {"DATA":"ggg","ID":7,"_meta":{"op":"c","source":{"schema":"PUBLIC","table":"test_DynamicTable_99720399","seq":2,"off":4}}}
 # ================================
 # Final State Checkpoint
 # ================================
-{"streams":{"PUBLIC%2Ftest_DynamicTable_99720399":{"off":0,"seq":3,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_DYNAMICTABLE_99720399"}}}
+{"streams":{"PUBLIC%2Ftest_DynamicTable_99720399":{"disabled":false,"off":0,"seq":3,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_DYNAMICTABLE_99720399"}}}
 

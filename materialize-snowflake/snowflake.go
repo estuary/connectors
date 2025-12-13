@@ -466,6 +466,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	for _, queryLoop := range subqueries {
 		var query = queryLoop
 		group.Go(func() error {
+			log.WithFields(log.Fields{
+				"query": query,
+			}).Debug("querying Load documents")
+			start := time.Now()
+
 			// Issue a join of the target table and (now staged) load keys,
 			// and send results to the load channel.
 			//
@@ -482,8 +487,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			var document stdsql.RawBytes
 
 			log.WithFields(log.Fields{
-				"query": query,
+				"query":           query,
+				"requestDuration": time.Since(start).String(),
 			}).Debug("sending Loaded documents from query")
+
 			for rows.Next() {
 				if err = rows.Scan(&binding, &document); err != nil {
 					return fmt.Errorf("scanning Load document: %w", err)

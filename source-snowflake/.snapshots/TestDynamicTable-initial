@@ -9,5 +9,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"streams":{"PUBLIC%2Ftest_DynamicTable_99720399":{"off":0,"seq":2,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_DYNAMICTABLE_99720399"}}}
+{"streams":{"PUBLIC%2Ftest_DynamicTable_99720399":{"disabled":false,"off":0,"seq":2,"uid":"FFFFFFFFFFFFFFFF_PUBLIC_TEST_DYNAMICTABLE_99720399"}}}
 

@@ -19,9 +19,11 @@ async def fetch_boards_by_ids(
     ids: list[str],
 ) -> AsyncGenerator[Board, None]:
     limit = 100
+    boards_fetched = 0
 
     for i in range(0, len(ids), limit):
         chunk = ids[i : i + limit]
+        chunk_num = (i // limit) + 1
         variables = {
             "limit": limit,
             "page": 1,
@@ -37,13 +39,18 @@ async def fetch_boards_by_ids(
                 BOARDS_WITH_KIND,
                 variables,
             ):
+                boards_fetched += 1
                 yield board
         except GraphQLQueryError as original_error:
+            log.warning(f"Board fetch failed for chunk {chunk_num}, retrying with fallback")
             try:
                 async for board in fetch_boards_with_retry(http, log, chunk):
+                    boards_fetched += 1
                     yield board
             except Exception as e:
                 raise e from original_error
+    
+    log.debug(f"Total boards fetched by fetch_boards_by_ids: {boards_fetched}")
 
 
 async def fetch_boards_minimal(
@@ -63,6 +70,7 @@ async def fetch_boards_minimal(
 
     page = 1
     limit = 10000
+    total_boards = 0
 
     while True:
         variables = {
@@ -82,11 +90,14 @@ async def fetch_boards_minimal(
         ):
             yield board
             boards_in_page += 1
+            total_boards += 1
 
         if boards_in_page == 0:
             break
 
         page += 1
+    
+    log.debug(f"Total boards fetched by fetch_boards_minimal: {total_boards}")
 
 
 async def fetch_boards_paginated(
