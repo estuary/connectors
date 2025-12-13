@@ -9,7 +9,7 @@ from estuary_cdk.capture.common import (
 from estuary_cdk.buffer_ordered import buffer_ordered
 
 from .client import FacebookAPIClient, FacebookRequestParams, FacebookCursor
-from .job_manager import FacebookInsightsJobManager
+from .insights import FacebookInsightsJobManager, TimeRange
 from .models import FacebookResource, FacebookInsightsResource, Images
 
 
@@ -344,7 +344,7 @@ async def fetch_page_insights(
         return
 
     end = min(start + timedelta(days=1), cutoff)
-    date_range = {
+    date_range: TimeRange = {
         "since": start.strftime("%Y-%m-%d"),
         "until": end.strftime("%Y-%m-%d"),
     }
@@ -402,7 +402,7 @@ async def fetch_changes_insights(
         start_date = log_cursor
         end_date = now
 
-    date_range = {
+    date_range: TimeRange = {
         "since": start_date.strftime("%Y-%m-%d"),
         "until": end_date.strftime("%Y-%m-%d"),
     }

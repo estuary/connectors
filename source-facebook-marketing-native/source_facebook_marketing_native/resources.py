@@ -13,14 +13,14 @@ from estuary_cdk.capture.common import (
 )
 from estuary_cdk.capture import Task
 from estuary_cdk.flow import CaptureBinding
-from estuary_cdk.http import HTTPMixin, TokenSource
+from estuary_cdk.http import HTTPMixin, HTTPSession, TokenSource
 
 from estuary_cdk.flow import ValidationError
 
 from .constants import BASE_URL
 from .utils import validate_credentials, validate_access_to_accounts, str_to_list
 from .client import FacebookAPIClient
-from .job_manager import FacebookInsightsJobManager
+from .insights import FacebookInsightsJobManager
 from .api import (
     snapshot_resource,
     snapshot_ad_creatives,
@@ -103,6 +103,27 @@ INSIGHTS_RESOURCES: set[type[FacebookInsightsResource]] = {
 
 TEST_CONFIG_CLIENT_ID = "placeholder_client_id"
 TEST_CONFIG_CLIENT_SECRET = "placeholder_client_secret"
+
+
+def create_insights_job_manager(
+    http: HTTPSession,
+    base_url: str,
+    log: Logger,
+    account_id: str,
+) -> FacebookInsightsJobManager:
+    """
+    Create a job manager instance for a specific account.
+
+    Each account gets its own job manager with independent concurrency
+    control (semaphore). This aligns with Facebook's per-account rate
+    limiting and provides isolation between accounts.
+    """
+    return FacebookInsightsJobManager(
+        http=http,
+        base_url=base_url,
+        log=log.getChild(f"insights.{account_id}"),
+        account_id=account_id,
+    )
 
 
 def _create_initial_state(account_ids: str | list[str]) -> ResourceState:
@@ -388,7 +409,9 @@ def incremental_resource(
 
 def incremental_resources(
     client: FacebookAPIClient,
-    job_manager: FacebookInsightsJobManager,
+    http: HTTPSession,
+    base_url: str,
+    log: Logger,
     start_date: datetime,
     accounts: list[str],
     initial_state: ResourceState,
@@ -397,6 +420,12 @@ def incremental_resources(
     custom_insights: list[InsightsConfig] | None = None,
 ) -> list[Resource]:
     resources = []
+
+    # Create one job manager per account for isolated concurrency control
+    job_managers: dict[str, FacebookInsightsJobManager] = {
+        account_id: create_insights_job_manager(http, base_url, log, account_id)
+        for account_id in accounts
+    }
 
     def create_resource(
         model: type[FacebookResource],
@@ -436,7 +465,7 @@ def incremental_resources(
         def create_fetch_page(account_id: str) -> Callable:
             return functools.partial(
                 fetch_page_insights,
-                job_manager,
+                job_managers[account_id],
                 model,
                 account_id,
                 start_date,
@@ -445,7 +474,7 @@ def incremental_resources(
         def create_fetch_changes(account_id: str) -> Callable:
             return functools.partial(
                 fetch_changes_insights,
-                job_manager,
+                job_managers[account_id],
                 model,
                 account_id,
                 lookback_window=insights_lookback_window,
@@ -492,13 +521,6 @@ async def all_resources(
         http,
         log,
     )
-    job_manager = FacebookInsightsJobManager(
-        http=http,
-        base_url=BASE_URL,
-        log=log,
-        poll_interval=30,
-        max_retries=3,
-    )
 
     if (
         should_validate_access
@@ -522,7 +544,9 @@ async def all_resources(
         ),
         *incremental_resources(
             client=client,
-            job_manager=job_manager,
+            http=http,
+            base_url=BASE_URL,
+            log=log,
             start_date=config.start_date,
             accounts=config.accounts,
             initial_state=initial_state,
