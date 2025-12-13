@@ -1078,26 +1078,6 @@ class Videos(FacebookResource):
 
 
 class FacebookInsightsResource(FacebookResource):
-    level: ClassVar[ApiLevel] = ApiLevel.ACCOUNT
-    breakdowns: ClassVar[list[Breakdown]] = []
-    action_breakdowns: ClassVar[list[ActionBreakdown]] = []
-    cursor_field: ClassVar[str] = CursorField.DATE_START
-
-    @classmethod
-    def _get_required_fields_for_level(cls) -> list[str]:
-        required: list[str] = [F.ACCOUNT_ID, F.DATE_START]
-
-        if cls.level == ApiLevel.AD:
-            required.append(F.AD_ID)
-        elif cls.level == ApiLevel.ADSET:
-            required.append(F.ADSET_ID)
-        elif cls.level == ApiLevel.CAMPAIGN:
-            required.append(F.CAMPAIGN_ID)
-
-        return required
-
-
-class BaseAdsInsights(FacebookInsightsResource):
     """
     Base class for all Ads Insights streams.
 
@@ -1107,6 +1087,10 @@ class BaseAdsInsights(FacebookInsightsResource):
     """
 
     endpoint: ClassVar[str] = "insights"
+    level: ClassVar[ApiLevel] = ApiLevel.ACCOUNT
+    breakdowns: ClassVar[list[Breakdown]] = []
+    action_breakdowns: ClassVar[list[ActionBreakdown]] = []
+    cursor_field: ClassVar[str] = CursorField.DATE_START
 
     # Level field constants for hierarchy logic
     LEVEL_ACCOUNT_FIELDS: ClassVar[list[str]] = [F.ACCOUNT_ID, F.ACCOUNT_NAME]
@@ -1182,7 +1166,7 @@ class BaseAdsInsights(FacebookInsightsResource):
         return now - self.insights_retention_period
 
 
-class AdsInsights(BaseAdsInsights):
+class AdsInsights(FacebookInsightsResource):
     name: ClassVar[str] = ResourceName.ADS_INSIGHTS
     level: ClassVar[ApiLevel] = ApiLevel.AD
 
@@ -1320,10 +1304,10 @@ class AdsInsightsActionType(AdsInsights):
 
 def build_custom_ads_insights_model(
     config: InsightsConfig,
-) -> type[BaseAdsInsights]:
+) -> type[FacebookInsightsResource]:
     """Build a dynamic model for custom insights.
 
-    Inherits from BaseAdsInsights and dynamically adds the appropriate
+    Inherits from FacebookInsightsResource and dynamically adds the appropriate
     level-specific ID field as a required instance field.
 
     Key considerations:
@@ -1345,7 +1329,7 @@ def build_custom_ads_insights_model(
 
     # Check if user specified any fields that aren't available at this level
     # and raise a validation error if so (do this early before building model)
-    excluded_fields = BaseAdsInsights.get_excluded_fields_for_level(config.level)
+    excluded_fields = FacebookInsightsResource.get_excluded_fields_for_level(config.level)
     user_excluded_fields = [f for f in fields if f in excluded_fields]
 
     if user_excluded_fields:
@@ -1415,7 +1399,7 @@ def build_custom_ads_insights_model(
     camel_case_name = "".join(word.capitalize() for word in config.name.split("_"))
     model = create_model(
         camel_case_name,
-        __base__=(BaseAdsInsights,),
+        __base__=(FacebookInsightsResource,),
         **field_defs,
     )
 
