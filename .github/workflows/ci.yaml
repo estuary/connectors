@@ -76,6 +76,7 @@ jobs:
           - source-dynamodb
           - source-firestore
           - source-gcs
+          - source-gigahello
           - source-google-drive
           - source-google-pubsub
           - source-hello-world

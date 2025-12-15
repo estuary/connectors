@@ -1,0 +1,52 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-gigahello/config",
+    "properties": {
+      "rate": {
+        "type": "number",
+        "title": "Message Rate",
+        "description": "Message rate in MBps",
+        "default": 1.0
+      }
+    },
+    "type": "object",
+    "required": [
+      "rate"
+    ],
+    "title": "GigaHello"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-gigahello/resource",
+    "properties": {
+      "name": {
+        "type": "string",
+        "title": "Stream Name",
+        "description": "Stream name to include in generated documents",
+        "default": "greetings"
+      },
+      "message": {
+        "type": "string",
+        "title": "Message",
+        "description": "A text payload to include in each document",
+        "default": "Hello world!"
+      },
+      "raw": {
+        "type": "string",
+        "title": "Raw JSON Payload",
+        "description": "An optional JSON value to include in each document"
+      }
+    },
+    "type": "object",
+    "required": [
+      "name",
+      "message"
+    ],
+    "title": "GigaHello Resource Spec"
+  },
+  "documentation_url": "https://go.estuary.dev/source-gigahello",
+  "resource_path_pointers": [
+    "/name"
+  ]
+}

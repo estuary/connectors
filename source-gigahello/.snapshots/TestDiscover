@@ -1,0 +1,41 @@
+{
+  "bindings": [
+    {
+      "recommended_name": "messages",
+      "resource_config_json": {
+        "name": "greetings",
+        "message": "Hello, world!"
+      },
+      "document_schema_json": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "$id": "https://github.com/estuary/connectors/source-gigahello/message",
+        "properties": {
+          "seq": {
+            "type": "integer",
+            "title": "Sequence Number",
+            "description": "The sequence number of this message"
+          },
+          "message": {
+            "type": "string",
+            "title": "Message",
+            "description": "A human-readable message"
+          },
+          "raw": {
+            "type": "string",
+            "description": "A JSON payload"
+          }
+        },
+        "type": "object",
+        "required": [
+          "seq",
+          "message",
+          "raw"
+        ],
+        "title": "GigaHello Output Document"
+      },
+      "key": [
+        "/seq"
+      ]
+    }
+  ]
+}
