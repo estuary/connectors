@@ -102,3 +102,5 @@ captures:
         name: location_metafields
         interval: PT5M
       target: acmeCo/location_metafields
+    shards:
+      logLevel: debug

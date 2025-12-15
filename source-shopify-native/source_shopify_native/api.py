@@ -20,11 +20,20 @@ PAGE_SIZE = 250
 TARGET_FETCH_PAGE_INVOCATION_RUN_TIME = 60 * 5 # 5 minutes
 
 
+def _inject_store_meta(record: dict, store: str) -> dict:
+    """Inject _meta.store field into a record."""
+    if "_meta" not in record:
+        record["_meta"] = {}
+    record["_meta"]["store"] = store
+    return record
+
+
 async def bulk_fetch_incremental(
     http: HTTPMixin,
     window_size: timedelta,
     bulk_job_manager: gql.bulk_job_manager.BulkJobManager,
     model: type[ShopifyGraphQLResource],
+    store: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ShopifyGraphQLResource | LogCursor, None]:
@@ -44,6 +53,7 @@ async def bulk_fetch_incremental(
 
     _, lines = await http.request_lines(log, url)
     async for record in model.process_result(log, lines()):
+        _inject_store_meta(record, store)
         resource = model.model_validate(record)
         yield resource
 
@@ -55,6 +65,7 @@ async def bulk_fetch_full_refresh(
     start_date: datetime,
     bulk_job_manager: gql.bulk_job_manager.BulkJobManager,
     model: type[ShopifyGraphQLResource],
+    store: str,
     log: Logger,
 ) -> AsyncGenerator[ShopifyGraphQLResource, None]:
     end = datetime.now(tz=UTC)
@@ -70,6 +81,7 @@ async def bulk_fetch_full_refresh(
 
     _, lines = await http.request_lines(log, url)
     async for record in model.process_result(log, lines()):
+        _inject_store_meta(record, store)
         resource = model.model_validate(record)
         yield resource
 
@@ -80,6 +92,7 @@ async def _paginate_through_resources(
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
     start: datetime,
     end: datetime,
+    store: str,
     log: Logger,
 ) -> AsyncGenerator[TShopifyGraphQLResource, None]:
     after: str | None = None
@@ -92,9 +105,13 @@ async def _paginate_through_resources(
             after=after,
         )
 
-        data = await client.request(query, data_model,log)
+        data = await client.request(query, data_model, log)
 
         for doc in data.nodes:
+            # Inject store into the raw model before yielding
+            doc_dict = doc.model_dump()
+            _inject_store_meta(doc_dict, store)
+            doc = model.model_validate(doc_dict)
             yield doc
 
         page_info = data.page_info
@@ -108,6 +125,7 @@ async def fetch_incremental_unsorted(
     client: ShopifyGraphQLClient,
     model: type[TShopifyGraphQLResource],
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    store: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TShopifyGraphQLResource | LogCursor, None]:
@@ -122,6 +140,7 @@ async def fetch_incremental_unsorted(
         data_model=data_model,
         start=log_cursor,
         end=end,
+        store=store,
         log=log,
     ):
         cursor_value = doc.get_cursor_value()
@@ -139,6 +158,7 @@ async def fetch_incremental(
     client: ShopifyGraphQLClient,
     model: type[TShopifyGraphQLResource],
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    store: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TShopifyGraphQLResource | LogCursor, None]:
@@ -154,6 +174,7 @@ async def fetch_incremental(
         data_model=data_model,
         start=log_cursor,
         end=end,
+        store=store,
         log=log,
     ):
         cursor_value = doc.get_cursor_value()
@@ -180,6 +201,7 @@ async def backfill_incremental(
     client: ShopifyGraphQLClient,
     model: type[TShopifyGraphQLResource],
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    store: str,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
@@ -199,6 +221,7 @@ async def backfill_incremental(
         data_model=data_model,
         start=start,
         end=cutoff,
+        store=store,
         log=log,
     ):
         cursor_value = doc.get_cursor_value()

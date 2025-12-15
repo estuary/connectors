@@ -1,7 +1,8 @@
-credentials:
-    credentials_title: Private App Credentials
-    access_token_sops: ENC[AES256_GCM,data:Mcq58scGHGj8jW7Lsv9gI7GQ+kbnnGe40nwOY+60W173vqNklHo=,iv:9XLi7MOmucqmyesaSxEhj4GQKd74JbyR1w20TdG7YcM=,tag:U2M6LgJeHn3Xj4ysnQYLag==,type:str]
-store: estuary-alex-testing
+stores:
+    - store: estuary-alex-testing
+      credentials:
+        credentials_title: Private App Credentials
+        access_token_sops: ENC[AES256_GCM,data:4VX3cQpp5l4dhkafbuolQdWbdpuLhZOzp+8dfoeFqLMj7bpUvjM=,iv:JhdCSDChsfp+Qe/For1HLUP13lruYkxfEry0TQ8ROlg=,tag:vQQrB/GgdZ2l/fnbydKjgg==,type:str]
 start_date: "2025-01-10T00:00:00Z"
 advanced:
     window_size: P50000D
@@ -9,13 +10,13 @@ sops:
     kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
-          created_at: "2023-12-19T13:25:05Z"
-          enc: CiQAdmEdwmjDSn1NNdMUXMUGzrNlxb+PmRnwO3SlDl7ECE2TEj8SSQCVvC1zgeSluXBB2sK8SHPxU5VLUcCcAoMUAYjww/YYhqowBhINH4xi+cC9zJaOZxU8Oq/jrGCzO0o1Kxr1HMKv4C3tyc6/4ck=
+          created_at: "2025-12-15T19:22:15Z"
+          enc: CiQAdmEdwqHibfl18OahBkDVpKVEea2dDG2jnCsRbRe/I8fydEwSSQDNZIk6nwRfHCNezP9BC0QLGSVxZWJXBIuP76wuow1euzB6EdsPh4Z4zVqf+8++woTcID0Hyferhe6UnDTz2JnQ7+3SyRUMJSQ=
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-09-05T13:06:45Z"
-    mac: ENC[AES256_GCM,data:I4FWGsOWyKxrI4ud+Ul5b8MR2qCOGeK0HyOtRnxpdC6cc2g7qa9o0ZNi70Uz+1LtigCfFgRKyJkU1lry7AFyPJsT9IEDo4mt/4+taSkoo7T1aFakwnN5GLDeD3j0ktKvlFXPt5/RoWGczTfgZ0U+q8IsjBF1gPPA2BgJ5+kP1S4=,iv:flzhyYQLxi/5vFPXywtE0ENHM67oWehJglMWHnvIclE=,tag:JXkLiXB8p/NHbj/UBqW69A==,type:str]
+    lastmodified: "2025-12-15T19:22:15Z"
+    mac: ENC[AES256_GCM,data:MHttIgJbZHfMdVWXj2il03FyjqqWUPRLsuLqjdQHLTi5hnYqiQW+1PiF6XwEYkBag4VRJ0M5GxqhWDQ0QP/+y4GFOnvG77VrhaBK3eis38hx4Lgb13LDp3dHNkc/KxVuSGAPAf0snYhDNXG1xwv56NbMfjKEj0nT4A90Pp0CDqY=,iv:Pi5LSJnozRuZzUctf5ZFqL7SDFhYlrtbwBS8mREgLZA=,tag:lCsE5VNRVwm/Yf9aMp9BQg==,type:str]
     pgp: []
     encrypted_suffix: _sops
-    version: 3.9.0
+    version: 3.9.4
