@@ -11,6 +11,7 @@ class AbandonedCheckouts(ShopifyGraphQLResource):
     NAME = "abandoned_checkouts"
     QUERY_ROOT = "abandonedCheckouts"
     SORT_KEY = SortKey.CREATED_AT
+    REQUIRED_SCOPE = "read_checkouts"
     QUERY = """
     id
     abandonedCheckoutUrl

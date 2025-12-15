@@ -10,6 +10,7 @@ class _Collections(ShopifyGraphQLResource):
     COLLECTION_TYPE: ClassVar[str] = ""
     QUERY_ROOT = "collections"
     SORT_KEY = SortKey.UPDATED_AT
+    REQUIRED_SCOPE = "read_products"
     QUERY = """
     title
     handle

@@ -11,6 +11,7 @@ class OrderAgreements(ShopifyGraphQLResource):
     NAME = "order_agreements"
     QUERY_ROOT = "orders"
     SORT_KEY = SortKey.UPDATED_AT
+    REQUIRED_SCOPE = "read_orders"
     QUERY = """
     agreements {
         edges {

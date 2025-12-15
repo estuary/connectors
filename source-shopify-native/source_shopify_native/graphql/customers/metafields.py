@@ -10,6 +10,7 @@ class CustomerMetafields(MetafieldsResource):
     PARENT_ID_KEY = "gid://shopify/Customer/"
     QUERY_ROOT = "customers"
     SORT_KEY = SortKey.UPDATED_AT
+    REQUIRED_SCOPE = "read_customers"
 
     @staticmethod
     def build_query(
