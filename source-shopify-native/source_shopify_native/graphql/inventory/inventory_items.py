@@ -9,6 +9,7 @@ class InventoryItems(ShopifyGraphQLResource):
     NAME = "inventory_items"
     QUERY_ROOT = "inventoryItems"
     SHOULD_USE_BULK_QUERIES = False
+    QUALIFYING_SCOPES = {"read_inventory", "read_products"}
     QUERY = """
     id
     legacyResourceId

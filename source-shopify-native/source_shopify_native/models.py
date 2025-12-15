@@ -27,17 +27,23 @@ from estuary_cdk.capture.common import (
 from .graphql.common import dt_to_str, str_to_dt
 
 
+# OAuth scopes requested during authorization.
+# These are verified against Shopify's GraphQL Admin API 2025-04 documentation.
+# See: https://shopify.dev/docs/api/usage/access-scopes#authenticated-access-scopes
 scopes = [
     "read_locales",
-    "read_products",
-    "read_orders",
-    "read_checkouts",
-    "read_locations",
-    "read_inventory",
-    "read_fulfillments",
-    "read_customers",
-    "read_publications",
-    "read_own_subscription_contracts",
+    "read_products",  # Products, ProductVariants, Collections, InventoryItems
+    "read_orders",  # Orders, AbandonedCheckouts, Fulfillments, Transactions, Refunds, Risks
+    "read_locations",  # Locations
+    "read_inventory",  # InventoryItems, InventoryLevels, Locations
+    "read_customers",  # Customers
+    "read_own_subscription_contracts",  # SubscriptionContracts
+    # FulfillmentOrder requires one of the following 4 scopes (not read_fulfillments).
+    # See: https://shopify.dev/docs/api/admin-graphql/latest/objects/FulfillmentOrder
+    "read_assigned_fulfillment_orders",
+    "read_merchant_managed_fulfillment_orders",
+    "read_third_party_fulfillment_orders",
+    "read_marketplace_fulfillment_orders",
 ]
 
 OAUTH2_SPEC = OAuth2Spec(
@@ -282,6 +288,36 @@ class ShopDetails(BaseModel, extra="allow"):
         """
 
 
+class AccessScopes(BaseModel, extra="allow"):
+    """Model for querying currentAppInstallation to determine granted scopes."""
+
+    class Data(BaseModel, extra="forbid"):
+        class AppInstallation(BaseModel, extra="forbid"):
+            class AccessScope(BaseModel, extra="forbid"):
+                handle: str
+
+            accessScopes: list[AccessScope]
+
+        currentAppInstallation: AppInstallation
+
+    data: Data
+
+    @staticmethod
+    def query() -> str:
+        return """
+        {
+            currentAppInstallation {
+                accessScopes {
+                    handle
+                }
+            }
+        }
+        """
+
+    def get_scope_handles(self) -> set[str]:
+        return {s.handle for s in self.data.currentAppInstallation.accessScopes}
+
+
 class SortKey(StrEnum):
     CREATED_AT = "CREATED_AT"
     UPDATED_AT = "UPDATED_AT"
@@ -294,6 +330,7 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = ""
     SORT_KEY: ClassVar[SortKey | None] = None
     SHOULD_USE_BULK_QUERIES: ClassVar[bool] = True
+    QUALIFYING_SCOPES: ClassVar[set[str]] = set()
 
     id: str
 

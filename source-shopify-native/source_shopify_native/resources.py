@@ -17,6 +17,7 @@ import source_shopify_native.graphql as gql
 
 from .models import (
     OAUTH2_SPEC,
+    AccessScopes,
     AccessToken,
     EndpointConfig,
     ShopifyGraphQLResource,
@@ -100,11 +101,29 @@ async def _can_access_pii(
                 return True
 
 
+async def _get_granted_scopes(
+    http: HTTPMixin,
+    url: str,
+    log: Logger,
+) -> set[str]:
+    """Query the currentAppInstallation to determine which scopes are granted."""
+    response = AccessScopes.model_validate_json(
+        await http.request(
+            log, url, method="POST", json={"query": AccessScopes.query()}
+        )
+    )
+    scopes = response.get_scope_handles()
+    log.info(f"Access token has scopes: {scopes}")
+    return scopes
+
+
 def _incremental_resources(
     http: HTTPMixin,
     config: EndpointConfig,
     client: gql.ShopifyGraphQLClient,
     bulk_job_manager: gql.bulk_job_manager.BulkJobManager,
+    resource_models: list[type[ShopifyGraphQLResource]],
+    granted_scopes: set[str],
 ) -> list[Resource]:
     def open(
         model: type[ShopifyGraphQLResource],
@@ -114,6 +133,17 @@ def _incremental_resources(
         task: Task,
         _all_bindings=None,
     ):
+        # Warn if FulfillmentOrders has partial scope coverage (data may be incomplete).
+        if model == gql.FulfillmentOrders:
+            fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
+            has_partial_coverage = fo_scopes.intersection(granted_scopes) and not fo_scopes.issubset(granted_scopes)
+            if has_partial_coverage:
+                missing = fo_scopes.difference(granted_scopes)
+                task.log.warning(
+                    f"FulfillmentOrders stream enabled with partial scopes. Missing: {missing}. "
+                    "Only fulfillment orders matching granted scope types will be captured."
+                )
+
         data_model = create_response_data_model(model)
 
         if model.SHOULD_USE_BULK_QUERIES:
@@ -174,7 +204,7 @@ def _incremental_resources(
 
     resources: list[Resource] = []
 
-    for model in INCREMENTAL_RESOURCES:
+    for model in resource_models:
         if model.SHOULD_USE_BULK_QUERIES or model.SORT_KEY is None:
             initial_state = ResourceState(
                 inc=ResourceState.Incremental(cursor=config.start_date)
@@ -235,14 +265,32 @@ async def all_resources(
     client = gql.ShopifyGraphQLClient(http, config.store)
     bulk_job_manager = gql.bulk_job_manager.BulkJobManager(client, log)
 
-    # Before opening bindings, cancel any ongoing bulk query jobs before the 
+    # Before opening bindings, cancel any ongoing bulk query jobs before the
     # connector starts submitting its own bulk query jobs.
     if should_cancel_ongoing_job:
         await bulk_job_manager.cancel_current()
 
+    # Query the access token's granted scopes to filter available streams.
+    granted_scopes = await _get_granted_scopes(http, client.url, log)
+
+    # Filter streams to only those whose required scope is granted.
+    # Uses set intersection to check if ANY of the required scopes are granted (OR logic).
+    available_models: list[type[ShopifyGraphQLResource]] = []
+    excluded_streams: list[tuple[str, set[str]]] = []
+    for model in INCREMENTAL_RESOURCES:
+        if model.QUALIFYING_SCOPES & granted_scopes:
+            available_models.append(model)
+        else:
+            excluded_streams.append((model.NAME, model.QUALIFYING_SCOPES))
+
+    if excluded_streams:
+        log.warning(
+            f"Excluding {len(excluded_streams)} stream(s) due to missing scopes: "
+            f"{', '.join(f'{name} (needs one of {scopes})' for name, scopes in excluded_streams)}"
+        )
 
     resources = [
-        *_incremental_resources(http, config, client, bulk_job_manager),
+        *_incremental_resources(http, config, client, bulk_job_manager, available_models, granted_scopes),
     ]
 
     # If the user is authenticating with an access token from their custom Shopify app,

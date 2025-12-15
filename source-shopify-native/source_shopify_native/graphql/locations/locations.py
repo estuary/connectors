@@ -9,6 +9,7 @@ class Locations(ShopifyGraphQLResource):
     NAME = "locations"
     QUERY_ROOT = "locations"
     SHOULD_USE_BULK_QUERIES = False
+    QUALIFYING_SCOPES = {"read_locations", "read_inventory", "read_markets_home"}
     QUERY = """
     id
     name

@@ -8,6 +8,7 @@ class LocationMetafields(MetafieldsResource):
     NAME = "location_metafields"
     PARENT_ID_KEY = "gid://shopify/Location/"
     QUERY_ROOT = "locations"
+    QUALIFYING_SCOPES = {"read_locations", "read_inventory", "read_markets_home"}
 
     @staticmethod
     def build_query(

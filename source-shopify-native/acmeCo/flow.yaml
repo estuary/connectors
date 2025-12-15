@@ -96,7 +96,3 @@ collections:
     schema: smart_collections.schema.yaml
     key:
       - /id
-  acmeCo/subscription_contracts:
-    schema: subscription_contracts.schema.yaml
-    key:
-    - /id
