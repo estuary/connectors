@@ -11,6 +11,7 @@ class CustomCollectionMetafields(MetafieldsResource):
     PARENT_ID_KEY = "gid://shopify/Collection/"
     QUERY_ROOT = "collections"
     SORT_KEY = SortKey.UPDATED_AT
+    QUALIFYING_SCOPES = {"read_products"}
 
     @staticmethod
     def build_query(
@@ -42,6 +43,7 @@ class SmartCollectionMetafields(MetafieldsResource):
     PARENT_ID_KEY = "gid://shopify/Collection/"
     QUERY_ROOT = "collections"
     SORT_KEY = SortKey.UPDATED_AT
+    QUALIFYING_SCOPES = {"read_products"}
 
     @staticmethod
     def build_query(

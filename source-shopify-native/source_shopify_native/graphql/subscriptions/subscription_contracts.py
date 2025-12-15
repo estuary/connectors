@@ -10,6 +10,7 @@ class SubscriptionContracts(ShopifyGraphQLResource):
     NAME = "subscription_contracts"
     QUERY_ROOT = "subscriptionContracts"
     SORT_KEY = SortKey.UPDATED_AT
+    QUALIFYING_SCOPES = {"read_own_subscription_contracts"}
     QUERY = """
     status
     nextBillingDate

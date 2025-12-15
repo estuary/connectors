@@ -10,6 +10,7 @@ class OrderRisks(ShopifyGraphQLResource):
     QUERY_ROOT = "orders"
     SORT_KEY = SortKey.UPDATED_AT
     SHOULD_USE_BULK_QUERIES = False
+    QUALIFYING_SCOPES = {"read_orders"}
     QUERY = """
     risk {
         recommendation

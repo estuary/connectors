@@ -10,6 +10,14 @@ class Fulfillments(ShopifyGraphQLResource):
     QUERY_ROOT = "orders"
     SORT_KEY = SortKey.UPDATED_AT
     SHOULD_USE_BULK_QUERIES = False
+    QUALIFYING_SCOPES = {
+        "read_orders",
+        "read_marketplace_orders",
+        "read_assigned_fulfillment_orders",
+        "read_merchant_managed_fulfillment_orders",
+        "read_third_party_fulfillment_orders",
+        "read_marketplace_fulfillment_orders",
+    }
     QUERY = """
     fulfillments {
         id

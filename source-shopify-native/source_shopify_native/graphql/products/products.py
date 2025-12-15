@@ -10,6 +10,7 @@ class Products(ShopifyGraphQLResource):
     NAME = "products"
     QUERY_ROOT = "products"
     SORT_KEY = SortKey.UPDATED_AT
+    QUALIFYING_SCOPES = {"read_products"}
     QUERY = """
     title
     bodyHtml

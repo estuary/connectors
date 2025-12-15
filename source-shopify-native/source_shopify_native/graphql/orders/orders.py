@@ -11,6 +11,7 @@ class Orders(ShopifyGraphQLResource):
     NAME = "orders"
     QUERY_ROOT = "orders"
     SORT_KEY = SortKey.UPDATED_AT
+    QUALIFYING_SCOPES = {"read_orders", "read_marketplace_orders", "read_quick_sale"}
     QUERY = """
     app {
         id

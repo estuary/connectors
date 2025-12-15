@@ -11,6 +11,7 @@ class OrderMetafields(MetafieldsResource):
     PARENT_ID_KEY = "gid://shopify/Order/"
     QUERY_ROOT = "orders"
     SORT_KEY = SortKey.UPDATED_AT
+    QUALIFYING_SCOPES = {"read_orders", "read_marketplace_orders", "read_quick_sale"}
 
     @staticmethod
     def build_query(

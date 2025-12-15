@@ -11,6 +11,11 @@ class AbandonedCheckouts(ShopifyGraphQLResource):
     NAME = "abandoned_checkouts"
     QUERY_ROOT = "abandonedCheckouts"
     SORT_KEY = SortKey.CREATED_AT
+    # Requires read_orders scope AND the user must have manage_abandoned_checkouts
+    # staff permission in Shopify admin. The staff permission cannot be verified
+    # programmatically - only the OAuth scope can be checked.
+    # See: https://shopify.dev/docs/api/admin-graphql/latest/objects/AbandonedCheckout
+    QUALIFYING_SCOPES = {"read_orders"}
     QUERY = """
     id
     abandonedCheckoutUrl
