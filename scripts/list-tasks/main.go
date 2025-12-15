@@ -109,7 +109,7 @@ func performListing(ctx context.Context) error {
 			}
 			fmt.Printf("added %q to draft\n", task.CatalogName)
 		}
-		if *pullSpecs && task.CatalogName != "-----/aman-dummy/source-mongodb" {
+		if *pullSpecs {
 			if err := pullTaskSpec(ctx, task.CatalogName); err != nil {
 				return fmt.Errorf("error pulling spec for task %q: %w", task.CatalogName, err)
 			}
