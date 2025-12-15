@@ -282,6 +282,36 @@ class ShopDetails(BaseModel, extra="allow"):
         """
 
 
+class AccessScopes(BaseModel, extra="allow"):
+    """Model for querying currentAppInstallation to determine granted scopes."""
+
+    class Data(BaseModel, extra="forbid"):
+        class AppInstallation(BaseModel, extra="forbid"):
+            class AccessScope(BaseModel, extra="forbid"):
+                handle: str
+
+            accessScopes: list[AccessScope]
+
+        currentAppInstallation: AppInstallation
+
+    data: Data
+
+    @staticmethod
+    def query() -> str:
+        return """
+        {
+            currentAppInstallation {
+                accessScopes {
+                    handle
+                }
+            }
+        }
+        """
+
+    def get_scope_handles(self) -> set[str]:
+        return {s.handle for s in self.data.currentAppInstallation.accessScopes}
+
+
 class SortKey(StrEnum):
     CREATED_AT = "CREATED_AT"
     UPDATED_AT = "UPDATED_AT"
@@ -294,6 +324,7 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = ""
     SORT_KEY: ClassVar[SortKey | None] = None
     SHOULD_USE_BULK_QUERIES: ClassVar[bool] = True
+    REQUIRED_SCOPE: ClassVar[str] = ""
 
     id: str
 

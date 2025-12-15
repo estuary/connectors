@@ -17,6 +17,7 @@ import source_shopify_native.graphql as gql
 
 from .models import (
     OAUTH2_SPEC,
+    AccessScopes,
     AccessToken,
     EndpointConfig,
     ShopifyGraphQLResource,
@@ -100,11 +101,28 @@ async def _can_access_pii(
                 return True
 
 
+async def _get_granted_scopes(
+    http: HTTPMixin,
+    url: str,
+    log: Logger,
+) -> set[str]:
+    """Query the currentAppInstallation to determine which scopes are granted."""
+    response = AccessScopes.model_validate_json(
+        await http.request(
+            log, url, method="POST", json={"query": AccessScopes.query()}
+        )
+    )
+    scopes = response.get_scope_handles()
+    log.info(f"Access token has scopes: {scopes}")
+    return scopes
+
+
 def _incremental_resources(
     http: HTTPMixin,
     config: EndpointConfig,
     client: gql.ShopifyGraphQLClient,
     bulk_job_manager: gql.bulk_job_manager.BulkJobManager,
+    resource_models: list[type[ShopifyGraphQLResource]] | None = None,
 ) -> list[Resource]:
     def open(
         model: type[ShopifyGraphQLResource],
@@ -174,7 +192,8 @@ def _incremental_resources(
 
     resources: list[Resource] = []
 
-    for model in INCREMENTAL_RESOURCES:
+    models_to_use = resource_models if resource_models is not None else INCREMENTAL_RESOURCES
+    for model in models_to_use:
         if model.SHOULD_USE_BULK_QUERIES or model.SORT_KEY is None:
             initial_state = ResourceState(
                 inc=ResourceState.Incremental(cursor=config.start_date)
@@ -235,14 +254,30 @@ async def all_resources(
     client = gql.ShopifyGraphQLClient(http, config.store)
     bulk_job_manager = gql.bulk_job_manager.BulkJobManager(client, log)
 
-    # Before opening bindings, cancel any ongoing bulk query jobs before the 
+    # Before opening bindings, cancel any ongoing bulk query jobs before the
     # connector starts submitting its own bulk query jobs.
     if should_cancel_ongoing_job:
         await bulk_job_manager.cancel_current()
 
+    # Query the access token's granted scopes to filter available streams.
+    granted_scopes = await _get_granted_scopes(http, client.url, log)
+
+    # Filter streams to only those whose required scope is granted.
+    available_models: list[type[ShopifyGraphQLResource]] = []
+    excluded_streams: list[str] = []
+    for model in INCREMENTAL_RESOURCES:
+        if model.REQUIRED_SCOPE in granted_scopes:
+            available_models.append(model)
+        else:
+            excluded_streams.append(model.NAME)
+
+    if excluded_streams:
+        log.warning(
+            f"Excluding {len(excluded_streams)} stream(s) due to missing scopes: {excluded_streams}"
+        )
 
     resources = [
-        *_incremental_resources(http, config, client, bulk_job_manager),
+        *_incremental_resources(http, config, client, bulk_job_manager, available_models),
     ]
 
     # If the user is authenticating with an access token from their custom Shopify app,

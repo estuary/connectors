@@ -10,6 +10,7 @@ class ProductMedia(ShopifyGraphQLResource):
     NAME = "product_media"
     QUERY_ROOT = "products"
     SORT_KEY = SortKey.UPDATED_AT
+    REQUIRED_SCOPE = "read_products"
     QUERY = """
     media(query:"media_type:IMAGE") {
         edges {

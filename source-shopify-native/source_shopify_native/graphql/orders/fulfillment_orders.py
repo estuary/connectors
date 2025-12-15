@@ -10,6 +10,7 @@ class FulfillmentOrders(ShopifyGraphQLResource):
     NAME = "fulfillment_orders"
     QUERY_ROOT = "orders"
     SORT_KEY = SortKey.UPDATED_AT
+    REQUIRED_SCOPE = "read_fulfillments"
     QUERY = """
     id
     fulfillmentOrders {

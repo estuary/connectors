@@ -10,6 +10,7 @@ class ProductVariants(ShopifyGraphQLResource):
     NAME = "product_variants"
     QUERY_ROOT = "products"
     SORT_KEY = SortKey.UPDATED_AT
+    REQUIRED_SCOPE = "read_products"
     QUERY = """
     variants {
         edges {
