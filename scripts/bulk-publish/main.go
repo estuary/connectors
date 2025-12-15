@@ -4,9 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -24,6 +26,14 @@ list-tasks script when using the '--pull' flag, but the script has logic to avoi
 publishing any 'flow.yaml' files which import others so _in theory_ it should work
 correctly on the specs produced by 'flowctl draft develop' as well.
 
+Percentile-based publishing:
+  Use --from-pct and --to-pct to publish a subset of specs. Files are ordered by
+  a hash of the catalog name (not alphabetically) to distribute publications across
+  tenants. For example:
+    --from-pct=0 --to-pct=10    # Publish the first 10%
+    --from-pct=10 --to-pct=50   # Publish from 10% to 50%
+  The --mark flag ensures already-published specs are skipped on subsequent runs.
+
 Refer to 'docs/feature_flags.md' for more information on the intended use-case and workflow.
 `
 
@@ -32,6 +42,8 @@ var (
 	configsDir    = flag.String("dir", "./specs", "The directory beneath which to publish configs.")
 	markPublished = flag.Bool("mark", false, "When true, renames files after publishing so that another run of this script will ignore them.")
 	yesFlag       = flag.Bool("yes", false, "When true, automatically answer 'yes' to the continue prompt.")
+	fromPct       = flag.Int("from-pct", 0, "Start publishing from this percentile (0-100). Files are ordered by hash of catalog name.")
+	toPct         = flag.Int("to-pct", 100, "Stop publishing at this percentile (0-100). Files are ordered by hash of catalog name.")
 )
 
 func main() {
@@ -50,6 +62,17 @@ func main() {
 		FullTimestamp: true,
 		PadLevelText:  true,
 	})
+
+	// Validate percentile flags
+	if *fromPct < 0 || *fromPct > 100 {
+		log.WithField("from-pct", *fromPct).Fatal("from-pct must be between 0 and 100")
+	}
+	if *toPct < 0 || *toPct > 100 {
+		log.WithField("to-pct", *toPct).Fatal("to-pct must be between 0 and 100")
+	}
+	if *fromPct >= *toPct {
+		log.WithFields(log.Fields{"from-pct": *fromPct, "to-pct": *toPct}).Fatal("from-pct must be less than to-pct")
+	}
 
 	if err := performPublishing(context.Background()); err != nil {
 		log.WithError(err).Fatal("error")
@@ -83,8 +106,41 @@ func performPublishing(ctx context.Context) error {
 	if len(leafFiles) == 0 {
 		return fmt.Errorf("no leaf flow.yaml files found")
 	}
+
+	// Sort files by hash of catalog name to distribute publications across tenants.
+	// This ensures a deterministic but non-alphabetical ordering.
+	sort.Slice(leafFiles, func(i, j int) bool {
+		return catalogNameHash(leafFiles[i]) < catalogNameHash(leafFiles[j])
+	})
+
+	// Select files in the specified percentile range.
+	totalFiles := len(leafFiles)
+	startIdx := (totalFiles * *fromPct) / 100
+	endIdx := (totalFiles * *toPct) / 100
+	if endIdx > totalFiles {
+		endIdx = totalFiles
+	}
+	selectedFiles := leafFiles[startIdx:endIdx]
+
+	if len(selectedFiles) == 0 {
+		log.WithFields(log.Fields{
+			"total":    totalFiles,
+			"from-pct": *fromPct,
+			"to-pct":   *toPct,
+		}).Warn("no files in the specified percentile range")
+		return nil
+	}
+
+	log.WithFields(log.Fields{
+		"total":    totalFiles,
+		"selected": len(selectedFiles),
+		"from-pct": *fromPct,
+		"to-pct":   *toPct,
+		"range":    fmt.Sprintf("[%d:%d]", startIdx, endIdx),
+	}).Info("selected files for publishing")
+
 	if !*yesFlag {
-		fmt.Printf("Publish %d changes? (y/N) ", len(leafFiles))
+		fmt.Printf("Publish %d changes (indices %d-%d of %d total)? (y/N) ", len(selectedFiles), startIdx, endIdx-1, totalFiles)
 		var response string
 		fmt.Scanln(&response)
 		if !strings.EqualFold(response, "y") {
@@ -95,7 +151,7 @@ func performPublishing(ctx context.Context) error {
 
 	// For each flow.yaml file, try and publish it to production.
 	var failedFiles []string
-	for _, file := range leafFiles {
+	for _, file := range selectedFiles {
 		if err := publishFile(ctx, file); err != nil {
 			log.WithField("file", file).WithError(err).Warn("error publishing file")
 			failedFiles = append(failedFiles, file)
@@ -164,4 +220,16 @@ func flowctl(ctx context.Context, args ...string) error {
 	log.WithField("command", args).Debug("executing flowctl command")
 	var _, err = exec.CommandContext(ctx, "flowctl", args...).Output()
 	return err
+}
+
+// catalogNameHash extracts the catalog name from a file path and returns its hash.
+// For a path like "./specs/tenantTaskName/flow.yaml", the catalog name is "tenantTaskName".
+func catalogNameHash(filePath string) uint64 {
+	// Get the parent directory name (catalog name)
+	catalogName := filepath.Base(filepath.Dir(filePath))
+
+	// Hash the catalog name using FNV-1a
+	h := fnv.New64a()
+	h.Write([]byte(catalogName))
+	return h.Sum64()
 }
