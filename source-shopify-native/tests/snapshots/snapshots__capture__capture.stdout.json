@@ -11,7 +11,6 @@
       "defaultEmailAddress": {
         "marketingOptInLevel": "SINGLE_OPT_IN",
         "marketingState": "NOT_SUBSCRIBED",
-        "marketingUnsubscribeUrl": "https://estuary-alex-testing.myshopify.com/account/unsubscribe?token=REDACTED",
         "marketingUpdatedAt": null
       },
       "defaultPhoneNumber": {

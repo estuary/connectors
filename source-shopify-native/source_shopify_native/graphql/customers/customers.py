@@ -22,7 +22,6 @@ class Customers(ShopifyGraphQLResource):
     defaultEmailAddress {
         marketingOptInLevel
         marketingState
-        marketingUnsubscribeUrl
         marketingUpdatedAt
     }
     defaultPhoneNumber {
