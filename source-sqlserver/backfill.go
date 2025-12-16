@@ -317,12 +317,12 @@ func (db *sqlserverDatabase) queryTableStatistics(ctx context.Context, schema, t
 
 	// Query sys.partitions for row count estimate
 	var query = `
-		SELECT SUM(P.ROWS)
-		FROM SYS.PARTITIONS P
-		JOIN SYS.TABLES T ON P.OBJECT_ID = T.OBJECT_ID
-		JOIN SYS.SCHEMAS S ON T.SCHEMA_ID = S.SCHEMA_ID
-		WHERE S.NAME = @p1 AND T.NAME = @p2
-		  AND P.INDEX_ID IN (0, 1)`
+		SELECT SUM(p.rows)
+		FROM sys.partitions p
+		JOIN sys.tables t ON p.object_id = t.object_id
+		JOIN sys.schemas s ON t.schema_id = s.schema_id
+		WHERE s.name = @p1 AND t.name = @p2
+		  AND p.index_id IN (0, 1)`
 	var rowCount sql.NullInt64
 	if err := db.conn.QueryRowContext(ctx, query, schema, table).Scan(&rowCount); err != nil {
 		var stats = &sqlserverTableStatistics{Err: fmt.Errorf("error querying table statistics for %q: %w", streamID, err)}
