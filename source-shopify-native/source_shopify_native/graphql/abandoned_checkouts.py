@@ -37,7 +37,6 @@ class AbandonedCheckouts(ShopifyGraphQLResource):
         defaultEmailAddress {
             marketingOptInLevel
             marketingState
-            marketingUnsubscribeUrl
             marketingUpdatedAt
         }
         defaultPhoneNumber {
