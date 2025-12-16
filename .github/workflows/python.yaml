@@ -54,6 +54,7 @@ on:
       - "source-navan/**"
       - "source-facebook-marketing-native/**"
       - "source-quickbooks/**"
+      - "source-airtable-native/**"
 
   pull_request:
     branches: [main]
@@ -109,6 +110,7 @@ on:
       - "source-navan/**"
       - "source-facebook-marketing-native/**"
       - "source-quickbooks/**"
+      - "source-airtable-native/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -317,6 +319,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-quickbooks
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-airtable-native
             type: capture
             version: v1
             usage_rate: "1.0"
