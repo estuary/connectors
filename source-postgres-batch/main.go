@@ -21,6 +21,10 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
+const (
+	truncateColumnThreshold = 1 * 1024 * 1024
+)
+
 var featureFlagDefaults = map[string]bool{
 	// When true, the fallback collection key for keyless source tables will be
 	// ["/_meta/row_id"] instead of ["/_meta/polled", "/_meta/index"].
@@ -249,7 +253,38 @@ func generatePostgresResource(cfg *Config, resourceName, schemaName, tableName, 
 	return nil, fmt.Errorf("unsupported entity type %q", tableType)
 }
 
+func oversizePlaceholderJSON(orig []byte) json.RawMessage {
+	return json.RawMessage(fmt.Sprintf(`{"flow_truncated":true,"original_size":%d}`, len(orig)))
+}
+
 func translatePostgresValue(val any, databaseTypeName string) (any, error) {
+	switch strings.ToUpper(databaseTypeName) {
+	case "CHAR", "BPCHAR", "TEXT", "VARCHAR":
+		if str, ok := val.(string); ok {
+			if len(str) > truncateColumnThreshold {
+				return str[:truncateColumnThreshold], nil
+			}
+			return str, nil
+		}
+		return val, nil
+	case "BYTEA":
+		if bs, ok := val.([]byte); ok {
+			if len(bs) > truncateColumnThreshold {
+				return bs[:truncateColumnThreshold], nil
+			}
+			return bs, nil
+		}
+		return val, nil
+	case "JSON", "JSONB":
+		if bs, ok := val.([]byte); ok {
+			if len(bs) > truncateColumnThreshold {
+				return oversizePlaceholderJSON(bs), nil
+			}
+			return json.RawMessage(bs), nil
+		}
+		return val, nil
+	}
+
 	if val, ok := val.(time.Time); ok {
 		if val.Year() < 0 || val.Year() > 9999 {
 			// We could in theory clamp excessively large years to positive infinity, but this
@@ -258,14 +293,6 @@ func translatePostgresValue(val any, databaseTypeName string) (any, error) {
 			return "0000-01-01T00:00:00Z", nil
 		}
 		return val.Format(time.RFC3339Nano), nil
-	}
-	if val, ok := val.([]byte); ok {
-		switch {
-		case strings.EqualFold(databaseTypeName, "JSON"):
-			return json.RawMessage(val), nil
-		case strings.EqualFold(databaseTypeName, "JSONB"):
-			return json.RawMessage(val), nil
-		}
 	}
 	if val, ok := val.(float64); ok { // Both FLOAT4 and FLOAT8 columns are float64's here
 		if math.IsNaN(val) {
