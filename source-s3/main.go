@@ -185,8 +185,19 @@ func (s *s3Store) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadC
 		Key:               aws.String(key),
 		IfUnmodifiedSince: &obj.ModTime,
 	}
-	resp, err := s.s3.GetObjectWithContext(ctx, &getInput)
-	if err != nil {
+
+	req, resp := s.s3.GetObjectRequest(&getInput)
+	// Prevent Go's HTTP client from automatically decompressing gzip responses.
+	// When S3 objects have Content-Encoding: gzip, Go's HTTP transport will
+	// transparently decompress the response body. This causes issues because
+	// the parser also infers compression from the filename (e.g. .gz extension)
+	// and attempts to decompress again, failing on already-decompressed data.
+	// By explicitly setting Accept-Encoding, we bypass the HTTP client's
+	// automatic decompression and let the parser handle all decompression.
+	req.HTTPRequest.Header.Set("Accept-Encoding", "gzip")
+	req.SetContext(ctx)
+
+	if err := req.Send(); err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
 
