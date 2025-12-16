@@ -1746,8 +1746,8 @@ async def _request_contact_list_memberships(
     start: datetime,
     end: datetime | None = None,
 ) -> AsyncGenerator[ContactListMembership, None]:
-    url = f"{HUB}/crm/v3/lists/{contact_list.listId}/memberships"
-    params = {"limit": 250}
+    url = f"{HUB}/crm/v3/lists/{contact_list.listId}/memberships/join-order"
+    params: dict[str, int | str] = {"limit": 250}
 
     while True:
         response = ContactListMembershipResponse.model_validate_json(
@@ -1756,15 +1756,16 @@ async def _request_contact_list_memberships(
         )
 
         for item in response.results:
-            if item.membershipTimestamp < start:
-                continue
             if end and item.membershipTimestamp >= end:
                 continue
+            if item.membershipTimestamp < start:
+                # The endpoint's sorted in descending join date order, so we are now caught up
+                return
 
             yield item
 
         if (next_cursor := response.get_next_cursor()) is None:
-            break
+            return
         params["after"] = next_cursor
 
 
@@ -1774,9 +1775,7 @@ class ContactListMembershipControl:
 
     # We expect users to have tens of thousands of lists to fetch.
     # This semaphore limits the number of tasks we keep in memory at any given time
-    task_slots: asyncio.Semaphore = field(
-        default_factory=lambda: asyncio.Semaphore(300)
-    )
+    task_slots: asyncio.Semaphore = field(default_factory=lambda: asyncio.Semaphore(20))
     results: asyncio.Queue[ContactListMembership | None] = field(
         default_factory=lambda: asyncio.Queue(1)
     )
