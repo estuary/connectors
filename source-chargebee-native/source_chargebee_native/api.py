@@ -44,8 +44,16 @@ async def _fetch_resource_data(
     resource_type: type[ChargebeeResourceType] = ChargebeeResource,
     filter_params: dict[str, str] | None = None,
     returns_list: bool = True,
+    sort_by: str | None = None,
+    sort_by_order: Literal["asc", "desc"] = "asc",
 ) -> tuple[list[ChargebeeResourceType], str | None]:
     url = f"https://{site}.chargebee.com/api/v2/{resource_name}"
+
+    if start_date and end_date and start_date == end_date:
+        raise ValueError(
+            "Start and end dates cannot be the same",
+            {"start_date": start_date, "end_date": end_date},
+        )
 
     params: dict[str, int | str | list[int]] = {}
 
@@ -57,26 +65,25 @@ async def _fetch_resource_data(
     if issubclass(resource_type, IncrementalChargebeeResource):
         cursor_field = resource_type.CURSOR_FIELD
 
-        if start_date and end_date:
+        if start_date or end_date:
+            if not start_date or not end_date:
+                raise ValueError(
+                    "Both start_date and end_date must be specified together",
+                    {"start_date": start_date, "end_date": end_date},
+                )
+
             params[f"{cursor_field}[between]"] = (
                 f"[{int(start_date.timestamp())},{int(end_date.timestamp())}]"
             )
-        elif start_date:
-            params[f"{cursor_field}[after]"] = int(start_date.timestamp())
-        elif end_date:
-            params[f"{cursor_field}[before]"] = int(end_date.timestamp())
-
-    if start_date and end_date and start_date == end_date:
-        raise ValueError(
-            "Start and end dates cannot be the same",
-            {"start_date": start_date, "end_date": end_date},
-        )
 
     if include_deleted:
         params["include_deleted"] = "true"
 
     if filter_params:
         params.update(filter_params)
+
+    if sort_by is not None:
+        params[f"sort_by[{sort_by_order}]"] = sort_by
 
     async def _fetch_data(
         http: HTTPSession,
@@ -184,6 +191,7 @@ async def fetch_resource_page(
         limit=limit,
         include_deleted=False,
         resource_type=resource_type,
+        sort_by=resource_type.SORT_KEY if resource_type.SORT_ENABLED else None,
     )
 
     if not resource_data:
@@ -228,6 +236,7 @@ async def fetch_resource_changes(
             limit=limit,
             include_deleted=True,
             resource_type=resource_type,
+            sort_by=resource_type.SORT_KEY if resource_type.SORT_ENABLED else None,
         )
 
         if not resource_data:
@@ -366,6 +375,7 @@ async def fetch_associated_resource_page(
             offset=offset,
             include_deleted=False,
             resource_type=resource_type,
+            sort_by=resource_type.SORT_KEY if resource_type.SORT_ENABLED else None,
         )
 
         if not child_data:
@@ -423,6 +433,7 @@ async def fetch_associated_resource_changes(
                 limit=limit,
                 include_deleted=True,
                 resource_type=resource_type,
+                sort_by=resource_type.SORT_KEY if resource_type.SORT_ENABLED else None,
             )
 
             if not child_data:
