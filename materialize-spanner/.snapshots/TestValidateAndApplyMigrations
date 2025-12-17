@@ -1,0 +1,114 @@
+Base Initial Constraints:
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
+{"Field":"boolWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"fieldWithProjection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"field_with_projection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"int64","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"int64ToNumber","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"intToNumber","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"intWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The first collection key component is required to be included for standard updates"}
+{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
+{"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
+{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"requiredNumeric","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Only a single root document projection can be materialized for standard updates"}
+{"Field":"stringAddMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIncreaseMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+
+Migratable Changes Before Apply Schema:
+key STRING(MAX) NO
+c__meta_flow_truncated BOOL NO
+boolWidenedToJson BOOL YES
+dateValue DATE YES
+datetimeValue TIMESTAMP YES
+fieldWithProjection STRING(MAX) YES
+field_with_projection STRING(MAX) YES
+flow_published_at TIMESTAMP NO
+int64 INT64 YES
+int64ToNumber NUMERIC YES
+intToNumber INT64 YES
+intWidenedToJson INT64 YES
+multiple JSON YES
+nonScalarValue JSON YES
+numericString NUMERIC YES
+optional JSON YES
+requiredNumeric NUMERIC NO
+scalarValue STRING(MAX) NO
+stringAddMaxLength STRING(MAX) YES
+stringIncreaseMaxLength STRING(MAX) YES
+stringWidenedToJson STRING(MAX) YES
+timeValue STRING(MAX) YES
+flow_document JSON NO
+
+
+Migratable Changes Before Apply Data:
+key, c__meta_flow_truncated, boolWidenedToJson, dateValue, datetimeValue, fieldWithProjection, field_with_projection, flow_published_at, int64, int64ToNumber, intToNumber, intWidenedToJson, multiple, nonScalarValue, numericString, optional, requiredNumeric, scalarValue, stringAddMaxLength, stringIncreaseMaxLength, stringWidenedToJson, timeValue, flow_document
+1, false, true, string_value:"2024-01-01", string_value:"2024-01-01T09:01:01.111111111Z", null_value:NULL_VALUE, null_value:NULL_VALUE, string_value:"2024-09-13T01:01:01Z", 1, string_value:"10000000000000000000", 9223372036854775807, 999, null_value:NULL_VALUE, null_value:NULL_VALUE, string_value:"123", null_value:NULL_VALUE, string_value:"456", test, null_value:NULL_VALUE, null_value:NULL_VALUE, hello, 01:01:01, string_value:"{}"
+
+Migratable Changes Constraints:
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
+{"Field":"boolWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
+{"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"fieldWithProjection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"field_with_projection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"int64","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"int64ToNumber","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"intToNumber","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"intWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
+{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The first collection key component is required to be included for standard updates"}
+{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
+{"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
+{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"requiredNumeric","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Only a single root document projection can be materialized for standard updates"}
+{"Field":"stringAddMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIncreaseMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
+{"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+
+Migratable Changes Applied Schema:
+key STRING(MAX) NO
+c__meta_flow_truncated BOOL NO
+boolWidenedToJson BOOL YES
+dateValue DATE YES
+datetimeValue TIMESTAMP YES
+fieldWithProjection STRING(MAX) YES
+field_with_projection STRING(MAX) YES
+flow_published_at TIMESTAMP NO
+int64 INT64 YES
+int64ToNumber NUMERIC YES
+intToNumber INT64 YES
+intWidenedToJson INT64 YES
+multiple JSON YES
+nonScalarValue JSON YES
+numericString NUMERIC YES
+optional JSON YES
+requiredNumeric NUMERIC NO
+scalarValue STRING(MAX) NO
+stringAddMaxLength STRING(MAX) YES
+stringIncreaseMaxLength STRING(MAX) YES
+stringWidenedToJson STRING(MAX) YES
+timeValue STRING(MAX) YES
+flow_document JSON NO
+
+
+Migratable Changes Applied Data:
+key, c__meta_flow_truncated, boolWidenedToJson, dateValue, datetimeValue, fieldWithProjection, field_with_projection, flow_published_at, int64, int64ToNumber, intToNumber, intWidenedToJson, multiple, nonScalarValue, numericString, optional, requiredNumeric, scalarValue, stringAddMaxLength, stringIncreaseMaxLength, stringWidenedToJson, timeValue, flow_document
+1, false, true, string_value:"2024-01-01", string_value:"2024-01-01T09:01:01.111111111Z", null_value:NULL_VALUE, null_value:NULL_VALUE, string_value:"2024-09-13T01:01:01Z", 1, string_value:"10000000000000000000", 9223372036854775807, 999, null_value:NULL_VALUE, null_value:NULL_VALUE, string_value:"123", null_value:NULL_VALUE, string_value:"456", test, null_value:NULL_VALUE, null_value:NULL_VALUE, hello, 01:01:01, string_value:"{}"
+

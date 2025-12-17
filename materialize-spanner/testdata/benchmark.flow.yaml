@@ -1,0 +1,22 @@
+collections:
+  benchmark/test_docs:
+    schema:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        updated_at: { type: string, format: date-time }
+        data: { type: object }
+      required: [id]
+    key: [/id]
+
+materializations:
+  test/spanner:
+    endpoint:
+      connector:
+        image: ghcr.io/estuary/materialize-sqlite:dev
+        config: {}
+    bindings:
+      - source: benchmark/test_docs
+        resource: { table: benchmark_test }
+        fields:
+          recommended: true
