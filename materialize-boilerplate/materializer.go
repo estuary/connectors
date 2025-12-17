@@ -306,6 +306,12 @@ type Materializer[
 	// with the materialized collection.
 	TruncateResource(context.Context, []string) (string, ActionApplyFn, error)
 
+	// MustRecreateResource checks if a resource must be recreated (rather than truncated)
+	// during a backfill operation. This is useful for connectors that need to force
+	// resource recreation when certain configuration changes occur (e.g., changes to
+	// primary key structure). Return true to force recreation, false to allow truncation.
+	MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error)
+
 	// NewMaterializerTransactor builds a new transactor for handling the
 	// transactions lifecycle of the materialization.
 	NewMaterializerTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[EC, RC, MT], *m.BindingEvents) (MaterializerTransactor, error)
@@ -313,6 +319,12 @@ type Materializer[
 	// Close performs any cleanup actions that should be done when gracefully
 	// exiting.
 	Close(context.Context)
+}
+
+// Flush any batched DDL operations if the materializer supports it
+// This is an optional interface that connectors can implement to batch DDL operations
+type DDLFlusher interface {
+	FlushDDL(context.Context) error
 }
 
 type NewMaterializerFn[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper] func(context.Context, string, EC, map[string]bool) (Materializer[EC, FC, RC, MT], error)
@@ -559,6 +571,13 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 				doTruncate = false
 			}
 
+			// Check if the materializer requires resource recreation (e.g., due to
+			// configuration changes that affect the resource's primary key structure).
+			if mustRecreate, err := materializer.MustRecreateResource(req, lastBinding, thisBinding); err != nil {
+				return nil, fmt.Errorf("checking MustRecreateResource: %w", err)
+			} else if mustRecreate {
+				doTruncate = false
+			}
 		}
 
 		if !mCfg.NoTruncateResources && !parsedFlags["always_drop_tables_on_backfill"] && doTruncate {
@@ -674,6 +693,12 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		return nil, err
 	} else if err := runActions(ctx, resourceActions, resourceActionDescriptions, mCfg.ConcurrentApply); err != nil {
 		return nil, err
+	}
+
+	if flusher, ok := materializer.(DDLFlusher); ok {
+		if err := flusher.FlushDDL(ctx); err != nil {
+			return nil, fmt.Errorf("flushing batched DDL: %w", err)
+		}
 	}
 
 	allActions := append(namespaceActionDesciptions, setupActionDescriptions...)

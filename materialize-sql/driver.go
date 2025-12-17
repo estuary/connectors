@@ -183,6 +183,10 @@ func (s *sqlMaterialization[EC, RC]) TruncateResource(ctx context.Context, path 
 	return s.client.TruncateTable(ctx, path)
 }
 
+func (s *sqlMaterialization[EC, RC]) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+	return s.client.MustRecreateResource(req, lastBinding, newBinding)
+}
+
 func (s *sqlMaterialization[EC, RC]) MapType(p boilerplate.Projection, fc FieldConfig) (MappedType, boilerplate.ElementConverter) {
 	pp := buildProjection(&p.Projection)
 
@@ -418,6 +422,16 @@ type checkpointRecoverer struct {
 
 func (c *checkpointRecoverer) RecoverCheckpoint(context.Context, pf.MaterializationSpec, pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
 	return c.cp, nil
+}
+
+func (s *sqlMaterialization[EC, RC]) FlushDDL(ctx context.Context) error {
+	if flusher, ok := s.client.(boilerplate.DDLFlusher); ok {
+		if err := flusher.FlushDDL(ctx); err != nil {
+			return fmt.Errorf("flushing batched DDL: %w", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *sqlMaterialization[EC, RC]) Close(ctx context.Context) {
