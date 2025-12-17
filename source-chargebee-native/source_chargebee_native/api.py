@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, UTC
 from logging import Logger
-from typing import AsyncGenerator, TypeVar
+from typing import AsyncGenerator, TypeVar, Literal
 
 import asyncio
 
@@ -16,9 +16,13 @@ from source_chargebee_native.models import (
     AssociationConfig,
 )
 
-# We cannot send a request with start and end dates that are the same, so
-# we enforce a minimum interval of 1 second between them.
-MIN_INCREMENTAL_INTERVAL = timedelta(seconds=1)
+# Chargebee's API has eventual consistency delays documented to be up to 5 minutes.
+# See: https://apidocs.chargebee.com/docs/api/list-ops
+LAG = timedelta(minutes=5)
+
+# Minimum interval between start and end dates for incremental queries.
+# This prevents us from making unnecessary API calls when the time window is too small.
+MIN_INCREMENTAL_INTERVAL = timedelta(minutes=1)
 
 ChargebeeResourceType = TypeVar("ChargebeeResourceType", bound=ChargebeeResource)
 
@@ -216,12 +220,15 @@ async def fetch_resource_changes(
     assert isinstance(log_cursor, int)
 
     start_date = _ts_to_dt(log_cursor)
-    end_date = min(start_date + timedelta(days=30), datetime.now(tz=UTC))
+    # Apply LAG to handle eventual consistency - don't fetch records more recent than LAG ago
+    now_with_lag = datetime.now(tz=UTC) - LAG
+    end_date = min(start_date + timedelta(days=1), now_with_lag)
     max_updated_at = start_date
     has_results = False
     offset = None
 
-    if (end_date - start_date) < MIN_INCREMENTAL_INTERVAL:
+    # Return early if the lagged end date is before the cursor or if the window is too small
+    if end_date < start_date or (end_date - start_date) < MIN_INCREMENTAL_INTERVAL:
         return
 
     while True:
@@ -265,6 +272,8 @@ async def fetch_resource_changes(
 
     if has_results:
         yield _dt_to_ts(max_updated_at + timedelta(seconds=1))
+    else:
+        yield _dt_to_ts(end_date)
 
 
 async def _get_parent_ids(
@@ -400,11 +409,14 @@ async def fetch_associated_resource_changes(
     assert isinstance(log_cursor, int)
 
     start_date = _ts_to_dt(log_cursor)
-    end_date = min(start_date + timedelta(days=30), datetime.now(tz=UTC))
+    # Apply LAG to handle eventual consistency - don't fetch records more recent than LAG ago
+    now_with_lag = datetime.now(tz=UTC) - LAG
+    end_date = min(start_date + timedelta(days=1), now_with_lag)
     max_updated_at = start_date
     has_results = False
 
-    if (end_date - start_date) < MIN_INCREMENTAL_INTERVAL:
+    # Return early if the lagged end date is before the cursor or if the window is too small
+    if end_date < start_date or (end_date - start_date) < MIN_INCREMENTAL_INTERVAL:
         return
 
     parent_ids = await _get_parent_ids(
@@ -465,3 +477,5 @@ async def fetch_associated_resource_changes(
 
     if has_results:
         yield _dt_to_ts(max_updated_at + timedelta(seconds=1))
+    else:
+        yield _dt_to_ts(end_date)
