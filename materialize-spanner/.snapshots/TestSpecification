@@ -1,0 +1,115 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-spanner/config",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "title": "Project ID",
+        "description": "Google Cloud Project ID",
+        "order": 0
+      },
+      "instance_id": {
+        "type": "string",
+        "title": "Instance ID",
+        "description": "Cloud Spanner Instance ID",
+        "order": 1
+      },
+      "database": {
+        "type": "string",
+        "title": "Database",
+        "description": "Cloud Spanner Database name",
+        "order": 2
+      },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
+        "default": false,
+        "order": 3
+      },
+      "credentials": {
+        "properties": {
+          "service_account_json": {
+            "type": "string",
+            "title": "Service Account JSON",
+            "description": "Google Cloud Service Account JSON credentials.",
+            "multiline": true,
+            "secret": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "service_account_json"
+        ],
+        "title": "Credentials",
+        "description": "Google Cloud authentication credentials",
+        "order": 4
+      },
+      "advanced": {
+        "properties": {
+          "no_flow_document": {
+            "type": "boolean",
+            "title": "Exclude Flow Document",
+            "description": "When enabled the root document will not be required for standard updates.",
+            "default": false
+          },
+          "disable_key_distribution_optimization": {
+            "type": "boolean",
+            "title": "Disable Key Distribution Optimization",
+            "description": "When enabled the hash prefix normally added to table keys will be omitted. The hash prefix distributes writes across Spanner splits and avoids hotspots.",
+            "default": false
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "project_id",
+      "instance_id",
+      "database",
+      "credentials"
+    ],
+    "title": "SQL Connection"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-spanner/table-config",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table",
+        "description": "Name of the database table",
+        "x-collection-name": true
+      },
+      "schema": {
+        "type": "string",
+        "title": "Alternative Schema",
+        "description": "Alternative schema for this table (optional). Overrides the default namespace."
+      },
+      "additional_table_create_sql": {
+        "type": "string",
+        "title": "Additional Table Create SQL",
+        "description": "Additional SQL statement(s) to be run in the same transaction that creates the table.",
+        "multiline": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "SQL Table"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-spanner"
+}

@@ -123,6 +123,7 @@ jobs:
           - materialize-s3-iceberg
           - materialize-s3-parquet
           - materialize-snowflake
+          - materialize-spanner
           - materialize-starburst
           - materialize-sqlite
           - materialize-webhook
