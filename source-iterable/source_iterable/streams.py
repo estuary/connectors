@@ -4,6 +4,7 @@
 
 import csv
 import json
+import time
 import urllib.parse as urlparse
 from abc import ABC, abstractmethod
 from io import StringIO
@@ -20,7 +21,7 @@ from airbyte_cdk.sources.utils.schema_helpers import ResourceSchemaLoader
 from pendulum.datetime import DateTime
 from datetime import datetime
 from requests import HTTPError, codes
-from requests.exceptions import ChunkedEncodingError
+from requests.exceptions import ChunkedEncodingError, ConnectionError, ReadTimeout
 from source_iterable.slice_generators import AdjustableSliceGenerator, RangeSliceGenerator, StreamSlice
 from source_iterable.utils import dateutil_parse
 
@@ -529,7 +530,35 @@ class Events(IterableStream):
     def request_kwargs(
         self, stream_state: Mapping[str, Any], stream_slice: Mapping[str, Any] = None, next_page_token: Mapping[str, Any] = None
     ) -> Mapping[str, Any]:
-        return {"stream": True}
+        return {
+            **super().request_kwargs(stream_state, stream_slice, next_page_token),
+            "stream": True,
+        }
+
+    def read_records(
+        self,
+        sync_mode: SyncMode,
+        cursor_field: List[str] = None,
+        stream_slice: Mapping[str, Any] = None,
+        stream_state: Mapping[str, Any] = None,
+    ) -> Iterable[Mapping[str, Any]]:
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                yield from super().read_records(
+                    sync_mode, cursor_field=cursor_field, stream_slice=stream_slice, stream_state=stream_state
+                )
+                break
+            except (ConnectionError, ReadTimeout) as e:
+                if attempt < max_retries - 1:
+                    wait_time = self.retry_factor * (attempt + 1)
+                    self.logger.warning(
+                        f"Connection error for user {stream_slice.get('email')}, attempt {attempt + 1}/{max_retries}. "
+                        f"Retrying in {wait_time}s: {e}"
+                    )
+                    time.sleep(wait_time)
+                else:
+                    self.logger.warning(f"Max retries reached for user {stream_slice.get('email')}, skipping: {e}")
 
 
 class EmailBounce(IterableExportStreamAdjustableRange):
