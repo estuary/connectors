@@ -75,7 +75,7 @@
        "schema": {
        "properties": {
            "id": { "type": "string" },
-           "str_field": { "type": "string" },
+           "str_field": { "type": "string" }
           },
           "required": ["id", "str_field"],
           "type": "object"
@@ -109,7 +109,7 @@
        "schema": {
        "properties": {
            "id": { "type": "integer" },
-           "unsigned_bigint": { "type": "integer", "maximum": 18446744073709551615 },
+           "unsigned_bigint": { "type": "integer", "maximum": 18446744073709551615 }
           },
           "required": ["id"],
           "type": "object"
@@ -354,6 +354,33 @@
           "a99": {"type": "integer"}
         },
         "required": ["id"]
+      },
+      "key": ["/id"]
+    },
+    "tests/perf-simple": {
+      "schema": {
+        "properties": {
+          "id": { "type": "integer" },
+          "uuid": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "value": { "type": "integer" }
+        },
+        "required": ["id"],
+        "type": "object"
+      },
+      "key": ["/id"]
+    },
+    "tests/perf-uuid-key": {
+      "schema": {
+        "properties": {
+          "id": { "type": "string" },
+          "timestamp": { "type": "string" },
+          "name": { "type": "string" },
+          "value": { "type": "integer" }
+        },
+        "required": ["id"],
+        "type": "object"
       },
       "key": ["/id"]
     }
