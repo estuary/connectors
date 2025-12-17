@@ -140,6 +140,10 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 	return sql.Fence{}, nil
 }
 
+func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+	return false, nil
+}
+
 func (c *client) Close() {
 	c.db.Close()
 }

@@ -321,6 +321,10 @@ func (m *testMaterializer) TruncateResource(ctx context.Context, path []string) 
 	return "", func(context.Context) error { return nil }, nil
 }
 
+func (m *testMaterializer) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+	return false, nil
+}
+
 type testEndpointConfiger struct {
 	Image  string         `json:"image"`
 	Config map[string]any `json:"config"`

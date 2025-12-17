@@ -10,6 +10,8 @@ import (
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	pm "github.com/estuary/flow/go/protocols/materialize"
 )
 
 var _ sql.SchemaManager = (*client)(nil)
@@ -185,6 +187,10 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 // InstallFence is a no-op since materialize-starburst doesn't use fencing.
 func (c *client) InstallFence(_ context.Context, _ sql.Table, _ sql.Fence) (sql.Fence, error) {
 	return sql.Fence{}, nil
+}
+
+func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+	return false, nil
 }
 
 func (c *client) Close() {

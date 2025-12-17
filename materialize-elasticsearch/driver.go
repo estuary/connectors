@@ -562,6 +562,10 @@ func (d *materialization) TruncateResource(ctx context.Context, path []string) (
 	panic("not supported")
 }
 
+func (d *materialization) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
+	return false, nil
+}
+
 func (d *materialization) UpdateResource(
 	ctx context.Context,
 	resourcePath []string,

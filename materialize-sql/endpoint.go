@@ -40,6 +40,13 @@ type Client interface {
 	// materialized collection.
 	TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error)
 
+	// MustRecreateResource checks if a resource must be recreated (rather than truncated)
+	// during a backfill operation. This is useful for connectors that need to force
+	// resource recreation when certain configuration changes occur (e.g., changes to
+	// primary key structure). Return true to force recreation, false to allow truncation.
+	// The default implementation should return (false, nil).
+	MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error)
+
 	// Close is called to free up any resources held by the Client.
 	Close()
 }
