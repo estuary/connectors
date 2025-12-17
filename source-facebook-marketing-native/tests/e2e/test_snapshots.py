@@ -1,15 +1,28 @@
+"""
+End-to-end tests using flowctl to verify connector spec and discover.
+
+These tests run the actual connector through flowctl and compare output
+against stored snapshots. They require flowctl to be installed and the
+connector to be properly configured with test.flow.yaml.
+"""
+
 import json
 import subprocess
 
 
 def test_discover(request, snapshot):
+    """Test that flowctl discover returns expected bindings.
+
+    Runs flowctl raw discover against the connector and verifies the
+    discovered bindings match the stored snapshot.
+    """
     result = subprocess.run(
         [
             "flowctl",
             "raw",
             "discover",
             "--source",
-            request.fspath.dirname + "/../test.flow.yaml",
+            request.fspath.dirname + "/../../test.flow.yaml",
             "-o",
             "json",
             "--emit-raw",
@@ -27,13 +40,18 @@ def test_discover(request, snapshot):
 
 
 def test_spec(request, snapshot):
+    """Test that flowctl spec returns expected connector specification.
+
+    Runs flowctl raw spec against the connector and verifies the
+    specification matches the stored snapshot.
+    """
     result = subprocess.run(
         [
             "flowctl",
             "raw",
             "spec",
             "--source",
-            request.fspath.dirname + "/../test.flow.yaml",
+            request.fspath.dirname + "/../../test.flow.yaml",
         ],
         stdout=subprocess.PIPE,
         text=True,
