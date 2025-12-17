@@ -206,21 +206,6 @@ class FacebookRequestParams(BaseModel):
         return {k: v for k, v in data.items() if v is not None}
 
 
-def _should_retry_request(
-    status: int,
-    headers: Headers,
-    body: bytes,
-    attempt: int,
-) -> bool:
-    # Facebook's Ads Insights API can return transient 500 errors under load or when
-    # requesting large amounts of data. We should retry these requests, but only a limited
-    # number of times to avoid a connector deadlock.
-    if status >= 500 and attempt < MAX_500_ERROR_RETRY_ATTEMPTS:
-        return True
-
-    return False
-
-
 # Although Facebook already has a Python client SDK, it is not asynchronous. We could use asyncio.to_thread to
 # run the synchronous methods in a thread, but we've seen that approach lead to performance issues in high-load scenarios.
 # So we've implemented a minimal async client with only the functionality we need.
@@ -265,7 +250,6 @@ class FacebookAPIClient:
                 self.log,
                 url,
                 params=request_params,
-                should_retry=_should_retry_request,
             )
         )
 
@@ -429,7 +413,6 @@ class FacebookAPIClient:
             headers, body = await self.http.request_stream(
                 self.log,
                 url,
-                should_retry=_should_retry_request,
             )
             content_type = headers.get("Content-Type")
             if not content_type:
