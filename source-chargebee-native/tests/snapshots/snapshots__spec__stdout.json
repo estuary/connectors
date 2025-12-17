@@ -10,6 +10,7 @@
               "default": 100,
               "description": "Limit used in queries to Chargebee API. This should be left as the default value unless connector errors indicate a smaller limit is required.",
               "exclusiveMinimum": 0,
+              "maximum": 100,
               "title": "Limit",
               "type": "integer"
             }

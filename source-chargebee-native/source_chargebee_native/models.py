@@ -69,6 +69,7 @@ class EndpointConfig(BaseModel):
                 title="Limit",
                 default=100,
                 gt=0,
+                le=100,
             ),
         ]
 
