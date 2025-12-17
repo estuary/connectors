@@ -120,6 +120,11 @@ class ChargebeeResource(BaseDocument, extra="allow"):
 class IncrementalChargebeeResource(ChargebeeResource):
     RESOURCE_KEY: ClassVar[str]
     CURSOR_FIELD: ClassVar[str] = "updated_at"
+    # The sort_by field in Chargebee API calls could differ from the cursor field
+    # but for most resources they are the same. This can be overridden in subclasses if needed.
+    SORT_KEY: ClassVar[str] = "updated_at"
+    # Some resources do not support sorting; override as needed.
+    SORT_ENABLED: ClassVar[bool] = True
     ID_FIELD: ClassVar[str] = "id"
     DELETED_FIELD: ClassVar[str] = "deleted"
 
@@ -197,6 +202,7 @@ class Customer(IncrementalChargebeeResource):
 class Comment(IncrementalChargebeeResource):
     RESOURCE_KEY = "comment"
     CURSOR_FIELD = "created_at"
+    SORT_KEY = "created_at"
 
     class CommentData(BaseModel, extra="allow"):
         id: str
@@ -215,6 +221,7 @@ class Subscription(IncrementalChargebeeResource):
 
 class Addon(IncrementalChargebeeResource):
     RESOURCE_KEY = "addon"
+    SORT_ENABLED = False
 
     class AddonData(BaseModel, extra="allow"):
         id: str
@@ -224,6 +231,7 @@ class Addon(IncrementalChargebeeResource):
 
 class AttachedItem(IncrementalChargebeeResource):
     RESOURCE_KEY = "attached_item"
+    SORT_ENABLED = False
 
     class AttachedItemData(BaseModel, extra="allow"):
         id: str
@@ -233,6 +241,7 @@ class AttachedItem(IncrementalChargebeeResource):
 
 class Coupon(IncrementalChargebeeResource):
     RESOURCE_KEY = "coupon"
+    SORT_KEY = "created_at"
 
     class CouponData(BaseModel, extra="allow"):
         id: str
@@ -242,6 +251,7 @@ class Coupon(IncrementalChargebeeResource):
 
 class CreditNote(IncrementalChargebeeResource):
     RESOURCE_KEY = "credit_note"
+    SORT_KEY = "date"
 
     class CreditNoteData(BaseModel, extra="allow"):
         id: str
@@ -252,6 +262,7 @@ class CreditNote(IncrementalChargebeeResource):
 class Event(IncrementalChargebeeResource):
     RESOURCE_KEY = "event"
     CURSOR_FIELD = "occurred_at"
+    SORT_KEY = "occurred_at"
 
     class EventData(BaseModel, extra="allow"):
         id: str
@@ -261,6 +272,7 @@ class Event(IncrementalChargebeeResource):
 
 class HostedPage(IncrementalChargebeeResource):
     RESOURCE_KEY = "hosted_page"
+    SORT_ENABLED = False
 
     class HostedPageData(BaseModel, extra="allow"):
         id: str
@@ -297,6 +309,7 @@ class ItemPrice(IncrementalChargebeeResource):
 
 class ItemFamily(IncrementalChargebeeResource):
     RESOURCE_KEY = "item_family"
+    SORT_ENABLED = False
 
     class ItemFamilyData(BaseModel, extra="allow"):
         id: str
@@ -324,6 +337,7 @@ class PaymentSource(IncrementalChargebeeResource):
 
 class Plan(IncrementalChargebeeResource):
     RESOURCE_KEY = "plan"
+    SORT_ENABLED = False
 
     class PlanData(BaseModel, extra="allow"):
         id: str
@@ -334,6 +348,7 @@ class Plan(IncrementalChargebeeResource):
 class PromotionalCredits(IncrementalChargebeeResource):
     RESOURCE_KEY = "promotional_credit"
     CURSOR_FIELD = "created_at"
+    SORT_ENABLED = False
 
     class PromotionalCreditData(BaseModel, extra="allow"):
         id: str
@@ -343,6 +358,7 @@ class PromotionalCredits(IncrementalChargebeeResource):
 
 class Quote(IncrementalChargebeeResource):
     RESOURCE_KEY = "quote"
+    SORT_KEY = "date"
 
     class QuoteData(BaseModel, extra="allow"):
         id: str
@@ -361,6 +377,7 @@ class Transaction(IncrementalChargebeeResource):
 
 class VirtualBankAccount(IncrementalChargebeeResource):
     RESOURCE_KEY = "virtual_bank_account"
+    SORT_ENABLED = False
 
     class VirtualBankAccountData(BaseModel, extra="allow"):
         id: str
