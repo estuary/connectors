@@ -240,10 +240,13 @@ async def fetch_page_with_associations(
     # On connector initiated backfills, only capture calculated properties and rely
     # on the merge reduction strategies to merge in partial documents containing
     # updated calculated properties.
-    property_names: list[str] = [
+    properties_to_fetch: list[str] = [
         p.name for p in properties.results
         if not is_connector_initiated or p.calculated
     ]
+
+    if not properties_to_fetch:
+        return
 
     # There is a limit on how large a URL can be when making a GET request to HubSpot. Exactly what
     # this limit is is a bit mysterious to me. Empirical testing indicates that a single property
@@ -257,7 +260,7 @@ async def fetch_page_with_associations(
     # cumulative byte lengths, we will issue multiple requests for different sets of properties and
     # combine the results together in the output documents.
     chunked_properties = _chunk_props(
-        property_names,
+        properties_to_fetch,
         5 * 1024,
     )
 
