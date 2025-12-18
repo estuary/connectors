@@ -3,18 +3,19 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
-	"net/http"
 	"path"
 	"strings"
 	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsConfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
+	"github.com/aws/smithy-go"
 	"github.com/estuary/connectors/filesource"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/flow/go/parser"
@@ -71,61 +72,80 @@ func (c config) PathRegex() string {
 	return c.MatchKeys
 }
 
+func (c config) CredentialsProvider(ctx context.Context) (aws.CredentialsProvider, error) {
+	if c.AWSSecretAccessKey != "" {
+		return credentials.NewStaticCredentialsProvider(
+			c.AWSAccessKeyID, c.AWSSecretAccessKey, ""), nil
+	} else {
+		return aws.AnonymousCredentials{}, nil
+	}
+}
+
 type s3Store struct {
-	s3 *s3.S3
+	s3 *s3.Client
 }
 
 func newS3Store(ctx context.Context, cfg config) (*s3Store, error) {
-	var c = aws.NewConfig()
-
-	if cfg.AWSSecretAccessKey != "" {
-		var creds = credentials.NewStaticCredentials(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, "")
-		c = c.WithCredentials(creds)
-	} else {
-		c = c.WithCredentials(credentials.AnonymousCredentials)
+	credProvider, err := cfg.CredentialsProvider(ctx)
+	if err != nil {
+		return nil, err
 	}
-	c = c.WithCredentialsChainVerboseErrors(true)
+
+	opts := []func(*awsConfig.LoadOptions) error{
+		awsConfig.WithCredentialsProvider(credProvider),
+	}
 
 	if cfg.Region != "" {
-		c = c.WithRegion(cfg.Region)
-	}
-	if cfg.Advanced.Endpoint != "" {
-		c = c.WithEndpoint(cfg.Advanced.Endpoint).WithS3ForcePathStyle(true)
+		opts = append(opts, awsConfig.WithRegion(cfg.Region))
 	}
 
-	awsSession, err := session.NewSession(c)
+	if cfg.Advanced.Endpoint != "" {
+		customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options ...interface{}) (aws.Endpoint, error) {
+			return aws.Endpoint{URL: cfg.Advanced.Endpoint,
+				HostnameImmutable: true,
+				Source:            aws.EndpointSourceCustom,
+			}, nil
+		})
+		opts = append(opts, awsConfig.WithEndpointResolverWithOptions(customResolver))
+	}
+
+	awsCfg, err := awsConfig.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating aws config: %w", err)
 	}
 
-	s3Sess := s3.New(awsSession)
-	if err := validateBucket(ctx, cfg, s3Sess); err != nil {
+	s3Client := s3.NewFromConfig(awsCfg)
+
+	if err := validateBucket(ctx, cfg, s3Client); err != nil {
 		return nil, err
 	}
 
-	return &s3Store{s3: s3Sess}, nil
+	return &s3Store{s3: s3Client}, nil
 }
 
 // validateBucket verifies that we can list objects in the bucket and potentially read an object in
 // the bucket. This is done in a way that requires only s3:ListBucket and s3:GetObject permissions,
 // since these are the permissions required by the connector.
-func validateBucket(ctx context.Context, cfg config, s3Sess *s3.S3) error {
+func validateBucket(ctx context.Context, cfg config, s3Client *s3.Client) error {
 	// All we care about is a successful listing rather than iterating on all objects, so MaxKeys =
 	// 1 in this query.
-	_, err := s3Sess.ListObjectsV2WithContext(ctx, &s3.ListObjectsV2Input{
+	_, err := s3Client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
 		Bucket:  aws.String(cfg.Bucket),
 		Prefix:  aws.String(cfg.Prefix),
-		MaxKeys: aws.Int64(1),
+		MaxKeys: aws.Int32(1),
 	})
 	if err != nil {
 		// Note that a listing with zero objects does not return an error here, so we don't have to
 		// account for that case.
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case s3.ErrCodeNoSuchBucket:
-				return cerrors.NewUserError(err, fmt.Sprintf("bucket %q does not exist", cfg.Bucket))
+		var noSuchBucket *s3Types.NoSuchBucket
+		var apiErr smithy.APIError
+		switch {
+		case errors.As(err, &noSuchBucket):
+			return cerrors.NewUserError(err, fmt.Sprintf("bucket %q does not exist", cfg.Bucket))
+		case errors.As(err, &apiErr):
+			switch apiErr.ErrorCode() {
 			case "AccessDenied":
-				return cerrors.NewUserError(err, fmt.Sprintf("access denied for listing objects in %q", path.Join(cfg.Bucket, cfg.Prefix)))
+				return cerrors.NewUserError(err, fmt.Sprintf("bucket %q does not exist", cfg.Bucket))
 			case "InvalidAccessKeyId":
 				return cerrors.NewUserError(err, "configured AWS Access Key ID does not exist")
 			case "SignatureDoesNotMatch":
@@ -141,8 +161,9 @@ func validateBucket(ctx context.Context, cfg config, s3Sess *s3.S3) error {
 	// exists & correct access) via the list operation, so we can interpret a "not found" as a
 	// successful outcome.
 	objectKey := strings.TrimPrefix(path.Join(cfg.Prefix, uuid.NewString()), "/")
-	if _, err := s3Sess.HeadObjectWithContext(ctx, &s3.HeadObjectInput{Bucket: &cfg.Bucket, Key: aws.String(objectKey)}); err != nil {
-		if e, ok := err.(awserr.RequestFailure); ok && e.StatusCode() != http.StatusNotFound {
+	if _, err := s3Client.HeadObject(ctx, &s3.HeadObjectInput{Bucket: &cfg.Bucket, Key: aws.String(objectKey)}); err != nil {
+		var notFoundErr *s3Types.NotFound
+		if !errors.As(err, &notFoundErr) {
 			return fmt.Errorf("unable to read objects in bucket %q: %w", cfg.Bucket, err)
 		}
 	}
@@ -180,42 +201,30 @@ func (s *s3Store) List(ctx context.Context, query filesource.Query) (filesource.
 func (s *s3Store) Read(ctx context.Context, obj filesource.ObjectInfo) (io.ReadCloser, filesource.ObjectInfo, error) {
 	var bucket, key = filesource.PathToParts(obj.Path)
 
-	var getInput = s3.GetObjectInput{
+	resp, err := s.s3.GetObject(ctx, &s3.GetObjectInput{
 		Bucket:            aws.String(bucket),
 		Key:               aws.String(key),
-		IfUnmodifiedSince: &obj.ModTime,
-	}
-
-	req, resp := s.s3.GetObjectRequest(&getInput)
-	// Prevent Go's HTTP client from automatically decompressing gzip responses.
-	// When S3 objects have Content-Encoding: gzip, Go's HTTP transport will
-	// transparently decompress the response body. This causes issues because
-	// the parser also infers compression from the filename (e.g. .gz extension)
-	// and attempts to decompress again, failing on already-decompressed data.
-	// By explicitly setting Accept-Encoding, we bypass the HTTP client's
-	// automatic decompression and let the parser handle all decompression.
-	req.HTTPRequest.Header.Set("Accept-Encoding", "gzip")
-	req.SetContext(ctx)
-
-	if err := req.Send(); err != nil {
+		IfUnmodifiedSince: aws.Time(obj.ModTime),
+	})
+	if err != nil {
 		return nil, filesource.ObjectInfo{}, err
 	}
 
-	obj.ContentType = aws.StringValue(resp.ContentType)
-	obj.ContentEncoding = aws.StringValue(resp.ContentEncoding)
+	obj.ContentType = aws.ToString(resp.ContentType)
+	obj.ContentEncoding = aws.ToString(resp.ContentEncoding)
 
 	return resp.Body, obj, nil
 }
 
 type s3Listing struct {
 	ctx    context.Context
-	s3     *s3.S3
+	s3     *s3.Client
 	input  s3.ListObjectsV2Input
 	output s3.ListObjectsV2Output
 }
 
 func (l *s3Listing) Next() (filesource.ObjectInfo, error) {
-	var bucket = aws.StringValue(l.input.Bucket)
+	var bucket = aws.ToString(l.input.Bucket)
 
 	for {
 		if len(l.output.CommonPrefixes) != 0 {
@@ -223,7 +232,7 @@ func (l *s3Listing) Next() (filesource.ObjectInfo, error) {
 			l.output.CommonPrefixes = l.output.CommonPrefixes[1:]
 
 			return filesource.ObjectInfo{
-				Path:     filesource.PartsToPath(bucket, aws.StringValue(prefix.Prefix)),
+				Path:     filesource.PartsToPath(bucket, aws.ToString(prefix.Prefix)),
 				IsPrefix: true,
 			}, nil
 		}
@@ -235,15 +244,15 @@ func (l *s3Listing) Next() (filesource.ObjectInfo, error) {
 			// Filter out any objects with a "glacier" storage class because those objects could
 			// take minutes or even hours to retrieve. This behavior matches that of other popular
 			// tool that ingest from S3.
-			if sc := aws.StringValue(obj.StorageClass); sc == s3.StorageClassGlacier || sc == s3.StorageClassDeepArchive {
+			if obj.StorageClass == s3Types.ObjectStorageClassGlacier || obj.StorageClass == s3Types.ObjectStorageClassDeepArchive {
 				continue
 			}
 
 			return filesource.ObjectInfo{
-				Path:       filesource.PartsToPath(bucket, aws.StringValue(obj.Key)),
-				ContentSum: aws.StringValue(obj.ETag),
-				Size:       aws.Int64Value(obj.Size),
-				ModTime:    aws.TimeValue(obj.LastModified),
+				Path:       filesource.PartsToPath(bucket, aws.ToString(obj.Key)),
+				ContentSum: aws.ToString(obj.ETag),
+				Size:       aws.ToInt64(obj.Size),
+				ModTime:    aws.ToTime(obj.LastModified),
 			}, nil
 		}
 
@@ -258,14 +267,14 @@ func (l *s3Listing) poll() error {
 
 	if l.output.Prefix == nil {
 		// Very first query.
-	} else if !aws.BoolValue(l.output.IsTruncated) {
+	} else if !aws.ToBool(l.output.IsTruncated) {
 		return io.EOF
 	} else {
 		input.StartAfter = nil
 		input.ContinuationToken = l.output.NextContinuationToken
 	}
 
-	if out, err := l.s3.ListObjectsV2WithContext(l.ctx, &input); err != nil {
+	if out, err := l.s3.ListObjectsV2(l.ctx, &input); err != nil {
 		return err
 	} else {
 		l.output = *out
