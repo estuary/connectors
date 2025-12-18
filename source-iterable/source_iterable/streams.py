@@ -813,7 +813,7 @@ class Templates(IterableExportStreamRanged):
             yield record
 
 
-class Users(IterableExportStreamRanged):
+class Users(IterableExportStreamAdjustableRange):
     data_field = "user"
     cursor_field = "profileUpdatedAt"
 
