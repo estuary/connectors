@@ -266,15 +266,13 @@ func (c *client) DeleteTable(ctx context.Context, path []string) (string, boiler
 }
 
 func (c *client) TruncateTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	// Spanner doesn't have TRUNCATE TABLE, so we use DELETE FROM without WHERE clause
-	// For large tables, this can be slow.
+	// Spanner doesn't have TRUNCATE TABLE, so we use DELETE FROM without WHERE clause.
+	// Use Partitioned DML to avoid mutation limits on large tables.
+	// See: https://cloud.google.com/spanner/docs/dml-partitioned
 	stmt := fmt.Sprintf("DELETE FROM %s WHERE TRUE", c.ep.Dialect.Identifier(path...))
 
 	return stmt, func(ctx context.Context) error {
-		_, err := c.dataClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
-			_, err := txn.Update(ctx, spanner.Statement{SQL: stmt})
-			return err
-		})
+		_, err := c.dataClient.PartitionedUpdate(ctx, spanner.Statement{SQL: stmt})
 		return err
 	}, nil
 }
