@@ -87,7 +87,11 @@ class AirtableResourceConfigWithSchedule(ResourceConfigWithSchedule):
 
 
 class EndpointConfig(BaseModel):
-    credentials: OAuth2Credentials | AccessToken = Field(
+    credentials: (
+        AccessToken
+        # Disable the OAuth authentication option until we have an OAuth app in Airtable set up.
+        # | OAuth2Credentials 
+    ) = Field(
         discriminator="credentials_title",
         title="Authentication",
     )
