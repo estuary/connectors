@@ -22,6 +22,7 @@ from pendulum.datetime import DateTime
 from datetime import datetime
 from requests import HTTPError, codes
 from requests.exceptions import ChunkedEncodingError, ConnectionError, ReadTimeout
+from source_iterable.models import ProjectType
 from source_iterable.slice_generators import AdjustableSliceGenerator, RangeSliceGenerator, StreamSlice
 from source_iterable.utils import dateutil_parse
 
@@ -815,8 +816,49 @@ class Templates(IterableExportStreamRanged):
 class Users(IterableExportStreamRanged):
     data_field = "user"
     cursor_field = "profileUpdatedAt"
-    primary_key = "email"
 
+    # Primary key mapping based on Iterable project type
+    # See: https://support.iterable.com/hc/en-us/articles/9216719179796-Project-Types-and-Unique-Identifiers
+    #
+    # Note: We use `itblUserId` (Iterable's internal identifier) instead of `userId` because `itblUserId`
+    # is always present on all user records for both Hybrid and UserId-based projects.
+    # See https://support.iterable.com/hc/en-us/articles/217744303-User-Profile-Fields-Used-by-Iterable#itbluserid.
+    PRIMARY_KEY_BY_PROJECT_TYPE = {
+        ProjectType.EMAIL_BASED: "email",
+        ProjectType.USER_ID_BASED: "itblUserId",
+        ProjectType.HYBRID: "itblUserId",
+    }
+
+    def __init__(self, project_type: str = None, **kwargs):
+        super().__init__(**kwargs)
+        self._project_type = project_type or ProjectType.EMAIL_BASED
+        self.primary_key = self.PRIMARY_KEY_BY_PROJECT_TYPE.get(self._project_type, "email")
+
+    def get_json_schema(self) -> Mapping[str, Any]:
+        schema = dict(ResourceSchemaLoader(package_name_from_class(self.__class__)).get_schema("users"))
+        # Make a copy of properties since we need to modify field types
+        schema["properties"] = dict(schema["properties"])
+
+        # Update required fields and field types based on project type
+        # Note: We use itblUserId (Iterable's internal identifier) rather than userId (user-provided)
+        # because itblUserId is always present, while userId may not be set on all user records.
+        match self._project_type:
+            case ProjectType.EMAIL_BASED:
+                schema["required"] = ["email"]
+                # email is required (non-nullable), userId and itblUserId are optional (nullable)
+                schema["properties"]["email"] = {"type": "string"}
+                schema["properties"]["userId"] = {"type": ["null", "string"]}
+                schema["properties"]["itblUserId"] = {"type": ["null", "string"]}
+            case ProjectType.USER_ID_BASED | ProjectType.HYBRID:
+                schema["required"] = ["itblUserId"]
+                # itblUserId is required (non-nullable), email and userId are optional (nullable)
+                schema["properties"]["itblUserId"] = {"type": "string"}
+                schema["properties"]["email"] = {"type": ["null", "string"]}
+                schema["properties"]["userId"] = {"type": ["null", "string"]}
+            case _:
+                raise ValueError(f"Unknown project type: {self._project_type}")
+
+        return schema
 
     def read_records(self, **kwargs) -> Iterable[Mapping[str, Any]]:
         # These datetime fields are not ISO 8601 compliant, so we re-format them so they comply

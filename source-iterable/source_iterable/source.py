@@ -11,6 +11,7 @@ from airbyte_cdk.sources.streams import Stream
 from airbyte_cdk.sources.streams.http.requests_native_auth import TokenAuthenticator
 from source_iterable.utils import read_full_refresh
 
+from .models import ProjectType
 from .streams import (
     AccessCheck,
     Campaigns,
@@ -81,6 +82,8 @@ class SourceIterable(AbstractSource):
 
     def streams(self, config: Mapping[str, Any]) -> List[Stream]:
         start_date, end_date = config["start_date"], config.get("end_date")
+        # If project_type is absent from the config, preserve the previous behavior of assuming this is an Email-based project.
+        project_type = config.get("project_type", ProjectType.EMAIL_BASED)
         date_range = {"start_date": start_date, "end_date": end_date}
 
         def all_streams_accessible():
@@ -116,7 +119,7 @@ class SourceIterable(AbstractSource):
         if all_streams_accessible():
             streams.extend(
                 [
-                    Users(authenticator=authenticator, **date_range),
+                    Users(authenticator=authenticator, project_type=project_type, **date_range),
                     ListUsers(authenticator=authenticator),
                     EmailBounce(authenticator=authenticator, **date_range),
                     EmailClick(authenticator=authenticator, **date_range),

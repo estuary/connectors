@@ -310,6 +310,9 @@
     "userId": {
       "type": ["null", "string"]
     },
+    "itblUserId": {
+      "type": ["null", "string"]
+    },
     "shopify_created_at": {
       "type": ["null", "string"],
       "format": "date-time"
