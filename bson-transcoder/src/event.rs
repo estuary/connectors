@@ -259,10 +259,11 @@ pub fn process_raw_document(
     buf.push(b'{');
 
     let deserializer = bson::RawDeserializer::new(doc.as_bytes())?;
+    let lossy_deserializer = bson_transcoder::Utf8LossyDeserializer::new(deserializer);
     let mut temp_buf = Vec::new();
     let mut serializer = SanitizingSerializer::new(&mut temp_buf, true); // true = stringify _id
-    serde_transcode::transcode(deserializer, &mut serializer)
-        .map_err(|e| Error::Json(serde_json::Error::custom(&e.to_string())))?;
+    serde_transcode::transcode(lossy_deserializer, &mut serializer)
+        .map_err(|e| Error::Json(serde_json::Error::custom(e.to_string())))?;
 
     if temp_buf.len() < 2 || temp_buf[0] != b'{' && temp_buf[temp_buf.len() - 1] != b'}' {
         return Err(Error::ExpectedObject(String::from_utf8_lossy(&temp_buf).to_string()));
@@ -284,8 +285,9 @@ pub fn process_raw_document(
 /// This combines BSON parsing, extended JSON conversion, and sanitization in a single pass.
 fn bson_to_sanitized_json_bytes(doc: &RawDocument, is_root: bool, buf: &mut Vec<u8>) -> Result<()> {
     let deserializer = bson::RawDeserializer::new(doc.as_bytes())?;
+    let lossy_deserializer = bson_transcoder::Utf8LossyDeserializer::new(deserializer);
     let mut serializer = SanitizingSerializer::new(buf, is_root);
-    serde_transcode::transcode(deserializer, &mut serializer)?;
+    serde_transcode::transcode(lossy_deserializer, &mut serializer)?;
     Ok(())
 }
 
@@ -357,4 +359,147 @@ where
 
     buf.push(b'}');
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper to create a BSON document with invalid UTF-8 in a string field.
+    fn create_bson_with_invalid_utf8() -> Vec<u8> {
+        // BSON format:
+        // - 4 bytes: document length (little-endian)
+        // - elements...
+        // - 1 byte: null terminator
+        //
+        // String element format:
+        // - 1 byte: type (0x02 for string)
+        // - cstring: field name (null-terminated)
+        // - 4 bytes: string length including null terminator (little-endian)
+        // - bytes: string data
+        // - 1 byte: null terminator
+        //
+        // ObjectId element format:
+        // - 1 byte: type (0x07 for ObjectId)
+        // - cstring: field name (null-terminated)
+        // - 12 bytes: ObjectId data
+
+        let mut bson_bytes = Vec::new();
+        let mut doc_content = Vec::new();
+
+        // ObjectId element for "_id" field
+        doc_content.push(0x07); // ObjectId type
+        doc_content.extend_from_slice(b"_id\0"); // field name
+        doc_content.extend_from_slice(&[0x50, 0x7f, 0x1f, 0x77, 0xbc, 0xf8, 0x6c, 0xd7, 0x99, 0x43, 0x90, 0x11]); // ObjectId bytes
+
+        // String element for "name" field with invalid UTF-8
+        // 0x80 is an invalid UTF-8 byte (continuation byte without leading byte)
+        doc_content.push(0x02); // string type
+        doc_content.extend_from_slice(b"name\0"); // field name
+        let invalid_string = b"hello\x80world\0";
+        let str_len = invalid_string.len() as u32;
+        doc_content.extend_from_slice(&str_len.to_le_bytes());
+        doc_content.extend_from_slice(invalid_string);
+
+        // Document null terminator
+        doc_content.push(0x00);
+
+        // Calculate total document length (4 bytes for length + content)
+        let doc_len = (4 + doc_content.len()) as u32;
+        bson_bytes.extend_from_slice(&doc_len.to_le_bytes());
+        bson_bytes.extend_from_slice(&doc_content);
+
+        bson_bytes
+    }
+
+    /// Helper to create a simple BSON document with only invalid UTF-8 (no _id).
+    fn create_simple_bson_with_invalid_utf8() -> Vec<u8> {
+        let mut bson_bytes = Vec::new();
+        let mut doc_content = Vec::new();
+
+        // String element for "text" field with invalid UTF-8
+        doc_content.push(0x02); // string type
+        doc_content.extend_from_slice(b"text\0"); // field name
+        let invalid_string = b"before\xff\xfeafter\0"; // 0xff 0xfe are invalid UTF-8
+        let str_len = invalid_string.len() as u32;
+        doc_content.extend_from_slice(&str_len.to_le_bytes());
+        doc_content.extend_from_slice(invalid_string);
+
+        // Document null terminator
+        doc_content.push(0x00);
+
+        // Calculate total document length
+        let doc_len = (4 + doc_content.len()) as u32;
+        bson_bytes.extend_from_slice(&doc_len.to_le_bytes());
+        bson_bytes.extend_from_slice(&doc_content);
+
+        bson_bytes
+    }
+
+    #[test]
+    fn test_process_raw_document_handles_invalid_utf8() {
+        let bson_bytes = create_bson_with_invalid_utf8();
+        let raw_doc = RawDocument::from_bytes(&bson_bytes).unwrap();
+
+        let mut buf = Vec::new();
+        let result = process_raw_document(&raw_doc, "testdb", "testcoll", &mut buf);
+
+        // Should succeed despite invalid UTF-8
+        assert!(result.is_ok(), "Expected success but got error: {:?}", result);
+
+        let output = String::from_utf8(buf).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        // The invalid UTF-8 byte should be replaced with replacement character
+        assert_eq!(parsed["name"], "hello\u{FFFD}world");
+
+        // _id should be stringified
+        assert_eq!(parsed["_id"], "507f1f77bcf86cd799439011");
+
+        // _meta should be present with correct values
+        assert_eq!(parsed["_meta"]["op"], "c");
+        assert_eq!(parsed["_meta"]["source"]["db"], "testdb");
+        assert_eq!(parsed["_meta"]["source"]["collection"], "testcoll");
+        assert_eq!(parsed["_meta"]["snapshot"], true);
+    }
+
+    #[test]
+    fn test_bson_to_sanitized_json_bytes_handles_invalid_utf8() {
+        let bson_bytes = create_simple_bson_with_invalid_utf8();
+        let raw_doc = RawDocument::from_bytes(&bson_bytes).unwrap();
+
+        let mut buf = Vec::new();
+        let result = bson_to_sanitized_json_bytes(&raw_doc, false, &mut buf);
+
+        // Should succeed despite invalid UTF-8
+        assert!(result.is_ok(), "Expected success but got error: {:?}", result);
+
+        let output = String::from_utf8(buf).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        // The invalid UTF-8 bytes should be replaced with replacement characters
+        // 0xff and 0xfe each become U+FFFD
+        assert_eq!(parsed["text"], "before\u{FFFD}\u{FFFD}after");
+    }
+
+    #[test]
+    fn test_bson_to_sanitized_json_bytes_handles_invalid_utf8_with_root_id() {
+        let bson_bytes = create_bson_with_invalid_utf8();
+        let raw_doc = RawDocument::from_bytes(&bson_bytes).unwrap();
+
+        let mut buf = Vec::new();
+        let result = bson_to_sanitized_json_bytes(&raw_doc, true, &mut buf);
+
+        // Should succeed despite invalid UTF-8
+        assert!(result.is_ok(), "Expected success but got error: {:?}", result);
+
+        let output = String::from_utf8(buf).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+
+        // The invalid UTF-8 byte should be replaced with replacement character
+        assert_eq!(parsed["name"], "hello\u{FFFD}world");
+
+        // _id should be stringified when is_root=true
+        assert_eq!(parsed["_id"], "507f1f77bcf86cd799439011");
+    }
 }
