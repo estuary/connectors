@@ -110,21 +110,13 @@
           "type": "object"
         }
       },
-      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "AdAccount",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true
     },
@@ -164,21 +156,13 @@
           "type": "object"
         }
       },
-      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "AdCreative",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true
     },
@@ -892,21 +876,13 @@
           "type": "object"
         }
       },
-      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "string"
         }
       },
-      "required": [
-        "id"
-      ],
-      "title": "CustomConversions",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true
     },

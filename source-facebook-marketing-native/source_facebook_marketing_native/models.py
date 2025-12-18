@@ -701,7 +701,6 @@ InsightsFetchChangesFn = Callable[
 
 class AdAccount(FacebookResource):
     name: ClassVar[str] = ResourceName.AD_ACCOUNT
-    primary_keys: ClassVar[list[str]] = ["/id"]
     endpoint: ClassVar[str] = ""
     fields: ClassVar[list[str]] = [
         F.ID,
@@ -759,8 +758,6 @@ class AdAccount(FacebookResource):
         F.USER_TOS_ACCEPTED,
     ]
 
-    id: str
-
     @classmethod
     def sourced_schema(cls) -> dict[str, Any]:
         """Return explicit sourced schema matching legacy connector format."""
@@ -769,7 +766,6 @@ class AdAccount(FacebookResource):
 
 class AdCreative(FacebookResource):
     name: ClassVar[str] = ResourceName.AD_CREATIVES
-    primary_keys: ClassVar[list[str]] = ["/id"]
     endpoint: ClassVar[str] = "adcreatives"
     fields: ClassVar[list[str]] = [
         F.ID,
@@ -807,8 +803,6 @@ class AdCreative(FacebookResource):
         F.VIDEO_ID,
     ]
 
-    id: str
-
     @classmethod
     def sourced_schema(cls) -> dict[str, Any]:
         """Return explicit sourced schema matching legacy connector format."""
@@ -817,7 +811,6 @@ class AdCreative(FacebookResource):
 
 class CustomConversions(FacebookResource):
     name: ClassVar[str] = ResourceName.CUSTOM_CONVERSIONS
-    primary_keys: ClassVar[list[str]] = ["/id"]
     endpoint: ClassVar[str] = "customconversions"
     fields: ClassVar[list[str]] = [
         F.ID,
@@ -838,8 +831,6 @@ class CustomConversions(FacebookResource):
         F.RETENTION_DAYS,
         F.RULE,
     ]
-
-    id: str
 
 
 class Campaigns(FacebookResource):
