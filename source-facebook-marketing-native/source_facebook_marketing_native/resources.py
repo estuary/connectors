@@ -5,6 +5,7 @@ from copy import deepcopy
 from typing import Callable
 
 from estuary_cdk.capture.common import (
+    BaseDocument,
     Resource,
     ResourceState,
     open_binding,
@@ -298,13 +299,13 @@ def full_refresh_resource(
             state,
             task,
             fetch_snapshot=snapshot_fn,
-            tombstone=FacebookResource(_meta=FacebookResource.Meta(op="d")),
+            tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d")),
         )
 
     return Resource(
         name=model.name,
         key=["/_meta/row_id"],
-        model=model,
+        model=BaseDocument,
         open=functools.partial(
             open,
             snapshot_fn=functools.partial(
