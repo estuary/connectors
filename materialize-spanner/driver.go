@@ -186,7 +186,11 @@ func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Respo
 	}
 
 	// Check if key distribution optimization setting changed
-	keyDistOptChanged, err := keyDistributionOptimizationChanged(req.LastMaterialization.ConfigJson, req.ConfigJson)
+	var lastConfigJson []byte
+	if req.LastMaterialization != nil {
+		lastConfigJson = req.LastMaterialization.ConfigJson
+	}
+	keyDistOptChanged, err := keyDistributionOptimizationChanged(lastConfigJson, req.ConfigJson)
 	if err != nil {
 		return nil, err
 	}
@@ -270,6 +274,44 @@ type spannerBinding struct {
 	columnNames        []string // Column names in order for mutations
 	columnTypes        []string // DDL types for each column (e.g., "TIMESTAMP", "DATE", "INT64")
 	keyColumnIdxs      []int    // Indexes of key columns within columnNames
+}
+
+// hashSingleValue computes FNV-1a 64-bit hash of a single value.
+// Used for partition routing when key distribution optimization is disabled.
+func hashSingleValue(val interface{}) (int64, error) {
+	h := fnv.New64a()
+
+	switch v := val.(type) {
+	case int64:
+		buf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(buf, uint64(v))
+		h.Write(buf)
+	case float64:
+		buf := make([]byte, 8)
+		binary.LittleEndian.PutUint64(buf, math.Float64bits(v))
+		h.Write(buf)
+	case string:
+		h.Write([]byte(v))
+	case []byte:
+		h.Write(v)
+	case bool:
+		if v {
+			h.Write([]byte{1})
+		} else {
+			h.Write([]byte{0})
+		}
+	case nil:
+		h.Write([]byte{0})
+	default:
+		// For any other type, convert to JSON string for consistent serialization
+		jsonBytes, err := json.Marshal(v)
+		if err != nil {
+			return 0, fmt.Errorf("marshaling value of type %T for hashing: %w", v, err)
+		}
+		h.Write(jsonBytes)
+	}
+
+	return int64(h.Sum64()), nil
 }
 
 // computeKeyHash computes a deterministic hash of the given key values using FNV-1a 64-bit algorithm.
@@ -408,28 +450,21 @@ func newTransactor(
 
 	templates := renderTemplates(ep.Dialect, !cfg.Advanced.DisableKeyDistributionOptimization)
 
-	// Calculate number of partitions for parallel flushing
-	// When key distribution optimization is enabled, use nodes × 10
-	// When disabled, use a minimum of 2 partitions for parallelism
-	var numPartitions int
-	if !cfg.Advanced.DisableKeyDistributionOptimization {
-		nodeCount, err := queryNodeCount(ctx, cfg.ProjectID, cfg.InstanceID, opts)
-		if err != nil {
-			adminClient.Close()
-			client.Close()
-			return nil, fmt.Errorf("querying node count for key distribution: %w", err)
-		}
-		// Number of partitions = nodes × 10
-		numPartitions = nodeCount * 10
-		log.WithFields(log.Fields{
-			"nodeCount":     nodeCount,
-			"numPartitions": numPartitions,
-		}).Info("calculated partitions for key distribution optimization")
-	} else {
-		// Use 2 partitions for parallel flushing even without key distribution optimization
-		numPartitions = 2
-		log.WithField("numPartitions", numPartitions).Info("using default partitions for parallel flushing")
+	// Always query node count for partition calculation
+	// Partitions = nodes × 10 for parallel flushing
+	nodeCount, err := queryNodeCount(ctx, cfg.ProjectID, cfg.InstanceID, opts)
+	if err != nil {
+		adminClient.Close()
+		client.Close()
+		return nil, fmt.Errorf("querying node count: %w", err)
 	}
+	numPartitions := nodeCount * 10
+
+	log.WithFields(log.Fields{
+		"nodeCount":                   nodeCount,
+		"numPartitions":               numPartitions,
+		"keyDistributionOptimization": !cfg.Advanced.DisableKeyDistributionOptimization,
+	}).Info("calculated partitions for parallel flushing")
 
 	t := &transactor{
 		client:        client,
@@ -629,15 +664,24 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		// Convert key values to Spanner-compatible types
 		spannerKeyVals := make([]interface{}, 0, len(converted)+1)
 
-		// Compute key hash for partition routing (always computed for distribution)
-		keyHash, err := computeKeyHash(converted)
-		if err != nil {
-			return fmt.Errorf("computing key hash for load: %w", err)
-		}
-
-		// If key distribution optimization is enabled, prepend the hash to the values
+		// Compute partition index for routing
+		var partitionHash int64
 		if !t.cfg.Advanced.DisableKeyDistributionOptimization {
+			// When optimization enabled: compute full key hash for flow_key_hash column and partition routing
+			keyHash, err := computeKeyHash(converted)
+			if err != nil {
+				return fmt.Errorf("computing key hash for load: %w", err)
+			}
 			spannerKeyVals = append(spannerKeyVals, keyHash)
+			partitionHash = keyHash
+		} else {
+			// When optimization disabled: hash only first key value for partition routing
+			// This allows customers with well-distributed keys to benefit from parallel flushing
+			hash, err := hashSingleValue(converted[0])
+			if err != nil {
+				return fmt.Errorf("hashing first key value for partition routing: %w", err)
+			}
+			partitionHash = hash
 		}
 
 		for i, keyVal := range converted {
@@ -656,7 +700,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		mutationSize := calculateMutationByteSize(spannerKeyVals)
 
 		// Route to partition based on hash
-		partitionIdx := flusher.partitionedBatch.getPartitionIndex(keyHash)
+		partitionIdx := flusher.partitionedBatch.getPartitionIndex(partitionHash)
 		if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(spannerKeyVals), mutationSize); err != nil {
 			return fmt.Errorf("adding load mutation: %w", err)
 		}
@@ -787,15 +831,23 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Convert key values to Spanner-compatible types
 			spannerKeyValues := make([]interface{}, 0, len(keyValues)+1)
 
-			// Compute key hash for partition routing (always computed for distribution)
-			keyHash, err := computeKeyHash(keyValues)
-			if err != nil {
-				return nil, fmt.Errorf("computing key hash for delete: %w", err)
-			}
-
-			// If key distribution optimization is enabled, prepend the hash to the values
+			// Compute partition index for routing
+			var partitionHash int64
 			if !t.cfg.Advanced.DisableKeyDistributionOptimization {
+				// When optimization enabled: compute full key hash for flow_key_hash column and partition routing
+				keyHash, err := computeKeyHash(keyValues)
+				if err != nil {
+					return nil, fmt.Errorf("computing key hash for delete: %w", err)
+				}
 				spannerKeyValues = append(spannerKeyValues, keyHash)
+				partitionHash = keyHash
+			} else {
+				// When optimization disabled: hash only first key value for partition routing
+				hash, err := hashSingleValue(keyValues[0])
+				if err != nil {
+					return nil, fmt.Errorf("hashing first key value for partition routing: %w", err)
+				}
+				partitionHash = hash
 			}
 
 			for i, val := range keyValues {
@@ -815,7 +867,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			storeBytes += mutationSize
 
 			// Route to partition based on hash
-			partitionIdx := flusher.partitionedBatch.getPartitionIndex(keyHash)
+			partitionIdx := flusher.partitionedBatch.getPartitionIndex(partitionHash)
 			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(keyValues), mutationSize); err != nil {
 				return nil, fmt.Errorf("adding delete mutation: %w", err)
 			}
@@ -837,17 +889,25 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			// Convert values to Spanner-compatible types
 			spannerValues := make([]interface{}, 0, len(values)+1)
 
-			// Compute key hash for partition routing (always computed for distribution)
-			// The hash is computed from the key columns (first len(b.target.Keys) values)
+			// Compute partition index for routing
+			// The key values are the first len(b.target.Keys) values
 			keyValues := values[:len(b.target.Keys)]
-			keyHash, err := computeKeyHash(keyValues)
-			if err != nil {
-				return nil, fmt.Errorf("computing key hash for store: %w", err)
-			}
-
-			// If key distribution optimization is enabled, prepend the hash to the values
+			var partitionHash int64
 			if !t.cfg.Advanced.DisableKeyDistributionOptimization {
+				// When optimization enabled: compute full key hash for flow_key_hash column and partition routing
+				keyHash, err := computeKeyHash(keyValues)
+				if err != nil {
+					return nil, fmt.Errorf("computing key hash for store: %w", err)
+				}
 				spannerValues = append(spannerValues, keyHash)
+				partitionHash = keyHash
+			} else {
+				// When optimization disabled: hash only first key value for partition routing
+				hash, err := hashSingleValue(keyValues[0])
+				if err != nil {
+					return nil, fmt.Errorf("hashing first key value for partition routing: %w", err)
+				}
+				partitionHash = hash
 			}
 
 			for i, val := range values {
@@ -870,7 +930,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			storeBytes += mutationSize
 
 			// Route to partition based on hash
-			partitionIdx := flusher.partitionedBatch.getPartitionIndex(keyHash)
+			partitionIdx := flusher.partitionedBatch.getPartitionIndex(partitionHash)
 			if err := flusher.partitionedBatch.addMutation(partitionIdx, mutation, len(values), mutationSize); err != nil {
 				return nil, fmt.Errorf("adding store mutation: %w", err)
 			}
