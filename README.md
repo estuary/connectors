@@ -39,3 +39,89 @@ There are some things to consider and some tips here for developing a new connec
 ### SQL Materializations
 
 - [ ] The [materialize-sql](https://github.com/estuary/connectors/tree/main/materialize-sql) library abstracts away a lot of shared logic among our SQL materializations. Connector developers will need to implement the various interfaces of this library, and there are [standard implementations](https://github.com/estuary/connectors/blob/main/materialize-sql/std_sql.go) available as well, but they may or may not work with your destination technology. There are many examples of SQL materializations using this library that you can check to get an idea of how they work.
+
+### Materialization Fixtures
+
+You can use `flowctl preview` to run a connector with a fixture, which allows
+you to process custom collection data through the materialization connector.
+Here is an example of the process using the Motherduck materialization.
+
+First, download the flow binaries, these are required to build most connector
+images.  This script will place the binaries into `./flow-bin`:
+```
+./fetch-flow.sh
+```
+
+Build the connector image for your materialization you wish to test:
+```
+docker build -t ghcr.io/estuary/materialize-motherduck:local --platform=linux/amd64 -f materialize-motherduck/Dockerfile .
+```
+
+Write a spec for the test.  This will be similar to the specification used by
+flow, so consider using [`flowctl pull-specs`][pull-specs] to get an existing
+spec as a starting point:
+```yaml
+materializations:
+  acmeCo/materialize-motherduck:
+    endpoint:
+      connector:
+        image: "ghcr.io/estuary/materialize-motherduck:local"
+        config:
+          token: <motherduck_service_token>
+          database: my_db
+          schema: main
+          stagingBucket:
+            stagingBucketType: S3
+            bucketS3: my_bucket
+            awsAccessKeyId: <access_key_id>
+            awsSecretAccessKey: <secret_access_key>
+            region: us-east-1
+          syncSchedule:
+            syncFrequency: 0s
+          advanced:
+              no_flow_document: true
+              feature_flags: allow_existing_tables_for_new_bindings
+    bindings:
+      - resource:
+          table: tests_simple
+        source: tests/simple
+
+collections:
+  tests/simple:
+    schema:
+      type: object
+      properties:
+        id: { type: integer }
+        canary: { type: string }
+      required: [id, canary]
+    key: [/id]
+```
+
+Write the fixture data matching the collection in your above spec.  The file is
+a newline-delimited JSON file containing the data for each transaction:
+
+```json
+{"commit":true}
+["tests/simple", { "id": 1, "canary": "amputation's"}]
+["tests/simple", { "id": 2, "canary": "armament's"}]
+["tests/simple", { "id": 3, "canary": "splatters"}]
+["tests/simple", { "id": 4, "canary": "strengthen"}]
+["tests/simple", { "id": 5, "canary": "Kringle's"}]
+["tests/simple", { "id": 6, "canary": "grosbeak's"}]
+{"commit":true}
+["tests/simple", { "id": 7, "canary": "pieced"}]
+["tests/simple", { "id": 8, "canary": "roaches"}]
+["tests/simple", { "id": 9, "canary": "devilish"}]
+["tests/simple", { "id": 10, "canary": "glucose's"}]
+{"commit":true}
+```
+
+Install [flowctl][], or use the `flowctl` binary downloaded previously in `flow-bin`.
+
+Use `flowctl preview` to run the fixture:
+```
+RUST_LOG=DEBUG flowctl preview --source ./my-spec.yaml --fixture ./my-fixture.json --output-state --output-apply
+```
+
+[flowctl]: https://docs.estuary.dev/guides/get-started-with-flowctl/
+[pull-specs]: https://docs.estuary.dev/guides/flowctl/edit-specification-locally/#pull-specifications-locally
