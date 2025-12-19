@@ -7,6 +7,7 @@ import (
 	"io"
 	"math"
 	"math/rand"
+	"os"
 	"slices"
 	"strings"
 	"sync"
@@ -278,8 +279,8 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 		// We often want to shut down at this point in tests. Before doing so, we emit
 		// a state checkpoint to ensure that streams reliably transition into the Active
 		// state during tests even if there is no backfill work to do.
-		if TestShutdownAfterCaughtUp {
-			log.Info("Shutting down after backfill due to TestShutdownAfterCaughtUp")
+		if TestShutdownAfterCaughtUp || os.Getenv("SHUTDOWN_AFTER_POLLING") == "yes" {
+			log.Info("Shutting down due to SHUTDOWN_AFTER_POLLING=yes")
 			if bs, err := json.Marshal(c.State); err == nil {
 				FinalStateCheckpoint = bs // Set final state checkpoint
 			}

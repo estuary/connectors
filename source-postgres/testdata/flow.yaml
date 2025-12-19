@@ -1,0 +1,12 @@
+captures:
+  acmeCo/test_capture/source-postgres:
+    endpoint:
+      local:
+        command: ["go", "run", "./source-postgres"]
+        config:
+          address: "localhost:5432"
+          database: postgres
+          user: flow_capture
+          password: secret1234
+        protobuf: true
+    bindings: []
