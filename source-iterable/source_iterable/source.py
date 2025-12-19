@@ -2,6 +2,7 @@
 # Copyright (c) 2023 Airbyte, Inc., all rights reserved.
 #
 
+from datetime import datetime, timedelta, timezone
 from typing import Any, List, Mapping, Tuple
 
 import requests.exceptions
@@ -89,7 +90,8 @@ class SourceIterable(AbstractSource):
         def all_streams_accessible():
             if config["api_key"] == "estuary":
                 return True
-            access_check_stream = AccessCheck(authenticator=authenticator, start_date="2024-01-01T00:00:00Z")
+            access_check_start = (datetime.now(timezone.utc) - timedelta(minutes = 5)).strftime("%Y-%m-%dT%H:%M:%SZ")
+            access_check_stream = AccessCheck(authenticator=authenticator, start_date=access_check_start)
             try:
                 next(read_full_refresh(access_check_stream), None)
             except requests.exceptions.RequestException as e:
