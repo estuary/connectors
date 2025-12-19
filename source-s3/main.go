@@ -17,38 +17,127 @@ import (
 	s3Types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 	"github.com/estuary/connectors/filesource"
+	"github.com/estuary/connectors/go/auth/iam"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/estuary/flow/go/parser"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
+	"github.com/invopop/jsonschema"
+	log "github.com/sirupsen/logrus"
 )
 
+type AuthType string
+
+const (
+	AWSAccessKey AuthType = "AWSAccessKey"
+	AWSAnonymous AuthType = "AWSAnonymous"
+	AWSIAM       AuthType = "AWSIAM"
+)
+
+type CredentialsConfig struct {
+	AuthType AuthType `json:"auth_type"`
+
+	AccessKeyCredentials
+	AnonymousCredentials
+	iam.IAMConfig
+}
+
+func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
+	subSchemas := []schemagen.OneOfSubSchemaT{
+		schemagen.OneOfSubSchema("Access Key", AccessKeyCredentials{}, string(AWSAccessKey)),
+	}
+	subSchemas = append(subSchemas,
+		schemagen.OneOfSubSchema("Anonymous", AnonymousCredentials{}, string(AWSAnonymous)))
+	subSchemas = append(subSchemas,
+		schemagen.OneOfSubSchema("AWS IAM", iam.AWSConfig{}, string(AWSIAM)))
+
+	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(AWSAccessKey), subSchemas...)
+}
+
+func (c *CredentialsConfig) Validate() error {
+	switch c.AuthType {
+	case AWSAccessKey:
+		if c.AWSAccessKeyID == "" {
+			return errors.New("missing 'aws_access_key_id'")
+		}
+		if c.AWSSecretAccessKey == "" {
+			return errors.New("missing 'aws_secret_access_key'")
+		}
+		return nil
+	case AWSAnonymous:
+		return nil
+	case AWSIAM:
+		if err := c.ValidateIAM(); err != nil {
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("unknown 'auth_type'")
+}
+
+// Since the AccessKeyCredentials and IAMConfig have conflicting JSON field names, only parse
+// the embedded struct of interest.
+func (c *CredentialsConfig) UnmarshalJSON(data []byte) error {
+	var discriminator struct {
+		AuthType AuthType `json:"auth_type"`
+	}
+	if err := json.Unmarshal(data, &discriminator); err != nil {
+		return err
+	}
+	c.AuthType = discriminator.AuthType
+
+	switch c.AuthType {
+	case AWSAccessKey:
+		return json.Unmarshal(data, &c.AccessKeyCredentials)
+	case AWSAnonymous:
+		return nil
+	case AWSIAM:
+		return json.Unmarshal(data, &c.IAMConfig)
+	}
+	return fmt.Errorf("unexpected auth_type: %s", c.AuthType)
+}
+
+type AccessKeyCredentials struct {
+	AWSAccessKeyID     string `json:"aws_access_key_id" jsonschema:"title=AWS Access Key ID,description=Part of the AWS credentials that will be used to connect to S3." jsonschema_extras:"order=1"`
+	AWSSecretAccessKey string `json:"aws_secret_access_key" jsonschema:"title=AWS Secret Access key,description=Part of the AWS credentials that will be used to connect to S3." jsonschema_extras:"secret=true,order=2"`
+}
+
+type AnonymousCredentials struct{}
+
 type config struct {
-	AWSAccessKeyID     string         `json:"awsAccessKeyId"`
-	AWSSecretAccessKey string         `json:"awsSecretAccessKey"`
-	Bucket             string         `json:"bucket"`
-	MatchKeys          string         `json:"matchKeys"`
-	Parser             *parser.Config `json:"parser"`
-	Prefix             string         `json:"prefix"`
-	Region             string         `json:"region"`
-	Advanced           advancedConfig `json:"advanced"`
+	AWSAccessKeyID     string             `json:"awsAccessKeyId,omitempty" jsonschema:"-"`
+	AWSSecretAccessKey string             `json:"awsSecretAccessKey,omitempty" jsonschema:"-"`
+	Region             string             `json:"region"`
+	Bucket             string             `json:"bucket"`
+	Prefix             string             `json:"prefix"`
+	MatchKeys          string             `json:"matchKeys"`
+	Credentials        *CredentialsConfig `json:"credentials"`
+	Parser             *parser.Config     `json:"parser"`
+	Advanced           advancedConfig     `json:"advanced"`
 }
 
 type advancedConfig struct {
-	AscendingKeys bool   `json:"ascendingKeys"`
-	Endpoint      string `json:"endpoint"`
+	AscendingKeys bool   `json:"ascendingKeys" jsonschema="title=Ascending Keys,description=Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/xKswdo."`
+	Endpoint      string `json:"endpoint" jsonschema="title=AWS Endpoint,description=The AWS endpoint URI to connect to. Use if you're capturing from a S3-compatible API that isn't provided by AWS`
 }
 
 func (c config) Validate() error {
 	if c.Region == "" {
 		return fmt.Errorf("missing region")
 	}
-	if c.AWSAccessKeyID == "" && c.AWSSecretAccessKey != "" {
-		return fmt.Errorf("missing awsAccessKeyID")
+
+	if c.Credentials == nil {
+		if c.AWSAccessKeyID == "" {
+			return errors.New("missing 'awsAccessKeyId'")
+		}
+		if c.AWSSecretAccessKey == "" {
+			return errors.New("missing 'awsSecretAccessKey'")
+		}
+	} else if err := c.Credentials.Validate(); err != nil {
+		return err
 	}
-	if c.AWSAccessKeyID != "" && c.AWSSecretAccessKey == "" {
-		return fmt.Errorf("missing awsSecretAccessKey")
-	}
+
 	return nil
 }
 
@@ -72,17 +161,30 @@ func (c config) PathRegex() string {
 	return c.MatchKeys
 }
 
-func (c config) CredentialsProvider(ctx context.Context) (aws.CredentialsProvider, error) {
-	if c.AWSSecretAccessKey != "" {
-		return credentials.NewStaticCredentialsProvider(
-			c.AWSAccessKeyID, c.AWSSecretAccessKey, ""), nil
-	} else {
-		return aws.AnonymousCredentials{}, nil
-	}
-}
-
 type s3Store struct {
 	s3 *s3.Client
+}
+
+func (c config) CredentialsProvider(ctx context.Context) (aws.CredentialsProvider, error) {
+	if c.Credentials == nil {
+		if c.AWSSecretAccessKey != "" {
+			return credentials.NewStaticCredentialsProvider(
+				c.AWSAccessKeyID, c.AWSSecretAccessKey, ""), nil
+		} else {
+			return aws.AnonymousCredentials{}, nil
+		}
+	}
+
+	switch c.Credentials.AuthType {
+	case AWSAccessKey:
+		return credentials.NewStaticCredentialsProvider(
+			c.Credentials.AWSAccessKeyID, c.Credentials.AWSSecretAccessKey, ""), nil
+	case AWSAnonymous:
+		return aws.AnonymousCredentials{}, nil
+	case AWSIAM:
+		return c.Credentials.IAMTokens.AWSCredentialsProvider()
+	}
+	return nil, errors.New("unknown 'auth_type'")
 }
 
 func newS3Store(ctx context.Context, cfg config) (*s3Store, error) {
@@ -283,96 +385,105 @@ func (l *s3Listing) poll() error {
 	return nil
 }
 
-func main() {
-
-	var src = filesource.Source{
-		NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
-			var cfg config
-			if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
-				return nil, fmt.Errorf("parsing config json: %w", err)
-			}
-			return cfg, nil
-		},
-		Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
-			return newS3Store(ctx, cfg.(config))
-		},
-		ConfigSchema: func(parserSchema json.RawMessage) json.RawMessage {
-			return json.RawMessage(`{
-		"$schema": "http://json-schema.org/draft-07/schema#",
-		"title":   "S3 Source",
-		"type":    "object",
-		"required": [
-			"bucket",
-			"region"
-		],
-		"properties": {
-			"awsAccessKeyId": {
-				"type":        "string",
-				"title":       "AWS Access Key ID",
-				"description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
-				"order": 0
-			},
-			"awsSecretAccessKey": {
-				"type":        "string",
-				"title":       "AWS Secret Access Key",
-				"description": "Part of the AWS credentials that will be used to connect to S3. Required unless the bucket is public and allows anonymous listings and reads.",
-				"secret":      true,
-				"order":       1
-			},
-			"region": {
-				"type":        "string",
-				"title":       "AWS Region",
-				"description": "The name of the AWS region where the S3 bucket is located.",
-				"order":       2
-			},
-			"bucket": {
-				"type":        "string",
-				"title":       "Bucket",
-				"description": "Name of the S3 bucket",
-				"order":       3
-			},
-			"prefix": {
-				"type":        "string",
-				"title":       "Prefix",
-				"description": "Prefix within the bucket to capture from.",
-				"order":       4
-			},
-			"matchKeys": {
-				"type":        "string",
-				"title":       "Match Keys",
-				"format":      "regex",
-				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
-				"order":       5
-			},
-			"advanced": {
-				"properties": {
-				  "ascendingKeys": {
-					"type":        "boolean",
-					"title":       "Ascending Keys",
-					"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/xKswdo.",
-					"default":     false
-				  },
-				  "endpoint": {
-					"type":        "string",
-					"title":       "AWS Endpoint",
-					"description": "The AWS endpoint URI to connect to. Use if you're capturing from a S3-compatible API that isn't provided by AWS"
-				  }
-				},
-				"additionalProperties": false,
-				"type": "object",
-				"description": "Options for advanced users. You should not typically need to modify these.",
-				"advanced": true
-			},
-			"parser": ` + string(parserSchema) + `
+var src = filesource.Source{
+	NewConfig: func(raw json.RawMessage) (filesource.Config, error) {
+		var cfg config
+		if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
+			return nil, fmt.Errorf("parsing config json: %w", err)
 		}
-    }`)
-		},
-		DocumentationURL: "https://go.estuary.dev/source-s3",
-		// Set the delta to 30 seconds in the past, to guard against new files appearing with a
-		// timestamp that's equal to the `MinBound` in the state.
-		TimeHorizonDelta: time.Second * -30,
-	}
+		return cfg, nil
+	},
+	Connect: func(ctx context.Context, cfg filesource.Config) (filesource.Store, error) {
+		return newS3Store(ctx, cfg.(config))
+	},
+	ConfigSchema: func(parserSchema json.RawMessage) json.RawMessage {
+		authSchema := schemagen.GenerateSchema("Authentication", &CredentialsConfig{})
+		authSchema.Extras["order"] = 4
+		authSchema.Extras["x-iam-auth"] = true
 
+		var parserOrderSchema map[string]any
+		err := json.Unmarshal(parserSchema, &parserOrderSchema)
+		if err != nil {
+			log.Errorf("unable to parse parser schema: %v", err)
+		}
+		parserOrderSchema["order"] = 5
+
+		schema := map[string]any{
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"$id":     "https://github.com/estuary/connectors/source-s3/config",
+			"title":   "S3 Source",
+			"type":    "object",
+			"required": []string{
+				"bucket",
+				"region",
+				"credentials",
+			},
+			"properties": map[string]any{
+				"region": map[string]any{
+					"type":        "string",
+					"title":       "AWS Region",
+					"description": "The name of the AWS region where the S3 bucket is located.",
+					"order":       0,
+				},
+				"bucket": map[string]any{
+					"type":        "string",
+					"title":       "Bucket",
+					"description": "Name of the S3 bucket",
+					"order":       1,
+				},
+				"prefix": map[string]any{
+					"type":        "string",
+					"title":       "Prefix",
+					"description": "Prefix within the bucket to capture from.",
+					"order":       2,
+				},
+				"matchKeys": map[string]any{
+					"type":        "string",
+					"title":       "Match Keys",
+					"format":      "regex",
+					"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
+					"order":       3,
+				},
+				"credentials": authSchema,
+				"parser":      parserOrderSchema,
+				"advanced": map[string]any{
+					"properties": map[string]any{
+						"ascendingKeys": map[string]any{
+							"type":        "boolean",
+							"title":       "Ascending Keys",
+							"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/xKswdo.",
+							"default":     false,
+						},
+						"endpoint": map[string]any{
+							"type":        "string",
+							"title":       "AWS Endpoint",
+							"description": "The AWS endpoint URI to connect to. Use if you're capturing from a S3-compatible API that isn't provided by AWS",
+						},
+					},
+					"additionalProperties": false,
+					"type":                 "object",
+					"title":                "Advanced",
+					"description":          "Options for advanced users. You should not typically need to modify these.",
+					"order":                6,
+					"advanced":             true,
+				},
+			},
+		}
+
+		schemaBytes, err := json.Marshal(schema)
+		if err != nil {
+			log.Errorf("generating schema: %v", err)
+		}
+
+		return json.RawMessage(schemaBytes)
+	},
+	DocumentationURL: "https://go.estuary.dev/source-s3",
+	// Set the delta to 30 seconds in the past, to guard against new files appearing with a
+	// timestamp that's equal to the `MinBound` in the state.
+	TimeHorizonDelta: time.Second * -30,
+}
+
+func main() {
 	src.Main()
 }
 
