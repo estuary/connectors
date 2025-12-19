@@ -1,0 +1,15 @@
+captures:
+  acmeCo/source-ada:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_ada
+        config:
+          bot_handle: not_a_real_handle
+          credentials:
+            credentials_title: Private App Credentials
+            access_token: secret_token
+    bindings: []
+  
