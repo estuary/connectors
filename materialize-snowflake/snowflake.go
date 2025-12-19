@@ -466,50 +466,60 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	for _, queryLoop := range subqueries {
 		var query = queryLoop
 		group.Go(func() error {
-			log.WithFields(log.Fields{
-				"query": query,
-			}).Debug("querying Load documents")
-			start := time.Now()
+			var currentRow int
+			return Retry[*TemporaryError](RetryDelays, func() error {
+				log.WithFields(log.Fields{
+					"query": query,
+				}).Debug("querying Load documents")
+				start := time.Now()
 
-			// Issue a join of the target table and (now staged) load keys,
-			// and send results to the load channel.
-			//
-			// NB: Not using groupCtx here since the Go Snowflake driver
-			// retains contexts internally, and the group context is cancelled
-			// after group.Wait() returns.
-			rows, err := d.db.QueryContext(sf.WithStreamDownloader(ctx), query)
-			if err != nil {
-				return fmt.Errorf("querying Load documents: %w", err)
-			}
-			defer rows.Close()
+				// Issue a join of the target table and (now staged) load keys,
+				// and send results to the load channel.
+				//
+				// NB: Not using groupCtx here since the Go Snowflake driver
+				// retains contexts internally, and the group context is cancelled
+				// after group.Wait() returns.
+				rows, err := d.db.QueryContext(sf.WithStreamDownloader(ctx), query)
+				if err != nil {
+					return NewTemporaryError("querying Load documents: %w", err)
+				}
+				defer rows.Close()
 
-			var binding int
-			var document stdsql.RawBytes
+				var binding int
+				var rowNumber int
+				var document stdsql.RawBytes
 
-			log.WithFields(log.Fields{
-				"query":           query,
-				"requestDuration": time.Since(start).String(),
-			}).Debug("sending Loaded documents from query")
+				log.WithFields(log.Fields{
+					"query":           query,
+					"requestDuration": time.Since(start).String(),
+				}).Debug("sending Loaded documents from query")
 
-			for rows.Next() {
-				if err = rows.Scan(&binding, &document); err != nil {
-					return fmt.Errorf("scanning Load document: %w", err)
+				for rows.Next() {
+					if err = rows.Scan(&binding, &rowNumber, &document); err != nil {
+						return fmt.Errorf("scanning Load document: %w", err)
+					}
+
+					if rowNumber < currentRow {
+						continue
+					}
+
+					message := slices.Clone(document)
+					doc := &loadDoc{binding: binding, document: json.RawMessage(message)}
+					select {
+					case <-groupCtx.Done():
+						return groupCtx.Err()
+					case loadCh <- doc:
+					}
+
+					currentRow = rowNumber
 				}
 
-				message := slices.Clone(document)
-				doc := &loadDoc{binding: binding, document: json.RawMessage(message)}
-				select {
-				case <-groupCtx.Done():
-					return groupCtx.Err()
-				case loadCh <- doc:
+				if err = rows.Err(); err != nil {
+					return NewTemporaryError("querying Loads: %w", err)
 				}
-			}
 
-			if err = rows.Err(); err != nil {
-				return fmt.Errorf("querying Loads: %w", err)
-			}
-
-			return nil
+				return nil
+			})
 		})
 	}
 
@@ -523,6 +533,52 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	return returnErr
+}
+
+// TemporaryError is an error for an operation that is expected to succeed if
+// retried.
+type TemporaryError struct {
+	err error
+}
+
+func NewTemporaryError(format string, a ...any) *TemporaryError {
+	return &TemporaryError{err: fmt.Errorf(format, a...)}
+}
+
+func (e *TemporaryError) Error() string {
+	return e.err.Error()
+}
+
+func (e *TemporaryError) Unwrap() error {
+	return e.err
+}
+
+var RetryDelays = []float64{0.0, 2.0, 4.0, 8.0, 16.0, 30.0}
+
+// Run a function and if it fails, retry it according to the second delays in
+// backoff.  Only errors of the type E are retried.  If too many failures
+// occur, return the last error.
+func Retry[E error](secondDelays []float64, fn func() error) error {
+	var err error
+	var attempt = 0
+	for _, secondDelay := range secondDelays {
+		attempt++
+
+		err = fn()
+
+		var retryError E
+		if errors.As(err, &retryError) {
+			delay := time.Duration(secondDelay * float64(time.Second))
+			log.WithFields(log.Fields{
+				"attempt": attempt,
+				"delay":   delay.String(),
+			}).WithError(retryError).Info("retryable error occurred")
+			time.Sleep(delay)
+			continue
+		}
+		return err
+	}
+	return err
 }
 
 func (d *transactor) loadDocuments(ctx context.Context, ch chan *loadDoc, loaded func(int, json.RawMessage) error) error {
