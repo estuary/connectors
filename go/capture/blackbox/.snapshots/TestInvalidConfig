@@ -1,0 +1,17 @@
+=== Discover: With Invalid Config ===
+acmeCo/test_capture/events
+
+=== Run: With Invalid Config ===
+Error: flowctl preview failed: exit status 1
+stderr: 2025-12-17T22:55:57.956874Z  WARN flowctl: You are not authenticated. Run `auth login` to login to Flow.
+2025-12-17T22:55:58.107594Z  WARN ops: time="2025-12-17T16:55:58-06:00" level=info msg="Initializing connector" eventType=connectorStatus fields={}
+2025-12-17T22:55:58.228167Z  WARN ops: time="2025-12-17T16:55:58-06:00" level=info msg="Initializing connector" eventType=connectorStatus fields={}
+2025-12-17T22:55:58.229327Z  WARN ops: time="2025-12-17T16:55:58-06:00" level=info msg="Validating capture configuration" eventType=connectorStatus fields={}
+2025-12-17T22:55:58.229457Z  WARN ops: parsing endpoint config: message rate must be positive (got -1.000000) fields={}
+2025-12-17T22:55:58.230726Z  WARN ops: exit status 1 fields={}
+2025-12-17T22:55:58.234110Z ERROR connector_init::rpc: connector failed status=exit status: 1
+2025-12-17T22:55:58.234569Z ERROR flowctl::local_specs: scope=file:///tmp/blackbox-capture-3595834257.json#/captures/acmeCo~1test_capture~1source-hello-world error=exit status 1
+Error: failed due to encountered errors
+
+
+

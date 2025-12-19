@@ -1,0 +1,9 @@
+captures:
+  acmeCo/test/source-hello-world:
+    endpoint:
+      local:
+        command: ["go", "run", "./source-hello-world"]
+        config:
+          rate: 10
+        protobuf: true
+    bindings: []
