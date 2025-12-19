@@ -134,8 +134,15 @@ class AdjustableSliceGenerator(SliceGenerator):
             self._current_range = self.DEFAULT_RANGE_DAYS
         else:
             days_per_minute = self._current_range / minutes_spent
-            next_range = math.floor(days_per_minute / self.REQUEST_PER_MINUTE_LIMIT)
-            self._current_range = min(next_range or self.DEFAULT_RANGE_DAYS, self.MAX_RANGE_DAYS)
+            # When minutes_spent is extremely small (but not zero), days_per_minute can
+            # be infinity. This happens when requests complete nearly instantly,
+            # typically because there's no data in the slice. In that case, we know requests
+            # are completing quickly and we can use DEFAULT_RANGE_DAYS for the next slice's range.
+            if math.isinf(days_per_minute):
+                self._current_range = self.DEFAULT_RANGE_DAYS
+            else:
+                next_range = math.floor(days_per_minute / self.REQUEST_PER_MINUTE_LIMIT)
+                self._current_range = min(next_range or self.DEFAULT_RANGE_DAYS, self.MAX_RANGE_DAYS)
         self._range_adjusted = True
 
     def reduce_range(self) -> StreamSlice:
