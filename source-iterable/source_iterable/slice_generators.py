@@ -89,7 +89,7 @@ class AdjustableSliceGenerator(SliceGenerator):
     have different range based on was the previous slice processed successfully
     and how much time it took.
     The alghorithm is following:
-    1. First slice have INITIAL_RANGE_DAYS (30 days) length.
+    1. First slice have INITIAL_RANGE_DAYS (15 days) length.
     2. When slice is processed by stream this class expect "adjust_range"
     method to be called with parameter how much time it took to process
     previous request
@@ -107,7 +107,7 @@ class AdjustableSliceGenerator(SliceGenerator):
     """
 
     REQUEST_PER_MINUTE_LIMIT = 4
-    INITIAL_RANGE_DAYS: int = 30
+    INITIAL_RANGE_DAYS: int = 15
     DEFAULT_RANGE_DAYS: int = 90
     MAX_RANGE_DAYS: int = 180
     RANGE_REDUCE_FACTOR = 2

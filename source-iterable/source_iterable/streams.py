@@ -315,7 +315,11 @@ class IterableExportStreamAdjustableRange(IterableExportStream, ABC):
             try:
 
                 self.logger.info(
-                    f"Processing slice of {(stream_slice.end_date - stream_slice.start_date).total_days()} days for stream {self.name}"
+                    f"Processing slice of {(stream_slice.end_date - stream_slice.start_date).total_days()} days for stream {self.name}",
+                    {
+                        "start_date": stream_slice.start_date,
+                        "end_date": stream_slice.end_date,
+                    }
                 )
                 for record in super().read_records(
                     sync_mode=sync_mode,
