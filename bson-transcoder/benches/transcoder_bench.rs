@@ -1,6 +1,7 @@
 use bson::raw::RawDocument;
-use bson_transcoder::bson_to_sanitized_json;
 use bson_transcoder::id_to_string;
+use bson_transcoder::serializer::SanitizingSerializer;
+use bson_transcoder::Utf8LossyDeserializer;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use serde_json::{Value, json};
 
@@ -148,6 +149,31 @@ fn bench_bson_transcode(c: &mut Criterion) {
     group.finish();
 }
 
+/// Transcode without Utf8LossyDeserializer (strict UTF-8)
+fn bson_to_sanitized_json_strict<W: std::io::Write>(
+    doc: &RawDocument,
+    writer: W,
+    is_root: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let deserializer = bson::RawDeserializer::new(doc.as_bytes())?;
+    let mut serializer = SanitizingSerializer::new(writer, is_root);
+    serde_transcode::transcode(deserializer, &mut serializer)?;
+    Ok(())
+}
+
+/// Transcode with Utf8LossyDeserializer (lossy UTF-8)
+fn bson_to_sanitized_json_lossy<W: std::io::Write>(
+    doc: &RawDocument,
+    writer: W,
+    is_root: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let deserializer = bson::RawDeserializer::new(doc.as_bytes())?;
+    let lossy_deserializer = Utf8LossyDeserializer::new(deserializer);
+    let mut serializer = SanitizingSerializer::new(writer, is_root);
+    serde_transcode::transcode(lossy_deserializer, &mut serializer)?;
+    Ok(())
+}
+
 fn bench_bson_to_sanitized_json(c: &mut Criterion) {
     let small_bson = create_native_bson_small();
     let medium_bson = create_native_bson_medium();
@@ -165,7 +191,45 @@ fn bench_bson_to_sanitized_json(c: &mut Criterion) {
             b.iter(|| {
                 let raw = RawDocument::from_bytes(black_box(bytes)).unwrap();
                 let mut output = Vec::new();
-                bson_to_sanitized_json(black_box(&raw), &mut output, true).unwrap();
+                bson_to_sanitized_json_strict(black_box(&raw), &mut output, true).unwrap();
+                output
+            })
+        });
+    }
+
+    group.finish();
+}
+
+fn bench_utf8_lossy_overhead(c: &mut Criterion) {
+    let small_bson = create_native_bson_small();
+    let medium_bson = create_native_bson_medium();
+    let large_bson = create_native_bson_large();
+
+    let mut group = c.benchmark_group("utf8_lossy_overhead");
+
+    for (name, bson_bytes) in [
+        ("small", &small_bson),
+        ("medium", &medium_bson),
+        ("large", &large_bson),
+    ] {
+        group.throughput(Throughput::Bytes(bson_bytes.len() as u64));
+
+        // Benchmark without Utf8LossyDeserializer (strict)
+        group.bench_with_input(BenchmarkId::new("strict", name), bson_bytes, |b, bytes| {
+            b.iter(|| {
+                let raw = RawDocument::from_bytes(black_box(bytes)).unwrap();
+                let mut output = Vec::new();
+                bson_to_sanitized_json_strict(black_box(&raw), &mut output, true).unwrap();
+                output
+            })
+        });
+
+        // Benchmark with Utf8LossyDeserializer (lossy)
+        group.bench_with_input(BenchmarkId::new("lossy", name), bson_bytes, |b, bytes| {
+            b.iter(|| {
+                let raw = RawDocument::from_bytes(black_box(bytes)).unwrap();
+                let mut output = Vec::new();
+                bson_to_sanitized_json_lossy(black_box(&raw), &mut output, true).unwrap();
                 output
             })
         });
@@ -179,5 +243,6 @@ criterion_group!(
     bench_id_to_string,
     bench_bson_transcode,
     bench_bson_to_sanitized_json,
+    bench_utf8_lossy_overhead,
 );
 criterion_main!(benches);
