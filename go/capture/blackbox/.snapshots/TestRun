@@ -1,0 +1,20 @@
+=== Discover: Events Only ===
+acmeCo/test/events
+=== Run: Capture Events ===
+[
+  "acmeCo/test/events",
+  {
+    "_meta": {
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "message": "Hello 0!",
+    "ts": "<TIMESTAMP>"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "greetings": 1
+  }
+}
+

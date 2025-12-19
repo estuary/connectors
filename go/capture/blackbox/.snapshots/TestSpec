@@ -1,0 +1,49 @@
+=== Spec: Get Connector Spec ===
+{
+  "protocol": 3032023,
+  "configSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "rate": {
+        "type": "number",
+        "title": "Message Rate",
+        "description": "Message rate in documents per second",
+        "default": 1
+      }
+    },
+    "type": "object",
+    "required": [
+      "rate"
+    ],
+    "title": "Hello World"
+  },
+  "resourceConfigSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "name": {
+        "type": "string",
+        "title": "Stream Name",
+        "description": "Stream name to include in generated documents",
+        "default": "greetings"
+      },
+      "prefix": {
+        "type": "string",
+        "title": "Message Prefix",
+        "description": "Constant prefix to add to every message",
+        "default": "Hello {}"
+      }
+    },
+    "type": "object",
+    "required": [
+      "name",
+      "prefix"
+    ],
+    "title": "Example Resource Spec"
+  },
+  "documentationUrl": "https://go.estuary.dev/source-hello-world",
+  "resourcePathPointers": [
+    "/name"
+  ]
+}
+
+

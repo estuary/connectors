@@ -59,6 +59,11 @@ func RunMain(connector Connector) {
 		log.SetFormatter(&log.TextFormatter{})
 	case "color":
 		log.SetFormatter(&log.TextFormatter{ForceColors: true})
+	case "minimal":
+		log.SetFormatter(&log.TextFormatter{
+			DisableColors:    true,
+			DisableTimestamp: true,
+		})
 	default:
 		log.WithField("format", format).Fatal("invalid LOG_FORMAT (expected 'json', 'text', or 'color')")
 	}
