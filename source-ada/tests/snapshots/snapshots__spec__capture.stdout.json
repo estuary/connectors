@@ -1,0 +1,102 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "ApiKey": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "API Key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "ApiKey",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "bot_handle": {
+          "description": "Your Ada bot handle. This can be found in the URL of your bot's dashboard. ex: {BOT_HANDLE}.ada.support",
+          "title": "Bot Handle",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 12 months before the present date. Note: due to Ada's data retention limits, only the past 12 months of data can be captured.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "Private App Credentials": "#/$defs/ApiKey"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ApiKey"
+            }
+          ],
+          "title": "Authentication"
+        }
+      },
+      "required": [
+        "bot_handle",
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-ada",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
