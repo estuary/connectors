@@ -14,6 +14,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/capture/blackbox"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
@@ -248,6 +249,103 @@ func setResourceBackfillMode(t *testing.T, binding *flow.CaptureSpec_Binding, mo
 func TestGeneric(t *testing.T) {
 	var tb = postgresTestBackend(t)
 	tests.Run(context.Background(), t, tb)
+}
+
+var documentSanitizers = []blackbox.JSONSanitizer{
+	{Matcher: regexp.MustCompile(`"txid":[0-9]+`), Replacement: `"txid":"REDACTED"`},
+	{Matcher: regexp.MustCompile(`"loc":\[(-1|[0-9]+),[0-9]+,[0-9]+\]`), Replacement: `"loc":"REDACTED"`},
+	{Matcher: regexp.MustCompile(`"ts_ms":[0-9]+`), Replacement: `"ts_ms":"REDACTED"`},
+}
+
+var checkpointSanitizers = []blackbox.JSONSanitizer{
+	{Matcher: regexp.MustCompile(`"cursor":"[0-9A-F]+/[0-9A-F]+"`), Replacement: `"cursor":"REDACTED"`},
+}
+
+func postgresBlackboxSetup(t testing.TB) (*postgresTestDatabase, *blackbox.TranscriptCapture) {
+	t.Helper()
+
+	// TODO(wgd): Probably scoping this to just flowctl invocations would be cleaner, but this works
+	os.Setenv("SHUTDOWN_AFTER_POLLING", "yes")
+	t.Cleanup(func() { os.Unsetenv("SHUTDOWN_AFTER_POLLING") })
+
+	// Setup: Unique filter ID and full table name
+	var uniqueID = uniqueTableID(t)
+	var baseName = strings.TrimPrefix(t.Name(), "Test") + "_" + uniqueID
+	for _, str := range []string{"/", "=", "(", ")"} {
+		baseName = strings.ReplaceAll(baseName, str, "_")
+	}
+	baseName = strings.ToLower(baseName)
+	var fullName = testSchemaName + "." + baseName
+
+	// Setup: Create black-box test capture
+	tc, err := blackbox.NewWithTranscript("testdata/flow.yaml")
+	require.NoError(t, err)
+	tc.Capture.Logger = t.Log
+	tc.Capture.DiscoveryFilter = regexp.MustCompile(uniqueID)
+	tc.DocumentSanitizers = documentSanitizers
+	tc.CheckpointSanitizers = checkpointSanitizers
+
+	// Setup: Create database interface with <NAME> templating
+	var tb = postgresTestBackend(t)
+	var db = &postgresTestDatabase{
+		conn: tb.control,
+		vars: map[string]string{
+			"<SCHEMA>": testSchemaName,
+			"<NAME>":   fullName,
+			"<ID>":     uniqueID,
+		},
+		transcript: tc.Transcript,
+	}
+
+	return db, tc
+}
+
+type postgresTestDatabase struct {
+	conn       *pgxpool.Pool     // The control connection to use for test DB operations
+	vars       map[string]string // Map of string replacements like <NAME> to a fully qualified table name
+	transcript *strings.Builder  // Transcript builder to log SQL query execution to
+}
+
+func (db *postgresTestDatabase) Expand(s string) string {
+	for key, val := range db.vars {
+		s = strings.ReplaceAll(s, key, val)
+	}
+	return s
+}
+
+func (db *postgresTestDatabase) Exec(t testing.TB, query string) {
+	t.Helper()
+	query = db.Expand(query)
+	if db.transcript != nil {
+		fmt.Fprintf(db.transcript, "sql> %s\n", query)
+	}
+	if _, err := db.conn.Exec(context.Background(), query); err != nil {
+		t.Fatalf("error executing control query %q: %v", query, err)
+	}
+}
+
+func (db *postgresTestDatabase) QuietExec(t testing.TB, query string) {
+	t.Helper()
+	query = db.Expand(query)
+	if _, err := db.conn.Exec(context.Background(), query); err != nil {
+		t.Fatalf("error executing control query %q: %v", query, err)
+	}
+}
+
+// QueryRow executes a query and scans results into dest. Does not log to transcript.
+func (db *postgresTestDatabase) QueryRow(t testing.TB, query string, dest ...any) {
+	t.Helper()
+	query = db.Expand(query)
+	if err := db.conn.QueryRow(context.Background(), query).Scan(dest...); err != nil {
+		t.Fatalf("error querying %q: %v", query, err)
+	}
+}
+
+func (db *postgresTestDatabase) CreateTable(t testing.TB, name, defs string) {
+	t.Helper()
+	db.QuietExec(t, `DROP TABLE IF EXISTS `+name)
+	db.Exec(t, `CREATE TABLE `+name+` `+defs)
+	t.Cleanup(func() { db.QuietExec(t, `DROP TABLE IF EXISTS `+name) })
 }
 
 func TestCapitalizedTables(t *testing.T) {
