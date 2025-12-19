@@ -156,7 +156,7 @@ func TestDatatypes(t *testing.T) {
 
 func TestScanKeyTimestamps(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "26812649"
+	var uniqueID = uniqueTableID(t)
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(ts TIMESTAMP PRIMARY KEY, data TEXT)")
 	tb.Insert(ctx, t, tableName, [][]interface{}{
 		{"1991-08-31T12:34:56.000Z", "aood"},
@@ -183,7 +183,7 @@ func TestScanKeyTimestamps(t *testing.T) {
 
 func TestScanKeyTypes(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	for idx, tc := range []struct {
+	for _, tc := range []struct {
 		Name       string
 		ColumnType string
 		Values     []interface{}
@@ -208,7 +208,7 @@ func TestScanKeyTypes(t *testing.T) {
 		{"OID", "oid", []any{12345, 12344, 12346, 54321, 54323, 54322}},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
-			var uniqueID = fmt.Sprintf("2804%04d", idx)
+			var uniqueID = uniqueTableID(t)
 			var tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(key %s PRIMARY KEY, data TEXT)", tc.ColumnType))
 			var rows [][]interface{}
 			for idx, val := range tc.Values {
@@ -231,7 +231,7 @@ func TestEnumScanKey(t *testing.T) {
 	tb.Query(ctx, t, `CREATE TYPE UserEnum AS ENUM ('red', 'green', 'blue')`)
 	t.Cleanup(func() { tb.Query(ctx, t, `DROP TYPE UserEnum CASCADE`) })
 
-	var uniqueID = "97825976"
+	var uniqueID = uniqueTableID(t)
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER, color UserEnum, data TEXT, PRIMARY KEY (id, color))")
 
 	tb.Insert(ctx, t, tableName, [][]any{
@@ -252,7 +252,7 @@ func TestEnumScanKey(t *testing.T) {
 // column types to ensure that they all get captured as something reasonable.
 func TestSpecialTemporalValues(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "33220241"
+	var uniqueID = uniqueTableID(t)
 	// In theory we ought to test interval values 'infinity' and '-infinity' too, but the PGX client library fails to parse those at all right now.
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, a_date DATE, a_time TIME, a_timestamp TIMESTAMP)")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
@@ -285,7 +285,7 @@ func TestSpecialTemporalValues(t *testing.T) {
 // properly captured both during backfill and replication.
 func TestLongYearTimestamps(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "15366164"
+	var uniqueID = uniqueTableID(t)
 	var tableDef = "(id INTEGER PRIMARY KEY, created_at TIMESTAMPTZ, description TEXT)"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
 

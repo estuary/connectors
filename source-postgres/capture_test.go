@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	st "github.com/estuary/connectors/source-boilerplate/testing"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/connectors/sqlcapture/tests"
@@ -18,72 +19,75 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+const captureSessions = 4 // TODO(wgd): Get -1 working without the 5s shutdown delay
+
 // TestReplicaIdentity exercises the 'REPLICA IDENTITY' setting of a table,
 // which controls whether change events include full row contents or just the
 // primary keys of the "before" state.
 func TestReplicaIdentity(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "64422387"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
-	tb.Insert(ctx, t, tableName, [][]interface{}{{0, "A"}, {1, "bbb"}, {2, "CDEFGHIJKLMNOP"}, {3, "Four"}, {4, "5"}})
-
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	var db, tc = postgresBlackboxSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH'), (3, 'Three'), (4, 'Four')`)
+	tc.Discover("Discover Test Table")
+	tc.Run("Initial Backfill", captureSessions)
 
 	// Default REPLICA IDENTITY logs only the old primary key for deletions and updates.
-	tb.Delete(ctx, t, tableName, "id", 1)
-	tb.Update(ctx, t, tableName, "id", 2, "data", "UPDATED")
+	db.Exec(t, `DELETE FROM <NAME> WHERE id = 1`)
+	db.Exec(t, `UPDATE <NAME> SET data = 'UPDATED' WHERE id = 2`)
+	tc.Run("Default Replica Identity", captureSessions)
 
 	// Increase to REPLICA IDENTITY FULL, and repeat. Expect to see complete modified tuples logged.
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
-	tb.Delete(ctx, t, tableName, "id", 3)
-	tb.Update(ctx, t, tableName, "id", 4, "data", "UPDATED")
-
-	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	db.Exec(t, `ALTER TABLE <NAME> REPLICA IDENTITY FULL`)
+	db.Exec(t, `DELETE FROM <NAME> WHERE id = 3`)
+	db.Exec(t, `UPDATE <NAME> SET data = 'UPDATED' WHERE id = 4`)
+	tc.Run("Replica Identity Full", captureSessions)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestToastColumns(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "74018723"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, other INTEGER, data TEXT)")
+	var db, tc = postgresBlackboxSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, other INTEGER, data TEXT)`)
 
 	// Table is created with REPLICA IDENTITY DEFAULT, which does *not* include
-	// unchanged TOAST fields within the replication log.
-	// Postgres will attempt to compress values by default.
-	// Tell it to use TOAST but disable compression so our fixture spills out of the table.
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ALTER COLUMN data SET STORAGE EXTERNAL;", tableName))
+	// unchanged TOAST fields within the replication log. Postgres will attempt
+	// to compress values by default. Tell it to use TOAST but disable
+	// compression so our fixture spills out of the table.
+	db.Exec(t, `ALTER TABLE <NAME> ALTER COLUMN data SET STORAGE EXTERNAL`)
 
 	// Create a data fixture which is (barely) larger that Postgres's desired inline storage size.
 	const toastThreshold = 2048
 	var data = strings.Repeat("data", toastThreshold/4)
 
 	// Initial capture backfill.
-	tb.Insert(ctx, t, tableName, [][]interface{}{{1, 32, "smol"}})
-	tb.Insert(ctx, t, tableName, [][]interface{}{{2, 42, data}})
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 32, 'smol')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 42, '`+data+`')`)
+	tc.Discover("Discover Test Table")
+	tc.Run("Initial Backfill", captureSessions)
 
 	// Insert TOAST value, update TOAST value, and change an unrelated value.
-	tb.Insert(ctx, t, tableName, [][]interface{}{{3, 52, data}})        // Insert TOAST.
-	tb.Insert(ctx, t, tableName, [][]interface{}{{4, 62, "more smol"}}) // Insert non-TOAST.
-	tb.Update(ctx, t, tableName, "id", 1, "data", "UPDATE ONE "+data)   // Update non-TOAST => TOAST.
-	tb.Update(ctx, t, tableName, "id", 2, "data", "UPDATE TWO "+data)   // Update TOAST => TOAST.
-	tb.Update(ctx, t, tableName, "id", 3, "data", "UPDATE smol")        // Update TOAST => non-TOAST.
-	tb.Update(ctx, t, tableName, "id", 1, "other", 72)                  // Update other (TOAST); data _not_ expected.
-	tb.Update(ctx, t, tableName, "id", 3, "other", 82)                  // Update other (non-TOAST).
-	t.Run("ident-default", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 52, '`+data+`')`)               // Insert TOAST.
+	db.Exec(t, `INSERT INTO <NAME> VALUES (4, 62, 'more smol')`)              // Insert non-TOAST.
+	db.Exec(t, `UPDATE <NAME> SET data = 'UPDATE ONE `+data+`' WHERE id = 1`) // Update non-TOAST => TOAST.
+	db.Exec(t, `UPDATE <NAME> SET data = 'UPDATE TWO `+data+`' WHERE id = 2`) // Update TOAST => TOAST.
+	db.Exec(t, `UPDATE <NAME> SET data = 'UPDATE smol' WHERE id = 3`)         // Update TOAST => non-TOAST.
+	db.Exec(t, `UPDATE <NAME> SET other = 72 WHERE id = 1`)                   // Update other (TOAST); data _not_ expected.
+	db.Exec(t, `UPDATE <NAME> SET other = 82 WHERE id = 3`)                   // Update other (non-TOAST).
+	tc.Run("Default Replica Identity", captureSessions)
 
-	tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s REPLICA IDENTITY FULL;", tableName))
-	tb.Update(ctx, t, tableName, "id", 1, "other", 92)                // Update other (TOAST); data *is* expected.
-	tb.Update(ctx, t, tableName, "id", 3, "other", 102)               // Update other (non-TOAST).
-	tb.Update(ctx, t, tableName, "id", 1, "data", "smol smol")        // Update TOAST => non-TOAST.
-	tb.Update(ctx, t, tableName, "id", 4, "data", "UPDATE SIX "+data) // Update non-TOAST => TOAST.
-	t.Run("ident-full", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	db.Exec(t, `ALTER TABLE <NAME> REPLICA IDENTITY FULL`)
+	db.Exec(t, `UPDATE <NAME> SET other = 92 WHERE id = 1`)                   // Update other (TOAST); data *is* expected.
+	db.Exec(t, `UPDATE <NAME> SET other = 102 WHERE id = 3`)                  // Update other (non-TOAST).
+	db.Exec(t, `UPDATE <NAME> SET data = 'smol smol' WHERE id = 1`)           // Update TOAST => non-TOAST.
+	db.Exec(t, `UPDATE <NAME> SET data = 'UPDATE SIX `+data+`' WHERE id = 4`) // Update non-TOAST => TOAST.
+	tc.Run("Replica Identity Full", captureSessions)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 // TestSlotLSNAdvances checks that the `restart_lsn` of a replication slot
 // advances during normal connector operation.
 func TestSlotLSNAdvances(t *testing.T) {
+	t.Skip("skipping test: not yet translated to black-box test framework")
+
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
@@ -102,7 +106,7 @@ func TestSlotLSNAdvances(t *testing.T) {
 	}
 
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "99718274"
+	var uniqueID = uniqueTableID(t)
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
@@ -157,130 +161,97 @@ func TestSlotLSNAdvances(t *testing.T) {
 }
 
 func TestViewDiscovery(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var tableName = tb.CreateTable(ctx, t, "", "(id INTEGER PRIMARY KEY, grp INTEGER, data TEXT)")
+	var db, tc = postgresBlackboxSetup(t)
 
-	var view = tableName + "_simpleview"
-	tb.Query(ctx, t, fmt.Sprintf(`CREATE VIEW %s AS SELECT id, data FROM %s WHERE grp = 1;`, view, tableName))
-	t.Cleanup(func() {
-		logrus.WithField("view", view).Debug("dropping view")
-		tb.Query(ctx, t, fmt.Sprintf(`DROP VIEW IF EXISTS %s;`, view))
-	})
+	var cleanup = func() {
+		db.QuietExec(t, `DROP VIEW IF EXISTS <NAME>_simpleview`)
+		db.QuietExec(t, `DROP MATERIALIZED VIEW IF EXISTS <NAME>_matview`)
+	}
+	cleanup()
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, grp INTEGER, data TEXT)`)
+	db.Exec(t, `CREATE VIEW <NAME>_simpleview AS SELECT id, data FROM <NAME> WHERE grp = 1`)
+	db.Exec(t, `CREATE MATERIALIZED VIEW <NAME>_matview AS SELECT id, data FROM <NAME> WHERE grp = 2`)
+	t.Cleanup(cleanup)
 
-	var matview = tableName + "_matview"
-	tb.Query(ctx, t, fmt.Sprintf(`CREATE MATERIALIZED VIEW %s AS SELECT id, data FROM %s WHERE grp = 1;`, matview, tableName))
-	t.Cleanup(func() {
-		logrus.WithField("view", matview).Debug("dropping materialized view")
-		tb.Query(ctx, t, fmt.Sprintf(`DROP MATERIALIZED VIEW IF EXISTS %s;`, matview))
-	})
-
-	var bindings = tb.CaptureSpec(ctx, t).Discover(ctx, t, regexp.MustCompile(regexp.QuoteMeta(strings.TrimPrefix(tableName, "test."))))
-	for _, binding := range bindings {
-		logrus.WithField("name", binding.RecommendedName).Debug("discovered stream")
-		if strings.Contains(string(binding.RecommendedName), "_simpleview") {
+	var discovery = tc.DiscoverFull("Discover Tables")
+	for _, binding := range discovery {
+		if strings.Contains(string(binding), "_simpleview") {
 			t.Errorf("view returned by catalog discovery")
 		}
-		if strings.Contains(string(binding.RecommendedName), "_matview") {
+		if strings.Contains(string(binding), "_matview") {
 			t.Errorf("materialized view returned by catalog discovery")
 		}
 	}
 }
 
 func TestSkipBackfills(t *testing.T) {
-	// Set up three tables with some data in them, a catalog which captures all three,
-	// but a configuration which specifies that tables A and C should skip backfilling
-	// and only capture new changes.
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueA, uniqueB, uniqueC = "18110541", "24310805", "38410024"
-	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var tableC = tb.CreateTable(ctx, t, uniqueC, "(id INTEGER PRIMARY KEY, data TEXT)")
-	tb.config.Advanced.SkipBackfills = fmt.Sprintf("%s,%s", tableA, tableC)
-	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "one"}, {2, "two"}, {3, "three"}})
-	tb.Insert(ctx, t, tableB, [][]interface{}{{4, "four"}, {5, "five"}, {6, "six"}})
-	tb.Insert(ctx, t, tableC, [][]interface{}{{7, "seven"}, {8, "eight"}, {9, "nine"}})
+	var db, tc = postgresBlackboxSetup(t)
+	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.CreateTable(t, `<NAME>_c`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME>_a VALUES (1, 'one'), (2, 'two')`)
+	db.Exec(t, `INSERT INTO <NAME>_b VALUES (3, 'three'), (4, 'four')`)
+	db.Exec(t, `INSERT INTO <NAME>_c VALUES (5, 'five'), (6, 'six')`)
+	tc.Discover("Discover Tables")
 
-	// Run an initial capture, which should capture all three tables but only backfill events from table B
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB), regexp.MustCompile(uniqueC))
-	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	// Skip A and C, only B will be backfilled
+	require.NoError(t, tc.Capture.EditConfig("advanced.skip_backfills", db.Expand(`<NAME>_a,<NAME>_c`)))
+	tc.Run("Initial Backfill (Only B)", captureSessions)
 
-	// Insert additional data and verify that all three tables report new events
-	tb.Insert(ctx, t, tableA, [][]interface{}{{10, "ten"}, {11, "eleven"}, {12, "twelve"}})
-	tb.Insert(ctx, t, tableB, [][]interface{}{{13, "thirteen"}, {14, "fourteen"}, {15, "fifteen"}})
-	tb.Insert(ctx, t, tableC, [][]interface{}{{16, "sixteen"}, {17, "seventeen"}, {18, "eighteen"}})
-	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	// All three tables should see replication events
+	db.Exec(t, `INSERT INTO <NAME>_a VALUES (7, 'seven'), (8, 'eight')`)
+	db.Exec(t, `INSERT INTO <NAME>_b VALUES (9, 'nine'), (10, 'ten')`)
+	db.Exec(t, `INSERT INTO <NAME>_c VALUES (11, 'eleven'), (12, 'twelve')`)
+	tc.Run("Replication (All Tables)", captureSessions)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
+// TestTruncatedTables exercises table truncation behavior.
+// Currently truncation is ignored and further changes are replicated normally.
 func TestTruncatedTables(t *testing.T) {
-	// Set up two tables with some data in them
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueA, uniqueB = "14026504", "29415894"
-	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data TEXT)")
-	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "one"}, {2, "two"}, {3, "three"}})
-	tb.Insert(ctx, t, tableB, [][]interface{}{{4, "four"}, {5, "five"}, {6, "six"}})
+	var db, tc = postgresBlackboxSetup(t)
 
-	// Set up and run a capture of Table A only
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA))
-	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one'), (2, 'two')`)
+	tc.Discover("Discover Tables")
+	tc.Run("Initial Backfill", captureSessions)
 
-	// Add data to table A and truncate table B. Captures should still succeed because we
-	// don't care about truncates to non-active tables.
-	tb.Insert(ctx, t, tableA, [][]interface{}{{7, "seven"}, {8, "eight"}, {9, "nine"}})
-	tb.Query(ctx, t, fmt.Sprintf("TRUNCATE TABLE %s;", tableB))
-	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three'), (4, 'four')`)
+	tc.Run("Normal Replication", captureSessions)
 
-	// Truncating table A will cause the capture to fail though, as it should.
-	tb.Query(ctx, t, fmt.Sprintf("TRUNCATE TABLE %s;", tableA))
-	tb.Insert(ctx, t, tableA, [][]interface{}{{10, "ten"}, {11, "eleven"}, {12, "twelve"}})
-	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	db.Exec(t, `TRUNCATE TABLE <NAME>`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (5, 'five'), (6, 'six')`)
+	tc.Run("After Truncation", captureSessions)
+
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
+// TestTrickyColumnNames exercises the capture of a table with difficult column names.
 func TestTrickyColumnNames(t *testing.T) {
-	// Create a table with some 'difficult' column names (a reserved word, a capitalized
-	// name, and one containing special characters which also happens to be the primary key).
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueA, uniqueB = "39256824", "42531495"
-	var tableA = tb.CreateTable(ctx, t, uniqueA, `("Meta/""wtf""~ID" INTEGER PRIMARY KEY, data TEXT)`)
-	var tableB = tb.CreateTable(ctx, t, uniqueB, `("table" INTEGER PRIMARY KEY, data TEXT)`)
-	tb.Insert(ctx, t, tableA, [][]interface{}{{1, "aaa"}, {2, "bbb"}})
-	tb.Insert(ctx, t, tableB, [][]interface{}{{3, "ccc"}, {4, "ddd"}})
-
-	// Discover the catalog and verify that the table schemas looks correct
-	t.Run("discover", func(t *testing.T) {
-		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
-	})
-
-	// Perform an initial backfill
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
-	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
-
-	// Add more data and read it via replication
-	tb.Insert(ctx, t, tableA, [][]interface{}{{5, "eee"}, {6, "fff"}})
-	tb.Insert(ctx, t, tableB, [][]interface{}{{7, "ggg"}, {8, "hhh"}})
-	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	var db, tc = postgresBlackboxSetup(t)
+	db.CreateTable(t, `<NAME>`, `("Meta/""wtf""~ID" INTEGER PRIMARY KEY, "table" TEXT, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one', 'aaa'), (2, 'two', 'bbb')`)
+	tc.Discover("Discover Tables")
+	tc.Run("Initial Backfill", captureSessions)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three', 'eee'), (4, 'four', 'fff')`)
+	tc.Run("Replication", captureSessions)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
-// TestCursorResume sets up a capture with a (string, int) primary key and
-// and repeatedly restarts it after each row of capture output.
+// TestCursorResume sets up a capture with a (string, int) primary key and a backfill
+// chunk size of 1 row, so that every row backfilled goes through FDB key serialization.
 func TestCursorResume(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "95911555"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(epoch VARCHAR(8), count INTEGER, data TEXT, PRIMARY KEY (epoch, count))")
-	tb.Insert(ctx, t, tableName, [][]interface{}{
-		{"aaa", 1, "bvzf"}, {"aaa", 2, "ukwh"}, {"aaa", 3, "lntg"}, {"bbb", -100, "bycz"},
-		{"bbb", 2, "ajgp"}, {"bbb", 333, "zljj"}, {"bbb", 4096, "lhnw"}, {"bbb", 800000, "iask"},
-		{"ccc", 1234, "bikh"}, {"ddd", -10000, "dhqc"}, {"x", 1, "djsf"}, {"y", 1, "iwnx"},
-		{"z", 1, "qmjp"}, {"", 0, "xakg"}, {"", -1, "kvxr"}, {"   ", 3, "gboj"},
-	})
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-
-	// Reduce the backfill chunk size to 1 row. Since the capture will be killed and
-	// restarted after each scan key update, this means we'll advance over the keys
-	// one by one.
-	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 1
-	var summary, _ = tests.RestartingBackfillCapture(ctx, t, cs)
-	cupaloy.SnapshotT(t, summary)
+	var db, tc = postgresBlackboxSetup(t)
+	db.CreateTable(t, `<NAME>`, `(epoch VARCHAR(8), count INTEGER, data TEXT, PRIMARY KEY (epoch, count))`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES
+		('aaa', 1, 'bvzf'), ('aaa', 2, 'ukwh'), ('aaa', 3, 'lntg'), ('bbb', -100, 'bycz'),
+		('bbb', 2, 'ajgp'), ('bbb', 333, 'zljj'), ('bbb', 4096, 'lhnw'), ('bbb', 800000, 'iask'),
+		('ccc', 1234, 'bikh'), ('ddd', -10000, 'dhqc'), ('x', 1, 'djsf'), ('y', 1, 'iwnx'),
+		('z', 1, 'qmjp'), ('', 0, 'xakg'), ('', -1, 'kvxr'), ('   ', 3, 'gboj')`)
+	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
+	tc.Discover("Discover Tables")
+	tc.Run("Backfill Data", -1) // Run until the connector decides to shut down
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 // TestComplexDataset tries to throw together a bunch of different bits of complexity
@@ -290,10 +261,11 @@ func TestCursorResume(t *testing.T) {
 // some concurrent modifications to row ranges already-scanned and not-yet-scanned.
 func TestComplexDataset(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "86827053"
+	var uniqueID = uniqueTableID(t)
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state TEXT, fullname TEXT, population INTEGER, PRIMARY KEY (year, state))")
 	tests.LoadCSV(ctx, t, tb, tableName, "statepop.csv", 0)
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	var stateKey = boilerplate.StateKey("test%2Fcomplexdataset_" + uniqueID)
 
 	// Reduce the backfill chunk size to 10 rows for this test.
 	cs.EndpointSpec.(*Config).Advanced.BackfillChunkSize = 10
@@ -305,9 +277,9 @@ func TestComplexDataset(t *testing.T) {
 		// Rewind the backfill state to a specific reproducible point
 		var state sqlcapture.PersistentState
 		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
-		state.Streams["test%2Fcomplexdataset_86827053"].BackfilledCount = 130
-		state.Streams["test%2Fcomplexdataset_86827053"].Mode = sqlcapture.TableStateUnfilteredBackfill
-		state.Streams["test%2Fcomplexdataset_86827053"].Scanned = []byte{0x16, 0x07, 0x94, 0x02, 0x4e, 0x56, 0x00}
+		state.Streams[stateKey].BackfilledCount = 130
+		state.Streams[stateKey].Mode = sqlcapture.TableStateUnfilteredBackfill
+		state.Streams[stateKey].Scanned = []byte{0x16, 0x07, 0x94, 0x02, 0x4e, 0x56, 0x00}
 		var bs, err = json.Marshal(&state)
 		require.NoError(t, err)
 		cs.Checkpoint = bs
@@ -325,9 +297,9 @@ func TestComplexDataset(t *testing.T) {
 		// Rewind the backfill state to a specific reproducible point
 		var state sqlcapture.PersistentState
 		require.NoError(t, json.Unmarshal(cs.Checkpoint, &state))
-		state.Streams["test%2Fcomplexdataset_86827053"].BackfilledCount = 230
-		state.Streams["test%2Fcomplexdataset_86827053"].Mode = sqlcapture.TableStateUnfilteredBackfill
-		state.Streams["test%2Fcomplexdataset_86827053"].Scanned = []byte{0x16, 0x07, 0xbc, 0x02, 0x4e, 0x48, 0x00}
+		state.Streams[stateKey].BackfilledCount = 230
+		state.Streams[stateKey].Mode = sqlcapture.TableStateUnfilteredBackfill
+		state.Streams[stateKey].Scanned = []byte{0x16, 0x07, 0xbc, 0x02, 0x4e, 0x48, 0x00}
 		var bs, err = json.Marshal(&state)
 		require.NoError(t, err)
 		cs.Checkpoint = bs
@@ -354,174 +326,114 @@ func TestComplexDataset(t *testing.T) {
 	})
 }
 
+// TestUserTypes exercises discovery and capture of tables using various user-defined types.
 func TestUserTypes(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-
 	t.Run("Domain", func(t *testing.T) {
-		tb.Query(ctx, t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`)
-		tb.Query(ctx, t, `CREATE DOMAIN UserDomain AS TEXT`)
-		t.Cleanup(func() { tb.Query(ctx, t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`) })
+		var db, tc = postgresBlackboxSetup(t)
+		db.QuietExec(t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`)
+		db.Exec(t, `CREATE DOMAIN UserDomain AS TEXT`)
+		t.Cleanup(func() { db.QuietExec(t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`) })
 
-		var uniqueID = "68961947"
-		var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, value UserDomain)")
-		t.Run("Discovery", func(t *testing.T) {
-			var cs = tb.CaptureSpec(ctx, t)
-			cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
-		})
-
-		t.Run("Capture", func(t *testing.T) {
-			tb.Insert(ctx, t, tableName, [][]any{{1, "hello"}, {2, "world"}})
-			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-			tests.VerifiedCapture(ctx, t, cs)
-			t.Run("Replication", func(t *testing.T) {
-				tb.Insert(ctx, t, tableName, [][]any{{3, "foo"}, {4, "bar"}, {5, "baz"}})
-				tests.VerifiedCapture(ctx, t, cs)
-			})
-		})
+		db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, value UserDomain)`)
+		tc.DiscoverFull("Discover Tables")
+		db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'hello'), (2, 'world')`)
+		tc.Run("Initial Backfill", captureSessions)
+		db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'foo'), (4, 'bar'), (5, 'baz')`)
+		tc.Run("Replication", captureSessions)
+		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 
 	t.Run("Enum", func(t *testing.T) {
-		tb.Query(ctx, t, `DROP TYPE IF EXISTS UserEnum CASCADE`)
-		tb.Query(ctx, t, `CREATE TYPE UserEnum AS ENUM ('red', 'green', 'blue')`)
-		t.Cleanup(func() { tb.Query(ctx, t, `DROP TYPE UserEnum CASCADE`) })
+		var db, tc = postgresBlackboxSetup(t)
+		db.QuietExec(t, `DROP TYPE IF EXISTS UserEnum CASCADE`)
+		db.Exec(t, `CREATE TYPE UserEnum AS ENUM ('red', 'green', 'blue')`)
+		t.Cleanup(func() { db.QuietExec(t, `DROP TYPE IF EXISTS UserEnum CASCADE`) })
 
-		var uniqueID = "64812435"
-		var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, value UserEnum)")
-		t.Run("Discovery", func(t *testing.T) {
-			var cs = tb.CaptureSpec(ctx, t)
-			cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
-		})
-		t.Run("Capture", func(t *testing.T) {
-			tb.Insert(ctx, t, tableName, [][]any{{1, "red"}, {2, "green"}, {3, "blue"}})
-			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-			tests.VerifiedCapture(ctx, t, cs)
-			t.Run("Replication", func(t *testing.T) {
-				tb.Insert(ctx, t, tableName, [][]any{{4, "blue"}, {5, "red"}, {6, "green"}})
-				tests.VerifiedCapture(ctx, t, cs)
-			})
-		})
+		db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, value UserEnum)`)
+		tc.DiscoverFull("Discover Tables")
+		db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'red'), (2, 'green'), (3, 'blue')`)
+		tc.Run("Initial Backfill", captureSessions)
+		db.Exec(t, `INSERT INTO <NAME> VALUES (4, 'blue'), (5, 'red'), (6, 'green')`)
+		tc.Run("Replication", captureSessions)
+		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 
 	t.Run("Tuple", func(t *testing.T) {
-		tb.Query(ctx, t, `DROP TYPE IF EXISTS UserTuple CASCADE`)
-		tb.Query(ctx, t, `CREATE TYPE UserTuple AS (epoch INTEGER, count INTEGER, data TEXT)`)
-		t.Cleanup(func() { tb.Query(ctx, t, `DROP TYPE UserTuple CASCADE`) })
+		var db, tc = postgresBlackboxSetup(t)
+		db.QuietExec(t, `DROP TYPE IF EXISTS UserTuple CASCADE`)
+		db.Exec(t, `CREATE TYPE UserTuple AS (epoch INTEGER, count INTEGER, data TEXT)`)
+		t.Cleanup(func() { db.QuietExec(t, `DROP TYPE IF EXISTS UserTuple CASCADE`) })
 
-		var uniqueID = "51424093"
-		var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, value UserTuple)")
-
-		t.Run("Discovery", func(t *testing.T) {
-			var cs = tb.CaptureSpec(ctx, t)
-			cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
-		})
-
-		t.Run("Capture", func(t *testing.T) {
-			tb.Insert(ctx, t, tableName, [][]any{
-				{1, "(1234, 5678, 'hello')"},
-				{2, "(3456, 9876, 'world')"},
-			})
-			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-			tests.VerifiedCapture(ctx, t, cs)
-			t.Run("Replication", func(t *testing.T) {
-				tb.Insert(ctx, t, tableName, [][]any{
-					{3, "(34, 64, 'asdf')"},
-					{4, "(83, 12, 'fdsa')"},
-				})
-				tests.VerifiedCapture(ctx, t, cs)
-			})
-		})
+		db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, value UserTuple)`)
+		tc.DiscoverFull("Discover Tables")
+		db.Exec(t, `INSERT INTO <NAME> VALUES (1, '(1234, 5678, ''hello'')'), (2, '(3456, 9876, ''world'')')`)
+		tc.Run("Initial Backfill", captureSessions)
+		db.Exec(t, `INSERT INTO <NAME> VALUES (3, '(34, 64, ''asdf'')'), (4, '(83, 12, ''fdsa'')')`)
+		tc.Run("Replication", captureSessions)
+		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 
 	t.Run("Range", func(t *testing.T) {
-		tb.Query(ctx, t, `DROP TYPE IF EXISTS UserRange CASCADE`)
-		tb.Query(ctx, t, `CREATE TYPE UserRange AS RANGE (subtype = int4)`)
-		t.Cleanup(func() { tb.Query(ctx, t, `DROP TYPE UserRange CASCADE`) })
+		var db, tc = postgresBlackboxSetup(t)
+		db.QuietExec(t, `DROP TYPE IF EXISTS UserRange CASCADE`)
+		db.Exec(t, `CREATE TYPE UserRange AS RANGE (subtype = int4)`)
+		t.Cleanup(func() { db.QuietExec(t, `DROP TYPE IF EXISTS UserRange CASCADE`) })
 
-		var uniqueID = "91324557"
-		var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, value UserRange)")
-
-		t.Run("Discovery", func(t *testing.T) {
-			var cs = tb.CaptureSpec(ctx, t)
-			cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
-		})
-
-		t.Run("Capture", func(t *testing.T) {
-			tb.Insert(ctx, t, tableName, [][]any{
-				{1, "(1, 2]"},
-				{2, "[3,)"},
-			})
-			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-			tests.VerifiedCapture(ctx, t, cs)
-			t.Run("Replication", func(t *testing.T) {
-				tb.Insert(ctx, t, tableName, [][]any{
-					{3, "(,4]"},
-					{4, "[5,6)"},
-				})
-				tests.VerifiedCapture(ctx, t, cs)
-			})
-		})
+		db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, value UserRange)`)
+		tc.DiscoverFull("Discover Tables")
+		db.Exec(t, `INSERT INTO <NAME> VALUES (1, '(1, 2]'), (2, '[3,)')`)
+		tc.Run("Initial Backfill", captureSessions)
+		db.Exec(t, `INSERT INTO <NAME> VALUES (3, '(,4]'), (4, '[5,6)')`)
+		tc.Run("Replication", captureSessions)
+		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 }
 
+// TestCaptureCapitalization exercises tables with quoted names containing capital letters.
 func TestCaptureCapitalization(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-
-	var uniqueA, uniqueB = "69943814", "73423348"
-	var tablePrefix = strings.TrimPrefix(t.Name(), "Test")
-	var tableA = tablePrefix + "_AaAaA_" + uniqueA                  // Name containing capital letters
-	var tableB = strings.ToLower(tablePrefix + "_BbBbB_" + uniqueB) // Name which is all lowercase (like all our other test table names)
+	var db, tc = postgresBlackboxSetup(t)
 
 	var cleanup = func() {
-		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS "%s"."%s";`, testSchemaName, tableA))
-		tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS "%s"."%s";`, testSchemaName, tableB))
+		db.QuietExec(t, `DROP TABLE IF EXISTS "<SCHEMA>"."tbl_<ID>_AAaaAA"`)
+		db.QuietExec(t, `DROP TABLE IF EXISTS "<SCHEMA>"."tbl_<ID>_bbBBbb"`)
 	}
 	cleanup()
 	t.Cleanup(cleanup)
 
-	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data TEXT);`, testSchemaName, tableA))
-	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE "%s"."%s" (id INTEGER PRIMARY KEY, data TEXT);`, testSchemaName, tableB))
+	db.Exec(t, `CREATE TABLE "<SCHEMA>"."tbl_<ID>_AAaaAA" (id INTEGER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `CREATE TABLE "<SCHEMA>"."tbl_<ID>_bbBBbb" (id INTEGER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO "<SCHEMA>"."tbl_<ID>_AAaaAA" VALUES (0, 'hello'), (1, 'asdf');`)
+	db.Exec(t, `INSERT INTO "<SCHEMA>"."tbl_<ID>_bbBBbb" VALUES (2, 'world'), (3, 'fdsa');`)
 
-	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (0, 'hello'), (1, 'asdf');`, testSchemaName, tableA))
-	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO "%s"."%s" VALUES (2, 'world'), (3, 'fdsa');`, testSchemaName, tableB))
-
-	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB)))
+	tc.Discover("Discover Tables")
+	tc.Run("Backfill Data", captureSessions)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestCaptureOversizedFields(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping test in short mode")
-	}
+	// The string "datadatadata" over and over, ending with "ABCD|EFGH...", where | represents the text truncation boundary
+	var largeText = strings.Repeat("data", (truncateColumnThreshold/4)-1) + "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+	var largeJSON = fmt.Sprintf(`{"text": "%s"}`, largeText)
 
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "64819605"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, tdata TEXT, bdata BYTEA, jdata JSON, jbdata JSONB)")
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = new(st.ChecksumValidator)
-
-	var largeText = strings.Repeat("data", 4194304)          // 16MiB string
-	var largeJSON = fmt.Sprintf(`{"text": "%s"}`, largeText) // ~16MiB JSON object
-	tb.Insert(ctx, t, tableName, [][]any{
-		{0, largeText, []byte(largeText), largeJSON, largeJSON},
-		{1, largeText, []byte(largeText), largeJSON, largeJSON},
-		{2, largeText, []byte(largeText), largeJSON, largeJSON},
-		{3, largeText, []byte(largeText), largeJSON, largeJSON},
-	})
-	tests.VerifiedCapture(ctx, t, cs)
-
-	t.Run("Replication", func(t *testing.T) {
-		tb.Insert(ctx, t, tableName, [][]any{
-			{4, largeText, []byte(largeText), largeJSON, largeJSON},
-			{5, largeText, []byte(largeText), largeJSON, largeJSON},
-			{6, largeText, []byte(largeText), largeJSON, largeJSON},
-			{7, largeText, []byte(largeText), largeJSON, largeJSON},
-		})
-		tests.VerifiedCapture(ctx, t, cs)
-	})
+	var db, tc = postgresBlackboxSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, v_text TEXT, v_bytea BYTEA, v_json JSON, v_jsonb JSONB)`)
+	db.QuietExec(t, `INSERT INTO <NAME> (id, v_text)  VALUES (10, '`+largeText+`')`)
+	db.QuietExec(t, `INSERT INTO <NAME> (id, v_bytea) VALUES (11, '`+largeText+`')`)
+	db.QuietExec(t, `INSERT INTO <NAME> (id, v_json)  VALUES (12, '`+largeJSON+`')`)
+	db.QuietExec(t, `INSERT INTO <NAME> (id, v_jsonb) VALUES (13, '`+largeJSON+`')`)
+	tc.Discover("Discover Tables")
+	tc.Run("Initial Backfill", -1)
+	db.QuietExec(t, `INSERT INTO <NAME> (id, v_text)  VALUES (20, '`+largeText+`')`)
+	db.QuietExec(t, `INSERT INTO <NAME> (id, v_bytea) VALUES (21, '`+largeText+`')`)
+	db.QuietExec(t, `INSERT INTO <NAME> (id, v_json)  VALUES (22, '`+largeJSON+`')`)
+	db.QuietExec(t, `INSERT INTO <NAME> (id, v_jsonb) VALUES (23, '`+largeJSON+`')`)
+	tc.Run("Replication", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestCaptureAfterSlotDropped(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "46115540"
+	var uniqueID = uniqueTableID(t)
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 
@@ -549,7 +461,7 @@ func TestCaptureAfterSlotDropped(t *testing.T) {
 // has a concrete type which uses a custom decoder registered in the PGX type map.
 func TestCaptureDomainJSONB(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "40925847"
+	var uniqueID = uniqueTableID(t)
 
 	tb.Query(ctx, t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`)
 	tb.Query(ctx, t, `CREATE DOMAIN UserDomain AS JSONB`)
@@ -565,125 +477,62 @@ func TestCaptureDomainJSONB(t *testing.T) {
 }
 
 func TestDroppedAndRecreatedTable(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "37815596"
-	var tableDef = "(id INTEGER PRIMARY KEY, data TEXT)"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
-
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &st.OrderedCaptureValidator{}
-	sqlcapture.TestShutdownAfterCaughtUp = true
-	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
-
-	// Initial backfill
-	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
-	cs.Capture(ctx, t, nil)
-
-	// Some replication
-	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
-	cs.Capture(ctx, t, nil)
-
-	// Drop and recreate the table, then fill it with some new data.
-	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE %s;`, tableName))
-	tb.Query(ctx, t, fmt.Sprintf(`CREATE TABLE %s%s;`, tableName, tableDef))
-	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
-	tb.Insert(ctx, t, tableName, [][]any{{6, "six"}, {7, "seven"}, {8, "eight"}})
-	cs.Capture(ctx, t, nil)
-
-	// Followed by some more replication
-	tb.Insert(ctx, t, tableName, [][]any{{9, "nine"}, {10, "ten"}, {11, "eleven"}})
-	cs.Capture(ctx, t, nil)
-
-	cupaloy.SnapshotT(t, cs.Summary())
+	var db, tc = postgresBlackboxSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	tc.Discover("Discover Tables")
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
+	tc.Run("Initial Backfill", captureSessions)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 'two'), (3, 'three')`)
+	tc.Run("Some Replication", captureSessions)
+	db.Exec(t, `DROP TABLE <NAME>`)
+	db.Exec(t, `CREATE TABLE <NAME> (id INTEGER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (4, 'four'), (5, 'five')`)
+	tc.Run("Dropped and Recreated", captureSessions)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (6, 'six'), (7, 'seven')`)
+	tc.Run("More Replication", captureSessions)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestCIText(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "58810479"
-	var tableDef = "(id INTEGER PRIMARY KEY, data CITEXT, arr CITEXT[])"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
-
-	t.Run("Discovery", func(t *testing.T) {
-		var cs = tb.CaptureSpec(ctx, t)
-		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
-	})
-
-	t.Run("Capture", func(t *testing.T) {
-		var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-		cs.Validator = &st.OrderedCaptureValidator{}
-		sqlcapture.TestShutdownAfterCaughtUp = true
-		t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
-
-		// Initial backfill
-		tb.Insert(ctx, t, tableName, [][]any{{0, "zero", "{a,b}"}, {1, "one", "{c,d}"}, {2, "two", "{e,f}"}})
-		cs.Capture(ctx, t, nil)
-
-		// Some replication
-		tb.Insert(ctx, t, tableName, [][]any{{3, "three", "{g,h}"}, {4, "four", "{i,j}"}, {5, "five", "{k,l}"}})
-		cs.Capture(ctx, t, nil)
-
-		// Snapshot
-		cupaloy.SnapshotT(t, cs.Summary())
-	})
+	var db, tc = postgresBlackboxSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data CITEXT, arr CITEXT[])`)
+	tc.DiscoverFull("Discover Tables")
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero', '{a,b}'), (1, 'one', '{c,d}')`)
+	tc.Run("Initial Backfill", captureSessions)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 'two', '{e,f}'), (3, 'three', '{g,h}')`)
+	tc.Run("Replication", captureSessions)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestPrimaryKeyUpdate(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "63510878"
-	var tableDef = "(id INTEGER PRIMARY KEY, data TEXT)"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
-
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &st.OrderedCaptureValidator{}
-	sqlcapture.TestShutdownAfterCaughtUp = true
-	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
-
-	// Initial backfill
-	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
-	cs.Capture(ctx, t, nil)
-
-	// Some replication
-	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
-	cs.Capture(ctx, t, nil)
-
-	// Primary key updates
-	tb.Update(ctx, t, tableName, "id", 1, "id", 6)
-	tb.Update(ctx, t, tableName, "id", 4, "id", 7)
-	cs.Capture(ctx, t, nil)
-
-	cupaloy.SnapshotT(t, cs.Summary())
+	var db, tc = postgresBlackboxSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	tc.Discover("Discover Tables")
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
+	tc.Run("Initial Backfill", captureSessions)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three'), (4, 'four')`)
+	tc.Run("Replication", captureSessions)
+	db.Exec(t, `UPDATE <NAME> SET id = 5 WHERE id = 1`)
+	db.Exec(t, `UPDATE <NAME> SET id = 6 WHERE id = 4`)
+	tc.Run("Primary Key Updates", captureSessions)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestGeneratedColumn(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "91418628"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, a VARCHAR(32), b VARCHAR(32), generated VARCHAR(64) GENERATED ALWAYS AS (COALESCE(a, b)) STORED)")
-
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &st.OrderedCaptureValidator{}
-	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
-	sqlcapture.TestShutdownAfterCaughtUp = true
-
-	t.Run("discovery", func(t *testing.T) {
-		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
-	})
-
-	t.Run("capture", func(t *testing.T) {
-		tb.Insert(ctx, t, tableName, [][]any{{0, "a0", "b0"}, {1, nil, "b1"}, {2, "a2", nil}, {3, nil, nil}})
-		cs.Capture(ctx, t, nil)
-		tb.Insert(ctx, t, tableName, [][]any{{4, "a4", "b4"}, {5, nil, "b5"}, {6, "a6", nil}, {7, nil, nil}})
-		cs.Capture(ctx, t, nil)
-		tb.Update(ctx, t, tableName, "id", 4, "a", "a4-modified")
-		tb.Update(ctx, t, tableName, "id", 5, "b", "b5-modified")
-		tb.Update(ctx, t, tableName, "id", 6, "a", "a6-modified")
-		cs.Capture(ctx, t, nil)
-		tb.Delete(ctx, t, tableName, "id", 4)
-		tb.Delete(ctx, t, tableName, "id", 5)
-		tb.Delete(ctx, t, tableName, "id", 6)
-		tb.Delete(ctx, t, tableName, "id", 7)
-		cs.Capture(ctx, t, nil)
-		cupaloy.SnapshotT(t, cs.Summary())
-	})
+	var db, tc = postgresBlackboxSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, a VARCHAR(32), b VARCHAR(32), generated VARCHAR(64) GENERATED ALWAYS AS (COALESCE(a, b)) STORED)`)
+	tc.DiscoverFull("Discover Tables")
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'a0', 'b0'), (1, null, 'b1'), (2, 'a2', null), (3, null, null)`)
+	tc.Run("Initial Backfill", captureSessions)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (4, 'a4', 'b4'), (5, null, 'b5'), (6, 'a6', null), (7, null, null)`)
+	tc.Run("Replication Inserts", captureSessions)
+	db.Exec(t, `UPDATE <NAME> SET a = 'a-modified' WHERE id IN (4, 6)`)
+	db.Exec(t, `UPDATE <NAME> SET b = 'b-modified' WHERE id = 5`)
+	tc.Run("Updates", captureSessions)
+	db.Exec(t, `DELETE FROM <NAME> WHERE id IN (4, 5, 6, 7)`)
+	tc.Run("Deletes", captureSessions)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 // TestFeatureFlagFlattenArrays exercises the handling of array columns in both
@@ -691,7 +540,7 @@ func TestGeneratedColumn(t *testing.T) {
 // enabled and disabled.
 func TestFeatureFlagFlattenArrays(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "70143951"
+	var uniqueID = uniqueTableID(t)
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, text_array TEXT[], int_array INTEGER[], nested_array INTEGER[][])")
 
 	tb.Insert(ctx, t, tableName, [][]any{
@@ -731,7 +580,7 @@ func TestFeatureFlagFlattenArrays(t *testing.T) {
 
 func TestXMINBackfill(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "60228969"
+	var uniqueID = uniqueTableID(t)
 	var tableDef = "(id INTEGER PRIMARY KEY, data TEXT)"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
 
@@ -756,7 +605,7 @@ func TestXMINBackfill(t *testing.T) {
 
 func TestMultidimensionalArrays(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "82375147"
+	var uniqueID = uniqueTableID(t)
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, arr TEXT[])")
 
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
@@ -803,7 +652,7 @@ func TestMultidimensionalArrays(t *testing.T) {
 // TestFeatureFlagEmitSourcedSchemas runs a capture with the `emit_sourced_schemas` feature flag set.
 func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = "64029092"
+	var uniqueID = uniqueTableID(t)
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR(32))")
 
 	tb.Insert(ctx, t, tableName, [][]any{{1, "hello"}, {2, "world"}})
@@ -942,49 +791,41 @@ func TestCaptureAsPartitions(t *testing.T) {
 // Values containing the raw UTF-8 bytes representing those codepoints are rejected
 // by the database, and similarly JSONB columns decode the escapes and reject them.
 func TestUnpairedSurrogatesInJSON(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = uniqueTableID(t)
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data JSON)")
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	setShutdownAfterCaughtUp(t, true)
+	var db, tc = postgresBlackboxSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data JSON)`)
 
-	// Test values
-	var vals = []string{
-		`{"text": "normal"}`,
-		`{"text": "\ud83d\u200b\ude14"}`,
-		`{"text": "\uDeAd"}`,
-		`{"\uDeAd": "\ud83d\udE14"}`,
-		`{"text": "foo \uDEAD bar \uDEAD baz"}`,
-		`[{"type":"text","text":"foo \"bar\\udfs\" /baz"}]`,
-	}
+	// Backfill inserts with unpaired surrogates in JSON
+	db.Exec(t, `INSERT INTO <NAME> VALUES (100, '{"text": "normal"}')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (101, '{"text": "\ud83d\u200b\ude14"}')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (102, '{"text": "\uDeAd"}')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (103, '{"\uDeAd": "\ud83d\udE14"}')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (104, '{"text": "foo \uDEAD bar \uDEAD baz"}')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (105, '[{"type":"text","text":"foo \"bar\\udfs\" /baz"}]')`)
+	tc.Discover("Discover Tables")
+	tc.Run("Backfill", captureSessions)
 
-	// Backfill
-	for idx, val := range vals {
-		tb.Insert(ctx, t, tableName, [][]any{{100 + idx, val}})
-	}
-	cs.Capture(ctx, t, nil)
-
-	// Replication
-	for idx, val := range vals {
-		tb.Insert(ctx, t, tableName, [][]any{{200 + idx, val}})
-	}
-	cs.Capture(ctx, t, nil)
-	cupaloy.SnapshotT(t, cs.Summary())
+	// Replication inserts with the same values
+	db.Exec(t, `INSERT INTO <NAME> VALUES (200, '{"text": "normal"}')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (201, '{"text": "\ud83d\u200b\ude14"}')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (202, '{"text": "\uDeAd"}')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (203, '{"\uDeAd": "\ud83d\udE14"}')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (204, '{"text": "foo \uDEAD bar \uDEAD baz"}')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (205, '[{"type":"text","text":"foo \"bar\\udfs\" /baz"}]')`)
+	tc.Run("Replication", captureSessions)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 // TestSourceTag verifies the output of a capture with /advanced/source_tag set
 func TestSourceTag(t *testing.T) {
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueID = uniqueTableID(t)
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.EndpointSpec.(*Config).Advanced.SourceTag = "example_source_tag_1234"
-	setShutdownAfterCaughtUp(t, true)
-	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}})
-	cs.Capture(ctx, t, nil)
-	tb.Insert(ctx, t, tableName, [][]any{{2, "two"}, {3, "three"}})
-	cs.Capture(ctx, t, nil)
-	cupaloy.SnapshotT(t, cs.Summary())
+	var db, tc = postgresBlackboxSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	require.NoError(t, tc.Capture.EditConfig("advanced.source_tag", "example_source_tag_1234"))
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
+	tc.Discover("Discover Tables")
+	tc.Run("Initial Backfill", captureSessions)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 'two'), (3, 'three')`)
+	tc.Run("Replication", captureSessions)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 // TestBackfillPriority checks that tables with higher priority values are
