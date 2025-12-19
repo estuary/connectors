@@ -29,5 +29,9 @@ def dateutil_parse(text):
 def read_full_refresh(stream_instance: Stream):
     slices = stream_instance.stream_slices(sync_mode=SyncMode.full_refresh)
     for _slice in slices:
-        for record in stream_instance.read_records(stream_slice=_slice, sync_mode=SyncMode.full_refresh):
+        for record in stream_instance.read_records(
+            stream_slice=_slice,
+            sync_mode=SyncMode.full_refresh,
+            cursor_field=stream_instance.cursor_field,
+        ):
             yield record
