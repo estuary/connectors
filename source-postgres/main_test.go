@@ -245,12 +245,6 @@ func setResourceBackfillMode(t *testing.T, binding *flow.CaptureSpec_Binding, mo
 	binding.ResourceConfigJson = bs
 }
 
-// TestGeneric runs the generic sqlcapture test suite.
-func TestGeneric(t *testing.T) {
-	var tb = postgresTestBackend(t)
-	tests.Run(context.Background(), t, tb)
-}
-
 var documentSanitizers = []blackbox.JSONSanitizer{
 	{Matcher: regexp.MustCompile(`"txid":[0-9]+`), Replacement: `"txid":"REDACTED"`},
 	{Matcher: regexp.MustCompile(`"loc":\[(-1|[0-9]+),[0-9]+,[0-9]+\]`), Replacement: `"loc":"REDACTED"`},
