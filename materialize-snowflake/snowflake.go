@@ -491,10 +491,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				"requestDuration": time.Since(start).String(),
 			}).Debug("sending Loaded documents from query")
 
+			rowsProcessed := 0
 			for rows.Next() {
 				if err = rows.Scan(&binding, &document); err != nil {
-					return fmt.Errorf("scanning Load document: %w", err)
+					return fmt.Errorf("scanning Load document(%d): %w", rowsProcessed, err)
 				}
+				rowsProcessed += 1
 
 				message := slices.Clone(document)
 				doc := &loadDoc{binding: binding, document: json.RawMessage(message)}
@@ -506,7 +508,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 
 			if err = rows.Err(); err != nil {
-				return fmt.Errorf("querying Loads: %w", err)
+				return fmt.Errorf("querying Loads(%d): %w", rowsProcessed, err)
 			}
 
 			return nil
