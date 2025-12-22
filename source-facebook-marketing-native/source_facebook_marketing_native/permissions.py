@@ -137,12 +137,6 @@ class PermissionManager:
                 )
 
                 match field_requirements:
-                    case ResourcePermissionRequirement() if (
-                        "business_management" in field_requirements.required_permissions
-                    ):
-                        # For business_management, we'll handle this in the API client with error handling
-                        # Include the field for now and let the API client handle the error
-                        filtered_fields.append(field)
                     case ResourcePermissionRequirement():
                         has_required_permissions = any(
                             perm in user_permissions
