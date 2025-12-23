@@ -6,7 +6,7 @@ from enum import Enum
 from logging import Logger
 from typing import AsyncGenerator, Generic, TypeVar
 
-from estuary_cdk.http import HTTPSession, Headers
+from estuary_cdk.http import HTTPSession, Headers, ShouldRetryProtocol
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -25,6 +25,7 @@ from .enums import Field
 
 MAX_500_ERROR_RETRY_ATTEMPTS = 5
 DEFAULT_PAGE_SIZE = 100
+MIN_PAGE_SIZE = 1
 UNSUPPORTED_FIELDS = {
     Field.UNIQUE_CONVERSIONS,
     Field.UNIQUE_CTR,
@@ -220,6 +221,59 @@ class FacebookAPIClient:
         self.log = log
         self.permission_manager = PermissionManager(http, BASE_URL, log)
 
+    def _make_should_retry(
+        self,
+        params: FacebookRequestParams | None = None,
+    ) -> ShouldRetryProtocol:
+        """
+        Returns a callback that matches ShouldRetryProtocol and can:
+        - Retry on 500 errors up to MAX_500_ERROR_RETRY_ATTEMPTS
+        - Reduce page size when the error message indicates too much data was requested
+        """
+
+        def _should_retry(
+            status: int,
+            headers: Headers,
+            body: bytes,
+            attempt: int,
+        ) -> bool:
+            if status != 500:
+                return False
+
+            if attempt >= MAX_500_ERROR_RETRY_ATTEMPTS:
+                return False
+
+            if params is None:
+                # No params to adjust, just retry
+                return False
+
+            msg = ""
+            try:
+                payload = json.loads(body.decode("utf-8"))
+                msg = (
+                    payload.get("error", {}).get("message")
+                    or payload.get("message")
+                    or ""
+                )
+            except Exception:
+                msg = body.decode("utf-8", errors="ignore")
+
+            should_reduce = params.limit > MIN_PAGE_SIZE and (
+                "reduce" in msg.lower() or "amount of data" in msg.lower()
+            )
+
+            if should_reduce:
+                new_limit = max(MIN_PAGE_SIZE, params.limit // 2)
+                self.log.warning(
+                    f"Reducing page size from {params.limit} to {new_limit} due to server error message: {msg}"
+                )
+                params.limit = new_limit
+                return True
+
+            return False
+
+        return _should_retry
+
     async def _fetch_resource_data(
         self,
         resource_model: type[TFacebookResource],
@@ -250,6 +304,7 @@ class FacebookAPIClient:
                 self.log,
                 url,
                 params=request_params,
+                should_retry=self._make_should_retry(params),
             )
         )
 
@@ -413,6 +468,7 @@ class FacebookAPIClient:
             headers, body = await self.http.request_stream(
                 self.log,
                 url,
+                should_retry=self._make_should_retry(),
             )
             content_type = headers.get("Content-Type")
             if not content_type:
