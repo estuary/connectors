@@ -23,7 +23,7 @@ from .fields import DELIVERY_INFO_FIELDS
 from .enums import Field
 
 
-MAX_500_ERROR_RETRY_ATTEMPTS = 5
+MAX_500_ERROR_RETRY_ATTEMPTS = 15
 DEFAULT_PAGE_SIZE = 100
 MIN_PAGE_SIZE = 1
 UNSUPPORTED_FIELDS = {
@@ -237,9 +237,6 @@ class FacebookAPIClient:
             body: bytes,
             attempt: int,
         ) -> bool:
-            if status != 500:
-                return False
-
             if attempt >= MAX_500_ERROR_RETRY_ATTEMPTS:
                 return False
 
@@ -264,7 +261,10 @@ class FacebookAPIClient:
                 msg = body.decode("utf-8", errors="ignore")
 
             should_reduce = current_limit > MIN_PAGE_SIZE and (
-                "reduce" in msg.lower() or "amount of data" in msg.lower()
+                "reduce" in msg
+                or "too much data" in msg
+                or "retry" in msg
+                or "unknown error" in msg
             )
 
             if should_reduce:
@@ -273,9 +273,8 @@ class FacebookAPIClient:
                     f"Reducing page size from {current_limit} to {new_limit} due to server error message: {msg}"
                 )
                 params["limit"] = new_limit
-                return True
 
-            return False
+            return True
 
         return _should_retry
 
