@@ -33,39 +33,59 @@ type client struct {
 	ddlMutex   sync.Mutex
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
-	cfg := ep.Config
+// spannerClients holds shared Spanner client instances used by both Apply and Runtime phases.
+type spannerClients struct {
+	dataClient  *spanner.Client
+	adminClient *database.DatabaseAdminClient
+	dbPath      string
+}
 
-	// Build the database path
+// newSpannerClients creates new Spanner data and admin clients.
+func newSpannerClients(ctx context.Context, cfg config) (*spannerClients, error) {
 	dbPath := fmt.Sprintf("projects/%s/instances/%s/databases/%s",
 		cfg.ProjectID, cfg.InstanceID, cfg.Database)
 
 	var opts []option.ClientOption
-
 	opts = append(opts, option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON)))
 
-	// Create admin client for DDL operations
 	adminClient, err := database.NewDatabaseAdminClient(ctx, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating Spanner admin client: %w", err)
 	}
 
-	// Create data client for query and DML operations
 	dataClient, err := spanner.NewClient(ctx, dbPath, opts...)
 	if err != nil {
 		adminClient.Close()
 		return nil, fmt.Errorf("creating Spanner data client: %w", err)
 	}
 
+	return &spannerClients{
+		dataClient:  dataClient,
+		adminClient: adminClient,
+		dbPath:      dbPath,
+	}, nil
+}
+
+func (c *spannerClients) Close() {
+	c.dataClient.Close()
+	c.adminClient.Close()
+}
+
+func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+	clients, err := newSpannerClients(ctx, ep.Config)
+	if err != nil {
+		return nil, err
+	}
+
 	templates := renderTemplates(ep.Dialect, !ep.Config.Advanced.DisableKeyDistributionOptimization)
 
 	return &client{
-		dataClient:  dataClient,
-		adminClient: adminClient,
-		cfg:         cfg,
+		dataClient:  clients.dataClient,
+		adminClient: clients.adminClient,
+		cfg:         ep.Config,
 		ep:          ep,
 		templates:   templates,
-		dbPath:      dbPath,
+		dbPath:      clients.dbPath,
 	}, nil
 }
 
@@ -347,7 +367,6 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		// TODO: test migrations
 		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges); err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		} else {
@@ -483,7 +502,11 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 			}
 			fence.Fence = readFence
 			if checkpoint.Valid {
-				fence.Checkpoint, _ = base64.StdEncoding.DecodeString(checkpoint.StringVal)
+				var decodeErr error
+				fence.Checkpoint, decodeErr = base64.StdEncoding.DecodeString(checkpoint.StringVal)
+				if decodeErr != nil {
+					return fmt.Errorf("decoding checkpoint: %w", decodeErr)
+				}
 			}
 		}
 
@@ -520,10 +543,6 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 }
 
 func (c *client) Close() {
-	if c.dataClient != nil {
-		c.dataClient.Close()
-	}
-	if c.adminClient != nil {
-		c.adminClient.Close()
-	}
+	c.dataClient.Close()
+	c.adminClient.Close()
 }
