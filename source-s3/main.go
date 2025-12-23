@@ -127,15 +127,10 @@ func (c config) Validate() error {
 		return fmt.Errorf("missing region")
 	}
 
-	if c.Credentials == nil {
-		if c.AWSAccessKeyID == "" {
-			return errors.New("missing 'awsAccessKeyId'")
+	if c.Credentials != nil {
+		if err := c.Credentials.Validate(); err != nil {
+			return err
 		}
-		if c.AWSSecretAccessKey == "" {
-			return errors.New("missing 'awsSecretAccessKey'")
-		}
-	} else if err := c.Credentials.Validate(); err != nil {
-		return err
 	}
 
 	return nil
