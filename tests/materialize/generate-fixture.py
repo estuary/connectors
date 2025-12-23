@@ -10,7 +10,7 @@ import os
 import sys
 import uuid
 import random
-from typing import Any, Dict, List, Set
+from typing import Any
 
 # Configuration
 PERF_DOC_COUNT = int(os.environ.get('PERF_DOC_COUNT', '100000'))
@@ -45,7 +45,7 @@ def generate_value(field_name: str, field_type: str, index: int) -> Any:
     else:
         return None
 
-def generate_document(collection: str, index: int, schema: Dict, properties: List[str]) -> Dict:
+def generate_document(collection: str, index: int, schema: dict, properties: list[str]) -> dict:
     """Generate a single document based on schema."""
     doc = {}
 
@@ -61,7 +61,7 @@ def generate_document(collection: str, index: int, schema: Dict, properties: Lis
 
     return doc
 
-def extract_perf_collections(resources_config: str) -> Set[str]:
+def extract_perf_collections(resources_config: str) -> set[str]:
     """Extract collections matching 'tests/perf-*' pattern."""
     try:
         resources = json.loads(resources_config)
@@ -74,7 +74,7 @@ def extract_perf_collections(resources_config: str) -> Set[str]:
         print(f"Error parsing RESOURCES_CONFIG: {e}", file=sys.stderr)
         return set()
 
-def load_flow_config(flow_json_path: str) -> Dict:
+def load_flow_config(flow_json_path: str) -> dict:
     """Load and parse flow.json configuration."""
     try:
         with open(flow_json_path, 'r') as f:
@@ -83,7 +83,7 @@ def load_flow_config(flow_json_path: str) -> Dict:
         print(f"Error loading flow.json: {e}", file=sys.stderr)
         sys.exit(1)
 
-def write_phase_documents(f, collection: str, schema: Dict, properties: List[str],
+def write_phase_documents(f, collection: str, schema: dict, properties: list[str],
                          start_idx: int, count: int) -> None:
     """
     Write documents for a phase, one per line.

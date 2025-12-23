@@ -417,45 +417,29 @@ func newTransactor(
 	open pm.Request_Open,
 	is *boilerplate.InfoSchema,
 	be *m.BindingEvents,
-) (m.Transactor, error) {
+) (_ m.Transactor, err error) {
 	cfg := ep.Config
 
-	// Build the database path
-	dbPath := fmt.Sprintf("projects/%s/instances/%s/databases/%s",
-		cfg.ProjectID, cfg.InstanceID, cfg.Database)
-
-	var opts []option.ClientOption
-
-	opts = append(opts, option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON)))
-
-	// Create a client for this transactor
-	// Note: The client will be closed in the Destroy() method
-	client, err := spanner.NewClient(ctx, dbPath, opts...)
+	// Create shared Spanner clients
+	clients, err := newSpannerClients(ctx, cfg)
 	if err != nil {
-		if strings.Contains(err.Error(), "PermissionDenied") {
-			return nil, fmt.Errorf("permission denied: check your credentials and IAM roles")
-		} else if strings.Contains(err.Error(), "NotFound") {
-			return nil, fmt.Errorf("database not found: %s (check project, instance, and database IDs)", dbPath)
-		} else {
-			return nil, fmt.Errorf("connecting to Spanner: %w", err)
+		return nil, err
+	}
+
+	// Ensure cleanup on error
+	defer func() {
+		if err != nil {
+			clients.Close()
 		}
-	}
-
-	// Create an admin client for DDL operations
-	adminClient, err := database.NewDatabaseAdminClient(ctx, opts...)
-	if err != nil {
-		client.Close()
-		return nil, fmt.Errorf("creating Spanner admin client: %w", err)
-	}
+	}()
 
 	templates := renderTemplates(ep.Dialect, !cfg.Advanced.DisableKeyDistributionOptimization)
 
 	// Always query node count for partition calculation
 	// Partitions = nodes × 10 for parallel flushing
+	opts := []option.ClientOption{option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON))}
 	nodeCount, err := queryNodeCount(ctx, cfg.ProjectID, cfg.InstanceID, opts)
 	if err != nil {
-		adminClient.Close()
-		client.Close()
 		return nil, fmt.Errorf("querying node count: %w", err)
 	}
 	numPartitions := nodeCount * 10
@@ -467,9 +451,9 @@ func newTransactor(
 	}).Info("calculated partitions for parallel flushing")
 
 	t := &transactor{
-		client:        client,
-		adminClient:   adminClient,
-		dbPath:        dbPath,
+		client:        clients.dataClient,
+		adminClient:   clients.adminClient,
+		dbPath:        clients.dbPath,
 		cfg:           cfg,
 		templates:     templates,
 		fence:         fence,
@@ -489,18 +473,14 @@ func newTransactor(
 
 	// Execute all DDL statements in a single operation for efficiency
 	log.WithField("statements", len(ddlStatements)).Info("executing flow_internal schema initialization")
-	op, err := adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
-		Database:   dbPath,
+	op, err := clients.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+		Database:   clients.dbPath,
 		Statements: ddlStatements,
 	})
 	if err != nil {
-		adminClient.Close()
-		client.Close()
 		return nil, fmt.Errorf("submitting flow_internal schema DDL: %w", err)
 	}
 	if err := op.Wait(ctx); err != nil {
-		adminClient.Close()
-		client.Close()
 		return nil, fmt.Errorf("executing flow_internal schema DDL: %w", err)
 	}
 	log.Info("created flow_internal schema for Load operations")
@@ -1016,12 +996,8 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 }
 
 func (t *transactor) Destroy() {
-	if t.client != nil {
-		t.client.Close()
-	}
-	if t.adminClient != nil {
-		t.adminClient.Close()
-	}
+	t.client.Close()
+	t.adminClient.Close()
 }
 
 func main() {
