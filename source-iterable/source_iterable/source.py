@@ -27,7 +27,6 @@ from .streams import (
     EmailSendSkip,
     EmailSubscribe,
     EmailUnsubscribe,
-    Events,
     HostedUnsubscribeClick,
     InAppClick,
     InAppClose,
@@ -157,7 +156,6 @@ class SourceIterable(AbstractSource):
                     Purchase(authenticator=authenticator, **date_range),
                     CustomEvent(authenticator=authenticator, **date_range),
                     HostedUnsubscribeClick(authenticator=authenticator, **date_range),
-                    Events(authenticator=authenticator),
                 ]
             )
         return streams
