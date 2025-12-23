@@ -2,6 +2,23 @@
 
 set -e
 
+# Decrypt config and set credentials from config.yaml
+CONFIG_JSON="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
+SPANNER_PROJECT_ID="$(echo "$CONFIG_JSON" | jq -r .project_id)"
+SPANNER_INSTANCE_ID="$(echo "$CONFIG_JSON" | jq -r .instance_id)"
+SPANNER_DATABASE="$(echo "$CONFIG_JSON" | jq -r .database)"
+SPANNER_SERVICE_ACCOUNT_JSON="$(echo "$CONFIG_JSON" | jq -r '.credentials.service_account_json')"
+
+# Set up gcloud authentication using service account credentials
+SPANNER_KEY_FILE=$(mktemp)
+echo "$SPANNER_SERVICE_ACCOUNT_JSON" > "$SPANNER_KEY_FILE"
+gcloud auth activate-service-account --key-file="$SPANNER_KEY_FILE" --quiet
+
+function cleanup_keyfile() {
+  rm -f "$SPANNER_KEY_FILE"
+}
+trap cleanup_keyfile EXIT
+
 touch ${TEMP_DIR}/drop.sql
 echo '' > ${TEMP_DIR}/drop.sql
 
@@ -34,8 +51,3 @@ gcloud spanner databases ddl update "$SPANNER_DATABASE" \
     --ddl-file="${TEMP_DIR}/drop.sql"
 
 rm ${TEMP_DIR}/drop.sql
-
-# Cleanup temporary key file if it was created
-if [ -n "$SPANNER_KEY_FILE" ] && [ -f "$SPANNER_KEY_FILE" ]; then
-    rm -f "$SPANNER_KEY_FILE"
-fi

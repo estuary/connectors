@@ -136,18 +136,6 @@ perf_resources_json_template='[
 ]'
 
 export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
-export SPANNER_PROJECT_ID="$(echo $CONNECTOR_CONFIG | jq -r .project_id)"
-export SPANNER_INSTANCE_ID="$(echo $CONNECTOR_CONFIG | jq -r .instance_id)"
-export SPANNER_DATABASE="$(echo $CONNECTOR_CONFIG | jq -r .database)"
-
-# Set credentials for gcloud if provided
-export SPANNER_SERVICE_ACCOUNT_JSON="$(echo $CONNECTOR_CONFIG | jq -r '.credentials.service_account_json')"
-if [ -n "$SPANNER_SERVICE_ACCOUNT_JSON" ]; then
-  # Create a temporary service account key file for authentication
-  export SPANNER_KEY_FILE=$(mktemp)
-  echo "$SPANNER_SERVICE_ACCOUNT_JSON" > "$SPANNER_KEY_FILE"
-  export GOOGLE_APPLICATION_CREDENTIALS="$SPANNER_KEY_FILE"
-fi
 
 # Use performance bindings if PERF_DOC_COUNT is set, otherwise use standard test bindings
 if [[ -n "${PERF_DOC_COUNT:-}" ]]; then

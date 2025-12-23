@@ -298,6 +298,7 @@ jobs:
               "materialize-postgres",
               "materialize-mysql",
               "materialize-sqlserver",
+              "materialize-spanner",
               "materialize-kafka",
               "materialize-mongodb",
               "materialize-motherduck",
