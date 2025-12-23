@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from logging import Logger
-from typing import AsyncGenerator, Generic, TypeVar
+from typing import AsyncGenerator, Generic, TypeVar, Any
 
 from estuary_cdk.http import HTTPSession, Headers, ShouldRetryProtocol
 from pydantic import (
@@ -223,7 +223,7 @@ class FacebookAPIClient:
 
     def _make_should_retry(
         self,
-        params: FacebookRequestParams | None = None,
+        params: dict[str, Any] | None = None,
     ) -> ShouldRetryProtocol:
         """
         Returns a callback that matches ShouldRetryProtocol and can:
@@ -243,9 +243,14 @@ class FacebookAPIClient:
             if attempt >= MAX_500_ERROR_RETRY_ATTEMPTS:
                 return False
 
-            if params is None:
+            if params is None or "limit" not in params:
                 # No params to adjust, just retry
-                return False
+                return True
+
+            current_limit = params.get("limit")
+            if not current_limit:
+                # No limit to adjust, just retry
+                return True
 
             msg = ""
             try:
@@ -254,20 +259,20 @@ class FacebookAPIClient:
                     payload.get("error", {}).get("message")
                     or payload.get("message")
                     or ""
-                )
+                ).lower()
             except Exception:
                 msg = body.decode("utf-8", errors="ignore")
 
-            should_reduce = params.limit > MIN_PAGE_SIZE and (
+            should_reduce = current_limit > MIN_PAGE_SIZE and (
                 "reduce" in msg.lower() or "amount of data" in msg.lower()
             )
 
             if should_reduce:
-                new_limit = max(MIN_PAGE_SIZE, params.limit // 2)
+                new_limit = max(MIN_PAGE_SIZE, current_limit // 2)
                 self.log.warning(
-                    f"Reducing page size from {params.limit} to {new_limit} due to server error message: {msg}"
+                    f"Reducing page size from {current_limit} to {new_limit} due to server error message: {msg}"
                 )
-                params.limit = new_limit
+                params["limit"] = new_limit
                 return True
 
             return False
@@ -304,7 +309,7 @@ class FacebookAPIClient:
                 self.log,
                 url,
                 params=request_params,
-                should_retry=self._make_should_retry(params),
+                should_retry=self._make_should_retry(request_params),
             )
         )
 
