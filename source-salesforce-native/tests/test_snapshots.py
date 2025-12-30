@@ -13,7 +13,7 @@ def test_capture(request, snapshot):
         "LoginTime",
         "LastLoginDate",
         "LastPasswordChangeDate",
-        "LastReferenceDate",
+        "LastReferencedDate",
         "LastViewedDate",
         "PasswordExpirationDate",
         "my_time_field__c",
