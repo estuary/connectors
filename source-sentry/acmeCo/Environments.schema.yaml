@@ -22,13 +22,6 @@ properties:
   _meta:
     $ref: '#/$defs/Meta'
     description: Document metadata
-  access:
-    items:
-      type: string
-    title: Access
-    type: array
-required:
-- access
-title: Team
+title: Environment
 type: object
 x-infer-schema: true
