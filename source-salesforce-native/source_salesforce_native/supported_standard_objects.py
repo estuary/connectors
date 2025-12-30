@@ -3943,6 +3943,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "ProductSpecificationTypeLocalization": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "ProductItem":{
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "Profile": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
