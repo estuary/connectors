@@ -156,7 +156,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return it.Err()
 	}
 
-	defer d.loadFiles.CleanupCurrentTransaction(ctx)
+	// defer d.loadFiles.CleanupCurrentTransaction(ctx)
 
 	var subqueries []string
 	for idx, b := range d.bindings {
@@ -276,8 +276,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return fmt.Errorf("closing gzip reader: %w", err)
 	} else if err := r.Close(); err != nil {
 		return fmt.Errorf("closing reader: %w", err)
-	} else if err := d.loadFiles.CleanupCurrentTransaction(ctx); err != nil {
-		return fmt.Errorf("cleaning up load files: %w", err)
 	}
 
 	return nil
@@ -339,7 +337,7 @@ type bindingCommit struct {
 }
 
 func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
-	defer d.storeFiles.CleanupCurrentTransaction(ctx)
+	// defer d.storeFiles.CleanupCurrentTransaction(ctx)
 
 	var commits []bindingCommit
 	for idx, b := range d.bindings {
@@ -392,9 +390,9 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
 		break
 	}
 
-	if err := d.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
-		return fmt.Errorf("cleaning up store files: %w", err)
-	}
+	// if err := d.storeFiles.CleanupCurrentTransaction(ctx); err != nil {
+	// 	return fmt.Errorf("cleaning up store files: %w", err)
+	// }
 
 	return nil
 }
