@@ -1,0 +1,14 @@
+captures:
+  acmeCo/source-iterable-native:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_iterable_native
+        config:
+          credentials:
+            credentials_title: Private App Credentials
+            access_token: not_a_real_access_token
+          project_type: Email-based
+    bindings: []

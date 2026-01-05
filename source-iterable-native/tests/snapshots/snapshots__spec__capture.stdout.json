@@ -1,0 +1,129 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "window_size": {
+              "description": "Date window size for export jobs in ISO 8601 format. E.g. P5D means 5 days, PT6H means 6 hours.",
+              "format": "duration",
+              "title": "Window Size",
+              "type": "string"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "ApiKey": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "API Key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "ApiKey",
+          "type": "object"
+        },
+        "ProjectType": {
+          "enum": [
+            "Email-based",
+            "UserID-based",
+            "Hybrid"
+          ],
+          "title": "ProjectType",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "project_type": {
+          "$ref": "#/$defs/ProjectType",
+          "description": "The type of Iterable project, which determines how users are uniquely identified. See https://support.iterable.com/hc/en-us/articles/9216719179796-Project-Types-and-Unique-Identifiers for more information.",
+          "title": "Project Type"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present date.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "Private App Credentials": "#/$defs/ApiKey"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ApiKey"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "project_type",
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-iterable-native",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]

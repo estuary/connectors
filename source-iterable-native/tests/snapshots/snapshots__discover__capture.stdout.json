@@ -1,0 +1,587 @@
+[
+  {
+    "recommendedName": "campaign_metrics",
+    "resourceConfig": {
+      "name": "campaign_metrics",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "CampaignMetrics",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "campaigns",
+    "resourceConfig": {
+      "name": "campaigns",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "CampaignFinalStates": {
+          "enum": [
+            "Aborted",
+            "Archived",
+            "Finished",
+            "Recalled"
+          ],
+          "title": "CampaignFinalStates",
+          "type": "string"
+        },
+        "CampaignInProgressStates": {
+          "enum": [
+            "Ready",
+            "Running",
+            "Recalling"
+          ],
+          "title": "CampaignInProgressStates",
+          "type": "string"
+        },
+        "CampaignPreLaunchStates": {
+          "enum": [
+            "Draft",
+            "Recurring",
+            "Scheduled"
+          ],
+          "title": "CampaignPreLaunchStates",
+          "type": "string"
+        },
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "createdAt": {
+          "title": "Createdat",
+          "type": "integer"
+        },
+        "updatedAt": {
+          "title": "Updatedat",
+          "type": "integer"
+        },
+        "endedAt": {
+          "title": "Endedat",
+          "type": "integer"
+        },
+        "campaignState": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CampaignPreLaunchStates"
+            },
+            {
+              "$ref": "#/$defs/CampaignInProgressStates"
+            },
+            {
+              "$ref": "#/$defs/CampaignFinalStates"
+            }
+          ],
+          "title": "Campaignstate"
+        }
+      },
+      "required": [
+        "id",
+        "createdAt",
+        "updatedAt",
+        "campaignState"
+      ],
+      "title": "Campaigns",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "channels",
+    "resourceConfig": {
+      "name": "channels",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "events",
+    "resourceConfig": {
+      "name": "events",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "email": {
+          "title": "Email",
+          "type": "string"
+        },
+        "createdAt": {
+          "format": "date-time",
+          "title": "Createdat",
+          "type": "string"
+        },
+        "eventType": {
+          "title": "Eventtype",
+          "type": "string"
+        },
+        "_estuary_id": {
+          "title": "Estuary Id",
+          "type": "string"
+        },
+        "itblUserId": {
+          "title": "Itbluserid",
+          "type": "string"
+        },
+        "campaignId": {
+          "title": "Campaignid",
+          "type": "integer"
+        },
+        "eventName": {
+          "title": "Eventname",
+          "type": "string"
+        }
+      },
+      "required": [
+        "email",
+        "createdAt",
+        "eventType",
+        "_estuary_id"
+      ],
+      "title": "Events",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_estuary_id",
+      "/eventType"
+    ]
+  },
+  {
+    "recommendedName": "list_users",
+    "resourceConfig": {
+      "name": "list_users",
+      "interval": "PT4H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ],
+    "disable": true
+  },
+  {
+    "recommendedName": "lists",
+    "resourceConfig": {
+      "name": "lists",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "message_types",
+    "resourceConfig": {
+      "name": "message_types",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "metadata_tables",
+    "resourceConfig": {
+      "name": "metadata_tables",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "templates",
+    "resourceConfig": {
+      "name": "templates",
+      "interval": "PT15M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "BaseDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "users",
+    "resourceConfig": {
+      "name": "users",
+      "interval": "PT5M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "profileUpdatedAt": {
+          "format": "date-time",
+          "title": "Profileupdatedat",
+          "type": "string"
+        },
+        "email": {
+          "title": "Email",
+          "type": "string"
+        }
+      },
+      "required": [
+        "profileUpdatedAt",
+        "email"
+      ],
+      "title": "UsersWithEmails",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/email"
+    ]
+  }
+]
