@@ -350,6 +350,10 @@ func TestUnicodeText(t *testing.T) {
 	sqlcapture.TestShutdownAfterCaughtUp = true
 	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
 
+	// Set connection charset to utf8mb4 before inserting, so Unicode strings make
+	// it into the table correctly.
+	tb.Query(ctx, t, "SET NAMES utf8mb4")
+
 	var latinTestStrings = []string{
 		"Sphinx of black quartz, judge my vow",
 		"Le cœur déçu mais l'âme plutôt naïve",

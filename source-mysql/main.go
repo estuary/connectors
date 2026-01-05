@@ -329,6 +329,13 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		}
 	}
 
+	// Set collation to utf8mb4 for the connection so UTF-8 data is transferred correctly.
+	// This should work on every MySQL/MariaDB version we care about, but just in case we
+	// log a warning and continue (presumably with the default server setting) if it fails.
+	if _, err := db.conn.Execute("SET NAMES utf8mb4"); err != nil {
+		logrus.WithField("err", err).Warn("failed to set connection charset to utf8mb4")
+	}
+
 	// Set our desired timezone (specifically for the backfill connection, this has
 	// no effect on the database as a whole) to UTC. This is required for backfills of
 	// TIMESTAMP columns to behave consistently, and has no effect on DATETIME columns.
