@@ -195,9 +195,6 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "ActiveScratchOrgShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
-    "ActivityFieldHistory": {
-        "cursor_field": CursorFields.SYSTEM_MODSTAMP
-    },
     "ActivityMetric": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
@@ -1298,13 +1295,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "ContentFolder": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
-    "ContentFolderItem": {
-        "cursor_field": CursorFields.SYSTEM_MODSTAMP
-    },
     "ContentFolderLink": {},
-    "ContentFolderMember": {
-        "cursor_field": CursorFields.SYSTEM_MODSTAMP
-    },
     "ContentNote": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
@@ -2183,9 +2174,6 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "FlowStageRelation": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
-    },
-    "FlowVersionView": {
-        "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
     "Folder": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -3262,9 +3250,6 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "OmniProcessTransientDataShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
-    "OmniRoutingEventStore": {
-        "cursor_field": CursorFields.SYSTEM_MODSTAMP
-    },
     "OmniScriptConfig": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
@@ -3633,9 +3618,6 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     },
     "PipelineInspectionSumField": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
-    },
-    "PlatformAction": {
-        "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
     "PlatformCachePartition": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -4305,9 +4287,6 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "ScratchOrgInfoShare": {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
-    "SearchLayout": {
-        "cursor_field": CursorFields.LAST_MODIFIED_DATE
-    },
     "SearchPromotionRule": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
@@ -4866,9 +4845,6 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "VoiceVendorInfo": {
-        "cursor_field": CursorFields.SYSTEM_MODSTAMP
-    },
-    "Vote": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "WaveAutoInstallRequest": {
