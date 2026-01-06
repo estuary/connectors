@@ -1,0 +1,110 @@
+sql> CREATE TABLE dbo.CatalogPrimaryKey_358130 (id INTEGER, name TEXT, value INTEGER)
+sql> INSERT INTO dbo.CatalogPrimaryKey_358130 VALUES (1, 'alice', 100), (2, 'bob', 200)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/catalogprimarykey_358130
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/catalogprimarykey_358130",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "CatalogPrimaryKey_358130"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1,
+    "name": "alice",
+    "value": 100
+  }
+]
+[
+  "acmeCo/test_capture/dbo/catalogprimarykey_358130",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "CatalogPrimaryKey_358130"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2,
+    "name": "bob",
+    "value": 200
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCatalogPrimaryKey_358130": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.CatalogPrimaryKey_358130 VALUES (3, 'carol', 300), (4, 'dave', 400)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/dbo/catalogprimarykey_358130",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "CatalogPrimaryKey_358130",
+        "updateMask": "Bw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 3,
+    "name": "carol",
+    "value": 300
+  }
+]
+[
+  "acmeCo/test_capture/dbo/catalogprimarykey_358130",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "CatalogPrimaryKey_358130",
+        "updateMask": "Bw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 4,
+    "name": "dave",
+    "value": 400
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCatalogPrimaryKey_358130": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

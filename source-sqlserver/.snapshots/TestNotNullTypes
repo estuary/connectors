@@ -1,0 +1,122 @@
+sql> CREATE TABLE dbo.NotNullTypes_650217 (
+		id INTEGER PRIMARY KEY,
+		a_integer INTEGER NOT NULL,
+		a_bigint BIGINT NOT NULL,
+		a_bit BIT NOT NULL,
+		a_varchar VARCHAR(32) NOT NULL,
+		a_decimal DECIMAL(10,2) NOT NULL,
+		a_float FLOAT NOT NULL,
+		a_datetime2 DATETIME2 NOT NULL,
+		a_uniqueidentifier UNIQUEIDENTIFIER NOT NULL
+	)
+sql> INSERT INTO dbo.NotNullTypes_650217 VALUES
+		(1, 123, 1234567891234567, 1, 'hello', 123.45, 1234.5, '2024-01-15T12:30:00', '8292f3cb-0cce-41e8-86aa-ae09bcc988e9'),
+		(2, -456, -9876543219876543, 0, 'world', -678.90, -5678.9, '1991-08-31T00:00:00', '00000000-0000-0000-0000-000000000000')
+=== Discover: Discover ===
+acmeCo/test_capture/dbo/notnulltypes_650217
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/notnulltypes_650217",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "NotNullTypes_650217"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": 1234567891234567,
+    "a_bit": true,
+    "a_datetime2": "2024-01-15T12:30:00Z",
+    "a_decimal": "123.45",
+    "a_float": 1234.5,
+    "a_integer": 123,
+    "a_uniqueidentifier": "8292f3cb-0cce-41e8-86aa-ae09bcc988e9",
+    "a_varchar": "hello",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/notnulltypes_650217",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "NotNullTypes_650217"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": -9876543219876543,
+    "a_bit": false,
+    "a_datetime2": "1991-08-31T00:00:00Z",
+    "a_decimal": "-678.90",
+    "a_float": -5678.9,
+    "a_integer": -456,
+    "a_uniqueidentifier": "00000000-0000-0000-0000-000000000000",
+    "a_varchar": "world",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FNotNullTypes_650217": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.NotNullTypes_650217 VALUES
+		(101, 789, 111222333444555, 1, 'test', 999.99, 9999.9, '2000-06-15T18:45:00', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/dbo/notnulltypes_650217",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "NotNullTypes_650217",
+        "updateMask": "Af8="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": 111222333444555,
+    "a_bit": true,
+    "a_datetime2": "2000-06-15T18:45:00Z",
+    "a_decimal": "999.99",
+    "a_float": 9999.9,
+    "a_integer": 789,
+    "a_uniqueidentifier": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    "a_varchar": "test",
+    "id": 101
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FNotNullTypes_650217": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

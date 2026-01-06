@@ -1,0 +1,12 @@
+sql> CREATE TABLE dbo.MissingTable_551059_a (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.MissingTable_551059_b (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/missingtable_551059_a
+acmeCo/test_capture/dbo/missingtable_551059_b
+sql> DROP TABLE dbo.MissingTable_551059_b
+=== Run: Capture ===
+error: flowctl preview failed:
+the capture cannot run due to the following error(s):
+ - table "dbo.missingtable_551059_b" has no capture instances and user "flow_capture" cannot create one
+
+

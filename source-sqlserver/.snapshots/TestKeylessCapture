@@ -1,0 +1,100 @@
+sql> CREATE TABLE dbo.KeylessCapture_315710 (id INTEGER, data TEXT)
+sql> INSERT INTO dbo.KeylessCapture_315710 VALUES (1, 'one'), (2, 'two')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/keylesscapture_315710
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/keylesscapture_315710",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "KeylessCapture_315710"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/keylesscapture_315710",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "KeylessCapture_315710"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FKeylessCapture_315710": {
+      "backfilled": 2,
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.KeylessCapture_315710 VALUES (3, 'three'), (4, 'four')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/dbo/keylesscapture_315710",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "KeylessCapture_315710",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/keylesscapture_315710",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "KeylessCapture_315710",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FKeylessCapture_315710": {
+      "backfilled": 2,
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
