@@ -1,57 +1,32 @@
 package main
 
 import (
-	"context"
-	"fmt"
-	"regexp"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	"github.com/estuary/connectors/sqlcapture/tests"
-	"github.com/estuary/flow/go/protocols/flow"
 )
 
+// TestPrerequisites verifies that the connector properly validates table existence
+// before capture. It creates three tables, discovers them, then drops one and verifies
+// that subsequent capture attempts fail with an appropriate error message.
 func TestPrerequisites(t *testing.T) {
-	// Table A exists and contains data, table B exists but is empty, and table C does not exist.
-	var tb, ctx = postgresTestBackend(t), context.Background()
-	var uniqueA, uniqueB, uniqueC = "12111583", "25518078", "35527129"
-	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data TEXT)")
-	tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data TEXT)")
-	tb.Insert(ctx, t, tableA, [][]any{{0, "hello"}, {1, "world"}})
-	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE IF EXISTS %s;`, tb.config.Advanced.WatermarksTable))
+	var db, tc = postgresBlackboxSetup(t)
 
-	var bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB))
-	var bindingA, bindingB = bindings[0], bindings[1]
-	var bindingC = tests.BindingReplace(bindingA, uniqueA, uniqueC)
+	// Create tables A (with data), B (empty), and C (will be dropped later)
+	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.CreateTable(t, `<NAME>_c`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME>_a VALUES (0, 'hello'), (1, 'world')`)
 
-	t.Run("validateAB", func(t *testing.T) {
-		var cs = tb.CaptureSpec(ctx, t)
-		cs.Bindings = []*flow.CaptureSpec_Binding{bindingA, bindingB}
-		_, err := cs.Validate(ctx, t)
-		if err != nil {
-			cupaloy.SnapshotT(t, err.Error())
-		} else {
-			cupaloy.SnapshotT(t, "no error")
-		}
-	})
-	t.Run("validateABC-fails", func(t *testing.T) {
-		var cs = tb.CaptureSpec(ctx, t)
-		cs.Bindings = []*flow.CaptureSpec_Binding{bindingA, bindingB, bindingC}
-		_, err := cs.Validate(ctx, t)
-		if err != nil {
-			cupaloy.SnapshotT(t, err.Error())
-		} else {
-			cupaloy.SnapshotT(t, "no error")
-		}
-	})
-	t.Run("captureAB", func(t *testing.T) {
-		var cs = tb.CaptureSpec(ctx, t)
-		cs.Bindings = []*flow.CaptureSpec_Binding{bindingA, bindingB}
-		tests.VerifiedCapture(ctx, t, cs)
-	})
-	t.Run("captureABC-fails", func(t *testing.T) {
-		var cs = tb.CaptureSpec(ctx, t)
-		cs.Bindings = []*flow.CaptureSpec_Binding{bindingA, bindingB, bindingC}
-		tests.VerifiedCapture(ctx, t, cs)
-	})
+	// Discover all three tables
+	tc.Discover("Discover Tables A, B, C")
+
+	// Capture with all tables present - should succeed
+	tc.Run("Capture A+B+C (All Tables Exist)", -1)
+
+	// Drop table C and try to capture again - should fail with prerequisite error
+	db.Exec(t, `DROP TABLE <NAME>_c`)
+	tc.Run("Capture A+B+C (Table C Dropped)", -1)
+
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
