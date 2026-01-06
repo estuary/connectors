@@ -33,6 +33,7 @@ from .streams import (
     ClickView,
     DisplayKeywordPerformanceReport,
     DisplayTopicsPerformanceReport,
+    GeoTargetConstant,
     GeographicReport,
     KeywordReport,
     ServiceAccounts,
@@ -183,6 +184,7 @@ class SourceGoogleAds(AbstractSource):
             Accounts(**incremental_config),
             CampaignLabels(google_api, customers=customers),
             ClickView(**incremental_config),
+            GeoTargetConstant(google_api, customers=customers),
         ]
         # Metrics streams cannot be requested for a manager account.
         if non_manager_accounts:

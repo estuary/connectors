@@ -1616,6 +1616,71 @@
     ]
   },
   {
+    "recommendedName": "geo_target_constant",
+    "resourceConfig": {
+      "stream": "geo_target_constant",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "geo_target_constant.id",
+        "geo_target_constant.resource_name"
+      ],
+      "properties": {
+        "geo_target_constant.canonical_name": {
+          "type": "string"
+        },
+        "geo_target_constant.country_code": {
+          "type": "string"
+        },
+        "geo_target_constant.id": {
+          "type": "integer"
+        },
+        "geo_target_constant.name": {
+          "type": "string"
+        },
+        "geo_target_constant.parent_geo_target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "geo_target_constant.resource_name": {
+          "type": "string"
+        },
+        "geo_target_constant.status": {
+          "type": "string",
+          "enum": [
+            "ENABLED",
+            "REMOVAL_PLANNED",
+            "UNKNOWN",
+            "UNSPECIFIED"
+          ]
+        },
+        "geo_target_constant.target_type": {
+          "type": "string"
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
+        }
+      },
+      "x-infer-schema": true
+    },
+    "key": [
+      "/geo_target_constant.id"
+    ]
+  },
+  {
     "recommendedName": "campaigns",
     "resourceConfig": {
       "stream": "campaigns",
@@ -5135,10 +5200,10 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
       "required": [
-        "segments.date",
-        "ad_group.id",
+        "customer.descriptive_name",
         "geographic_view.country_criterion_id",
-        "customer.descriptive_name"
+        "ad_group.id",
+        "segments.date"
       ],
       "properties": {
         "customer.descriptive_name": {

@@ -47,6 +47,10 @@ captures:
         - segments.date
       target: acmeCo/click_view
     - resource:
+        stream: geo_target_constant
+        syncMode: full_refresh
+      target: acmeCo/geo_target_constant
+    - resource:
         stream: campaigns
         syncMode: incremental
         cursorField:
