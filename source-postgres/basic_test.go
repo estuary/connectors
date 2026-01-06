@@ -29,7 +29,7 @@ func TestSimpleCapture(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Backfill", captureSessions)
+	tc.Run("Initial Backfill", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -41,9 +41,9 @@ func TestReplicationInserts(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Backfill", captureSessions)
+	tc.Run("Initial Backfill", -1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1002, 'some'), (1000, 'more'), (1001, 'rows')`)
-	tc.Run("Replication Inserts", captureSessions)
+	tc.Run("Replication Inserts", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -55,11 +55,11 @@ func TestReplicationUpdates(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Backfill", captureSessions)
+	tc.Run("Initial Backfill", -1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1002, 'some'), (1000, 'more'), (1001, 'rows')`)
 	db.Exec(t, `UPDATE <NAME> SET data = 'updated' WHERE id = 1`)
 	db.Exec(t, `UPDATE <NAME> SET data = 'updated' WHERE id = 1002`)
-	tc.Run("Replication Updates", captureSessions)
+	tc.Run("Replication Updates", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -71,11 +71,11 @@ func TestReplicationDeletes(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Backfill", captureSessions)
+	tc.Run("Initial Backfill", -1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1002, 'some'), (1000, 'more'), (1001, 'rows')`)
 	db.Exec(t, `DELETE FROM <NAME> WHERE id = 1`)
 	db.Exec(t, `DELETE FROM <NAME> WHERE id = 1002`)
-	tc.Run("Replication Deletes", captureSessions)
+	tc.Run("Replication Deletes", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -85,9 +85,9 @@ func TestEmptyTable(t *testing.T) {
 	var db, tc = postgresBlackboxSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Backfill (Empty)", captureSessions)
+	tc.Run("Initial Backfill (Empty)", -1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1002, 'some'), (1000, 'more'), (1001, 'rows')`)
-	tc.Run("Replication Inserts", captureSessions)
+	tc.Run("Replication Inserts", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -101,10 +101,10 @@ func TestIgnoredStreams(t *testing.T) {
 	db.Exec(t, `INSERT INTO <NAME>_b VALUES (2, 'two'), (3, 'three')`)
 	tc.Discover("Discover Tables")
 	require.NoError(t, tc.Capture.EditBinding(0, "disable", true)) // Disable table A
-	tc.Run("Backfill (Without A)", captureSessions)
+	tc.Run("Backfill (Without A)", -1)
 	db.Exec(t, `INSERT INTO <NAME>_a VALUES (4, 'four')`)
 	db.Exec(t, `INSERT INTO <NAME>_b VALUES (5, 'five')`)
-	tc.Run("Replication (Without A)", captureSessions)
+	tc.Run("Replication (Without A)", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -122,19 +122,19 @@ func TestMultipleStreams(t *testing.T) {
 	// Bindings sorted alphabetically: 0=A, 1=B, 2=C
 	require.NoError(t, tc.Capture.EditBinding(1, "disable", true)) // Disable B
 	require.NoError(t, tc.Capture.EditBinding(2, "disable", true)) // Disable C
-	tc.Run("Backfill (Only A)", captureSessions)
+	tc.Run("Backfill (Only A)", -1)
 	require.NoError(t, tc.Capture.EditBinding(1, "disable", false)) // Enable B
 	require.NoError(t, tc.Capture.EditBinding(2, "disable", false)) // Enable C
 	tc.Run("Backfill (Add B+C)", -1)                                // -1 to ensure all backfills finish
 	require.NoError(t, tc.Capture.EditBinding(1, "disable", true))  // Disable B
-	tc.Run("No-op Capture (Removed B)", captureSessions)
+	tc.Run("No-op Capture (Removed B)", -1)
 	db.Exec(t, `INSERT INTO <NAME>_a VALUES (6, 'six')`)
 	db.Exec(t, `INSERT INTO <NAME>_b VALUES (7, 'seven')`)
 	db.Exec(t, `INSERT INTO <NAME>_c VALUES (8, 'eight')`)
-	tc.Run("Replication (A+C only)", captureSessions)
+	tc.Run("Replication (A+C only)", -1)
 	require.NoError(t, tc.Capture.EditBinding(1, "disable", false)) // Enable B
 	db.Exec(t, `INSERT INTO <NAME>_a VALUES (9, 'nine')`)
-	tc.Run("Backfill B (Re-enabled) and Replicate A Changes", captureSessions)
+	tc.Run("Backfill B (Re-enabled) and Replicate A Changes", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -149,7 +149,7 @@ func TestMissingTable(t *testing.T) {
 	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	tc.Discover("Discover Tables")
 	db.Exec(t, `DROP TABLE <NAME>_b`)
-	tc.Run("Capture", captureSessions)
+	tc.Run("Capture", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -163,7 +163,7 @@ func TestDuplicatedScanKey(t *testing.T) {
 	tc.Discover("Discover Tables")
 	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
 	require.NoError(t, tc.Capture.EditCollection(db.Expand(`<ID>`), "key", []string{"/id"}))
-	tc.Run("Capture", captureSessions)
+	tc.Run("Capture", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -174,9 +174,9 @@ func TestReplicationOnly(t *testing.T) {
 	tc.Discover("Discover Tables")
 	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
 	require.NoError(t, tc.Capture.EditBinding(0, "resource.mode", string(sqlcapture.BackfillModeOnlyChanges)))
-	tc.Run("Backfill (no documents expected)", captureSessions)
+	tc.Run("Backfill (no documents expected)", -1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (5, 'five'), (6, 'six'), (7, 'seven'), (8, 'eight')`)
-	tc.Run("Replication", captureSessions)
+	tc.Run("Replication", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -193,9 +193,9 @@ func TestKeylessCapture(t *testing.T) {
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one'), (2, 'two')`)
 	tc.Discover("Discover Tables")
 	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
-	tc.Run("Backfill", captureSessions)
+	tc.Run("Backfill", -1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three'), (4, 'four')`)
-	tc.Run("Replication", captureSessions)
+	tc.Run("Replication", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -210,9 +210,9 @@ func TestCatalogPrimaryKey(t *testing.T) {
 	require.NoError(t, tc.Capture.EditBinding(0, "resource.mode", string(sqlcapture.BackfillModeAutomatic)))
 	require.NoError(t, tc.Capture.EditBinding(0, "resource.primary_key", []string{"id"}))
 	require.NoError(t, tc.Capture.EditCollection(db.Expand("<ID>"), "key", []string{"/id"}))
-	tc.Run("Backfill", captureSessions)
+	tc.Run("Backfill", -1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'carol', 300), (4, 'dave', 400)`)
-	tc.Run("Replication", captureSessions)
+	tc.Run("Replication", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -228,8 +228,8 @@ func TestPrimaryKeyOverride(t *testing.T) {
 	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
 	require.NoError(t, tc.Capture.EditBinding(0, "resource.primary_key", []string{"name"}))
 	require.NoError(t, tc.Capture.EditCollection(db.Expand("<ID>"), "key", []string{"/name"}))
-	tc.Run("Backfill", captureSessions)
+	tc.Run("Backfill", -1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'bob', 300), (4, 'dave', 400)`)
-	tc.Run("Replication", captureSessions)
+	tc.Run("Replication", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
