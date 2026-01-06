@@ -1,10 +1,11 @@
-import estuary_cdk.pydantic_polyfill  # Must be first.
-import estuary_cdk.requests_session_send_patch # Must be second.
-
 import asyncio
-from estuary_cdk import shim_airbyte_cdk, flow
-from source_google_ads import SourceGoogleAds
 import json
+
+import estuary_cdk.pydantic_polyfill  # Must be first.
+import estuary_cdk.requests_session_send_patch  # Must be second.
+from estuary_cdk import flow, shim_airbyte_cdk
+
+from source_google_ads import SourceGoogleAds
 
 
 def wrap_with_braces(body: str, count: int):
