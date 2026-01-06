@@ -1,11 +1,10 @@
----
-$schema: "http://json-schema.org/draft-07/schema#"
+$schema: http://json-schema.org/draft-07/schema#
 type: object
 required:
-  - segments.date
-  - ad_group.id
-  - geographic_view.country_criterion_id
-  - customer.descriptive_name
+- segments.date
+- ad_group.id
+- geographic_view.country_criterion_id
+- customer.descriptive_name
 properties:
   customer.descriptive_name:
     type: string
@@ -13,16 +12,16 @@ properties:
     type: integer
   geographic_view.location_type:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
     enum:
-      - AREA_OF_INTEREST
-      - LOCATION_OF_PRESENCE
-      - UNKNOWN
-      - UNSPECIFIED
+    - AREA_OF_INTEREST
+    - LOCATION_OF_PRESENCE
+    - UNKNOWN
+    - UNSPECIFIED
   ad_group.id:
     type:
-      - integer
+    - integer
   segments.date:
     type: string
     format: date
@@ -32,5 +31,5 @@ properties:
       row_id:
         type: integer
     required:
-      - row_id
+    - row_id
 x-infer-schema: true
