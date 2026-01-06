@@ -1,22 +1,284 @@
-# ================================
-# Collection "acmeCo/test/test/unpairedsurrogatesinjson_208860": 14 Documents
-# ================================
-{"$defs":{"TestUnpairedsurrogatesinjson_208860":{"type":"object","required":["data","id"],"$anchor":"TestUnpairedsurrogatesinjson_208860","properties":{"data":{"description":"(source type: json)"},"id":{"type":"integer","description":"(source type: non-nullable int4)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestUnpairedsurrogatesinjson_208860","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestUnpairedsurrogatesinjson_208860"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"unpairedsurrogatesinjson_208860","loc":[11111111,11111111,11111111]}},"data":{"text":"normal"},"id":100}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"unpairedsurrogatesinjson_208860","loc":[11111111,11111111,11111111]}},"data":{"text":"\uFFFD\u200b\uFFFD"},"id":101}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"unpairedsurrogatesinjson_208860","loc":[11111111,11111111,11111111]}},"data":{"text":"\uFFFD"},"id":102}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"unpairedsurrogatesinjson_208860","loc":[11111111,11111111,11111111]}},"data":{"\uFFFD":"\ud83d\udE14"},"id":103}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"unpairedsurrogatesinjson_208860","loc":[11111111,11111111,11111111]}},"data":{"text":"foo \uFFFD bar \uFFFD baz"},"id":104}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"unpairedsurrogatesinjson_208860","loc":[11111111,11111111,11111111]}},"data":[{"type":"text","text":"foo \"bar\\udfs\" /baz"}],"id":105}
-{"$defs":{"TestUnpairedsurrogatesinjson_208860":{"type":"object","required":["data","id"],"$anchor":"TestUnpairedsurrogatesinjson_208860","properties":{"data":{"description":"(source type: json)"},"id":{"type":"integer","description":"(source type: non-nullable int4)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestUnpairedsurrogatesinjson_208860","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestUnpairedsurrogatesinjson_208860"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"unpairedsurrogatesinjson_208860","loc":[11111111,11111111,11111111],"txid":111111}},"data":{"text":"normal"},"id":200}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"unpairedsurrogatesinjson_208860","loc":[11111111,11111111,11111111],"txid":111111}},"data":{"text":"\uFFFD\u200b\uFFFD"},"id":201}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"unpairedsurrogatesinjson_208860","loc":[11111111,11111111,11111111],"txid":111111}},"data":{"text":"\uFFFD"},"id":202}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"unpairedsurrogatesinjson_208860","loc":[11111111,11111111,11111111],"txid":111111}},"data":{"\uFFFD":"\ud83d\udE14"},"id":203}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"unpairedsurrogatesinjson_208860","loc":[11111111,11111111,11111111],"txid":111111}},"data":{"text":"foo \uFFFD bar \uFFFD baz"},"id":204}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"unpairedsurrogatesinjson_208860","loc":[11111111,11111111,11111111],"txid":111111}},"data":[{"type":"text","text":"foo \"bar\\udfs\" /baz"}],"id":205}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Funpairedsurrogatesinjson_208860":{"backfilled":6,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
+sql> CREATE TABLE test.unpairedsurrogatesinjson_208860 (id INTEGER PRIMARY KEY, data JSON)
+sql> INSERT INTO test.unpairedsurrogatesinjson_208860 VALUES (100, '{"text": "normal"}')
+sql> INSERT INTO test.unpairedsurrogatesinjson_208860 VALUES (101, '{"text": "\ud83d\u200b\ude14"}')
+sql> INSERT INTO test.unpairedsurrogatesinjson_208860 VALUES (102, '{"text": "\uDeAd"}')
+sql> INSERT INTO test.unpairedsurrogatesinjson_208860 VALUES (103, '{"\uDeAd": "\ud83d\udE14"}')
+sql> INSERT INTO test.unpairedsurrogatesinjson_208860 VALUES (104, '{"text": "foo \uDEAD bar \uDEAD baz"}')
+sql> INSERT INTO test.unpairedsurrogatesinjson_208860 VALUES (105, '[{"type":"text","text":"foo \"bar\\udfs\" /baz"}]')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/unpairedsurrogatesinjson_208860
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/unpairedsurrogatesinjson_208860",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "unpairedsurrogatesinjson_208860"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "text": "normal"
+    },
+    "id": 100
+  }
+]
+[
+  "acmeCo/test_capture/test/unpairedsurrogatesinjson_208860",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "unpairedsurrogatesinjson_208860"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "text": "�​�"
+    },
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/unpairedsurrogatesinjson_208860",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "unpairedsurrogatesinjson_208860"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "text": "�"
+    },
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/unpairedsurrogatesinjson_208860",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "unpairedsurrogatesinjson_208860"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "�": "😔"
+    },
+    "id": 103
+  }
+]
+[
+  "acmeCo/test_capture/test/unpairedsurrogatesinjson_208860",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "unpairedsurrogatesinjson_208860"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "text": "foo � bar � baz"
+    },
+    "id": 104
+  }
+]
+[
+  "acmeCo/test_capture/test/unpairedsurrogatesinjson_208860",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "unpairedsurrogatesinjson_208860"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": [
+      {
+        "text": "foo \"bar\\udfs\" /baz",
+        "type": "text"
+      }
+    ],
+    "id": 105
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Funpairedsurrogatesinjson_208860": {
+      "backfilled": 6,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.unpairedsurrogatesinjson_208860 VALUES (200, '{"text": "normal"}')
+sql> INSERT INTO test.unpairedsurrogatesinjson_208860 VALUES (201, '{"text": "\ud83d\u200b\ude14"}')
+sql> INSERT INTO test.unpairedsurrogatesinjson_208860 VALUES (202, '{"text": "\uDeAd"}')
+sql> INSERT INTO test.unpairedsurrogatesinjson_208860 VALUES (203, '{"\uDeAd": "\ud83d\udE14"}')
+sql> INSERT INTO test.unpairedsurrogatesinjson_208860 VALUES (204, '{"text": "foo \uDEAD bar \uDEAD baz"}')
+sql> INSERT INTO test.unpairedsurrogatesinjson_208860 VALUES (205, '[{"type":"text","text":"foo \"bar\\udfs\" /baz"}]')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/unpairedsurrogatesinjson_208860",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "unpairedsurrogatesinjson_208860",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "text": "normal"
+    },
+    "id": 200
+  }
+]
+[
+  "acmeCo/test_capture/test/unpairedsurrogatesinjson_208860",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "unpairedsurrogatesinjson_208860",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "text": "�​�"
+    },
+    "id": 201
+  }
+]
+[
+  "acmeCo/test_capture/test/unpairedsurrogatesinjson_208860",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "unpairedsurrogatesinjson_208860",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "text": "�"
+    },
+    "id": 202
+  }
+]
+[
+  "acmeCo/test_capture/test/unpairedsurrogatesinjson_208860",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "unpairedsurrogatesinjson_208860",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "�": "😔"
+    },
+    "id": 203
+  }
+]
+[
+  "acmeCo/test_capture/test/unpairedsurrogatesinjson_208860",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "unpairedsurrogatesinjson_208860",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "text": "foo � bar � baz"
+    },
+    "id": 204
+  }
+]
+[
+  "acmeCo/test_capture/test/unpairedsurrogatesinjson_208860",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "unpairedsurrogatesinjson_208860",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": [
+      {
+        "text": "foo \"bar\\udfs\" /baz",
+        "type": "text"
+      }
+    ],
+    "id": 205
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Funpairedsurrogatesinjson_208860": {
+      "backfilled": 6,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
 

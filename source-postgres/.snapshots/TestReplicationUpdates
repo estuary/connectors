@@ -1,0 +1,177 @@
+sql> CREATE TABLE test.replicationupdates_843686 (id INTEGER PRIMARY KEY, data VARCHAR(2000))
+sql> INSERT INTO test.replicationupdates_843686 VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/replicationupdates_843686
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/replicationupdates_843686",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "replicationupdates_843686"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "A",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/replicationupdates_843686",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "replicationupdates_843686"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "bbb",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/replicationupdates_843686",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "replicationupdates_843686"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "CDEFGH",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Freplicationupdates_843686": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.replicationupdates_843686 VALUES (1002, 'some'), (1000, 'more'), (1001, 'rows')
+sql> UPDATE test.replicationupdates_843686 SET data = 'updated' WHERE id = 1
+sql> UPDATE test.replicationupdates_843686 SET data = 'updated' WHERE id = 1002
+=== Run: Replication Updates ===
+[
+  "acmeCo/test_capture/test/replicationupdates_843686",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "replicationupdates_843686",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "updated",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/replicationupdates_843686",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "replicationupdates_843686",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "more",
+    "id": 1000
+  }
+]
+[
+  "acmeCo/test_capture/test/replicationupdates_843686",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "replicationupdates_843686",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "rows",
+    "id": 1001
+  }
+]
+[
+  "acmeCo/test_capture/test/replicationupdates_843686",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "replicationupdates_843686",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "some",
+    "id": 1002
+  }
+]
+[
+  "acmeCo/test_capture/test/replicationupdates_843686",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "replicationupdates_843686",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "updated",
+    "id": 1002
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Freplicationupdates_843686": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

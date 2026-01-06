@@ -1,0 +1,183 @@
+sql> CREATE TABLE test.binarytypes_537491 (
+		id INTEGER PRIMARY KEY,
+		a_bool BOOLEAN,
+		a_bytea BYTEA,
+		a_bit BIT,
+		a_bit3 BIT(3),
+		a_varbit BIT VARYING,
+		a_varbit5 BIT VARYING(5)
+	)
+sql> INSERT INTO test.binarytypes_537491 VALUES
+		(1, true, '\xDEADBEEF', B'1', B'101', B'1101', B'10111'),
+		(2, false, '\xCAFEBABE', B'0', B'010', B'0010', B'01000'),
+		(3, NULL, NULL, NULL, NULL, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/test/binarytypes_537491
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/binarytypes_537491",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "binarytypes_537491"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bit": "1",
+    "a_bit3": "101",
+    "a_bool": true,
+    "a_bytea": "3q2+7w==",
+    "a_varbit": "1101",
+    "a_varbit5": "10111",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/binarytypes_537491",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "binarytypes_537491"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bit": "0",
+    "a_bit3": "010",
+    "a_bool": false,
+    "a_bytea": "yv66vg==",
+    "a_varbit": "0010",
+    "a_varbit5": "01000",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/binarytypes_537491",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "binarytypes_537491"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bit": null,
+    "a_bit3": null,
+    "a_bool": null,
+    "a_bytea": null,
+    "a_varbit": null,
+    "a_varbit5": null,
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fbinarytypes_537491": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.binarytypes_537491 VALUES
+		(101, true, '\xDEADBEEF', B'1', B'101', B'1101', B'10111'),
+		(102, false, '\xCAFEBABE', B'0', B'010', B'0010', B'01000'),
+		(103, NULL, NULL, NULL, NULL, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/binarytypes_537491",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "binarytypes_537491",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bit": "1",
+    "a_bit3": "101",
+    "a_bool": true,
+    "a_bytea": "3q2+7w==",
+    "a_varbit": "1101",
+    "a_varbit5": "10111",
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/binarytypes_537491",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "binarytypes_537491",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bit": "0",
+    "a_bit3": "010",
+    "a_bool": false,
+    "a_bytea": "yv66vg==",
+    "a_varbit": "0010",
+    "a_varbit5": "01000",
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/binarytypes_537491",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "binarytypes_537491",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bit": null,
+    "a_bit3": null,
+    "a_bool": null,
+    "a_bytea": null,
+    "a_varbit": null,
+    "a_varbit5": null,
+    "id": 103
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fbinarytypes_537491": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

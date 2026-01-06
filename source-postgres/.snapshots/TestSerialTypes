@@ -1,0 +1,162 @@
+sql> CREATE TABLE test.serialtypes_770030 (
+		id INTEGER PRIMARY KEY,
+		a_serial SERIAL,
+		a_smallserial SMALLSERIAL,
+		a_bigserial BIGSERIAL
+	)
+sql> INSERT INTO test.serialtypes_770030 VALUES
+		(1, 100, 200, 300),
+		(2, 101, 201, 301),
+		(3, 102, 202, 302)
+=== Discover: Discover ===
+acmeCo/test_capture/test/serialtypes_770030
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/serialtypes_770030",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "serialtypes_770030"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigserial": 300,
+    "a_serial": 100,
+    "a_smallserial": 200,
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/serialtypes_770030",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "serialtypes_770030"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigserial": 301,
+    "a_serial": 101,
+    "a_smallserial": 201,
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/serialtypes_770030",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "serialtypes_770030"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigserial": 302,
+    "a_serial": 102,
+    "a_smallserial": 202,
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fserialtypes_770030": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.serialtypes_770030 VALUES
+		(101, 1000, 2000, 3000),
+		(102, 1001, 2001, 3001),
+		(103, 1002, 2002, 3002)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/serialtypes_770030",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "serialtypes_770030",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigserial": 3000,
+    "a_serial": 1000,
+    "a_smallserial": 2000,
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/serialtypes_770030",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "serialtypes_770030",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigserial": 3001,
+    "a_serial": 1001,
+    "a_smallserial": 2001,
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/serialtypes_770030",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "serialtypes_770030",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigserial": 3002,
+    "a_serial": 1002,
+    "a_smallserial": 2002,
+    "id": 103
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fserialtypes_770030": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

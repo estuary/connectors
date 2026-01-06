@@ -1,23 +1,245 @@
-# ================================
-# Collection "acmeCo/test/test/droppedandrecreatedtable_37815596": 15 Documents
-# ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111]}},"data":"zero","id":0}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111]}},"data":"one","id":1}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111]}},"data":"two","id":2}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111],"txid":111111}},"data":"three","id":3}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111],"txid":111111}},"data":"four","id":4}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111],"txid":111111}},"data":"five","id":5}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111],"txid":111111}},"data":"zero","id":0}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111],"txid":111111}},"data":"one","id":1}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111],"txid":111111}},"data":"two","id":2}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111],"txid":111111}},"data":"six","id":6}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111],"txid":111111}},"data":"seven","id":7}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111],"txid":111111}},"data":"eight","id":8}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111],"txid":111111}},"data":"nine","id":9}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111],"txid":111111}},"data":"ten","id":10}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"droppedandrecreatedtable_37815596","loc":[11111111,11111111,11111111],"txid":111111}},"data":"eleven","id":11}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fdroppedandrecreatedtable_37815596":{"backfilled":3,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
+sql> CREATE TABLE test.droppedandrecreatedtable_728084 (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/droppedandrecreatedtable_728084
+sql> INSERT INTO test.droppedandrecreatedtable_728084 VALUES (0, 'zero'), (1, 'one')
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "droppedandrecreatedtable_728084"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "droppedandrecreatedtable_728084"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fdroppedandrecreatedtable_728084": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.droppedandrecreatedtable_728084 VALUES (2, 'two'), (3, 'three')
+=== Run: Some Replication ===
+[
+  "acmeCo/test_capture/test/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "droppedandrecreatedtable_728084",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "droppedandrecreatedtable_728084",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fdroppedandrecreatedtable_728084": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> DROP TABLE test.droppedandrecreatedtable_728084
+sql> CREATE TABLE test.droppedandrecreatedtable_728084 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO test.droppedandrecreatedtable_728084 VALUES (0, 'zero'), (1, 'one')
+sql> INSERT INTO test.droppedandrecreatedtable_728084 VALUES (4, 'four'), (5, 'five')
+=== Run: Dropped and Recreated ===
+[
+  "acmeCo/test_capture/test/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "droppedandrecreatedtable_728084",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "droppedandrecreatedtable_728084",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "droppedandrecreatedtable_728084",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "droppedandrecreatedtable_728084",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "id": 5
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fdroppedandrecreatedtable_728084": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.droppedandrecreatedtable_728084 VALUES (6, 'six'), (7, 'seven')
+=== Run: More Replication ===
+[
+  "acmeCo/test_capture/test/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "droppedandrecreatedtable_728084",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "six",
+    "id": 6
+  }
+]
+[
+  "acmeCo/test_capture/test/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "droppedandrecreatedtable_728084",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "seven",
+    "id": 7
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fdroppedandrecreatedtable_728084": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
 

@@ -1,238 +1,291 @@
-####################################
-### Capture from Start
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 2","key":"-1.1"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":1,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUSsd4BODg6AAABAP8CAP8A/0AA/wD/AQD/AQPoAAA="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUSsd4BODg6AAABAP8CAP8A/0AA/wD/AQD/AQPoAAA="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 1","key":"-1"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":2,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUSsd4BODoAAAEA/wEA/wD/QAD/AP8A/wD/AQAA"}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUSsd4BODoAAAEA/wEA/wD/QAD/AP8A/wD/AQAA"
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 0","key":"-0.9"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":3,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUSsd8BMDoAAAEA/wH//0AA/wD/ASMoAAA="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUSsd8BMDoAAAEA/wH//0AA/wD/ASMoAAA="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 3","key":"0"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":4,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUUAQAAAQD/AP///wD/AP8A/wD/AAA="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUUAQAAAQD/AP///wD/AP8A/wD/AAA="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 4","key":"0.9"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":5,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUWTiABOQAAAQD/Af//AP8A/wD/ASMoAAA="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUWTiABOQAAAQD/Af//AP8A/wD/ASMoAAA="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 5","key":"1"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":6,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUWTiEBMQAAAQD/AQD/AP8A/wD/AP8A/wD/AQAA"}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUWTiEBMQAAAQD/AQD/AP8A/wD/AP8A/wD/AQAA"
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 6","key":"1.111"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":7,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUWTiEBMTExMQAAAQD/AgD/AP8A/wD/AP8DAP8BBFYAAA=="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUWTiEBMTExMQAAAQD/AgD/AP8A/wD/AP8DAP8BBFYAAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 7","key":"1.222"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":8,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUWTiEBMTIyMgAAAQD/AgD/AP8A/wD/AP8DAP8BCKwAAA=="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUWTiEBMTIyMgAAAQD/AgD/AP8A/wD/AP8DAP8BCKwAAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 8","key":"1.333"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":9,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUWTiEBMTMzMwAAAQD/AgD/AP8A/wD/AP8DAP8BDQIAAA=="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUWTiEBMTMzMwAAAQD/AgD/AP8A/wD/AP8DAP8BDQIAAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 9","key":"1.444"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":10,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUWTiEBMTQ0NAAAAQD/AgD/AP8A/wD/AP8DAP8BEVgAAA=="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUWTiEBMTQ0NAAAAQD/AgD/AP8A/wD/AP8DAP8BEVgAAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 10","key":"1.555"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":11,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUWTiEBMTU1NQAAAQD/AgD/AP8A/wD/AP8DAP8BFa4AAA=="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUWTiEBMTU1NQAAAQD/AgD/AP8A/wD/AP8DAP8BFa4AAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 11","key":"1.666"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":12,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUWTiEBMTY2NgAAAQD/AgD/AP8A/wD/AP8DAP8BGgQAAA=="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUWTiEBMTY2NgAAAQD/AgD/AP8A/wD/AP8DAP8BGgQAAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 12","key":"1.777"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":13,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUWTiEBMTc3NwAAAQD/AgD/AP8A/wD/AP8DAP8BHloAAA=="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUWTiEBMTc3NwAAAQD/AgD/AP8A/wD/AP8DAP8BHloAAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 13","key":"1.888"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":14,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUWTiEBMTg4OAAAAQD/AgD/AP8A/wD/AP8DAP8BIrAAAA=="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUWTiEBMTg4OAAAAQD/AgD/AP8A/wD/AP8DAP8BIrAAAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 14","key":"1.999"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":15,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUWTiEBMTk5OQAAAQD/AgD/AP8A/wD/AP8DAP8BJwYAAA=="}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUWTiEBMTk5OQAAAQD/AgD/AP8A/wD/AP8DAP8BJwYAAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 2 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"scankeytypes_decimal_28040009","loc":[11111111,11111111,11111111]}},"data":"Data 15","key":"2"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":16,"key_columns":["key"],"mode":"Backfill","scanned":"BQJOAAUWTiEBMgAAAQD/AQD/AP8A/wD/AP8A/wD/AgAA"}},"cursor":"0/1111111"}
-
-
-####################################
-### Capture from Key "BQJOAAUWTiEBMgAAAQD/AQD/AP8A/wD/AP8A/wD/AgAA"
-####################################
-# ================================
-# Collection "acmeCo/test/test/scankeytypes_decimal_28040009": 1 Documents
-# ================================
-{"$defs":{"TestScankeytypes_decimal_28040009":{"type":"object","required":["data","key"],"$anchor":"TestScankeytypes_decimal_28040009","properties":{"data":{"description":"(source type: text)","type":["string"]},"key":{"type":"string","format":"number","description":"(source type: non-nullable numeric)"}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#TestScankeytypes_decimal_28040009","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-postgres/postgres-source","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"loc":{"items":{"type":"integer"},"type":"array","maxItems":3,"minItems":3,"description":"Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"},"txid":{"type":"integer","description":"The 32-bit transaction ID assigned by Postgres to the commit which produced this change."}},"additionalProperties":false,"type":"object","required":["schema","table","loc"]}}}}},{"$ref":"#TestScankeytypes_decimal_28040009"}],"unevaluatedProperties":false,"x-infer-schema":true}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fscankeytypes_decimal_28040009":{"backfilled":16,"key_columns":["key"],"mode":"Active"}},"cursor":"0/1111111"}
-
-
+sql> CREATE TABLE test.scankeytypes_decimal_173455 (key DECIMAL PRIMARY KEY, data TEXT)
+sql> INSERT INTO test.scankeytypes_decimal_173455 VALUES (-0.9, 'Data 0'), (-1.0, 'Data 1'), (-1.1, 'Data 2'), (0.0, 'Data 3'), (0.9, 'Data 4'), (1.0, 'Data 5'), (1.111, 'Data 6'), (1.222, 'Data 7'), (1.333, 'Data 8'), (1.444, 'Data 9'), (1.555, 'Data 10'), (1.666, 'Data 11'), (1.777, 'Data 12'), (1.888, 'Data 13'), (1.999, 'Data 14'), (2.000, 'Data 15')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/scankeytypes_decimal_173455
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 2",
+    "key": "-1.1"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 1",
+    "key": "-1.0"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 0",
+    "key": "-0.9"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 3",
+    "key": "0"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 4",
+    "key": "0.9"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 5",
+    "key": "1.0"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 6",
+    "key": "1.111"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 7",
+    "key": "1.222"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 8",
+    "key": "1.333"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 9",
+    "key": "1.444"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 10",
+    "key": "1.555"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 11",
+    "key": "1.666"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 12",
+    "key": "1.777"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 13",
+    "key": "1.888"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 14",
+    "key": "1.999"
+  }
+]
+[
+  "acmeCo/test_capture/test/scankeytypes_decimal_173455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "scankeytypes_decimal_173455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Data 15",
+    "key": "2.000"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fscankeytypes_decimal_173455": {
+      "backfilled": 16,
+      "key_columns": [
+        "key"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
 

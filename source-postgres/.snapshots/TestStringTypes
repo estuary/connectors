@@ -1,0 +1,223 @@
+sql> CREATE TABLE test.stringtypes_339419 (
+		id INTEGER PRIMARY KEY,
+		a_varchar VARCHAR(100),
+		a_varchar_unbound VARCHAR,
+		a_char CHAR(10),
+		a_char1 CHAR,
+		a_text TEXT
+	)
+sql> INSERT INTO test.stringtypes_339419 VALUES
+		(1, 'hello', 'world', 'fixed', 'X', 'some text here'),
+		(2, '', '', '          ', ' ', ''),
+		(3, 'special: "quotes" and ''apostrophes''', 'tabs	and
+newlines', 'unicode: ñ', '✓', 'emoji: 🎉'),
+		(4, NULL, NULL, NULL, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/test/stringtypes_339419
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/stringtypes_339419",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "stringtypes_339419"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_char": "fixed     ",
+    "a_char1": "X",
+    "a_text": "some text here",
+    "a_varchar": "hello",
+    "a_varchar_unbound": "world",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/stringtypes_339419",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "stringtypes_339419"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_char": "          ",
+    "a_char1": " ",
+    "a_text": "",
+    "a_varchar": "",
+    "a_varchar_unbound": "",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/stringtypes_339419",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "stringtypes_339419"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_char": "unicode: ñ",
+    "a_char1": "✓",
+    "a_text": "emoji: 🎉",
+    "a_varchar": "special: \"quotes\" and 'apostrophes'",
+    "a_varchar_unbound": "tabs\tand\nnewlines",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/stringtypes_339419",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "stringtypes_339419"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_char": null,
+    "a_char1": null,
+    "a_text": null,
+    "a_varchar": null,
+    "a_varchar_unbound": null,
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fstringtypes_339419": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.stringtypes_339419 VALUES
+		(101, 'hello', 'world', 'fixed', 'X', 'some text here'),
+		(102, '', '', '          ', ' ', ''),
+		(103, 'special: "quotes" and ''apostrophes''', 'tabs	and
+newlines', 'unicode: ñ', '✓', 'emoji: 🎉'),
+		(104, NULL, NULL, NULL, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/stringtypes_339419",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "stringtypes_339419",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_char": "fixed     ",
+    "a_char1": "X",
+    "a_text": "some text here",
+    "a_varchar": "hello",
+    "a_varchar_unbound": "world",
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/stringtypes_339419",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "stringtypes_339419",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_char": "          ",
+    "a_char1": " ",
+    "a_text": "",
+    "a_varchar": "",
+    "a_varchar_unbound": "",
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/stringtypes_339419",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "stringtypes_339419",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_char": "unicode: ñ",
+    "a_char1": "✓",
+    "a_text": "emoji: 🎉",
+    "a_varchar": "special: \"quotes\" and 'apostrophes'",
+    "a_varchar_unbound": "tabs\tand\nnewlines",
+    "id": 103
+  }
+]
+[
+  "acmeCo/test_capture/test/stringtypes_339419",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "stringtypes_339419",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_char": null,
+    "a_char1": null,
+    "a_text": null,
+    "a_varchar": null,
+    "a_varchar_unbound": null,
+    "id": 104
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fstringtypes_339419": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

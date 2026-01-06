@@ -1,0 +1,272 @@
+sql> CREATE TABLE test.floatingpointtypes_774548 (
+		id INTEGER PRIMARY KEY,
+		a_real REAL,
+		a_double DOUBLE PRECISION
+	)
+sql> INSERT INTO test.floatingpointtypes_774548 VALUES
+		(1, 123.456, 123.456789012345),
+		(2, -123.456, -123.456789012345),
+		(3, 'NaN', 'NaN'),
+		(4, 'Infinity', 'Infinity'),
+		(5, '-Infinity', '-Infinity'),
+		(6, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/test/floatingpointtypes_774548
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/floatingpointtypes_774548",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "floatingpointtypes_774548"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_double": 123.456789012345,
+    "a_real": 123.456,
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/floatingpointtypes_774548",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "floatingpointtypes_774548"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_double": -123.456789012345,
+    "a_real": -123.456,
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/floatingpointtypes_774548",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "floatingpointtypes_774548"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_double": "NaN",
+    "a_real": "NaN",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/floatingpointtypes_774548",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "floatingpointtypes_774548"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_double": "Infinity",
+    "a_real": "Infinity",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/floatingpointtypes_774548",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "floatingpointtypes_774548"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_double": "-Infinity",
+    "a_real": "-Infinity",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/test/floatingpointtypes_774548",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "floatingpointtypes_774548"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_double": null,
+    "a_real": null,
+    "id": 6
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Ffloatingpointtypes_774548": {
+      "backfilled": 6,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.floatingpointtypes_774548 VALUES
+		(101, 123.456, 123.456789012345),
+		(102, -123.456, -123.456789012345),
+		(103, 'NaN', 'NaN'),
+		(104, 'Infinity', 'Infinity'),
+		(105, '-Infinity', '-Infinity'),
+		(106, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/floatingpointtypes_774548",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "floatingpointtypes_774548",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_double": 123.456789012345,
+    "a_real": 123.456,
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/floatingpointtypes_774548",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "floatingpointtypes_774548",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_double": -123.456789012345,
+    "a_real": -123.456,
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/floatingpointtypes_774548",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "floatingpointtypes_774548",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_double": "NaN",
+    "a_real": "NaN",
+    "id": 103
+  }
+]
+[
+  "acmeCo/test_capture/test/floatingpointtypes_774548",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "floatingpointtypes_774548",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_double": "Infinity",
+    "a_real": "Infinity",
+    "id": 104
+  }
+]
+[
+  "acmeCo/test_capture/test/floatingpointtypes_774548",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "floatingpointtypes_774548",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_double": "-Infinity",
+    "a_real": "-Infinity",
+    "id": 105
+  }
+]
+[
+  "acmeCo/test_capture/test/floatingpointtypes_774548",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "floatingpointtypes_774548",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_double": null,
+    "a_real": null,
+    "id": 106
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Ffloatingpointtypes_774548": {
+      "backfilled": 6,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
