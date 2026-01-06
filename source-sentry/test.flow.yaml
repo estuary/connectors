@@ -1,33 +1,32 @@
----
 import:
-  - acmeCo/flow.yaml
+- acmeCo/flow.yaml
 captures:
   acmeCo/source-sentry:
     endpoint:
       local:
         command:
-          - python
-          - "-m"
-          - source_sentry
+        - python
+        - -m
+        - source_sentry
         config: config.yaml
     bindings:
-      - resource:
-          name: Environments
-          interval: PT5M
-        target: acmeCo/Environments
-      - resource:
-          name: Projects
-          interval: PT5M
-        target: acmeCo/Projects
-      - resource:
-          name: Teams
-          interval: PT5M
-        target: acmeCo/Teams
-      - resource:
-          name: Releases
-          interval: PT5M
-        target: acmeCo/Releases
-      - resource:
-          name: Issues
-          interval: PT5M
-        target: acmeCo/Issues
+    - resource:
+        name: Environments
+        interval: PT5M
+      target: acmeCo/Environments
+    - resource:
+        name: Projects
+        interval: PT5M
+      target: acmeCo/Projects
+    - resource:
+        name: Teams
+        interval: PT5M
+      target: acmeCo/Teams
+    - resource:
+        name: Releases
+        interval: PT5M
+      target: acmeCo/Releases
+    - resource:
+        name: Issues
+        interval: PT5M
+      target: acmeCo/Issues

@@ -1,77 +1,76 @@
----
-$schema: "http://json-schema.org/draft-07/schema#"
+$schema: http://json-schema.org/draft-07/schema#
 type: object
 required:
-  - click_view.gclid
-  - segments.date
-  - segments.ad_network_type
+- click_view.gclid
+- segments.date
+- segments.ad_network_type
 properties:
   ad_group.name:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   click_view.gclid:
     type:
-      - string
+    - string
   click_view.ad_group_ad:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   click_view.keyword:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   click_view.keyword_info.match_type:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   click_view.keyword_info.text:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   campaign.id:
     type:
-      - "null"
-      - integer
+    - 'null'
+    - integer
   ad_group.id:
     type:
-      - "null"
-      - integer
+    - 'null'
+    - integer
   segments.date:
     type:
-      - string
+    - string
   customer.id:
     type:
-      - "null"
-      - integer
+    - 'null'
+    - integer
   campaign.name:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   segments.ad_network_type:
     type:
-      - string
+    - string
   campaign.network_settings.target_content_network:
     type:
-      - "null"
-      - boolean
+    - 'null'
+    - boolean
   campaign.network_settings.target_google_search:
     type:
-      - "null"
-      - boolean
+    - 'null'
+    - boolean
   campaign.network_settings.target_partner_search_network:
     type:
-      - "null"
-      - boolean
+    - 'null'
+    - boolean
   campaign.network_settings.target_search_network:
     type:
-      - "null"
-      - boolean
+    - 'null'
+    - boolean
   _meta:
     type: object
     properties:
       row_id:
         type: integer
     required:
-      - row_id
+    - row_id
 x-infer-schema: true
