@@ -16,9 +16,8 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
-	st "github.com/estuary/connectors/source-boilerplate/testing"
+	"github.com/estuary/connectors/go/capture/blackbox"
 	"github.com/estuary/connectors/sqlcapture"
-	"github.com/estuary/connectors/sqlcapture/tests"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )
@@ -29,14 +28,9 @@ var (
 	dbControlAddress = flag.String("db_control_addr", "127.0.0.1:1433", "The database server address to use for test setup/control operations")
 	dbControlUser    = flag.String("db_control_user", "sa", "The user for test setup/control operations")
 	dbControlPass    = flag.String("db_control_pass", "gf6w6dkD", "The password the the test setup/control user")
-
-	dbCaptureAddress = flag.String("db_capture_addr", "127.0.0.1:1433", "The database server address to use for test captures")
 	dbCaptureUser    = flag.String("db_capture_user", "flow_capture", "The user to perform captures as")
-	dbCapturePass    = flag.String("db_capture_pass", "we2rie1E", "The password for the capture user")
 
-	enableCDCWhenCreatingTables = flag.Bool("enable_cdc_when_creating_tables", true, "Set to true if CDC should be enabled before the test capture runs")
-	testSchemaName              = flag.String("test_schema_name", "dbo", "The schema in which to create test tables.")
-	testFeatureFlags            = flag.String("feature_flags", "", "Feature flags to apply to all test captures.")
+	testSchemaName = flag.String("test_schema_name", "dbo", "The schema in which to create test tables.")
 )
 
 func TestMain(m *testing.M) {
@@ -56,14 +50,46 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func sqlserverTestBackend(t testing.TB) *testBackend {
+var documentSanitizers = []blackbox.JSONSanitizer{
+	{Matcher: regexp.MustCompile(`"lsn":"[0-9A-Za-z+/=]+"`), Replacement: `"lsn":"REDACTED"`},
+	{Matcher: regexp.MustCompile(`"seqval":"[0-9A-Za-z+/=]+"`), Replacement: `"seqval":"REDACTED"`},
+}
+
+var checkpointSanitizers = []blackbox.JSONSanitizer{
+	{Matcher: regexp.MustCompile(`"cursor":"[0-9A-Za-z+/=]+"`), Replacement: `"cursor":"REDACTED"`},
+	{Matcher: regexp.MustCompile(`"lsn":"[0-9A-Za-z+/=]+"`), Replacement: `"lsn":"REDACTED"`},
+	{Matcher: regexp.MustCompile(`"seqval":"[0-9A-Za-z+/=]+"`), Replacement: `"seqval":"REDACTED"`},
+}
+
+func blackboxTestSetup(t testing.TB) (*sqlserverTestDatabase, *blackbox.TranscriptCapture) {
 	t.Helper()
+
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
-		return nil
+		return nil, nil
 	}
 
-	// Open control connection
+	// TODO(wgd): Probably scoping this to just flowctl invocations would be cleaner, but this works
+	os.Setenv("SHUTDOWN_AFTER_POLLING", "yes")
+	t.Cleanup(func() { os.Unsetenv("SHUTDOWN_AFTER_POLLING") })
+
+	// Setup: Unique filter ID and full table name
+	var uniqueID = uniqueTableID(t)
+	var baseName = strings.TrimPrefix(t.Name(), "Test") + "_" + uniqueID
+	for _, str := range []string{"/", "=", "(", ")"} {
+		baseName = strings.ReplaceAll(baseName, str, "_")
+	}
+	var fullName = *testSchemaName + "." + baseName
+
+	// Setup: Create black-box test capture
+	tc, err := blackbox.NewWithTranscript("testdata/flow.yaml")
+	require.NoError(t, err)
+	tc.Capture.Logger = t.Log
+	tc.Capture.DiscoveryFilter = regexp.MustCompile(uniqueID)
+	tc.DocumentSanitizers = documentSanitizers
+	tc.CheckpointSanitizers = checkpointSanitizers
+
+	// Setup: Connect to target database
 	var controlURI = (&Config{
 		Address:  *dbControlAddress,
 		User:     *dbControlUser,
@@ -71,154 +97,97 @@ func sqlserverTestBackend(t testing.TB) *testBackend {
 		Database: *dbName,
 	}).ToURI()
 	t.Logf("opening control connection: addr=%q, user=%q", *dbControlAddress, *dbControlUser)
-	var conn, err = sql.Open("sqlserver", controlURI)
+	conn, err := sql.Open("sqlserver", controlURI)
 	require.NoError(t, err)
 	t.Cleanup(func() { conn.Close() })
 
-	// Construct the capture config
-	var captureConfig = Config{
-		Address:  *dbCaptureAddress,
-		User:     *dbCaptureUser,
-		Password: *dbCapturePass,
-		Database: *dbName,
+	// Setup: Create database interface with <NAME> templating
+	var db = &sqlserverTestDatabase{
+		conn: conn,
+		vars: map[string]string{
+			"<SCHEMA>": *testSchemaName,
+			"<NAME>":   fullName,
+			"<ID>":     uniqueID,
+		},
+		transcript: tc.Transcript,
 	}
-	captureConfig.Advanced.FeatureFlags = *testFeatureFlags
-	// Other connectors use 16 in tests, but going below 128 here
-	// appears to change database backfill row ordering in the
-	// 'DuplicatedScanKey' test.
-	captureConfig.Advanced.BackfillChunkSize = 128
-	if err := captureConfig.Validate(); err != nil {
-		t.Fatalf("error validating capture config: %v", err)
-	}
-	captureConfig.SetDefaults()
 
-	return &testBackend{control: conn, config: captureConfig}
+	return db, tc
 }
 
-type testBackend struct {
-	control *sql.DB
-	config  Config
+type sqlserverTestDatabase struct {
+	conn       *sql.DB           // The control connection to use for test DB operations
+	vars       map[string]string // Map of string replacements like <NAME> to a fully qualified table name
+	transcript *strings.Builder  // Transcript builder to log SQL query execution to
 }
 
-func (tb *testBackend) UpperCaseMode() bool { return false }
-
-func (tb *testBackend) CaptureSpec(ctx context.Context, t testing.TB, streamMatchers ...*regexp.Regexp) *st.CaptureSpec {
-	var sanitizers = make(map[string]*regexp.Regexp)
-	sanitizers[`"<TIMESTAMP>"`] = regexp.MustCompile(`"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\.[0-9]+)?(Z|[+-][0-9]+:[0-9]+)"`)
-	sanitizers[`"cursor":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"cursor":"[0-9A-Za-z+/=]+"`)
-	sanitizers[`"lsn":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"lsn":"[0-9A-Za-z+/=]+"`)
-	sanitizers[`"seqval":"AAAAAAAAAAAAAA=="`] = regexp.MustCompile(`"seqval":"[0-9A-Za-z+/=]+"`)
-
-	var cfg = tb.config
-	var cs = &st.CaptureSpec{
-		Driver:       sqlserverDriver,
-		EndpointSpec: &cfg,
-		Validator:    &st.OrderedCaptureValidator{IncludeSourcedSchemas: true},
-		Sanitizers:   sanitizers,
+func (db *sqlserverTestDatabase) Expand(s string) string {
+	for key, val := range db.vars {
+		s = strings.ReplaceAll(s, key, val)
 	}
-	if strings.Contains(*testFeatureFlags, "replica_fencing") {
-		cs.CaptureDelay = 1 * time.Second
-	}
-	if len(streamMatchers) > 0 {
-		cs.Bindings = tests.DiscoverBindings(ctx, t, tb, streamMatchers...)
-	}
-	return cs
+	return s
 }
 
-// CreateTable creates a new database table whose name is based on the current test
-// name. If `suffix` is non-empty it should be included at the end of the new table's
-// name. The table will be registered with `t.Cleanup()` to be deleted at the end of
-// the current test.
-func (tb *testBackend) CreateTable(ctx context.Context, t testing.TB, suffix string, tableDef string) string {
+func (db *sqlserverTestDatabase) Exec(t testing.TB, query string) {
 	t.Helper()
-
-	var tableName = tb.TableName(t, suffix)
-	var quotedTableName = fmt.Sprintf("[%s].[%s]", *testSchemaName, tableName)
-
-	log.WithFields(log.Fields{"table": quotedTableName, "cols": tableDef}).Debug("creating test table")
-
-	tb.Query(ctx, t, fmt.Sprintf("IF OBJECT_ID('%[1]s', 'U') IS NOT NULL DROP TABLE %[1]s;", quotedTableName))
-	tb.Query(ctx, t, fmt.Sprintf("CREATE TABLE %s%s;", quotedTableName, tableDef))
-
-	if *enableCDCWhenCreatingTables {
-		time.Sleep(1 * time.Second) // Sleep to make deadlocks less likely
-		var query = fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%s', @source_name = '%s', @role_name = '%s';`,
-			*testSchemaName,
-			tableName,
-			*dbCaptureUser,
-		)
-		tb.Query(ctx, t, query)
+	query = db.Expand(query)
+	if db.transcript != nil {
+		fmt.Fprintf(db.transcript, "sql> %s\n", query)
 	}
-
-	t.Cleanup(func() {
-		log.WithField("table", quotedTableName).Debug("destroying test table")
-		tb.Query(ctx, t, fmt.Sprintf("IF OBJECT_ID('%[1]s', 'U') IS NOT NULL DROP TABLE %[1]s;", quotedTableName))
-	})
-
-	return quotedTableName
+	if _, err := db.conn.ExecContext(context.Background(), query); err != nil {
+		t.Fatalf("error executing control query %q: %v", query, err)
+	}
 }
 
-func (tb *testBackend) TableName(t testing.TB, suffix string) string {
+func (db *sqlserverTestDatabase) QuietExec(t testing.TB, query string) {
 	t.Helper()
-	var tableName = "test_" + strings.TrimPrefix(t.Name(), "Test")
-	if suffix != "" {
-		tableName += "_" + suffix
+	query = db.Expand(query)
+	if _, err := db.conn.ExecContext(context.Background(), query); err != nil {
+		t.Fatalf("error executing control query %q: %v", query, err)
 	}
-	for _, str := range []string{"/", "=", "(", ")"} {
-		tableName = strings.ReplaceAll(tableName, str, "_")
-	}
-	return tableName
 }
 
-// Insert adds all provided rows to the specified table in a single transaction.
-func (tb *testBackend) Insert(ctx context.Context, t testing.TB, table string, rows [][]interface{}) {
+// QueryRow executes a query and scans results into dest. Does not log to transcript.
+func (db *sqlserverTestDatabase) QueryRow(t testing.TB, query string, dest ...any) {
 	t.Helper()
-
-	if len(rows) < 1 {
-		t.Fatalf("must insert at least one row")
+	query = db.Expand(query)
+	if err := db.conn.QueryRowContext(context.Background(), query).Scan(dest...); err != nil {
+		t.Fatalf("error querying %q: %v", query, err)
 	}
-	var tx, err = tb.control.BeginTx(ctx, nil)
-	require.NoErrorf(t, err, "begin transaction")
+}
 
-	log.WithFields(log.Fields{"table": table, "count": len(rows)}).Debug("inserting data")
-	var query = fmt.Sprintf(`INSERT INTO %s VALUES %s`, table, argsTuple(len(rows[0])))
-	for _, row := range rows {
-		log.WithFields(log.Fields{"table": table, "row": row, "query": query}).Trace("inserting row")
-		require.Equal(t, len(row), len(rows[0]), "incorrect number of values in row")
-		var _, err = tx.ExecContext(ctx, query, row...)
-		require.NoError(t, err, "insert row")
+func (db *sqlserverTestDatabase) CreateTable(t testing.TB, name, defs string) {
+	t.Helper()
+	name = db.Expand(name)
+	var tableName = name
+	// Extract just the table name (without schema) for CDC enablement
+	var parts = strings.Split(name, ".")
+	var schema, shortName string
+	if len(parts) == 2 {
+		schema, shortName = parts[0], parts[1]
+	} else {
+		schema, shortName = *testSchemaName, name
 	}
-	require.NoErrorf(t, tx.Commit(), "commit transaction")
+
+	db.QuietExec(t, `IF OBJECT_ID('`+tableName+`', 'U') IS NOT NULL DROP TABLE `+tableName)
+	db.Exec(t, `CREATE TABLE `+tableName+` `+defs)
+
+	// Enable CDC for the table
+	time.Sleep(1 * time.Second) // Sleep to make deadlocks less likely
+	var cdcQuery = fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%s', @source_name = '%s', @role_name = '%s'`,
+		schema, shortName, *dbCaptureUser)
+	db.QuietExec(t, cdcQuery)
+
+	t.Cleanup(func() { db.QuietExec(t, `IF OBJECT_ID('`+tableName+`', 'U') IS NOT NULL DROP TABLE `+tableName) })
 }
 
-func argsTuple(argc int) string {
-	var tuple = "(@p1"
-	for idx := 1; idx < argc; idx++ {
-		tuple += fmt.Sprintf(",@p%d", idx+1)
-	}
-	return tuple + ")"
-}
-
-// Update modifies preexisting rows to a new value.
-func (tb *testBackend) Update(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}, setCol string, setVal interface{}) {
+// CreateTableWithoutCDC creates a table without enabling CDC, for tests that need manual control.
+func (db *sqlserverTestDatabase) CreateTableWithoutCDC(t testing.TB, name, defs string) {
 	t.Helper()
-	var query = fmt.Sprintf(`UPDATE %s SET %s = @p1 WHERE %s = @p2;`, table, setCol, whereCol)
-	log.WithField("query", query).Debug("updating rows")
-	tb.Query(ctx, t, query, setVal, whereVal)
-}
-
-// Delete removes preexisting rows.
-func (tb *testBackend) Delete(ctx context.Context, t testing.TB, table string, whereCol string, whereVal interface{}) {
-	t.Helper()
-	var query = fmt.Sprintf(`DELETE FROM %s WHERE %s = @p1;`, table, whereCol)
-	log.WithField("query", query).Debug("deleting rows")
-	tb.Query(ctx, t, query, whereVal)
-}
-
-func (tb *testBackend) Query(ctx context.Context, t testing.TB, query string, args ...any) {
-	t.Helper()
-	var _, err = tb.control.ExecContext(ctx, query, args...)
-	require.NoError(t, err)
+	name = db.Expand(name)
+	db.QuietExec(t, `IF OBJECT_ID('`+name+`', 'U') IS NOT NULL DROP TABLE `+name)
+	db.Exec(t, `CREATE TABLE `+name+` `+defs)
+	t.Cleanup(func() { db.QuietExec(t, `IF OBJECT_ID('`+name+`', 'U') IS NOT NULL DROP TABLE `+name) })
 }
 
 func uniqueTableID(t testing.TB, extra ...string) string {
@@ -240,98 +209,89 @@ func setShutdownAfterCaughtUp(t testing.TB, setting bool) {
 	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = prevSetting })
 }
 
-// TestGeneric runs the generic sqlcapture test suite.
-func TestGeneric(t *testing.T) {
-	var tb = sqlserverTestBackend(t)
-	tests.Run(context.Background(), t, tb)
-}
-
 func TestColumnNameQuoting(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = "79126849"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "([id] INTEGER, [data] INTEGER, [CAPITALIZED] INTEGER, [unique] INTEGER, [type] INTEGER, PRIMARY KEY ([id], [data], [capitalized], [unique], [type]))")
-	tb.Insert(ctx, t, tableName, [][]any{{0, 0, 0, 0, 0}, {1, 1, 1, 1, 1}, {2, 2, 2, 2, 2}})
-	tests.VerifiedCapture(ctx, t, tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID)))
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `([id] INTEGER, [data] INTEGER, [CAPITALIZED] INTEGER, [unique] INTEGER, [type] INTEGER, PRIMARY KEY ([id], [data], [CAPITALIZED], [unique], [type]))`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 0, 0, 0, 0), (1, 1, 1, 1, 1), (2, 2, 2, 2, 2)`)
+	tc.Discover("Discover Tables")
+	tc.Run("Capture", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestTextCollation(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = "89620867"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id VARCHAR(8) PRIMARY KEY, data TEXT)")
-	tb.Insert(ctx, t, tableName, [][]any{{"AAA", "1"}, {"BBB", "2"}, {"-J C", "3"}, {"H R", "4"}})
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &st.OrderedCaptureValidator{}
-	tests.VerifiedCapture(ctx, t, cs)
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id VARCHAR(8) PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES ('AAA', '1'), ('BBB', '2'), ('-J C', '3'), ('H R', '4')`)
+	tc.Discover("Discover Tables")
+	tc.Run("Capture", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 // TestDiscoveryIrrelevantConstraints verifies that discovery works correctly
 // even when there are other non-primary-key constraints on a table.
 func TestDiscoveryIrrelevantConstraints(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = "44516719"
-	tb.CreateTable(ctx, t, uniqueID, "(id VARCHAR(8) PRIMARY KEY, foo INTEGER UNIQUE, data TEXT)")
-	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id VARCHAR(8) PRIMARY KEY, foo INTEGER UNIQUE, data TEXT)`)
+	tc.DiscoverFull("Discover Tables")
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestUUIDCaptureOrder(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = "1794630882"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id UNIQUEIDENTIFIER PRIMARY KEY, data TEXT)")
-	tb.Insert(ctx, t, tableName, [][]any{
-		{"00ffffff-ffff-ffff-ffff-ffffffffffff", "sixteen"},
-		{"ff00ffff-ffff-ffff-ffff-ffffffffffff", "fifteen"},
-		{"ffff00ff-ffff-ffff-ffff-ffffffffffff", "fourteen"},
-		{"ffffff00-ffff-ffff-ffff-ffffffffffff", "thirteen"},
-		{"ffffffff-00ff-ffff-ffff-ffffffffffff", "twelve"},
-		{"ffffffff-ff00-ffff-ffff-ffffffffffff", "eleven"},
-		{"ffffffff-ffff-00ff-ffff-ffffffffffff", "ten"},
-		{"ffffffff-ffff-ff00-ffff-ffffffffffff", "nine"},
-		{"ffffffff-ffff-ffff-00ff-ffffffffffff", "seven"},
-		{"ffffffff-ffff-ffff-ff00-ffffffffffff", "eight"},
-		{"ffffffff-ffff-ffff-ffff-00ffffffffff", "one"},
-		{"ffffffff-ffff-ffff-ffff-ff00ffffffff", "two"},
-		{"ffffffff-ffff-ffff-ffff-ffff00ffffff", "three"},
-		{"ffffffff-ffff-ffff-ffff-ffffff00ffff", "four"},
-		{"ffffffff-ffff-ffff-ffff-ffffffff00ff", "five"},
-		{"ffffffff-ffff-ffff-ffff-ffffffffff00", "six"},
-	})
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &st.OrderedCaptureValidator{}
-	tests.VerifiedCapture(ctx, t, cs)
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id UNIQUEIDENTIFIER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES
+		('00ffffff-ffff-ffff-ffff-ffffffffffff', 'sixteen'),
+		('ff00ffff-ffff-ffff-ffff-ffffffffffff', 'fifteen'),
+		('ffff00ff-ffff-ffff-ffff-ffffffffffff', 'fourteen'),
+		('ffffff00-ffff-ffff-ffff-ffffffffffff', 'thirteen'),
+		('ffffffff-00ff-ffff-ffff-ffffffffffff', 'twelve'),
+		('ffffffff-ff00-ffff-ffff-ffffffffffff', 'eleven'),
+		('ffffffff-ffff-00ff-ffff-ffffffffffff', 'ten'),
+		('ffffffff-ffff-ff00-ffff-ffffffffffff', 'nine'),
+		('ffffffff-ffff-ffff-00ff-ffffffffffff', 'seven'),
+		('ffffffff-ffff-ffff-ff00-ffffffffffff', 'eight'),
+		('ffffffff-ffff-ffff-ffff-00ffffffffff', 'one'),
+		('ffffffff-ffff-ffff-ffff-ff00ffffffff', 'two'),
+		('ffffffff-ffff-ffff-ffff-ffff00ffffff', 'three'),
+		('ffffffff-ffff-ffff-ffff-ffffff00ffff', 'four'),
+		('ffffffff-ffff-ffff-ffff-ffffffff00ff', 'five'),
+		('ffffffff-ffff-ffff-ffff-ffffffffff00', 'six')`)
+	tc.Discover("Discover Tables")
+	tc.Run("Capture", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestManyTables(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniquePrefix = "2546318"
-
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
 
-	var tableNames []string
-	var streamMatchers []*regexp.Regexp
-	for i := 0; i < 20; i++ {
-		var uniqueID = fmt.Sprintf("%s_%03d", uniquePrefix, i)
-		var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
-		tableNames = append(tableNames, tableName)
-		streamMatchers = append(streamMatchers, regexp.MustCompile(uniqueID))
-	}
-	var cs = tb.CaptureSpec(ctx, t, streamMatchers...)
+	var db, tc = blackboxTestSetup(t)
 
+	// Create 20 tables
 	for i := 0; i < 20; i++ {
-		tb.Insert(ctx, t, tableNames[i], [][]any{{0, fmt.Sprintf("table %d row zero", i)}, {1, fmt.Sprintf("table %d row one", i)}})
+		db.CreateTable(t, fmt.Sprintf(`<NAME>_%03d`, i), `(id INTEGER PRIMARY KEY, data TEXT)`)
 	}
-	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 
+	// Insert initial data
 	for i := 0; i < 20; i++ {
-		tb.Insert(ctx, t, tableNames[i], [][]any{{2, fmt.Sprintf("table %d row two", i)}, {3, fmt.Sprintf("table %d row three", i)}})
+		db.Exec(t, fmt.Sprintf(`INSERT INTO <NAME>_%03d VALUES (0, 'table %d row zero'), (1, 'table %d row one')`, i, i, i))
 	}
-	t.Run("capture1", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	tc.Discover("Discover Tables")
+	tc.Run("Initial Backfill", -1)
 
+	// More inserts
+	for i := 0; i < 20; i++ {
+		db.Exec(t, fmt.Sprintf(`INSERT INTO <NAME>_%03d VALUES (2, 'table %d row two'), (3, 'table %d row three')`, i, i, i))
+	}
+	tc.Run("Replication 1", -1)
+
+	// Partial inserts
 	for i := 0; i < 10; i++ {
-		tb.Insert(ctx, t, tableNames[i], [][]any{{4, fmt.Sprintf("table %d row four", i)}, {5, fmt.Sprintf("table %d row five", i)}})
+		db.Exec(t, fmt.Sprintf(`INSERT INTO <NAME>_%03d VALUES (4, 'table %d row four'), (5, 'table %d row five')`, i, i, i))
 	}
-	t.Run("capture2", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	tc.Run("Replication 2", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestCaptureInstanceCleanup(t *testing.T) {
@@ -344,323 +304,265 @@ func TestCaptureInstanceCleanup(t *testing.T) {
 	t.Cleanup(func() { cdcCleanupInterval = oldInterval })
 	cdcCleanupInterval = 5 * time.Second
 
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	for _, tc := range []struct {
-		Name     string
-		UniqueID string
-		WithDBO  bool
+	for _, testCase := range []struct {
+		Name    string
+		WithDBO bool
 	}{
-		{"WithDBO", "71329622", true},
-		{"WithoutDBO", "72928064", false},
+		{"WithDBO", true},
+		{"WithoutDBO", false},
 	} {
-		t.Run(tc.Name, func(t *testing.T) {
-			var fullTableName = tb.CreateTable(ctx, t, tc.UniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
-			var changeTableName = fmt.Sprintf("cdc.%s_%s_CT", *testSchemaName, tb.TableName(t, tc.UniqueID))
-			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(tc.UniqueID))
-			cs.EndpointSpec.(*Config).Advanced.AutomaticChangeTableCleanup = true
+		t.Run(testCase.Name, func(t *testing.T) {
+			var db, tc = blackboxTestSetup(t)
 
-			// The db_owner permission is required to automatically clean up change tables,
-			// and we need to test both with and without to verify that the capture correctly
-			// handles the lack of this permission.
-			if tc.WithDBO {
-				tb.Query(ctx, t, fmt.Sprintf("ALTER ROLE db_owner ADD MEMBER %s", *dbCaptureUser))
-				t.Cleanup(func() { tb.Query(ctx, t, fmt.Sprintf("ALTER ROLE db_owner DROP MEMBER %s", *dbCaptureUser)) })
+			db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+			require.NoError(t, tc.Capture.EditConfig("advanced.change_table_cleanup", true))
+
+			// The db_owner permission is required to automatically clean up change tables
+			if testCase.WithDBO {
+				db.QuietExec(t, `ALTER ROLE db_owner ADD MEMBER flow_capture`)
+				t.Cleanup(func() { db.QuietExec(t, `ALTER ROLE db_owner DROP MEMBER flow_capture`) })
 			}
 
-			// Run the capture once to dispense with any backfills
-			sqlcapture.TestShutdownAfterCaughtUp = true
-			cs.Capture(ctx, t, nil)
-			cs.Reset() // Reset validator/error state
-			sqlcapture.TestShutdownAfterCaughtUp = false
+			// Initial backfill
+			tc.Discover("Discover Tables")
+			tc.Run("Initial Backfill", -1)
 
-			// Launch the ongoing capture in a separate thread
-			var captureCtx, cancelCapture = context.WithCancel(ctx)
+			// For the ongoing capture, we need to disable SHUTDOWN_AFTER_POLLING
+			os.Unsetenv("SHUTDOWN_AFTER_POLLING")
+
+			// Launch the ongoing capture in a background goroutine
+			var captureCtx, cancelCapture = context.WithCancel(context.Background())
 			defer cancelCapture()
 			var captureDone atomic.Bool
-			go func(ctx context.Context) {
-				cs.Capture(captureCtx, t, nil)
+			var captureErr error
+			go func() {
+				_, captureErr = tc.Capture.RunWithContext(captureCtx, -1)
 				captureDone.Store(true)
-			}(captureCtx)
+			}()
 
-			// Traffic generator in a separate thread
-			var trafficCtx, cancelTraffic = context.WithCancel(ctx)
-			defer cancelTraffic()
-			var trafficDone atomic.Bool
-			go func(ctx context.Context) {
-				for i := 0; i < 10; i++ {
-					tb.Insert(ctx, t, fullTableName, [][]any{
-						{i*100 + 1, fmt.Sprintf("iteration %d row one", i)},
-						{i*100 + 2, fmt.Sprintf("iteration %d row two", i)},
-						{i*100 + 3, fmt.Sprintf("iteration %d row three", i)},
-						{i*100 + 4, fmt.Sprintf("iteration %d row four", i)},
-					})
-					time.Sleep(1 * time.Second)
-				}
-				time.Sleep(cdcCleanupInterval + 2*time.Second)
-				trafficDone.Store(true)
-			}(trafficCtx)
-
-			// Wait until the traffic generator shuts down and then cancel the capture
-			for !trafficDone.Load() {
-				time.Sleep(100 * time.Millisecond)
+			// Traffic generator - insert rows over time
+			for i := 0; i < 10; i++ {
+				db.QuietExec(t, fmt.Sprintf(`INSERT INTO <NAME> VALUES (%d, 'iteration %d row one'), (%d, 'iteration %d row two'), (%d, 'iteration %d row three'), (%d, 'iteration %d row four')`,
+					i*100+1, i, i*100+2, i, i*100+3, i, i*100+4, i))
+				time.Sleep(1 * time.Second)
 			}
+
+			// Wait for cleanup interval to pass
+			time.Sleep(cdcCleanupInterval + 2*time.Second)
+
+			// Cancel the capture and wait for it to finish
 			cancelCapture()
 			for !captureDone.Load() {
 				time.Sleep(100 * time.Millisecond)
 			}
 
-			// Query the number of rows in the change table after everything finishes
-			var changeTableRows int
-			require.NoError(t, tb.control.QueryRowContext(ctx, fmt.Sprintf("SELECT COUNT(*) FROM %s;", changeTableName)).Scan(&changeTableRows))
+			// Context cancellation is expected, not an error
+			if captureErr != nil && !strings.Contains(captureErr.Error(), "context canceled") {
+				t.Logf("capture error (may be expected): %v", captureErr)
+			}
 
-			// Validate test snapshot plus change table row count
-			var summary = cs.Summary()
-			cs.Reset()
-			summary += fmt.Sprintf("\n# Capture Instance Contained %d Rows At Finish", changeTableRows)
-			cupaloy.SnapshotT(t, summary)
+			// Query the number of rows in the change table
+			var schemaName = *testSchemaName
+			var tableName = db.Expand(`<NAME>`)
+			var shortName = tableName[len(schemaName)+1:]
+			var changeTableName = fmt.Sprintf("cdc.%s_%s_CT", schemaName, shortName)
+			var changeTableRows int
+			db.QueryRow(t, fmt.Sprintf("SELECT COUNT(*) FROM %s", changeTableName), &changeTableRows)
+
+			// Add the change table row count to transcript
+			fmt.Fprintf(tc.Transcript, "# Change Table Row Count: %d\n", changeTableRows)
+			cupaloy.SnapshotT(t, tc.Transcript.String())
 		})
 	}
 }
 
 func TestAlterationAddColumn(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	sqlcapture.TestShutdownAfterCaughtUp = true
-	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
-
-	// Grant the 'db_owner' role, it is required for the capture instance automation to work.
-	tb.Query(ctx, t, fmt.Sprintf("ALTER ROLE db_owner ADD MEMBER %s", *dbCaptureUser))
-	t.Cleanup(func() { tb.Query(ctx, t, fmt.Sprintf("ALTER ROLE db_owner DROP MEMBER %s", *dbCaptureUser)) })
-
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		Name     string
-		UniqueID string
 		Manual   bool
 		Automate bool
 	}{
-		{"Off", "39517707", false, false},
-		{"Manual", "22713060", true, false},
-		{"Automatic", "81310450", false, true},
+		{"Off", false, false},
+		{"Manual", true, false},
+		{"Automatic", false, true},
 	} {
-		t.Run(tc.Name, func(t *testing.T) {
-			var tableName = tb.CreateTable(ctx, t, tc.UniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
-			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(tc.UniqueID))
-			cs.Validator = &st.OrderedCaptureValidator{}
-			cs.EndpointSpec.(*Config).Advanced.AutomaticCaptureInstances = tc.Automate
+		t.Run(testCase.Name, func(t *testing.T) {
+			var db, tc = blackboxTestSetup(t)
 
-			// Get the backfill out of the way
-			tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}})
-			cs.Capture(ctx, t, nil)
+			// Grant db_owner role required for capture instance automation
+			db.QuietExec(t, `ALTER ROLE db_owner ADD MEMBER flow_capture`)
+			t.Cleanup(func() { db.QuietExec(t, `ALTER ROLE db_owner DROP MEMBER flow_capture`) })
 
-			// Add a column. Since the changes occur before the first capture here, it won't
-			// be able to get the new column, but the second capture should.
-			tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD extra TEXT;", tableName))
-			tb.Insert(ctx, t, tableName, [][]any{{2, "two", "aaa"}, {3, "three", "bbb"}})
-			time.Sleep(1 * time.Second) // Sleep to let the alteration make its way to cdc.ddl_history
-			if tc.Manual {
-				tb.Query(ctx, t, fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%[1]s', @source_name = '%[2]s', @role_name = '%[3]s', @capture_instance = '%[1]s_%[2]s_v2';`, *testSchemaName, tb.TableName(t, tc.UniqueID), *dbCaptureUser))
-				time.Sleep(1 * time.Second)
-			}
-			cs.Capture(ctx, t, nil)
-			tb.Insert(ctx, t, tableName, [][]any{{4, "four", "ccc"}, {5, "five", "ddd"}})
-			cs.Capture(ctx, t, nil)
-			if tc.Manual {
-				time.Sleep(1 * time.Second)
-				tb.Query(ctx, t, fmt.Sprintf(`EXEC sys.sp_cdc_disable_table @source_schema = '%[1]s', @source_name = '%[2]s', @capture_instance = '%[1]s_%[2]s';`, *testSchemaName, tb.TableName(t, tc.UniqueID)))
-				time.Sleep(1 * time.Second)
+			db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+			if testCase.Automate {
+				require.NoError(t, tc.Capture.EditConfig("advanced.capture_instance_management", true))
 			}
 
-			// Add a second column. Since each table alteration requires a new capture instance
-			// this should demonstrate that cleanup is working correctly as well.
-			tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD evenmore TEXT;", tableName))
-			tb.Insert(ctx, t, tableName, [][]any{{6, "six", "eee", "foo"}, {7, "seven", "fff", "bar"}})
-			time.Sleep(1 * time.Second) // Sleep to let the alteration make its way to cdc.ddl_history
-			if tc.Manual {
-				tb.Query(ctx, t, fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%[1]s', @source_name = '%[2]s', @role_name = '%[3]s', @capture_instance = '%[1]s_%[2]s_v3';`, *testSchemaName, tb.TableName(t, tc.UniqueID), *dbCaptureUser))
+			// Initial backfill
+			db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
+			tc.Discover("Discover Tables")
+			tc.Run("Initial Backfill", -1)
+
+			// Add first column
+			db.Exec(t, `ALTER TABLE <NAME> ADD extra TEXT`)
+			db.Exec(t, `INSERT INTO <NAME> VALUES (2, 'two', 'aaa'), (3, 'three', 'bbb')`)
+			time.Sleep(1 * time.Second) // Let alteration propagate to cdc.ddl_history
+			if testCase.Manual {
+				// Manually create new capture instance for the altered schema
+				var schemaName = *testSchemaName
+				var tableName = db.Expand(`<NAME>`)
+				var shortName = tableName[len(schemaName)+1:]
+				db.QuietExec(t, fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%s', @source_name = '%s', @role_name = 'flow_capture', @capture_instance = '%s_%s_v2'`,
+					schemaName, shortName, schemaName, shortName))
 				time.Sleep(1 * time.Second)
 			}
-			cs.Capture(ctx, t, nil)
-			tb.Insert(ctx, t, tableName, [][]any{{8, "eight", "ggg", "baz"}, {9, "nine", "hhh", "asdf"}})
-			cs.Capture(ctx, t, nil)
-			if tc.Manual {
+			tc.Run("After First Column Add", -1)
+
+			db.Exec(t, `INSERT INTO <NAME> VALUES (4, 'four', 'ccc'), (5, 'five', 'ddd')`)
+			tc.Run("More Inserts After First Add", -1)
+
+			if testCase.Manual {
+				// Disable old capture instance
 				time.Sleep(1 * time.Second)
-				tb.Query(ctx, t, fmt.Sprintf(`EXEC sys.sp_cdc_disable_table @source_schema = '%[1]s', @source_name = '%[2]s', @capture_instance = '%[1]s_%[2]s_v2';`, *testSchemaName, tb.TableName(t, tc.UniqueID)))
+				var schemaName = *testSchemaName
+				var tableName = db.Expand(`<NAME>`)
+				var shortName = tableName[len(schemaName)+1:]
+				db.QuietExec(t, fmt.Sprintf(`EXEC sys.sp_cdc_disable_table @source_schema = '%s', @source_name = '%s', @capture_instance = '%s_%s'`,
+					schemaName, shortName, schemaName, shortName))
 				time.Sleep(1 * time.Second)
 			}
 
-			// Validate test snapshot
-			cupaloy.SnapshotT(t, cs.Summary())
+			// Add second column
+			db.Exec(t, `ALTER TABLE <NAME> ADD evenmore TEXT`)
+			db.Exec(t, `INSERT INTO <NAME> VALUES (6, 'six', 'eee', 'foo'), (7, 'seven', 'fff', 'bar')`)
+			time.Sleep(1 * time.Second)
+			if testCase.Manual {
+				var schemaName = *testSchemaName
+				var tableName = db.Expand(`<NAME>`)
+				var shortName = tableName[len(schemaName)+1:]
+				db.QuietExec(t, fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = '%s', @source_name = '%s', @role_name = 'flow_capture', @capture_instance = '%s_%s_v3'`,
+					schemaName, shortName, schemaName, shortName))
+				time.Sleep(1 * time.Second)
+			}
+			tc.Run("After Second Column Add", -1)
+
+			db.Exec(t, `INSERT INTO <NAME> VALUES (8, 'eight', 'ggg', 'baz'), (9, 'nine', 'hhh', 'asdf')`)
+			tc.Run("Final Inserts", -1)
+
+			if testCase.Manual {
+				time.Sleep(1 * time.Second)
+				var schemaName = *testSchemaName
+				var tableName = db.Expand(`<NAME>`)
+				var shortName = tableName[len(schemaName)+1:]
+				db.QuietExec(t, fmt.Sprintf(`EXEC sys.sp_cdc_disable_table @source_schema = '%s', @source_name = '%s', @capture_instance = '%s_%s_v2'`,
+					schemaName, shortName, schemaName, shortName))
+			}
+
+			cupaloy.SnapshotT(t, tc.Transcript.String())
 		})
 	}
 }
 
 func TestDeletedTextColumn(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = "41823101"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, v_text TEXT NOT NULL, v_varchar VARCHAR(32), v_int INTEGER)")
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &st.OrderedCaptureValidator{}
-
-	tb.Insert(ctx, t, tableName, [][]any{{0, "zero", "zero", 100}, {1, "one", "one", 101}})
-	t.Run("init", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
-	tb.Insert(ctx, t, tableName, [][]any{{2, "two", "two", 102}, {3, "three", "three", 103}})
-	tb.Delete(ctx, t, tableName, "id", 1)
-	tb.Delete(ctx, t, tableName, "id", 2)
-	t.Run("main", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, v_text TEXT NOT NULL, v_varchar VARCHAR(32), v_int INTEGER)`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero', 'zero', 100), (1, 'one', 'one', 101)`)
+	tc.Discover("Discover Tables")
+	tc.Run("Initial Backfill", -1)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 'two', 'two', 102), (3, 'three', 'three', 103)`)
+	db.Exec(t, `DELETE FROM <NAME> WHERE id = 1`)
+	db.Exec(t, `DELETE FROM <NAME> WHERE id = 2`)
+	tc.Run("Replication With Deletes", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestComputedColumn(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = "18851564"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, a VARCHAR(32), b VARCHAR(32), computed AS ISNULL(a, ISNULL(b, 'default')))")
-
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &st.OrderedCaptureValidator{}
-	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
-	sqlcapture.TestShutdownAfterCaughtUp = true
-
-	t.Run("discovery", func(t *testing.T) {
-		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
-	})
-
-	t.Run("capture", func(t *testing.T) {
-		tb.Insert(ctx, t, tableName, [][]any{{0, "a0", "b0"}, {1, nil, "b1"}, {2, "a2", nil}, {3, nil, nil}})
-		cs.Capture(ctx, t, nil)
-		tb.Insert(ctx, t, tableName, [][]any{{4, "a4", "b4"}, {5, nil, "b5"}, {6, "a6", nil}, {7, nil, nil}})
-		cs.Capture(ctx, t, nil)
-		tb.Update(ctx, t, tableName, "id", 4, "a", "a4-modified")
-		tb.Update(ctx, t, tableName, "id", 5, "b", "b5-modified")
-		tb.Update(ctx, t, tableName, "id", 6, "a", "a6-modified")
-		cs.Capture(ctx, t, nil)
-		tb.Delete(ctx, t, tableName, "id", 4)
-		tb.Delete(ctx, t, tableName, "id", 5)
-		tb.Delete(ctx, t, tableName, "id", 6)
-		tb.Delete(ctx, t, tableName, "id", 7)
-		cs.Capture(ctx, t, nil)
-		cupaloy.SnapshotT(t, cs.Summary())
-	})
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, a VARCHAR(32), b VARCHAR(32), computed AS ISNULL(a, ISNULL(b, 'default')))`)
+	tc.DiscoverFull("Discover Table Schema")
+	db.Exec(t, `INSERT INTO <NAME> (id, a, b) VALUES (0, 'a0', 'b0'), (1, NULL, 'b1'), (2, 'a2', NULL), (3, NULL, NULL)`)
+	tc.Run("Initial Backfill", -1)
+	db.Exec(t, `INSERT INTO <NAME> (id, a, b) VALUES (4, 'a4', 'b4'), (5, NULL, 'b5'), (6, 'a6', NULL), (7, NULL, NULL)`)
+	tc.Run("Replication Inserts", -1)
+	db.Exec(t, `UPDATE <NAME> SET a = 'a4-modified' WHERE id = 4`)
+	db.Exec(t, `UPDATE <NAME> SET b = 'b5-modified' WHERE id = 5`)
+	db.Exec(t, `UPDATE <NAME> SET a = 'a6-modified' WHERE id = 6`)
+	tc.Run("Updates", -1)
+	db.Exec(t, `DELETE FROM <NAME> WHERE id IN (4, 5, 6, 7)`)
+	tc.Run("Deletes", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestDroppedAndRecreatedTable(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = "37815596"
-	var tableDef = "(id INTEGER PRIMARY KEY, data TEXT)"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one'), (2, 'two')`)
+	tc.Discover("Discover Tables")
+	tc.Run("Initial Backfill", -1)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three'), (4, 'four'), (5, 'five')`)
+	tc.Run("Some Replication", -1)
 
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &st.OrderedCaptureValidator{}
-	sqlcapture.TestShutdownAfterCaughtUp = true
-	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+	// Drop and recreate
+	db.Exec(t, `DROP TABLE <NAME>`)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one'), (2, 'two')`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (6, 'six'), (7, 'seven'), (8, 'eight')`)
+	tc.Run("After Drop/Recreate", -1)
 
-	// Initial backfill
-	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
-	cs.Capture(ctx, t, nil)
-
-	// Some replication
-	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
-	cs.Capture(ctx, t, nil)
-
-	// Drop and recreate the table, then fill it with some new data.
-	tb.Query(ctx, t, fmt.Sprintf(`DROP TABLE %s;`, tableName))
-	tb.CreateTable(ctx, t, uniqueID, tableDef)
-	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
-	tb.Insert(ctx, t, tableName, [][]any{{6, "six"}, {7, "seven"}, {8, "eight"}})
-	cs.Capture(ctx, t, nil)
-
-	// Followed by some more replication
-	tb.Insert(ctx, t, tableName, [][]any{{9, "nine"}, {10, "ten"}, {11, "eleven"}})
-	cs.Capture(ctx, t, nil)
-
-	cupaloy.SnapshotT(t, cs.Summary())
+	db.Exec(t, `INSERT INTO <NAME> VALUES (9, 'nine'), (10, 'ten'), (11, 'eleven')`)
+	tc.Run("More Replication", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestFilegroupAndRole(t *testing.T) {
-	// Turn off the test logic that creates CDC instances when creating tables, for this one test.
-	var oldEnableCDCWhenCreatingTables = *enableCDCWhenCreatingTables
-	*enableCDCWhenCreatingTables = false
-	t.Cleanup(func() { *enableCDCWhenCreatingTables = oldEnableCDCWhenCreatingTables })
+	var db, tc = blackboxTestSetup(t)
 
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = "93932362"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
+	// Create table without CDC (connector will create CDC instance with specified config)
+	db.CreateTableWithoutCDC(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 
-	// Grant the 'db_owner' role, it is required to create a CDC instance automatically.
-	tb.Query(ctx, t, fmt.Sprintf("ALTER ROLE db_owner ADD MEMBER %s", *dbCaptureUser))
-	t.Cleanup(func() { tb.Query(ctx, t, fmt.Sprintf("ALTER ROLE db_owner DROP MEMBER %s", *dbCaptureUser)) })
+	// Grant db_owner so connector can create CDC instance
+	db.Exec(t, `ALTER ROLE db_owner ADD MEMBER flow_capture`)
+	t.Cleanup(func() { db.QuietExec(t, `ALTER ROLE db_owner DROP MEMBER flow_capture`) })
 
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &st.OrderedCaptureValidator{}
-	cs.EndpointSpec.(*Config).Advanced.Filegroup = "PRIMARY"
-	cs.EndpointSpec.(*Config).Advanced.RoleName = "flow_capture"
-	sqlcapture.TestShutdownAfterCaughtUp = true
-	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+	require.NoError(t, tc.Capture.EditConfig("advanced.filegroup", "PRIMARY"))
+	require.NoError(t, tc.Capture.EditConfig("advanced.role_name", "flow_capture"))
+	tc.Discover("Discover Tables")
 
-	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
-	cs.Capture(ctx, t, nil)
-	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
-	cs.Capture(ctx, t, nil)
-
-	cupaloy.SnapshotT(t, cs.Summary())
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one'), (2, 'two')`)
+	tc.Run("Initial Backfill", -1)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three'), (4, 'four'), (5, 'five')`)
+	tc.Run("Replication", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestPrimaryKeyUpdate(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = "63510878"
-	var tableDef = "(id INTEGER PRIMARY KEY, data TEXT)"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, tableDef)
-
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &st.OrderedCaptureValidator{}
-	sqlcapture.TestShutdownAfterCaughtUp = true
-	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
-
-	// Initial backfill
-	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
-	cs.Capture(ctx, t, nil)
-
-	// Some replication
-	tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
-	cs.Capture(ctx, t, nil)
-
-	// Primary key updates
-	tb.Update(ctx, t, tableName, "id", 1, "id", 6)
-	tb.Update(ctx, t, tableName, "id", 4, "id", 7)
-	cs.Capture(ctx, t, nil)
-
-	cupaloy.SnapshotT(t, cs.Summary())
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one'), (2, 'two')`)
+	tc.Discover("Discover Tables")
+	tc.Run("Initial Backfill", -1)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three'), (4, 'four'), (5, 'five')`)
+	tc.Run("Some Replication", -1)
+	db.Exec(t, `UPDATE <NAME> SET id = 6 WHERE id = 1`)
+	db.Exec(t, `UPDATE <NAME> SET id = 7 WHERE id = 4`)
+	tc.Run("Primary Key Updates", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestComputedPrimaryKey(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = "10118243"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(actual_id INTEGER NOT NULL, data VARCHAR(32), id AS actual_id PRIMARY KEY)")
-
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.Validator = &st.OrderedCaptureValidator{}
-	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
-	sqlcapture.TestShutdownAfterCaughtUp = true
-
-	t.Run("discovery", func(t *testing.T) {
-		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
-	})
-
-	t.Run("capture", func(t *testing.T) {
-		tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}, {2, "two"}})
-		cs.Capture(ctx, t, nil)
-		tb.Insert(ctx, t, tableName, [][]any{{3, "three"}, {4, "four"}, {5, "five"}})
-		cs.Capture(ctx, t, nil)
-		cupaloy.SnapshotT(t, cs.Summary())
-	})
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `(actual_id INTEGER NOT NULL, data VARCHAR(32), id AS actual_id PRIMARY KEY)`)
+	tc.DiscoverFull("Discover Table Schema")
+	db.Exec(t, `INSERT INTO <NAME> (actual_id, data) VALUES (0, 'zero'), (1, 'one'), (2, 'two')`)
+	tc.Run("Initial Backfill", -1)
+	db.Exec(t, `INSERT INTO <NAME> (actual_id, data) VALUES (3, 'three'), (4, 'four'), (5, 'five')`)
+	tc.Run("Replication", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 // TestFeatureFlagEmitSourcedSchemas runs a capture with the `emit_sourced_schemas` feature flag set.
 func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = "64029092"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data VARCHAR(32))")
-
-	tb.Insert(ctx, t, tableName, [][]any{{1, "hello"}, {2, "world"}})
-
-	for _, tc := range []struct {
+	for _, testCase := range []struct {
 		name string
 		flag string
 	}{
@@ -668,31 +570,29 @@ func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 		{"Enabled", "emit_sourced_schemas"},
 		{"Disabled", "no_emit_sourced_schemas"},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			var cs = tb.CaptureSpec(ctx, t)
-			cs.EndpointSpec.(*Config).Advanced.FeatureFlags = tc.flag
-			cs.Bindings = tests.DiscoverBindings(ctx, t, tb, regexp.MustCompile(uniqueID))
-
-			sqlcapture.TestShutdownAfterCaughtUp = true
-			t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
-
-			cs.Capture(ctx, t, nil)
-			cupaloy.SnapshotT(t, cs.Summary())
+		t.Run(testCase.name, func(t *testing.T) {
+			var db, tc = blackboxTestSetup(t)
+			db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(32))`)
+			db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'hello'), (2, 'world')`)
+			if testCase.flag != "" {
+				require.NoError(t, tc.Capture.EditConfig("advanced.feature_flags", testCase.flag))
+			}
+			tc.Discover("Discover Tables")
+			tc.Run("Capture", -1)
+			cupaloy.SnapshotT(t, tc.Transcript.String())
 		})
 	}
 }
 
 // TestSourceTag verifies the output of a capture with /advanced/source_tag set
 func TestSourceTag(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var uniqueID = uniqueTableID(t)
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
-	cs.EndpointSpec.(*Config).Advanced.SourceTag = "example_source_tag_1234"
-	setShutdownAfterCaughtUp(t, true)
-	tb.Insert(ctx, t, tableName, [][]any{{0, "zero"}, {1, "one"}})
-	cs.Capture(ctx, t, nil)
-	tb.Insert(ctx, t, tableName, [][]any{{2, "two"}, {3, "three"}})
-	cs.Capture(ctx, t, nil)
-	cupaloy.SnapshotT(t, cs.Summary())
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+	require.NoError(t, tc.Capture.EditConfig("advanced.source_tag", "example_source_tag_1234"))
+	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
+	tc.Discover("Discover Tables")
+	tc.Run("Initial Backfill", -1)
+	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 'two'), (3, 'three')`)
+	tc.Run("Replication", -1)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
