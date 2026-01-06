@@ -1,94 +1,93 @@
----
-$schema: "http://json-schema.org/draft-07/schema#"
+$schema: http://json-schema.org/draft-07/schema#
 type: object
 required:
-  - customer.id
-  - segments.date
+- customer.id
+- segments.date
 properties:
   customer.auto_tagging_enabled:
     type:
-      - "null"
-      - boolean
+    - 'null'
+    - boolean
   customer.call_reporting_setting.call_conversion_action:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   customer.call_reporting_setting.call_conversion_reporting_enabled:
     type:
-      - "null"
-      - boolean
+    - 'null'
+    - boolean
   customer.call_reporting_setting.call_reporting_enabled:
     type:
-      - "null"
-      - boolean
+    - 'null'
+    - boolean
   customer.conversion_tracking_setting.conversion_tracking_id:
     type:
-      - "null"
-      - integer
+    - 'null'
+    - integer
   customer.conversion_tracking_setting.cross_account_conversion_tracking_id:
     type:
-      - "null"
-      - integer
+    - 'null'
+    - integer
   customer.currency_code:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   customer.descriptive_name:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   customer.final_url_suffix:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   customer.has_partners_badge:
     type:
-      - "null"
-      - boolean
+    - 'null'
+    - boolean
   customer.id:
     type:
-      - integer
+    - integer
   customer.manager:
     type:
-      - "null"
-      - boolean
+    - 'null'
+    - boolean
   customer.optimization_score:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   customer.optimization_score_weight:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   customer.pay_per_conversion_eligibility_failure_reasons:
     type:
-      - "null"
-      - array
+    - 'null'
+    - array
     items:
       type: string
   customer.remarketing_setting.google_global_site_tag:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   customer.resource_name:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   customer.test_account:
     type:
-      - "null"
-      - boolean
+    - 'null'
+    - boolean
   customer.time_zone:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   customer.tracking_url_template:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   segments.date:
     type:
-      - string
+    - string
     format: date
   _meta:
     type: object
@@ -96,5 +95,5 @@ properties:
       row_id:
         type: integer
     required:
-      - row_id
+    - row_id
 x-infer-schema: true

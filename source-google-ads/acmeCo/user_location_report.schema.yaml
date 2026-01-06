@@ -1,189 +1,188 @@
----
-$schema: "http://json-schema.org/draft-07/schema#"
+$schema: http://json-schema.org/draft-07/schema#
 type: object
 required:
-  - segments.ad_network_type
-  - segments.date
-  - customer.id
-  - campaign.id
-  - user_location_view.resource_name
+- segments.ad_network_type
+- segments.date
+- customer.id
+- campaign.id
+- user_location_view.resource_name
 properties:
   segments.date:
     type: string
     format: date
   segments.day_of_week:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   segments.month:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   segments.week:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   segments.quarter:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   segments.year:
     type:
-      - "null"
-      - integer
+    - 'null'
+    - integer
   segments.ad_network_type:
     type: string
   customer.currency_code:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   customer.id:
     type: integer
   customer.descriptive_name:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   customer.time_zone:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   user_location_view.country_criterion_id:
     type:
-      - "null"
-      - integer
+    - 'null'
+    - integer
   user_location_view.resource_name:
     type: string
   campaign.base_campaign:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   campaign.id:
     type: integer
   campaign.name:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   campaign.status:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   ad_group.name:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   ad_group.status:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   ad_group.base_ad_group:
     type:
-      - "null"
-      - string
+    - 'null'
+    - string
   metrics.all_conversions:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.all_conversions_from_interactions_rate:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.all_conversions_value:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.average_cost:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.average_cpc:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.average_cpm:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.average_cpv:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.clicks:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.conversions:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.conversions_from_interactions_rate:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.conversions_value:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.cost_micros:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.cost_per_all_conversions:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.cost_per_conversion:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.cross_device_conversions:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.ctr:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.impressions:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.interaction_event_types:
     type:
-      - "null"
-      - array
+    - 'null'
+    - array
   metrics.interaction_rate:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.interactions:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.value_per_all_conversions:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.value_per_conversion:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.video_view_rate:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.video_views:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   metrics.view_through_conversions:
     type:
-      - "null"
-      - number
+    - 'null'
+    - number
   _meta:
     type: object
     properties:
       row_id:
         type: integer
     required:
-      - row_id
+    - row_id
 x-infer-schema: true
