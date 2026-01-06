@@ -1,0 +1,212 @@
+sql> CREATE TABLE test.extensiontypes_833424 (
+		id INTEGER PRIMARY KEY,
+		a_citext CITEXT,
+		a_citext_arr CITEXT[]
+	)
+sql> INSERT INTO test.extensiontypes_833424 VALUES
+		(1, 'Hello World', '{"Hello","World"}'),
+		(2, 'UPPERCASE', '{"UPPER","CASE"}'),
+		(3, 'lowercase', '{"lower","case"}'),
+		(4, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/test/extensiontypes_833424
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/extensiontypes_833424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "extensiontypes_833424"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_citext": "Hello World",
+    "a_citext_arr": [
+      "Hello",
+      "World"
+    ],
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/extensiontypes_833424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "extensiontypes_833424"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_citext": "UPPERCASE",
+    "a_citext_arr": [
+      "UPPER",
+      "CASE"
+    ],
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/extensiontypes_833424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "extensiontypes_833424"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_citext": "lowercase",
+    "a_citext_arr": [
+      "lower",
+      "case"
+    ],
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/extensiontypes_833424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "extensiontypes_833424"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_citext": null,
+    "a_citext_arr": null,
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fextensiontypes_833424": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.extensiontypes_833424 VALUES
+		(101, 'Hello World', '{"Hello","World"}'),
+		(102, 'UPPERCASE', '{"UPPER","CASE"}'),
+		(103, 'lowercase', '{"lower","case"}'),
+		(104, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/extensiontypes_833424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "extensiontypes_833424",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_citext": "Hello World",
+    "a_citext_arr": [
+      "Hello",
+      "World"
+    ],
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/extensiontypes_833424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "extensiontypes_833424",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_citext": "UPPERCASE",
+    "a_citext_arr": [
+      "UPPER",
+      "CASE"
+    ],
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/extensiontypes_833424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "extensiontypes_833424",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_citext": "lowercase",
+    "a_citext_arr": [
+      "lower",
+      "case"
+    ],
+    "id": 103
+  }
+]
+[
+  "acmeCo/test_capture/test/extensiontypes_833424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "extensiontypes_833424",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_citext": null,
+    "a_citext_arr": null,
+    "id": 104
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fextensiontypes_833424": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

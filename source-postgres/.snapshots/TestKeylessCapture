@@ -1,0 +1,98 @@
+sql> CREATE TABLE test.keylesscapture_315710 (id INTEGER, data TEXT)
+sql> INSERT INTO test.keylesscapture_315710 VALUES (1, 'one'), (2, 'two')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/keylesscapture_315710
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/keylesscapture_315710",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "keylesscapture_315710"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/keylesscapture_315710",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "keylesscapture_315710"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fkeylesscapture_315710": {
+      "backfilled": 2,
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.keylesscapture_315710 VALUES (3, 'three'), (4, 'four')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/keylesscapture_315710",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "keylesscapture_315710",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/keylesscapture_315710",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "keylesscapture_315710",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fkeylesscapture_315710": {
+      "backfilled": 2,
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

@@ -1,16 +1,198 @@
-# ================================
-# Collection "acmeCo/test/test/specialtemporalvalues_33220241": 8 Documents
-# ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111]}},"a_date":"1970-01-01","a_time":null,"a_timestamp":"1970-01-01T00:00:00Z","id":0}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111]}},"a_date":"9999-12-31","a_time":null,"a_timestamp":"9999-12-31T23:59:59Z","id":1}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111]}},"a_date":"0000-01-01","a_time":null,"a_timestamp":"0000-01-01T00:00:00Z","id":2}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111]}},"a_date":null,"a_time":"00:00:00Z","a_timestamp":null,"id":3}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111],"txid":111111}},"a_date":"1970-01-01","a_time":null,"a_timestamp":"1970-01-01T00:00:00Z","id":10}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111],"txid":111111}},"a_date":"9999-12-31","a_time":null,"a_timestamp":"9999-12-31T23:59:59Z","id":11}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111],"txid":111111}},"a_date":"0000-01-01","a_time":null,"a_timestamp":"0000-01-01T00:00:00Z","id":12}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"specialtemporalvalues_33220241","loc":[11111111,11111111,11111111],"txid":111111}},"a_date":null,"a_time":"00:00:00Z","a_timestamp":null,"id":13}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fspecialtemporalvalues_33220241":{"backfilled":4,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
+sql> CREATE TABLE test.specialtemporalvalues_956773 (id INTEGER PRIMARY KEY, a_date DATE, a_time TIME, a_timestamp TIMESTAMP)
+sql> INSERT INTO test.specialtemporalvalues_956773 VALUES
+		(0, 'epoch', NULL, 'epoch'),
+		(1, 'infinity', NULL, 'infinity'),
+		(2, '-infinity', NULL, '-infinity'),
+		(3, NULL, 'allballs', NULL)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/specialtemporalvalues_956773
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/specialtemporalvalues_956773",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "specialtemporalvalues_956773"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "1970-01-01",
+    "a_time": null,
+    "a_timestamp": "1970-01-01T00:00:00Z",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/specialtemporalvalues_956773",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "specialtemporalvalues_956773"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "9999-12-31",
+    "a_time": null,
+    "a_timestamp": "9999-12-31T23:59:59Z",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/specialtemporalvalues_956773",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "specialtemporalvalues_956773"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "0000-01-01",
+    "a_time": null,
+    "a_timestamp": "0000-01-01T00:00:00Z",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/specialtemporalvalues_956773",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "specialtemporalvalues_956773"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": null,
+    "a_time": "00:00:00Z",
+    "a_timestamp": null,
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fspecialtemporalvalues_956773": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.specialtemporalvalues_956773 VALUES
+		(10, 'epoch', NULL, 'epoch'),
+		(11, 'infinity', NULL, 'infinity'),
+		(12, '-infinity', NULL, '-infinity'),
+		(13, NULL, 'allballs', NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/specialtemporalvalues_956773",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "specialtemporalvalues_956773",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "1970-01-01",
+    "a_time": null,
+    "a_timestamp": "1970-01-01T00:00:00Z",
+    "id": 10
+  }
+]
+[
+  "acmeCo/test_capture/test/specialtemporalvalues_956773",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "specialtemporalvalues_956773",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "9999-12-31",
+    "a_time": null,
+    "a_timestamp": "9999-12-31T23:59:59Z",
+    "id": 11
+  }
+]
+[
+  "acmeCo/test_capture/test/specialtemporalvalues_956773",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "specialtemporalvalues_956773",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "0000-01-01",
+    "a_time": null,
+    "a_timestamp": "0000-01-01T00:00:00Z",
+    "id": 12
+  }
+]
+[
+  "acmeCo/test_capture/test/specialtemporalvalues_956773",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "specialtemporalvalues_956773",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": null,
+    "a_time": "00:00:00Z",
+    "a_timestamp": null,
+    "id": 13
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fspecialtemporalvalues_956773": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
 

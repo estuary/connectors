@@ -1,152 +1,153 @@
-Binding 0:
+sql> CREATE TABLE test.tbl693037 (k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)
+sql> CREATE UNIQUE INDEX idx693037_k23 ON test.tbl693037 (k2, k3)
+=== Discover: Discover Tables ===
 {
-    "recommended_name": "test/secondaryindexdiscovery_index_only_g26313",
-    "resource_config_json": {
-      "namespace": "test",
-      "stream": "secondaryindexdiscovery_index_only_g26313"
-    },
-    "document_schema_json": {
-      "$defs": {
-        "TestSecondaryindexdiscovery_index_only_g26313": {
-          "type": "object",
-          "required": [
-            "k2",
-            "k3"
-          ],
-          "$anchor": "TestSecondaryindexdiscovery_index_only_g26313",
-          "properties": {
-            "data": {
-              "description": "(source type: text)",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "k1": {
-              "description": "(source type: int4)",
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "k2": {
-              "type": "integer",
-              "description": "(source type: non-nullable int4)"
-            },
-            "k3": {
-              "type": "integer",
-              "description": "(source type: non-nullable int4)"
-            }
+  "recommendedName": "test/tbl693037",
+  "resourceConfig": {
+    "namespace": "test",
+    "stream": "tbl693037"
+  },
+  "documentSchema": {
+    "$defs": {
+      "TestTbl693037": {
+        "type": "object",
+        "required": [
+          "k2",
+          "k3"
+        ],
+        "$anchor": "TestTbl693037",
+        "properties": {
+          "data": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "k1": {
+            "description": "(source type: int4)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "k2": {
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
+          },
+          "k3": {
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
           }
         }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "_meta": {
-                "properties": {
-                  "op": {
-                    "const": "d"
-                  }
-                }
-              }
-            }
-          },
-          "then": {
-            "reduce": {
-              "delete": true,
-              "strategy": "merge"
-            }
-          },
-          "else": {
-            "reduce": {
-              "strategy": "merge"
-            }
-          },
-          "required": [
-            "_meta"
-          ],
+      }
+    },
+    "allOf": [
+      {
+        "if": {
           "properties": {
             "_meta": {
-              "type": "object",
-              "required": [
-                "op",
-                "source"
-              ],
               "properties": {
-                "before": {
-                  "$ref": "#TestSecondaryindexdiscovery_index_only_g26313",
-                  "description": "Record state immediately before this change was applied.",
-                  "reduce": {
-                    "strategy": "firstWriteWins"
-                  }
-                },
                 "op": {
-                  "enum": [
-                    "c",
-                    "d",
-                    "u"
-                  ],
-                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
-                },
-                "source": {
-                  "$id": "https://github.com/estuary/connectors/source-postgres/postgres-source",
-                  "properties": {
-                    "ts_ms": {
-                      "type": "integer",
-                      "description": "Unix timestamp (in millis) at which this event was recorded by the database."
-                    },
-                    "schema": {
-                      "type": "string",
-                      "description": "Database schema (namespace) of the event."
-                    },
-                    "snapshot": {
-                      "type": "boolean",
-                      "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
-                    },
-                    "table": {
-                      "type": "string",
-                      "description": "Database table of the event."
-                    },
-                    "loc": {
-                      "items": {
-                        "type": "integer"
-                      },
-                      "type": "array",
-                      "maxItems": 3,
-                      "minItems": 3,
-                      "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
-                    },
-                    "txid": {
-                      "type": "integer",
-                      "description": "The 32-bit transaction ID assigned by Postgres to the commit which produced this change."
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "schema",
-                    "table",
-                    "loc"
-                  ]
+                  "const": "d"
                 }
-              },
-              "reduce": {
-                "strategy": "merge"
               }
             }
           }
         },
-        {
-          "$ref": "#TestSecondaryindexdiscovery_index_only_g26313"
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "merge"
+          }
+        },
+        "else": {
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "op",
+              "source"
+            ],
+            "properties": {
+              "before": {
+                "$ref": "#TestTbl693037",
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "loc": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array",
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
+                  },
+                  "txid": {
+                    "type": "integer",
+                    "description": "The 32-bit transaction ID assigned by Postgres to the commit which produced this change."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table",
+                  "loc"
+                ]
+              }
+            },
+            "reduce": {
+              "strategy": "merge"
+            }
+          }
         }
-      ],
-      "x-infer-schema": true
-    },
-    "key": [
-      "/k2",
-      "/k3"
+      },
+      {
+        "$ref": "#TestTbl693037"
+      }
     ],
-    "is_fallback_key": true
-  }
+    "x-infer-schema": true
+  },
+  "key": [
+    "/k2",
+    "/k3"
+  ],
+  "isFallbackKey": true
+}
 

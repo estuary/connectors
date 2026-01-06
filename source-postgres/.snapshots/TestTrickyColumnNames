@@ -1,0 +1,108 @@
+sql> CREATE TABLE test.trickycolumnnames_459872 ("Meta/""wtf""~ID" INTEGER PRIMARY KEY, "table" TEXT, data TEXT)
+sql> INSERT INTO test.trickycolumnnames_459872 VALUES (1, 'one', 'aaa'), (2, 'two', 'bbb')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/trickycolumnnames_459872
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/trickycolumnnames_459872",
+  {
+    "Meta/\"wtf\"~ID": 1,
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "trickycolumnnames_459872"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "aaa",
+    "table": "one"
+  }
+]
+[
+  "acmeCo/test_capture/test/trickycolumnnames_459872",
+  {
+    "Meta/\"wtf\"~ID": 2,
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "trickycolumnnames_459872"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "bbb",
+    "table": "two"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Ftrickycolumnnames_459872": {
+      "backfilled": 2,
+      "key_columns": [
+        "Meta/\"wtf\"~ID"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.trickycolumnnames_459872 VALUES (3, 'three', 'eee'), (4, 'four', 'fff')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/trickycolumnnames_459872",
+  {
+    "Meta/\"wtf\"~ID": 3,
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "trickycolumnnames_459872",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "eee",
+    "table": "three"
+  }
+]
+[
+  "acmeCo/test_capture/test/trickycolumnnames_459872",
+  {
+    "Meta/\"wtf\"~ID": 4,
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "trickycolumnnames_459872",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "fff",
+    "table": "four"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Ftrickycolumnnames_459872": {
+      "backfilled": 2,
+      "key_columns": [
+        "Meta/\"wtf\"~ID"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

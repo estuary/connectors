@@ -1,0 +1,70 @@
+sql> CREATE TABLE test.simplecapture_140272 (id INTEGER PRIMARY KEY, data VARCHAR(2000))
+sql> INSERT INTO test.simplecapture_140272 VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/simplecapture_140272
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/simplecapture_140272",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "simplecapture_140272"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "A",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/simplecapture_140272",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "simplecapture_140272"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "bbb",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/simplecapture_140272",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "simplecapture_140272"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "CDEFGH",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fsimplecapture_140272": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

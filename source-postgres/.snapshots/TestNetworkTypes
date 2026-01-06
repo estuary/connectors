@@ -1,0 +1,212 @@
+sql> CREATE TABLE test.networktypes_297765 (
+		id INTEGER PRIMARY KEY,
+		a_inet INET,
+		a_cidr CIDR,
+		a_macaddr MACADDR,
+		a_macaddr8 MACADDR8
+	)
+sql> INSERT INTO test.networktypes_297765 VALUES
+		(1, '192.168.1.1', '192.168.1.0/24', '08:00:2b:01:02:03', '08:00:2b:01:02:03:04:05'),
+		(2, '2001:4f8:3:ba::1', '2001:4f8:3:ba::/64', 'ff:ff:ff:ff:ff:ff', 'ff:ff:ff:ff:ff:ff:ff:ff'),
+		(3, '10.0.0.1/8', '10.0.0.0/8', '00:00:00:00:00:00', '00:00:00:00:00:00:00:00'),
+		(4, NULL, NULL, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/test/networktypes_297765
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/networktypes_297765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "networktypes_297765"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_cidr": "192.168.1.0/24",
+    "a_inet": "192.168.1.1/32",
+    "a_macaddr": "08:00:2b:01:02:03",
+    "a_macaddr8": "08:00:2b:01:02:03:04:05",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/networktypes_297765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "networktypes_297765"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_cidr": "2001:4f8:3:ba::/64",
+    "a_inet": "2001:4f8:3:ba::1/128",
+    "a_macaddr": "ff:ff:ff:ff:ff:ff",
+    "a_macaddr8": "ff:ff:ff:ff:ff:ff:ff:ff",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/networktypes_297765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "networktypes_297765"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_cidr": "10.0.0.0/8",
+    "a_inet": "10.0.0.1/8",
+    "a_macaddr": "00:00:00:00:00:00",
+    "a_macaddr8": "00:00:00:00:00:00:00:00",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/networktypes_297765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "networktypes_297765"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_cidr": null,
+    "a_inet": null,
+    "a_macaddr": null,
+    "a_macaddr8": null,
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fnetworktypes_297765": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.networktypes_297765 VALUES
+		(101, '192.168.1.1', '192.168.1.0/24', '08:00:2b:01:02:03', '08:00:2b:01:02:03:04:05'),
+		(102, '2001:4f8:3:ba::1', '2001:4f8:3:ba::/64', 'ff:ff:ff:ff:ff:ff', 'ff:ff:ff:ff:ff:ff:ff:ff'),
+		(103, '10.0.0.1/8', '10.0.0.0/8', '00:00:00:00:00:00', '00:00:00:00:00:00:00:00'),
+		(104, NULL, NULL, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/networktypes_297765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "networktypes_297765",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_cidr": "192.168.1.0/24",
+    "a_inet": "192.168.1.1/32",
+    "a_macaddr": "08:00:2b:01:02:03",
+    "a_macaddr8": "08:00:2b:01:02:03:04:05",
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/networktypes_297765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "networktypes_297765",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_cidr": "2001:4f8:3:ba::/64",
+    "a_inet": "2001:4f8:3:ba::1/128",
+    "a_macaddr": "ff:ff:ff:ff:ff:ff",
+    "a_macaddr8": "ff:ff:ff:ff:ff:ff:ff:ff",
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/networktypes_297765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "networktypes_297765",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_cidr": "10.0.0.0/8",
+    "a_inet": "10.0.0.1/8",
+    "a_macaddr": "00:00:00:00:00:00",
+    "a_macaddr8": "00:00:00:00:00:00:00:00",
+    "id": 103
+  }
+]
+[
+  "acmeCo/test_capture/test/networktypes_297765",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "networktypes_297765",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_cidr": null,
+    "a_inet": null,
+    "a_macaddr": null,
+    "a_macaddr8": null,
+    "id": 104
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fnetworktypes_297765": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

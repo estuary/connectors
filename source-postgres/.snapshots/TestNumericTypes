@@ -1,0 +1,285 @@
+sql> CREATE TABLE test.numerictypes_559424 (
+		id INTEGER PRIMARY KEY,
+		a_decimal DECIMAL,
+		a_numeric NUMERIC,
+		a_numeric_prec NUMERIC(10,4)
+	)
+sql> INSERT INTO test.numerictypes_559424 VALUES
+		(1, 123.456, 123.456, 123456.7890),
+		(2, -999.999, -999.999, -999999.9999),
+		(3, 'NaN', 'NaN', 'NaN'),
+		(4, 'Infinity', 'Infinity', NULL),
+		(5, '-Infinity', '-Infinity', NULL),
+		(6, NULL, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/test/numerictypes_559424
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/numerictypes_559424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "numerictypes_559424"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "123.456",
+    "a_numeric": "123.456",
+    "a_numeric_prec": "123456.7890",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/numerictypes_559424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "numerictypes_559424"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "-999.999",
+    "a_numeric": "-999.999",
+    "a_numeric_prec": "-999999.9999",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/numerictypes_559424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "numerictypes_559424"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "NaN",
+    "a_numeric": "NaN",
+    "a_numeric_prec": "NaN",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/numerictypes_559424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "numerictypes_559424"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "Infinity",
+    "a_numeric": "Infinity",
+    "a_numeric_prec": null,
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/numerictypes_559424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "numerictypes_559424"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "-Infinity",
+    "a_numeric": "-Infinity",
+    "a_numeric_prec": null,
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/test/numerictypes_559424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "numerictypes_559424"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": null,
+    "a_numeric": null,
+    "a_numeric_prec": null,
+    "id": 6
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fnumerictypes_559424": {
+      "backfilled": 6,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.numerictypes_559424 VALUES
+		(101, 123.456, 123.456, 123456.7890),
+		(102, -999.999, -999.999, -999999.9999),
+		(103, 'NaN', 'NaN', 'NaN'),
+		(104, 'Infinity', 'Infinity', NULL),
+		(105, '-Infinity', '-Infinity', NULL),
+		(106, NULL, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/numerictypes_559424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "numerictypes_559424",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "123.456",
+    "a_numeric": "123.456",
+    "a_numeric_prec": "123456.7890",
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/numerictypes_559424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "numerictypes_559424",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "-999.999",
+    "a_numeric": "-999.999",
+    "a_numeric_prec": "-999999.9999",
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/numerictypes_559424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "numerictypes_559424",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "NaN",
+    "a_numeric": "NaN",
+    "a_numeric_prec": "NaN",
+    "id": 103
+  }
+]
+[
+  "acmeCo/test_capture/test/numerictypes_559424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "numerictypes_559424",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "Infinity",
+    "a_numeric": "Infinity",
+    "a_numeric_prec": null,
+    "id": 104
+  }
+]
+[
+  "acmeCo/test_capture/test/numerictypes_559424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "numerictypes_559424",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "-Infinity",
+    "a_numeric": "-Infinity",
+    "a_numeric_prec": null,
+    "id": 105
+  }
+]
+[
+  "acmeCo/test_capture/test/numerictypes_559424",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "numerictypes_559424",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": null,
+    "a_numeric": null,
+    "a_numeric_prec": null,
+    "id": 106
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fnumerictypes_559424": {
+      "backfilled": 6,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

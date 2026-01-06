@@ -1,0 +1,84 @@
+sql> CREATE TABLE test.duplicatedscankey_611570 (id VARCHAR(8), data VARCHAR(2000))
+sql> INSERT INTO test.duplicatedscankey_611570 VALUES ('AAA', '1'), ('BBB', '2'), ('BBB', '3'), ('CCC', '4')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/duplicatedscankey_611570
+=== Run: Capture ===
+[
+  "acmeCo/test_capture/test/duplicatedscankey_611570",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "duplicatedscankey_611570"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "1",
+    "id": "AAA"
+  }
+]
+[
+  "acmeCo/test_capture/test/duplicatedscankey_611570",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "duplicatedscankey_611570"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "2",
+    "id": "BBB"
+  }
+]
+[
+  "acmeCo/test_capture/test/duplicatedscankey_611570",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "duplicatedscankey_611570"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "3",
+    "id": "BBB"
+  }
+]
+[
+  "acmeCo/test_capture/test/duplicatedscankey_611570",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "duplicatedscankey_611570"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "4",
+    "id": "CCC"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fduplicatedscankey_611570": {
+      "backfilled": 4,
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

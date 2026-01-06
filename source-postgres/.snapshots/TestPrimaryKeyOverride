@@ -1,0 +1,108 @@
+sql> CREATE TABLE test.primarykeyoverride_709926 (id INTEGER PRIMARY KEY, name TEXT, value INTEGER)
+sql> INSERT INTO test.primarykeyoverride_709926 VALUES (1, 'charlie', 100), (2, 'alice', 200)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/primarykeyoverride_709926
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/primarykeyoverride_709926",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "primarykeyoverride_709926"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2,
+    "name": "alice",
+    "value": 200
+  }
+]
+[
+  "acmeCo/test_capture/test/primarykeyoverride_709926",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "primarykeyoverride_709926"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1,
+    "name": "charlie",
+    "value": 100
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fprimarykeyoverride_709926": {
+      "backfilled": 2,
+      "key_columns": [
+        "name"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.primarykeyoverride_709926 VALUES (3, 'bob', 300), (4, 'dave', 400)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/primarykeyoverride_709926",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "primarykeyoverride_709926",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 3,
+    "name": "bob",
+    "value": 300
+  }
+]
+[
+  "acmeCo/test_capture/test/primarykeyoverride_709926",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "primarykeyoverride_709926",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 4,
+    "name": "dave",
+    "value": 400
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fprimarykeyoverride_709926": {
+      "backfilled": 2,
+      "key_columns": [
+        "name"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

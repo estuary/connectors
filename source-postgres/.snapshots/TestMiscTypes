@@ -1,0 +1,212 @@
+sql> CREATE TABLE test.misctypes_682629 (
+		id INTEGER PRIMARY KEY,
+		a_uuid UUID,
+		a_tsvector TSVECTOR,
+		a_tsquery TSQUERY,
+		a_money MONEY
+	)
+sql> INSERT INTO test.misctypes_682629 VALUES
+		(1, 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a fat cat sat', 'fat & cat', '$123.45'),
+		(2, '00000000-0000-0000-0000-000000000000', 'the quick brown fox', 'quick | fox', '$0.00'),
+		(3, 'ffffffff-ffff-ffff-ffff-ffffffffffff', '''simple''', 'simple', '-$999.99'),
+		(4, NULL, NULL, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/test/misctypes_682629
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/misctypes_682629",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "misctypes_682629"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_money": "$123.45",
+    "a_tsquery": "'fat' & 'cat'",
+    "a_tsvector": "'a' 'cat' 'fat' 'sat'",
+    "a_uuid": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/misctypes_682629",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "misctypes_682629"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_money": "$0.00",
+    "a_tsquery": "'quick' | 'fox'",
+    "a_tsvector": "'brown' 'fox' 'quick' 'the'",
+    "a_uuid": "00000000-0000-0000-0000-000000000000",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/misctypes_682629",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "misctypes_682629"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_money": "-$999.99",
+    "a_tsquery": "'simple'",
+    "a_tsvector": "'simple'",
+    "a_uuid": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/misctypes_682629",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "misctypes_682629"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_money": null,
+    "a_tsquery": null,
+    "a_tsvector": null,
+    "a_uuid": null,
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fmisctypes_682629": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.misctypes_682629 VALUES
+		(101, 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a fat cat sat', 'fat & cat', '$123.45'),
+		(102, '00000000-0000-0000-0000-000000000000', 'the quick brown fox', 'quick | fox', '$0.00'),
+		(103, 'ffffffff-ffff-ffff-ffff-ffffffffffff', '''simple''', 'simple', '-$999.99'),
+		(104, NULL, NULL, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/misctypes_682629",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "misctypes_682629",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_money": "$123.45",
+    "a_tsquery": "'fat' & 'cat'",
+    "a_tsvector": "'a' 'cat' 'fat' 'sat'",
+    "a_uuid": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/misctypes_682629",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "misctypes_682629",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_money": "$0.00",
+    "a_tsquery": "'quick' | 'fox'",
+    "a_tsvector": "'brown' 'fox' 'quick' 'the'",
+    "a_uuid": "00000000-0000-0000-0000-000000000000",
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/misctypes_682629",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "misctypes_682629",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_money": "-$999.99",
+    "a_tsquery": "'simple'",
+    "a_tsvector": "'simple'",
+    "a_uuid": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+    "id": 103
+  }
+]
+[
+  "acmeCo/test_capture/test/misctypes_682629",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "misctypes_682629",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_money": null,
+    "a_tsquery": null,
+    "a_tsvector": null,
+    "a_uuid": null,
+    "id": 104
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fmisctypes_682629": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

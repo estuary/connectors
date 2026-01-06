@@ -1,0 +1,240 @@
+sql> CREATE TABLE test.jsontypes_447235 (
+		id INTEGER PRIMARY KEY,
+		a_json JSON,
+		a_jsonb JSONB,
+		a_jsonpath JSONPATH,
+		a_xml XML
+	)
+sql> INSERT INTO test.jsontypes_447235 VALUES
+		(1, '{"name": "test", "value": 123}', '{"name": "test", "value": 123}', '$.name', '<root><item>hello</item></root>'),
+		(2, '[1, 2, 3]', '[1, 2, 3]', '$[0]', '<empty/>'),
+		(3, 'null', 'null', '$', '<data attr="value">content</data>'),
+		(4, NULL, NULL, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/test/jsontypes_447235
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/jsontypes_447235",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "jsontypes_447235"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_json": {
+      "name": "test",
+      "value": 123
+    },
+    "a_jsonb": {
+      "name": "test",
+      "value": 123
+    },
+    "a_jsonpath": "$.\"name\"",
+    "a_xml": "<root><item>hello</item></root>",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/jsontypes_447235",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "jsontypes_447235"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_json": [
+      1,
+      2,
+      3
+    ],
+    "a_jsonb": [
+      1,
+      2,
+      3
+    ],
+    "a_jsonpath": "$[0]",
+    "a_xml": "<empty/>",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/jsontypes_447235",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "jsontypes_447235"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_json": null,
+    "a_jsonb": null,
+    "a_jsonpath": "$",
+    "a_xml": "<data attr=\"value\">content</data>",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/jsontypes_447235",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "jsontypes_447235"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_json": null,
+    "a_jsonb": null,
+    "a_jsonpath": null,
+    "a_xml": null,
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fjsontypes_447235": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.jsontypes_447235 VALUES
+		(101, '{"name": "test", "value": 123}', '{"name": "test", "value": 123}', '$.name', '<root><item>hello</item></root>'),
+		(102, '[1, 2, 3]', '[1, 2, 3]', '$[0]', '<empty/>'),
+		(103, 'null', 'null', '$', '<data attr="value">content</data>'),
+		(104, NULL, NULL, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/jsontypes_447235",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "jsontypes_447235",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_json": {
+      "name": "test",
+      "value": 123
+    },
+    "a_jsonb": {
+      "name": "test",
+      "value": 123
+    },
+    "a_jsonpath": "$.\"name\"",
+    "a_xml": "<root><item>hello</item></root>",
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/jsontypes_447235",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "jsontypes_447235",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_json": [
+      1,
+      2,
+      3
+    ],
+    "a_jsonb": [
+      1,
+      2,
+      3
+    ],
+    "a_jsonpath": "$[0]",
+    "a_xml": "<empty/>",
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/jsontypes_447235",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "jsontypes_447235",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_json": null,
+    "a_jsonb": null,
+    "a_jsonpath": "$",
+    "a_xml": "<data attr=\"value\">content</data>",
+    "id": 103
+  }
+]
+[
+  "acmeCo/test_capture/test/jsontypes_447235",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "jsontypes_447235",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_json": null,
+    "a_jsonb": null,
+    "a_jsonpath": null,
+    "a_xml": null,
+    "id": 104
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fjsontypes_447235": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

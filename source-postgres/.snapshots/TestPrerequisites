@@ -1,0 +1,77 @@
+sql> CREATE TABLE test.prerequisites_944868_a (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE test.prerequisites_944868_b (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE test.prerequisites_944868_c (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO test.prerequisites_944868_a VALUES (0, 'hello'), (1, 'world')
+=== Discover: Discover Tables A, B, C ===
+acmeCo/test_capture/test/prerequisites_944868_a
+acmeCo/test_capture/test/prerequisites_944868_b
+acmeCo/test_capture/test/prerequisites_944868_c
+=== Run: Capture A+B+C (All Tables Exist) ===
+[
+  "acmeCo/test_capture/test/prerequisites_944868_a",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "prerequisites_944868_a"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "hello",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/prerequisites_944868_a",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "prerequisites_944868_a"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "world",
+    "id": 1
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fprerequisites_944868_a": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "test%2Fprerequisites_944868_b": {
+      "backfilled": 0,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "test%2Fprerequisites_944868_c": {
+      "backfilled": 0,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> DROP TABLE test.prerequisites_944868_c
+=== Run: Capture A+B+C (Table C Dropped) ===
+error: flowctl preview failed:
+the capture cannot run due to the following error(s):
+ - user "flow_capture" cannot read from table "test.prerequisites_944868_c"
+
+

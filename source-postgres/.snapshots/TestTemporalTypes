@@ -1,0 +1,324 @@
+sql> CREATE TABLE test.temporaltypes_137023 (
+		id INTEGER PRIMARY KEY,
+		a_date DATE,
+		a_time TIME,
+		a_timetz TIME WITH TIME ZONE,
+		a_timestamp TIMESTAMP,
+		a_timestamptz TIMESTAMPTZ,
+		a_interval INTERVAL
+	)
+sql> INSERT INTO test.temporaltypes_137023 VALUES
+		(1, '2024-01-15', '14:30:00', '14:30:00+05:30', '2024-01-15 14:30:00', '2024-01-15 14:30:00+00', '1 year 2 months 3 days'),
+		(2, '1999-12-31', '23:59:59.999999', '23:59:59.999999-08:00', '1999-12-31 23:59:59.999999', '1999-12-31 23:59:59.999999+00', '5 hours 30 minutes'),
+		(3, 'epoch', 'allballs', '00:00:00+00', 'epoch', 'epoch', '0'),
+		(4, 'infinity', NULL, NULL, 'infinity', 'infinity', NULL),
+		(5, '-infinity', NULL, NULL, '-infinity', '-infinity', NULL),
+		(6, NULL, NULL, NULL, NULL, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/test/temporaltypes_137023
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/temporaltypes_137023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "temporaltypes_137023"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "2024-01-15",
+    "a_interval": "14 mon 3 day",
+    "a_time": "14:30:00Z",
+    "a_timestamp": "2024-01-15T14:30:00Z",
+    "a_timestamptz": "2024-01-15T06:30:00-08:00",
+    "a_timetz": "14:30:00+05:30",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/temporaltypes_137023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "temporaltypes_137023"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "1999-12-31",
+    "a_interval": " 05:30:00",
+    "a_time": "23:59:59.999999Z",
+    "a_timestamp": "1999-12-31T23:59:59.999999Z",
+    "a_timestamptz": "1999-12-31T15:59:59.999999-08:00",
+    "a_timetz": "23:59:59.999999-08:00",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/temporaltypes_137023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "temporaltypes_137023"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "1970-01-01",
+    "a_interval": "",
+    "a_time": "00:00:00Z",
+    "a_timestamp": "1970-01-01T00:00:00Z",
+    "a_timestamptz": "1969-12-31T16:00:00-08:00",
+    "a_timetz": "00:00:00Z",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/temporaltypes_137023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "temporaltypes_137023"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "9999-12-31",
+    "a_interval": null,
+    "a_time": null,
+    "a_timestamp": "9999-12-31T23:59:59Z",
+    "a_timestamptz": "9999-12-31T23:59:59Z",
+    "a_timetz": null,
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/temporaltypes_137023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "temporaltypes_137023"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "0000-01-01",
+    "a_interval": null,
+    "a_time": null,
+    "a_timestamp": "0000-01-01T00:00:00Z",
+    "a_timestamptz": "0000-01-01T00:00:00Z",
+    "a_timetz": null,
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/test/temporaltypes_137023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "temporaltypes_137023"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": null,
+    "a_interval": null,
+    "a_time": null,
+    "a_timestamp": null,
+    "a_timestamptz": null,
+    "a_timetz": null,
+    "id": 6
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Ftemporaltypes_137023": {
+      "backfilled": 6,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.temporaltypes_137023 VALUES
+		(101, '2024-01-15', '14:30:00', '14:30:00+05:30', '2024-01-15 14:30:00', '2024-01-15 14:30:00+00', '1 year 2 months 3 days'),
+		(102, '1999-12-31', '23:59:59.999999', '23:59:59.999999-08:00', '1999-12-31 23:59:59.999999', '1999-12-31 23:59:59.999999+00', '5 hours 30 minutes'),
+		(103, 'epoch', 'allballs', '00:00:00+00', 'epoch', 'epoch', '0'),
+		(104, 'infinity', NULL, NULL, 'infinity', 'infinity', NULL),
+		(105, '-infinity', NULL, NULL, '-infinity', '-infinity', NULL),
+		(106, NULL, NULL, NULL, NULL, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/temporaltypes_137023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "temporaltypes_137023",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "2024-01-15",
+    "a_interval": "14 mon 3 day",
+    "a_time": "14:30:00Z",
+    "a_timestamp": "2024-01-15T14:30:00Z",
+    "a_timestamptz": "2024-01-15T06:30:00-08:00",
+    "a_timetz": "14:30:00+05:30",
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/temporaltypes_137023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "temporaltypes_137023",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "1999-12-31",
+    "a_interval": " 05:30:00",
+    "a_time": "23:59:59.999999Z",
+    "a_timestamp": "1999-12-31T23:59:59.999999Z",
+    "a_timestamptz": "1999-12-31T15:59:59.999999-08:00",
+    "a_timetz": "23:59:59.999999-08:00",
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/temporaltypes_137023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "temporaltypes_137023",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "1970-01-01",
+    "a_interval": "",
+    "a_time": "00:00:00Z",
+    "a_timestamp": "1970-01-01T00:00:00Z",
+    "a_timestamptz": "1969-12-31T16:00:00-08:00",
+    "a_timetz": "00:00:00Z",
+    "id": 103
+  }
+]
+[
+  "acmeCo/test_capture/test/temporaltypes_137023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "temporaltypes_137023",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "9999-12-31",
+    "a_interval": null,
+    "a_time": null,
+    "a_timestamp": "9999-12-31T23:59:59Z",
+    "a_timestamptz": "9999-12-31T23:59:59Z",
+    "a_timetz": null,
+    "id": 104
+  }
+]
+[
+  "acmeCo/test_capture/test/temporaltypes_137023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "temporaltypes_137023",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": "0000-01-01",
+    "a_interval": null,
+    "a_time": null,
+    "a_timestamp": "0000-01-01T00:00:00Z",
+    "a_timestamptz": "0000-01-01T00:00:00Z",
+    "a_timetz": null,
+    "id": 105
+  }
+]
+[
+  "acmeCo/test_capture/test/temporaltypes_137023",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "temporaltypes_137023",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_date": null,
+    "a_interval": null,
+    "a_time": null,
+    "a_timestamp": null,
+    "a_timestamptz": null,
+    "a_timetz": null,
+    "id": 106
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Ftemporaltypes_137023": {
+      "backfilled": 6,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
