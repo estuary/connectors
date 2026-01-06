@@ -18,7 +18,7 @@ import (
 // which controls whether change events include full row contents or just the
 // primary keys of the "before" state.
 func TestReplicaIdentity(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH'), (3, 'Three'), (4, 'Four')`)
 	tc.Discover("Discover Test Table")
@@ -38,7 +38,7 @@ func TestReplicaIdentity(t *testing.T) {
 }
 
 func TestToastColumns(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, other INTEGER, data TEXT)`)
 
 	// Table is created with REPLICA IDENTITY DEFAULT, which does *not* include
@@ -82,7 +82,7 @@ func TestSlotLSNAdvances(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode.")
 	}
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 
 	// Disable SHUTDOWN_AFTER_POLLING so the capture runs indefinitely until cancelled
 	//
@@ -141,7 +141,7 @@ func TestSlotLSNAdvances(t *testing.T) {
 }
 
 func TestViewDiscovery(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 
 	var cleanup = func() {
 		db.QuietExec(t, `DROP VIEW IF EXISTS <NAME>_simpleview`)
@@ -165,7 +165,7 @@ func TestViewDiscovery(t *testing.T) {
 }
 
 func TestSkipBackfills(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_c`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -189,7 +189,7 @@ func TestSkipBackfills(t *testing.T) {
 // TestTruncatedTables exercises table truncation behavior.
 // Currently truncation is ignored and further changes are replicated normally.
 func TestTruncatedTables(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one'), (2, 'two')`)
@@ -208,7 +208,7 @@ func TestTruncatedTables(t *testing.T) {
 
 // TestTrickyColumnNames exercises the capture of a table with difficult column names.
 func TestTrickyColumnNames(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `("Meta/""wtf""~ID" INTEGER PRIMARY KEY, "table" TEXT, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one', 'aaa'), (2, 'two', 'bbb')`)
 	tc.Discover("Discover Tables")
@@ -221,7 +221,7 @@ func TestTrickyColumnNames(t *testing.T) {
 // TestCursorResume sets up a capture with a (string, int) primary key and a backfill
 // chunk size of 1 row, so that every row backfilled goes through FDB key serialization.
 func TestCursorResume(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(epoch VARCHAR(8), count INTEGER, data TEXT, PRIMARY KEY (epoch, count))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		('aaa', 1, 'bvzf'), ('aaa', 2, 'ukwh'), ('aaa', 3, 'lntg'), ('bbb', -100, 'bycz'),
@@ -245,7 +245,7 @@ func TestCursorResume(t *testing.T) {
 //   - Rows modified AFTER the backfill cursor are filtered (picked up in backfill)
 //   - The backfill correctly resumes from the cursor position
 func TestComplexDataset(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 
 	// Generate 25 rows: 5 groups (A-E) × 5 ids (0-4) each
 	db.CreateTable(t, `<NAME>`, `(grp VARCHAR(8), id INTEGER, data TEXT, PRIMARY KEY (grp, id))`)
@@ -295,7 +295,7 @@ func TestComplexDataset(t *testing.T) {
 // TestUserTypes exercises discovery and capture of tables using various user-defined types.
 func TestUserTypes(t *testing.T) {
 	t.Run("Domain", func(t *testing.T) {
-		var db, tc = postgresBlackboxSetup(t)
+		var db, tc = blackboxTestSetup(t)
 		db.QuietExec(t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`)
 		db.Exec(t, `CREATE DOMAIN UserDomain AS TEXT`)
 		t.Cleanup(func() { db.QuietExec(t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`) })
@@ -310,7 +310,7 @@ func TestUserTypes(t *testing.T) {
 	})
 
 	t.Run("Enum", func(t *testing.T) {
-		var db, tc = postgresBlackboxSetup(t)
+		var db, tc = blackboxTestSetup(t)
 		db.QuietExec(t, `DROP TYPE IF EXISTS UserEnum CASCADE`)
 		db.Exec(t, `CREATE TYPE UserEnum AS ENUM ('red', 'green', 'blue')`)
 		t.Cleanup(func() { db.QuietExec(t, `DROP TYPE IF EXISTS UserEnum CASCADE`) })
@@ -325,7 +325,7 @@ func TestUserTypes(t *testing.T) {
 	})
 
 	t.Run("Tuple", func(t *testing.T) {
-		var db, tc = postgresBlackboxSetup(t)
+		var db, tc = blackboxTestSetup(t)
 		db.QuietExec(t, `DROP TYPE IF EXISTS UserTuple CASCADE`)
 		db.Exec(t, `CREATE TYPE UserTuple AS (epoch INTEGER, count INTEGER, data TEXT)`)
 		t.Cleanup(func() { db.QuietExec(t, `DROP TYPE IF EXISTS UserTuple CASCADE`) })
@@ -340,7 +340,7 @@ func TestUserTypes(t *testing.T) {
 	})
 
 	t.Run("Range", func(t *testing.T) {
-		var db, tc = postgresBlackboxSetup(t)
+		var db, tc = blackboxTestSetup(t)
 		db.QuietExec(t, `DROP TYPE IF EXISTS UserRange CASCADE`)
 		db.Exec(t, `CREATE TYPE UserRange AS RANGE (subtype = int4)`)
 		t.Cleanup(func() { db.QuietExec(t, `DROP TYPE IF EXISTS UserRange CASCADE`) })
@@ -357,7 +357,7 @@ func TestUserTypes(t *testing.T) {
 
 // TestCaptureCapitalization exercises tables with quoted names containing capital letters.
 func TestCaptureCapitalization(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 
 	var cleanup = func() {
 		db.QuietExec(t, `DROP TABLE IF EXISTS "<SCHEMA>"."tbl_<ID>_AAaaAA"`)
@@ -381,7 +381,7 @@ func TestCaptureOversizedFields(t *testing.T) {
 	var largeText = strings.Repeat("data", (truncateColumnThreshold/4)-1) + "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 	var largeJSON = fmt.Sprintf(`{"text": "%s"}`, largeText)
 
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, v_text TEXT, v_bytea BYTEA, v_json JSON, v_jsonb JSONB)`)
 	db.QuietExec(t, `INSERT INTO <NAME> (id, v_text)  VALUES (10, '`+largeText+`')`)
 	db.QuietExec(t, `INSERT INTO <NAME> (id, v_bytea) VALUES (11, '`+largeText+`')`)
@@ -398,7 +398,7 @@ func TestCaptureOversizedFields(t *testing.T) {
 }
 
 func TestCaptureAfterSlotDropped(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 
 	// Run a normal capture
@@ -426,7 +426,7 @@ func TestCaptureAfterSlotDropped(t *testing.T) {
 // TestCaptureDomainJSONB exercises an edge case where a user-defined domain type
 // has a concrete type which uses a custom decoder registered in the PGX type map.
 func TestCaptureDomainJSONB(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.QuietExec(t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`)
 	db.Exec(t, `CREATE DOMAIN UserDomain AS JSONB`)
 	t.Cleanup(func() { db.QuietExec(t, `DROP DOMAIN IF EXISTS UserDomain CASCADE`) })
@@ -441,7 +441,7 @@ func TestCaptureDomainJSONB(t *testing.T) {
 }
 
 func TestDroppedAndRecreatedTable(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	tc.Discover("Discover Tables")
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
@@ -459,7 +459,7 @@ func TestDroppedAndRecreatedTable(t *testing.T) {
 }
 
 func TestCIText(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data CITEXT, arr CITEXT[])`)
 	tc.DiscoverFull("Discover Tables")
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero', '{a,b}'), (1, 'one', '{c,d}')`)
@@ -470,7 +470,7 @@ func TestCIText(t *testing.T) {
 }
 
 func TestPrimaryKeyUpdate(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	tc.Discover("Discover Tables")
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
@@ -484,7 +484,7 @@ func TestPrimaryKeyUpdate(t *testing.T) {
 }
 
 func TestGeneratedColumn(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, a VARCHAR(32), b VARCHAR(32), generated VARCHAR(64) GENERATED ALWAYS AS (COALESCE(a, b)) STORED)`)
 	tc.DiscoverFull("Discover Tables")
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'a0', 'b0'), (1, null, 'b1'), (2, 'a2', null), (3, null, null)`)
@@ -511,7 +511,7 @@ func TestFeatureFlagFlattenArrays(t *testing.T) {
 		{"Disabled", "no_flatten_arrays"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			var db, tc = postgresBlackboxSetup(t)
+			var db, tc = blackboxTestSetup(t)
 			db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, text_array TEXT[], int_array INTEGER[], nested_array INTEGER[][])`)
 			db.Exec(t, `INSERT INTO <NAME> VALUES
 				(1, ARRAY['a','b','c'], ARRAY[1,2,3], ARRAY[[1,2],[3,4]]),
@@ -528,7 +528,7 @@ func TestFeatureFlagFlattenArrays(t *testing.T) {
 }
 
 func TestXMINBackfill(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 
 	// Insert some initial rows, then establish the current server XID.
@@ -550,7 +550,7 @@ func TestXMINBackfill(t *testing.T) {
 }
 
 func TestMultidimensionalArrays(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, arr TEXT[])`)
 
 	require.NoError(t, tc.Capture.EditConfig("advanced.feature_flags", "multidimensional_arrays"))
@@ -595,7 +595,7 @@ func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 		{"Disabled", "no_emit_sourced_schemas"},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			var db, tc = postgresBlackboxSetup(t)
+			var db, tc = blackboxTestSetup(t)
 			db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(32))`)
 			db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'hello'), (2, 'world')`)
 
@@ -611,7 +611,7 @@ func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 
 // TestPartitionedCTIDBackfill tests the handling of partitioned tables with CTID-based backfill.
 func TestPartitionedCTIDBackfill(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 
 	// Create a partitioned table with three partitions
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT) PARTITION BY RANGE (id)`)
@@ -637,7 +637,7 @@ func TestPartitionedCTIDBackfill(t *testing.T) {
 
 // TestCaptureAsPartitions verifies that the "Capture Partitioned Tables as Partitions" advanced setting works as intended.
 func TestCaptureAsPartitions(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 
 	// Create a partitioned table with quarterly partitions
 	db.CreateTable(t, `<NAME>`, `(logdate DATE PRIMARY KEY, value TEXT) PARTITION BY RANGE (logdate)`)
@@ -698,7 +698,7 @@ func TestCaptureAsPartitions(t *testing.T) {
 // Values containing the raw UTF-8 bytes representing those codepoints are rejected
 // by the database, and similarly JSONB columns decode the escapes and reject them.
 func TestUnpairedSurrogatesInJSON(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data JSON)`)
 
 	// Backfill inserts with unpaired surrogates in JSON
@@ -724,7 +724,7 @@ func TestUnpairedSurrogatesInJSON(t *testing.T) {
 
 // TestSourceTag verifies the output of a capture with /advanced/source_tag set
 func TestSourceTag(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	require.NoError(t, tc.Capture.EditConfig("advanced.source_tag", "example_source_tag_1234"))
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
@@ -738,7 +738,7 @@ func TestSourceTag(t *testing.T) {
 // TestBackfillPriority checks that tables with higher priority values are
 // backfilled completely before tables with lower priority values.
 func TestBackfillPriority(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 
 	// Create five tables with 5 rows each
 	db.CreateTable(t, `<NAME>_def`, `(id INTEGER PRIMARY KEY, data TEXT)`)

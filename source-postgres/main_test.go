@@ -67,7 +67,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func postgresBlackboxSetup(t testing.TB) (*postgresTestDatabase, *blackbox.TranscriptCapture) {
+func blackboxTestSetup(t testing.TB) (*postgresTestDatabase, *blackbox.TranscriptCapture) {
 	t.Helper()
 
 	// TODO(wgd): Probably scoping this to just flowctl invocations would be cleaner, but this works
@@ -191,7 +191,7 @@ func setResourceBackfillMode(t *testing.T, binding *flow.CaptureSpec_Binding, mo
 }
 
 func TestCapitalizedTables(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 
 	// Create table with quoted capitalized name (outside of template system)
 	db.QuietExec(t, `DROP TABLE IF EXISTS "<SCHEMA>"."USERS"`)

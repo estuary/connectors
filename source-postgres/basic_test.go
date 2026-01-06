@@ -10,14 +10,14 @@ import (
 
 // TestSpec verifies the connector's spec output against a snapshot.
 func TestSpec(t *testing.T) {
-	var _, tc = postgresBlackboxSetup(t)
+	var _, tc = blackboxTestSetup(t)
 	tc.Spec("Get Connector Spec")
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 // TestSimpleDiscovery exercises discovery of a single, simple table.
 func TestSimpleDiscovery(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(a INTEGER PRIMARY KEY, b VARCHAR(2000), c REAL NOT NULL, d VARCHAR(255))`)
 	tc.DiscoverFull("Discover Tables")
 	cupaloy.SnapshotT(t, tc.Transcript.String())
@@ -25,7 +25,7 @@ func TestSimpleDiscovery(t *testing.T) {
 
 // TestSimpleCapture exercises the simplest possible backfill of a small table.
 func TestSimpleCapture(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
 	tc.Discover("Discover Tables")
@@ -37,7 +37,7 @@ func TestSimpleCapture(t *testing.T) {
 // initial table scan and the second capture will use replication to receive
 // additional inserts performed after the first capture.
 func TestReplicationInserts(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
 	tc.Discover("Discover Tables")
@@ -51,7 +51,7 @@ func TestReplicationInserts(t *testing.T) {
 // initial table scan and the second capture will use replication to receive
 // additional inserts and row updates performed after the first capture.
 func TestReplicationUpdates(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
 	tc.Discover("Discover Tables")
@@ -67,7 +67,7 @@ func TestReplicationUpdates(t *testing.T) {
 // initial table scan and the second capture will use replication to receive
 // additional inserts and deletions performed after the first capture.
 func TestReplicationDeletes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
 	tc.Discover("Discover Tables")
@@ -82,7 +82,7 @@ func TestReplicationDeletes(t *testing.T) {
 // TestEmptyTable leaves the table empty during the initial table backfill
 // and only adds data after replication has begun.
 func TestEmptyTable(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	tc.Discover("Discover Tables")
 	tc.Run("Initial Backfill (Empty)", -1)
@@ -94,7 +94,7 @@ func TestEmptyTable(t *testing.T) {
 // TestIgnoredStreams checks that replicated changes are only reported
 // for tables which are configured in the catalog.
 func TestIgnoredStreams(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME>_a VALUES (0, 'zero'), (1, 'one')`)
@@ -111,7 +111,7 @@ func TestIgnoredStreams(t *testing.T) {
 // TestMultipleStreams exercises captures with multiple stream configured, as
 // well as adding/removing/re-adding a stream.
 func TestMultipleStreams(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_c`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -144,7 +144,7 @@ func TestMultipleStreams(t *testing.T) {
 // TODO(wgd): We need to do better at snapshotting capture error messages
 // in the black-box testing framework.
 func TestMissingTable(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	tc.Discover("Discover Tables")
@@ -157,7 +157,7 @@ func TestMissingTable(t *testing.T) {
 // the collection key shouldn't impact correctness of the capture even if multiple
 // rows have the same collection key value.
 func TestDuplicatedScanKey(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id VARCHAR(8), data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES ('AAA', '1'), ('BBB', '2'), ('BBB', '3'), ('CCC', '4')`)
 	tc.Discover("Discover Tables")
@@ -168,7 +168,7 @@ func TestDuplicatedScanKey(t *testing.T) {
 }
 
 func TestReplicationOnly(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one'), (2, 'two'), (3, 'three'), (4, 'four')`)
 	tc.Discover("Discover Tables")
@@ -181,14 +181,14 @@ func TestReplicationOnly(t *testing.T) {
 }
 
 func TestKeylessDiscovery(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(a INTEGER, b VARCHAR(2000), c REAL NOT NULL, d VARCHAR(255))`)
 	tc.DiscoverFull("Discover Tables")
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 func TestKeylessCapture(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one'), (2, 'two')`)
 	tc.Discover("Discover Tables")
@@ -202,7 +202,7 @@ func TestKeylessCapture(t *testing.T) {
 // TestCatalogPrimaryKey sets up a table with no primary key in the database
 // and instead specifies one in the catalog configuration.
 func TestCatalogPrimaryKey(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER, name TEXT, value INTEGER)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'alice', 100), (2, 'bob', 200)`)
 	tc.Discover("Discover Tables")
@@ -219,7 +219,7 @@ func TestCatalogPrimaryKey(t *testing.T) {
 // TestPrimaryKeyOverride sets up a table with a primary key, but
 // then overrides that via the catalog configuration.
 func TestPrimaryKeyOverride(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, name TEXT, value INTEGER)`)
 	// Names out of id order: charlie(1), alice(2), bob(3), dave(4)
 	// By name: alice, bob, charlie, dave -> ids 2, 3, 1, 4

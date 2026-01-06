@@ -10,7 +10,7 @@ import (
 )
 
 func TestScanKeyTimestamps(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(ts TIMESTAMP PRIMARY KEY, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		('1991-08-31T12:34:56.000Z', 'aood'),
@@ -116,7 +116,7 @@ func TestScanKeyTypes(t *testing.T) {
 		}},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
-			var db, tc = postgresBlackboxSetup(t)
+			var db, tc = blackboxTestSetup(t)
 			db.CreateTable(t, `<NAME>`, fmt.Sprintf(`(key %s PRIMARY KEY, data TEXT)`, testCase.ColumnType))
 			db.Exec(t, `INSERT INTO <NAME> VALUES `+strings.Join(testCase.Values, ", "))
 
@@ -129,7 +129,7 @@ func TestScanKeyTypes(t *testing.T) {
 }
 
 func TestEnumScanKey(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.QuietExec(t, `DROP TYPE IF EXISTS UserEnum CASCADE`)
 	db.Exec(t, `CREATE TYPE UserEnum AS ENUM ('red', 'green', 'blue')`)
 	t.Cleanup(func() { db.QuietExec(t, `DROP TYPE UserEnum CASCADE`) })
@@ -154,7 +154,7 @@ func TestEnumScanKey(t *testing.T) {
 // In theory we ought to test interval values 'infinity' and '-infinity' too,
 // but the PGX client library fails to parse those at all right now.
 func TestSpecialTemporalValues(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, a_date DATE, a_time TIME, a_timestamp TIMESTAMP)`)
 
 	// Backfill with special temporal values
@@ -178,7 +178,7 @@ func TestSpecialTemporalValues(t *testing.T) {
 
 // TestBinaryTypes exercises boolean, bytea, and bit types.
 func TestBinaryTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_bool BOOLEAN,
@@ -205,7 +205,7 @@ func TestBinaryTypes(t *testing.T) {
 // TestLongYearTimestamps validates that timestamps with 5-digit years can be
 // properly captured both during backfill and replication.
 func TestLongYearTimestamps(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, created_at TIMESTAMPTZ, description TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, '2023-01-01 12:30:45+00', 'Recent date'), (2, '12345-06-07 08:09:10+00', 'Far future date')`)
 	tc.Discover("Discover Tables")
@@ -217,7 +217,7 @@ func TestLongYearTimestamps(t *testing.T) {
 
 // TestIntegerTypes exercises integer, smallint, bigint, serial, and oid types.
 func TestIntegerTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_integer INTEGER,
@@ -243,7 +243,7 @@ func TestIntegerTypes(t *testing.T) {
 
 // TestFloatingPointTypes exercises real and double precision types.
 func TestFloatingPointTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_real REAL,
@@ -271,7 +271,7 @@ func TestFloatingPointTypes(t *testing.T) {
 
 // TestNumericTypes exercises decimal and numeric types.
 func TestNumericTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_decimal DECIMAL,
@@ -300,7 +300,7 @@ func TestNumericTypes(t *testing.T) {
 
 // TestStringTypes exercises varchar, char, and text types.
 func TestStringTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_varchar VARCHAR(100),
@@ -329,7 +329,7 @@ newlines', 'unicode: ñ', '✓', 'emoji: 🎉'),
 
 // TestTemporalTypes exercises date, time, timestamp, and interval types.
 func TestTemporalTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_date DATE,
@@ -361,7 +361,7 @@ func TestTemporalTypes(t *testing.T) {
 
 // TestGeometryTypes exercises PostgreSQL geometric types.
 func TestGeometryTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_point POINT,
@@ -388,7 +388,7 @@ func TestGeometryTypes(t *testing.T) {
 
 // TestNetworkTypes exercises inet, cidr, and MAC address types.
 func TestNetworkTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_inet INET,
@@ -414,7 +414,7 @@ func TestNetworkTypes(t *testing.T) {
 
 // TestMiscTypes exercises uuid, text search, and money types.
 func TestMiscTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_uuid UUID,
@@ -440,7 +440,7 @@ func TestMiscTypes(t *testing.T) {
 
 // TestJSONTypes exercises json, jsonb, jsonpath, and xml types.
 func TestJSONTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_json JSON,
@@ -466,7 +466,7 @@ func TestJSONTypes(t *testing.T) {
 
 // TestArrayTypes exercises various PostgreSQL array types.
 func TestArrayTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_integer INTEGER[],
@@ -495,7 +495,7 @@ func TestArrayTypes(t *testing.T) {
 
 // TestRangeTypes exercises PostgreSQL range types.
 func TestRangeTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_int4range INT4RANGE,
@@ -523,7 +523,7 @@ func TestRangeTypes(t *testing.T) {
 
 // TestExtensionTypes exercises extension types like citext.
 func TestExtensionTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_citext CITEXT,
@@ -547,7 +547,7 @@ func TestExtensionTypes(t *testing.T) {
 
 // TestSerialTypes exercises serial types which are always NOT NULL.
 func TestSerialTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_serial SERIAL,
@@ -571,7 +571,7 @@ func TestSerialTypes(t *testing.T) {
 
 // TestNotNullTypes exercises NOT NULL variants of types where nullability affects the schema.
 func TestNotNullTypes(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_integer INTEGER NOT NULL,

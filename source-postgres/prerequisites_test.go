@@ -10,7 +10,7 @@ import (
 // before capture. It creates three tables, discovers them, then drops one and verifies
 // that subsequent capture attempts fail with an appropriate error message.
 func TestPrerequisites(t *testing.T) {
-	var db, tc = postgresBlackboxSetup(t)
+	var db, tc = blackboxTestSetup(t)
 
 	// Create tables A (with data), B (empty), and C (will be dropped later)
 	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
