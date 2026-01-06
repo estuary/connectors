@@ -158,6 +158,10 @@ collections:
     - /customer.id
     - /campaign.id
     - /ad_group_criterion.criterion_id
+  acmeCo/geo_target_constant:
+    schema: geo_target_constant.schema.yaml
+    key:
+    - /geo_target_constant.id
   acmeCo/geographic_report:
     schema: geographic_report.schema.yaml
     key:

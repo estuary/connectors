@@ -195,6 +195,7 @@ class GoogleAdsStream(Stream, ABC):
             self.logger.debug("Received response. Parsing response")
             for response in response_records:
                 yield from self.parse_response(response)
+
         except GoogleAdsException as exc:
             self.logger.debug(
                 "Received exception",
@@ -589,3 +590,11 @@ class ClickView(IncrementalGoogleAdsStream):
     primary_key = ["click_view.gclid", "segments.date", "segments.ad_network_type"]
     days_of_data_storage = 90
     range_days = 1
+
+
+class GeoTargetConstant(GoogleAdsStream):
+    """
+    GeoTargetConstant stream: https://developers.google.com/google-ads/api/fields/v19/geo_target_constant
+    """
+
+    primary_key = ["geo_target_constant.id"]
