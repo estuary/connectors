@@ -12,7 +12,7 @@ from typing import (
     TypeVar,
     Generic,
 )
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field, model_validator
 
 from estuary_cdk.capture.common import (
     AccessToken,
@@ -82,20 +82,30 @@ else:
     )
 
 
-def default_start_date():
-    dt = datetime.now(tz=UTC) - timedelta(days=30)
-    return dt
+def default_start_date() -> datetime:
+    return datetime.now(tz=UTC) - timedelta(days=30)
 
 
-class EndpointConfig(BaseModel):
+class StoreConfig(BaseModel):
+    """Configuration for a single Shopify store."""
+
     store: str = Field(
-        title="Shopify Store",
-        description="Shopify store ID. Use the prefix of your admin URL e.g. https://{YOUR_STORE}.myshopify.com/admin",
+        title="Store Name",
+        description="Shopify store name (the prefix of your admin URL, e.g., 'mystore' for mystore.myshopify.com)",
     )
     credentials: AccessToken | OAuth2Credentials = Field(
         discriminator="credentials_title",
         title="Authentication",
     )
+
+
+class EndpointConfig(BaseModel):
+    stores: list[StoreConfig] = Field(
+        title="Shopify Stores",
+        description="One or more Shopify stores to capture. Each store requires its own credentials.",
+        min_length=1,
+    )
+
     start_date: AwareDatetime = Field(
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
         title="Start Date",
@@ -120,12 +130,39 @@ class EndpointConfig(BaseModel):
         json_schema_extra={"advanced": True},
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def transform_legacy_config(cls, data: Any) -> Any:
+        """Transform legacy single-store config to new stores array format.
+
+        Legacy format:
+            {"store": "mystore", "credentials": {...}, "start_date": "..."}
+
+        New format:
+            {"stores": [{"store": "mystore", "credentials": {...}}], "start_date": "..."}
+        """
+        if not isinstance(data, dict):
+            return data
+
+        # Already in new format or missing required legacy fields
+        if "stores" in data or "store" not in data or "credentials" not in data:
+            return data
+
+        # Transform legacy format to new format
+        store = data.pop("store")
+        credentials = data.pop("credentials")
+        data["stores"] = [{"store": store, "credentials": credentials}]
+
+        return data
+
 
 ConnectorState = GenericConnectorState[ResourceState]
 
 
-T = TypeVar('T')
-TShopifyGraphQLResource = TypeVar('TShopifyGraphQLResource', bound='ShopifyGraphQLResource')
+T = TypeVar("T")
+TShopifyGraphQLResource = TypeVar(
+    "TShopifyGraphQLResource", bound="ShopifyGraphQLResource"
+)
 
 
 class GraphQLErrorCode(StrEnum):
@@ -235,14 +272,22 @@ class BulkSpecificData(BaseModel, extra="forbid"):
     node: BulkOperationDetails
 
 
+class BulkOperationEdge(BaseModel, extra="forbid"):
+    node: BulkOperationDetails
+
+
+class BulkOperationsConnection(BaseModel, extra="forbid"):
+    edges: list[BulkOperationEdge]
+
+
+class BulkOperationsData(BaseModel, extra="forbid"):
+    """Response model for the bulkOperations query (API 2026-01+)."""
+
+    bulkOperations: BulkOperationsConnection
+
+
 class BulkSubmitData(BaseModel, extra="forbid"):
     bulkOperationRunQuery: BulkOperationRunQuery
-
-
-BulkJobCancelResponse = GraphQLResponse[BulkCancelData]
-BulkCurrentJobResponse = GraphQLResponse[BulkCurrentData]  
-BulkSpecificJobResponse = GraphQLResponse[BulkSpecificData]
-BulkJobSubmitResponse = GraphQLResponse[BulkSubmitData]
 
 
 # Names of Shopify plan types. Some plan types do not have access
@@ -332,6 +377,18 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
     SHOULD_USE_BULK_QUERIES: ClassVar[bool] = True
     QUALIFYING_SCOPES: ClassVar[set[str]] = set()
 
+    class Meta(BaseDocument.Meta):
+        store: str | None = Field(
+            default=None,
+            description="The Shopify store this document belongs to",
+        )
+
+    meta_: Meta = Field(  # type: ignore[override]
+        default_factory=lambda: ShopifyGraphQLResource.Meta(op="u"),
+        alias="_meta",
+        description="Document metadata",
+    )
+
     id: str
 
     def get_cursor_value(self) -> AwareDatetime:
@@ -405,10 +462,12 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
         query = f"""
         {{
             {cls.QUERY_ROOT}(
-                query: "updated_at:>='{lower_bound}' AND updated_at:<='{upper_bound}' {"AND " + query.strip() if query else ""}"
+                query: "updated_at:>='{lower_bound}' AND updated_at:<='{upper_bound}' {
+            "AND " + query.strip() if query else ""
+        }"
                 {f"sortKey: {cls.SORT_KEY}" if cls.SORT_KEY else ""}
                 {f"first: {first}" if first else ""}
-                {f"after: \"{after}\"" if after else ""}
+                {f'after: "{after}"' if after else ""}
             ) {{
                 edges {{
                     node {{
@@ -419,10 +478,14 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
                         {cls.QUERY}
                     }}
                 }}
-                {f"""pageInfo {{
+                {
+            '''pageInfo {
                     hasNextPage
                     endCursor
-                }}""" if first else ""}
+                }'''
+            if first
+            else ""
+        }
             }}
         }}
         """
@@ -454,7 +517,7 @@ class BaseResponseData(BaseModel, Generic[TShopifyGraphQLResource]):
     def edges(self) -> list[Edge[TShopifyGraphQLResource]]:
         raise NotImplementedError("edges property must be implemented by subclass")
 
-    @property 
+    @property
     def page_info(self) -> PageInfo:
         raise NotImplementedError("page_info property must be implemented by subclass")
 
@@ -466,7 +529,9 @@ class BaseResponseData(BaseModel, Generic[TShopifyGraphQLResource]):
 # create_response_data_model dynamically creates a model for the data field of
 # each response. Models are created dynamically since the query root/field name
 # under the "data" field is different for each query.
-def create_response_data_model(resource_type: type[TShopifyGraphQLResource]) -> type[BaseResponseData[TShopifyGraphQLResource]]:
+def create_response_data_model(
+    resource_type: type[TShopifyGraphQLResource],
+) -> type[BaseResponseData[TShopifyGraphQLResource]]:
     """Factory function to create typed GraphQL data field models."""
     query_root = resource_type.QUERY_ROOT
 
@@ -482,6 +547,8 @@ def create_response_data_model(resource_type: type[TShopifyGraphQLResource]) -> 
         "page_info": property(get_page_info),
     }
 
-    DataModel = type(f"{query_root.title()}Data", (BaseResponseData[resource_type],), class_dict)
+    DataModel = type(
+        f"{query_root.title()}Data", (BaseResponseData[resource_type],), class_dict
+    )
 
     return DataModel
