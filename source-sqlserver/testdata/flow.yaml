@@ -1,0 +1,12 @@
+captures:
+  acmeCo/test_capture/source-sqlserver:
+    endpoint:
+      local:
+        command: ["go", "run", "./source-sqlserver"]
+        config:
+          address: "localhost:1433"
+          database: test
+          user: flow_capture
+          password: we2rie1E
+        protobuf: true
+    bindings: []

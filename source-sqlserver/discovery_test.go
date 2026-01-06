@@ -1,87 +1,93 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"regexp"
-	"strings"
 	"testing"
+
+	"github.com/bradleyjkemp/cupaloy"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSecondaryIndexDiscovery(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var testName = strings.TrimPrefix(t.Name(), "Test")
-
 	t.Run("pk_and_index", func(t *testing.T) {
-		var uniqueID = "g14228"
-		var tableName = tb.CreateTable(ctx, t, uniqueID, "(k1 INTEGER PRIMARY KEY, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)")
-		var indexName = fmt.Sprintf("UX_%s_%s_k23", testName, uniqueID)
-		tb.Query(ctx, t, fmt.Sprintf(`CREATE UNIQUE INDEX %s ON %s (k2, k3)`, indexName, tableName))
-		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+		var db, tc = blackboxTestSetup(t)
+		db.CreateTable(t, `<NAME>`, `(k1 INTEGER PRIMARY KEY, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)`)
+		db.Exec(t, `CREATE UNIQUE INDEX UX_<ID>_k23 ON <NAME> (k2, k3)`)
+		tc.DiscoverFull("Discover Tables")
+		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("index_only", func(t *testing.T) {
-		var uniqueID = "g26313"
-		var tableName = tb.CreateTable(ctx, t, uniqueID, "(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)")
-		var indexName = fmt.Sprintf("UX_%s_%s_k23", testName, uniqueID)
-		tb.Query(ctx, t, fmt.Sprintf(`CREATE UNIQUE INDEX %s ON %s (k2, k3)`, indexName, tableName))
-		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+		var db, tc = blackboxTestSetup(t)
+		db.CreateTable(t, `<NAME>`, `(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)`)
+		db.Exec(t, `CREATE UNIQUE INDEX UX_<ID>_k23 ON <NAME> (k2, k3)`)
+		tc.DiscoverFull("Discover Tables")
+		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("nullable_index", func(t *testing.T) {
-		var uniqueID = "g31990"
-		var tableName = tb.CreateTable(ctx, t, uniqueID, "(k1 INTEGER, k2 INTEGER, k3 INTEGER, data TEXT)")
-		var indexName = fmt.Sprintf("UX_%s_%s_k23", testName, uniqueID)
-		tb.Query(ctx, t, fmt.Sprintf(`CREATE UNIQUE INDEX %s ON %s (k2, k3)`, indexName, tableName))
-		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+		var db, tc = blackboxTestSetup(t)
+		db.CreateTable(t, `<NAME>`, `(k1 INTEGER, k2 INTEGER, k3 INTEGER, data TEXT)`)
+		db.Exec(t, `CREATE UNIQUE INDEX UX_<ID>_k23 ON <NAME> (k2, k3)`)
+		tc.DiscoverFull("Discover Tables")
+		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("nonunique_index", func(t *testing.T) {
-		var uniqueID = "g22906"
-		var tableName = tb.CreateTable(ctx, t, uniqueID, "(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)")
-		var indexName = fmt.Sprintf("UX_%s_%s_k23", testName, uniqueID)
-		tb.Query(ctx, t, fmt.Sprintf(`CREATE INDEX %s ON %s (k2, k3)`, indexName, tableName))
-		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+		var db, tc = blackboxTestSetup(t)
+		db.CreateTable(t, `<NAME>`, `(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)`)
+		db.Exec(t, `CREATE INDEX UX_<ID>_k23 ON <NAME> (k2, k3)`)
+		tc.DiscoverFull("Discover Tables")
+		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("nothing", func(t *testing.T) {
-		var uniqueID = "g14307"
-		tb.CreateTable(ctx, t, uniqueID, "(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)")
-		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+		var db, tc = blackboxTestSetup(t)
+		db.CreateTable(t, `<NAME>`, `(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)`)
+		tc.DiscoverFull("Discover Tables")
+		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 }
 
 // TestIndexIncludedDiscovery tests discovery when a secondary unique index contains
 // some included non-key columns.
 func TestIndexIncludedDiscovery(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-	var testName = strings.TrimPrefix(t.Name(), "Test")
-
-	var uniqueID = "98476798"
-	var tableName = tb.CreateTable(ctx, t, uniqueID, "(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)")
-	var indexName = fmt.Sprintf("UX_%s_%s_k23", testName, uniqueID)
-	tb.Query(ctx, t, fmt.Sprintf(`CREATE UNIQUE INDEX %s ON %s (k2, k3) INCLUDE (k1)`, indexName, tableName))
-	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	var db, tc = blackboxTestSetup(t)
+	db.CreateTable(t, `<NAME>`, `(k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)`)
+	db.Exec(t, `CREATE UNIQUE INDEX UX_<ID>_k23 ON <NAME> (k2, k3) INCLUDE (k1)`)
+	tc.DiscoverFull("Discover Tables")
+	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 // TestDiscoverOnlyEnabled tests discovery table filtering when only CDC-enabled tables should be discovered.
 func TestDiscoverOnlyEnabled(t *testing.T) {
-	var tb, ctx = sqlserverTestBackend(t), context.Background()
-
-	// Create tables A, B, and C
-	var uniqueA, uniqueB, uniqueC = uniqueTableID(t, "a"), uniqueTableID(t, "b"), uniqueTableID(t, "c")
-	var _ = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var _ = tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data TEXT)")
-	var _ = tb.CreateTable(ctx, t, uniqueC, "(id INTEGER PRIMARY KEY, data TEXT)")
-
-	// Delete CDC instance for table B so only tables A and C should be discovered.
-	tb.Query(ctx, t, fmt.Sprintf(`EXEC sys.sp_cdc_disable_table @source_schema = '%s', @source_name = '%s', @capture_instance = 'all'`,
-		*testSchemaName,
-		"test_DiscoverOnlyEnabled_325570", // Known name of table B, a bit hacky to hard-code but it's already snapshotted so whatever.
-	))
 	t.Run("Disabled", func(t *testing.T) {
-		var cs = tb.CaptureSpec(ctx, t)
-		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB), regexp.MustCompile(uniqueC))
+		var db, tc = blackboxTestSetup(t)
+		// Create three tables
+		db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+		db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+		db.CreateTable(t, `<NAME>_c`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+
+		// Disable CDC for table B
+		var schemaName = *testSchemaName
+		var tableB = db.Expand(`<NAME>_b`)
+		var tableBShort = tableB[len(schemaName)+1:] // Strip schema prefix
+		db.QuietExec(t, fmt.Sprintf(`EXEC sys.sp_cdc_disable_table @source_schema = '%s', @source_name = '%s', @capture_instance = 'all'`, schemaName, tableBShort))
+
+		tc.Discover("Discover Tables (default - shows all)")
+		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 	t.Run("Enabled", func(t *testing.T) {
-		var cs = tb.CaptureSpec(ctx, t)
-		cs.EndpointSpec.(*Config).Advanced.DiscoverOnlyEnabled = true
-		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueA), regexp.MustCompile(uniqueB), regexp.MustCompile(uniqueC))
+		var db, tc = blackboxTestSetup(t)
+		// Create three tables
+		db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+		db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+		db.CreateTable(t, `<NAME>_c`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+
+		// Disable CDC for table B
+		var schemaName = *testSchemaName
+		var tableB = db.Expand(`<NAME>_b`)
+		var tableBShort = tableB[len(schemaName)+1:] // Strip schema prefix
+		db.QuietExec(t, fmt.Sprintf(`EXEC sys.sp_cdc_disable_table @source_schema = '%s', @source_name = '%s', @capture_instance = 'all'`, schemaName, tableBShort))
+
+		require.NoError(t, tc.Capture.EditConfig("advanced.discover_only_enabled", true))
+		tc.Discover("Discover Tables (only CDC-enabled)")
+		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 }
