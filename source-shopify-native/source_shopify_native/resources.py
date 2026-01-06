@@ -1,4 +1,5 @@
 import functools
+from copy import deepcopy
 from datetime import datetime, timedelta, UTC
 from logging import Logger
 from pydantic import AwareDatetime
@@ -19,8 +20,8 @@ import source_shopify_native.graphql as gql
 
 from .models import (
     OAUTH2_SPEC,
-    ConnectorState,
     AccessScopes,
+    ConnectorState,
     EndpointConfig,
     ShopifyGraphQLResource,
     ShopDetails,
@@ -151,41 +152,75 @@ def _create_initial_state(
     )
 
 
-def _migrate_legacy_state(
+def _reconcile_connector_state(
+    store_ids: list[str],
+    binding: CaptureBinding[ResourceConfig],
     state: ResourceState,
-    store_id: str,
     initial_state: ResourceState,
     task: Task,
-    binding: CaptureBinding[ResourceConfig],
 ) -> None:
-    """Migrate legacy flat state to dict-based state if needed.
+    """Reconcile connector state to ensure all stores have proper state entries.
 
-    Legacy state has ResourceState.Incremental directly in state.inc.
-    New state has {store_id: ResourceState.Incremental} in state.inc.
+    This handles:
+    1. Legacy flat state migration to dict-based state
+    2. Adding new stores to existing dict-based state
+
+    Args:
+        store_ids: List of store IDs that should have state entries.
+        binding: The capture binding being processed.
+        state: The current state (may be flat or dict-based).
+        initial_state: The initial state template for new entries.
+        task: The task for logging and checkpointing.
     """
-    # Check if state is already dict-based
-    if isinstance(state.inc, dict):
-        # Already migrated, but check if this store needs to be added
-        if store_id not in state.inc:
-            task.log.info(f"Adding state for new store: {store_id}")
-            assert isinstance(initial_state.inc, dict)
-            state.inc[store_id] = initial_state.inc[store_id]
-            if isinstance(state.backfill, dict) and isinstance(initial_state.backfill, dict):
-                state.backfill[store_id] = initial_state.backfill[store_id]
-            task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
-        return
+    should_checkpoint = False
 
-    # Migrate legacy flat state to dict-based
-    task.log.info(f"Migrating legacy state to dict-based for store: {store_id}")
+    # Handle legacy flat state migration
+    if isinstance(state.inc, ResourceState.Incremental):
+        # Legacy flat state - migrate to dict-based
+        if len(store_ids) != 1:
+            raise RuntimeError(
+                f"Cannot migrate legacy flat state with multiple stores ({len(store_ids)}). "
+                "Legacy captures should only have one store."
+            )
+        store_id = store_ids[0]
+        task.log.info(f"Migrating legacy flat state to dict-based for store: {store_id}")
 
-    legacy_inc = state.inc
-    state.inc = {store_id: legacy_inc}  # type: ignore[assignment]
+        legacy_inc = state.inc
+        state.inc = {store_id: legacy_inc}  # type: ignore[assignment]
 
-    if state.backfill is not None:
-        legacy_backfill = state.backfill
-        state.backfill = {store_id: legacy_backfill}  # type: ignore[assignment,dict-item]
+        if state.backfill is not None and isinstance(state.backfill, ResourceState.Backfill):
+            legacy_backfill = state.backfill
+            state.backfill = {store_id: legacy_backfill}  # type: ignore[assignment]
 
-    task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
+        should_checkpoint = True
+
+    # Handle adding new stores to existing dict-based state
+    elif isinstance(state.inc, dict) and isinstance(initial_state.inc, dict):
+        for store_id in store_ids:
+            inc_state_exists = store_id in state.inc
+            backfill_state_exists = (
+                isinstance(state.backfill, dict) and store_id in state.backfill
+            )
+
+            if not inc_state_exists and not backfill_state_exists:
+                task.log.info(f"Initializing new state for store: {store_id}")
+                state.inc[store_id] = deepcopy(initial_state.inc[store_id])
+                if isinstance(state.backfill, dict) and isinstance(initial_state.backfill, dict):
+                    state.backfill[store_id] = deepcopy(initial_state.backfill[store_id])
+                should_checkpoint = True
+            elif not inc_state_exists and backfill_state_exists:
+                # Edge case: backfill exists but incremental doesn't
+                task.log.info(
+                    f"Reinitializing state for store {store_id} due to missing incremental state."
+                )
+                state.inc[store_id] = deepcopy(initial_state.inc[store_id])
+                if isinstance(state.backfill, dict) and isinstance(initial_state.backfill, dict):
+                    state.backfill[store_id] = deepcopy(initial_state.backfill[store_id])
+                should_checkpoint = True
+
+    if should_checkpoint:
+        task.log.info(f"Checkpointing reconciled state for {binding.stateKey}.")
+        task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
 
 
 async def _check_plan_allows_pii(http: HTTPMixin, url: str, log: Logger) -> bool:
@@ -260,7 +295,7 @@ async def all_resources(
 ) -> list[Resource]:
     """Discover all available resources across all configured stores.
 
-    State is always dict-based internally (keyed by store_id).
+    State is always dict-based internally, keyed by store_id.
     Collection keys depend on use_multi_store_keys:
     - True: ["/_meta/store", "/id"] (new captures and multi-store)
     - False: ["/id"] (legacy single-store captures for backward compatibility)
@@ -327,6 +362,11 @@ async def all_resources(
                 task: Task,
                 _all_bindings=None,
             ):
+                # Reconcile state: migrate legacy flat state or add new stores
+                _reconcile_connector_state(
+                    stores_with_access, binding, state, initial_state, task
+                )
+
                 # Warn if FulfillmentOrders has partial scope coverage
                 if model == gql.FulfillmentOrders:
                     fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
@@ -342,11 +382,7 @@ async def all_resources(
                 if not model.SHOULD_USE_BULK_QUERIES and "edges" in model.QUERY.lower():
                     raise RuntimeError("Non-bulk queries cannot contain nested connections.")
 
-                # Migrate legacy state and/or add new stores
-                for store_id in stores_with_access:
-                    _migrate_legacy_state(state, store_id, initial_state, task, binding)
-
-                # Build fetch functions (always dict-based)
+                # Build fetch functions (always dict-based, keyed by store_id)
                 data_model = create_response_data_model(model)
                 fetch_changes: dict[str, functools.partial] = {}
                 fetch_page: dict[str, functools.partial] = {}
