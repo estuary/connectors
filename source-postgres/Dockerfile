@@ -18,13 +18,6 @@ COPY source-postgres ./source-postgres
 
 ENV PATH="/builder/bin:$PATH"
 
-# Run automated tests. To skip tests which interact with an external database,
-# specify `--build-arg TEST_DATABASE=no` in the Docker command line.
-ARG TEST_DATABASE=yes
-ENV TEST_DATABASE=$TEST_DATABASE
-ENV CI_BUILD=yes
-RUN go test -short -failfast ./source-postgres/... --db_control_address=localhost:5432  --db_capture_address=localhost:5432
-
 # Build the connector.
 RUN --mount=type=cache,id=gomod,target=/go/pkg/mod \
     --mount=type=cache,id=gobuild,target=/root/.cache/go-build \

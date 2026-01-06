@@ -214,10 +214,11 @@ jobs:
       - name: Go Connector ${{ matrix.connector }} Database Tests
         if: |
           contains(fromJson('[
+            "source-postgres",
             "source-redshift-batch"
             ]'), matrix.connector)
         run: |
-          TEST_DATABASE=yes go test -short -failfast -timeout=0 -v ./${{ matrix.connector }}/...
+          ${{ matrix.connector }}/run_tests.sh
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
 
