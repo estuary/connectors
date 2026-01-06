@@ -1,7 +1,12 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["segments.date", "ad_group.id", "geographic_view.country_criterion_id", "customer.descriptive_name"],
+  "required": [
+    "customer.descriptive_name",
+    "geographic_view.country_criterion_id",
+    "ad_group.id",
+    "segments.date"
+  ],
   "properties": {
     "customer.descriptive_name": {
       "type": "string"

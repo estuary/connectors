@@ -39,6 +39,7 @@ REPORT_MAPPING = {
     "click_view": "click_view",
     "geographic_report": "geographic_view",
     "keyword_report": "keyword_view",
+    "geo_target_constant": "geo_target_constant",
 }
 API_VERSION = "v19"
 GRPC_TIMEOUT = 300.0
