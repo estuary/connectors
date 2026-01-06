@@ -9,7 +9,7 @@ estuary-cdk = {path="../estuary-cdk", develop = true}
 pydantic = "^2"
 python = "^3.11"
 pycares = "^4.9.0"
-aiohttp = "^3.11.11"
+aiohttp = "^3.13.3"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"
