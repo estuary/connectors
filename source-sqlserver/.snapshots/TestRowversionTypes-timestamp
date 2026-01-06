@@ -1,0 +1,271 @@
+sql> CREATE TABLE dbo.RowversionTypes_timestamp_555477 (id INTEGER PRIMARY KEY, data VARCHAR(32), rv timestamp)
+=== Discover: Discover Table Schema ===
+{
+  "recommendedName": "dbo/rowversiontypes_timestamp_555477",
+  "resourceConfig": {
+    "namespace": "dbo",
+    "stream": "RowversionTypes_timestamp_555477"
+  },
+  "documentSchema": {
+    "$defs": {
+      "DboRowversionTypes_timestamp_555477": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "$anchor": "DboRowversionTypes_timestamp_555477",
+        "properties": {
+          "data": {
+            "maxLength": 32,
+            "description": "(source type: varchar(32))",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
+          },
+          "rv": {
+            "type": "string",
+            "description": "(source type: non-nullable timestamp)",
+            "contentEncoding": "base64"
+          }
+        }
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "_meta": {
+              "properties": {
+                "op": {
+                  "const": "d"
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "merge"
+          }
+        },
+        "else": {
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "op",
+              "source"
+            ],
+            "properties": {
+              "before": {
+                "$ref": "#DboRowversionTypes_timestamp_555477",
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "lsn": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "The LSN at which a CDC event occurred. Only set for CDC events"
+                  },
+                  "seqval": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "Sequence value used to order changes to a row within a transaction. Only set for CDC events"
+                  },
+                  "updateMask": {
+                    "description": "A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events"
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table",
+                  "lsn",
+                  "seqval"
+                ]
+              }
+            },
+            "reduce": {
+              "strategy": "merge"
+            }
+          }
+        }
+      },
+      {
+        "$ref": "#DboRowversionTypes_timestamp_555477"
+      }
+    ],
+    "x-infer-schema": true
+  },
+  "key": [
+    "/id"
+  ]
+}
+sql> INSERT INTO dbo.RowversionTypes_timestamp_555477 (id, data) VALUES (1, 'first'), (2, 'second')
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/dbo/rowversiontypes_timestamp_555477",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "RowversionTypes_timestamp_555477"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "first",
+    "id": 1,
+    "rv": "<REDACTED>"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/rowversiontypes_timestamp_555477",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "RowversionTypes_timestamp_555477"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "second",
+    "id": 2,
+    "rv": "<REDACTED>"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FRowversionTypes_timestamp_555477": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.RowversionTypes_timestamp_555477 (id, data) VALUES (3, 'third'), (4, 'fourth')
+sql> UPDATE dbo.RowversionTypes_timestamp_555477 SET data = 'updated' WHERE id = 2
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/dbo/rowversiontypes_timestamp_555477",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "RowversionTypes_timestamp_555477",
+        "updateMask": "Bg=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "updated",
+    "id": 2,
+    "rv": "<REDACTED>"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/rowversiontypes_timestamp_555477",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "RowversionTypes_timestamp_555477",
+        "updateMask": "Bw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "third",
+    "id": 3,
+    "rv": "<REDACTED>"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/rowversiontypes_timestamp_555477",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "RowversionTypes_timestamp_555477",
+        "updateMask": "Bw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "fourth",
+    "id": 4,
+    "rv": "<REDACTED>"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FRowversionTypes_timestamp_555477": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

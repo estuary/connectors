@@ -1,56 +1,73 @@
-####################################
-### Capture from Start
-####################################
-# ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_datetime_889298060005": 2 Documents
-# ================================
-{"$defs":{"DboTest_ScanKeyTypes_DateTime_889298060005":{"type":"object","required":["k","v"],"$anchor":"DboTest_ScanKeyTypes_DateTime_889298060005","properties":{"k":{"type":"string","format":"date-time","description":"(source type: non-nullable datetime)"},"v":{"description":"(source type: text)","type":["string"]}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#DboTest_ScanKeyTypes_DateTime_889298060005","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-sqlserver/sqlserver-source-info","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"lsn":{"type":"string","contentEncoding":"base64","description":"The LSN at which a CDC event occurred. Only set for CDC events"},"seqval":{"type":"string","contentEncoding":"base64","description":"Sequence value used to order changes to a row within a transaction. Only set for CDC events"},"updateMask":{"description":"A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events"}},"additionalProperties":false,"type":"object","required":["schema","table","lsn","seqval"]}}}}},{"$ref":"#DboTest_ScanKeyTypes_DateTime_889298060005"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTime_889298060005","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 0"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_DateTime_889298060005":{"backfilled":1,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTEwAA=="}},"cursor":"AAAAAAAAAAAAAA=="}
-
-
-####################################
-### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMTEwAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_datetime_889298060005": 2 Documents
-# ================================
-{"$defs":{"DboTest_ScanKeyTypes_DateTime_889298060005":{"type":"object","required":["k","v"],"$anchor":"DboTest_ScanKeyTypes_DateTime_889298060005","properties":{"k":{"type":"string","format":"date-time","description":"(source type: non-nullable datetime)"},"v":{"description":"(source type: text)","type":["string"]}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#DboTest_ScanKeyTypes_DateTime_889298060005","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-sqlserver/sqlserver-source-info","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"lsn":{"type":"string","contentEncoding":"base64","description":"The LSN at which a CDC event occurred. Only set for CDC events"},"seqval":{"type":"string","contentEncoding":"base64","description":"Sequence value used to order changes to a row within a transaction. Only set for CDC events"},"updateMask":{"description":"A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events"}},"additionalProperties":false,"type":"object","required":["schema","table","lsn","seqval"]}}}}},{"$ref":"#DboTest_ScanKeyTypes_DateTime_889298060005"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTime_889298060005","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 1"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_DateTime_889298060005":{"backfilled":2,"key_columns":["k"],"mode":"Backfill","scanned":"AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMzMzAA=="}},"cursor":"AAAAAAAAAAAAAA=="}
-
-
-####################################
-### Capture from Key "AjE5OTEtMDgtMzFUMTI6MzQ6NTQuMzMzAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_datetime_889298060005": 2 Documents
-# ================================
-{"$defs":{"DboTest_ScanKeyTypes_DateTime_889298060005":{"type":"object","required":["k","v"],"$anchor":"DboTest_ScanKeyTypes_DateTime_889298060005","properties":{"k":{"type":"string","format":"date-time","description":"(source type: non-nullable datetime)"},"v":{"description":"(source type: text)","type":["string"]}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#DboTest_ScanKeyTypes_DateTime_889298060005","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-sqlserver/sqlserver-source-info","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"lsn":{"type":"string","contentEncoding":"base64","description":"The LSN at which a CDC event occurred. Only set for CDC events"},"seqval":{"type":"string","contentEncoding":"base64","description":"Sequence value used to order changes to a row within a transaction. Only set for CDC events"},"updateMask":{"description":"A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events"}},"additionalProperties":false,"type":"object","required":["schema","table","lsn","seqval"]}}}}},{"$ref":"#DboTest_ScanKeyTypes_DateTime_889298060005"}],"unevaluatedProperties":false,"x-infer-schema":true}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_ScanKeyTypes_DateTime_889298060005","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"k":"<TIMESTAMP>","v":"Data 2"}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_DateTime_889298060005":{"backfilled":3,"key_columns":["k"],"mode":"Backfill","scanned":"AjIwMDAtMDEtMDFUMDE6MDE6MDEuMDAwAA=="}},"cursor":"AAAAAAAAAAAAAA=="}
-
-
-####################################
-### Capture from Key "AjIwMDAtMDEtMDFUMDE6MDE6MDEuMDAwAA=="
-####################################
-# ================================
-# Collection "acmeCo/test/dbo/test_scankeytypes_datetime_889298060005": 1 Documents
-# ================================
-{"$defs":{"DboTest_ScanKeyTypes_DateTime_889298060005":{"type":"object","required":["k","v"],"$anchor":"DboTest_ScanKeyTypes_DateTime_889298060005","properties":{"k":{"type":"string","format":"date-time","description":"(source type: non-nullable datetime)"},"v":{"description":"(source type: text)","type":["string"]}}}},"allOf":[{"required":["_meta"],"properties":{"_meta":{"type":"object","required":["op","source"],"additionalProperties":false,"properties":{"before":{"$ref":"#DboTest_ScanKeyTypes_DateTime_889298060005","description":"Record state immediately before this change was applied.","unevaluatedProperties":false},"op":{"enum":["c","d","u"],"description":"Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."},"source":{"$id":"https://github.com/estuary/connectors/source-sqlserver/sqlserver-source-info","properties":{"ts_ms":{"type":"integer","description":"Unix timestamp (in millis) at which this event was recorded by the database."},"schema":{"type":"string","description":"Database schema (namespace) of the event."},"snapshot":{"type":"boolean","description":"Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."},"table":{"type":"string","description":"Database table of the event."},"lsn":{"type":"string","contentEncoding":"base64","description":"The LSN at which a CDC event occurred. Only set for CDC events"},"seqval":{"type":"string","contentEncoding":"base64","description":"Sequence value used to order changes to a row within a transaction. Only set for CDC events"},"updateMask":{"description":"A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events"}},"additionalProperties":false,"type":"object","required":["schema","table","lsn","seqval"]}}}}},{"$ref":"#DboTest_ScanKeyTypes_DateTime_889298060005"}],"unevaluatedProperties":false,"x-infer-schema":true}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"dbo%2Ftest_ScanKeyTypes_DateTime_889298060005":{"backfilled":3,"key_columns":["k"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
-
-
+sql> CREATE TABLE dbo.ScanKeyTypes_DateTime_371668 (k DATETIME PRIMARY KEY, v TEXT)
+sql> INSERT INTO dbo.ScanKeyTypes_DateTime_371668 VALUES ('1991-08-31T12:34:54.111', 'Data 0'), ('1991-08-31T12:34:54.333', 'Data 1'), ('2000-01-01T01:01:01', 'Data 2')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/scankeytypes_datetime_371668
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/scankeytypes_datetime_371668",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ScanKeyTypes_DateTime_371668"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "1991-08-31T12:34:54.11Z",
+    "v": "Data 0"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/scankeytypes_datetime_371668",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ScanKeyTypes_DateTime_371668"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "1991-08-31T12:34:54.333Z",
+    "v": "Data 1"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/scankeytypes_datetime_371668",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ScanKeyTypes_DateTime_371668"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": "2000-01-01T01:01:01Z",
+    "v": "Data 2"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FScanKeyTypes_DateTime_371668": {
+      "backfilled": 3,
+      "key_columns": [
+        "k"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
 

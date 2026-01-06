@@ -1,10 +1,55 @@
-# ================================
-# Collection "acmeCo/test/dbo/test_featureflagemitsourcedschemas_64029092": 2 Documents
-# ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_FeatureFlagEmitSourcedSchemas_64029092","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"hello","id":1}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_FeatureFlagEmitSourcedSchemas_64029092","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"world","id":2}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"dbo%2Ftest_FeatureFlagEmitSourcedSchemas_64029092":{"backfilled":2,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
+sql> CREATE TABLE dbo.FeatureFlagEmitSourcedSchemas_Disabled_137265 (id INTEGER PRIMARY KEY, data VARCHAR(32))
+sql> INSERT INTO dbo.FeatureFlagEmitSourcedSchemas_Disabled_137265 VALUES (1, 'hello'), (2, 'world')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/featureflagemitsourcedschemas_disabled_137265
+=== Run: Capture ===
+[
+  "acmeCo/test_capture/dbo/featureflagemitsourcedschemas_disabled_137265",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "FeatureFlagEmitSourcedSchemas_Disabled_137265"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "hello",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/featureflagemitsourcedschemas_disabled_137265",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "FeatureFlagEmitSourcedSchemas_Disabled_137265"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "world",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FFeatureFlagEmitSourcedSchemas_Disabled_137265": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
 

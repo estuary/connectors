@@ -1,18 +1,269 @@
-# ================================
-# Collection "acmeCo/test/dbo/test_alterationaddcolumn_automatic_81310450": 10 Documents
-# ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_AlterationAddColumn_Automatic_81310450","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"zero","id":0}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_AlterationAddColumn_Automatic_81310450","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"one","id":1}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"two","id":2}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"three","id":3}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Bw=="}},"data":"four","extra":"ccc","id":4}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Bw=="}},"data":"five","extra":"ddd","id":5}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Bw=="}},"data":"six","extra":"eee","id":6}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Bw=="}},"data":"seven","extra":"fff","id":7}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Dw=="}},"data":"eight","evenmore":"baz","extra":"ggg","id":8}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_AlterationAddColumn_Automatic_81310450","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Dw=="}},"data":"nine","evenmore":"asdf","extra":"hhh","id":9}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"dbo%2Ftest_AlterationAddColumn_Automatic_81310450":{"backfilled":2,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
+sql> CREATE TABLE dbo.AlterationAddColumn_Automatic_291461 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.AlterationAddColumn_Automatic_291461 VALUES (0, 'zero'), (1, 'one')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/alterationaddcolumn_automatic_291461
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/dbo/alterationaddcolumn_automatic_291461",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "AlterationAddColumn_Automatic_291461"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/alterationaddcolumn_automatic_291461",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "AlterationAddColumn_Automatic_291461"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FAlterationAddColumn_Automatic_291461": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> ALTER TABLE dbo.AlterationAddColumn_Automatic_291461 ADD extra TEXT
+sql> INSERT INTO dbo.AlterationAddColumn_Automatic_291461 VALUES (2, 'two', 'aaa'), (3, 'three', 'bbb')
+=== Run: After First Column Add ===
+[
+  "acmeCo/test_capture/dbo/alterationaddcolumn_automatic_291461",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "AlterationAddColumn_Automatic_291461",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/alterationaddcolumn_automatic_291461",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "AlterationAddColumn_Automatic_291461",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FAlterationAddColumn_Automatic_291461": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.AlterationAddColumn_Automatic_291461 VALUES (4, 'four', 'ccc'), (5, 'five', 'ddd')
+=== Run: More Inserts After First Add ===
+[
+  "acmeCo/test_capture/dbo/alterationaddcolumn_automatic_291461",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "AlterationAddColumn_Automatic_291461",
+        "updateMask": "Bw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "extra": "ccc",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/alterationaddcolumn_automatic_291461",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "AlterationAddColumn_Automatic_291461",
+        "updateMask": "Bw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "extra": "ddd",
+    "id": 5
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FAlterationAddColumn_Automatic_291461": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> ALTER TABLE dbo.AlterationAddColumn_Automatic_291461 ADD evenmore TEXT
+sql> INSERT INTO dbo.AlterationAddColumn_Automatic_291461 VALUES (6, 'six', 'eee', 'foo'), (7, 'seven', 'fff', 'bar')
+=== Run: After Second Column Add ===
+[
+  "acmeCo/test_capture/dbo/alterationaddcolumn_automatic_291461",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "AlterationAddColumn_Automatic_291461",
+        "updateMask": "Bw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "six",
+    "extra": "eee",
+    "id": 6
+  }
+]
+[
+  "acmeCo/test_capture/dbo/alterationaddcolumn_automatic_291461",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "AlterationAddColumn_Automatic_291461",
+        "updateMask": "Bw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "seven",
+    "extra": "fff",
+    "id": 7
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FAlterationAddColumn_Automatic_291461": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.AlterationAddColumn_Automatic_291461 VALUES (8, 'eight', 'ggg', 'baz'), (9, 'nine', 'hhh', 'asdf')
+=== Run: Final Inserts ===
+[
+  "acmeCo/test_capture/dbo/alterationaddcolumn_automatic_291461",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "AlterationAddColumn_Automatic_291461",
+        "updateMask": "Dw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "eight",
+    "evenmore": "baz",
+    "extra": "ggg",
+    "id": 8
+  }
+]
+[
+  "acmeCo/test_capture/dbo/alterationaddcolumn_automatic_291461",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "AlterationAddColumn_Automatic_291461",
+        "updateMask": "Dw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "nine",
+    "evenmore": "asdf",
+    "extra": "hhh",
+    "id": 9
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FAlterationAddColumn_Automatic_291461": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
 
