@@ -1,153 +1,154 @@
-Binding 0:
+sql> CREATE TABLE dbo.SecondaryIndexDiscovery_index_only_693037 (k1 INTEGER, k2 INTEGER NOT NULL, k3 INTEGER NOT NULL, data TEXT)
+sql> CREATE UNIQUE INDEX UX_693037_k23 ON dbo.SecondaryIndexDiscovery_index_only_693037 (k2, k3)
+=== Discover: Discover Tables ===
 {
-    "recommended_name": "dbo/test_secondaryindexdiscovery_index_only_g26313",
-    "resource_config_json": {
-      "namespace": "dbo",
-      "stream": "test_SecondaryIndexDiscovery_index_only_g26313"
-    },
-    "document_schema_json": {
-      "$defs": {
-        "DboTest_SecondaryIndexDiscovery_index_only_g26313": {
-          "type": "object",
-          "required": [
-            "k2",
-            "k3"
-          ],
-          "$anchor": "DboTest_SecondaryIndexDiscovery_index_only_g26313",
-          "properties": {
-            "data": {
-              "description": "(source type: text)",
-              "type": [
-                "string",
-                "null"
-              ]
-            },
-            "k1": {
-              "description": "(source type: int)",
-              "type": [
-                "integer",
-                "null"
-              ]
-            },
-            "k2": {
-              "type": "integer",
-              "description": "(source type: non-nullable int)"
-            },
-            "k3": {
-              "type": "integer",
-              "description": "(source type: non-nullable int)"
-            }
+  "recommendedName": "dbo/secondaryindexdiscovery_index_only_693037",
+  "resourceConfig": {
+    "namespace": "dbo",
+    "stream": "SecondaryIndexDiscovery_index_only_693037"
+  },
+  "documentSchema": {
+    "$defs": {
+      "DboSecondaryIndexDiscovery_index_only_693037": {
+        "type": "object",
+        "required": [
+          "k2",
+          "k3"
+        ],
+        "$anchor": "DboSecondaryIndexDiscovery_index_only_693037",
+        "properties": {
+          "data": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "k1": {
+            "description": "(source type: int)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "k2": {
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
+          },
+          "k3": {
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
           }
         }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "_meta": {
-                "properties": {
-                  "op": {
-                    "const": "d"
-                  }
-                }
-              }
-            }
-          },
-          "then": {
-            "reduce": {
-              "delete": true,
-              "strategy": "merge"
-            }
-          },
-          "else": {
-            "reduce": {
-              "strategy": "merge"
-            }
-          },
-          "required": [
-            "_meta"
-          ],
+      }
+    },
+    "allOf": [
+      {
+        "if": {
           "properties": {
             "_meta": {
-              "type": "object",
-              "required": [
-                "op",
-                "source"
-              ],
               "properties": {
-                "before": {
-                  "$ref": "#DboTest_SecondaryIndexDiscovery_index_only_g26313",
-                  "description": "Record state immediately before this change was applied.",
-                  "reduce": {
-                    "strategy": "firstWriteWins"
-                  }
-                },
                 "op": {
-                  "enum": [
-                    "c",
-                    "d",
-                    "u"
-                  ],
-                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
-                },
-                "source": {
-                  "$id": "https://github.com/estuary/connectors/source-sqlserver/sqlserver-source-info",
-                  "properties": {
-                    "ts_ms": {
-                      "type": "integer",
-                      "description": "Unix timestamp (in millis) at which this event was recorded by the database."
-                    },
-                    "schema": {
-                      "type": "string",
-                      "description": "Database schema (namespace) of the event."
-                    },
-                    "snapshot": {
-                      "type": "boolean",
-                      "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
-                    },
-                    "table": {
-                      "type": "string",
-                      "description": "Database table of the event."
-                    },
-                    "lsn": {
-                      "type": "string",
-                      "contentEncoding": "base64",
-                      "description": "The LSN at which a CDC event occurred. Only set for CDC events"
-                    },
-                    "seqval": {
-                      "type": "string",
-                      "contentEncoding": "base64",
-                      "description": "Sequence value used to order changes to a row within a transaction. Only set for CDC events"
-                    },
-                    "updateMask": {
-                      "description": "A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events"
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "schema",
-                    "table",
-                    "lsn",
-                    "seqval"
-                  ]
+                  "const": "d"
                 }
-              },
-              "reduce": {
-                "strategy": "merge"
               }
             }
           }
         },
-        {
-          "$ref": "#DboTest_SecondaryIndexDiscovery_index_only_g26313"
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "merge"
+          }
+        },
+        "else": {
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "op",
+              "source"
+            ],
+            "properties": {
+              "before": {
+                "$ref": "#DboSecondaryIndexDiscovery_index_only_693037",
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "lsn": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "The LSN at which a CDC event occurred. Only set for CDC events"
+                  },
+                  "seqval": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "Sequence value used to order changes to a row within a transaction. Only set for CDC events"
+                  },
+                  "updateMask": {
+                    "description": "A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events"
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table",
+                  "lsn",
+                  "seqval"
+                ]
+              }
+            },
+            "reduce": {
+              "strategy": "merge"
+            }
+          }
         }
-      ],
-      "x-infer-schema": true
-    },
-    "key": [
-      "/k2",
-      "/k3"
+      },
+      {
+        "$ref": "#DboSecondaryIndexDiscovery_index_only_693037"
+      }
     ],
-    "is_fallback_key": true
-  }
+    "x-infer-schema": true
+  },
+  "key": [
+    "/k2",
+    "/k3"
+  ],
+  "isFallbackKey": true
+}
 

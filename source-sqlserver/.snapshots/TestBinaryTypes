@@ -1,0 +1,144 @@
+sql> CREATE TABLE dbo.BinaryTypes_537491 (
+		id INTEGER PRIMARY KEY,
+		a_binary BINARY(8),
+		a_varbinary VARBINARY(8),
+		a_image IMAGE
+	)
+sql> INSERT INTO dbo.BinaryTypes_537491 VALUES
+		(1, 0x1234567800000000, 0x12345678, 0x12345678),
+		(2, 0xDEADBEEFCAFEBABE, 0xDEADBEEF, 0xDEADBEEFCAFEBABE),
+		(3, NULL, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/dbo/binarytypes_537491
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/binarytypes_537491",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "BinaryTypes_537491"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_binary": "EjRWeAAAAAA=",
+    "a_image": "EjRWeA==",
+    "a_varbinary": "EjRWeA==",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/binarytypes_537491",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "BinaryTypes_537491"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_binary": "3q2+78r+ur4=",
+    "a_image": "3q2+78r+ur4=",
+    "a_varbinary": "3q2+7w==",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/binarytypes_537491",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "BinaryTypes_537491"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_binary": null,
+    "a_image": null,
+    "a_varbinary": null,
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FBinaryTypes_537491": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.BinaryTypes_537491 VALUES
+		(101, 0xABCDEF0123456789, 0xABCDEF01, 0xABCDEF0123456789),
+		(102, NULL, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/dbo/binarytypes_537491",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "BinaryTypes_537491",
+        "updateMask": "Dw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_binary": "q83vASNFZ4k=",
+    "a_image": "q83vASNFZ4k=",
+    "a_varbinary": "q83vAQ==",
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/dbo/binarytypes_537491",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "BinaryTypes_537491",
+        "updateMask": "Dw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_binary": null,
+    "a_image": null,
+    "a_varbinary": null,
+    "id": 102
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FBinaryTypes_537491": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

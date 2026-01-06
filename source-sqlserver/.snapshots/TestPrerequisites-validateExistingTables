@@ -1,0 +1,64 @@
+sql> CREATE TABLE dbo.Prerequisites_validateExistingTables_875237_a (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.Prerequisites_validateExistingTables_875237_b (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.Prerequisites_validateExistingTables_875237_a VALUES (0, 'hello'), (1, 'world')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/prerequisites_validateexistingtables_875237_a
+acmeCo/test_capture/dbo/prerequisites_validateexistingtables_875237_b
+=== Run: Validate And Capture ===
+[
+  "acmeCo/test_capture/dbo/prerequisites_validateexistingtables_875237_a",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Prerequisites_validateExistingTables_875237_a"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "hello",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/prerequisites_validateexistingtables_875237_a",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Prerequisites_validateExistingTables_875237_a"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "world",
+    "id": 1
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FPrerequisites_validateExistingTables_875237_a": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FPrerequisites_validateExistingTables_875237_b": {
+      "backfilled": 0,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

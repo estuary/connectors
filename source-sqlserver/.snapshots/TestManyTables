@@ -1,0 +1,2333 @@
+sql> CREATE TABLE dbo.ManyTables_789736_000 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_001 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_002 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_003 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_004 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_005 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_006 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_007 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_008 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_009 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_010 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_011 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_012 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_013 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_014 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_015 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_016 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_017 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_018 (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.ManyTables_789736_019 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.ManyTables_789736_000 VALUES (0, 'table 0 row zero'), (1, 'table 0 row one')
+sql> INSERT INTO dbo.ManyTables_789736_001 VALUES (0, 'table 1 row zero'), (1, 'table 1 row one')
+sql> INSERT INTO dbo.ManyTables_789736_002 VALUES (0, 'table 2 row zero'), (1, 'table 2 row one')
+sql> INSERT INTO dbo.ManyTables_789736_003 VALUES (0, 'table 3 row zero'), (1, 'table 3 row one')
+sql> INSERT INTO dbo.ManyTables_789736_004 VALUES (0, 'table 4 row zero'), (1, 'table 4 row one')
+sql> INSERT INTO dbo.ManyTables_789736_005 VALUES (0, 'table 5 row zero'), (1, 'table 5 row one')
+sql> INSERT INTO dbo.ManyTables_789736_006 VALUES (0, 'table 6 row zero'), (1, 'table 6 row one')
+sql> INSERT INTO dbo.ManyTables_789736_007 VALUES (0, 'table 7 row zero'), (1, 'table 7 row one')
+sql> INSERT INTO dbo.ManyTables_789736_008 VALUES (0, 'table 8 row zero'), (1, 'table 8 row one')
+sql> INSERT INTO dbo.ManyTables_789736_009 VALUES (0, 'table 9 row zero'), (1, 'table 9 row one')
+sql> INSERT INTO dbo.ManyTables_789736_010 VALUES (0, 'table 10 row zero'), (1, 'table 10 row one')
+sql> INSERT INTO dbo.ManyTables_789736_011 VALUES (0, 'table 11 row zero'), (1, 'table 11 row one')
+sql> INSERT INTO dbo.ManyTables_789736_012 VALUES (0, 'table 12 row zero'), (1, 'table 12 row one')
+sql> INSERT INTO dbo.ManyTables_789736_013 VALUES (0, 'table 13 row zero'), (1, 'table 13 row one')
+sql> INSERT INTO dbo.ManyTables_789736_014 VALUES (0, 'table 14 row zero'), (1, 'table 14 row one')
+sql> INSERT INTO dbo.ManyTables_789736_015 VALUES (0, 'table 15 row zero'), (1, 'table 15 row one')
+sql> INSERT INTO dbo.ManyTables_789736_016 VALUES (0, 'table 16 row zero'), (1, 'table 16 row one')
+sql> INSERT INTO dbo.ManyTables_789736_017 VALUES (0, 'table 17 row zero'), (1, 'table 17 row one')
+sql> INSERT INTO dbo.ManyTables_789736_018 VALUES (0, 'table 18 row zero'), (1, 'table 18 row one')
+sql> INSERT INTO dbo.ManyTables_789736_019 VALUES (0, 'table 19 row zero'), (1, 'table 19 row one')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/manytables_789736_000
+acmeCo/test_capture/dbo/manytables_789736_001
+acmeCo/test_capture/dbo/manytables_789736_002
+acmeCo/test_capture/dbo/manytables_789736_003
+acmeCo/test_capture/dbo/manytables_789736_004
+acmeCo/test_capture/dbo/manytables_789736_005
+acmeCo/test_capture/dbo/manytables_789736_006
+acmeCo/test_capture/dbo/manytables_789736_007
+acmeCo/test_capture/dbo/manytables_789736_008
+acmeCo/test_capture/dbo/manytables_789736_009
+acmeCo/test_capture/dbo/manytables_789736_010
+acmeCo/test_capture/dbo/manytables_789736_011
+acmeCo/test_capture/dbo/manytables_789736_012
+acmeCo/test_capture/dbo/manytables_789736_013
+acmeCo/test_capture/dbo/manytables_789736_014
+acmeCo/test_capture/dbo/manytables_789736_015
+acmeCo/test_capture/dbo/manytables_789736_016
+acmeCo/test_capture/dbo/manytables_789736_017
+acmeCo/test_capture/dbo/manytables_789736_018
+acmeCo/test_capture/dbo/manytables_789736_019
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/dbo/manytables_789736_000",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_000"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 0 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_000",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_000"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 0 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_001",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_001"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 1 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_001",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_001"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 1 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_002",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_002"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 2 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_002",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_002"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 2 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_003",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_003"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 3 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_003",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_003"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 3 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_004",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_004"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 4 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_004",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_004"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 4 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_005",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_005"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 5 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_005",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_005"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 5 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_006",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_006"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 6 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_006",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_006"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 6 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_007",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_007"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 7 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_007",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_007"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 7 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_008",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_008"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 8 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_008",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_008"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 8 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_009",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_009"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 9 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_009",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_009"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 9 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_010",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_010"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 10 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_010",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_010"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 10 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_011",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_011"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 11 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_011",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_011"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 11 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_012",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_012"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 12 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_012",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_012"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 12 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_013",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_013"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 13 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_013",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_013"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 13 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_014",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_014"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 14 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_014",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_014"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 14 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_015",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_015"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 15 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_015",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_015"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 15 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_016",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_016"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 16 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_016",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_016"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 16 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_017",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_017"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 17 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_017",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_017"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 17 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_018",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_018"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 18 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_018",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_018"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 18 row one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_019",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_019"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 19 row zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_019",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "ManyTables_789736_019"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 19 row one",
+    "id": 1
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FManyTables_789736_000": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_001": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_002": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_003": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_004": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_005": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_006": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_007": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_008": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_009": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_010": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_011": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_012": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_013": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_014": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_015": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_016": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_017": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_018": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_019": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.ManyTables_789736_000 VALUES (2, 'table 0 row two'), (3, 'table 0 row three')
+sql> INSERT INTO dbo.ManyTables_789736_001 VALUES (2, 'table 1 row two'), (3, 'table 1 row three')
+sql> INSERT INTO dbo.ManyTables_789736_002 VALUES (2, 'table 2 row two'), (3, 'table 2 row three')
+sql> INSERT INTO dbo.ManyTables_789736_003 VALUES (2, 'table 3 row two'), (3, 'table 3 row three')
+sql> INSERT INTO dbo.ManyTables_789736_004 VALUES (2, 'table 4 row two'), (3, 'table 4 row three')
+sql> INSERT INTO dbo.ManyTables_789736_005 VALUES (2, 'table 5 row two'), (3, 'table 5 row three')
+sql> INSERT INTO dbo.ManyTables_789736_006 VALUES (2, 'table 6 row two'), (3, 'table 6 row three')
+sql> INSERT INTO dbo.ManyTables_789736_007 VALUES (2, 'table 7 row two'), (3, 'table 7 row three')
+sql> INSERT INTO dbo.ManyTables_789736_008 VALUES (2, 'table 8 row two'), (3, 'table 8 row three')
+sql> INSERT INTO dbo.ManyTables_789736_009 VALUES (2, 'table 9 row two'), (3, 'table 9 row three')
+sql> INSERT INTO dbo.ManyTables_789736_010 VALUES (2, 'table 10 row two'), (3, 'table 10 row three')
+sql> INSERT INTO dbo.ManyTables_789736_011 VALUES (2, 'table 11 row two'), (3, 'table 11 row three')
+sql> INSERT INTO dbo.ManyTables_789736_012 VALUES (2, 'table 12 row two'), (3, 'table 12 row three')
+sql> INSERT INTO dbo.ManyTables_789736_013 VALUES (2, 'table 13 row two'), (3, 'table 13 row three')
+sql> INSERT INTO dbo.ManyTables_789736_014 VALUES (2, 'table 14 row two'), (3, 'table 14 row three')
+sql> INSERT INTO dbo.ManyTables_789736_015 VALUES (2, 'table 15 row two'), (3, 'table 15 row three')
+sql> INSERT INTO dbo.ManyTables_789736_016 VALUES (2, 'table 16 row two'), (3, 'table 16 row three')
+sql> INSERT INTO dbo.ManyTables_789736_017 VALUES (2, 'table 17 row two'), (3, 'table 17 row three')
+sql> INSERT INTO dbo.ManyTables_789736_018 VALUES (2, 'table 18 row two'), (3, 'table 18 row three')
+sql> INSERT INTO dbo.ManyTables_789736_019 VALUES (2, 'table 19 row two'), (3, 'table 19 row three')
+=== Run: Replication 1 ===
+[
+  "acmeCo/test_capture/dbo/manytables_789736_000",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_000",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 0 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_000",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_000",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 0 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_001",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_001",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 1 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_001",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_001",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 1 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_002",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_002",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 2 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_002",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_002",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 2 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_003",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_003",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 3 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_003",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_003",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 3 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_004",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_004",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 4 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_004",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_004",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 4 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_005",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_005",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 5 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_005",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_005",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 5 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_006",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_006",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 6 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_006",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_006",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 6 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_007",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_007",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 7 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_007",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_007",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 7 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_008",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_008",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 8 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_008",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_008",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 8 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_009",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_009",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 9 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_009",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_009",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 9 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_010",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_010",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 10 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_010",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_010",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 10 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_011",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_011",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 11 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_011",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_011",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 11 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_012",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_012",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 12 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_012",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_012",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 12 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_013",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_013",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 13 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_013",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_013",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 13 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_014",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_014",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 14 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_014",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_014",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 14 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_015",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_015",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 15 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_015",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_015",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 15 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_016",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_016",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 16 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_016",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_016",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 16 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_017",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_017",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 17 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_017",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_017",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 17 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_018",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_018",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 18 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_018",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_018",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 18 row three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_019",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_019",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 19 row two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_019",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_019",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 19 row three",
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FManyTables_789736_000": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_001": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_002": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_003": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_004": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_005": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_006": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_007": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_008": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_009": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_010": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_011": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_012": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_013": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_014": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_015": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_016": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_017": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_018": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_019": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.ManyTables_789736_000 VALUES (4, 'table 0 row four'), (5, 'table 0 row five')
+sql> INSERT INTO dbo.ManyTables_789736_001 VALUES (4, 'table 1 row four'), (5, 'table 1 row five')
+sql> INSERT INTO dbo.ManyTables_789736_002 VALUES (4, 'table 2 row four'), (5, 'table 2 row five')
+sql> INSERT INTO dbo.ManyTables_789736_003 VALUES (4, 'table 3 row four'), (5, 'table 3 row five')
+sql> INSERT INTO dbo.ManyTables_789736_004 VALUES (4, 'table 4 row four'), (5, 'table 4 row five')
+sql> INSERT INTO dbo.ManyTables_789736_005 VALUES (4, 'table 5 row four'), (5, 'table 5 row five')
+sql> INSERT INTO dbo.ManyTables_789736_006 VALUES (4, 'table 6 row four'), (5, 'table 6 row five')
+sql> INSERT INTO dbo.ManyTables_789736_007 VALUES (4, 'table 7 row four'), (5, 'table 7 row five')
+sql> INSERT INTO dbo.ManyTables_789736_008 VALUES (4, 'table 8 row four'), (5, 'table 8 row five')
+sql> INSERT INTO dbo.ManyTables_789736_009 VALUES (4, 'table 9 row four'), (5, 'table 9 row five')
+=== Run: Replication 2 ===
+[
+  "acmeCo/test_capture/dbo/manytables_789736_000",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_000",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 0 row four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_000",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_000",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 0 row five",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_001",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_001",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 1 row four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_001",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_001",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 1 row five",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_002",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_002",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 2 row four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_002",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_002",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 2 row five",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_003",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_003",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 3 row four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_003",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_003",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 3 row five",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_004",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_004",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 4 row four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_004",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_004",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 4 row five",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_005",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_005",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 5 row four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_005",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_005",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 5 row five",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_006",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_006",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 6 row four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_006",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_006",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 6 row five",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_007",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_007",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 7 row four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_007",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_007",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 7 row five",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_008",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_008",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 8 row four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_008",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_008",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 8 row five",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_009",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_009",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 9 row four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/manytables_789736_009",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "ManyTables_789736_009",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "table 9 row five",
+    "id": 5
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FManyTables_789736_000": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_001": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_002": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_003": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_004": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_005": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_006": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_007": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_008": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_009": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_010": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_011": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_012": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_013": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_014": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_015": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_016": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_017": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_018": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FManyTables_789736_019": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

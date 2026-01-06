@@ -1,14 +1,143 @@
-# ================================
-# Collection "acmeCo/test/dbo/test_filegroupandrole_93932362": 6 Documents
-# ================================
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_FilegroupAndRole_93932362","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"zero","id":0}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_FilegroupAndRole_93932362","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"one","id":1}
-{"_meta":{"op":"c","source":{"schema":"dbo","snapshot":true,"table":"test_FilegroupAndRole_93932362","lsn":"","seqval":"AAAAAAAAAAAAAA=="}},"data":"two","id":2}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_FilegroupAndRole_93932362","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"three","id":3}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_FilegroupAndRole_93932362","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"four","id":4}
-{"_meta":{"op":"c","source":{"schema":"dbo","table":"test_FilegroupAndRole_93932362","lsn":"AAAAAAAAAAAAAA==","seqval":"AAAAAAAAAAAAAA==","updateMask":"Aw=="}},"data":"five","id":5}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"dbo%2Ftest_FilegroupAndRole_93932362":{"backfilled":3,"key_columns":["id"],"mode":"Active"}},"cursor":"AAAAAAAAAAAAAA=="}
+sql> CREATE TABLE dbo.FilegroupAndRole_270562 (id INTEGER PRIMARY KEY, data TEXT)
+sql> ALTER ROLE db_owner ADD MEMBER flow_capture
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/filegroupandrole_270562
+sql> INSERT INTO dbo.FilegroupAndRole_270562 VALUES (0, 'zero'), (1, 'one'), (2, 'two')
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/dbo/filegroupandrole_270562",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "FilegroupAndRole_270562"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/filegroupandrole_270562",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "FilegroupAndRole_270562"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/filegroupandrole_270562",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "FilegroupAndRole_270562"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FFilegroupAndRole_270562": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.FilegroupAndRole_270562 VALUES (3, 'three'), (4, 'four'), (5, 'five')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/dbo/filegroupandrole_270562",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "FilegroupAndRole_270562",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/filegroupandrole_270562",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "FilegroupAndRole_270562",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/filegroupandrole_270562",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "FilegroupAndRole_270562",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "id": 5
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FFilegroupAndRole_270562": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
 

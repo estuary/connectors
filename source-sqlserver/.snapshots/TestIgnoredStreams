@@ -1,0 +1,92 @@
+sql> CREATE TABLE dbo.IgnoredStreams_942579_a (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.IgnoredStreams_942579_b (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.IgnoredStreams_942579_a VALUES (0, 'zero'), (1, 'one')
+sql> INSERT INTO dbo.IgnoredStreams_942579_b VALUES (2, 'two'), (3, 'three')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/ignoredstreams_942579_a
+acmeCo/test_capture/dbo/ignoredstreams_942579_b
+=== Run: Backfill (Without A) ===
+[
+  "acmeCo/test_capture/dbo/ignoredstreams_942579_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "IgnoredStreams_942579_b"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/ignoredstreams_942579_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "IgnoredStreams_942579_b"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FIgnoredStreams_942579_b": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.IgnoredStreams_942579_a VALUES (4, 'four')
+sql> INSERT INTO dbo.IgnoredStreams_942579_b VALUES (5, 'five')
+=== Run: Replication (Without A) ===
+[
+  "acmeCo/test_capture/dbo/ignoredstreams_942579_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "IgnoredStreams_942579_b",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "id": 5
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FIgnoredStreams_942579_b": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
