@@ -145,6 +145,7 @@ class HTTPSession(abc.ABC):
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
+        with_token: bool = True,
         delim: bytes = b"\n",
         headers: dict[str, Any] | None = None,
         should_retry: ShouldRetryProtocol | None = None,
@@ -158,7 +159,7 @@ class HTTPSession(abc.ABC):
             params,
             json,
             form,
-            True,
+            with_token,
             headers,
             should_retry,
         )
