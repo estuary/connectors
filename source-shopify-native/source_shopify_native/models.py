@@ -12,7 +12,7 @@ from typing import (
     TypeVar,
     Generic,
 )
-from pydantic import AwareDatetime, BaseModel, Field, model_validator
+from pydantic import AwareDatetime, BaseModel, Field, PrivateAttr, model_validator
 
 from estuary_cdk.capture.common import (
     AccessToken,
@@ -132,6 +132,10 @@ class EndpointConfig(BaseModel):
         json_schema_extra={"advanced": True},
     )
 
+    # Track whether config was migrated from legacy format.
+    # Used to persist the new format back to the control plane.
+    _was_migrated: bool = PrivateAttr(default=False)
+
     @model_validator(mode="before")
     @classmethod
     def transform_legacy_config(cls, data: Any) -> Any:
@@ -142,6 +146,8 @@ class EndpointConfig(BaseModel):
 
         New format:
             {"stores": [{"store": "mystore", "credentials": {...}}], "start_date": "..."}
+
+        Sets _was_migrated flag so the connector can persist the new format.
         """
         if not isinstance(data, dict):
             return data
@@ -154,8 +160,14 @@ class EndpointConfig(BaseModel):
         store = data.pop("store")
         credentials = data.pop("credentials")
         data["stores"] = [{"store": store, "credentials": credentials}]
+        data["_was_migrated"] = True
 
         return data
+
+    def __init__(self, **data: Any) -> None:
+        was_migrated = data.pop("_was_migrated", False)
+        super().__init__(**data)
+        self._was_migrated = was_migrated
 
 
 ConnectorState = GenericConnectorState[ResourceState]

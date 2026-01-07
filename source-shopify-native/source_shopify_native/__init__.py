@@ -1,4 +1,6 @@
 from logging import Logger
+
+from estuary_cdk.logger import FlowLogger
 from typing import Callable, Awaitable
 
 from estuary_cdk.flow import (
@@ -206,17 +208,28 @@ class Connector(
 
     async def open(
         self,
-        log: Logger,
+        log: FlowLogger,
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
+        config = open.capture.config
+
+        # Persist migrated config so UI shows the new format
+        if config._was_migrated:
+            log.info("Persisting migrated config to multi-store format")
+            encrypted_config = await self._encrypt_config(log, config)
+            log.event.config_update(
+                "Migrating legacy single-store config to multi-store format.",
+                encrypted_config
+            )
+
         # Determine key structure from existing bindings
         use_multi_store_keys = _should_use_multi_store_keys(
             open.capture.bindings,
-            len(open.capture.config.stores),
+            len(config.stores),
         )
 
         resources = await all_resources(
-            log, self, open.capture.config,
+            log, self, config,
             should_cancel_ongoing_job=True,
             use_multi_store_keys=use_multi_store_keys,
         )
