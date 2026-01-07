@@ -161,62 +161,44 @@ def _reconcile_connector_state(
 ) -> None:
     """Reconcile connector state to ensure all stores have proper state entries.
 
-    This handles:
-    1. Legacy flat state migration to dict-based state
-    2. Adding new stores to existing dict-based state
+    This handles adding new stores to existing dict-based state. Legacy flat state
+    migration is handled earlier in ShopifyOpen.migrate_legacy_state() before
+    Pydantic validation, which prevents hybrid state from being created.
 
     Args:
         store_ids: List of store IDs that should have state entries.
         binding: The capture binding being processed.
-        state: The current state (may be flat or dict-based).
+        state: The current state (always dict-based after ShopifyOpen migration).
         initial_state: The initial state template for new entries.
         task: The task for logging and checkpointing.
     """
+    # State should always be dict-based at this point (migration happens in ShopifyOpen)
+    if not isinstance(state.inc, dict) or not isinstance(initial_state.inc, dict):
+        return
+
     should_checkpoint = False
 
-    # Handle legacy flat state migration
-    if isinstance(state.inc, ResourceState.Incremental):
-        # Legacy flat state - migrate to dict-based
-        if len(store_ids) != 1:
-            raise RuntimeError(
-                f"Cannot migrate legacy flat state with multiple stores ({len(store_ids)}). "
-                "Legacy captures should only have one store."
+    for store_id in store_ids:
+        inc_state_exists = store_id in state.inc
+        backfill_state_exists = (
+            isinstance(state.backfill, dict) and store_id in state.backfill
+        )
+
+        if not inc_state_exists and not backfill_state_exists:
+            task.log.info(f"Initializing new state for store: {store_id}")
+            state.inc[store_id] = deepcopy(initial_state.inc[store_id])
+            if isinstance(state.backfill, dict) and isinstance(initial_state.backfill, dict):
+                state.backfill[store_id] = deepcopy(initial_state.backfill[store_id])
+            should_checkpoint = True
+        elif not inc_state_exists and backfill_state_exists:
+            # Edge case: backfill exists but incremental doesn't
+            task.log.info(
+                f"Reinitializing state for store {store_id} due to missing incremental state."
             )
-        store_id = store_ids[0]
-        task.log.info(f"Migrating legacy flat state to dict-based for store: {store_id}")
-
-        legacy_inc = state.inc
-        state.inc = {store_id: legacy_inc}  # type: ignore[assignment]
-
-        if state.backfill is not None and isinstance(state.backfill, ResourceState.Backfill):
-            legacy_backfill = state.backfill
-            state.backfill = {store_id: legacy_backfill}  # type: ignore[assignment]
-
-        should_checkpoint = True
-
-    # Handle adding new stores to existing dict-based state
-    elif isinstance(state.inc, dict) and isinstance(initial_state.inc, dict):
-        for store_id in store_ids:
-            inc_state_exists = store_id in state.inc
-            backfill_state_exists = (
-                isinstance(state.backfill, dict) and store_id in state.backfill
-            )
-
-            if not inc_state_exists and not backfill_state_exists:
-                task.log.info(f"Initializing new state for store: {store_id}")
-                state.inc[store_id] = deepcopy(initial_state.inc[store_id])
-                if isinstance(state.backfill, dict) and isinstance(initial_state.backfill, dict):
-                    state.backfill[store_id] = deepcopy(initial_state.backfill[store_id])
-                should_checkpoint = True
-            elif not inc_state_exists and backfill_state_exists:
-                # Edge case: backfill exists but incremental doesn't
-                task.log.info(
-                    f"Reinitializing state for store {store_id} due to missing incremental state."
-                )
-                state.inc[store_id] = deepcopy(initial_state.inc[store_id])
-                if isinstance(state.backfill, dict) and isinstance(initial_state.backfill, dict):
-                    state.backfill[store_id] = deepcopy(initial_state.backfill[store_id])
-                should_checkpoint = True
+            state.inc[store_id] = deepcopy(initial_state.inc[store_id])
+            if isinstance(state.backfill, dict) and isinstance(initial_state.backfill, dict):
+                state.backfill[store_id] = deepcopy(initial_state.backfill[store_id])
+            should_checkpoint = True
 
     if should_checkpoint:
         task.log.info(f"Checkpointing reconciled state for {binding.stateKey}.")

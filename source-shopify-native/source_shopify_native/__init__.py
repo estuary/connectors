@@ -1,5 +1,5 @@
 from logging import Logger
-from typing import Callable, Awaitable
+from typing import Callable, Awaitable, Union
 
 from estuary_cdk.flow import (
     ConnectorSpec,
@@ -7,7 +7,6 @@ from estuary_cdk.flow import (
 )
 from estuary_cdk.capture import (
     BaseCaptureConnector,
-    Request,
     Task,
     common,
     request,
@@ -20,7 +19,19 @@ from .models import (
     ConnectorState,
     EndpointConfig,
     OAUTH2_SPEC,
+    ShopifyOpen,
 )
+
+
+# Custom Request type that uses ShopifyOpen for cleaning hybrid state during parsing.
+# This is necessary because Flow's checkpoint merging can create hybrid state when
+# migrating from flat to dict-based format, which Pydantic cannot parse.
+ShopifyRequest = Union[
+    request.Spec,
+    request.Discover[EndpointConfig],
+    request.Validate[EndpointConfig, ResourceConfig],
+    ShopifyOpen,
+]
 
 
 def _bindings_use_multi_store_keys(bindings: list | None) -> bool:
@@ -159,7 +170,7 @@ class Connector(
     BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState],
 ):
     def request_class(self):
-        return Request[EndpointConfig, ResourceConfig, ConnectorState]
+        return ShopifyRequest
 
     async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
