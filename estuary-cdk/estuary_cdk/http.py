@@ -108,7 +108,7 @@ class HTTPSession(abc.ABC):
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
-        _with_token: bool = True,  # Unstable internal API.
+        with_token: bool = True,
         headers: dict[str, Any] | None = None,
         should_retry: ShouldRetryProtocol | None = None,
     ) -> bytes:
@@ -122,7 +122,7 @@ class HTTPSession(abc.ABC):
             params,
             json,
             form,
-            _with_token,
+            with_token,
             headers,
             should_retry,
         )
@@ -184,14 +184,14 @@ class HTTPSession(abc.ABC):
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | None = None,
         form: dict[str, Any] | None = None,
-        _with_token: bool = True,  # Unstable internal API.
+        with_token: bool = True,
         headers: dict[str, Any] | None = None,
         should_retry: ShouldRetryProtocol | None = None,
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and and return the raw response as a stream of bytes"""
 
         return await self._request_stream(
-            log, url, method, params, json, form, _with_token, headers, should_retry
+            log, url, method, params, json, form, with_token, headers, should_retry
         )
 
     @abc.abstractmethod
@@ -203,14 +203,10 @@ class HTTPSession(abc.ABC):
         params: dict[str, Any] | None,
         json: dict[str, Any] | None,
         form: dict[str, Any] | None,
-        _with_token: bool,
+        with_token: bool,
         headers: dict[str, Any] | None = None,
         should_retry: ShouldRetryProtocol | None = None,
     ) -> HeadersAndBodyGenerator: ...
-
-    # TODO(johnny): This is an unstable API.
-    # It may need to accept request headers, or surface response headers,
-    # or we may refactor TokenSource, etc.
 
 
 @dataclass
@@ -383,7 +379,7 @@ class TokenSource:
             method="POST",
             headers=headers,
             form=form,
-            _with_token=False,
+            with_token=False,
         )
         return self.AccessTokenResponse.model_validate_json(response)
 
@@ -457,10 +453,10 @@ class HTTPMixin(Mixin, HTTPSession):
         params: dict[str, Any] | None,
         json: dict[str, Any] | None,
         form: dict[str, Any] | None,
-        _with_token: bool,
+        with_token: bool,
         headers: dict[str, Any],
     ):
-        if _with_token and self.token_source is not None:
+        if with_token and self.token_source is not None:
             token_type, token = await self.token_source.fetch_token(log, self)
             header_value = (
                 f"{token_type} {token}"
@@ -526,7 +522,7 @@ class HTTPMixin(Mixin, HTTPSession):
         params: dict[str, Any] | None,
         json: dict[str, Any] | None,
         form: dict[str, Any] | None,
-        _with_token: bool,
+        with_token: bool,
         headers: dict[str, Any] | None = None,
         should_retry: ShouldRetryProtocol | None = None,
     ) -> HeadersAndBodyGenerator:
@@ -550,7 +546,7 @@ class HTTPMixin(Mixin, HTTPSession):
                     params,
                     json,
                     form,
-                    _with_token,
+                    with_token,
                     headers,
                 ),
             )

@@ -300,7 +300,7 @@ class AppleAppStoreClient:
         _, body_generator = await self.http.request_stream(
             self.log,
             download_url,
-            _with_token=False, # Apple's API returns signed/authenticated URLs; using Authorization header causes HTTP 400 errors
+            with_token=False, # Apple's API returns signed/authenticated URLs; using Authorization header causes HTTP 400 errors
         )
 
         async def uncompressed_body() -> AsyncGenerator[bytes, None]:
