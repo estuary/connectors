@@ -138,18 +138,39 @@ def _create_initial_state(
     store_ids: list[str],
     start_date: AwareDatetime,
     use_backfill: bool,
+    use_multi_store_keys: bool,
 ) -> ResourceState:
-    """Create initial state for a resource. State is always dict-based, keyed by store_id."""
+    """Create initial state for a resource.
+
+    State format depends on use_multi_store_keys:
+    - False (1 store): Flat state format {"inc": {"cursor": "..."}}
+    - True (multiple stores): Dict-based {"inc": {"store_id": {"cursor": "..."}}}
+
+    This follows the same pattern as source-stripe-native: flat state for single account,
+    dict-based for multiple accounts. Transitioning requires backfill.
+    """
     cutoff = datetime.now(tz=UTC)
 
-    if use_backfill:
+    if use_multi_store_keys:
+        # Dict-based state for multiple stores
+        if use_backfill:
+            return ResourceState(
+                inc={sid: ResourceState.Incremental(cursor=cutoff) for sid in store_ids},  # type: ignore[arg-type]
+                backfill={sid: ResourceState.Backfill(next_page=dt_to_str(start_date), cutoff=cutoff) for sid in store_ids},  # type: ignore[arg-type]
+            )
         return ResourceState(
-            inc={sid: ResourceState.Incremental(cursor=cutoff) for sid in store_ids},  # type: ignore[arg-type]
-            backfill={sid: ResourceState.Backfill(next_page=dt_to_str(start_date), cutoff=cutoff) for sid in store_ids},  # type: ignore[arg-type]
+            inc={sid: ResourceState.Incremental(cursor=start_date) for sid in store_ids},  # type: ignore[arg-type]
         )
-    return ResourceState(
-        inc={sid: ResourceState.Incremental(cursor=start_date) for sid in store_ids},  # type: ignore[arg-type]
-    )
+    else:
+        # Flat state for single store (backward compatible with legacy)
+        if use_backfill:
+            return ResourceState(
+                inc=ResourceState.Incremental(cursor=cutoff),
+                backfill=ResourceState.Backfill(next_page=dt_to_str(start_date), cutoff=cutoff),
+            )
+        return ResourceState(
+            inc=ResourceState.Incremental(cursor=start_date),
+        )
 
 
 def _reconcile_connector_state(
@@ -161,48 +182,53 @@ def _reconcile_connector_state(
 ) -> None:
     """Reconcile connector state to ensure all stores have proper state entries.
 
-    This handles adding new stores to existing dict-based state. Legacy flat state
-    migration is handled earlier in ShopifyOpen.migrate_legacy_state() before
-    Pydantic validation, which prevents hybrid state from being created.
+    This follows the pattern from source-stripe-native: only add new stores to
+    existing dict-based state. Flat state (single store) is left unchanged.
+
+    State format is determined by _create_initial_state based on use_multi_store_keys:
+    - Single store: flat state, no reconciliation needed
+    - Multiple stores: dict-based state, add new stores as needed
 
     Args:
         store_ids: List of store IDs that should have state entries.
         binding: The capture binding being processed.
-        state: The current state (always dict-based after ShopifyOpen migration).
+        state: The current state.
         initial_state: The initial state template for new entries.
         task: The task for logging and checkpointing.
     """
-    # State should always be dict-based at this point (migration happens in ShopifyOpen)
-    if not isinstance(state.inc, dict) or not isinstance(initial_state.inc, dict):
-        return
+    # Only reconcile dict-based state (multiple stores)
+    # Flat state (single store) doesn't need reconciliation
+    if (
+        isinstance(state.inc, dict)
+        and isinstance(initial_state.inc, dict)
+    ):
+        should_checkpoint = False
 
-    should_checkpoint = False
-
-    for store_id in store_ids:
-        inc_state_exists = store_id in state.inc
-        backfill_state_exists = (
-            isinstance(state.backfill, dict) and store_id in state.backfill
-        )
-
-        if not inc_state_exists and not backfill_state_exists:
-            task.log.info(f"Initializing new state for store: {store_id}")
-            state.inc[store_id] = deepcopy(initial_state.inc[store_id])
-            if isinstance(state.backfill, dict) and isinstance(initial_state.backfill, dict):
-                state.backfill[store_id] = deepcopy(initial_state.backfill[store_id])
-            should_checkpoint = True
-        elif not inc_state_exists and backfill_state_exists:
-            # Edge case: backfill exists but incremental doesn't
-            task.log.info(
-                f"Reinitializing state for store {store_id} due to missing incremental state."
+        for store_id in store_ids:
+            inc_state_exists = store_id in state.inc
+            backfill_state_exists = (
+                isinstance(state.backfill, dict) and store_id in state.backfill
             )
-            state.inc[store_id] = deepcopy(initial_state.inc[store_id])
-            if isinstance(state.backfill, dict) and isinstance(initial_state.backfill, dict):
-                state.backfill[store_id] = deepcopy(initial_state.backfill[store_id])
-            should_checkpoint = True
 
-    if should_checkpoint:
-        task.log.info(f"Checkpointing reconciled state for {binding.stateKey}.")
-        task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
+            if not inc_state_exists and not backfill_state_exists:
+                task.log.info(f"Initializing new state for store: {store_id}")
+                state.inc[store_id] = deepcopy(initial_state.inc[store_id])
+                if isinstance(state.backfill, dict) and isinstance(initial_state.backfill, dict):
+                    state.backfill[store_id] = deepcopy(initial_state.backfill[store_id])
+                should_checkpoint = True
+            elif not inc_state_exists and backfill_state_exists:
+                # Edge case: backfill exists but incremental doesn't
+                task.log.info(
+                    f"Reinitializing state for store {store_id} due to missing incremental state."
+                )
+                state.inc[store_id] = deepcopy(initial_state.inc[store_id])
+                if isinstance(state.backfill, dict) and isinstance(initial_state.backfill, dict):
+                    state.backfill[store_id] = deepcopy(initial_state.backfill[store_id])
+                should_checkpoint = True
+
+        if should_checkpoint:
+            task.log.info(f"Checkpointing reconciled state for {binding.stateKey}.")
+            task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
 
 
 async def _check_plan_allows_pii(http: HTTPMixin, url: str, log: Logger) -> bool:
@@ -277,15 +303,19 @@ async def all_resources(
 ) -> list[Resource]:
     """Discover all available resources across all configured stores.
 
-    State is always dict-based internally, keyed by store_id.
-    Collection keys depend on use_multi_store_keys:
-    - True: ["/_meta/store", "/id"] (new captures and multi-store)
-    - False: ["/id"] (legacy single-store captures for backward compatibility)
+    State and collection key format depends on use_multi_store_keys:
+    - True: Dict-based state {"inc": {"store_id": {...}}}, keys ["/_meta/store", "/id"]
+    - False: Flat state {"inc": {"cursor": "..."}}, keys ["/id"]
+
+    This follows the pattern from source-stripe-native: new captures always use
+    dict-based state, legacy single-store captures continue with flat state,
+    and transitioning requires backfill.
 
     Args:
-        use_multi_store_keys: Whether to include /_meta/store in collection keys.
-            New captures should always pass True. Only pass False for legacy
-            single-store captures that haven't added additional stores.
+        use_multi_store_keys: Whether to use multi-store format.
+            True: New captures, existing multi-store captures, or legacy captures
+                  transitioning to multiple stores (after backfill acknowledgment).
+            False: Legacy single-store captures (backward compatibility).
     """
     # Build store contexts
     store_contexts: dict[str, dict] = {}
@@ -330,7 +360,7 @@ async def all_resources(
             continue
 
         use_backfill = not model.SHOULD_USE_BULK_QUERIES and model.SORT_KEY is not None
-        initial_state = _create_initial_state(stores_with_access, config.start_date, use_backfill)
+        initial_state = _create_initial_state(stores_with_access, config.start_date, use_backfill, use_multi_store_keys)
 
         def create_open_fn(
             model: type[ShopifyGraphQLResource],
