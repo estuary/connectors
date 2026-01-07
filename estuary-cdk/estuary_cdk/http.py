@@ -11,7 +11,7 @@ import aiohttp
 from google.auth.credentials import TokenState as GoogleTokenState
 from google.auth.transport.requests import Request as GoogleAuthRequest
 from google.oauth2.service_account import Credentials as GoogleServiceAccountCredentials
-from multidict import CIMultiDict
+from multidict import CIMultiDictProxy
 from pydantic import BaseModel
 
 from . import Mixin
@@ -37,7 +37,7 @@ DEFAULT_AUTHORIZATION_TOKEN_TYPE = "Bearer"
 
 T = TypeVar("T")
 
-Headers = CIMultiDict[str]
+Headers = CIMultiDictProxy[str]
 
 BodyGeneratorFunction = Callable[[], AsyncGenerator[bytes, None]]
 HeadersAndBodyGenerator = tuple[Headers, BodyGeneratorFunction]
