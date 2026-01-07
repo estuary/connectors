@@ -366,6 +366,7 @@ async def all_resources(
             model: type[ShopifyGraphQLResource],
             stores_with_access: list[str],
             initial_state: ResourceState,
+            use_multi_store_keys: bool,
         ):
             def open(
                 binding: CaptureBinding[ResourceConfig],
@@ -374,7 +375,7 @@ async def all_resources(
                 task: Task,
                 _all_bindings=None,
             ):
-                # Reconcile state: migrate legacy flat state or add new stores
+                # Reconcile state (only for dict-based state with multiple stores)
                 _reconcile_connector_state(
                     stores_with_access, binding, state, initial_state, task
                 )
@@ -394,42 +395,80 @@ async def all_resources(
                 if not model.SHOULD_USE_BULK_QUERIES and "edges" in model.QUERY.lower():
                     raise RuntimeError("Non-bulk queries cannot contain nested connections.")
 
-                # Build fetch functions (always dict-based, keyed by store_id)
                 data_model = create_response_data_model(model)
-                fetch_changes: dict[str, functools.partial] = {}
-                fetch_page: dict[str, functools.partial] = {}
 
-                for store_id in stores_with_access:
+                if use_multi_store_keys:
+                    # Dict-based fetch functions for multiple stores
+                    fetch_changes: dict[str, functools.partial] = {}
+                    fetch_page: dict[str, functools.partial] = {}
+
+                    for store_id in stores_with_access:
+                        ctx = store_contexts[store_id]
+
+                        if model.SHOULD_USE_BULK_QUERIES:
+                            fetch_changes[store_id] = functools.partial(
+                                bulk_fetch_incremental,
+                                ctx["http"], config.advanced.window_size, ctx["bulk_job_manager"], model, store_id,
+                            )
+                        elif model.SORT_KEY is None:
+                            fetch_changes[store_id] = functools.partial(
+                                fetch_incremental_unsorted,
+                                ctx["client"], model, data_model, store_id,
+                            )
+                        else:
+                            fetch_changes[store_id] = functools.partial(
+                                fetch_incremental,
+                                ctx["client"], model, data_model, store_id,
+                            )
+                            fetch_page[store_id] = functools.partial(
+                                backfill_incremental,
+                                ctx["client"], model, data_model, store_id,
+                            )
+
+                    open_binding(
+                        binding,
+                        binding_index,
+                        state,
+                        task,
+                        fetch_changes=fetch_changes,  # type: ignore[arg-type]
+                        fetch_page=fetch_page if fetch_page else None,  # type: ignore[arg-type]
+                    )
+                else:
+                    # Flat fetch functions for single store (legacy backward compatibility)
+                    # For flat state, open_binding expects functools.partial, not dict
+                    store_id = stores_with_access[0]
                     ctx = store_contexts[store_id]
 
                     if model.SHOULD_USE_BULK_QUERIES:
-                        fetch_changes[store_id] = functools.partial(
+                        fetch_changes_fn = functools.partial(
                             bulk_fetch_incremental,
                             ctx["http"], config.advanced.window_size, ctx["bulk_job_manager"], model, store_id,
                         )
+                        fetch_page_fn = None
                     elif model.SORT_KEY is None:
-                        fetch_changes[store_id] = functools.partial(
+                        fetch_changes_fn = functools.partial(
                             fetch_incremental_unsorted,
                             ctx["client"], model, data_model, store_id,
                         )
+                        fetch_page_fn = None
                     else:
-                        fetch_changes[store_id] = functools.partial(
+                        fetch_changes_fn = functools.partial(
                             fetch_incremental,
                             ctx["client"], model, data_model, store_id,
                         )
-                        fetch_page[store_id] = functools.partial(
+                        fetch_page_fn = functools.partial(
                             backfill_incremental,
                             ctx["client"], model, data_model, store_id,
                         )
 
-                open_binding(
-                    binding,
-                    binding_index,
-                    state,
-                    task,
-                    fetch_changes=fetch_changes,  # type: ignore[arg-type]
-                    fetch_page=fetch_page if fetch_page else None,  # type: ignore[arg-type]
-                )
+                    open_binding(
+                        binding,
+                        binding_index,
+                        state,
+                        task,
+                        fetch_changes=fetch_changes_fn,
+                        fetch_page=fetch_page_fn,
+                    )
 
             return open
 
@@ -438,7 +477,7 @@ async def all_resources(
                 name=model.NAME,
                 key=key,
                 model=ShopifyGraphQLResource,
-                open=create_open_fn(model, stores_with_access, initial_state),
+                open=create_open_fn(model, stores_with_access, initial_state, use_multi_store_keys),
                 initial_state=initial_state,
                 initial_config=ResourceConfig(name=model.NAME, interval=timedelta(minutes=5)),
                 schema_inference=True,
