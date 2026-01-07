@@ -1,0 +1,378 @@
+sql> CREATE TABLE test.featureflagflattenarrays_disabled_688545 (id INTEGER PRIMARY KEY, text_array TEXT[], int_array INTEGER[], nested_array INTEGER[][])
+sql> INSERT INTO test.featureflagflattenarrays_disabled_688545 VALUES
+				(1, ARRAY['a','b','c'], ARRAY[1,2,3], ARRAY[[1,2],[3,4]]),
+				(2, ARRAY['foo','bar'], ARRAY[10,20], ARRAY[[5,6],[7,8]]),
+				(3, '{}', '{}', ARRAY[[]]::INTEGER[][]),
+				(4, NULL, NULL, NULL)
+=== Discover: Discover Tables ===
+{
+  "recommendedName": "test/featureflagflattenarrays_disabled_688545",
+  "resourceConfig": {
+    "namespace": "test",
+    "stream": "featureflagflattenarrays_disabled_688545"
+  },
+  "documentSchema": {
+    "$defs": {
+      "TestFeatureflagflattenarrays_disabled_688545": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "$anchor": "TestFeatureflagflattenarrays_disabled_688545",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
+          },
+          "int_array": {
+            "required": [
+              "dimensions",
+              "elements"
+            ],
+            "description": "(source type: _int4)",
+            "additionalProperties": false,
+            "properties": {
+              "dimensions": {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "elements": {
+                "items": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "type": "array"
+              }
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "nested_array": {
+            "required": [
+              "dimensions",
+              "elements"
+            ],
+            "description": "(source type: _int4)",
+            "additionalProperties": false,
+            "properties": {
+              "dimensions": {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "elements": {
+                "items": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ]
+                },
+                "type": "array"
+              }
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "text_array": {
+            "required": [
+              "dimensions",
+              "elements"
+            ],
+            "description": "(source type: _text)",
+            "additionalProperties": false,
+            "properties": {
+              "dimensions": {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              "elements": {
+                "items": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "type": "array"
+              }
+            },
+            "type": [
+              "object",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "_meta": {
+              "properties": {
+                "op": {
+                  "const": "d"
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "merge"
+          }
+        },
+        "else": {
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "op",
+              "source"
+            ],
+            "properties": {
+              "before": {
+                "$ref": "#TestFeatureflagflattenarrays_disabled_688545",
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "loc": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array",
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
+                  },
+                  "txid": {
+                    "type": "integer",
+                    "description": "The 32-bit transaction ID assigned by Postgres to the commit which produced this change."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table",
+                  "loc"
+                ]
+              }
+            },
+            "reduce": {
+              "strategy": "merge"
+            }
+          }
+        }
+      },
+      {
+        "$ref": "#TestFeatureflagflattenarrays_disabled_688545"
+      }
+    ],
+    "x-infer-schema": true
+  },
+  "key": [
+    "/id"
+  ]
+}
+=== Run: Capture ===
+[
+  "acmeCo/test_capture/test/featureflagflattenarrays_disabled_688545",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "featureflagflattenarrays_disabled_688545"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1,
+    "int_array": {
+      "dimensions": [
+        3
+      ],
+      "elements": [
+        1,
+        2,
+        3
+      ]
+    },
+    "nested_array": {
+      "dimensions": [
+        2,
+        2
+      ],
+      "elements": [
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    "text_array": {
+      "dimensions": [
+        3
+      ],
+      "elements": [
+        "a",
+        "b",
+        "c"
+      ]
+    }
+  }
+]
+[
+  "acmeCo/test_capture/test/featureflagflattenarrays_disabled_688545",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "featureflagflattenarrays_disabled_688545"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2,
+    "int_array": {
+      "dimensions": [
+        2
+      ],
+      "elements": [
+        10,
+        20
+      ]
+    },
+    "nested_array": {
+      "dimensions": [
+        2,
+        2
+      ],
+      "elements": [
+        5,
+        6,
+        7,
+        8
+      ]
+    },
+    "text_array": {
+      "dimensions": [
+        2
+      ],
+      "elements": [
+        "foo",
+        "bar"
+      ]
+    }
+  }
+]
+[
+  "acmeCo/test_capture/test/featureflagflattenarrays_disabled_688545",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "featureflagflattenarrays_disabled_688545"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 3,
+    "int_array": {
+      "dimensions": [],
+      "elements": []
+    },
+    "nested_array": {
+      "dimensions": [],
+      "elements": []
+    },
+    "text_array": {
+      "dimensions": [],
+      "elements": []
+    }
+  }
+]
+[
+  "acmeCo/test_capture/test/featureflagflattenarrays_disabled_688545",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "featureflagflattenarrays_disabled_688545"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 4,
+    "int_array": null,
+    "nested_array": null,
+    "text_array": null
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Ffeatureflagflattenarrays_disabled_688545": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

@@ -1,12 +1,90 @@
-# ================================
-# Collection "acmeCo/test/test/xminbackfill_60228969": 4 Documents
-# ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"xminbackfill_60228969","loc":[11111111,11111111,11111111]}},"data":"one-modified","id":1}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"xminbackfill_60228969","loc":[11111111,11111111,11111111]}},"data":"three","id":3}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"xminbackfill_60228969","loc":[11111111,11111111,11111111]}},"data":"four","id":4}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"xminbackfill_60228969","loc":[11111111,11111111,11111111]}},"data":"five","id":5}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Fxminbackfill_60228969":{"backfilled":4,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
+sql> CREATE TABLE test.xminbackfill_494223 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO test.xminbackfill_494223 VALUES (0, 'zero'), (1, 'one'), (2, 'two')
+sql> INSERT INTO test.xminbackfill_494223 VALUES (3, 'three'), (4, 'four'), (5, 'five')
+sql> DELETE FROM test.xminbackfill_494223 WHERE id = 0
+sql> UPDATE test.xminbackfill_494223 SET data = 'one-modified' WHERE id = 1
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/xminbackfill_494223
+=== Run: Backfill With XMIN Filter ===
+[
+  "acmeCo/test_capture/test/xminbackfill_494223",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "xminbackfill_494223"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one-modified",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/xminbackfill_494223",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "xminbackfill_494223"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/xminbackfill_494223",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "xminbackfill_494223"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/xminbackfill_494223",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "xminbackfill_494223"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "id": 5
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fxminbackfill_494223": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
 

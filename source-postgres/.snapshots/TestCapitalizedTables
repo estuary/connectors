@@ -1,0 +1,104 @@
+sql> CREATE TABLE "test"."USERS" (id INTEGER PRIMARY KEY, data TEXT NOT NULL)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/users
+sql> INSERT INTO "test"."USERS" VALUES (1, 'Alice'), (2, 'Bob')
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/users",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "USERS"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Alice",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/users",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "USERS"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Bob",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2FUSERS": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO "test"."USERS" VALUES (3, 'Carol'), (4, 'Dave')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/users",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "USERS",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Carol",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/users",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "USERS",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Dave",
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2FUSERS": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

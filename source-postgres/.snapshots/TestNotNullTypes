@@ -1,0 +1,153 @@
+sql> CREATE TABLE test.notnulltypes_650217 (
+		id INTEGER PRIMARY KEY,
+		a_integer INTEGER NOT NULL,
+		a_text TEXT NOT NULL,
+		a_boolean BOOLEAN NOT NULL,
+		a_numeric NUMERIC NOT NULL,
+		a_uuid UUID NOT NULL,
+		a_jsonb JSONB NOT NULL,
+		a_integer_arr INTEGER[] NOT NULL
+	)
+sql> INSERT INTO test.notnulltypes_650217 VALUES
+		(1, 123, 'hello', true, 123.456, 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '{"key": "value"}', '{1,2,3}'),
+		(2, -456, 'world', false, -789.012, '00000000-0000-0000-0000-000000000000', '[]', '{}')
+=== Discover: Discover ===
+acmeCo/test_capture/test/notnulltypes_650217
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/notnulltypes_650217",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "notnulltypes_650217"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_boolean": true,
+    "a_integer": 123,
+    "a_integer_arr": [
+      1,
+      2,
+      3
+    ],
+    "a_jsonb": {
+      "key": "value"
+    },
+    "a_numeric": "123.456",
+    "a_text": "hello",
+    "a_uuid": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/notnulltypes_650217",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "notnulltypes_650217"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_boolean": false,
+    "a_integer": -456,
+    "a_integer_arr": [],
+    "a_jsonb": [],
+    "a_numeric": "-789.012",
+    "a_text": "world",
+    "a_uuid": "00000000-0000-0000-0000-000000000000",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fnotnulltypes_650217": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.notnulltypes_650217 VALUES
+		(101, 123, 'hello', true, 123.456, 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '{"key": "value"}', '{1,2,3}'),
+		(102, -456, 'world', false, -789.012, '00000000-0000-0000-0000-000000000000', '[]', '{}')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/notnulltypes_650217",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "notnulltypes_650217",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_boolean": true,
+    "a_integer": 123,
+    "a_integer_arr": [
+      1,
+      2,
+      3
+    ],
+    "a_jsonb": {
+      "key": "value"
+    },
+    "a_numeric": "123.456",
+    "a_text": "hello",
+    "a_uuid": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/notnulltypes_650217",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "notnulltypes_650217",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_boolean": false,
+    "a_integer": -456,
+    "a_integer_arr": [],
+    "a_jsonb": [],
+    "a_numeric": "-789.012",
+    "a_text": "world",
+    "a_uuid": "00000000-0000-0000-0000-000000000000",
+    "id": 102
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fnotnulltypes_650217": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

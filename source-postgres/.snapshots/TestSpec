@@ -1,0 +1,348 @@
+=== Spec: Get Connector Spec ===
+{
+  "protocol": 3032023,
+  "configSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "address": {
+        "type": "string",
+        "title": "Server Address",
+        "description": "The host or host:port at which the database can be reached.",
+        "order": 0
+      },
+      "user": {
+        "type": "string",
+        "title": "User",
+        "description": "The database user to authenticate as.",
+        "default": "flow_capture",
+        "order": 1
+      },
+      "database": {
+        "type": "string",
+        "description": "Logical database name to capture from.",
+        "default": "postgres",
+        "order": 2
+      },
+      "historyMode": {
+        "type": "boolean",
+        "description": "Capture change events without reducing them to a final state.",
+        "default": false,
+        "order": 3
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "UserPassword",
+                "default": "UserPassword",
+                "order": 0
+              },
+              "password": {
+                "type": "string",
+                "title": "Password",
+                "description": "Database user's password",
+                "secret": true
+              }
+            },
+            "type": "object",
+            "required": [
+              "password"
+            ],
+            "title": "Password"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/aws-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSIAM",
+                "default": "AWSIAM",
+                "order": 0
+              },
+              "aws_region": {
+                "type": "string",
+                "title": "AWS Region",
+                "description": "AWS Region of your resource"
+              },
+              "aws_role_arn": {
+                "type": "string",
+                "title": "AWS Role ARN",
+                "description": "AWS Role which has access to the resource which will be assumed by Flow"
+              }
+            },
+            "type": "object",
+            "required": [
+              "aws_region",
+              "aws_role_arn"
+            ],
+            "title": "AWS IAM"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/gcp-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "GCPIAM",
+                "default": "GCPIAM",
+                "order": 0
+              },
+              "gcp_service_account_to_impersonate": {
+                "type": "string",
+                "title": "Service Account",
+                "description": "GCP Service Account email for Cloud SQL IAM authentication"
+              },
+              "gcp_workload_identity_pool_audience": {
+                "type": "string",
+                "title": "Workload Identity Pool Audience",
+                "description": "GCP Workload Identity Pool Audience in the format //iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"
+              }
+            },
+            "type": "object",
+            "required": [
+              "gcp_service_account_to_impersonate",
+              "gcp_workload_identity_pool_audience"
+            ],
+            "title": "Google Cloud IAM"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/azure-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AzureIAM",
+                "default": "AzureIAM",
+                "order": 0
+              },
+              "azure_client_id": {
+                "type": "string",
+                "title": "Azure Client ID",
+                "description": "Azure App Registration Client ID for Azure Active Directory authentication"
+              },
+              "azure_tenant_id": {
+                "type": "string",
+                "title": "Azure Tenant ID",
+                "description": "Azure Tenant ID for Azure Active Directory authentication"
+              }
+            },
+            "type": "object",
+            "required": [
+              "azure_client_id",
+              "azure_tenant_id"
+            ],
+            "title": "Azure IAM"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "default": {
+          "auth_type": "UserPassword"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
+        "order": 4,
+        "x-iam-auth": true
+      },
+      "advanced": {
+        "properties": {
+          "publicationName": {
+            "type": "string",
+            "description": "The name of the PostgreSQL publication to replicate from.",
+            "default": "flow_publication"
+          },
+          "slotName": {
+            "type": "string",
+            "description": "The name of the PostgreSQL replication slot to replicate from.",
+            "default": "flow_slot"
+          },
+          "watermarksTable": {
+            "type": "string",
+            "description": "The name of the table used for watermark writes during backfills. Must be fully-qualified in '\u003cschema\u003e.\u003ctable\u003e' form.",
+            "default": "public.flow_watermarks"
+          },
+          "skip_backfills": {
+            "type": "string",
+            "title": "Skip Backfills",
+            "description": "A comma-separated list of fully-qualified table names which should not be backfilled."
+          },
+          "backfill_chunk_size": {
+            "type": "integer",
+            "title": "Backfill Chunk Size",
+            "description": "The number of rows which should be fetched from the database in a single backfill query.",
+            "default": 50000
+          },
+          "sslmode": {
+            "type": "string",
+            "enum": [
+              "disable",
+              "allow",
+              "prefer",
+              "require",
+              "verify-ca",
+              "verify-full"
+            ],
+            "title": "SSL Mode",
+            "description": "Overrides SSL connection behavior by setting the 'sslmode' parameter."
+          },
+          "discover_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Discovery Schema Selection",
+            "description": "If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."
+          },
+          "min_backfill_xid": {
+            "type": "string",
+            "title": "Minimum Backfill XID",
+            "description": "Only backfill rows with XMIN values greater (in a 32-bit modular comparison) than the specified XID. Helpful for reducing re-backfill data volume in certain edge cases.",
+            "pattern": "^[0-9]+$"
+          },
+          "read_only_capture": {
+            "type": "boolean",
+            "title": "Read-Only Capture",
+            "description": "When set the capture will operate in read-only mode and avoid operations such as watermark writes. This comes with some tradeoffs; consult the connector documentation for more information."
+          },
+          "capture_as_partitions": {
+            "type": "boolean",
+            "title": "Capture Partitioned Tables As Partitions",
+            "description": "When set the capture will discover and capture partitioned tables as individual partitions rather than as a single root table. This requires the publication to be created without 'publish_via_partition_root'."
+          },
+          "discover_unpublished_tables": {
+            "type": "boolean",
+            "title": "Discover Unpublished Tables",
+            "description": "When set the capture will discover all tables including those not currently in the publication. Unpublished tables will be added to the publication at capture time if possible. Use with caution as this requires appropriate database permissions."
+          },
+          "source_tag": {
+            "type": "string",
+            "title": "Source Tag",
+            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document."
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+          },
+          "statement_timeout": {
+            "type": "string",
+            "enum": [
+              "",
+              "30s",
+              "1m",
+              "5m",
+              "30m"
+            ],
+            "title": "Statement Timeout",
+            "description": "Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.",
+            "default": ""
+          },
+          "discover_only_published": {
+            "type": "boolean",
+            "x-hidden-field": true
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      },
+      "networkTunnel": {
+        "properties": {
+          "sshForwarding": {
+            "properties": {
+              "sshEndpoint": {
+                "type": "string",
+                "title": "SSH Endpoint",
+                "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+                "pattern": "^ssh://.+@.+$"
+              },
+              "privateKey": {
+                "type": "string",
+                "title": "SSH Private Key",
+                "description": "Private key to connect to the remote SSH server.",
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sshEndpoint",
+              "privateKey"
+            ],
+            "title": "SSH Forwarding"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Network Tunnel",
+        "description": "Connect to your system through an SSH server that acts as a bastion host for your network."
+      }
+    },
+    "type": "object",
+    "required": [
+      "address",
+      "user",
+      "database",
+      "historyMode",
+      "credentials"
+    ],
+    "title": "PostgreSQL Connection"
+  },
+  "resourceConfigSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/sqlcapture/resource",
+    "properties": {
+      "mode": {
+        "type": "string",
+        "enum": [
+          "",
+          "Normal",
+          "Precise",
+          "Only Changes",
+          "Without Primary Key"
+        ],
+        "title": "Backfill Mode",
+        "description": "How the preexisting contents of the table should be backfilled. This should generally not be changed.",
+        "default": ""
+      },
+      "namespace": {
+        "type": "string",
+        "title": "Schema",
+        "description": "The schema (namespace) in which the table resides.",
+        "readOnly": true
+      },
+      "stream": {
+        "type": "string",
+        "title": "Table Name",
+        "description": "The name of the table to be captured.",
+        "readOnly": true
+      },
+      "priority": {
+        "type": "integer",
+        "title": "Backfill Priority",
+        "description": "An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others."
+      }
+    },
+    "type": "object",
+    "required": [
+      "namespace",
+      "stream"
+    ],
+    "title": "SQL Database Resource Spec"
+  },
+  "documentationUrl": "https://go.estuary.dev/source-postgresql",
+  "resourcePathPointers": [
+    "/namespace",
+    "/stream"
+  ]
+}
+
+

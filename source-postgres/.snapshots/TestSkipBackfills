@@ -1,0 +1,212 @@
+sql> CREATE TABLE test.skipbackfills_328414_a (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE test.skipbackfills_328414_b (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE test.skipbackfills_328414_c (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO test.skipbackfills_328414_a VALUES (1, 'one'), (2, 'two')
+sql> INSERT INTO test.skipbackfills_328414_b VALUES (3, 'three'), (4, 'four')
+sql> INSERT INTO test.skipbackfills_328414_c VALUES (5, 'five'), (6, 'six')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/skipbackfills_328414_a
+acmeCo/test_capture/test/skipbackfills_328414_b
+acmeCo/test_capture/test/skipbackfills_328414_c
+=== Run: Initial Backfill (Only B) ===
+[
+  "acmeCo/test_capture/test/skipbackfills_328414_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "skipbackfills_328414_b"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/skipbackfills_328414_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "skipbackfills_328414_b"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fskipbackfills_328414_a": {
+      "backfilled": 0,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "test%2Fskipbackfills_328414_b": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "test%2Fskipbackfills_328414_c": {
+      "backfilled": 0,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.skipbackfills_328414_a VALUES (7, 'seven'), (8, 'eight')
+sql> INSERT INTO test.skipbackfills_328414_b VALUES (9, 'nine'), (10, 'ten')
+sql> INSERT INTO test.skipbackfills_328414_c VALUES (11, 'eleven'), (12, 'twelve')
+=== Run: Replication (All Tables) ===
+[
+  "acmeCo/test_capture/test/skipbackfills_328414_a",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "skipbackfills_328414_a",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "seven",
+    "id": 7
+  }
+]
+[
+  "acmeCo/test_capture/test/skipbackfills_328414_a",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "skipbackfills_328414_a",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "eight",
+    "id": 8
+  }
+]
+[
+  "acmeCo/test_capture/test/skipbackfills_328414_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "skipbackfills_328414_b",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "nine",
+    "id": 9
+  }
+]
+[
+  "acmeCo/test_capture/test/skipbackfills_328414_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "skipbackfills_328414_b",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "ten",
+    "id": 10
+  }
+]
+[
+  "acmeCo/test_capture/test/skipbackfills_328414_c",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "skipbackfills_328414_c",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "eleven",
+    "id": 11
+  }
+]
+[
+  "acmeCo/test_capture/test/skipbackfills_328414_c",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "skipbackfills_328414_c",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "twelve",
+    "id": 12
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fskipbackfills_328414_a": {
+      "backfilled": 0,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "test%2Fskipbackfills_328414_b": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "test%2Fskipbackfills_328414_c": {
+      "backfilled": 0,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

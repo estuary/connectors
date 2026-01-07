@@ -1,0 +1,274 @@
+sql> CREATE TYPE UserEnum AS ENUM ('red', 'green', 'blue')
+sql> CREATE TABLE test.usertypes_enum_211653 (id INTEGER PRIMARY KEY, value UserEnum)
+=== Discover: Discover Tables ===
+{
+  "recommendedName": "test/usertypes_enum_211653",
+  "resourceConfig": {
+    "namespace": "test",
+    "stream": "usertypes_enum_211653"
+  },
+  "documentSchema": {
+    "$defs": {
+      "TestUsertypes_enum_211653": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "$anchor": "TestUsertypes_enum_211653",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "description": "(source type: non-nullable int4)"
+          },
+          "value": {
+            "description": "(source type: enum)",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "_meta": {
+              "properties": {
+                "op": {
+                  "const": "d"
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "merge"
+          }
+        },
+        "else": {
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "op",
+              "source"
+            ],
+            "properties": {
+              "before": {
+                "$ref": "#TestUsertypes_enum_211653",
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "loc": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array",
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
+                  },
+                  "txid": {
+                    "type": "integer",
+                    "description": "The 32-bit transaction ID assigned by Postgres to the commit which produced this change."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table",
+                  "loc"
+                ]
+              }
+            },
+            "reduce": {
+              "strategy": "merge"
+            }
+          }
+        }
+      },
+      {
+        "$ref": "#TestUsertypes_enum_211653"
+      }
+    ],
+    "x-infer-schema": true
+  },
+  "key": [
+    "/id"
+  ]
+}
+sql> INSERT INTO test.usertypes_enum_211653 VALUES (1, 'red'), (2, 'green'), (3, 'blue')
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/usertypes_enum_211653",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "usertypes_enum_211653"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1,
+    "value": "red"
+  }
+]
+[
+  "acmeCo/test_capture/test/usertypes_enum_211653",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "usertypes_enum_211653"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2,
+    "value": "green"
+  }
+]
+[
+  "acmeCo/test_capture/test/usertypes_enum_211653",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "usertypes_enum_211653"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 3,
+    "value": "blue"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fusertypes_enum_211653": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.usertypes_enum_211653 VALUES (4, 'blue'), (5, 'red'), (6, 'green')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/usertypes_enum_211653",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "usertypes_enum_211653",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 4,
+    "value": "blue"
+  }
+]
+[
+  "acmeCo/test_capture/test/usertypes_enum_211653",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "usertypes_enum_211653",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 5,
+    "value": "red"
+  }
+]
+[
+  "acmeCo/test_capture/test/usertypes_enum_211653",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "usertypes_enum_211653",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 6,
+    "value": "green"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fusertypes_enum_211653": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

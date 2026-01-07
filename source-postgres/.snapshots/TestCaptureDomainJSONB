@@ -1,0 +1,118 @@
+sql> CREATE DOMAIN UserDomain AS JSONB
+sql> CREATE TABLE test.capturedomainjsonb_920446 (id INTEGER PRIMARY KEY, data UserDomain NOT NULL)
+sql> INSERT INTO test.capturedomainjsonb_920446 VALUES (0, '{}'), (1, '{"foo": "bar"}')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/capturedomainjsonb_920446
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/capturedomainjsonb_920446",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "capturedomainjsonb_920446"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {},
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/capturedomainjsonb_920446",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "capturedomainjsonb_920446"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "foo": "bar"
+    },
+    "id": 1
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fcapturedomainjsonb_920446": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.capturedomainjsonb_920446 VALUES (2, '{"baz": [1, 2, 3]}'), (3, '{"asdf": {"a": 1, "b": 2}}')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/capturedomainjsonb_920446",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "capturedomainjsonb_920446",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "baz": [
+        1,
+        2,
+        3
+      ]
+    },
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/capturedomainjsonb_920446",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "capturedomainjsonb_920446",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": {
+      "asdf": {
+        "a": 1,
+        "b": 2
+      }
+    },
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fcapturedomainjsonb_920446": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

@@ -1,139 +1,143 @@
-Binding 0:
+sql> CREATE TABLE test.partitionedtablediscovery_242722 (logdate DATE PRIMARY KEY, value TEXT) PARTITION BY RANGE (logdate)
+sql> CREATE TABLE test.partitionedtablediscovery_242722_2023q1 PARTITION OF test.partitionedtablediscovery_242722 FOR VALUES FROM ('2023-01-01') TO ('2023-04-01')
+sql> CREATE TABLE test.partitionedtablediscovery_242722_2023q2 PARTITION OF test.partitionedtablediscovery_242722 FOR VALUES FROM ('2023-04-01') TO ('2023-07-01')
+sql> CREATE TABLE test.partitionedtablediscovery_242722_2023q3 PARTITION OF test.partitionedtablediscovery_242722 FOR VALUES FROM ('2023-07-01') TO ('2023-10-01')
+sql> CREATE TABLE test.partitionedtablediscovery_242722_2023q4 PARTITION OF test.partitionedtablediscovery_242722 FOR VALUES FROM ('2023-10-01') TO ('2024-01-01')
+=== Discover: Discover Partitioned Table ===
 {
-    "recommended_name": "test/partitionedtablediscovery_27339326",
-    "resource_config_json": {
-      "namespace": "test",
-      "stream": "partitionedtablediscovery_27339326"
-    },
-    "document_schema_json": {
-      "$defs": {
-        "TestPartitionedtablediscovery_27339326": {
-          "type": "object",
-          "required": [
-            "logdate"
-          ],
-          "$anchor": "TestPartitionedtablediscovery_27339326",
-          "properties": {
-            "logdate": {
-              "type": "string",
-              "format": "date",
-              "description": "(source type: non-nullable date)"
-            },
-            "value": {
-              "description": "(source type: text)",
-              "type": [
-                "string",
-                "null"
-              ]
-            }
+  "recommendedName": "test/partitionedtablediscovery_242722",
+  "resourceConfig": {
+    "namespace": "test",
+    "stream": "partitionedtablediscovery_242722"
+  },
+  "documentSchema": {
+    "$defs": {
+      "TestPartitionedtablediscovery_242722": {
+        "type": "object",
+        "required": [
+          "logdate"
+        ],
+        "$anchor": "TestPartitionedtablediscovery_242722",
+        "properties": {
+          "logdate": {
+            "type": "string",
+            "format": "date",
+            "description": "(source type: non-nullable date)"
+          },
+          "value": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "_meta": {
-                "properties": {
-                  "op": {
-                    "const": "d"
-                  }
-                }
-              }
-            }
-          },
-          "then": {
-            "reduce": {
-              "delete": true,
-              "strategy": "merge"
-            }
-          },
-          "else": {
-            "reduce": {
-              "strategy": "merge"
-            }
-          },
-          "required": [
-            "_meta"
-          ],
+      }
+    },
+    "allOf": [
+      {
+        "if": {
           "properties": {
             "_meta": {
-              "type": "object",
-              "required": [
-                "op",
-                "source"
-              ],
               "properties": {
-                "before": {
-                  "$ref": "#TestPartitionedtablediscovery_27339326",
-                  "description": "Record state immediately before this change was applied.",
-                  "reduce": {
-                    "strategy": "firstWriteWins"
-                  }
-                },
                 "op": {
-                  "enum": [
-                    "c",
-                    "d",
-                    "u"
-                  ],
-                  "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
-                },
-                "source": {
-                  "$id": "https://github.com/estuary/connectors/source-postgres/postgres-source",
-                  "properties": {
-                    "ts_ms": {
-                      "type": "integer",
-                      "description": "Unix timestamp (in millis) at which this event was recorded by the database."
-                    },
-                    "schema": {
-                      "type": "string",
-                      "description": "Database schema (namespace) of the event."
-                    },
-                    "snapshot": {
-                      "type": "boolean",
-                      "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
-                    },
-                    "table": {
-                      "type": "string",
-                      "description": "Database table of the event."
-                    },
-                    "loc": {
-                      "items": {
-                        "type": "integer"
-                      },
-                      "type": "array",
-                      "maxItems": 3,
-                      "minItems": 3,
-                      "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
-                    },
-                    "txid": {
-                      "type": "integer",
-                      "description": "The 32-bit transaction ID assigned by Postgres to the commit which produced this change."
-                    }
-                  },
-                  "type": "object",
-                  "required": [
-                    "schema",
-                    "table",
-                    "loc"
-                  ]
+                  "const": "d"
                 }
-              },
-              "reduce": {
-                "strategy": "merge"
               }
             }
           }
         },
-        {
-          "$ref": "#TestPartitionedtablediscovery_27339326"
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "merge"
+          }
+        },
+        "else": {
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "op",
+              "source"
+            ],
+            "properties": {
+              "before": {
+                "$ref": "#TestPartitionedtablediscovery_242722",
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "loc": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array",
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
+                  },
+                  "txid": {
+                    "type": "integer",
+                    "description": "The 32-bit transaction ID assigned by Postgres to the commit which produced this change."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table",
+                  "loc"
+                ]
+              }
+            },
+            "reduce": {
+              "strategy": "merge"
+            }
+          }
         }
-      ],
-      "x-infer-schema": true
-    },
-    "key": [
-      "/logdate"
-    ]
-  }
+      },
+      {
+        "$ref": "#TestPartitionedtablediscovery_242722"
+      }
+    ],
+    "x-infer-schema": true
+  },
+  "key": [
+    "/logdate"
+  ]
+}
 

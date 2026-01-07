@@ -1,0 +1,875 @@
+sql> CREATE TABLE test.complexdataset_168352 (grp VARCHAR(8), id INTEGER, data TEXT, PRIMARY KEY (grp, id))
+sql> INSERT INTO test.complexdataset_168352
+		SELECT chr(65 + grp), id, chr(65 + grp) || '_' || id
+		FROM generate_series(0, 4) grp, generate_series(0, 4) id
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/complexdataset_168352
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "A_0",
+    "grp": "A",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "A_1",
+    "grp": "A",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "A_2",
+    "grp": "A",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "A_3",
+    "grp": "A",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "A_4",
+    "grp": "A",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "B_0",
+    "grp": "B",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "B_1",
+    "grp": "B",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "B_2",
+    "grp": "B",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "B_3",
+    "grp": "B",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "B_4",
+    "grp": "B",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "C_0",
+    "grp": "C",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "C_1",
+    "grp": "C",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "C_2",
+    "grp": "C",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "C_3",
+    "grp": "C",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "C_4",
+    "grp": "C",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "D_0",
+    "grp": "D",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "D_1",
+    "grp": "D",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "D_2",
+    "grp": "D",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "D_3",
+    "grp": "D",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "D_4",
+    "grp": "D",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "E_0",
+    "grp": "E",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "E_1",
+    "grp": "E",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "E_2",
+    "grp": "E",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "E_3",
+    "grp": "E",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "E_4",
+    "grp": "E",
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fcomplexdataset_168352": {
+      "backfilled": 25,
+      "key_columns": [
+        "grp",
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.complexdataset_168352 VALUES ('A', 99, 'inserted_before_cursor')
+sql> INSERT INTO test.complexdataset_168352 VALUES ('D', 99, 'inserted_after_cursor')
+sql> UPDATE test.complexdataset_168352 SET data = 'updated_before_cursor' WHERE grp = 'B' AND id = 2
+sql> UPDATE test.complexdataset_168352 SET data = 'updated_after_cursor' WHERE grp = 'D' AND id = 2
+sql> DELETE FROM test.complexdataset_168352 WHERE grp = 'A' AND id = 3
+sql> DELETE FROM test.complexdataset_168352 WHERE grp = 'E' AND id = 3
+=== Run: Resume After Checkpoint Rewind ===
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "complexdataset_168352",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "grp": "A",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "complexdataset_168352",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "inserted_before_cursor",
+    "grp": "A",
+    "id": 99
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "complexdataset_168352",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "updated_before_cursor",
+    "grp": "B",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "complexdataset_168352",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "updated_after_cursor",
+    "grp": "D",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "complexdataset_168352",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "inserted_after_cursor",
+    "grp": "D",
+    "id": 99
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "complexdataset_168352",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "grp": "E",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "C_0",
+    "grp": "C",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "C_1",
+    "grp": "C",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "C_2",
+    "grp": "C",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "C_3",
+    "grp": "C",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "C_4",
+    "grp": "C",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "D_0",
+    "grp": "D",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "D_1",
+    "grp": "D",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "updated_after_cursor",
+    "grp": "D",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "D_3",
+    "grp": "D",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "D_4",
+    "grp": "D",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "inserted_after_cursor",
+    "grp": "D",
+    "id": 99
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "E_0",
+    "grp": "E",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "E_1",
+    "grp": "E",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "E_2",
+    "grp": "E",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/complexdataset_168352",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "complexdataset_168352"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "E_4",
+    "grp": "E",
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fcomplexdataset_168352": {
+      "backfilled": 25,
+      "key_columns": [
+        "grp",
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

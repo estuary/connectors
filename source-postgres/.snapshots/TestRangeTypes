@@ -1,0 +1,230 @@
+sql> CREATE TABLE test.rangetypes_613635 (
+		id INTEGER PRIMARY KEY,
+		a_int4range INT4RANGE,
+		a_int8range INT8RANGE,
+		a_numrange NUMRANGE,
+		a_tsrange TSRANGE,
+		a_tstzrange TSTZRANGE,
+		a_daterange DATERANGE
+	)
+sql> INSERT INTO test.rangetypes_613635 VALUES
+		(1, '[1,10)', '[1,1000000000)', '(0,1]', '[2024-01-01,2024-12-31)', '[2024-01-01 00:00:00+00,2024-12-31 23:59:59+00)', '[2024-01-01,2024-12-31)'),
+		(2, '(,)', '(,)', '(,)', '(,)', '(,)', '(,)'),
+		(3, '[5,5]', '[100,100]', '[1.5,1.5]', NULL, NULL, NULL),
+		(4, NULL, NULL, NULL, NULL, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/test/rangetypes_613635
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/rangetypes_613635",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "rangetypes_613635"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_daterange": "[2024-01-01T00:00:00Z,2024-12-31T00:00:00Z)",
+    "a_int4range": "[1,10)",
+    "a_int8range": "[1,1000000000)",
+    "a_numrange": "(0,1]",
+    "a_tsrange": "[2024-01-01T00:00:00Z,2024-12-31T00:00:00Z)",
+    "a_tstzrange": "[2023-12-31T16:00:00-08:00,2024-12-31T15:59:59-08:00)",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/rangetypes_613635",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "rangetypes_613635"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_daterange": "(,)",
+    "a_int4range": "(,)",
+    "a_int8range": "(,)",
+    "a_numrange": "(,)",
+    "a_tsrange": "(,)",
+    "a_tstzrange": "(,)",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/rangetypes_613635",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "rangetypes_613635"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_daterange": null,
+    "a_int4range": "[5,6)",
+    "a_int8range": "[100,101)",
+    "a_numrange": "[1.5,1.5]",
+    "a_tsrange": null,
+    "a_tstzrange": null,
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/rangetypes_613635",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "rangetypes_613635"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_daterange": null,
+    "a_int4range": null,
+    "a_int8range": null,
+    "a_numrange": null,
+    "a_tsrange": null,
+    "a_tstzrange": null,
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Frangetypes_613635": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.rangetypes_613635 VALUES
+		(101, '[1,10)', '[1,1000000000)', '(0,1]', '[2024-01-01,2024-12-31)', '[2024-01-01 00:00:00+00,2024-12-31 23:59:59+00)', '[2024-01-01,2024-12-31)'),
+		(102, '(,)', '(,)', '(,)', '(,)', '(,)', '(,)'),
+		(103, '[5,5]', '[100,100]', '[1.5,1.5]', NULL, NULL, NULL),
+		(104, NULL, NULL, NULL, NULL, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/rangetypes_613635",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "rangetypes_613635",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_daterange": "[2024-01-01T00:00:00Z,2024-12-31T00:00:00Z)",
+    "a_int4range": "[1,10)",
+    "a_int8range": "[1,1000000000)",
+    "a_numrange": "(0,1]",
+    "a_tsrange": "[2024-01-01T00:00:00Z,2024-12-31T00:00:00Z)",
+    "a_tstzrange": "[2023-12-31T16:00:00-08:00,2024-12-31T15:59:59-08:00)",
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/rangetypes_613635",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "rangetypes_613635",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_daterange": "(,)",
+    "a_int4range": "(,)",
+    "a_int8range": "(,)",
+    "a_numrange": "(,)",
+    "a_tsrange": "(,)",
+    "a_tstzrange": "(,)",
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/rangetypes_613635",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "rangetypes_613635",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_daterange": null,
+    "a_int4range": "[5,6)",
+    "a_int8range": "[100,101)",
+    "a_numrange": "[1.5,1.5]",
+    "a_tsrange": null,
+    "a_tstzrange": null,
+    "id": 103
+  }
+]
+[
+  "acmeCo/test_capture/test/rangetypes_613635",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "rangetypes_613635",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_daterange": null,
+    "a_int4range": null,
+    "a_int8range": null,
+    "a_numrange": null,
+    "a_tsrange": null,
+    "a_tstzrange": null,
+    "id": 104
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Frangetypes_613635": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

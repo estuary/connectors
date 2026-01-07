@@ -1,12 +1,108 @@
-# ================================
-# Collection "acmeCo/test/test/longyeartimestamps_15366164": 4 Documents
-# ================================
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111]}},"created_at":"2023-01-01T04:30:45-08:00","description":"Recent date","id":1}
-{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111]}},"created_at":"0000-01-01T00:00:00Z","description":"Far future date","id":2}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111],"txid":111111}},"created_at":"2024-05-15T02:30:00-07:00","description":"Another recent date","id":4}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"longyeartimestamps_15366164","loc":[11111111,11111111,11111111],"txid":111111}},"created_at":"0000-01-01T00:00:00Z","description":"Even further future","id":5}
-# ================================
-# Final State Checkpoint
-# ================================
-{"bindingStateV1":{"test%2Flongyeartimestamps_15366164":{"backfilled":2,"key_columns":["id"],"mode":"Active"}},"cursor":"0/1111111"}
+sql> CREATE TABLE test.longyeartimestamps_894823 (id INTEGER PRIMARY KEY, created_at TIMESTAMPTZ, description TEXT)
+sql> INSERT INTO test.longyeartimestamps_894823 VALUES (1, '2023-01-01 12:30:45+00', 'Recent date'), (2, '12345-06-07 08:09:10+00', 'Far future date')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/longyeartimestamps_894823
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/longyeartimestamps_894823",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "longyeartimestamps_894823"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "created_at": "2023-01-01T04:30:45-08:00",
+    "description": "Recent date",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/longyeartimestamps_894823",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "longyeartimestamps_894823"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "created_at": "0000-01-01T00:00:00Z",
+    "description": "Far future date",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Flongyeartimestamps_894823": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.longyeartimestamps_894823 VALUES (4, '2024-05-15 09:30:00+00', 'Another recent date'), (5, '54321-10-11 12:13:14+00', 'Even further future')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/longyeartimestamps_894823",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "longyeartimestamps_894823",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "created_at": "2024-05-15T02:30:00-07:00",
+    "description": "Another recent date",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/longyeartimestamps_894823",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "longyeartimestamps_894823",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "created_at": "0000-01-01T00:00:00Z",
+    "description": "Even further future",
+    "id": 5
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Flongyeartimestamps_894823": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
 

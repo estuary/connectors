@@ -1,0 +1,212 @@
+sql> CREATE TABLE test.replicaidentity_615359 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO test.replicaidentity_615359 VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH'), (3, 'Three'), (4, 'Four')
+=== Discover: Discover Test Table ===
+acmeCo/test_capture/test/replicaidentity_615359
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/test/replicaidentity_615359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "replicaidentity_615359"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "A",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/replicaidentity_615359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "replicaidentity_615359"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "bbb",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/replicaidentity_615359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "replicaidentity_615359"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "CDEFGH",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/replicaidentity_615359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "replicaidentity_615359"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/replicaidentity_615359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "replicaidentity_615359"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Four",
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Freplicaidentity_615359": {
+      "backfilled": 5,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> DELETE FROM test.replicaidentity_615359 WHERE id = 1
+sql> UPDATE test.replicaidentity_615359 SET data = 'UPDATED' WHERE id = 2
+=== Run: Default Replica Identity ===
+[
+  "acmeCo/test_capture/test/replicaidentity_615359",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "replicaidentity_615359",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/replicaidentity_615359",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "replicaidentity_615359",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "UPDATED",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Freplicaidentity_615359": {
+      "backfilled": 5,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> ALTER TABLE test.replicaidentity_615359 REPLICA IDENTITY FULL
+sql> DELETE FROM test.replicaidentity_615359 WHERE id = 3
+sql> UPDATE test.replicaidentity_615359 SET data = 'UPDATED' WHERE id = 4
+=== Run: Replica Identity Full ===
+[
+  "acmeCo/test_capture/test/replicaidentity_615359",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "replicaidentity_615359",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/replicaidentity_615359",
+  {
+    "_meta": {
+      "before": {
+        "data": "Four",
+        "id": 4
+      },
+      "op": "u",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "replicaidentity_615359",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "UPDATED",
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Freplicaidentity_615359": {
+      "backfilled": 5,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

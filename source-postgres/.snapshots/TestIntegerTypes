@@ -1,0 +1,212 @@
+sql> CREATE TABLE test.integertypes_795898 (
+		id INTEGER PRIMARY KEY,
+		a_integer INTEGER,
+		a_smallint SMALLINT,
+		a_bigint BIGINT,
+		a_oid OID
+	)
+sql> INSERT INTO test.integertypes_795898 VALUES
+		(1, 123, 456, 789012345678, 54321),
+		(2, -2147483648, -32768, -9223372036854775808, 0),
+		(3, 2147483647, 32767, 9223372036854775807, 4294967295),
+		(4, NULL, NULL, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/test/integertypes_795898
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/integertypes_795898",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "integertypes_795898"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": 789012345678,
+    "a_integer": 123,
+    "a_oid": 54321,
+    "a_smallint": 456,
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/integertypes_795898",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "integertypes_795898"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": -9223372036854775808,
+    "a_integer": -2147483648,
+    "a_oid": 0,
+    "a_smallint": -32768,
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/integertypes_795898",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "integertypes_795898"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": 9223372036854775807,
+    "a_integer": 2147483647,
+    "a_oid": 4294967295,
+    "a_smallint": 32767,
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/integertypes_795898",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "integertypes_795898"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": null,
+    "a_integer": null,
+    "a_oid": null,
+    "a_smallint": null,
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fintegertypes_795898": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.integertypes_795898 VALUES
+		(101, 123, 456, 789012345678, 54321),
+		(102, -2147483648, -32768, -9223372036854775808, 0),
+		(103, 2147483647, 32767, 9223372036854775807, 4294967295),
+		(104, NULL, NULL, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/integertypes_795898",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "integertypes_795898",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": 789012345678,
+    "a_integer": 123,
+    "a_oid": 54321,
+    "a_smallint": 456,
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/test/integertypes_795898",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "integertypes_795898",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": -9223372036854775808,
+    "a_integer": -2147483648,
+    "a_oid": 0,
+    "a_smallint": -32768,
+    "id": 102
+  }
+]
+[
+  "acmeCo/test_capture/test/integertypes_795898",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "integertypes_795898",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": 9223372036854775807,
+    "a_integer": 2147483647,
+    "a_oid": 4294967295,
+    "a_smallint": 32767,
+    "id": 103
+  }
+]
+[
+  "acmeCo/test_capture/test/integertypes_795898",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "integertypes_795898",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": null,
+    "a_integer": null,
+    "a_oid": null,
+    "a_smallint": null,
+    "id": 104
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fintegertypes_795898": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

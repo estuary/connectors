@@ -1,0 +1,219 @@
+sql> CREATE TABLE test.captureafterslotdropped_144833 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO test.captureafterslotdropped_144833 VALUES (0, 'zero'), (1, 'one')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/captureafterslotdropped_144833
+=== Run: Initial Capture ===
+[
+  "acmeCo/test_capture/test/captureafterslotdropped_144833",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureafterslotdropped_144833"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/captureafterslotdropped_144833",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureafterslotdropped_144833"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fcaptureafterslotdropped_144833": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.captureafterslotdropped_144833 VALUES (2, 'two'), (3, 'three')
+sql> SELECT pg_drop_replication_slot('flow_slot')
+sql> INSERT INTO test.captureafterslotdropped_144833 VALUES (4, 'four'), (5, 'five')
+=== Run: Capture After Slot Dropped (Should Fail) ===
+error: flowctl preview failed:
+error starting replication: ERROR: replication slot "flow_slot" does not exist (SQLSTATE 42704)
+
+sql> INSERT INTO test.captureafterslotdropped_144833 VALUES (6, 'six'), (7, 'seven')
+=== Run: Capture Still Failing ===
+error: flowctl preview failed:
+error starting replication: ERROR: replication slot "flow_slot" does not exist (SQLSTATE 42704)
+
+=== Run: Capture After Backfill Counter Bumped ===
+[
+  "acmeCo/test_capture/test/captureafterslotdropped_144833",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureafterslotdropped_144833"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/test/captureafterslotdropped_144833",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureafterslotdropped_144833"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/test/captureafterslotdropped_144833",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureafterslotdropped_144833"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/test/captureafterslotdropped_144833",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureafterslotdropped_144833"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/test/captureafterslotdropped_144833",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureafterslotdropped_144833"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/test/captureafterslotdropped_144833",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureafterslotdropped_144833"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/test/captureafterslotdropped_144833",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureafterslotdropped_144833"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "six",
+    "id": 6
+  }
+]
+[
+  "acmeCo/test_capture/test/captureafterslotdropped_144833",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureafterslotdropped_144833"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "seven",
+    "id": 7
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fcaptureafterslotdropped_144833": {
+      "backfilled": 0,
+      "mode": "Ignore"
+    },
+    "test%2Fcaptureafterslotdropped_144833.v1": {
+      "backfilled": 8,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
