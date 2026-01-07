@@ -5200,10 +5200,10 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "type": "object",
       "required": [
-        "customer.descriptive_name",
-        "geographic_view.country_criterion_id",
+        "segments.date",
         "ad_group.id",
-        "segments.date"
+        "geographic_view.country_criterion_id",
+        "customer.descriptive_name"
       ],
       "properties": {
         "customer.descriptive_name": {
