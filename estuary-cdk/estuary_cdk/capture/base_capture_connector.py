@@ -184,7 +184,7 @@ class BaseCaptureConnector(
         }
 
         encrypted_config = await self.request(
-            log, ENCRYPTION_URL, "POST", json=body, _with_token=False
+            log, ENCRYPTION_URL, "POST", json=body, with_token=False
         )
 
         return json.loads(encrypted_config.decode("utf-8"))
