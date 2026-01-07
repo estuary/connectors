@@ -1,0 +1,22 @@
+database: test_db
+schema: main
+token_sops: ENC[AES256_GCM,data:zJKezW9wWrmo5uZHt3BK/P5AWm6dIWnskg3KTh38q9v5O/w/LsVaSH+WVP+hT92zBF8wl83Q02reRcz3VUK1ma0bNkONkj9u2VPQb16TdlRp0f2lG1SOPcDP/1VhSpnoeRo9DFxsejg3+AwfMbkkTX2iCIZL59+yzFEX6PwRNsih1rtxR66MsjuPyFfspIKaxN1MXDpAUi1ESi1CvSB2N7bUtghLQ6n+87fIJ04FcVFwRUfuOPkdxC9ONNoJi/evha5cvfncZ8jOap8fwC1AjNY/5b13E5kEixmIAryWcnhydg5sgufFGsi6WMTMhMzb+4qkZGcuTd953KF3jGtf5qo6vcku8lYN8KUtTlTZb3WldILNO6Lu0/10s718BxR3n71qKGYmThFWwaeguFHbT79fS+/ffFeenx4ReoffAM+GS4DrWH5B/h7VmjqyHtvU3lOi,iv:u2LmumgY2AOqDd57vagcSbRPc13R6UfQyopX+kK/QHI=,tag:PHuliexX5UNKzcOCVvsuJg==,type:str]
+hardDelete: true
+stagingBucket:
+    stagingBucketType: Azure
+    containerName: connectors
+    storageAccountKey_sops: ENC[AES256_GCM,data:l+yLpC4exbKn2+Tm2ACCIaYazpUegYoKnzCaryDVMZzSenmcNiox4iZL0qoszTixjOKg5/9iZa2AgTQduQXj/B2KtpbXV/8SD7Y6p8vcDLzd2nTMH5RSTQ==,iv:TU4MX16BDvbZSe+k9kT8WB66DUdMrsAH9z7bJkfV0ug=,tag:f0+IKMidp4jPqB9JGnjqfA==,type:str]
+    storageAccountName: estuaryconnectors
+syncSchedule:
+    syncFrequency: 0s
+advanced:
+    no_flow_document: true
+sops:
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-05-23T21:25:19Z"
+          enc: CiQAdmEdwuYd5dgBmZKmE/v2/ebAF9rqZVtWs48HNDf1NOr11gQSSQCSobQjWx53iByTq/afJbpWDsWW4U67+LzfXRO15Ui1vpC2UaJKz58rMXUjoTy/umt1ftuZxKhaa9BzrLWfwLUvKCuBivYAwwA=
+    lastmodified: "2026-01-06T21:46:00Z"
+    mac: ENC[AES256_GCM,data:f4mFxLfXiRUq1F+q/HlN0d/Sf9GN33v7FsAIo4hNmy0C1jyt37DaLF1damMReo0YFdZaDot9WE66LgAzN8C9iHDDGXGO4C93rs4sNYv55QLcpsp1ActXRqLtJVKX/4vQdp6WtNn4+TC4+hpWOJiMTdsPZezCOij1YMZm+6+ujR4=,iv:gAFx/j+4WLx1HlMAukz9lx1SdyTMnqQCpYyO7LQcutw=,tag:C8OOPa0RU6bLHIawqCXuQg==,type:str]
+    encrypted_suffix: _sops
+    version: 3.10.2
