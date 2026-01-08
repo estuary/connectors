@@ -30,12 +30,11 @@ CACHE_TTL = MINIMUM_AZURE_SYNAPSE_LINK_EXPORT_INTERVAL / 5   # 1 minute
 # FOLDER_PROCESSING_SEMAPHORE is used to bound how many timestamp
 # folders are processed concurrently. Processing an unbounded number
 # of folders can easily trigger the connector to exceed its memory
-# limit and get OOM killed. When 50+ bindings are reading CSVs
-# concurrently, the connector is CPU bound. Meaning, the CPU is
-# effectively already limiting how much concurrent processing occurs,
-# and this semphore should only server to guard against OOMs, not
-# slow down the connector further.
-FOLDER_PROCESSING_SEMAPHORE = asyncio.Semaphore(50)
+# limit and get OOM killed. 5 was chosen to ensure large tables
+# with a massive number of changes only have to compete with a few
+# other streams for CPU time and can finish processing the contents
+# of a timestamp folder in a reasonable amount of time.
+FOLDER_PROCESSING_SEMAPHORE = asyncio.Semaphore(5)
 
 
 # model.json metadata files are not updated after they're written.
