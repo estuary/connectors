@@ -215,7 +215,8 @@ jobs:
         if: |
           contains(fromJson('[
             "source-postgres",
-            "source-redshift-batch"
+            "source-redshift-batch",
+            "source-sqlserver"
             ]'), matrix.connector)
         run: |
           ${{ matrix.connector }}/run_tests.sh

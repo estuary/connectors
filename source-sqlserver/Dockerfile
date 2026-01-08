@@ -16,12 +16,6 @@ COPY source-boilerplate  ./source-boilerplate
 COPY sqlcapture          ./sqlcapture
 COPY source-sqlserver    ./source-sqlserver
 
-# Run the unit tests. To skip tests which access a test database, specify `--build-arg TEST_DATABASE=no` in the Docker command line.
-ARG TEST_DATABASE=yes
-ENV TEST_DATABASE=$TEST_DATABASE
-ENV CI_BUILD=yes
-RUN go test -short -failfast ./source-sqlserver/... -timeout=60m
-
 # Build the connector.
 RUN go build -o ./connector -v ./source-sqlserver/...
 
