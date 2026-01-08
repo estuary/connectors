@@ -75,7 +75,7 @@ def resources(
                 inc=ResourceState.Incremental(cursor=EPOCH),
             ),
             initial_config=ResourceConfig(
-                name=table.name, interval=timedelta(minutes=5)
+                name=table.name, interval=timedelta(days=1)
             ),
             schema_inference=True,
         )
