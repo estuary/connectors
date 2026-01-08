@@ -1,7 +1,7 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 
 DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
-VERSION = "2025-04"
+VERSION = "2026-01"
 
 
 def dt_to_str(dt: datetime) -> str:

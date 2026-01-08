@@ -164,7 +164,7 @@ class BaseCaptureConnector(
         config: EndpointConfig,
     ) -> dict[str, Any]:
         assert isinstance(config, BaseModel)
-        ENCRYPTION_URL = "https://config-encryption.estuary.dev/v1/encrypt-config"
+        ENCRYPTION_URL = "http://localhost:8765/v1/encrypt-config"
 
         # mode="json" converts Python-specific concepts (like datetimes) to valid JSON.
         # include=config.model_fields_set ensures only the fields that are explicitly set on the
