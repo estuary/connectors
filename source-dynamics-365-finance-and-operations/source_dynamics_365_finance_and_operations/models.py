@@ -63,6 +63,9 @@ class BaseTable(BaseCSVRow, extra="allow"):
     name: ClassVar[str]
     field_names: ClassVar[list[str]]
     field_types: ClassVar[dict[str, str]]
+    # Pre-computed set of boolean field names for efficient conversion.
+    # Avoids iterating all fields per row - only iterate boolean fields.
+    boolean_fields: ClassVar[frozenset[str]]
 
     Id: str
     IsDelete: bool | None
@@ -70,11 +73,11 @@ class BaseTable(BaseCSVRow, extra="allow"):
     @model_validator(mode='before')
     @classmethod
     def convert_boolean_fields(cls, values: dict) -> dict:
-        if hasattr(cls, 'field_types'):
-            for field_name, value in values.items():
-                if (cls.field_types.get(field_name) == "boolean") and value is not None:
-                    assert isinstance(value, str)
-                    values[field_name] = value.lower() == 'true'
+        for field_name in cls.boolean_fields:
+            value = values.get(field_name)
+            if value is not None:
+                assert isinstance(value, str)
+                values[field_name] = value.lower() == 'true'
         return values
 
     @model_validator(mode='after')
@@ -89,11 +92,15 @@ class BaseTable(BaseCSVRow, extra="allow"):
 def model_from_entity(entity: ModelDotJson.Entity) -> type[BaseTable]:
     field_names = [attr.name for attr in entity.attributes]
     field_types = {attr.name: attr.dataType for attr in entity.attributes}
+    boolean_fields = frozenset(
+        attr.name for attr in entity.attributes if attr.dataType == "boolean"
+    )
 
     attrs = {
         'name': entity.name,
         'field_names': field_names,
         'field_types': field_types,
+        'boolean_fields': boolean_fields,
     }
 
     return type(entity.name, (BaseTable,), attrs)
