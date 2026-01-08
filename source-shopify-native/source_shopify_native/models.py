@@ -149,11 +149,16 @@ class EndpointConfig(BaseModel):
 
         Sets _was_migrated flag so the connector can persist the new format.
         """
+        import logging
+        logger = logging.getLogger("source-shopify-native:models:EndpointConfig:transform_legacy_config")
+
         if not isinstance(data, dict):
+            logger.debug("Config data is not a dict; skipping migration.", extra={"data": data})
             return data
 
         # Already in new format or missing required legacy fields
         if "stores" in data or "store" not in data or "credentials" not in data:
+            logger.debug("Config data is already in new format or missing legacy fields; skipping migration.", extra={"data": data})
             return data
 
         # Transform legacy format to new format
@@ -162,13 +167,9 @@ class EndpointConfig(BaseModel):
         data["stores"] = [{"store": store, "credentials": credentials}]
         data["_was_migrated"] = True
 
+        logger.info("Migrated legacy config to new stores format.", extra={"data": data})
+
         return data
-
-    def __init__(self, **data: Any) -> None:
-        was_migrated = data.pop("_was_migrated", False)
-        super().__init__(**data)
-        self._was_migrated = was_migrated
-
 
 ConnectorState = GenericConnectorState[ResourceState]
 

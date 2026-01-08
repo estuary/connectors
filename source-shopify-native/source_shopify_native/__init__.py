@@ -215,8 +215,9 @@ class Connector(
 
         # Persist migrated config so UI shows the new format
         if config._was_migrated:
-            log.info("Persisting migrated config to multi-store format")
+            log.info("Persisting migrated config to multi-store format", extra={"config": config})
             encrypted_config = await self._encrypt_config(log, config)
+            log.info("Persisting migrated config to multi-store format", extra={"encrypted_config": encrypted_config})
             log.event.config_update(
                 "Migrating legacy single-store config to multi-store format.",
                 encrypted_config
