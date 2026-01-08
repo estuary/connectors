@@ -274,6 +274,9 @@
       "default": false,
       "description": null,
       "id": 28835714801684,
+      "permissions": {
+        "can_edit": true
+      },
       "position": 9999,
       "raw_title": "Take it!",
       "restriction": null,
