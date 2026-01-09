@@ -1,6 +1,6 @@
 import pytest
 import asyncio
-from typing import AsyncIterator
+from typing import Any, AsyncGenerator
 from pydantic import BaseModel
 
 from estuary_cdk.incremental_csv_processor import (
@@ -60,7 +60,7 @@ John{delimiter}Product with, comma{delimiter}"Quoted notes"
 Jane{delimiter}Another product{delimiter}Simple notes
 Bob{delimiter}"Quoted product"{delimiter}Notes with {delimiter} delimiter"""
 
-    async def create_byte_chunk_iterator(self, data: str, chunk_size: int = 10, encoding: str = 'utf-8') -> AsyncIterator[bytes]:
+    async def create_byte_chunk_iterator(self, data: str, chunk_size: int = 10, encoding: str = 'utf-8') -> AsyncGenerator[bytes, None]:
         """Helper to create async byte chunk iterator."""
         data_bytes = data.encode(encoding)
         for i in range(0, len(data_bytes), chunk_size):
@@ -420,3 +420,81 @@ Bob,35,Chicago"""
         assert rows[0].name == "John" and rows[0].age == "25" and rows[0].city == "New York"
         assert rows[1].name == "Jane" and rows[1].age == "30" and rows[1].city == "Los Angeles"
         assert rows[2].name == "Bob" and rows[2].age == "35" and rows[2].city == "Chicago"
+
+
+class TestIncrementalCSVProcessorDictMode:
+    """Test suite for IncrementalCSVProcessor without Pydantic model (dict mode)."""
+
+    async def create_byte_chunk_iterator(self, data: str, chunk_size: int = 10, encoding: str = 'utf-8') -> AsyncGenerator[bytes, None]:
+        """Helper to create async byte chunk iterator."""
+        data_bytes = data.encode(encoding)
+        for i in range(0, len(data_bytes), chunk_size):
+            chunk = data_bytes[i:i + chunk_size]
+            yield chunk
+            await asyncio.sleep(0.001)
+
+    @pytest.mark.asyncio
+    async def test_basic_dict_processing(self):
+        """Test basic CSV processing without a Pydantic model yields dicts."""
+        csv_data = """name,age,city
+John,25,New York
+Jane,30,Los Angeles"""
+
+        chunk_iterator = self.create_byte_chunk_iterator(csv_data, chunk_size=10)
+        processor = IncrementalCSVProcessor(chunk_iterator)
+
+        rows: list[dict[str, Any]] = []
+        async for row in processor:
+            rows.append(row)
+
+        assert len(rows) == 2
+        assert isinstance(rows[0], dict)
+        assert rows[0] == {"name": "John", "age": "25", "city": "New York"}
+        assert rows[1] == {"name": "Jane", "age": "30", "city": "Los Angeles"}
+
+    @pytest.mark.asyncio
+    async def test_dict_mode_preserves_all_string_values(self):
+        """Test that dict mode preserves all values as strings without validation."""
+        csv_data = """name,age,active,score
+John,25,true,99.5
+Jane,invalid_age,false,N/A"""
+
+        chunk_iterator = self.create_byte_chunk_iterator(csv_data, chunk_size=10)
+        processor = IncrementalCSVProcessor(chunk_iterator)
+
+        rows: list[dict[str, Any]] = []
+        async for row in processor:
+            rows.append(row)
+
+        assert len(rows) == 2
+        # All values should be strings - no type conversion
+        assert rows[0] == {"name": "John", "age": "25", "active": "true", "score": "99.5"}
+        assert rows[1] == {"name": "Jane", "age": "invalid_age", "active": "false", "score": "N/A"}
+
+    @pytest.mark.asyncio
+    async def test_dict_mode_vs_model_mode_equivalence(self):
+        """Test that dict mode and model mode produce equivalent data."""
+        csv_data = """name,age,city
+John,25,New York
+Jane,30,Los Angeles"""
+
+        # Dict mode
+        chunk_iterator1 = self.create_byte_chunk_iterator(csv_data, chunk_size=10)
+        dict_processor = IncrementalCSVProcessor(chunk_iterator1)
+        dict_rows: list[dict[str, Any]] = []
+        async for row in dict_processor:
+            dict_rows.append(row)
+
+        # Model mode
+        chunk_iterator2 = self.create_byte_chunk_iterator(csv_data, chunk_size=10)
+        model_processor = IncrementalCSVProcessor(chunk_iterator2, BasicRecord)
+        model_rows: list[BasicRecord] = []
+        async for row in model_processor:
+            model_rows.append(row)
+
+        # Verify equivalence
+        assert len(dict_rows) == len(model_rows)
+        for dict_row, model_row in zip(dict_rows, model_rows):
+            assert dict_row["name"] == model_row.name
+            assert dict_row["age"] == model_row.age
+            assert dict_row["city"] == model_row.city
