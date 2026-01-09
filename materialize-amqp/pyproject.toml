@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "source-amqp"
+version = "0.1.0"
+description = "Estuary Flow source connector for AMQP message brokers (RabbitMQ, etc.)"
+readme = "README.md"
+license = {text = "MIT OR Apache-2.0"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Estuary Technologies", email = "support@estuary.dev"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database",
+    "Topic :: System :: Distributed Computing",
+]
+keywords = ["estuary", "flow", "connector", "amqp", "rabbitmq", "messaging", "streaming"]
+
+dependencies = [
+    "pydantic>=2.0.0",
+    "aio-pika>=9.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0",
+    "aio-pika>=9.0.0",
+]
+
+[project.scripts]
+source-amqp = "source_amqp:main"
+
+[project.urls]
+Homepage = "https://github.com/estuary/connectors"
+Documentation = "https://docs.estuary.dev/reference/connectors/source-amqp/"
+Repository = "https://github.com/estuary/connectors"
+Issues = "https://github.com/estuary/connectors/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["source_amqp*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
