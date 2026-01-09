@@ -2,6 +2,7 @@
 # Copyright (c) 2023 Airbyte, Inc., all rights reserved.
 #
 
+import functools
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
@@ -122,6 +123,21 @@ class GoogleAds:
         """
         response = ga_field_service.search_google_ads_fields(request=request)
         return {r.name: r for r in response}
+
+    @functools.cache
+    def _get_segments_date_selectable_resources(self) -> set:
+        ga_field_service = self.client.get_service("GoogleAdsFieldService")
+        request = self.client.get_type("SearchGoogleAdsFieldsRequest")
+        request.query = "SELECT name, selectable_with WHERE name = 'segments.date'"
+        response = ga_field_service.search_google_ads_fields(request=request)
+
+        field = next(iter(response), None)
+        if field:
+            return set(field.selectable_with)
+        return set()
+
+    def is_full_refresh_resource(self, resource_name: str) -> bool:
+        return resource_name not in self._get_segments_date_selectable_resources()
 
     @staticmethod
     def get_fields_from_schema(schema: Mapping[str, Any]) -> List[str]:

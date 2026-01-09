@@ -33,6 +33,13 @@ from .common import (
 )
 
 
+@pytest.fixture(autouse=True)
+def mock_is_full_refresh_resource(mocker):
+    # Mock is_full_refresh_resource to avoid real API calls in tests
+    # Returns False by default (incremental), matching most resources
+    mocker.patch.object(GoogleAds, "is_full_refresh_resource", return_value=False)
+
+
 @pytest.fixture
 def mock_account_info(mocker):
     mocker.patch(
