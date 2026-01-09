@@ -1,0 +1,578 @@
+[
+  {
+    "recommendedName": "Accounts",
+    "resourceConfig": {
+      "name": "Accounts",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Modified_Time": {
+          "format": "date-time",
+          "title": "Modified Time",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "Modified_Time",
+        "id"
+      ],
+      "title": "Accounts",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Calls",
+    "resourceConfig": {
+      "name": "Calls",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Modified_Time": {
+          "format": "date-time",
+          "title": "Modified Time",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "Modified_Time",
+        "id"
+      ],
+      "title": "Calls",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Campaigns",
+    "resourceConfig": {
+      "name": "Campaigns",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Modified_Time": {
+          "format": "date-time",
+          "title": "Modified Time",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "Modified_Time",
+        "id"
+      ],
+      "title": "Campaigns",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Contacts",
+    "resourceConfig": {
+      "name": "Contacts",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Modified_Time": {
+          "format": "date-time",
+          "title": "Modified Time",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "Modified_Time",
+        "id"
+      ],
+      "title": "Contacts",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "DealHistory",
+    "resourceConfig": {
+      "name": "DealHistory",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Modified_Time": {
+          "format": "date-time",
+          "title": "Modified Time",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "Modified_Time",
+        "id"
+      ],
+      "title": "DealHistory",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Deals",
+    "resourceConfig": {
+      "name": "Deals",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Modified_Time": {
+          "format": "date-time",
+          "title": "Modified Time",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "Modified_Time",
+        "id"
+      ],
+      "title": "Deals",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Events",
+    "resourceConfig": {
+      "name": "Events",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Modified_Time": {
+          "format": "date-time",
+          "title": "Modified Time",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "Modified_Time",
+        "id"
+      ],
+      "title": "Events",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Leads",
+    "resourceConfig": {
+      "name": "Leads",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Modified_Time": {
+          "format": "date-time",
+          "title": "Modified Time",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "Modified_Time",
+        "id"
+      ],
+      "title": "Leads",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "Tasks",
+    "resourceConfig": {
+      "name": "Tasks",
+      "interval": "PT5M",
+      "schedule": "55 23 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Modified_Time": {
+          "format": "date-time",
+          "title": "Modified Time",
+          "type": "string"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "Modified_Time",
+        "id"
+      ],
+      "title": "Tasks",
+      "type": "object",
+      "x-infer-schema": true,
+      "reduce": {
+        "strategy": "merge"
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  }
+]
