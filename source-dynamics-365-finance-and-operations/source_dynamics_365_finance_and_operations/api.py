@@ -141,7 +141,7 @@ async def read_csvs_in_folder(
     folder: str,
     table_name: str,
     client: ADLSGen2Client,
-) -> AsyncGenerator[BaseTable, None]:
+) -> AsyncGenerator[dict, None]:
     folder_contents = await get_folder_contents_for_table(folder, table_name, client)
 
     csvs: list[ADLSPathMetadata] = []
@@ -164,8 +164,29 @@ async def read_csvs_in_folder(
         csvs.sort(key=lambda c: c.last_modified_datetime)
 
         for csv in csvs:
-            async for row in client.stream_csv(csv.name, table_model, table_model.field_names):
-                yield row
+            async for row in client.stream_csv(csv.name, table_model.field_names):
+                yield transform_row(row, table_model.boolean_fields)
+
+
+def transform_row(row: dict, boolean_fields: frozenset[str]) -> dict:
+    """
+    Apply Dynamics 365-specific transformations to a CSV row.
+
+    Transformations:
+    - Convert boolean fields from "true"/"false" strings to actual booleans
+      (None/empty values become False)
+    - Add _meta field with operation type based on IsDelete field
+    """
+    for field_name in boolean_fields:
+        value = row.get(field_name)
+        if value is None:
+            row[field_name] = False
+        else:
+            row[field_name] = value.lower() == "true"
+
+    row["_meta"] = {"op": "d" if row.get("IsDelete") else "u"}
+
+    return row
 
 
 async def fetch_changes(
@@ -173,7 +194,7 @@ async def fetch_changes(
     table_name: str,
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator[BaseTable | LogCursor, None]:
+) -> AsyncGenerator[dict | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
     finalized_folders = await get_finalized_timestamp_folders(client)
