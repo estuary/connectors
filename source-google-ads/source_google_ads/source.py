@@ -33,23 +33,14 @@ from .streams import (
     ClickView,
     DisplayKeywordPerformanceReport,
     DisplayTopicsPerformanceReport,
-    GeoTargetConstant,
     GeographicReport,
+    GeoTargetConstant,
     KeywordReport,
     ServiceAccounts,
     ShoppingPerformanceReport,
     UserLocationReport,
 )
 from .utils import GAQL
-
-FULL_REFRESH_CUSTOM_TABLE = [
-    "ad_group_criterion",
-    "asset",
-    "asset_group_listing_group_filter",
-    "call_view",
-    "custom_audience",
-    "geo_target_constant",
-]
 
 
 class SourceGoogleAds(AbstractSource):
@@ -133,7 +124,7 @@ class SourceGoogleAds(AbstractSource):
                             f"Metrics are not available for manager account {customer.id}. "
                             f"Please remove metrics fields in your custom query: {query}."
                         )
-                    if query.resource_name not in FULL_REFRESH_CUSTOM_TABLE:
+                    if not google_api.is_full_refresh_resource(query.resource_name):
                         query = IncrementalCustomQuery.insert_segments_date_expr(
                             query, "1980-01-01", "1980-01-01"
                         )
@@ -205,7 +196,7 @@ class SourceGoogleAds(AbstractSource):
             query = single_query_config["query"]
             if self.is_metrics_in_custom_query(query):
                 if non_manager_accounts:
-                    if query.resource_name in FULL_REFRESH_CUSTOM_TABLE:
+                    if google_api.is_full_refresh_resource(query.resource_name):
                         streams.append(
                             CustomQuery(
                                 config=single_query_config,
@@ -221,7 +212,7 @@ class SourceGoogleAds(AbstractSource):
                             )
                         )
                 continue
-            if query.resource_name in FULL_REFRESH_CUSTOM_TABLE:
+            if google_api.is_full_refresh_resource(query.resource_name):
                 streams.append(
                     CustomQuery(
                         config=single_query_config, api=google_api, customers=customers
