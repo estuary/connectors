@@ -67,9 +67,38 @@ class CSVProcessingError(Exception):
         super().__init__(message)
 
 
-class IncrementalCSVProcessor(Generic[StreamedItem]):
+class _AsyncByteReader(aiocsv.protocols.WithAsyncRead):
+    """Internal class that handles incremental decoding for aiocsv."""
+
+    def __init__(self, byte_gen: AsyncGenerator[bytes, None], encoding: str = 'utf-8'):
+        self.byte_gen = byte_gen
+        self.decoder = codecs.getincrementaldecoder(encoding)(errors='strict')
+        self._exhausted = False
+
+    async def read(self, size: int = -1) -> str:
+        """Read and incrementally decode data from the byte stream."""
+        if self._exhausted:
+            return ""
+
+        try:
+            chunk = await self.byte_gen.__anext__()
+            # Use incremental decoder to handle multi-byte characters
+            # that may be split across chunk boundaries.
+            return self.decoder.decode(chunk, final=False)
+
+        except StopAsyncIteration:
+            self._exhausted = True
+
+            # Finalize the decoder to get any remaining characters.
+            # This will raise UnicodeDecodeError if there are incomplete characters.
+            final_chunk = self.decoder.decode(b'', final=True)
+
+            return final_chunk if final_chunk else ""
+
+
+class IncrementalCSVProcessor(Generic[T]):
     """
-    Process a stream of CSV bytes incrementally, yielding rows as dictionaries.
+    Process a stream of CSV bytes incrementally, yielding rows.
 
     This processor handles CSV data that arrives in chunks and uses incremental
     decoding to handle multi-byte characters that may be split across
@@ -161,36 +190,7 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
         Raises:
             CSVProcessingError: When CSV data is malformed or cannot be parsed
         """
-
-        class AsyncByteReader(aiocsv.protocols.WithAsyncRead):
-            """Internal class that handles incremental decoding for aiocsv."""
-
-            def __init__(self, byte_gen: AsyncGenerator[bytes, None], encoding: str):
-                self.byte_gen = byte_gen
-                self.decoder = codecs.getincrementaldecoder(encoding)(errors='strict')
-                self._exhausted = False
-
-            async def read(self, size: int = -1) -> str:
-                """Read and incrementally decode data from the byte stream."""
-                if self._exhausted:
-                    return ""
-
-                try:
-                    chunk = await self.byte_gen.__anext__()
-                    # Use incremental decoder to handle multi-byte characters
-                    # that may be split across chunk boundaries.
-                    return self.decoder.decode(chunk, final=False)
-
-                except StopAsyncIteration:
-                    self._exhausted = True
-
-                    # Finalize the decoder to get any remaining characters.
-                    # This will raise UnicodeDecodeError if there are incomplete characters.
-                    final_chunk = self.decoder.decode(b'', final=True)
-
-                    return final_chunk if final_chunk else ""
-
-        async_reader = AsyncByteReader(self.byte_iterator, self.config.encoding)
+        async_reader = _AsyncByteReader(self.byte_iterator, self.config.encoding)
 
         reader_kwargs = {
             'delimiter': self.config.delimiter,
