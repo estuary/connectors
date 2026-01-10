@@ -3,13 +3,14 @@ import aiocsv.protocols
 import codecs
 import csv
 import sys
-from typing import Any, AsyncGenerator, ClassVar, Generic, Optional, TypeVar
+from typing import Any, AsyncGenerator, ClassVar, Generic, Optional, TypeVar, overload
 from dataclasses import dataclass
 from pydantic import BaseModel, model_validator
 from estuary_cdk.capture.common import BaseDocument
 
 
 StreamedItem = TypeVar("StreamedItem", bound=BaseModel)
+T = TypeVar("T")
 
 # Python's csv module has a default field size limit of 131,072 bytes,
 # and it will raise an _csv.Error exception if a field value is larger
@@ -67,18 +68,56 @@ class CSVProcessingError(Exception):
         super().__init__(message)
 
 
-class IncrementalCSVProcessor(Generic[StreamedItem]):
+class _AsyncByteReader(aiocsv.protocols.WithAsyncRead):
+    """Internal class that handles incremental decoding for aiocsv."""
+
+    def __init__(self, byte_gen: AsyncGenerator[bytes, None], encoding: str = 'utf-8'):
+        self.byte_gen = byte_gen
+        self.decoder = codecs.getincrementaldecoder(encoding)(errors='strict')
+        self._exhausted = False
+
+    async def read(self, size: int = -1) -> str:
+        """Read and incrementally decode data from the byte stream."""
+        if self._exhausted:
+            return ""
+
+        try:
+            chunk = await self.byte_gen.__anext__()
+            # Use incremental decoder to handle multi-byte characters
+            # that may be split across chunk boundaries.
+            return self.decoder.decode(chunk, final=False)
+
+        except StopAsyncIteration:
+            self._exhausted = True
+
+            # Finalize the decoder to get any remaining characters.
+            # This will raise UnicodeDecodeError if there are incomplete characters.
+            final_chunk = self.decoder.decode(b'', final=True)
+
+            return final_chunk if final_chunk else ""
+
+
+class IncrementalCSVProcessor(Generic[T]):
     """
-    Process a stream of CSV bytes incrementally, yielding rows as dictionaries.
+    Process a stream of CSV bytes incrementally, yielding rows.
 
     This processor handles CSV data that arrives in chunks and uses incremental
     decoding to handle multi-byte characters that may be split across
     chunk boundaries.
 
-    Example usage with default configuration:
+    When a Pydantic model is provided, rows are validated and yielded as model instances.
+    When no model is provided, dicts are yielded.
+
+    Example usage with Pydantic validation:
     ```python
-    async for row in IncrementalCSVProcessor(byte_iterator, model):
-        do_something_with(row)
+    async for row in IncrementalCSVProcessor(byte_iterator, MyModel):
+        row.field  # row is MyModel
+    ```
+
+    Example usage without Pydantic validation:
+    ```python
+    async for row in IncrementalCSVProcessor(byte_iterator):
+        row["field"]  # row is dict[str, Any]
     ```
 
     Example usage with custom configuration:
@@ -98,7 +137,7 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
     ```python
     # Pass context to the pydantic model validation
     context = {'data_source': 'bulk_api'}
-    
+
     async for row in IncrementalCSVProcessor(byte_iterator, model, validation_context=context):
         do_something_with(row)
     ```
@@ -107,16 +146,36 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
     ```python
     # For CSV files without header rows, provide explicit field names
     fieldnames = ['name', 'age', 'city']
-    
+
     async for row in IncrementalCSVProcessor(byte_iterator, model, fieldnames=fieldnames):
         do_something_with(row)
     ```
     """
 
+    @overload
+    def __init__(
+        self: "IncrementalCSVProcessor[StreamedItem]",
+        byte_iterator: AsyncGenerator[bytes, None],
+        streamed_item_cls: type[StreamedItem],
+        config: Optional[CSVConfig] = None,
+        validation_context: Optional[object] = None,
+        fieldnames: Optional[list[str]] = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self: "IncrementalCSVProcessor[dict[str, Any]]",
+        byte_iterator: AsyncGenerator[bytes, None],
+        streamed_item_cls: None = None,
+        config: Optional[CSVConfig] = None,
+        validation_context: Optional[object] = None,
+        fieldnames: Optional[list[str]] = None,
+    ) -> None: ...
+
     def __init__(
             self,
             byte_iterator: AsyncGenerator[bytes, None],
-            streamed_item_cls: type[StreamedItem],
+            streamed_item_cls: Optional[type[BaseModel]] = None,
             config: Optional[CSVConfig] = None,
             validation_context: Optional[object] = None,
             fieldnames: Optional[list[str]] = None,
@@ -126,7 +185,7 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
 
         Args:
             byte_iterator: Async generator of CSV byte chunks
-            streamed_item_cls: Pydantic model class for validation
+            streamed_item_cls: Optional Pydantic model class for validation. If None, yields raw dicts.
             config: Optional CSV configuration options
             validation_context: Optional validation context object passed to pydantic model_validate
             fieldnames: Optional list of field names to use for CSV columns. If None, uses first row as headers.
@@ -136,18 +195,20 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
         self.streamed_item_cls = streamed_item_cls
         self.validation_context = validation_context
         self.fieldnames = fieldnames
-        self._row_iterator: Optional[AsyncGenerator[dict[str, Any]]] = None
+        self._row_iterator: Optional[AsyncGenerator[dict[str, Any], None]] = None
 
-    def __aiter__(self):
+    def __aiter__(self) -> "IncrementalCSVProcessor[T]":
         return self
 
-    async def __anext__(self) -> StreamedItem:
+    async def __anext__(self) -> T:
         if self._row_iterator is None:
             self._row_iterator = self._process_stream()
 
         try:
             row_data = await self._row_iterator.__anext__()
-            return self.streamed_item_cls.model_validate(row_data, context=self.validation_context)
+            if self.streamed_item_cls is not None:
+                return self.streamed_item_cls.model_validate(row_data, context=self.validation_context)
+            return row_data
         except StopAsyncIteration:
             raise
 
@@ -161,36 +222,7 @@ class IncrementalCSVProcessor(Generic[StreamedItem]):
         Raises:
             CSVProcessingError: When CSV data is malformed or cannot be parsed
         """
-
-        class AsyncByteReader(aiocsv.protocols.WithAsyncRead):
-            """Internal class that handles incremental decoding for aiocsv."""
-
-            def __init__(self, byte_gen: AsyncGenerator[bytes, None], encoding: str):
-                self.byte_gen = byte_gen
-                self.decoder = codecs.getincrementaldecoder(encoding)(errors='strict')
-                self._exhausted = False
-
-            async def read(self, size: int = -1) -> str:
-                """Read and incrementally decode data from the byte stream."""
-                if self._exhausted:
-                    return ""
-
-                try:
-                    chunk = await self.byte_gen.__anext__()
-                    # Use incremental decoder to handle multi-byte characters
-                    # that may be split across chunk boundaries.
-                    return self.decoder.decode(chunk, final=False)
-
-                except StopAsyncIteration:
-                    self._exhausted = True
-
-                    # Finalize the decoder to get any remaining characters.
-                    # This will raise UnicodeDecodeError if there are incomplete characters.
-                    final_chunk = self.decoder.decode(b'', final=True)
-
-                    return final_chunk if final_chunk else ""
-
-        async_reader = AsyncByteReader(self.byte_iterator, self.config.encoding)
+        async_reader = _AsyncByteReader(self.byte_iterator, self.config.encoding)
 
         reader_kwargs = {
             'delimiter': self.config.delimiter,

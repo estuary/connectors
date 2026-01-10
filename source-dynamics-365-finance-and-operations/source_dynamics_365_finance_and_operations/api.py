@@ -1,7 +1,7 @@
 import asyncio
 from datetime import datetime
 from logging import Logger
-from typing import AsyncGenerator
+from typing import AsyncGenerator, cast
 
 # Some functions that send a request to Azure for listing files or reading
 # metadata files are wrapped with the alru_cache decorator. alru_cache
@@ -141,7 +141,7 @@ async def read_csvs_in_folder(
     folder: str,
     table_name: str,
     client: ADLSGen2Client,
-) -> AsyncGenerator[BaseTable, None]:
+) -> AsyncGenerator[dict, None]:
     folder_contents = await get_folder_contents_for_table(folder, table_name, client)
 
     csvs: list[ADLSPathMetadata] = []
@@ -164,8 +164,28 @@ async def read_csvs_in_folder(
         csvs.sort(key=lambda c: c.last_modified_datetime)
 
         for csv in csvs:
-            async for row in client.stream_csv(csv.name, table_model, table_model.field_names):
-                yield row
+            async for row in client.stream_csv(csv.name, table_model.field_names):
+                yield transform_row(row, table_model.boolean_fields)
+
+
+def transform_row(row: dict[str, str], boolean_fields: frozenset[str]) -> dict[str, str | bool | dict[str, str]]:
+    """
+    Apply Dynamics 365-specific transformations to a CSV row.
+
+    Transformations:
+    - Convert boolean fields from "True"/"False"/empty strings to actual booleans
+    - Add _meta field with operation type based on IsDelete field
+      (IsDelete is "True" for deletions, "" otherwise)
+    """
+    result = cast(dict[str, str | bool | dict[str, str]], row)
+
+    for field_name in boolean_fields:
+        value = row.get(field_name)
+        result[field_name] = value.lower() == "true" if value else False
+
+    result["_meta"] = {"op": "d" if result.get("IsDelete") else "u"}
+
+    return result
 
 
 async def fetch_changes(
@@ -173,7 +193,7 @@ async def fetch_changes(
     table_name: str,
     log: Logger,
     log_cursor: LogCursor,
-) -> AsyncGenerator[BaseTable | LogCursor, None]:
+) -> AsyncGenerator[dict | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
     finalized_folders = await get_finalized_timestamp_folders(client)
