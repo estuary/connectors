@@ -3,13 +3,14 @@ import aiocsv.protocols
 import codecs
 import csv
 import sys
-from typing import Any, AsyncGenerator, ClassVar, Generic, Optional, TypeVar
+from typing import Any, AsyncGenerator, ClassVar, Generic, Optional, TypeVar, overload
 from dataclasses import dataclass
 from pydantic import BaseModel, model_validator
 from estuary_cdk.capture.common import BaseDocument
 
 
 StreamedItem = TypeVar("StreamedItem", bound=BaseModel)
+T = TypeVar("T")
 
 # Python's csv module has a default field size limit of 131,072 bytes,
 # and it will raise an _csv.Error exception if a field value is larger
@@ -104,10 +105,19 @@ class IncrementalCSVProcessor(Generic[T]):
     decoding to handle multi-byte characters that may be split across
     chunk boundaries.
 
-    Example usage with default configuration:
+    When a Pydantic model is provided, rows are validated and yielded as model instances.
+    When no model is provided, dicts are yielded.
+
+    Example usage with Pydantic validation:
     ```python
-    async for row in IncrementalCSVProcessor(byte_iterator, model):
-        do_something_with(row)
+    async for row in IncrementalCSVProcessor(byte_iterator, MyModel):
+        row.field  # row is MyModel
+    ```
+
+    Example usage without Pydantic validation:
+    ```python
+    async for row in IncrementalCSVProcessor(byte_iterator):
+        row["field"]  # row is dict[str, str]
     ```
 
     Example usage with custom configuration:
@@ -127,7 +137,7 @@ class IncrementalCSVProcessor(Generic[T]):
     ```python
     # Pass context to the pydantic model validation
     context = {'data_source': 'bulk_api'}
-    
+
     async for row in IncrementalCSVProcessor(byte_iterator, model, validation_context=context):
         do_something_with(row)
     ```
@@ -136,16 +146,36 @@ class IncrementalCSVProcessor(Generic[T]):
     ```python
     # For CSV files without header rows, provide explicit field names
     fieldnames = ['name', 'age', 'city']
-    
+
     async for row in IncrementalCSVProcessor(byte_iterator, model, fieldnames=fieldnames):
         do_something_with(row)
     ```
     """
 
+    @overload
+    def __init__(
+        self: "IncrementalCSVProcessor[StreamedItem]",
+        byte_iterator: AsyncGenerator[bytes, None],
+        streamed_item_cls: type[StreamedItem],
+        config: Optional[CSVConfig] = None,
+        validation_context: Optional[object] = None,
+        fieldnames: Optional[list[str]] = None,
+    ) -> None: ...
+
+    @overload
+    def __init__(
+        self: "IncrementalCSVProcessor[dict[str, str]]",
+        byte_iterator: AsyncGenerator[bytes, None],
+        streamed_item_cls: None = None,
+        config: Optional[CSVConfig] = None,
+        validation_context: Optional[object] = None,
+        fieldnames: Optional[list[str]] = None,
+    ) -> None: ...
+
     def __init__(
             self,
             byte_iterator: AsyncGenerator[bytes, None],
-            streamed_item_cls: type[StreamedItem],
+            streamed_item_cls: Optional[type[BaseModel]] = None,
             config: Optional[CSVConfig] = None,
             validation_context: Optional[object] = None,
             fieldnames: Optional[list[str]] = None,
@@ -155,7 +185,7 @@ class IncrementalCSVProcessor(Generic[T]):
 
         Args:
             byte_iterator: Async generator of CSV byte chunks
-            streamed_item_cls: Pydantic model class for validation
+            streamed_item_cls: Optional Pydantic model class for validation. If None, yields raw dicts.
             config: Optional CSV configuration options
             validation_context: Optional validation context object passed to pydantic model_validate
             fieldnames: Optional list of field names to use for CSV columns. If None, uses first row as headers.
@@ -165,27 +195,34 @@ class IncrementalCSVProcessor(Generic[T]):
         self.streamed_item_cls = streamed_item_cls
         self.validation_context = validation_context
         self.fieldnames = fieldnames
-        self._row_iterator: Optional[AsyncGenerator[dict[str, Any]]] = None
+        self._row_iterator: Optional[AsyncGenerator[dict[str, str], None]] = None
 
-    def __aiter__(self):
+    def __aiter__(self) -> "IncrementalCSVProcessor[T]":
         return self
 
-    async def __anext__(self) -> StreamedItem:
+    @overload
+    async def __anext__(self: "IncrementalCSVProcessor[StreamedItem]") -> StreamedItem: ...
+    @overload
+    async def __anext__(self: "IncrementalCSVProcessor[dict[str, str]]") -> dict[str, str]: ...
+
+    async def __anext__(self) -> BaseModel | dict[str, str]:
         if self._row_iterator is None:
             self._row_iterator = self._process_stream()
 
         try:
             row_data = await self._row_iterator.__anext__()
-            return self.streamed_item_cls.model_validate(row_data, context=self.validation_context)
+            if self.streamed_item_cls is not None:
+                return self.streamed_item_cls.model_validate(row_data, context=self.validation_context)
+            return row_data
         except StopAsyncIteration:
             raise
 
-    async def _process_stream(self) -> AsyncGenerator[dict[str, Any], None]:
+    async def _process_stream(self) -> AsyncGenerator[dict[str, str], None]:
         """
         Internal method to process the byte stream and yield CSV records.
 
         Yields:
-            dict[str, Any]: Complete CSV records as dictionaries
+            dict[str, str]: Complete CSV records as dictionaries
 
         Raises:
             CSVProcessingError: When CSV data is malformed or cannot be parsed
