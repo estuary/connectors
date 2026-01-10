@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from logging import Logger
-from typing import AsyncGenerator, Any, Optional, TypeVar
+from typing import AsyncGenerator, Any, Optional
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -10,8 +10,6 @@ from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 
 NEXT_PAGE_HEADER = "x-ms-continuation"
-
-_CSVRow = TypeVar('_CSVRow', bound=BaseModel)
 
 
 class ADLSFilesystemMetadata(BaseModel):
@@ -119,11 +117,16 @@ class ADLSGen2Client:
         return await self.http.request(self.log, url)
 
     async def stream_csv(
-        self, 
+        self,
         path: str,
-        model: type[_CSVRow],
         field_names: list[str],
-    ) -> AsyncGenerator[_CSVRow, None]:
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """
+        Stream and parse a CSV file, yielding dict rows.
+
+        Transformations applied:
+        - Empty strings converted to None
+        """
         url_without_sas = f"{self.base_url}/{self.filesystem}/{path}"
 
         self.log.debug(f"Streaming CSV contents from /{path}.", {
@@ -134,11 +137,10 @@ class ADLSGen2Client:
 
         _, body = await self.http.request_stream(self.log, url)
 
-        processor = IncrementalCSVProcessor(
-            body(),
-            model,
-            fieldnames=field_names
-        )
+        async for row in IncrementalCSVProcessor(body(), fieldnames=field_names):
+            # Convert empty strings to None
+            for key, value in row.items():
+                if value == "":
+                    row[key] = None
 
-        async for item in processor:
-            yield item
+            yield row
