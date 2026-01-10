@@ -1,4 +1,3 @@
-from enum import StrEnum
 from typing import ClassVar, Literal, Annotated
 
 from estuary_cdk.capture.common import (
@@ -8,7 +7,7 @@ from estuary_cdk.capture.common import (
 )
 from estuary_cdk.incremental_csv_processor import BaseCSVRow
 
-from pydantic import BaseModel, Field, model_validator, BeforeValidator
+from pydantic import BaseModel, Field, BeforeValidator
 
 
 class AzureSASToken(BaseModel):
@@ -60,6 +59,11 @@ class ModelDotJson(BaseModel, extra="allow"):
 
 
 class BaseTable(BaseCSVRow, extra="allow"):
+    """
+    Used for schema generation and table metadata. Not used to validate actual
+    documents - we yield raw dicts to avoid Pydantic's serialization/validation
+    overhead that's not necessary in this connector.
+    """
     name: ClassVar[str]
     field_names: ClassVar[list[str]]
     field_types: ClassVar[dict[str, str]]
@@ -69,24 +73,6 @@ class BaseTable(BaseCSVRow, extra="allow"):
 
     Id: str
     IsDelete: bool | None
-
-    @model_validator(mode='before')
-    @classmethod
-    def convert_boolean_fields(cls, values: dict) -> dict:
-        for field_name in cls.boolean_fields:
-            value = values.get(field_name)
-            if value is not None:
-                assert isinstance(value, str)
-                values[field_name] = value.lower() == 'true'
-        return values
-
-    @model_validator(mode='after')
-    def set_meta_op(self) -> 'BaseTable':
-        if self.IsDelete:
-            self.meta_ = BaseTable.Meta(op='d')
-        else:
-            self.meta_ = BaseTable.Meta(op='u')
-        return self
 
 
 def model_from_entity(entity: ModelDotJson.Entity) -> type[BaseTable]:
