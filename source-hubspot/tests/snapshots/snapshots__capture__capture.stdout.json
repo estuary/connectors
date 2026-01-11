@@ -131,6 +131,7 @@
         "hs_object_source_label": "CRM_SETTING",
         "hs_object_source_user_id": null,
         "hs_owning_teams": null,
+        "hs_paid_for_intent_signals": null,
         "hs_parent_company_id": null,
         "hs_pinned_engagement_id": null,
         "hs_pipeline": "companies-lifecycle-pipeline",
@@ -201,7 +202,8 @@
         "website": "hubspot.com",
         "zip": null
       },
-      "updatedAt": "2025-01-18T21:49:41.259Z"
+      "updatedAt": "2025-01-18T21:49:41.259Z",
+      "url": "https://app.hubspot.com/contacts/47912630/record/0-2/25177527565"
     }
   ],
   [
@@ -298,6 +300,7 @@
         "hs_created_by_conversations": null,
         "hs_created_by_user_id": null,
         "hs_createdate": null,
+        "hs_cross_sell_opportunity": null,
         "hs_document_last_revisited": null,
         "hs_email_bad_address": null,
         "hs_email_bounce": null,
@@ -371,6 +374,7 @@
         "hs_linkedin_ad_clicked": null,
         "hs_linkedin_url": null,
         "hs_live_enrichment_deadline": null,
+        "hs_manual_campaign_ids": null,
         "hs_membership_has_accessed_private_content": 0,
         "hs_membership_last_private_content_access_date": null,
         "hs_merged_object_ids": null,
@@ -492,7 +496,8 @@
         "work_email": null,
         "zip": null
       },
-      "updatedAt": "2024-10-28T16:40:17.996Z"
+      "updatedAt": "2024-10-28T16:40:17.996Z",
+      "url": "https://app.hubspot.com/contacts/47912630/record/0-1/72810357568"
     }
   ],
   [
@@ -648,6 +653,7 @@
         "hs_analytics_source_data_1": null,
         "hs_analytics_source_data_2": null,
         "hs_arr": null,
+        "hs_attributed_team_ids": null,
         "hs_average_call_duration": null,
         "hs_campaign": null,
         "hs_closed_amount": 0,
@@ -672,6 +678,9 @@
         "hs_is_closed_won": false,
         "hs_is_in_first_deal_stage": true,
         "hs_is_open_count": 1,
+        "hs_last_gs_shared_message": null,
+        "hs_last_partner_shared_message_date": null,
+        "hs_last_shared_message_create_date": null,
         "hs_lastmodifieddate": "2025-04-03T12:59:43.469000+00:00",
         "hs_latest_approval_status": null,
         "hs_latest_approval_status_approval_id": null,
@@ -750,7 +759,8 @@
         "num_notes": 0,
         "pipeline": "default"
       },
-      "updatedAt": "2025-04-03T12:59:43.469Z"
+      "updatedAt": "2025-04-03T12:59:43.469Z",
+      "url": "https://app.hubspot.com/contacts/47912630/record/0-3/35447325508"
     }
   ],
   [
@@ -788,7 +798,7 @@
       "id": "83700335",
       "lastName": "Lazo",
       "type": "PERSON",
-      "updatedAt": "2025-09-30T12:49:18.373Z",
+      "updatedAt": "2025-10-20T15:18:28.094Z",
       "userId": 83700335,
       "userIdIncludingInactive": 83700335
     }

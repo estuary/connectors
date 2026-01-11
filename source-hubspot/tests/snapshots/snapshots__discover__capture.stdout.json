@@ -990,6 +990,12 @@
                 "string"
               ]
             },
+            "hs_paid_for_intent_signals": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_parent_company_id": {
               "type": [
                 "null",
@@ -2189,6 +2195,12 @@
                 "string"
               ]
             },
+            "hs_cross_sell_opportunity": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_document_last_revisited": {
               "format": "date-time",
               "type": [
@@ -2654,6 +2666,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_manual_campaign_ids": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_membership_has_accessed_private_content": {
@@ -3952,6 +3970,12 @@
                 "number"
               ]
             },
+            "hs_attributed_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_average_call_duration": {
               "type": [
                 "null",
@@ -4096,6 +4120,27 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_last_gs_shared_message": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_last_partner_shared_message_date": {
+              "format": "date",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_last_shared_message_create_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_lastmodifieddate": {
@@ -4903,6 +4948,12 @@
                 "number"
               ]
             },
+            "hs_attributed_team_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_average_call_duration": {
               "type": [
                 "null",
@@ -5047,6 +5098,27 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_last_gs_shared_message": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_last_partner_shared_message_date": {
+              "format": "date",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_last_shared_message_create_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_lastmodifieddate": {
@@ -7265,6 +7337,12 @@
                 "string"
               ]
             },
+            "hs_voice_agent_is_most_recent_customer_feedback_positive": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_voicemail_count": {
               "type": [
                 "null",
@@ -8029,6 +8107,12 @@
                 "string"
               ]
             },
+            "hs_sequence_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_shared_team_ids": {
               "type": [
                 "null",
@@ -8036,6 +8120,12 @@
               ]
             },
             "hs_shared_user_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_template_id": {
               "type": [
                 "null",
                 "string"
@@ -8538,6 +8628,12 @@
               ]
             },
             "hs_modified_by": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_notetaker_attendance_duration": {
               "type": [
                 "null",
                 "number"
@@ -9643,6 +9739,13 @@
               ]
             },
             "hs_shared_user_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_start_date": {
+              "format": "date-time",
               "type": [
                 "null",
                 "string"
@@ -11651,6 +11754,12 @@
                 "string"
               ]
             },
+            "hs_product_classification": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_product_type": {
               "type": [
                 "null",
@@ -12332,6 +12441,12 @@
                 "string"
               ]
             },
+            "hs_cross_sell_opportunity": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_document_last_revisited": {
               "format": "date-time",
               "type": [
@@ -12797,6 +12912,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_manual_campaign_ids": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_membership_has_accessed_private_content": {
@@ -13979,6 +14100,13 @@
                 "number"
               ]
             },
+            "hs_customer_agent_escalated_time": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_customer_agent_ticket_status": {
               "type": [
                 "null",
@@ -14041,6 +14169,12 @@
                 "string"
               ]
             },
+            "hs_draft_user_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_email_subject": {
               "type": [
                 "null",
@@ -14084,6 +14218,12 @@
                 "string"
               ]
             },
+            "hs_has_live_chat_ended_or_email_sent": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_helpdesk_sort_timestamp": {
               "format": "date-time",
               "type": [
@@ -14101,6 +14241,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_is_closed": {
+              "type": [
+                "null",
+                "boolean"
               ]
             },
             "hs_is_latest_message_failed": {
@@ -14145,12 +14291,6 @@
               "type": [
                 "null",
                 "string"
-              ]
-            },
-            "hs_last_email_id": {
-              "type": [
-                "null",
-                "number"
               ]
             },
             "hs_last_email_type": {
@@ -14232,6 +14372,12 @@
             },
             "hs_latest_message_visible_to_visitor_sent_at": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_mentions_resolved_user_ids": {
               "type": [
                 "null",
                 "string"
@@ -14487,6 +14633,13 @@
               ]
             },
             "hs_ticket_priority": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_ticket_reopened_at": {
+              "format": "date-time",
               "type": [
                 "null",
                 "string"

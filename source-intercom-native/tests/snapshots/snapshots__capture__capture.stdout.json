@@ -48,6 +48,7 @@
       "admin_ids": [
         7939621
       ],
+      "distribution_method": "round_robin",
       "id": "7949170",
       "name": "Test Team Inbox",
       "type": "team"

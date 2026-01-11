@@ -6,7 +6,7 @@ credentials:
     password_sops: ENC[AES256_GCM,data:9ZA97LWsl71jev6gUU/xejm62/wU+E5prjLcwahtb2c=,iv:c7biwuboJb6uMrnNHoPX5udegxpM49P4qBnupoDNmes=,tag:3i6DsY4IFC6bEfRiOtHARA==,type:str]
 advanced:
     is_sandbox: true
-    window_size: 30000
+    window_size: 1248
 sops:
     kms: []
     gcp_kms:
@@ -16,8 +16,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-04-05T15:07:49Z"
-    mac: ENC[AES256_GCM,data:JwplkP6EkLTpQOFL+7tcJGts4xEsbPi44vbmtYKg2GLUWTeAEJIFNsh4liLaR4hZhInHZrEzwzioFaXnnzU384Moy3Xl1qo3k4mJ9zxtru0yuFchvD+dNsf/UZ2Fiku3goGfdLMJBePALaqylLHZCa7CJthh6ZKIbQggZgV5J4U=,iv:IcRUmCHq/As7xNNu8J9/RZbPQ1gva8QDg3j4XfAuC4E=,tag:mxtG3JbUWf1c1dLXkabVfw==,type:str]
+    lastmodified: "2026-01-11T03:25:01Z"
+    mac: ENC[AES256_GCM,data:9Ufu+bgq8q1aH1LVB7EKwoRy5bzvNwTkzW/KihWb6pmHQxRuygUBuJ0y7v5qdKK7Yqc6j62LR/tO1GN5xfynL0E5/x+b4kBm1EKSyfN8BVYGx/xKMhkqXmFGMq42PSrllgHvwLhyprs+vJGRzletl4rRwrd4LFe0ytIutt26aXM=,iv:DXdFZ+DR0mKVKW0UjjLoFxezMuo/KZnQNpdJEbFlrOs=,tag:TwreZr+7IrvEY9fZJeXK8A==,type:str]
     pgp: []
     encrypted_suffix: _sops
-    version: 3.7.3
+    version: 3.9.0
