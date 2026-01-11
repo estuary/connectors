@@ -489,6 +489,10 @@
           {
             "id": 39405384709780,
             "value": null
+          },
+          {
+            "id": 43010621832468,
+            "value": null
           }
         ],
         "custom_status_id": 28835714727188,
@@ -505,6 +509,10 @@
           },
           {
             "id": 39405384709780,
+            "value": null
+          },
+          {
+            "id": 43010621832468,
             "value": null
           }
         ],
@@ -530,6 +538,7 @@
         "status": "open",
         "subject": "SAMPLE TICKET: Meet the ticket",
         "submitter_id": 28835702984212,
+        "support_type": "agent",
         "tags": [
           "sample",
           "support",
@@ -575,6 +584,10 @@
         {
           "id": 39405384709780,
           "value": null
+        },
+        {
+          "id": 43010621832468,
+          "value": null
         }
       ],
       "custom_status_id": 28835714727188,
@@ -590,6 +603,10 @@
         },
         {
           "id": 39405384709780,
+          "value": null
+        },
+        {
+          "id": 43010621832468,
           "value": null
         }
       ],
@@ -615,6 +632,7 @@
       "status": "open",
       "subject": "SAMPLE TICKET: Meet the ticket",
       "submitter_id": 28835702984212,
+      "support_type": "agent",
       "tags": [
         "sample",
         "support",
@@ -652,6 +670,7 @@
       "external_id": null,
       "iana_time_zone": "America/New_York",
       "id": 28835702984212,
+      "is_billing_admin": true,
       "last_login_at": "redacted",
       "locale": "en-US",
       "locale_id": 1,
@@ -733,7 +752,7 @@
           "ticket_access_selected_brands": [],
           "ticket_access_selected_groups": []
         },
-        "export_views": false,
+        "export_views": true,
         "forum_access": "readonly",
         "forum_access_restricted_content": false,
         "group_access": false,
