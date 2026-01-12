@@ -3,7 +3,7 @@ import aiocsv.protocols
 import codecs
 import csv
 import sys
-from typing import Any, AsyncGenerator, ClassVar, Generic, Optional, TypeVar, overload
+from typing import Any, AsyncGenerator, ClassVar, Generic, TypeVar, overload
 from dataclasses import dataclass
 from pydantic import BaseModel, model_validator
 from estuary_cdk.capture.common import BaseDocument
@@ -48,7 +48,7 @@ class CSVConfig:
     """Configuration for CSV processing."""
     delimiter: str = ','
     quotechar: str = '"'
-    escapechar: Optional[str] = None
+    escapechar: str | None = None
     doublequote: bool = True
     skipinitialspace: bool = False
     lineterminator: str = '\r\n'
@@ -60,7 +60,7 @@ class CSVConfig:
 class CSVProcessingError(Exception):
     """Exception raised when CSV processing fails."""
 
-    def __init__(self, message: str, config: Optional[dict] = None):
+    def __init__(self, message: str, config: dict | None = None):
         self.config = config
         if config:
             config_str = ", ".join([f"{k}={repr(v)}" for k, v in config.items()])
@@ -157,9 +157,9 @@ class IncrementalCSVProcessor(Generic[T]):
         self: "IncrementalCSVProcessor[StreamedItem]",
         byte_iterator: AsyncGenerator[bytes, None],
         streamed_item_cls: type[StreamedItem],
-        config: Optional[CSVConfig] = None,
-        validation_context: Optional[object] = None,
-        fieldnames: Optional[list[str]] = None,
+        config: CSVConfig | None = None,
+        validation_context: object | None = None,
+        fieldnames: list[str] | None = None,
     ) -> None: ...
 
     @overload
@@ -167,18 +167,18 @@ class IncrementalCSVProcessor(Generic[T]):
         self: "IncrementalCSVProcessor[dict[str, str]]",
         byte_iterator: AsyncGenerator[bytes, None],
         streamed_item_cls: None = None,
-        config: Optional[CSVConfig] = None,
-        validation_context: Optional[object] = None,
-        fieldnames: Optional[list[str]] = None,
+        config: CSVConfig | None = None,
+        validation_context: object | None = None,
+        fieldnames: list[str] | None = None,
     ) -> None: ...
 
     def __init__(
             self,
             byte_iterator: AsyncGenerator[bytes, None],
-            streamed_item_cls: Optional[type[BaseModel]] = None,
-            config: Optional[CSVConfig] = None,
-            validation_context: Optional[object] = None,
-            fieldnames: Optional[list[str]] = None,
+            streamed_item_cls: type[BaseModel] | None = None,
+            config: CSVConfig | None = None,
+            validation_context: object | None = None,
+            fieldnames: list[str] | None = None,
         ):
         """
         Initialize the processor with byte iterator and optional CSV configuration or validation context.
@@ -195,7 +195,7 @@ class IncrementalCSVProcessor(Generic[T]):
         self.streamed_item_cls = streamed_item_cls
         self.validation_context = validation_context
         self.fieldnames = fieldnames
-        self._row_iterator: Optional[AsyncGenerator[dict[str, str], None]] = None
+        self._row_iterator: AsyncGenerator[dict[str, str], None] | None = None
 
     def __aiter__(self) -> "IncrementalCSVProcessor[T]":
         return self
