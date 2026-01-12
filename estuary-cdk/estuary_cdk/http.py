@@ -114,28 +114,53 @@ class HTTPSession(abc.ABC):
     ) -> bytes:
         """Request a url and return its body as bytes"""
 
-        chunks: list[bytes] = []
-        _, body_generator = await self._request_stream(
-            log,
-            url,
-            method,
-            params,
-            json,
-            form,
-            with_token,
-            headers,
-            should_retry,
-        )
+        max_attempts = 3
+        attempt = 1
 
-        async for chunk in body_generator():
-            chunks.append(chunk)
+        while True:
+            try:
+                chunks: list[bytes] = []
+                _, body_generator = await self._request_stream(
+                    log,
+                    url,
+                    method,
+                    params,
+                    json,
+                    form,
+                    with_token,
+                    headers,
+                    should_retry,
+                )
 
-        if len(chunks) == 0:
-            return b""
-        elif len(chunks) == 1:
-            return chunks[0]
-        else:
-            return b"".join(chunks)
+                async for chunk in body_generator():
+                    chunks.append(chunk)
+
+                if len(chunks) == 0:
+                    return b""
+                elif len(chunks) == 1:
+                    return chunks[0]
+                else:
+                    return b"".join(chunks)
+            except (
+                asyncio.TimeoutError,
+                aiohttp.ClientPayloadError,
+                aiohttp.ServerDisconnectedError,
+                aiohttp.ClientOSError,
+                ConnectionResetError,
+            ) as e:
+                if attempt <= max_attempts:
+                    log.warning(
+                        "error occurred while reading response body (will retry)",
+                        {
+                            "url": url,
+                            "method": method,
+                            "attempt": attempt,
+                            "error": format_error_message(e),
+                        },
+                    )
+                    attempt += 1
+                else:
+                    raise
 
     async def request_lines(
         self,
@@ -503,7 +528,7 @@ class HTTPMixin(Mixin, HTTPSession):
             ) as e:
                 if attempt <= max_attempts:
                     log.warning(
-                        f"Connection error occurred while establishing connection (will retry)",
+                        f"error occurred while establishing connection (will retry)",
                         {
                             "url": url,
                             "method": method,
