@@ -73,6 +73,10 @@ captures:
         name: contact_list_memberships
         interval: PT3H
       target: acmeCo/contact_list_memberships
+    - resource:
+        name: orders
+        schedule: 55 23 * * *
+      target: acmeCo/orders
     interval: 3m
     shards:
       logLevel: debug

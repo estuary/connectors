@@ -1,4 +1,5 @@
 import json
+import re
 import subprocess
 
 
@@ -7,11 +8,10 @@ def test_capture(request, snapshot):
         "url",
     ]
 
-    PROPERTIES_TO_REDACT = [
-        "hs_time_in_lead",
-        "hs_time_in_opportunity",
-        "hs_time_in_appointmentscheduled",
-        "hs_time_in_1",
+    PROPERTY_PATTERNS_TO_REDACT = [
+        re.compile(r"^hs_time_in_"),
+        re.compile(r"^hs_date_entered_"),
+        re.compile(r"^hs_date_exited_"),
     ]
 
     result = subprocess.run(
@@ -34,10 +34,13 @@ def test_capture(request, snapshot):
     for l in lines:
         _collection, record = l[0], l[1]
 
-        for m in ["properties", "propertiesWithHistory"]:
-            for prop in PROPERTIES_TO_REDACT:
-                if m in record and prop in record[m]:
-                    record[m][prop] = "redacted"
+        for key in ["properties", "propertiesWithHistory"]:
+            if key in record:
+                for prop in record[key].keys():
+                    if any(
+                        pattern.match(prop) for pattern in PROPERTY_PATTERNS_TO_REDACT
+                    ):
+                        record[key][prop] = "redacted"
 
         for field in FIELDS_TO_REDACT:
             if field in record:

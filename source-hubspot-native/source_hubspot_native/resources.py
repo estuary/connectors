@@ -30,6 +30,7 @@ from .api import (
     fetch_delayed_goals,
     fetch_delayed_line_items,
     fetch_delayed_marketing_emails,
+    fetch_delayed_orders,
     fetch_delayed_products,
     fetch_delayed_tickets,
     fetch_delayed_workflows,
@@ -50,6 +51,7 @@ from .api import (
     fetch_recent_goals,
     fetch_recent_line_items,
     fetch_recent_marketing_emails,
+    fetch_recent_orders,
     fetch_recent_products,
     fetch_recent_tickets,
     fetch_recent_workflows,
@@ -77,6 +79,7 @@ from .models import (
     LineItem,
     MarketingEmail,
     Names,
+    Order,
     Owner,
     Product,
     Property,
@@ -154,6 +157,16 @@ async def _remove_permission_blocked_resources(
             fetch_recent_workflows(
                 log, http, False, datetime.now(tz=UTC), None,
             )
+        ),
+        (
+            Names.orders,
+            fetch_recent_orders(
+                log,
+                http,
+                False,
+                datetime.now(tz=UTC),
+                None,
+            ),
         ),
     ]
 
@@ -301,6 +314,7 @@ async def all_resources(
         contact_lists(http),
         contact_list_memberships(http),
         workflows(http),
+        orders(http, with_history),
     ]
 
     if should_check_permissions:
@@ -739,4 +753,16 @@ def workflows(http: HTTPSession) -> Resource:
         ),
         initial_config=ResourceConfig(name=Names.workflows),
         schema_inference=True,
+    )
+
+
+def orders(http: HTTPSession, with_history: bool) -> Resource:
+    return crm_object_with_associations(
+        Order,
+        Names.orders,
+        Names.orders,
+        http,
+        with_history,
+        fetch_recent_orders,
+        fetch_delayed_orders,
     )
