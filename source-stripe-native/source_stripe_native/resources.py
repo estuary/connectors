@@ -105,7 +105,7 @@ async def _fetch_platform_account_id(
     return platform_account.id
 
 
-def _reconcile_connector_state(
+async def _reconcile_connector_state(
     account_ids: list[str],
     binding: CaptureBinding[ResourceConfig],
     state: ResourceState,
@@ -146,7 +146,7 @@ def _reconcile_connector_state(
             task.log.info(
                 f"Checkpointing state to ensure any new state is persisted for {binding.stateKey}."
             )
-            task.checkpoint(
+            await task.checkpoint(
                 ConnectorState(
                     bindingStateV1={binding.stateKey: state},
                 )
@@ -325,7 +325,7 @@ def base_object(
     It requires a single, parent stream with a valid Event API Type
     """
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -357,7 +357,7 @@ def base_object(
                 fetch_page=fetch_page_fns,
             )
         else:
-            _reconcile_connector_state(
+            await _reconcile_connector_state(
                 all_account_ids, binding, state, initial_state, task
             )
 
@@ -416,7 +416,7 @@ def child_object(
     a valid Event API Type
     """
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -450,7 +450,7 @@ def child_object(
                 fetch_page=fetch_page_fns,
             )
         else:
-            _reconcile_connector_state(
+            await _reconcile_connector_state(
                 all_account_ids, binding, state, initial_state, task
             )
 
@@ -515,7 +515,7 @@ def split_child_object(
     in the API response. Meaning, the stream behaves like a non-chid stream incrementally.
     """
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -548,7 +548,7 @@ def split_child_object(
                 fetch_page=fetch_page_fns,
             )
         else:
-            _reconcile_connector_state(
+            await _reconcile_connector_state(
                 all_account_ids, binding, state, initial_state, task
             )
 
@@ -611,7 +611,7 @@ def usage_records(
     and requires special processing.
     """
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -645,7 +645,7 @@ def usage_records(
                 fetch_page=fetch_page_fns,
             )
         else:
-            _reconcile_connector_state(
+            await _reconcile_connector_state(
                 all_account_ids, binding, state, initial_state, task
             )
 
@@ -708,7 +708,7 @@ def no_events_object(
     It works very similar to the base object, but without the use of the Events APi.
     """
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -740,7 +740,7 @@ def no_events_object(
                 fetch_page=fetch_page_fns,
             )
         else:
-            _reconcile_connector_state(
+            await _reconcile_connector_state(
                 all_account_ids, binding, state, initial_state, task
             )
 

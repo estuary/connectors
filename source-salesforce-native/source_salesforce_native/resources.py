@@ -74,7 +74,7 @@ def full_refresh_resource(
     enable: bool,
 ) -> common.Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[SalesforceResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
@@ -89,7 +89,7 @@ def full_refresh_resource(
         model_cls = create_salesforce_model(name, fields)
 
         task.sourced_schema(binding_index, model_cls.sourced_schema())
-        task.checkpoint(state=ConnectorState())
+        await task.checkpoint(state=ConnectorState())
 
         common.open_binding(
             binding,
@@ -137,7 +137,7 @@ def incremental_resource(
     enable: bool,
 ) -> common.Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[SalesforceResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
@@ -152,7 +152,7 @@ def incremental_resource(
         model_cls = create_salesforce_model(name, fields)
 
         task.sourced_schema(binding_index, model_cls.sourced_schema())
-        task.checkpoint(state=ConnectorState())
+        await task.checkpoint(state=ConnectorState())
 
         common.open_binding(
             binding,

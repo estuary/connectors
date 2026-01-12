@@ -338,7 +338,7 @@ def issues(
         log: Logger, http: HTTPMixin, config: EndpointConfig, timezone: ZoneInfo
 ) -> common.Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -355,7 +355,7 @@ def issues(
             }
             state.inc = migrated_inc_state
 
-            task.checkpoint(
+            await task.checkpoint(
                 ConnectorState(
                     bindingStateV1={binding.stateKey: state}
                 ),
@@ -421,7 +421,7 @@ def issue_child_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig, timezone: ZoneInfo
 ) -> list[common.Resource]:
 
-    def open(
+    async def open(
         stream: type[IssueChildStream],
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -439,7 +439,7 @@ def issue_child_resources(
             }
             state.inc = migrated_inc_state
 
-            task.checkpoint(
+            await task.checkpoint(
                 ConnectorState(
                     bindingStateV1={binding.stateKey: state}
                 ),

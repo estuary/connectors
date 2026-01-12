@@ -24,6 +24,7 @@ from ..http import HTTPMixin, TokenSource
 from ..logger import FlowLogger
 from ..utils import format_error_message, sort_dict
 from . import Request, Response, Task, request, response
+from ._emit import emit_bytes
 from .common import _ConnectorState
 
 
@@ -81,20 +82,20 @@ class BaseCaptureConnector(
         if spec := request.spec:
             response = await self.spec(log, spec)
             response.protocol = 3032023
-            self._emit(Response(spec=response))
+            await self._emit(Response(spec=response))
 
         elif discover := request.discover:
-            self._emit(Response(discovered=await self.discover(log, discover)))
+            await self._emit(Response(discovered=await self.discover(log, discover)))
 
         elif validate := request.validate_:
-            self._emit(Response(validated=await self.validate(log, validate)))
+            await self._emit(Response(validated=await self.validate(log, validate)))
 
         elif apply := request.apply:
-            self._emit(Response(applied=await self.apply(log, apply)))
+            await self._emit(Response(applied=await self.apply(log, apply)))
 
         elif open := request.open:
             opened, capture = await self.open(log, open)
-            self._emit(Response(opened=opened))
+            await self._emit(Response(opened=opened))
 
             stopping = Task.Stopping(asyncio.Event())
 
@@ -140,23 +141,20 @@ class BaseCaptureConnector(
         else:
             raise RuntimeError("malformed request", request)
 
-    def _emit(
+    async def _emit(
         self, response: Response[EndpointConfig, ResourceConfig, GeneralConnectorState]
     ):
-        self.output.write(
-            response.model_dump_json(by_alias=True, exclude_unset=True).encode()
-        )
-        self.output.write(b"\n")
-        self.output.flush()
+        data = response.model_dump_json(by_alias=True, exclude_unset=True).encode()
+        await emit_bytes(data + b"\n", self.output)
 
-    def _checkpoint(self, state: GeneralConnectorState, merge_patch: bool = True):
+    async def _checkpoint(self, state: GeneralConnectorState, merge_patch: bool = True):
         r = Response[Any, Any, GeneralConnectorState](
             checkpoint=response.Checkpoint(
                 state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
             )
         )
 
-        self._emit(r)
+        await self._emit(r)
 
     async def _encrypt_config(
         self,

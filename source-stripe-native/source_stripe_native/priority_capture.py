@@ -564,7 +564,7 @@ async def _binding_incremental_task_with_work_item(
                     "incremental task triggered backfill", {"subtask_id": work_item.account_id}
                 )
                 task.stopping.event.set()
-                task.checkpoint(
+                await task.checkpoint(
                     ConnectorState(backfillRequests={binding.stateKey: True})
                 )
                 return
@@ -593,7 +593,7 @@ async def _binding_incremental_task_with_work_item(
                     )
 
                 state.cursor = item
-                task.checkpoint(connector_state)
+                await task.checkpoint(connector_state)
                 checkpoints += 1
                 pending = False
 
@@ -684,13 +684,13 @@ async def _binding_backfill_task_with_work_item(
                 )
             else:
                 state.next_page = item
-                task.checkpoint(connector_state)
+                await task.checkpoint(connector_state)
                 done = False
 
         if done:
             break
 
-    task.checkpoint(
+    await task.checkpoint(
         ConnectorState(
             bindingStateV1={
                 binding.stateKey: ResourceState(backfill={work_item.account_id: None})

@@ -451,6 +451,8 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     name: str
     key: list[str]
     model: type[_BaseDocument] | FixedSchema
+    # The open callback can be async or sync.
+    # Async is required when the callback needs to call task.checkpoint().
     open: Callable[
         [
             CaptureBinding[_BaseResourceConfig],
@@ -464,7 +466,7 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
                 ]
             ],
         ],
-        None,
+        None | Awaitable[None],
     ]
     initial_state: _BaseResourceState
     initial_config: _BaseResourceConfig
@@ -593,7 +595,7 @@ def open(
                     {"stateKey": stateKey},
                 )
                 backfill_requests.append(stateKey)
-                task.checkpoint(
+                await task.checkpoint(
                     ConnectorState(
                         bindingStateV1={stateKey: None},
                         backfillRequests={stateKey: None},
@@ -614,7 +616,7 @@ def open(
             if state:
                 if state.last_initialized is None:
                     state.last_initialized = NOW
-                    task.checkpoint(
+                    await task.checkpoint(
                         ConnectorState(bindingStateV1={binding.stateKey: state})
                     )
 
@@ -665,19 +667,22 @@ def open(
                 state.last_initialized = NOW
 
                 # Checkpoint the binding's initialized state prior to any processing.
-                task.checkpoint(
+                await task.checkpoint(
                     ConnectorState(
                         bindingStateV1={binding.stateKey: state},
                     )
                 )
 
-            resource.open(
+            result = resource.open(
                 binding,
                 index,
                 state,
                 task,
                 resolved_bindings,
             )
+            # Support both sync and async open callbacks
+            if inspect.iscoroutine(result):
+                await result
 
 
         if soonest_future_scheduled_initialization:
@@ -910,7 +915,7 @@ async def _binding_snapshot_task(
             # Suppress all captured documents, as they're unchanged.
             task.reset()
 
-        task.checkpoint(connector_state)
+        await task.checkpoint(connector_state)
 
 
 async def _binding_backfill_task(
@@ -1004,14 +1009,14 @@ async def _binding_backfill_task(
                     state.next_page = item
                     state_to_checkpoint = connector_state
 
-                task.checkpoint(state_to_checkpoint)
+                await task.checkpoint(state_to_checkpoint)
                 done = False
 
         if done:
             break
 
     if subtask_id is not None:
-        task.checkpoint(
+        await task.checkpoint(
             ConnectorState(
                 bindingStateV1={
                     binding.stateKey: ResourceState(backfill={subtask_id: None})
@@ -1019,7 +1024,7 @@ async def _binding_backfill_task(
             )
         )
     else:
-        task.checkpoint(
+        await task.checkpoint(
             ConnectorState(
                 bindingStateV1={binding.stateKey: ResourceState(backfill=None)}
             )
@@ -1108,7 +1113,7 @@ async def _binding_incremental_task(
                     "incremental task triggered backfill", {"subtask_id": subtask_id}
                 )
                 task.stopping.event.set()
-                task.checkpoint(
+                await task.checkpoint(
                     ConnectorState(backfillRequests={binding.stateKey: True})
                 )
                 return
@@ -1137,7 +1142,7 @@ async def _binding_incremental_task(
                     )
 
                 state.cursor = item
-                task.checkpoint(connector_state)
+                await task.checkpoint(connector_state)
                 checkpoints += 1
                 pending = False
 
