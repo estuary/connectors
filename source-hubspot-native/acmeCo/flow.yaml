@@ -49,6 +49,10 @@ collections:
     schema: marketing_emails.schema.yaml
     key:
     - /id
+  acmeCo/orders:
+    schema: orders.schema.yaml
+    key:
+    - /id
   acmeCo/owners:
     schema: owners.schema.yaml
     key:

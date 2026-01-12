@@ -51,6 +51,7 @@ optional_scopes = [
     "crm.objects.custom.read",
     "crm.objects.feedback_submissions.read",
     "crm.objects.goals.read",
+    "crm.objects.orders.read",
     "crm.schemas.custom.read",
 ]
 
@@ -744,3 +745,17 @@ class ContactListMembership(BaseDocument, extra="allow"):
     listId: int
     recordId: str
     membershipTimestamp: AwareDatetime
+
+
+class Order(BaseCRMObject):
+    ASSOCIATED_ENTITIES = [
+        Names.contacts,
+        Names.companies,
+        Names.deals,
+        Names.line_items,
+    ]
+
+    contacts: list[int] = []
+    companies: list[int] = []
+    deals: list[int] = []
+    line_items: list[int] = []
