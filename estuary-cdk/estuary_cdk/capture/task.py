@@ -7,12 +7,12 @@ import orjson
 import base64
 from logging import Logger
 import asyncio
-import shutil
 import tempfile
 import traceback
 import xxhash
 
 from . import request, response
+from ._emit import emit_from_buffer
 from ..flow import (
     ConnectorSpec,
     ConnectorState,
@@ -159,10 +159,9 @@ class Task:
         self._buffer.write(b)
         self._buffer.write(b"\n")
 
-    def checkpoint(self, state: ConnectorState, merge_patch: bool = True):
-        """Emit previously-queued, captured documents follows by a checkpoint"""
-
-        self._emit(
+    async def checkpoint(self, state: ConnectorState, merge_patch: bool = True):
+        """Emit previously-queued, captured documents followed by a checkpoint."""
+        await self._emit(
             Response[Any, Any, ConnectorState](
                 checkpoint=response.Checkpoint(
                     state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
@@ -212,12 +211,11 @@ class Task:
         task.set_name(child_name)
         return task
 
-    def _emit(self, response: Response[EndpointConfig, ResourceConfig, ConnectorState]):
+    async def _emit(self, response: Response[EndpointConfig, ResourceConfig, ConnectorState]):
         self._buffer.write(
             response.model_dump_json(by_alias=True, exclude_unset=True).encode()
         )
         self._buffer.write(b"\n")
         self._buffer.seek(0)
-        shutil.copyfileobj(self._buffer, self._output)
-        self._output.flush()
+        await emit_from_buffer(self._buffer, self._output)
         self.reset()

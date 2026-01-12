@@ -375,7 +375,7 @@ class CaptureShim(BaseCaptureConnector):
                     binding_index=binding_idx,
                     schema=schema,
                 )
-                task.checkpoint(state=ConnectorState())
+                await task.checkpoint(state=ConnectorState())
 
         airbyte_catalog = ConfiguredAirbyteCatalog(streams=airbyte_streams)
 
@@ -462,7 +462,7 @@ class CaptureShim(BaseCaptureConnector):
 
                 entry[1].state = state_msg.dict()
 
-                task.checkpoint(connector_state, merge_patch=False)
+                await task.checkpoint(connector_state, merge_patch=False)
 
             elif trace := message.trace:
                 if error := trace.error:
@@ -517,5 +517,5 @@ class CaptureShim(BaseCaptureConnector):
 
         # Emit a final checkpoint before exiting.
         task.log.info("Emitting final checkpoint for sweep.")
-        task.checkpoint(connector_state, merge_patch=False)
+        await task.checkpoint(connector_state, merge_patch=False)
         return None

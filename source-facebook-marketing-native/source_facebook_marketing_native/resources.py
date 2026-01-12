@@ -143,7 +143,7 @@ def _create_initial_state(account_ids: str | list[str]) -> ResourceState:
     )
 
 
-def _reconcile_connector_state(
+async def _reconcile_connector_state(
     account_ids: list[str],
     binding: CaptureBinding[ResourceConfig],
     state: ResourceState,
@@ -176,7 +176,7 @@ def _reconcile_connector_state(
             task.log.info(
                 f"Checkpointing state to ensure any new state is persisted for {binding.stateKey}."
             )
-            task.checkpoint(
+            await task.checkpoint(
                 ConnectorState(
                     bindingStateV1={binding.stateKey: state},
                 )
@@ -280,7 +280,7 @@ def full_refresh_resource(
     snapshot_fn: FullRefreshFetchFn,
     use_sourced_schemas: bool = False,
 ) -> Resource:
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -291,7 +291,7 @@ def full_refresh_resource(
     ):
         if use_sourced_schemas and hasattr(model, 'sourced_schema'):
             task.sourced_schema(binding_index, model.sourced_schema())
-            task.checkpoint(state=ConnectorState())
+            await task.checkpoint(state=ConnectorState())
 
         open_binding(
             binding,
@@ -366,7 +366,7 @@ def incremental_resource(
     create_fetch_page_fn: Callable[[str], Callable],
     create_fetch_changes_fn: Callable[[str], Callable],
 ) -> Resource:
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
@@ -375,7 +375,7 @@ def incremental_resource(
     ):
         assert len(accounts) > 0, "At least one account ID is required"
 
-        _reconcile_connector_state(accounts, binding, state, initial_state, task)
+        await _reconcile_connector_state(accounts, binding, state, initial_state, task)
 
         fetch_page_fns = {}
         fetch_changes_fns = {}

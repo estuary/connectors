@@ -76,7 +76,7 @@ def _create_initial_state(app_ids: list[str]) -> ResourceState:
     return initial_state
 
 
-def _reconcile_connector_state(
+async def _reconcile_connector_state(
     app_ids: list[str],
     binding: CaptureBinding[ResourceConfig],
     state: ResourceState,
@@ -109,7 +109,7 @@ def _reconcile_connector_state(
             task.log.info(
                 f"Checkpointing state to ensure any new state is persisted for {binding.stateKey}."
             )
-            task.checkpoint(
+            await task.checkpoint(
                 ConnectorState(
                     bindingStateV1={binding.stateKey: state},
                 )
@@ -130,7 +130,7 @@ async def analytics_resources(
 
     initial_state = _create_initial_state(app_ids)
 
-    def open(
+    async def open(
         model: type[AppleAnalyticsRow],
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -155,7 +155,7 @@ async def analytics_resources(
                 model,
             )
 
-        _reconcile_connector_state(app_ids, binding, state, initial_state, task)
+        await _reconcile_connector_state(app_ids, binding, state, initial_state, task)
 
         open_binding(
             binding,
@@ -194,7 +194,7 @@ async def api_resources(
 
     initial_state = _create_initial_state(app_ids)
 
-    def open(
+    async def open(
         app_ids: list[str],
         fetch_changes_fn: ApiFetchChangesFn,
         fetch_page_fn: ApiFetchPageFn,
@@ -219,7 +219,7 @@ async def api_resources(
                 app_id,
             )
 
-        _reconcile_connector_state(app_ids, binding, state, initial_state, task)
+        await _reconcile_connector_state(app_ids, binding, state, initial_state, task)
 
         open_binding(
             binding,
