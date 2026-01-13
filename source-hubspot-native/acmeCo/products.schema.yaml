@@ -1,4 +1,3 @@
----
 $defs:
   History:
     additionalProperties: true
@@ -15,42 +14,42 @@ $defs:
         type: string
       sourceId:
         anyOf:
-          - type: string
-          - type: "null"
-        default: ~
+        - type: string
+        - type: 'null'
+        default: null
         title: Sourceid
       sourceLabel:
         anyOf:
-          - type: string
-          - type: "null"
-        default: ~
+        - type: string
+        - type: 'null'
+        default: null
         title: Sourcelabel
       updatedByUserId:
         anyOf:
-          - type: integer
-          - type: "null"
-        default: ~
+        - type: integer
+        - type: 'null'
+        default: null
         title: Updatedbyuserid
     required:
-      - timestamp
-      - value
-      - sourceType
+    - timestamp
+    - value
+    - sourceType
     title: History
     type: object
   Meta:
     properties:
       op:
         default: u
-        description: "Operation type (c: Create, u: Update, d: Delete)"
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
         enum:
-          - c
-          - u
-          - d
+        - c
+        - u
+        - d
         title: Op
         type: string
       row_id:
         default: -1
-        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        description: Row ID of the Document, counting up from zero, or -1 if not known
         title: Row Id
         type: integer
     title: Meta
@@ -58,7 +57,7 @@ $defs:
 additionalProperties: true
 properties:
   _meta:
-    $ref: "#/$defs/Meta"
+    $ref: '#/$defs/Meta'
     description: Document metadata
   id:
     title: Id
@@ -78,18 +77,25 @@ properties:
     type: object
     additionalProperties:
       anyOf:
-        - type: string
-        - type: "null"
+      - type: string
+      - type: 'null'
+    reduce:
+      strategy: merge
     title: Properties
   propertiesWithHistory:
     anyOf:
-      - additionalProperties:
-          items:
-            $ref: "#/$defs/History"
-          type: array
-        type: object
-      - type: "null"
-    default: ~
+    - additionalProperties:
+        items:
+          $ref: '#/$defs/History'
+        type: array
+      type: object
+    - type: 'null'
+    default: null
+    if:
+      type: object
+    then:
+      reduce:
+        strategy: merge
     title: Propertieswithhistory
   associations:
     additionalProperties: false
@@ -97,11 +103,13 @@ properties:
     title: Associations
     type: object
 required:
-  - id
-  - createdAt
-  - updatedAt
-  - archived
-  - properties
+- id
+- createdAt
+- updatedAt
+- archived
+- properties
 title: Product
 type: object
 x-infer-schema: true
+reduce:
+  strategy: merge
