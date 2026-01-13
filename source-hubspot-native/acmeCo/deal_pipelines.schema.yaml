@@ -1,19 +1,18 @@
----
 $defs:
   Meta:
     properties:
       op:
         default: u
-        description: "Operation type (c: Create, u: Update, d: Delete)"
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
         enum:
-          - c
-          - u
-          - d
+        - c
+        - u
+        - d
         title: Op
         type: string
       row_id:
         default: -1
-        description: "Row ID of the Document, counting up from zero, or -1 if not known"
+        description: Row ID of the Document, counting up from zero, or -1 if not known
         title: Row Id
         type: integer
     title: Meta
@@ -21,23 +20,23 @@ $defs:
 additionalProperties: true
 properties:
   _meta:
-    $ref: "#/$defs/Meta"
+    $ref: '#/$defs/Meta'
     description: Document metadata
   createdAt:
     anyOf:
-      - format: date-time
-        type: string
-      - type: "null"
+    - format: date-time
+      type: string
+    - type: 'null'
     title: Createdat
   updatedAt:
     anyOf:
-      - format: date-time
-        type: string
-      - type: "null"
+    - format: date-time
+      type: string
+    - type: 'null'
     title: Updatedat
 required:
-  - createdAt
-  - updatedAt
+- createdAt
+- updatedAt
 title: DealPipeline
 type: object
 x-infer-schema: true

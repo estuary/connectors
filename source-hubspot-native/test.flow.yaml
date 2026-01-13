@@ -1,72 +1,78 @@
----
 import:
-  - acmeCo/flow.yaml
+- acmeCo/flow.yaml
 captures:
   acmeCo/source-hubspot:
     endpoint:
       local:
         command:
-          - python
-          - "-m"
-          - source_hubspot_native
+        - python
+        - -m
+        - source_hubspot_native
         config: config.yaml
     bindings:
-      - resource:
-          name: companies
-        target: acmeCo/companies
-      - resource:
-          name: contacts
-        target: acmeCo/contacts
-      - resource:
-          name: deals
-        target: acmeCo/deals
-      - resource:
-          name: engagements
-        target: acmeCo/engagements
-      - resource:
-          name: tickets
-        target: acmeCo/tickets
-      - resource:
-          name: products
-        target: acmeCo/products
-      - resource:
-          name: line_items
-        target: acmeCo/line_items
-      - resource:
-          name: properties
-          interval: P1D
-        target: acmeCo/properties
-        disable: true
-      - resource:
-          name: deal_pipelines
-          interval: PT5M
-        target: acmeCo/deal_pipelines
-      - resource:
-          name: owners
-          interval: PT5M
-        target: acmeCo/owners
-      - resource:
-          name: email_events
-        target: acmeCo/email_events
-      - resource:
-          name: forms
-          interval: PT5M
-        target: acmeCo/forms
-      - resource:
-          name: form_submissions
-          interval: PT5M
-        target: acmeCo/form_submissions
-      - resource:
-          name: marketing_emails
-        target: acmeCo/marketing_emails
-      - resource:
-          name: contact_lists
-          interval: PT3H
-        target: acmeCo/contact_lists
-      - resource:
-          name: contact_list_memberships
-          interval: PT3H
-        target: acmeCo/contact_list_memberships
+    - resource:
+        name: companies
+        schedule: 55 23 * * *
+      target: acmeCo/companies
+    - resource:
+        name: contacts
+        schedule: 55 23 * * *
+      target: acmeCo/contacts
+    - resource:
+        name: deals
+        schedule: 55 23 * * *
+      target: acmeCo/deals
+    - resource:
+        name: engagements
+        schedule: 55 23 * * *
+      target: acmeCo/engagements
+    - resource:
+        name: tickets
+        schedule: 55 23 * * *
+      target: acmeCo/tickets
+    - resource:
+        name: products
+        schedule: 55 23 * * *
+      target: acmeCo/products
+    - resource:
+        name: line_items
+        schedule: 55 23 * * *
+      target: acmeCo/line_items
+    - resource:
+        name: properties
+        interval: P1D
+      target: acmeCo/properties
+      disable: true
+    - resource:
+        name: deal_pipelines
+        interval: PT5M
+      target: acmeCo/deal_pipelines
+    - resource:
+        name: owners
+        interval: PT5M
+      target: acmeCo/owners
+    - resource:
+        name: email_events
+      target: acmeCo/email_events
+    - resource:
+        name: forms
+        interval: PT5M
+      target: acmeCo/forms
+    - resource:
+        name: form_submissions
+        interval: PT5M
+      target: acmeCo/form_submissions
+    - resource:
+        name: marketing_emails
+      target: acmeCo/marketing_emails
+    - resource:
+        name: contact_lists
+        interval: PT3H
+      target: acmeCo/contact_lists
+    - resource:
+        name: contact_list_memberships
+        interval: PT3H
+      target: acmeCo/contact_list_memberships
     interval: 3m
     shards:
       logLevel: debug

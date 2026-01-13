@@ -1,68 +1,67 @@
----
 collections:
   acmeCo/companies:
     schema: companies.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/contact_list_memberships:
     schema: contact_list_memberships.schema.yaml
     key:
-      - /listId
-      - /recordId
+    - /listId
+    - /recordId
   acmeCo/contact_lists:
     schema: contact_lists.schema.yaml
     key:
-      - /listId
+    - /listId
   acmeCo/contacts:
     schema: contacts.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/deal_pipelines:
     schema: deal_pipelines.schema.yaml
     key:
-      - /_meta/row_id
+    - /_meta/row_id
   acmeCo/deals:
     schema: deals.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/email_events:
     schema: email_events.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/engagements:
     schema: engagements.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/form_submissions:
     schema: form_submissions.schema.yaml
     key:
-      - /formId
-      - /submittedAt
+    - /formId
+    - /submittedAt
   acmeCo/forms:
     schema: forms.schema.yaml
     key:
-      - /_meta/row_id
+    - /_meta/row_id
   acmeCo/line_items:
     schema: line_items.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/marketing_emails:
     schema: marketing_emails.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/owners:
     schema: owners.schema.yaml
     key:
-      - /_meta/row_id
+    - /_meta/row_id
   acmeCo/products:
     schema: products.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/properties:
     schema: properties.schema.yaml
     key:
-      - /_meta/row_id
+    - /_meta/row_id
   acmeCo/tickets:
     schema: tickets.schema.yaml
     key:
-      - /id
+    - /id
