@@ -240,7 +240,7 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
     bulk_job_manager = gql.bulk_job_manager.BulkJobManager(client, log)
 
     try:
-        await bulk_job_manager._get_currently_running_job()
+        await bulk_job_manager._get_running_jobs()
     except HTTPError as err:
         msg = "Unknown error occurred."
         if err.code == 401:

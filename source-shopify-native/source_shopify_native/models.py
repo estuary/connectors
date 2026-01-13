@@ -124,8 +124,10 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
-T = TypeVar('T')
-TShopifyGraphQLResource = TypeVar('TShopifyGraphQLResource', bound='ShopifyGraphQLResource')
+T = TypeVar("T")
+TShopifyGraphQLResource = TypeVar(
+    "TShopifyGraphQLResource", bound="ShopifyGraphQLResource"
+)
 
 
 class GraphQLErrorCode(StrEnum):
@@ -235,14 +237,22 @@ class BulkSpecificData(BaseModel, extra="forbid"):
     node: BulkOperationDetails
 
 
+class BulkOperationEdge(BaseModel, extra="forbid"):
+    node: BulkOperationDetails
+
+
+class BulkOperationsConnection(BaseModel, extra="forbid"):
+    edges: list[BulkOperationEdge]
+
+
+class BulkOperationsData(BaseModel, extra="forbid"):
+    """Response model for the bulkOperations query (API 2026-01+)."""
+
+    bulkOperations: BulkOperationsConnection
+
+
 class BulkSubmitData(BaseModel, extra="forbid"):
     bulkOperationRunQuery: BulkOperationRunQuery
-
-
-BulkJobCancelResponse = GraphQLResponse[BulkCancelData]
-BulkCurrentJobResponse = GraphQLResponse[BulkCurrentData]  
-BulkSpecificJobResponse = GraphQLResponse[BulkSpecificData]
-BulkJobSubmitResponse = GraphQLResponse[BulkSubmitData]
 
 
 # Names of Shopify plan types. Some plan types do not have access
