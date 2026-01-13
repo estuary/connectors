@@ -179,6 +179,7 @@ collections:
     schema: my_custom_query.schema.yaml
     key:
     - /customer.id
+    - /segments.date
   acmeCo/shopping_performance_report:
     schema: shopping_performance_report.schema.yaml
     key:

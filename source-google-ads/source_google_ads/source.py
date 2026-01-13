@@ -103,6 +103,18 @@ class SourceGoogleAds(AbstractSource):
                 return True
         return False
 
+    @staticmethod
+    def is_full_refresh_query(
+        google_api: GoogleAds, query: GAQL, single_query_config: Mapping[str, Any]
+    ) -> bool:
+        primary_keys = [
+            k.strip() for k in single_query_config.get("primary_key", "").split(",")
+        ]
+        return (
+            google_api.is_full_refresh_resource(query.resource_name)
+            or "segments.date" not in primary_keys
+        )
+
     def check_connection(
         self, logger: logging.Logger, config: Mapping[str, Any]
     ) -> Tuple[bool, any]:
@@ -115,8 +127,8 @@ class SourceGoogleAds(AbstractSource):
             customers = Customer.from_accounts(accounts)
             # Check custom query request validity by sending metric request with non-existant time window
             for customer in customers:
-                for query in config.get("custom_queries", []):
-                    query = query["query"]
+                for single_query_config in config.get("custom_queries", []):
+                    query = single_query_config["query"]
                     if customer.is_manager_account and self.is_metrics_in_custom_query(
                         query
                     ):
@@ -124,7 +136,12 @@ class SourceGoogleAds(AbstractSource):
                             f"Metrics are not available for manager account {customer.id}. "
                             f"Please remove metrics fields in your custom query: {query}."
                         )
-                    if not google_api.is_full_refresh_resource(query.resource_name):
+
+                    is_full_refresh = self.is_full_refresh_query(
+                        google_api, query, single_query_config
+                    )
+
+                    if not is_full_refresh:
                         query = IncrementalCustomQuery.insert_segments_date_expr(
                             query, "1980-01-01", "1980-01-01"
                         )
@@ -194,9 +211,12 @@ class SourceGoogleAds(AbstractSource):
             )
         for single_query_config in config.get("custom_queries", []):
             query = single_query_config["query"]
+            is_full_refresh = self.is_full_refresh_query(
+                google_api, query, single_query_config
+            )
             if self.is_metrics_in_custom_query(query):
                 if non_manager_accounts:
-                    if google_api.is_full_refresh_resource(query.resource_name):
+                    if is_full_refresh:
                         streams.append(
                             CustomQuery(
                                 config=single_query_config,
@@ -212,7 +232,7 @@ class SourceGoogleAds(AbstractSource):
                             )
                         )
                 continue
-            if google_api.is_full_refresh_resource(query.resource_name):
+            if is_full_refresh:
                 streams.append(
                     CustomQuery(
                         config=single_query_config, api=google_api, customers=customers
