@@ -21,7 +21,7 @@ def test_config():
         "custom_queries": [
             {
                 "query": "SELECT campaign.accessible_bidding_strategy, segments.ad_destination_type, campaign.start_date, campaign.end_date FROM campaign",
-                "primary_key": None,
+                "primary_key": "customer.id",
                 "cursor_field": "campaign.start_date",
                 "table_name": "happytable",
             },

@@ -8,19 +8,14 @@ customer_id: "6458773721"
 start_date: "2022-01-01"
 custom_queries:
     - query: SELECT segments.ad_destination_type, segments.ad_network_type, segments.day_of_week, customer.auto_tagging_enabled, customer.id, metrics.conversions, campaign.start_date FROM campaign
-      primary_key: customer.id
+      primary_key: customer.id, segments.date
       table_name: my_custom_query
 sops:
-    kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2024-02-01T15:11:34Z"
           enc: CiQAdmEdwpewZLDvu80ySB31XOaRpBuQ5twOS4zpydRmn3imRsQSSQCVvC1zm2KgUypWm0F//eD1yeScHf7y/TMYBC5tqXHiK6Qy4eb7deyHVe5dO5rYenWveJzy7enCAhxAxk9N7RHXUjK89lsgn6E=
-    azure_kv: []
-    hc_vault: []
-    age: []
-    lastmodified: "2025-06-11T20:26:18Z"
-    mac: ENC[AES256_GCM,data:ib9b0KKu+2DAQNWCkMo9PbKvy7Rb96nQptk/TvGNAK9RzXuC77zZoAaZtmz9w68M33f128e+6o8XQYXo5K3uA69YUPhU2LpdncQprKjklZIpuKVt5DoUPAoFRAFXqrXu/g53OqCnqOYce3BPAmpDQ55DViRzcH9Vds7/qzvVxqM=,iv:8qMqKbPhk2tmnwlrubW32WAb5eLmHWKjENcnfA7XtlI=,tag:yEVCxLdJ8Ar304phxFsyoA==,type:str]
-    pgp: []
+    lastmodified: "2026-01-14T13:58:33Z"
+    mac: ENC[AES256_GCM,data:GiT6SFgCK/IW110/M/AUcDW5VQLW6Q09EaBbsDby5Jj4NHPMt7YdWxl/0MpqwVkS7BZxPUIO/y2GUcV/TmqIY7rFqa4Ej8FPyo+l/pn3PaRJULY3hgkrHOYjlPr63dR32uc/s51NcNY5W2JTSkihXpx22xBWrmIu9a5K+Nbh6cs=,iv:CHXNv1niaix6YYdNfFMP3VGFV+0uOKMeAsQlifOQ3ao=,tag:u6vD+lxBiXH7D4kk8/IKSQ==,type:str]
     encrypted_suffix: _sops
-    version: 3.9.0
+    version: 3.10.2

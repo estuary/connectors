@@ -5521,7 +5521,8 @@
       "x-infer-schema": true
     },
     "key": [
-      "/customer.id"
+      "/customer.id",
+      "/segments.date"
     ]
   }
 ]

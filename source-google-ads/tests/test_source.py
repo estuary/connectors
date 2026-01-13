@@ -239,6 +239,26 @@ def test_metrics_in_custom_query(query, is_metrics_in_query):
 
 
 @pytest.mark.parametrize(
+    ("is_full_refresh_resource_return", "primary_key", "expected"),
+    (
+        (True, "segments.date", True),
+        (True, "customer.id", True),
+        (False, "segments.date", False),
+        (False, "customer.id", True),
+        (False, "customer.id, segments.date", False),  # segments.date in multi-key
+        (False, "", True),  # empty primary key
+    ),
+)
+def test_is_full_refresh_query(is_full_refresh_resource_return, primary_key, expected):
+    source = SourceGoogleAds()
+    google_api = Mock()
+    google_api.is_full_refresh_resource.return_value = is_full_refresh_resource_return
+    query = GAQL.parse("SELECT campaign.id FROM campaign")
+    single_query_config = {"primary_key": primary_key}
+    assert source.is_full_refresh_query(google_api, query, single_query_config) is expected
+
+
+@pytest.mark.parametrize(
     ("latest_record", "current_state", "expected_state"),
     (
         ({"segments.date": "2020-01-01"}, {}, {"segments.date": "2020-01-01"}),
@@ -502,7 +522,7 @@ def test_check_connection_should_pass_when_config_valid(mocker):
             "custom_queries": [
                 {
                     "query": "SELECT campaign.accessible_bidding_strategy, segments.ad_destination_type, campaign.start_date, campaign.end_date FROM campaign",
-                    "primary_key": None,
+                    "primary_key": "customer.id",
                     "cursor_field": "campaign.start_date",
                     "table_name": "happytable",
                 },
@@ -545,7 +565,7 @@ def test_check_connection_should_fail_when_api_call_fails(mocker):
             "custom_queries": [
                 {
                     "query": "SELECT campaign.accessible_bidding_strategy, segments.ad_destination_type, campaign.start_date, campaign.end_date FROM campaign",
-                    "primary_key": None,
+                    "primary_key": "customer.id",
                     "cursor_field": "campaign.start_date",
                     "table_name": "happytable",
                 },
