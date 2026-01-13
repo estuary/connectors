@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, UTC
+from datetime import timedelta
 import functools
 from logging import Logger
 
@@ -11,14 +11,16 @@ from .models import (
     EndpointConfig,
     ResourceConfig,
     ResourceState,
-    tables_from_model_dot_json
+    format_cursor,
+    tables_from_model_dot_json,
 )
 
 from .adls_gen2_client import ADLSGen2Client
 from .api import fetch_model_dot_json, fetch_changes
 
 
-EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
+# Initial cursor - empty string indicates no data processed yet
+INITIAL_CURSOR = format_cursor(folder_timestamp="")
 
 
 async def validate_credentials(
@@ -72,7 +74,7 @@ def resources(
             model=table,
             open=functools.partial(open, table),
             initial_state=ResourceState(
-                inc=ResourceState.Incremental(cursor=EPOCH),
+                inc=ResourceState.Incremental(cursor=INITIAL_CURSOR),
             ),
             initial_config=ResourceConfig(
                 name=table.name, interval=timedelta(days=1)

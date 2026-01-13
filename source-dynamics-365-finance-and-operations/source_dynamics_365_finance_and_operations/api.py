@@ -16,7 +16,11 @@ from estuary_cdk.http import HTTPError
 from .adls_gen2_client import ADLSGen2Client, ADLSPathMetadata
 from .models import (
     BaseTable,
+    CHECKPOINT_EVERY,
     ModelDotJson,
+    ParsedCursor,
+    format_cursor,
+    parse_cursor,
     tables_from_model_dot_json,
 )
 from .shared import is_datetime_format, str_to_dt
@@ -34,7 +38,7 @@ CACHE_TTL = MINIMUM_AZURE_SYNAPSE_LINK_EXPORT_INTERVAL / 5   # 1 minute
 # with a massive number of changes only have to compete with a few
 # other streams for CPU time and can finish processing the contents
 # of a timestamp folder in a reasonable amount of time.
-FOLDER_PROCESSING_SEMAPHORE = asyncio.Semaphore(5)
+FOLDER_PROCESSING_SEMAPHORE = asyncio.Semaphore(10)
 
 
 # model.json metadata files are not updated after they're written.
@@ -137,11 +141,32 @@ async def get_folder_contents_for_table(
     return metadata
 
 
+def datetime_to_iso(dt: datetime) -> str:
+    """Convert datetime to ISO 8601 string format for cursor."""
+    return dt.strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
+
+
 async def read_csvs_in_folder(
     folder: str,
     table_name: str,
     client: ADLSGen2Client,
-) -> AsyncGenerator[dict, None]:
+    resume_csv_last_modified: str = "",
+    resume_row_offset: int = 0,
+) -> AsyncGenerator[tuple[dict | None, str, int], None]:
+    """
+    Read CSVs in a folder, yielding (row, csv_last_modified, row_index) tuples.
+
+    Args:
+        folder: Folder timestamp string
+        table_name: Name of table to read
+        client: ADLS client
+        resume_csv_last_modified: If resuming, the last_modified of CSV to resume from
+        resume_row_offset: If resuming, number of rows already processed in that CSV
+
+    Yields:
+        Tuple of (transformed_row, csv_last_modified_iso, row_index_in_csv)
+        When a CSV is complete, yields (None, csv_last_modified_iso, total_rows) as a signal
+    """
     folder_contents = await get_folder_contents_for_table(folder, table_name, client)
 
     csvs: list[ADLSPathMetadata] = []
@@ -154,18 +179,46 @@ async def read_csvs_in_folder(
         ):
             csvs.append(metadata)
 
-    if csvs:
-        table_model = await get_table(
-            timestamp=folder,
-            table_name=table_name,
-            client=client,
-        )
+    if not csvs:
+        return
 
-        csvs.sort(key=lambda c: c.last_modified_datetime)
+    table_model = await get_table(
+        timestamp=folder,
+        table_name=table_name,
+        client=client,
+    )
 
-        for csv in csvs:
-            async for row in client.stream_csv(csv.name, table_model.field_names):
-                yield transform_row(row, table_model.boolean_fields)
+    csvs.sort(key=lambda c: c.last_modified_datetime)
+
+    for csv in csvs:
+        csv_last_modified_iso = datetime_to_iso(csv.last_modified_datetime)
+
+        # Skip CSVs we've already fully processed
+        if resume_csv_last_modified:
+            if csv_last_modified_iso < resume_csv_last_modified:
+                continue
+
+            # This is the CSV we're resuming from
+            if csv_last_modified_iso == resume_csv_last_modified:
+                skip_rows = resume_row_offset
+            else:
+                # Past the resume point, start from beginning
+                skip_rows = 0
+                resume_csv_last_modified = ""  # Clear so we don't check again
+        else:
+            skip_rows = 0
+
+        row_index = skip_rows
+        rows_yielded_from_csv = 0
+        async for row in client.stream_csv(csv.name, table_model.field_names, skip=skip_rows):
+            yield (transform_row(row, table_model.boolean_fields), csv_last_modified_iso, row_index)
+            row_index += 1
+            rows_yielded_from_csv += 1
+
+        # Signal that this CSV is complete (row=None signals completion)
+        # Only signal if we actually processed rows from this CSV
+        if rows_yielded_from_csv > 0:
+            yield (None, csv_last_modified_iso, row_index)
 
 
 def transform_row(row: dict[str, str], boolean_fields: frozenset[str]) -> dict[str, str | bool | dict[str, str]]:
@@ -194,27 +247,96 @@ async def fetch_changes(
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[dict | LogCursor, None]:
-    assert isinstance(log_cursor, datetime)
+    """
+    Fetch incremental changes for a table, yielding rows and checkpoints.
+
+    Yields a checkpoint cursor every CHECKPOINT_EVERY rows to keep buffer sizes small.
+    """
+    assert isinstance(log_cursor, tuple) and len(log_cursor) == 1 and isinstance(log_cursor[0], str)
+    parsed = parse_cursor(log_cursor)
 
     finalized_folders = await get_finalized_timestamp_folders(client)
 
+    rows_since_checkpoint = 0
+
     for folder in finalized_folders:
-        if (
-            # Do not read folders we've already read on previous sweeps.
-            str_to_dt(folder) <= log_cursor
-        ):
-            log.debug("Skipping folder", {
+        folder_dt = str_to_dt(folder)
+        folder_iso = datetime_to_iso(folder_dt)
+
+        # Skip folders we've already fully processed
+        if parsed.folder_timestamp and not parsed.is_initial:
+            if folder_iso < parsed.folder_timestamp:
+                log.debug("Skipping already-processed folder", {"folder": folder})
+                continue
+
+            if folder_iso == parsed.folder_timestamp and parsed.is_folder_complete:
+                log.debug("Skipping completed folder", {"folder": folder})
+                continue
+
+        # Determine resume position within this folder
+        if folder_iso == parsed.folder_timestamp and not parsed.is_folder_complete:
+            resume_csv = parsed.csv_last_modified
+            resume_offset = parsed.row_offset
+            log.debug("Resuming mid-folder", {
                 "folder": folder,
-                "log_cursor": log_cursor,
+                "resume_csv": resume_csv,
+                "resume_offset": resume_offset,
             })
-            continue
+        else:
+            resume_csv = ""
+            resume_offset = 0
 
         async with FOLDER_PROCESSING_SEMAPHORE:
             log.debug(f"Reading CSVs in {folder}/{table_name}.")
-            async for row in read_csvs_in_folder(folder, table_name, client):
-                yield row
 
-            log.debug(f"Read all CSVs in folder. Yielding folder name as new cursor.", {
-                "folder": str_to_dt(folder),
-            })
-            yield str_to_dt(folder)
+            # Track last checkpointed position to avoid duplicate cursors
+            last_checkpoint_csv = resume_csv
+            last_checkpoint_row = resume_offset
+
+            async for (row, csv_last_modified, row_index) in read_csvs_in_folder(
+                folder, table_name, client, resume_csv, resume_offset
+            ):
+                # Reset tracking when we move to a new CSV
+                if csv_last_modified != last_checkpoint_csv:
+                    last_checkpoint_csv = csv_last_modified
+                    last_checkpoint_row = 0
+
+                # row=None signals CSV completion
+                if row is None:
+                    # Only checkpoint if we've made progress since last checkpoint
+                    if row_index > last_checkpoint_row:
+                        cursor = format_cursor(folder_iso, csv_last_modified, row_index)
+                        log.debug("CSV complete, yielding checkpoint", {
+                            "folder": folder,
+                            "csv_last_modified": csv_last_modified,
+                            "total_rows": row_index,
+                        })
+                        yield cursor
+                        rows_since_checkpoint = 0
+                        last_checkpoint_row = row_index
+                    continue
+
+                yield row
+                rows_since_checkpoint += 1
+
+                # Checkpoint every N rows
+                if rows_since_checkpoint >= CHECKPOINT_EVERY:
+                    # row_index is 0-based, so row_index + 1 = rows emitted from this CSV
+                    cursor = format_cursor(folder_iso, csv_last_modified, row_index + 1)
+                    log.debug("Yielding mid-CSV checkpoint", {
+                        "folder": folder,
+                        "csv_last_modified": csv_last_modified,
+                        "rows_emitted": row_index + 1,
+                    })
+                    yield cursor
+                    rows_since_checkpoint = 0
+                    last_checkpoint_row = row_index + 1
+
+            # Folder complete - yield cursor marking folder as done
+            cursor = format_cursor(folder_iso, "", 0)
+            log.debug("Folder complete, yielding cursor", {"folder": folder})
+            yield cursor
+            rows_since_checkpoint = 0
+
+            # Update parsed cursor for next folder comparison
+            parsed = parse_cursor(cursor)

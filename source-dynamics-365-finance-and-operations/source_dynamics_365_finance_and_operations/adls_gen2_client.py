@@ -120,9 +120,15 @@ class ADLSGen2Client:
         self,
         path: str,
         field_names: list[str],
+        skip: int = 0,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """
         Stream and parse a CSV file, yielding dict rows.
+
+        Args:
+            path: Path to CSV file
+            field_names: List of column names
+            skip: Number of rows to skip from the beginning (for resume)
 
         Transformations applied:
         - Empty strings converted to None
@@ -131,16 +137,24 @@ class ADLSGen2Client:
 
         self.log.debug(f"Streaming CSV contents from /{path}.", {
             "url": url_without_sas,
+            "skip": skip,
         })
 
         url = self._build_url_with_sas(url_without_sas)
 
         _, body = await self.http.request_stream(self.log, url)
 
+        row_count = 0
         async for row in IncrementalCSVProcessor(body(), fieldnames=field_names):
+            # Skip already-processed rows when resuming
+            if row_count < skip:
+                row_count += 1
+                continue
+
             # Convert empty strings to None
             for key, value in row.items():
                 if value == "":
                     row[key] = None
 
             yield row
+            row_count += 1

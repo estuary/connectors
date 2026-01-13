@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import ClassVar, Literal, Annotated
 
 from estuary_cdk.capture.common import (
@@ -8,6 +9,14 @@ from estuary_cdk.capture.common import (
 from estuary_cdk.incremental_csv_processor import BaseCSVRow
 
 from pydantic import BaseModel, Field, BeforeValidator
+
+
+# Checkpoint every N rows to keep buffer sizes small
+CHECKPOINT_EVERY = 10_000
+
+# Cursor format constants
+CURSOR_SEPARATOR = "|"
+ROW_OFFSET_WIDTH = 10  # Zero-pad to 10 digits (supports up to 9,999,999,999 rows)
 
 
 class AzureSASToken(BaseModel):
@@ -101,3 +110,71 @@ def tables_from_model_dot_json(model_dot_json: ModelDotJson) -> list[type[BaseTa
         )
 
     return tables
+
+
+@dataclass
+class ParsedCursor:
+    """Structured representation of the composite cursor string."""
+    folder_timestamp: str  # ISO 8601 folder timestamp, e.g., "2024-07-15T00:00:00.000Z"
+    csv_last_modified: str  # ISO 8601 CSV last-modified, empty if folder complete
+    row_offset: int  # Number of rows already emitted from current CSV
+
+    @property
+    def is_folder_complete(self) -> bool:
+        """True if the folder has been fully processed."""
+        return self.csv_last_modified == ""
+
+    @property
+    def is_initial(self) -> bool:
+        """True if this is the initial cursor (no data processed yet)."""
+        return self.folder_timestamp == ""
+
+
+def parse_cursor(cursor: tuple[str]) -> ParsedCursor:
+    """
+    Parse a composite cursor string into structured components.
+
+    Args:
+        cursor: Tuple containing single composite string
+
+    Returns:
+        ParsedCursor with extracted components
+    """
+    cursor_str = cursor[0]
+
+    if cursor_str == "":
+        return ParsedCursor(folder_timestamp="", csv_last_modified="", row_offset=0)
+
+    parts = cursor_str.split(CURSOR_SEPARATOR)
+    if len(parts) != 3:
+        raise ValueError(f"Invalid cursor format: {cursor_str}")
+
+    folder_timestamp, csv_last_modified, row_offset_str = parts
+    row_offset = int(row_offset_str) if row_offset_str else 0
+
+    return ParsedCursor(
+        folder_timestamp=folder_timestamp,
+        csv_last_modified=csv_last_modified,
+        row_offset=row_offset,
+    )
+
+
+def format_cursor(folder_timestamp: str, csv_last_modified: str = "", row_offset: int = 0) -> tuple[str]:
+    """
+    Create a composite cursor tuple from components.
+
+    Args:
+        folder_timestamp: ISO 8601 folder timestamp
+        csv_last_modified: ISO 8601 CSV last-modified (empty for folder complete)
+        row_offset: Number of rows emitted from current CSV
+
+    Returns:
+        Single-element tuple containing composite cursor string
+    """
+    # Empty folder_timestamp means initial cursor - use empty string
+    # which sorts before any real timestamp
+    if not folder_timestamp:
+        return ("",)
+
+    row_offset_str = str(row_offset).zfill(ROW_OFFSET_WIDTH) if csv_last_modified else ""
+    return (f"{folder_timestamp}{CURSOR_SEPARATOR}{csv_last_modified}{CURSOR_SEPARATOR}{row_offset_str}",)
