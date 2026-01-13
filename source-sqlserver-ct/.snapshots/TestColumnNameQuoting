@@ -1,0 +1,80 @@
+sql> CREATE TABLE dbo.ColumnNameQuoting_536304 ([id] INTEGER, [data] INTEGER, [CAPITALIZED] INTEGER, [unique] INTEGER, [type] INTEGER, PRIMARY KEY ([id], [data], [CAPITALIZED], [unique], [type]))
+sql> INSERT INTO dbo.ColumnNameQuoting_536304 VALUES (0, 0, 0, 0, 0), (1, 1, 1, 1, 1), (2, 2, 2, 2, 2)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/columnnamequoting_536304
+=== Run: Capture ===
+[
+  "acmeCo/test_capture/dbo/columnnamequoting_536304",
+  {
+    "CAPITALIZED": 0,
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "ColumnNameQuoting_536304"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": 0,
+    "id": 0,
+    "type": 0,
+    "unique": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/columnnamequoting_536304",
+  {
+    "CAPITALIZED": 1,
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "ColumnNameQuoting_536304"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": 1,
+    "id": 1,
+    "type": 1,
+    "unique": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/columnnamequoting_536304",
+  {
+    "CAPITALIZED": 2,
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "ColumnNameQuoting_536304"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": 2,
+    "id": 2,
+    "type": 2,
+    "unique": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FColumnNameQuoting_536304": {
+      "backfilled": 3,
+      "key_columns": [
+        "id",
+        "data",
+        "CAPITALIZED",
+        "unique",
+        "type"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

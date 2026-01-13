@@ -1,0 +1,307 @@
+sql> CREATE TABLE dbo.DroppedAndRecreatedTable_728084 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.DroppedAndRecreatedTable_728084 VALUES (0, 'zero'), (1, 'one'), (2, 'two')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/droppedandrecreatedtable_728084
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "DroppedAndRecreatedTable_728084"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "DroppedAndRecreatedTable_728084"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "DroppedAndRecreatedTable_728084"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDroppedAndRecreatedTable_728084": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.DroppedAndRecreatedTable_728084 VALUES (3, 'three'), (4, 'four'), (5, 'five')
+=== Run: Some Replication ===
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DroppedAndRecreatedTable_728084",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DroppedAndRecreatedTable_728084",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DroppedAndRecreatedTable_728084",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "id": 5
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDroppedAndRecreatedTable_728084": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> DROP TABLE dbo.DroppedAndRecreatedTable_728084
+sql> CREATE TABLE dbo.DroppedAndRecreatedTable_728084 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.DroppedAndRecreatedTable_728084 VALUES (0, 'zero'), (1, 'one'), (2, 'two')
+sql> INSERT INTO dbo.DroppedAndRecreatedTable_728084 VALUES (6, 'six'), (7, 'seven'), (8, 'eight')
+=== Run: After Drop/Recreate ===
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DroppedAndRecreatedTable_728084",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DroppedAndRecreatedTable_728084",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DroppedAndRecreatedTable_728084",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DroppedAndRecreatedTable_728084",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "six",
+    "id": 6
+  }
+]
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DroppedAndRecreatedTable_728084",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "seven",
+    "id": 7
+  }
+]
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DroppedAndRecreatedTable_728084",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "eight",
+    "id": 8
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDroppedAndRecreatedTable_728084": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.DroppedAndRecreatedTable_728084 VALUES (9, 'nine'), (10, 'ten'), (11, 'eleven')
+=== Run: More Replication ===
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DroppedAndRecreatedTable_728084",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "nine",
+    "id": 9
+  }
+]
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DroppedAndRecreatedTable_728084",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "ten",
+    "id": 10
+  }
+]
+[
+  "acmeCo/test_capture/dbo/droppedandrecreatedtable_728084",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DroppedAndRecreatedTable_728084",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "eleven",
+    "id": 11
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDroppedAndRecreatedTable_728084": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

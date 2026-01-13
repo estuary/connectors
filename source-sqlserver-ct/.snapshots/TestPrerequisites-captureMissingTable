@@ -1,0 +1,13 @@
+sql> CREATE TABLE dbo.Prerequisites_captureMissingTable_597017_a (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.Prerequisites_captureMissingTable_597017_b (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.Prerequisites_captureMissingTable_597017_a VALUES (0, 'hello'), (1, 'world')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/prerequisites_capturemissingtable_597017_a
+acmeCo/test_capture/dbo/prerequisites_capturemissingtable_597017_b
+sql> DROP TABLE dbo.Prerequisites_captureMissingTable_597017_b
+=== Run: Capture With Missing Table ===
+error: flowctl preview failed:
+the capture cannot run due to the following error(s):
+ - table "dbo.prerequisites_capturemissingtable_597017_b" does not exist
+
+

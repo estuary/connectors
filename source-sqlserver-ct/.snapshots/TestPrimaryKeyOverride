@@ -1,0 +1,14 @@
+sql> CREATE TABLE dbo.PrimaryKeyOverride_709926 (id INTEGER PRIMARY KEY, name VARCHAR(32), value INTEGER)
+sql> INSERT INTO dbo.PrimaryKeyOverride_709926 VALUES (1, 'charlie', 100), (2, 'alice', 200)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/primarykeyoverride_709926
+=== Run: Backfill ===
+error: flowctl preview failed:
+error initializing pending streams: error activating replication for table "dbo.primarykeyoverride_709926": configured primary key column "name" is not part of the table's actual primary key [id]; Change Tracking only provides actual primary key columns
+
+sql> INSERT INTO dbo.PrimaryKeyOverride_709926 VALUES (3, 'bob', 300), (4, 'dave', 400)
+=== Run: Replication ===
+error: flowctl preview failed:
+error initializing pending streams: error activating replication for table "dbo.primarykeyoverride_709926": configured primary key column "name" is not part of the table's actual primary key [id]; Change Tracking only provides actual primary key columns
+
+

@@ -1,0 +1,120 @@
+sql> CREATE TABLE dbo.DeletedTextColumn_478107 (id INTEGER PRIMARY KEY, v_text TEXT NOT NULL, v_varchar VARCHAR(32), v_int INTEGER)
+sql> INSERT INTO dbo.DeletedTextColumn_478107 VALUES (0, 'zero', 'zero', 100), (1, 'one', 'one', 101)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/deletedtextcolumn_478107
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/dbo/deletedtextcolumn_478107",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "DeletedTextColumn_478107"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 0,
+    "v_int": 100,
+    "v_text": "zero",
+    "v_varchar": "zero"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/deletedtextcolumn_478107",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "DeletedTextColumn_478107"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1,
+    "v_int": 101,
+    "v_text": "one",
+    "v_varchar": "one"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDeletedTextColumn_478107": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.DeletedTextColumn_478107 VALUES (2, 'two', 'two', 102), (3, 'three', 'three', 103)
+sql> DELETE FROM dbo.DeletedTextColumn_478107 WHERE id = 1
+sql> DELETE FROM dbo.DeletedTextColumn_478107 WHERE id = 2
+=== Run: Replication With Deletes ===
+[
+  "acmeCo/test_capture/dbo/deletedtextcolumn_478107",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "schema": "dbo",
+        "table": "DeletedTextColumn_478107",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/deletedtextcolumn_478107",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "schema": "dbo",
+        "table": "DeletedTextColumn_478107",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/deletedtextcolumn_478107",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "DeletedTextColumn_478107",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 3,
+    "v_int": 103,
+    "v_text": "three",
+    "v_varchar": "three"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDeletedTextColumn_478107": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

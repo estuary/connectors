@@ -1,0 +1,310 @@
+package main
+
+import (
+	"context"
+	"database/sql"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net"
+	"net/url"
+	"strings"
+	"time"
+
+	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
+	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	"github.com/estuary/connectors/go/schedule"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
+	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	"github.com/estuary/connectors/sqlcapture"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/invopop/jsonschema"
+	log "github.com/sirupsen/logrus"
+
+	mssqldb "github.com/microsoft/go-mssqldb"
+)
+
+func main() {
+	boilerplate.RunMain(sqlserverDriver)
+}
+
+var sqlserverDriver = &sqlcapture.Driver{
+	ConfigSchema:     configSchema(),
+	DocumentationURL: "https://go.estuary.dev/source-sqlserver",
+	Connect:          connectSQLServer,
+}
+
+const defaultPort = "1433"
+
+var featureFlagDefaults = map[string]bool{
+	// Intentionally empty: all desired behaviors should be the default for a new connector.
+	// Feature flags should only be added when backwards-compatibility requires gating a
+	// behavior change for existing captures.
+}
+
+// Config tells the connector how to connect to and interact with the source database.
+type Config struct {
+	Address     string `json:"address" jsonschema:"title=Server Address,description=The host or host:port at which the database can be reached." jsonschema_extras:"order=0"`
+	User        string `json:"user" jsonschema:"default=flow_capture,description=The database user to authenticate as." jsonschema_extras:"order=1"`
+	Password    string `json:"password" jsonschema:"description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
+	Database    string `json:"database" jsonschema:"description=Logical database name to capture from." jsonschema_extras:"order=3"`
+	Timezone    string `json:"timezone,omitempty" jsonschema:"title=Time Zone,default=UTC,description=The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank." jsonschema_extras:"order=4"`
+	HistoryMode bool   `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=5"`
+
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+
+	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+}
+
+type advancedConfig struct {
+	DiscoverNonEnabled bool   `json:"discover_tables_without_ct,omitempty" jsonschema:"title=Discover Tables Without Change Tracking,description=When set the connector will discover all tables even if they do not have Change Tracking enabled. By default only CT-enabled tables are discovered."`
+	SkipBackfills      string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
+	BackfillChunkSize  int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	PollingInterval    string `json:"polling_interval,omitempty" jsonschema:"title=Change Tracking Polling Interval,default=500ms,description=The interval at which the connector polls for Change Tracking changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
+	SourceTag          string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
+	FeatureFlags       string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+}
+
+type tunnelConfig struct {
+	SSHForwarding *sshForwarding `json:"sshForwarding,omitempty" jsonschema:"title=SSH Forwarding"`
+}
+
+type sshForwarding struct {
+	SSHEndpoint string `json:"sshEndpoint" jsonschema:"title=SSH Endpoint,description=Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])" jsonschema_extras:"pattern=^ssh://.+@.+$"`
+	PrivateKey  string `json:"privateKey" jsonschema:"title=SSH Private Key,description=Private key to connect to the remote SSH server." jsonschema_extras:"secret=true,multiline=true"`
+}
+
+// Validate checks that the configuration possesses all required properties.
+func (c *Config) Validate() error {
+	var requiredProperties = [][]string{
+		{"address", c.Address},
+		{"user", c.User},
+		{"password", c.Password},
+		{"database", c.Database},
+	}
+	for _, req := range requiredProperties {
+		if req[1] == "" {
+			return fmt.Errorf("missing '%s'", req[0])
+		}
+	}
+
+	if c.Timezone != "" {
+		if _, err := schedule.ParseTimezone(c.Timezone); err != nil {
+			return err
+		}
+	}
+
+	if c.Advanced.PollingInterval != "" {
+		if parsedInterval, err := time.ParseDuration(c.Advanced.PollingInterval); err != nil {
+			return fmt.Errorf("invalid 'polling_interval' configuration %q: %w", c.Advanced.PollingInterval, err)
+		} else if parsedInterval < 100*time.Millisecond {
+			return fmt.Errorf("invalid 'polling_interval' configuration %q: must be at least 100ms", c.Advanced.PollingInterval)
+		}
+	}
+
+	if c.Advanced.SkipBackfills != "" {
+		for _, skipStreamID := range strings.Split(c.Advanced.SkipBackfills, ",") {
+			if !strings.Contains(skipStreamID, ".") {
+				return fmt.Errorf("invalid 'skipBackfills' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", skipStreamID)
+			}
+		}
+	}
+	return nil
+}
+
+// SetDefaults fills in the default values for unset optional parameters.
+func (c *Config) SetDefaults() {
+	// Note these are 1:1 with 'omitempty' in Config field tags,
+	// which cause these fields to be emitted as non-required.
+	if c.Advanced.BackfillChunkSize <= 0 {
+		c.Advanced.BackfillChunkSize = 50000
+	}
+	if c.Advanced.PollingInterval == "" {
+		c.Advanced.PollingInterval = "500ms"
+	}
+	if c.Timezone == "" {
+		c.Timezone = "UTC"
+	}
+
+	// The address config property should accept a host or host:port
+	// value, and if the port is unspecified it should be the MS SQL
+	// default of 1433.
+	if !strings.Contains(c.Address, ":") {
+		c.Address += ":" + defaultPort
+	}
+}
+
+// ToURI converts the Config to a DSN string.
+func (c *Config) ToURI() string {
+	// If SSH Tunnel is configured, we are going to create a tunnel from localhost
+	// to the target via the bastion server, so we use the tunnel's address.
+	var address = c.Address
+	if c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+		address = "localhost:" + defaultPort
+	}
+
+	var params = make(url.Values)
+	params.Add("app name", "Estuary Change Tracking Connector")
+	params.Add("encrypt", "true")
+	params.Add("TrustServerCertificate", "true")
+	params.Add("database", c.Database)
+	var connectURL = &url.URL{
+		Scheme:   "sqlserver",
+		User:     url.UserPassword(c.User, c.Password),
+		Host:     address,
+		RawQuery: params.Encode(),
+	}
+	return connectURL.String()
+}
+
+func configSchema() json.RawMessage {
+	var schema = schemagen.GenerateSchema("SQL Server Connection", &Config{})
+	var configSchema, err = schema.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+	return json.RawMessage(configSchema)
+}
+
+func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sqlcapture.Database, error) {
+	var config Config
+	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
+		return nil, fmt.Errorf("error parsing config json: %w", err)
+	}
+	config.SetDefaults()
+
+	// Parse pseudo-flags for cursor overrides. These are internal mechanisms for Estuary support
+	// to use and are not exposed as real config options.
+	var featureFlags = common.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
+	var initialBackfillCursor string
+	var forceResetCursor string
+	for flag, value := range featureFlags {
+		if strings.HasPrefix(flag, "initial_backfill_cursor=") && value {
+			initialBackfillCursor = strings.TrimPrefix(flag, "initial_backfill_cursor=")
+		}
+		if strings.HasPrefix(flag, "force_reset_cursor=") && value {
+			forceResetCursor = strings.TrimPrefix(flag, "force_reset_cursor=")
+		}
+	}
+	if config.Advanced.FeatureFlags != "" {
+		log.WithFields(log.Fields{
+			"initialBackfillCursor": initialBackfillCursor,
+			"forceResetCursor":      forceResetCursor,
+		}).Info("parsed feature flags")
+	}
+
+	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
+	if config.NetworkTunnel != nil && config.NetworkTunnel.SSHForwarding != nil && config.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
+		host, port, err := net.SplitHostPort(config.Address)
+		if err != nil {
+			return nil, fmt.Errorf("splitting address to host and port: %w", err)
+		}
+
+		var sshConfig = &networkTunnel.SshConfig{
+			SshEndpoint: config.NetworkTunnel.SSHForwarding.SSHEndpoint,
+			PrivateKey:  []byte(config.NetworkTunnel.SSHForwarding.PrivateKey),
+			ForwardHost: host,
+			ForwardPort: port,
+			LocalPort:   defaultPort,
+		}
+		var tunnel = sshConfig.CreateTunnel()
+
+		// FIXME/question: do we need to shut down the tunnel manually if it is a child process?
+		// at the moment tunnel.Stop is not being called anywhere, but if the connector shuts down, the child process also shuts down.
+		if err := tunnel.Start(); err != nil {
+			return nil, err
+		}
+	}
+
+	var db = &sqlserverDatabase{
+		config:                &config,
+		initialBackfillCursor: initialBackfillCursor,
+		forceResetCursor:      forceResetCursor,
+	}
+	if err := db.connect(ctx); err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
+type sqlserverDatabase struct {
+	config *Config
+	conn   *sql.DB
+
+	datetimeLocation      *time.Location // The location in which to interpret DATETIME column values as timestamps.
+	initialBackfillCursor string         // When set, this CT version will be used instead of the current version when initializing newly-added tables
+	forceResetCursor      string         // When set, this CT version will override all existing table versions. DO NOT USE unless you know exactly what you're doing.
+
+	tableStatistics      map[sqlcapture.StreamID]*sqlserverTableStatistics // Cached table statistics for backfill progress tracking
+	ctEnabledTablesCache map[sqlcapture.StreamID]bool                      // Cached set of CT-enabled tables
+}
+
+func (db *sqlserverDatabase) HistoryMode() bool {
+	return db.config.HistoryMode
+}
+
+func (db *sqlserverDatabase) connect(ctx context.Context) error {
+	log.WithFields(log.Fields{
+		"address": db.config.Address,
+		"user":    db.config.User,
+	}).Info("connecting to database")
+
+	var conn, err = sql.Open("sqlserver", db.config.ToURI())
+	if err != nil {
+		return fmt.Errorf("unable to connect to database: %w", err)
+	}
+	if err := conn.PingContext(ctx); err != nil {
+		var mssqlErr mssqldb.Error
+		if errors.As(err, &mssqlErr) {
+			switch mssqlErr.Number {
+			case 18456:
+				return cerrors.NewUserError(err, "incorrect username or password")
+			case 4063:
+				return cerrors.NewUserError(err, fmt.Sprintf("cannot open database %q: database does not exist or user %q does not have access", db.config.Database, db.config.User))
+			}
+		}
+		return fmt.Errorf("unable to connect to database: %w", err)
+	}
+	db.conn = conn
+
+	loc, err := schedule.ParseTimezone(db.config.Timezone)
+	if err != nil {
+		return fmt.Errorf("invalid config timezone: %w", err)
+	}
+	log.WithFields(log.Fields{
+		"tzName": db.config.Timezone,
+		"loc":    loc.String(),
+	}).Debug("using datetime location from config")
+	db.datetimeLocation = loc
+
+	return nil
+}
+
+// Close shuts down the database connection.
+func (db *sqlserverDatabase) Close(ctx context.Context) error {
+	if err := db.conn.Close(); err != nil {
+		return fmt.Errorf("error closing database connection: %w", err)
+	}
+	return nil
+}
+
+func (db *sqlserverDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.Schema {
+	var sourceSchema = (&jsonschema.Reflector{
+		ExpandedStruct:            true,
+		DoNotReference:            true,
+		AllowAdditionalProperties: writeSchema,
+	}).Reflect(&sqlserverCTSourceInfo{})
+	sourceSchema.Version = ""
+	if db.config.Advanced.SourceTag == "" {
+		sourceSchema.Properties.Delete("tag")
+	}
+	return sourceSchema
+}
+
+func (db *sqlserverDatabase) FallbackCollectionKey() []string {
+	// Change Tracking requires primary keys, so this should never be used.
+	return []string{}
+}
+
+func (db *sqlserverDatabase) RequestTxIDs(schema, table string) {}

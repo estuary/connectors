@@ -1,0 +1,177 @@
+=== Spec: Get Connector Spec ===
+{
+  "protocol": 3032023,
+  "configSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "properties": {
+      "address": {
+        "type": "string",
+        "title": "Server Address",
+        "description": "The host or host:port at which the database can be reached.",
+        "order": 0
+      },
+      "user": {
+        "type": "string",
+        "description": "The database user to authenticate as.",
+        "default": "flow_capture",
+        "order": 1
+      },
+      "password": {
+        "type": "string",
+        "description": "Password for the specified database user.",
+        "order": 2,
+        "secret": true
+      },
+      "database": {
+        "type": "string",
+        "description": "Logical database name to capture from.",
+        "order": 3
+      },
+      "timezone": {
+        "type": "string",
+        "title": "Time Zone",
+        "description": "The IANA timezone name in which datetime columns will be converted to RFC3339 timestamps. Defaults to UTC if left blank.",
+        "default": "UTC",
+        "order": 4
+      },
+      "historyMode": {
+        "type": "boolean",
+        "description": "Capture change events without reducing them to a final state.",
+        "default": false,
+        "order": 5
+      },
+      "advanced": {
+        "properties": {
+          "discover_tables_without_ct": {
+            "type": "boolean",
+            "title": "Discover Tables Without Change Tracking",
+            "description": "When set the connector will discover all tables even if they do not have Change Tracking enabled. By default only CT-enabled tables are discovered."
+          },
+          "skip_backfills": {
+            "type": "string",
+            "title": "Skip Backfills",
+            "description": "A comma-separated list of fully-qualified table names which should not be backfilled."
+          },
+          "backfill_chunk_size": {
+            "type": "integer",
+            "title": "Backfill Chunk Size",
+            "description": "The number of rows which should be fetched from the database in a single backfill query.",
+            "default": 50000
+          },
+          "polling_interval": {
+            "type": "string",
+            "title": "Change Tracking Polling Interval",
+            "description": "The interval at which the connector polls for Change Tracking changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified.",
+            "default": "500ms",
+            "pattern": "^[0-9]+(ms|s|m|h)$"
+          },
+          "source_tag": {
+            "type": "string",
+            "title": "Source Tag",
+            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document."
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      },
+      "networkTunnel": {
+        "properties": {
+          "sshForwarding": {
+            "properties": {
+              "sshEndpoint": {
+                "type": "string",
+                "title": "SSH Endpoint",
+                "description": "Endpoint of the remote SSH server that supports tunneling (in the form of ssh://user@hostname[:port])",
+                "pattern": "^ssh://.+@.+$"
+              },
+              "privateKey": {
+                "type": "string",
+                "title": "SSH Private Key",
+                "description": "Private key to connect to the remote SSH server.",
+                "multiline": true,
+                "secret": true
+              }
+            },
+            "additionalProperties": false,
+            "type": "object",
+            "required": [
+              "sshEndpoint",
+              "privateKey"
+            ],
+            "title": "SSH Forwarding"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Network Tunnel",
+        "description": "Connect to your system through an SSH server that acts as a bastion host for your network."
+      }
+    },
+    "type": "object",
+    "required": [
+      "address",
+      "user",
+      "password",
+      "database",
+      "historyMode"
+    ],
+    "title": "SQL Server Connection"
+  },
+  "resourceConfigSchema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/sqlcapture/resource",
+    "properties": {
+      "mode": {
+        "type": "string",
+        "enum": [
+          "",
+          "Normal",
+          "Precise",
+          "Only Changes",
+          "Without Primary Key"
+        ],
+        "title": "Backfill Mode",
+        "description": "How the preexisting contents of the table should be backfilled. This should generally not be changed.",
+        "default": ""
+      },
+      "namespace": {
+        "type": "string",
+        "title": "Schema",
+        "description": "The schema (namespace) in which the table resides.",
+        "readOnly": true
+      },
+      "stream": {
+        "type": "string",
+        "title": "Table Name",
+        "description": "The name of the table to be captured.",
+        "readOnly": true
+      },
+      "priority": {
+        "type": "integer",
+        "title": "Backfill Priority",
+        "description": "An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others."
+      }
+    },
+    "type": "object",
+    "required": [
+      "namespace",
+      "stream"
+    ],
+    "title": "SQL Database Resource Spec"
+  },
+  "documentationUrl": "https://go.estuary.dev/source-sqlserver",
+  "resourcePathPointers": [
+    "/namespace",
+    "/stream"
+  ]
+}
+
+
