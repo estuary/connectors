@@ -254,7 +254,8 @@ func (db *sqlserverDatabase) prerequisiteWatermarksTable(ctx context.Context) er
 
 func (db *sqlserverDatabase) prerequisiteWatermarksCaptureInstance(ctx context.Context) error {
 	var schema, table = splitStreamID(db.config.Advanced.WatermarksTable)
-	return db.prerequisiteTableCaptureInstance(ctx, schema, table)
+	var tableID = sqlcapture.TableID{Schema: schema, Table: table}
+	return db.prerequisiteTableCaptureInstances(ctx, []sqlcapture.TableID{tableID})[tableID]
 }
 
 func splitStreamID(streamID string) (string, string) {
@@ -277,37 +278,39 @@ func (db *sqlserverDatabase) prerequisiteMaximumLSN(ctx context.Context) error {
 }
 
 func (db *sqlserverDatabase) SetupTablePrerequisites(ctx context.Context, tables []sqlcapture.TableID) map[sqlcapture.TableID]error {
+	return db.prerequisiteTableCaptureInstances(ctx, tables)
+}
+
+// prerequisiteTableCaptureInstances checks that each table has at least one CDC capture
+// instance, attempting to create one if not. Returns a map of errors keyed by table ID.
+func (db *sqlserverDatabase) prerequisiteTableCaptureInstances(ctx context.Context, tables []sqlcapture.TableID) map[sqlcapture.TableID]error {
 	var errs = make(map[sqlcapture.TableID]error)
+
+	// Query all capture instances once upfront
+	captureInstances, err := cdcListCaptureInstances(ctx, db.conn)
+	if err != nil {
+		for _, table := range tables {
+			errs[table] = fmt.Errorf("unable to query capture instances: %w", err)
+		}
+		return errs
+	}
+
 	for _, table := range tables {
-		if err := db.prerequisiteTableCaptureInstance(ctx, table.Schema, table.Table); err != nil {
-			errs[table] = err
+		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Table)
+		var logEntry = log.WithField("table", streamID)
+
+		// If the table has at least one preexisting capture instance then we're happy
+		if instances := captureInstances[streamID]; len(instances) > 0 {
+			logEntry.WithField("instances", instances).Debug("table has capture instances")
+			continue
+		}
+
+		// Otherwise we attempt to create one
+		if instanceName, err := cdcCreateCaptureInstance(ctx, db.conn, table.Schema, table.Table, db.config.User, db.config.Advanced.Filegroup, db.config.Advanced.RoleName); err == nil {
+			logEntry.WithField("instance", instanceName).Info("enabled cdc for table")
+		} else {
+			errs[table] = fmt.Errorf("table %q has no capture instances and user %q cannot create one", streamID, db.config.User)
 		}
 	}
 	return errs
-}
-
-func (db *sqlserverDatabase) prerequisiteTableCaptureInstance(ctx context.Context, schema, table string) error {
-	var streamID = sqlcapture.JoinStreamID(schema, table)
-	var logEntry = log.WithField("table", streamID)
-
-	// TODO(wgd): It's inefficient to redo the 'list instances' work for each table,
-	// consider caching this across all prerequisite validation calls.
-	var captureInstances, err = cdcListCaptureInstances(ctx, db.conn)
-	if err != nil {
-		return fmt.Errorf("unable to query capture instances for table %q: %w", streamID, err)
-	}
-
-	// If the table has at least one preexisting capture instance then we're happy
-	var instancesForStream = captureInstances[streamID]
-	if len(instancesForStream) > 0 {
-		logEntry.WithField("instances", instancesForStream).Debug("table has capture instances")
-		return nil
-	}
-
-	// Otherwise we attempt to create one
-	if instanceName, err := cdcCreateCaptureInstance(ctx, db.conn, schema, table, db.config.User, db.config.Advanced.Filegroup, db.config.Advanced.RoleName); err == nil {
-		logEntry.WithField("instance", instanceName).Info("enabled cdc for table")
-		return nil
-	}
-	return fmt.Errorf("table %q has no capture instances and user %q cannot create one", streamID, db.config.User)
 }
