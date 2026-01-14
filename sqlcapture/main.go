@@ -228,6 +228,8 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 	for _, err := range errs {
 		log.WithError(err).Debug("prerequisite error")
 	}
+
+	var tables []TableID
 	var out []*pc.Response_Validated_Binding
 	for _, binding := range req.Bindings {
 		var res Resource
@@ -236,6 +238,8 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		}
 		res.SetDefaults()
 		var streamID = JoinStreamID(res.Namespace, res.Stream)
+
+		tables = append(tables, TableID{Schema: res.Namespace, Table: res.Stream})
 
 		// When performing a keyed backfill, it's an error for the collection key to be the fallback key. It has to be one or more top-level properties.
 		if (res.Mode == BackfillModeAutomatic || res.Mode == BackfillModeNormal || res.Mode == BackfillModePrecise) && len(res.PrimaryKey) == 0 {
@@ -254,15 +258,15 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 			errs = append(errs, err)
 		}
 
-		if err := db.SetupTablePrerequisites(ctx, res.Namespace, res.Stream); err != nil {
-			log.WithError(err).Debug("prerequisite error")
-			errs = append(errs, err)
-			continue
-		}
-
 		out = append(out, &pc.Response_Validated_Binding{
 			ResourcePath: []string{res.Namespace, res.Stream},
 		})
+	}
+
+	// Run batch table prerequisite check
+	for table, err := range db.SetupTablePrerequisites(ctx, tables) {
+		log.WithFields(log.Fields{"table": table}).WithError(err).Debug("table prerequisite error")
+		errs = append(errs, err)
 	}
 	if len(errs) > 0 {
 		log.WithField("count", len(errs)).Debug("prerequisite validation encountered errors")
@@ -365,6 +369,7 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	// Build a mapping from stream IDs to capture binding information
+	var tables []TableID
 	var bindings = make(map[StreamID]*Binding)
 	for idx, binding := range open.Capture.Bindings {
 		var res Resource
@@ -372,12 +377,9 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			return fmt.Errorf("error parsing resource config: %w", err)
 		}
 		res.SetDefaults()
-		if err := db.SetupTablePrerequisites(ctx, res.Namespace, res.Stream); err != nil {
-			log.WithError(err).Debug("prerequisite error")
-			errs = append(errs, err)
-			continue
-		}
 		var streamID = JoinStreamID(res.Namespace, res.Stream)
+
+		tables = append(tables, TableID{Schema: res.Namespace, Table: res.Stream})
 
 		// TODO: Remove the whole 'Enable TxIDs' thing and instead include them unconditionally
 		// at some point in the future once automatic schema updates are a thing and the
@@ -395,6 +397,12 @@ func (d *Driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			Resource:      res,
 			CollectionKey: binding.Collection.Key,
 		}
+	}
+
+	// Run batch table prerequisite check
+	for table, err := range db.SetupTablePrerequisites(ctx, tables) {
+		log.WithFields(log.Fields{"table": table}).WithError(err).Debug("table prerequisite error")
+		errs = append(errs, err)
 	}
 
 	if len(errs) > 0 {

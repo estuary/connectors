@@ -276,8 +276,14 @@ func (db *sqlserverDatabase) prerequisiteMaximumLSN(ctx context.Context) error {
 	return err
 }
 
-func (db *sqlserverDatabase) SetupTablePrerequisites(ctx context.Context, schema, table string) error {
-	return db.prerequisiteTableCaptureInstance(ctx, schema, table)
+func (db *sqlserverDatabase) SetupTablePrerequisites(ctx context.Context, tables []sqlcapture.TableID) map[sqlcapture.TableID]error {
+	var errs = make(map[sqlcapture.TableID]error)
+	for _, table := range tables {
+		if err := db.prerequisiteTableCaptureInstance(ctx, table.Schema, table.Table); err != nil {
+			errs[table] = err
+		}
+	}
+	return errs
 }
 
 func (db *sqlserverDatabase) prerequisiteTableCaptureInstance(ctx context.Context, schema, table string) error {

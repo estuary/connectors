@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/estuary/connectors/sqlcapture"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -144,7 +145,17 @@ func (db *oracleDatabase) prerequisiteTableAndColumnNameLengths(ctx context.Cont
 	return nil
 }
 
-func (db *oracleDatabase) SetupTablePrerequisites(ctx context.Context, owner, tableName string) error {
+func (db *oracleDatabase) SetupTablePrerequisites(ctx context.Context, tables []sqlcapture.TableID) map[sqlcapture.TableID]error {
+	var errs = make(map[sqlcapture.TableID]error)
+	for _, table := range tables {
+		if err := db.setupTablePrerequisite(ctx, table.Schema, table.Table); err != nil {
+			errs[table] = err
+		}
+	}
+	return errs
+}
+
+func (db *oracleDatabase) setupTablePrerequisite(ctx context.Context, owner, tableName string) error {
 	if err := db.prerequisiteSupplementalLogging(ctx, owner, tableName); err != nil {
 		return err
 	} else if err := db.prerequisiteTableAndColumnNameLengths(ctx, owner, tableName); err != nil {
