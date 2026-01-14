@@ -279,8 +279,9 @@ type Database interface {
 	// informed about all of them at once.
 	SetupPrerequisites(ctx context.Context) []error
 	// SetupTablePrerequisites is like SetupPrerequisites but for any table-specific
-	// verification or setup that needs to be performed.
-	SetupTablePrerequisites(ctx context.Context, schema, table string) error
+	// verification or setup that needs to be performed. It receives the full list of
+	// tables and returns a map of any errors encountered, keyed by table.
+	SetupTablePrerequisites(ctx context.Context, tables []TableID) map[TableID]error
 
 	// Called when replication appears to not be progressing as it should, this
 	// function provides a hook for database-specific diagnostic information to

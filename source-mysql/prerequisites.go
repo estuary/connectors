@@ -122,7 +122,17 @@ func (db *mysqlDatabase) prerequisiteUserPermissions(ctx context.Context) error 
 	return nil
 }
 
-func (db *mysqlDatabase) SetupTablePrerequisites(ctx context.Context, schema, table string) error {
+func (db *mysqlDatabase) SetupTablePrerequisites(ctx context.Context, tables []sqlcapture.TableID) map[sqlcapture.TableID]error {
+	var errs = make(map[sqlcapture.TableID]error)
+	for _, table := range tables {
+		if err := db.setupTablePrerequisite(ctx, table.Schema, table.Table); err != nil {
+			errs[table] = err
+		}
+	}
+	return errs
+}
+
+func (db *mysqlDatabase) setupTablePrerequisite(ctx context.Context, schema, table string) error {
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 
 	results, err := db.conn.Execute(fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 0;", schema, table))

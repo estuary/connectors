@@ -218,7 +218,17 @@ func (db *postgresDatabase) prerequisiteWatermarksInPublication(ctx context.Cont
 	return db.addTableToPublication(ctx, tableParts[0], tableParts[1])
 }
 
-func (db *postgresDatabase) SetupTablePrerequisites(ctx context.Context, schema, table string) error {
+func (db *postgresDatabase) SetupTablePrerequisites(ctx context.Context, tables []sqlcapture.TableID) map[sqlcapture.TableID]error {
+	var errs = make(map[sqlcapture.TableID]error)
+	for _, table := range tables {
+		if err := db.setupTablePrerequisite(ctx, table.Schema, table.Table); err != nil {
+			errs[table] = err
+		}
+	}
+	return errs
+}
+
+func (db *postgresDatabase) setupTablePrerequisite(ctx context.Context, schema, table string) error {
 	var rows, err = db.conn.Query(ctx, fmt.Sprintf(`SELECT * FROM "%s"."%s" LIMIT 0;`, schema, table))
 	rows.Close()
 	if err != nil {
