@@ -25,6 +25,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -79,6 +92,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -133,6 +159,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -187,6 +226,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -241,6 +293,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -295,6 +360,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -349,6 +427,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -403,6 +494,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -457,6 +561,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -511,6 +628,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -565,6 +695,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -619,6 +762,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -673,6 +829,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -727,6 +896,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -781,6 +963,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -835,6 +1030,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -889,6 +1097,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -943,6 +1164,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -997,6 +1231,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -1051,6 +1298,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -1105,6 +1365,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -1159,6 +1432,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -1213,6 +1499,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
@@ -1267,6 +1566,19 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "store": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "The Shopify store this document belongs to",
+              "title": "Store"
             }
           },
           "title": "Meta",
