@@ -223,9 +223,14 @@ class SchedulesResponse(FullRefreshResponse):
     resources: list[FullRefreshResource] = Field(alias="schedules")
 
 
+class CustomTicketStatusesResponse(FullRefreshResponse):
+    resources: list[FullRefreshResource] = Field(alias="custom_statuses")
+
+
 # Full refresh resources with no pagination.
 # Tuples contain the name, path, and response model for each resource.
 FULL_REFRESH_RESOURCES: list[tuple[str, str, type[FullRefreshResponse]]] = [
+    ("custom_ticket_statuses", "custom_statuses", CustomTicketStatusesResponse),
     ("schedules", "business_hours/schedules", SchedulesResponse),
 ]
 
@@ -264,15 +269,9 @@ class FullRefreshCursorPaginatedResponse(FullRefreshResponse):
 class TagsResponse(FullRefreshCursorPaginatedResponse):
     resources: list[FullRefreshResource] = Field(alias="tags")
 
-
-class CustomTicketStatusesResponse(FullRefreshCursorPaginatedResponse):
-    resources: list[FullRefreshResource] = Field(alias="custom_statuses")
-
-
 # Full refresh resources that are paginated through with a cursor.
 # Tuples contain the name, path, and response model for each resource.
 FULL_REFRESH_CURSOR_PAGINATED_RESOURCES: list[tuple[str, str, type[FullRefreshCursorPaginatedResponse]]] = [
-    ("custom_ticket_statuses", "custom_statuses", CustomTicketStatusesResponse),
     ("tags", "tags", TagsResponse),
 ]
 

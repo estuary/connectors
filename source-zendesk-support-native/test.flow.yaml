@@ -35,6 +35,10 @@ captures:
         interval: PT1H
       target: acmeCo/tags
     - resource:
+        name: custom_ticket_statuses
+        interval: PT1H
+      target: acmeCo/custom_ticket_statuses
+    - resource:
         name: custom_roles
         interval: PT30M
       target: acmeCo/custom_roles

@@ -219,6 +219,31 @@
     }
   ],
   [
+    "acmeCo/custom_ticket_statuses",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "agent_label": "New",
+      "created_at": "2024-07-26T15:41:00Z",
+      "default": true,
+      "description": "Ticket is awaiting assignment to an agent",
+      "end_user_description": "We are working on a response for you",
+      "end_user_label": "Open",
+      "id": 28835740806676,
+      "raw_agent_label": "{{zd.status_new}}",
+      "raw_description": "{{zd.status_new_description}}",
+      "raw_end_user_description": "{{zd.status_end_user_new_description}}",
+      "raw_end_user_label": "{{zd.status_end_user_new}}",
+      "status_category": "new",
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/custom_statuses/28835740806676.json"
+    }
+  ],
+  [
     "acmeCo/group_memberships",
     {
       "_meta": {

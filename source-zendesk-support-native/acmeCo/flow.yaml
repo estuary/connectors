@@ -27,6 +27,10 @@ collections:
     schema: custom_roles.schema.yaml
     key:
     - /id
+  acmeCo/custom_ticket_statuses:
+    schema: custom_ticket_statuses.schema.yaml
+    key:
+    - /_meta/row_id
   acmeCo/group_memberships:
     schema: group_memberships.schema.yaml
     key:
