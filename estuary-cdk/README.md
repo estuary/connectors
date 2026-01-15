@@ -29,7 +29,39 @@ The CDK's `common` module implements common strategies for capturing data, inclu
 
 - Capturing from a logical log of changes, implemented as common.FetchChangesFn.
 - Capturing from an enumerated backfill of a resource, implemented as common.FetchPageFn (which can happen concurrently with fetching incremental changes).
-- Capturing a "snapshot" of a resource and emitting it if it's content has changed, implemented as common.FetchSnapshotFn.
+- Capturing a "snapshot" of a resource and emitting it if its content has changed, implemented as common.FetchSnapshotFn.
+
+## Key Capabilities
+
+### HTTP Client (`http.py`)
+- **HTTPMixin** — Async HTTP client with automatic retries, rate limiting, and error handling
+- **TokenSource** — OAuth2 token management supporting multiple flows (authorization code, client credentials, refresh tokens, Google service accounts)
+
+### Capture Strategies (`capture/common.py`)
+- **FetchPageFn** — Paginated backfill enumeration (can run concurrently with incremental)
+- **FetchChangesFn** — Incremental change capture using cursors (datetime or offset-based)
+- **FetchSnapshotFn** — Periodic full snapshots, emitting only when content changes
+- **Resource** — Binds document models to fetch functions and manages state
+
+### Stream Processing
+- **incremental_json_processor** — Streaming JSON parser for large responses
+- **incremental_csv_processor** — Streaming CSV parser
+- **gunzip_stream** / **unzip_stream** — Compressed data handling
+
+### Third-Party Connector Support
+- **CaptureShim** (`shim_airbyte_cdk.py`) — Wraps Airbyte CDK connectors to run within the Estuary framework
+
+## Runtime Behavior
+
+### Graceful Exit
+The CDK implements graceful shutdown: when the connector receives a stop signal, it allows all bindings to finish their current `FetchPageFn`, `FetchChangesFn`, or `FetchSnapshotFn` invocation before exiting. This ensures data consistency and proper checkpointing.
+
+**Important:** Fetch functions should avoid blocking for extended periods. Long-running operations (e.g., waiting on slow API responses or large batch jobs) can prevent the connector from exiting in a timely manner. If an operation may take a long time, consider breaking it into smaller incremental steps that yield progress periodically.
+
+### Snapshot Bindings
+Snapshot bindings store a digest of the previous snapshot in their state and compare it against the current snapshot to detect changes. To avoid emitting duplicate data, `FetchSnapshotFn` implementations should yield documents in a consistent order.
+
+When a snapshot captures fewer documents than the previous run, the CDK emits minimal documents with `_meta/op: "d"` for the missing keys. This deletion inference enables standard-updates materializations to maintain a complete view of what exists in the source system.
 
 ## Why Another Connector Kit?
 
