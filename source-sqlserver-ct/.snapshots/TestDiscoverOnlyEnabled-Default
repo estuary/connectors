@@ -1,0 +1,7 @@
+sql> CREATE TABLE dbo.DiscoverOnlyEnabled_Default_800479_a (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.DiscoverOnlyEnabled_Default_800479_b (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.DiscoverOnlyEnabled_Default_800479_c (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables (Default behavior: only CT-enabled) ===
+acmeCo/test_capture/dbo/discoveronlyenabled_default_800479_a
+acmeCo/test_capture/dbo/discoveronlyenabled_default_800479_c
+

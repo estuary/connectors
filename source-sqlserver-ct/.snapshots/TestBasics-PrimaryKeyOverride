@@ -1,0 +1,14 @@
+sql> CREATE TABLE dbo.Basics_PrimaryKeyOverride_836524 (id INTEGER PRIMARY KEY, name VARCHAR(32), value INTEGER)
+sql> INSERT INTO dbo.Basics_PrimaryKeyOverride_836524 VALUES (1, 'charlie', 100), (2, 'alice', 200)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/basics_primarykeyoverride_836524
+=== Run: Backfill ===
+error: flowctl preview failed:
+error initializing pending streams: error activating replication for table "dbo.basics_primarykeyoverride_836524": configured primary key ["name"] does not match the table's current primary key ["id"]; Change Tracking requires matching keys
+
+sql> INSERT INTO dbo.Basics_PrimaryKeyOverride_836524 VALUES (3, 'bob', 300), (4, 'dave', 400)
+=== Run: Replication ===
+error: flowctl preview failed:
+error initializing pending streams: error activating replication for table "dbo.basics_primarykeyoverride_836524": configured primary key ["name"] does not match the table's current primary key ["id"]; Change Tracking requires matching keys
+
+

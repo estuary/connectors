@@ -1,0 +1,208 @@
+sql> CREATE TABLE dbo.Capture_PrimaryKeyUpdate_486359 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.Capture_PrimaryKeyUpdate_486359 VALUES (0, 'zero'), (1, 'one'), (2, 'two')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/capture_primarykeyupdate_486359
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/dbo/capture_primarykeyupdate_486359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Capture_PrimaryKeyUpdate_486359"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_primarykeyupdate_486359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Capture_PrimaryKeyUpdate_486359"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_primarykeyupdate_486359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Capture_PrimaryKeyUpdate_486359"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCapture_PrimaryKeyUpdate_486359": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.Capture_PrimaryKeyUpdate_486359 VALUES (3, 'three'), (4, 'four'), (5, 'five')
+=== Run: Some Replication ===
+[
+  "acmeCo/test_capture/dbo/capture_primarykeyupdate_486359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "Capture_PrimaryKeyUpdate_486359",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_primarykeyupdate_486359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "Capture_PrimaryKeyUpdate_486359",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_primarykeyupdate_486359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "Capture_PrimaryKeyUpdate_486359",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "id": 5
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCapture_PrimaryKeyUpdate_486359": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> UPDATE dbo.Capture_PrimaryKeyUpdate_486359 SET id = 6 WHERE id = 1
+sql> UPDATE dbo.Capture_PrimaryKeyUpdate_486359 SET id = 7 WHERE id = 4
+=== Run: Primary Key Updates ===
+[
+  "acmeCo/test_capture/dbo/capture_primarykeyupdate_486359",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "schema": "dbo",
+        "table": "Capture_PrimaryKeyUpdate_486359",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_primarykeyupdate_486359",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "schema": "dbo",
+        "table": "Capture_PrimaryKeyUpdate_486359",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_primarykeyupdate_486359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "Capture_PrimaryKeyUpdate_486359",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 6
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_primarykeyupdate_486359",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "Capture_PrimaryKeyUpdate_486359",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 7
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCapture_PrimaryKeyUpdate_486359": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

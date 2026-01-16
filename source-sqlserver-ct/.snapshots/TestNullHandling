@@ -1,0 +1,235 @@
+sql> CREATE TABLE dbo.NullHandling_532454 (id INTEGER PRIMARY KEY, data VARCHAR(32))
+sql> INSERT INTO dbo.NullHandling_532454 VALUES (1, 'test'), (2, ''), (3, NULL)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/nullhandling_532454
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/nullhandling_532454",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "NullHandling_532454"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "test",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/nullhandling_532454",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "NullHandling_532454"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/nullhandling_532454",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "NullHandling_532454"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": null,
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FNullHandling_532454": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.NullHandling_532454 VALUES (4, 'test'), (5, ''), (6, NULL)
+=== Run: Replicated Inserts ===
+[
+  "acmeCo/test_capture/dbo/nullhandling_532454",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "NullHandling_532454",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "test",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/nullhandling_532454",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "NullHandling_532454",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "",
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/dbo/nullhandling_532454",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "NullHandling_532454",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": null,
+    "id": 6
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FNullHandling_532454": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> DELETE FROM dbo.NullHandling_532454 WHERE id IN (1, 2, 3, 4, 5, 6)
+=== Run: Deletes ===
+[
+  "acmeCo/test_capture/dbo/nullhandling_532454",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "schema": "dbo",
+        "table": "NullHandling_532454",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/nullhandling_532454",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "schema": "dbo",
+        "table": "NullHandling_532454",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/nullhandling_532454",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "schema": "dbo",
+        "table": "NullHandling_532454",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/nullhandling_532454",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "schema": "dbo",
+        "table": "NullHandling_532454",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/nullhandling_532454",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "schema": "dbo",
+        "table": "NullHandling_532454",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 5
+  }
+]
+[
+  "acmeCo/test_capture/dbo/nullhandling_532454",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "schema": "dbo",
+        "table": "NullHandling_532454",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 6
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FNullHandling_532454": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

@@ -1,0 +1,579 @@
+sql> CREATE TABLE dbo.Collation_CollatedCapture_Char_126411 (id Char(32) COLLATE SQL_Latin1_General_CP1_CI_AS PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('a?a 000', 'Row A000'), ('a?b 000', 'Row B000')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('aaa 001', 'Row A001'), ('aab 001', 'Row B001')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('aba 002', 'Row A002'), ('abb 002', 'Row B002')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('aca 003', 'Row A003'), ('acb 003', 'Row B003')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('a€a 004', 'Row A004'), ('a€b 004', 'Row B004')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('aŠa 005', 'Row A005'), ('aŠb 005', 'Row B005')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('a’a 006', 'Row A006'), ('a’b 006', 'Row B006')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('a•a 007', 'Row A007'), ('a•b 007', 'Row B007')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('aÀa 008', 'Row A008'), ('aÀb 008', 'Row B008')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('aÁa 009', 'Row A009'), ('aÁb 009', 'Row B009')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('aÂa 010', 'Row A010'), ('aÂb 010', 'Row B010')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('aÖa 011', 'Row A011'), ('aÖb 011', 'Row B011')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('a×a 012', 'Row A012'), ('a×b 012', 'Row B012')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('aØa 013', 'Row A013'), ('aØb 013', 'Row B013')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('aßa 014', 'Row A014'), ('aßb 014', 'Row B014')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('a÷a 015', 'Row A015'), ('a÷b 015', 'Row B015')
+sql> INSERT INTO dbo.Collation_CollatedCapture_Char_126411 VALUES ('aÿa 016', 'Row A016'), ('aÿb 016', 'Row B016')
+=== Discover: Discover ===
+acmeCo/test_capture/dbo/collation_collatedcapture_char_126411
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A000",
+    "id": "a?a 000                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B000",
+    "id": "a?b 000                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A004",
+    "id": "a€a 004                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B004",
+    "id": "a€b 004                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A005",
+    "id": "aŠa 005                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B005",
+    "id": "aŠb 005                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A006",
+    "id": "a’a 006                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B006",
+    "id": "a’b 006                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A007",
+    "id": "a•a 007                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B007",
+    "id": "a•b 007                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A012",
+    "id": "a×a 012                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B012",
+    "id": "a×b 012                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A015",
+    "id": "a÷a 015                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B015",
+    "id": "a÷b 015                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A001",
+    "id": "aaa 001                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A008",
+    "id": "aÀa 008                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A009",
+    "id": "aÁa 009                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A010",
+    "id": "aÂa 010                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B001",
+    "id": "aab 001                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B008",
+    "id": "aÀb 008                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B009",
+    "id": "aÁb 009                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B010",
+    "id": "aÂb 010                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A002",
+    "id": "aba 002                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B002",
+    "id": "abb 002                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A003",
+    "id": "aca 003                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B003",
+    "id": "acb 003                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A011",
+    "id": "aÖa 011                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A013",
+    "id": "aØa 013                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B011",
+    "id": "aÖb 011                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B013",
+    "id": "aØb 013                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A014",
+    "id": "aßa 014                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B014",
+    "id": "aßb 014                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row A016",
+    "id": "aÿa 016                         "
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_collatedcapture_char_126411",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Collation_CollatedCapture_Char_126411"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "Row B016",
+    "id": "aÿb 016                         "
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCollation_CollatedCapture_Char_126411": {
+      "backfilled": 34,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

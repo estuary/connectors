@@ -1,0 +1,102 @@
+sql> CREATE TABLE dbo.Capture_SourceTag_446138 (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.Capture_SourceTag_446138 VALUES (0, 'zero'), (1, 'one')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/capture_sourcetag_446138
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/dbo/capture_sourcetag_446138",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Capture_SourceTag_446138",
+        "tag": "example_source_tag_1234"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_sourcetag_446138",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Capture_SourceTag_446138",
+        "tag": "example_source_tag_1234"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCapture_SourceTag_446138": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.Capture_SourceTag_446138 VALUES (2, 'two'), (3, 'three')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/dbo/capture_sourcetag_446138",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "Capture_SourceTag_446138",
+        "tag": "example_source_tag_1234",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_sourcetag_446138",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "Capture_SourceTag_446138",
+        "tag": "example_source_tag_1234",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCapture_SourceTag_446138": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

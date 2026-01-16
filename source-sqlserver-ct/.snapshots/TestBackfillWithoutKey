@@ -1,0 +1,14 @@
+sql> CREATE TABLE dbo.BackfillWithoutKey_571434 (id INTEGER PRIMARY KEY, data VARCHAR(2000))
+sql> INSERT INTO dbo.BackfillWithoutKey_571434 VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/backfillwithoutkey_571434
+=== Run: Backfill ===
+error: flowctl preview failed:
+error initializing pending streams: error activating replication for table "dbo.backfillwithoutkey_571434": configured primary key [] does not match the table's current primary key ["id"]; Change Tracking requires matching keys
+
+sql> INSERT INTO dbo.BackfillWithoutKey_571434 VALUES (3, 'more'), (4, 'data')
+=== Run: Replication ===
+error: flowctl preview failed:
+error initializing pending streams: error activating replication for table "dbo.backfillwithoutkey_571434": configured primary key [] does not match the table's current primary key ["id"]; Change Tracking requires matching keys
+
+
