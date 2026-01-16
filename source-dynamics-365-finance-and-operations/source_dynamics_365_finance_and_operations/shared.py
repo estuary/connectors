@@ -1,6 +1,8 @@
 from datetime import datetime
 from logging import Logger
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, TypeVar, runtime_checkable
+
+T_co = TypeVar('T_co', covariant=True)
 
 
 class CacheInfoProtocol(Protocol):
@@ -16,19 +18,19 @@ class CacheInfoProtocol(Protocol):
 
 
 @runtime_checkable
-class CachedAsyncFunc(Protocol):
+class CachedAsyncFunc(Protocol[T_co]):
     """Protocol for an alru_cache decorated async function."""
     __wrapped__: Callable[..., Any]
     def cache_info(self) -> CacheInfoProtocol: ...
-    async def __call__(self, *args: Any, **kwargs: Any) -> Any: ...
+    async def __call__(self, *args: Any, **kwargs: Any) -> T_co: ...
 
 
 async def call_with_cache_logging(
-    cached_func: CachedAsyncFunc,
+    cached_func: CachedAsyncFunc[T_co],
     log: Logger,
     *args: Any,
     **kwargs: Any
-) -> Any:
+) -> T_co:
     """Call a cached function and log on cache miss."""
     info_before = cached_func.cache_info()
     result = await cached_func(*args, **kwargs)
