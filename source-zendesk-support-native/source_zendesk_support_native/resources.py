@@ -19,6 +19,7 @@ from .models import (
     FullRefreshResource,
     IncrementalCursorPaginatedResponse,
     IncrementalTimeExportResponse,
+    TalkIncrementalExportResponse,
     ResourceConfig,
     ResourceState,
     TimestampedResource,
@@ -33,6 +34,7 @@ from .models import (
     INCREMENTAL_CURSOR_EXPORT_RESOURCES,
     INCREMENTAL_CURSOR_EXPORT_TYPES,
     INCREMENTAL_CURSOR_PAGINATED_RESOURCES,
+    TALK_INCREMENTAL_EXPORT_RESOURCES,
     OAUTH2_SPEC,
     TICKET_CHILD_RESOURCES,
     POST_CHILD_RESOURCES,
@@ -44,6 +46,7 @@ from .api import (
     backfill_incremental_cursor_export_resources,
     backfill_incremental_cursor_paginated_resources,
     backfill_satisfaction_ratings,
+    backfill_talk_incremental_export_resources,
     backfill_ticket_child_resources,
     backfill_ticket_metrics,
     fetch_audit_logs,
@@ -55,6 +58,7 @@ from .api import (
     fetch_post_child_resources,
     fetch_post_comment_votes,
     fetch_satisfaction_ratings,
+    fetch_talk_incremental_export_resources,
     fetch_ticket_child_resources,
     fetch_ticket_metrics,
     snapshot_resources,
@@ -83,6 +87,12 @@ HELP_DESK_STREAMS = [
 ]
 
 
+TALK_STREAMS = [
+    "calls",
+    "call_legs",
+]
+
+
 async def _is_enterprise_account(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> bool:
@@ -104,6 +114,20 @@ async def _is_account_with_help_desk(
         await http.request(log, f"{url_base(config.subdomain)}/community/posts")
     except HTTPError as err:
         if err.code == 404 and "The page you were looking for doesn't exist" in err.message:
+            return False
+        else:
+            raise err
+
+    return True
+
+
+async def _is_talk_enabled(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> bool:
+    try:
+        await http.request(log, f"{url_base(config.subdomain)}/channels/voice/stats/account_overview")
+    except HTTPError as err:
+        if err.code == 403 or err.code == 404:
             return False
         else:
             raise err
@@ -634,6 +658,66 @@ def incremental_time_export_resources(
     return resources
 
 
+def talk_incremental_export_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+
+    def open(
+        name: str,
+        path: str,
+        response_model: type[TalkIncrementalExportResponse],
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_talk_incremental_export_resources,
+                http,
+                config.subdomain,
+                name,
+                path,
+                response_model,
+            ),
+            fetch_page=functools.partial(
+                backfill_talk_incremental_export_resources,
+                http,
+                config.subdomain,
+                name,
+                path,
+                response_model,
+            )
+        )
+
+    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+
+    resources = [
+            common.Resource(
+            name=name,
+            key=["/id"],
+            model=TimestampedResource,
+            open=functools.partial(open, name, path, response_model),
+            initial_state=ResourceState(
+                inc=ResourceState.Incremental(cursor=cutoff),
+                backfill=ResourceState.Backfill(cutoff=cutoff, next_page=_dt_to_s(config.start_date))
+            ),
+            initial_config=ResourceConfig(
+                name=name, interval=timedelta(minutes=5)
+            ),
+            schema_inference=True,
+        )
+        for (name, path, response_model) in TALK_INCREMENTAL_EXPORT_RESOURCES
+    ]
+
+    return resources
+
+
 def incremental_cursor_export_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -852,6 +936,7 @@ def _generate_resources(
         satisfaction_ratings(log, http, config),
         *incremental_cursor_paginated_resources(log, http, config),
         *incremental_time_export_resources(log, http, config),
+        *talk_incremental_export_resources(log, http, config),
         *incremental_cursor_export_resources(log, http, config),
         *ticket_child_resources(log, http, config),
         *post_child_resources(log, http, config),
@@ -867,11 +952,19 @@ async def all_resources(
 
     resources = _generate_resources(log, http, config)
 
+    excluded_streams: set[str] = set()
+
     if not await _is_enterprise_account(log, http, config):
-        resources = [r for r in resources if r.name not in ENTERPRISE_STREAMS]
+        excluded_streams.update(ENTERPRISE_STREAMS)
 
     if not await _is_account_with_help_desk(log, http, config):
-        resources = [r for r in resources if r.name not in HELP_DESK_STREAMS]
+        excluded_streams.update(HELP_DESK_STREAMS)
+
+    if not await _is_talk_enabled(log, http, config):
+        excluded_streams.update(TALK_STREAMS)
+
+    if excluded_streams:
+        resources = [r for r in resources if r.name not in excluded_streams]
 
     return resources
 

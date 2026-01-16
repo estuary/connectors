@@ -19,6 +19,10 @@ captures:
         interval: PT5M
       target: acmeCo/ticket_metrics
     - resource:
+        name: custom_ticket_statuses
+        interval: PT1H
+      target: acmeCo/custom_ticket_statuses
+    - resource:
         name: schedules
         interval: PT1H
       target: acmeCo/schedules
@@ -34,10 +38,6 @@ captures:
         name: tags
         interval: PT1H
       target: acmeCo/tags
-    - resource:
-        name: custom_ticket_statuses
-        interval: PT1H
-      target: acmeCo/custom_ticket_statuses
     - resource:
         name: custom_roles
         interval: PT30M
@@ -110,6 +110,14 @@ captures:
         name: organizations
         interval: PT5M
       target: acmeCo/organizations
+    - resource:
+        name: calls
+        interval: PT5M
+      target: acmeCo/calls
+    - resource:
+        name: call_legs
+        interval: PT5M
+      target: acmeCo/call_legs
     - resource:
         name: tickets
         interval: PT5M

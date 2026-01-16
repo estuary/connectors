@@ -19,6 +19,14 @@ collections:
     schema: brands.schema.yaml
     key:
     - /id
+  acmeCo/call_legs:
+    schema: call_legs.schema.yaml
+    key:
+    - /id
+  acmeCo/calls:
+    schema: calls.schema.yaml
+    key:
+    - /id
   acmeCo/categories:
     schema: categories.schema.yaml
     key:
