@@ -193,6 +193,29 @@ INCREMENTAL_TIME_EXPORT_RESOURCES: list[tuple[str, str, type[IncrementalTimeExpo
 ]
 
 
+class TalkIncrementalExportResponse(BaseModel, extra="allow"):
+    next_page: str | None
+    count: int
+    end_time: int | None
+    resources: list[TimestampedResource]
+
+
+class CallsResponse(TalkIncrementalExportResponse):
+    resources: list[TimestampedResource] = Field(alias="calls")
+
+
+class CallLegsResponse(TalkIncrementalExportResponse):
+    resources: list[TimestampedResource] = Field(alias="legs")
+
+
+# Talk API incremental export resources.
+# Tuples contain the name, path, and response model for each resource.
+TALK_INCREMENTAL_EXPORT_RESOURCES: list[tuple[str, str, type[TalkIncrementalExportResponse]]] = [
+    ("calls", "calls", CallsResponse),
+    ("call_legs", "legs", CallLegsResponse),
+]
+
+
 class IncrementalCursorExportResponse(BaseModel, extra="allow"):
     after_cursor: str | None
     end_of_stream: bool

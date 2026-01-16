@@ -116,6 +116,100 @@
     }
   ],
   [
+    "acmeCo/call_legs",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "agent_id": 0,
+      "available_via": null,
+      "call_charge": "0.059",
+      "call_id": 32274723903636,
+      "completion_status": "completed",
+      "conference_from": null,
+      "conference_time": null,
+      "conference_to": null,
+      "consultation_from": null,
+      "consultation_time": null,
+      "consultation_to": null,
+      "created_at": "2024-11-19T16:56:46Z",
+      "duration": 14,
+      "forwarded_to": null,
+      "hold_time": 0,
+      "id": 32274695343252,
+      "minutes_billed": 1,
+      "quality_issues": [
+        "none"
+      ],
+      "talk_time": 0,
+      "transferred_from": null,
+      "transferred_to": null,
+      "type": "customer",
+      "updated_at": "redacted",
+      "user_id": 32274730131988,
+      "wrap_up_time": null
+    }
+  ],
+  [
+    "acmeCo/calls",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "agent_id": null,
+      "call_channel": "phone",
+      "call_charge": "0.062",
+      "call_group_id": null,
+      "call_recording_consent": "always",
+      "call_recording_consent_action": null,
+      "call_recording_consent_keypress": null,
+      "callback": false,
+      "callback_source": null,
+      "completion_status": "completed",
+      "consultation_time": 0,
+      "created_at": "2024-11-19T16:57:27Z",
+      "customer_id": 32274730131988,
+      "customer_requested_voicemail": false,
+      "default_group": false,
+      "direction": "inbound",
+      "duration": 29,
+      "exceeded_queue_wait_time": false,
+      "hold_time": 0,
+      "id": 32274699328148,
+      "ivr_action": null,
+      "ivr_destination_group_name": null,
+      "ivr_hops": null,
+      "ivr_routed_to": null,
+      "ivr_time_spent": null,
+      "line": "+16194574051",
+      "line_id": 28835744176276,
+      "line_type": "phone",
+      "minutes_billed": 1,
+      "not_recording_time": 0,
+      "outside_business_hours": false,
+      "overflowed": false,
+      "overflowed_to": null,
+      "phone_number": "+16194574051",
+      "phone_number_id": 28835744176276,
+      "post_call_summary_created": null,
+      "post_call_transcription_created": null,
+      "quality_issues": [
+        "none"
+      ],
+      "recording_control_interactions": 0,
+      "recording_time": 0,
+      "talk_time": 0,
+      "ticket_id": 32,
+      "time_to_answer": null,
+      "updated_at": "redacted",
+      "voicemail": true,
+      "wait_time": 0,
+      "wrap_up_time": 0
+    }
+  ],
+  [
     "acmeCo/categories",
     {
       "_meta": {
