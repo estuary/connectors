@@ -1,0 +1,8 @@
+sql> CREATE TABLE dbo.DiscoverOnlyEnabled_DiscoverWithoutCT_480033_a (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.DiscoverOnlyEnabled_DiscoverWithoutCT_480033_b (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.DiscoverOnlyEnabled_DiscoverWithoutCT_480033_c (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables (Non-default behavior: includ tables without CT) ===
+acmeCo/test_capture/dbo/discoveronlyenabled_discoverwithoutct_480033_a
+acmeCo/test_capture/dbo/discoveronlyenabled_discoverwithoutct_480033_b
+acmeCo/test_capture/dbo/discoveronlyenabled_discoverwithoutct_480033_c
+

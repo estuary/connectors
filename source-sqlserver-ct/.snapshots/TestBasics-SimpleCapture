@@ -1,0 +1,67 @@
+sql> CREATE TABLE dbo.Basics_SimpleCapture_888971 (id INTEGER PRIMARY KEY, data VARCHAR(2000))
+sql> INSERT INTO dbo.Basics_SimpleCapture_888971 VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/basics_simplecapture_888971
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/dbo/basics_simplecapture_888971",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Basics_SimpleCapture_888971"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "A",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/basics_simplecapture_888971",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Basics_SimpleCapture_888971"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "bbb",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/basics_simplecapture_888971",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Basics_SimpleCapture_888971"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "CDEFGH",
+    "id": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FBasics_SimpleCapture_888971": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

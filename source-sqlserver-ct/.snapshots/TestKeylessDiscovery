@@ -1,0 +1,4 @@
+sql> CREATE TABLE dbo.KeylessDiscovery_729953 (a INTEGER, b VARCHAR(2000), c REAL NOT NULL, d VARCHAR(255))
+=== Discover: Discover Tables ===
+(no bindings)
+

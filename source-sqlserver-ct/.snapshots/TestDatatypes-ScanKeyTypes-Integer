@@ -1,0 +1,83 @@
+sql> CREATE TABLE dbo.Datatypes_ScanKeyTypes_Integer_108455 (k INTEGER PRIMARY KEY, v TEXT)
+sql> INSERT INTO dbo.Datatypes_ScanKeyTypes_Integer_108455 VALUES (0, 'Data 0'), (-3, 'Data 1'), (2, 'Data 2'), (1723, 'Data 3')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/datatypes_scankeytypes_integer_108455
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_integer_108455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_Integer_108455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": -3,
+    "v": "Data 1"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_integer_108455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_Integer_108455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": 0,
+    "v": "Data 0"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_integer_108455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_Integer_108455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": 2,
+    "v": "Data 2"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_scankeytypes_integer_108455",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_ScanKeyTypes_Integer_108455"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "k": 1723,
+    "v": "Data 3"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDatatypes_ScanKeyTypes_Integer_108455": {
+      "backfilled": 4,
+      "key_columns": [
+        "k"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

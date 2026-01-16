@@ -1,0 +1,250 @@
+sql> CREATE TABLE dbo.Datatypes_RowversionTypes_rowversion_318641 (id INTEGER PRIMARY KEY, data VARCHAR(32), rv rowversion)
+=== Discover: Discover Table Schema ===
+{
+  "recommendedName": "dbo/datatypes_rowversiontypes_rowversion_318641",
+  "resourceConfig": {
+    "namespace": "dbo",
+    "stream": "Datatypes_RowversionTypes_rowversion_318641"
+  },
+  "documentSchema": {
+    "$defs": {
+      "DboDatatypes_RowversionTypes_rowversion_318641": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "$anchor": "DboDatatypes_RowversionTypes_rowversion_318641",
+        "properties": {
+          "data": {
+            "maxLength": 32,
+            "description": "(source type: varchar(32))",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "integer",
+            "description": "(source type: non-nullable int)"
+          },
+          "rv": {
+            "type": "string",
+            "description": "(source type: non-nullable timestamp)",
+            "contentEncoding": "base64"
+          }
+        }
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "_meta": {
+              "properties": {
+                "op": {
+                  "const": "d"
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "merge"
+          }
+        },
+        "else": {
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "op",
+              "source"
+            ],
+            "properties": {
+              "before": {
+                "$ref": "#DboDatatypes_RowversionTypes_rowversion_318641",
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "version": {
+                    "type": "integer",
+                    "description": "The Change Tracking version at which this event occurred. Only set for replication events"
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table"
+                ]
+              }
+            },
+            "reduce": {
+              "strategy": "merge"
+            }
+          }
+        }
+      },
+      {
+        "$ref": "#DboDatatypes_RowversionTypes_rowversion_318641"
+      }
+    ],
+    "x-infer-schema": true
+  },
+  "key": [
+    "/id"
+  ]
+}
+sql> INSERT INTO dbo.Datatypes_RowversionTypes_rowversion_318641 (id, data) VALUES (1, 'first'), (2, 'second')
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/dbo/datatypes_rowversiontypes_rowversion_318641",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_RowversionTypes_rowversion_318641"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "first",
+    "id": 1,
+    "rv": "<REDACTED>"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_rowversiontypes_rowversion_318641",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "snapshot": true,
+        "table": "Datatypes_RowversionTypes_rowversion_318641"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "second",
+    "id": 2,
+    "rv": "<REDACTED>"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDatatypes_RowversionTypes_rowversion_318641": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.Datatypes_RowversionTypes_rowversion_318641 (id, data) VALUES (3, 'third'), (4, 'fourth')
+sql> UPDATE dbo.Datatypes_RowversionTypes_rowversion_318641 SET data = 'updated' WHERE id = 2
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/dbo/datatypes_rowversiontypes_rowversion_318641",
+  {
+    "_meta": {
+      "op": "u",
+      "source": {
+        "schema": "dbo",
+        "table": "Datatypes_RowversionTypes_rowversion_318641",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "updated",
+    "id": 2,
+    "rv": "<REDACTED>"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_rowversiontypes_rowversion_318641",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "Datatypes_RowversionTypes_rowversion_318641",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "third",
+    "id": 3,
+    "rv": "<REDACTED>"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_rowversiontypes_rowversion_318641",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "schema": "dbo",
+        "table": "Datatypes_RowversionTypes_rowversion_318641",
+        "version": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "fourth",
+    "id": 4,
+    "rv": "<REDACTED>"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDatatypes_RowversionTypes_rowversion_318641": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
