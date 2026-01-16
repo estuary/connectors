@@ -164,6 +164,7 @@
         "hs_target_account_recommendation_snooze_time": null,
         "hs_target_account_recommendation_state": null,
         "hs_task_label": "HubSpot",
+        "hs_tax_id": null,
         "hs_time_in_customer": "redacted",
         "hs_time_in_evangelist": "redacted",
         "hs_time_in_lead": "redacted",

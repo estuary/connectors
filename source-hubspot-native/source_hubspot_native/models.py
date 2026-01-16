@@ -53,6 +53,7 @@ optional_scopes = [
     "crm.objects.goals.read",
     "crm.objects.orders.read",
     "crm.schemas.custom.read",
+    "marketing.campaigns.read",
 ]
 
 # TODO(johnny): Lift this string building into higher-order helpers.
@@ -184,6 +185,7 @@ class Names(StrEnum):
     feedback_submissions = auto()
     goals = auto()
     workflows = auto()
+    campaigns = auto()
 
 
 # A Property is a HubSpot or HubSpot-user defined attribute that's
@@ -759,3 +761,8 @@ class Order(BaseCRMObject):
     companies: list[int] = []
     deals: list[int] = []
     line_items: list[int] = []
+
+
+class Campaign(BaseDocument, extra="allow"):
+    id: str
+    updatedAt: AwareDatetime

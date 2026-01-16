@@ -13,6 +13,9 @@ from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 from .api import (
     FetchDelayedFn,
     FetchRecentFn,
+    check_campaigns_access,
+    fetch_campaigns,
+    fetch_campaigns_page,
     fetch_contact_list_memberships,
     fetch_contact_lists_page,
     check_contact_list_memberships_access,
@@ -61,6 +64,7 @@ from .api import (
 )
 from .models import (
     OAUTH2_SPEC,
+    Campaign,
     Company,
     Contact,
     CRMObject,
@@ -167,6 +171,10 @@ async def _remove_permission_blocked_resources(
                 datetime.now(tz=UTC),
                 None,
             ),
+        ),
+        (
+            Names.campaigns,
+            check_campaigns_access(http, log),
         ),
     ]
 
@@ -314,6 +322,7 @@ async def all_resources(
         contact_lists(http),
         contact_list_memberships(http),
         workflows(http),
+        campaigns(http),
         orders(http, with_history),
     ]
 
@@ -765,4 +774,37 @@ def orders(http: HTTPSession, with_history: bool) -> Resource:
         with_history,
         fetch_recent_orders,
         fetch_delayed_orders,
+    )
+
+
+def campaigns(http: HTTPSession) -> Resource:
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(fetch_campaigns, http),
+            fetch_page=functools.partial(fetch_campaigns_page, http),
+        )
+
+    started_at = datetime.now(tz=UTC)
+
+    return Resource(
+        name=Names.campaigns,
+        key=["/id"],
+        model=Campaign,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=started_at),
+            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+        ),
+        initial_config=ResourceConfig(name=Names.campaigns),
+        schema_inference=True,
     )
