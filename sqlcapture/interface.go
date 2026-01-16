@@ -3,6 +3,7 @@ package sqlcapture
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"time"
 
@@ -17,6 +18,35 @@ type StreamID struct {
 
 func (s StreamID) String() string {
 	return fmt.Sprintf("%s.%s", s.Schema, s.Table)
+}
+
+// EncodeKey returns an unambiguous string representation of the StreamID
+// suitable for use as a map key in serialized cursors. The schema and table
+// components are encoded so that periods can be used as the separator.
+func (s StreamID) EncodeKey() string {
+	var encodeComponent = func(str string) string {
+		str = strings.ReplaceAll(str, "%", "%25")
+		str = strings.ReplaceAll(str, ".", "%2E")
+		return str
+	}
+	return encodeComponent(s.Schema) + "." + encodeComponent(s.Table)
+}
+
+// ParseStreamIDKey parses a string key (produced by EncodeKey) back into a StreamID.
+func ParseStreamIDKey(key string) (StreamID, error) {
+	parts := strings.SplitN(key, ".", 2)
+	if len(parts) != 2 {
+		return StreamID{}, fmt.Errorf("invalid stream ID key %q: expected schema.table format", key)
+	}
+	schema, err := url.PathUnescape(parts[0])
+	if err != nil {
+		return StreamID{}, fmt.Errorf("invalid stream ID key %q: %w", key, err)
+	}
+	table, err := url.PathUnescape(parts[1])
+	if err != nil {
+		return StreamID{}, fmt.Errorf("invalid stream ID key %q: %w", key, err)
+	}
+	return StreamID{Schema: schema, Table: table}, nil
 }
 
 // This is a temporary hack to allow us to plumb through a feature flag setting for
