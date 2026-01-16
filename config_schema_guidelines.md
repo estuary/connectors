@@ -95,7 +95,7 @@ Example:
     "properties": {
         "apiKey": {
             "type": "string",
-            "title": "Super Secret Software Stuff"
+            "title": "Super Secret Software Stuff",
             "secret": true
         },
         "plainProperty": {
@@ -109,6 +109,17 @@ Example:
 #### `secret` annotation only supports `string` type
 
 When you have a secret you must have it be a single type of `string`. This is currently a limitation by the UI implementation and could change if required with some work.
+
+#### The UI does NOT support encrypting entire arrays
+
+SOPS allows arrays to be encrypted like the example below but the UI does not support this. The `create` flow should work fine but `edit` will break. This is only true due to keeping scope small. If this is required talk to the UI team and it can be added.
+
+```
+an_array:
+    - ENC[AES256_GCM,data:v8jQ=,iv:HBE=,aad:21c=,tag:gA==]
+    - ENC[AES256_GCM,data:X10=,iv:o8=,aad:CQ=,tag:Hw==]
+    - ENC[AES256_GCM,data:KN=,iv:160=,aad:fI4=,tag:tNw==]
+```
 
 #### Remember to test `edit` while using `secret`
 
