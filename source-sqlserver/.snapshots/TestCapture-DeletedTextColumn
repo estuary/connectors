@@ -1,0 +1,154 @@
+sql> CREATE TABLE dbo.Capture_DeletedTextColumn_986897 (id INTEGER PRIMARY KEY, v_text TEXT NOT NULL, v_varchar VARCHAR(32), v_int INTEGER)
+sql> INSERT INTO dbo.Capture_DeletedTextColumn_986897 VALUES (0, 'zero', 'zero', 100), (1, 'one', 'one', 101)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/capture_deletedtextcolumn_986897
+=== Run: Initial Backfill ===
+[
+  "acmeCo/test_capture/dbo/capture_deletedtextcolumn_986897",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_DeletedTextColumn_986897"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 0,
+    "v_int": 100,
+    "v_text": "zero",
+    "v_varchar": "zero"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_deletedtextcolumn_986897",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_DeletedTextColumn_986897"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1,
+    "v_int": 101,
+    "v_text": "one",
+    "v_varchar": "one"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCapture_DeletedTextColumn_986897": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.Capture_DeletedTextColumn_986897 VALUES (2, 'two', 'two', 102), (3, 'three', 'three', 103)
+sql> DELETE FROM dbo.Capture_DeletedTextColumn_986897 WHERE id = 1
+sql> DELETE FROM dbo.Capture_DeletedTextColumn_986897 WHERE id = 2
+=== Run: Replication With Deletes ===
+[
+  "acmeCo/test_capture/dbo/capture_deletedtextcolumn_986897",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "Capture_DeletedTextColumn_986897",
+        "updateMask": "Dw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 1,
+    "v_int": 101,
+    "v_varchar": "one"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_deletedtextcolumn_986897",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "Capture_DeletedTextColumn_986897",
+        "updateMask": "Dw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2,
+    "v_int": 102,
+    "v_text": "two",
+    "v_varchar": "two"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_deletedtextcolumn_986897",
+  {
+    "_meta": {
+      "op": "d",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "Capture_DeletedTextColumn_986897",
+        "updateMask": "Dw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 2,
+    "v_int": 102,
+    "v_varchar": "two"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_deletedtextcolumn_986897",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "Capture_DeletedTextColumn_986897",
+        "updateMask": "Dw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "id": 3,
+    "v_int": 103,
+    "v_text": "three",
+    "v_varchar": "three"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCapture_DeletedTextColumn_986897": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

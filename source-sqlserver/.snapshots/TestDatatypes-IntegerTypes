@@ -1,0 +1,156 @@
+sql> CREATE TABLE dbo.Datatypes_IntegerTypes_668394 (
+		id INTEGER PRIMARY KEY,
+		a_integer INTEGER,
+		a_bigint BIGINT,
+		a_int INT,
+		a_smallint SMALLINT,
+		a_tinyint TINYINT
+	)
+sql> INSERT INTO dbo.Datatypes_IntegerTypes_668394 VALUES
+		(1, 123, 1234567891234567, 2147483647, 32767, 255),
+		(2, -123, -1234567891234567, -2147483648, -32768, 0),
+		(3, NULL, NULL, NULL, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/dbo/datatypes_integertypes_668394
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/datatypes_integertypes_668394",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Datatypes_IntegerTypes_668394"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": 1234567891234567,
+    "a_int": 2147483647,
+    "a_integer": 123,
+    "a_smallint": 32767,
+    "a_tinyint": 255,
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_integertypes_668394",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Datatypes_IntegerTypes_668394"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": -1234567891234567,
+    "a_int": -2147483648,
+    "a_integer": -123,
+    "a_smallint": -32768,
+    "a_tinyint": 0,
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_integertypes_668394",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Datatypes_IntegerTypes_668394"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": null,
+    "a_int": null,
+    "a_integer": null,
+    "a_smallint": null,
+    "a_tinyint": null,
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDatatypes_IntegerTypes_668394": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.Datatypes_IntegerTypes_668394 VALUES
+		(101, 456, 9876543219876543, 1000000, 1000, 128),
+		(102, NULL, NULL, NULL, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/dbo/datatypes_integertypes_668394",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "Datatypes_IntegerTypes_668394",
+        "updateMask": "Pw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": 9876543219876543,
+    "a_int": 1000000,
+    "a_integer": 456,
+    "a_smallint": 1000,
+    "a_tinyint": 128,
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_integertypes_668394",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "Datatypes_IntegerTypes_668394",
+        "updateMask": "Pw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_bigint": null,
+    "a_int": null,
+    "a_integer": null,
+    "a_smallint": null,
+    "a_tinyint": null,
+    "id": 102
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDatatypes_IntegerTypes_668394": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
