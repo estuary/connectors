@@ -3,13 +3,11 @@ package main
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
-	"strings"
-	"time"
 
+	"github.com/estuary/connectors/go/capture/sqlserver/backfill"
+	"github.com/estuary/connectors/go/capture/sqlserver/version"
 	"github.com/estuary/connectors/sqlcapture"
-	mssqldb "github.com/microsoft/go-mssqldb"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -21,28 +19,8 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 	}
 
 	var checks = []func(ctx context.Context) error{
-		db.prerequisiteCDCEnabled,
-		db.prerequisiteChangeTableCleanup,
-		db.prerequisiteCaptureInstanceManagement,
-		db.prerequisiteMaximumLSN,
+		db.prerequisiteCTEnabled,
 		db.prerequisiteConnectionEncryption,
-	}
-
-	// In non-read-only mode we still need to verify watermarks table usability.
-	// In read-only non-replica mode we need to verify that sys.dm_cdc_log_scan_sessions is accessible.
-	// In read-only replica mode we have no additional requirements.
-	var isReplica, _ = isReplicaDatabase(ctx, db.conn)
-	if !db.featureFlags["read_only"] {
-		checks = append(checks,
-			db.prerequisiteWatermarksTable,
-			db.prerequisiteWatermarksCaptureInstance,
-		)
-	} else if isReplica || db.featureFlags["replica_fencing"] {
-		// No additional requirements for read-only replica mode.
-	} else {
-		checks = append(checks,
-			db.prerequisiteViewCDCScanHistory,
-		)
 	}
 
 	for _, prereq := range checks {
@@ -53,144 +31,64 @@ func (db *sqlserverDatabase) SetupPrerequisites(ctx context.Context) []error {
 	return errs
 }
 
-const (
-	reqMajorVersion = 14
-	reqMinorVersion = 0
-	reqRelease      = "SQL Server 2017" // Used for error messaging only; not part of version checks
-)
-
-// Per https://learn.microsoft.com/en-us/sql/t-sql/functions/version-transact-sql-configuration-functions,
-// the product version reported by @@VERSION is incorrect for Azure SQL Database, Azure SQL Managed
-// Instance and Azure Synapse Analytics. These are managed services and are always up-to-date, so we
-// will not bother checking them. They have EngineEdition's of '5' for Azure SQL Database, '8' for
-// Azure SQL Managed Instance, and '6' or '11' for Azure Synapse.
-var managedEditions = map[int]bool{
-	5:  true,
-	6:  true,
-	8:  true,
-	11: true,
-}
-
 func (db *sqlserverDatabase) prerequisiteVersion(ctx context.Context) error {
-	var engineEdition int
-	var version string
-
-	if err := db.conn.QueryRowContext(ctx, `SELECT SERVERPROPERTY('EngineEdition');`).Scan(&engineEdition); err != nil {
-		log.Warn(fmt.Errorf("unable to query 'EngineEdition' server property: %w", err))
-	} else if managedEditions[engineEdition] {
-		log.WithFields(log.Fields{
-			"engineEdition": engineEdition,
-		}).Info("skipping database version check for Azure managed database")
-		return nil
-	} else if err := db.conn.QueryRowContext(ctx, `SELECT SERVERPROPERTY('productversion');`).Scan(&version); err != nil {
-		log.Warn(fmt.Errorf("unable to query 'productversion' server property: %w", err))
-	} else if len(version) == 0 {
-		log.Warn("'productversion' server property query result was empty")
-	} else if major, minor, err := sqlcapture.ParseVersion(version); err != nil {
-		log.Warn(fmt.Errorf("unable to parse server version from '%s': %w", version, err))
-	} else if !sqlcapture.ValidVersion(major, minor, reqMajorVersion, reqMinorVersion) {
-		// Return an error only if the actual version could be definitively determined to be less
-		// than required.
-		return fmt.Errorf(
-			"minimum supported SQL Server version is %d.%d (%s): attempted to capture from database version %d.%d",
-			reqMajorVersion,
-			reqMinorVersion,
-			reqRelease,
-			major,
-			minor,
-		)
-	} else {
-		log.WithFields(log.Fields{
-			"version": version,
-			"major":   major,
-			"minor":   minor,
-		}).Info("queried database version")
+	info, err := version.Query(ctx, db.conn)
+	if err != nil {
+		log.WithField("err", err).Warn("unable to query server version")
 		return nil
 	}
 
-	// Catch-all trailing log message for cases where the server version could not be determined.
-	log.Warn(fmt.Sprintf(
-		"attempting to capture from unknown database version: minimum supported SQL Server version is %d.%d (%s)",
-		reqMajorVersion,
-		reqMinorVersion,
-		reqRelease,
-	))
+	log.WithFields(log.Fields{
+		"engineEdition": info.EngineEditionName,
+		"edition":       info.Edition,
+		"version":       info.ProductVersion,
+		"productLevel":  info.ProductLevel,
+		"major":         info.MajorVersion,
+		"minor":         info.MinorVersion,
+	}).Info("queried database version")
 
 	return nil
 }
 
-func (db *sqlserverDatabase) prerequisiteCDCEnabled(ctx context.Context) error {
+func (db *sqlserverDatabase) prerequisiteCTEnabled(ctx context.Context) error {
 	var logEntry = log.WithField("db", db.config.Database)
-	if cdcEnabled, err := isCDCEnabled(ctx, db.conn, db.config.Database); err != nil {
+	if ctEnabled, err := isCTEnabled(ctx, db.conn); err != nil {
 		return err
-	} else if cdcEnabled {
-		logEntry.Debug("CDC already enabled on database")
+	} else if ctEnabled {
+		logEntry.Debug("Change Tracking already enabled on database")
 		return nil
 	}
 
-	logEntry.Info("CDC not enabled, attempting to enable it")
-	if _, err := db.conn.ExecContext(ctx, `EXEC sys.sp_cdc_enable_db;`); err == nil {
-		if cdcEnabled, err := isCDCEnabled(ctx, db.conn, db.config.Database); err != nil {
+	logEntry.Info("Change Tracking not enabled, attempting to enable it")
+	var query = fmt.Sprintf(`ALTER DATABASE %s SET CHANGE_TRACKING = ON (CHANGE_RETENTION = 2 DAYS, AUTO_CLEANUP = ON);`, backfill.QuoteIdentifier(db.config.Database))
+	if _, err := db.conn.ExecContext(ctx, query); err == nil {
+		if ctEnabled, err := isCTEnabled(ctx, db.conn); err != nil {
 			return err
-		} else if cdcEnabled {
-			logEntry.Info("successfully enabled CDC on database")
+		} else if ctEnabled {
+			logEntry.Info("successfully enabled Change Tracking on database")
 			return nil
 		}
 	} else {
-		logEntry.WithField("err", err).Error("unable to enable CDC")
+		logEntry.WithField("err", err).Error("unable to enable Change Tracking")
 	}
 
-	return fmt.Errorf("CDC is not enabled on database %q and user %q cannot enable it", db.config.Database, db.config.User)
+	return fmt.Errorf("Change Tracking is not enabled on database %q and user %q cannot enable it", db.config.Database, db.config.User)
 }
 
-func isCDCEnabled(ctx context.Context, conn *sql.DB, dbName string) (bool, error) {
-	var cdcEnabled bool
-	if err := conn.QueryRowContext(ctx, fmt.Sprintf(`SELECT is_cdc_enabled FROM sys.databases WHERE name = '%s';`, dbName)).Scan(&cdcEnabled); err != nil {
-		return false, fmt.Errorf("unable to query CDC status of database %q: %w", dbName, err)
+func isCTEnabled(ctx context.Context, conn *sql.DB) (bool, error) {
+	// CHANGE_TRACKING_CURRENT_VERSION() returns NULL if CT is not enabled on the database.
+	var version sql.NullInt64
+	if err := conn.QueryRowContext(ctx, `SELECT CHANGE_TRACKING_CURRENT_VERSION();`).Scan(&version); err != nil {
+		return false, fmt.Errorf("unable to query Change Tracking status: %w", err)
 	}
-	return cdcEnabled, nil
-}
-
-func (db *sqlserverDatabase) prerequisiteChangeTableCleanup(ctx context.Context) error {
-	// If automatic change-table cleanup is not in use there is nothing to verify here.
-	if !db.config.Advanced.AutomaticChangeTableCleanup {
-		return nil
-	}
-
-	if hasPermission, err := currentUserHasDBOwner(ctx, db.conn); err != nil {
-		return fmt.Errorf("error querying 'db_owner' role membership: %w", err)
-	} else if !hasPermission {
-		return fmt.Errorf("user %q does not have the \"db_owner\" role which is required for automatic change table cleanup", db.config.User)
-	}
-	return nil
-}
-
-func (db *sqlserverDatabase) prerequisiteCaptureInstanceManagement(ctx context.Context) error {
-	// If automatic capture instance management is not in use there is nothing to verify here.
-	if !db.config.Advanced.AutomaticCaptureInstances {
-		return nil
-	}
-
-	if hasPermission, err := currentUserHasDBOwner(ctx, db.conn); err != nil {
-		return fmt.Errorf("error querying 'db_owner' role membership: %w", err)
-	} else if !hasPermission {
-		return fmt.Errorf("user %q does not have the \"db_owner\" role which is required for automatic change table cleanup", db.config.User)
-	}
-	return nil
+	return version.Valid, nil
 }
 
 func (db *sqlserverDatabase) prerequisiteConnectionEncryption(ctx context.Context) error {
 	var sessionId int
-	if err := db.conn.QueryRowContext(ctx, `SELECT @@SPID;`).Scan(&sessionId); err != nil {
-		log.Warn(fmt.Errorf("unable to query @@SPID: %w", err))
-	}
-
 	var encryptOption bool
-	if err := db.conn.QueryRowContext(ctx, `SELECT encrypt_option FROM sys.dm_exec_connections WHERE session_id = @@SPID;`).Scan(&encryptOption); err != nil {
-		log.WithFields(log.Fields{
-			"err":       err,
-			"sessionId": sessionId,
-		}).Debug("unable to query connection encryption option")
+	if err := db.conn.QueryRowContext(ctx, `SELECT @@SPID, encrypt_option FROM sys.dm_exec_connections WHERE session_id = @@SPID;`).Scan(&sessionId, &encryptOption); err != nil {
+		log.WithField("err", err).Debug("unable to query connection encryption option")
 	} else {
 		log.WithFields(log.Fields{
 			"encrypted": encryptOption,
@@ -201,116 +99,84 @@ func (db *sqlserverDatabase) prerequisiteConnectionEncryption(ctx context.Contex
 	return nil
 }
 
-func currentUserHasDBOwner(ctx context.Context, conn *sql.DB) (bool, error) {
-	var isMember *int
-	if err := conn.QueryRowContext(ctx, "SELECT IS_ROLEMEMBER('db_owner');").Scan(&isMember); err != nil {
-		return false, err
-	} else if isMember == nil {
-		return false, fmt.Errorf("unexpected null result") // should never happen
-	} else if *isMember == 1 {
-		return true, nil
-	}
-	return false, nil
-}
-
-func (db *sqlserverDatabase) prerequisiteViewCDCScanHistory(ctx context.Context) error {
-	var _, err = latestCDCLogScanSession(ctx, db.conn)
-	if err != nil {
-		log.WithField("err", err).Error("failed to list CDC log scan sessions")
-		var msErr mssqldb.Error
-		if errors.As(err, &msErr) && msErr.SQLErrorNumber() == 297 { // Error 297 = "The user does not have permission to perform this action"
-			return fmt.Errorf("user %q needs the VIEW DATABASE STATE permission", db.config.User)
-		}
-		return fmt.Errorf("failed to query sys.dm_cdc_log_scan_sessions: %w", err)
-	}
-	return nil
-}
-
-func (db *sqlserverDatabase) prerequisiteWatermarksTable(ctx context.Context) error {
-	var table = db.config.Advanced.WatermarksTable
-	var logEntry = log.WithField("table", table)
-
-	if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
-		logEntry.Debug("watermarks table already exists")
-		return nil
-	}
-
-	// If we can create the watermarks table and then write a watermark, that also works
-	logEntry.Info("watermarks table doesn't exist, attempting to create it")
-	if err := db.createWatermarksTable(ctx); err == nil {
-		if err := db.WriteWatermark(ctx, "existence-check"); err == nil {
-			logEntry.Info("successfully created watermarks table")
-			return nil
-		} else {
-			logEntry.WithField("err", err).Error("watermark write failed")
-		}
-	} else {
-		logEntry.WithField("err", err).Error("failed to create watermarks table")
-	}
-
-	// Otherwise this is a failure
-	return fmt.Errorf("user %q cannot write to the watermarks table %q", db.config.User, table)
-}
-
-func (db *sqlserverDatabase) prerequisiteWatermarksCaptureInstance(ctx context.Context) error {
-	var schema, table = splitStreamID(db.config.Advanced.WatermarksTable)
-	var tableID = sqlcapture.TableID{Schema: schema, Table: table}
-	return db.prerequisiteTableCaptureInstances(ctx, []sqlcapture.TableID{tableID})[tableID]
-}
-
-func splitStreamID(streamID string) (string, string) {
-	var bits = strings.SplitN(streamID, ".", 2)
-	return bits[0], bits[1]
-}
-
-func (db *sqlserverDatabase) prerequisiteMaximumLSN(ctx context.Context) error {
-	// Retry loop with a 1s delay between retries, in case the watermarks table
-	// capture instance was the first one created on this database.
-	var err error
-	for retry := range 10 {
-		if _, err = cdcGetMaxLSN(ctx, db.conn); err == nil {
-			log.WithField("retry", retry).Debug("got current CDC LSN")
-			return nil
-		}
-		time.Sleep(1 * time.Second)
-	}
-	return err
-}
-
 func (db *sqlserverDatabase) SetupTablePrerequisites(ctx context.Context, tables []sqlcapture.TableID) map[sqlcapture.TableID]error {
-	return db.prerequisiteTableCaptureInstances(ctx, tables)
-}
-
-// prerequisiteTableCaptureInstances checks that each table has at least one CDC capture
-// instance, attempting to create one if not. Returns a map of errors keyed by table ID.
-func (db *sqlserverDatabase) prerequisiteTableCaptureInstances(ctx context.Context, tables []sqlcapture.TableID) map[sqlcapture.TableID]error {
 	var errs = make(map[sqlcapture.TableID]error)
 
-	// Query all capture instances once upfront
-	captureInstances, err := cdcListCaptureInstances(ctx, db.conn)
+	// Query CT-enabled tables once upfront for efficiency
+	ctEnabledTables, err := db.ctEnabledTables(ctx)
 	if err != nil {
 		for _, table := range tables {
-			errs[table] = fmt.Errorf("unable to query capture instances: %w", err)
+			errs[table] = fmt.Errorf("unable to query CT-enabled tables: %w", err)
 		}
 		return errs
 	}
 
 	for _, table := range tables {
-		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Table)
-		var logEntry = log.WithField("table", streamID)
-
-		// If the table has at least one preexisting capture instance then we're happy
-		if instances := captureInstances[streamID]; len(instances) > 0 {
-			logEntry.WithField("instances", instances).Debug("table has capture instances")
-			continue
-		}
-
-		// Otherwise we attempt to create one
-		if instanceName, err := cdcCreateCaptureInstance(ctx, db.conn, table.Schema, table.Table, db.config.User, db.config.Advanced.Filegroup, db.config.Advanced.RoleName); err == nil {
-			logEntry.WithField("instance", instanceName).Info("enabled cdc for table")
-		} else {
-			errs[table] = fmt.Errorf("table %q has no capture instances and user %q cannot create one", streamID, db.config.User)
+		if err := db.prerequisiteTableCTEnabled(ctx, ctEnabledTables, table.Schema, table.Table); err != nil {
+			errs[table] = err
 		}
 	}
 	return errs
+}
+
+func (db *sqlserverDatabase) prerequisiteTableCTEnabled(ctx context.Context, ctEnabledTables map[sqlcapture.StreamID]bool, schema, table string) error {
+	var streamID = sqlcapture.JoinStreamID(schema, table)
+	var logEntry = log.WithField("table", streamID)
+
+	// Check if Change Tracking is already enabled for this table. If so, we're done
+	// (and the table must necessarily exist if CT is enabled on it).
+	if ctEnabledTables[streamID] {
+		logEntry.Debug("Change Tracking already enabled for table")
+		return nil
+	}
+
+	// Check if the table exists.
+	if exists, err := tableExists(ctx, db.conn, schema, table); err != nil {
+		return fmt.Errorf("unable to check if table %q exists: %w", streamID, err)
+	} else if !exists {
+		return fmt.Errorf("table %q does not exist", streamID)
+	}
+
+	// Check if the table has a primary key (required for Change Tracking).
+	if hasPK, err := tableHasPrimaryKey(ctx, db.conn, schema, table); err != nil {
+		return fmt.Errorf("unable to query primary key for table %q: %w", streamID, err)
+	} else if !hasPK {
+		return fmt.Errorf("table %q does not have a primary key, which is required for Change Tracking", streamID)
+	}
+
+	// Attempt to enable Change Tracking on the table.
+	logEntry.Info("Change Tracking not enabled for table, attempting to enable it")
+	var query = fmt.Sprintf(`ALTER TABLE %s ENABLE CHANGE_TRACKING;`, backfill.QuoteTableName(schema, table))
+	if _, err := db.conn.ExecContext(ctx, query); err == nil {
+		logEntry.Info("successfully enabled Change Tracking for table")
+		return nil
+	} else {
+		logEntry.WithField("err", err).Error("unable to enable Change Tracking for table")
+	}
+
+	return fmt.Errorf("Change Tracking is not enabled for table %q and user %q cannot enable it", streamID, db.config.User)
+}
+
+func tableExists(ctx context.Context, conn *sql.DB, schema, table string) (bool, error) {
+	var objectName = backfill.QuoteTableName(schema, table)
+	var objectID sql.NullInt64
+	if err := conn.QueryRowContext(ctx, `SELECT OBJECT_ID(@p1, 'U');`, objectName).Scan(&objectID); err != nil {
+		return false, err
+	}
+	return objectID.Valid, nil
+}
+
+func tableHasPrimaryKey(ctx context.Context, conn *sql.DB, schema, table string) (bool, error) {
+	var count int
+	var query = `
+		SELECT COUNT(*)
+		FROM sys.indexes i
+		WHERE i.object_id = OBJECT_ID(@p1)
+		  AND i.is_primary_key = 1;
+	`
+	var objectName = backfill.QuoteTableName(schema, table)
+	if err := conn.QueryRowContext(ctx, query, objectName).Scan(&count); err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

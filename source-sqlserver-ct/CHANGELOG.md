@@ -1,5 +1,5 @@
-# source-sqlserver
+# source-sqlserver-ct
 
-## v0, 2023-01-05
+## v1, 2026-01-20
 
-- Beginning of changelog and start of connector implementation work.
+- Connector created.

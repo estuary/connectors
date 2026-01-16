@@ -1,52 +1,53 @@
-Flow Source Connector: MS SQL Server
-====================================
+Flow Source Connector: MS SQL Server (Change Tracking)
+======================================================
 
 This is a Flow [capture connector](https://docs.estuary.dev/concepts/captures/)
-which captures change events from a Microsoft SQL Server database.
+which captures change events from a Microsoft SQL Server database using
+SQL Server's Change Tracking feature.
 
-### Change Tables
+### Change Tracking
 
-Unlike many databases, SQL Server does not provide clients with direct access
-to WAL events. Instead, it uses a "change tables" abstraction. Basically you
-enable CDC on a particular source table, and this creates a destination "change table"
-in the `cdc` schema as well as performing some other setup, and then the "Agent"
-process will tail the writeahead log and periodically write change events into
-the change table.
+Change Tracking is a lightweight synchronous mechanism built into SQL Server
+that tracks which rows have changed in a table. Unlike CDC (Change Data Capture),
+which uses the transaction log and an asynchronous agent process, Change Tracking:
 
-This is actually kind of nice, because it means that there's only one code path
-along which value encoding/decoding/translation takes place. But it's also a pain
-because:
+  1. Records changes synchronously as part of each transaction
+  2. Only tracks that a row changed (insert/update/delete) and provides the primary key
+  3. Does not store the actual changed values, those must be fetched by joining with the source table
+  4. Has lower overhead and simpler setup than CDC
+  5. Requires tables to have a primary key
 
-  1. Waiting on the agent to write new events to the change table adds latency.
-  2. We have to poll the change tables for new events periodically, and this also
-     adds latency.
-
-This is mostly an issue for small-scale testing, as these overheads are more or
-less fixed and unrelated to the actual volume of changes. But this makes our
-automated test suite runs take 10-20x longer than they do on other databases.
+This connector polls for changes using the `CHANGETABLE(CHANGES ...)` function and
+joins with the source table to get the current row values for inserts and updates.
 
 ### Developing
 
 Some useful commands for working with a test instance of SQL Server:
 
-    $ docker-compose -f ./source-sqlserver/docker-compose.yaml exec db /opt/mssql-tools18/bin/sqlcmd -C -U sa -P gf6w6dkD
+    $ docker-compose -f ./source-sqlserver-ct/docker-compose.yaml exec db /opt/mssql-tools18/bin/sqlcmd -C -U sa -P gf6w6dkD
 
-    ## Enabling CDC on a database
+    ## Enabling Change Tracking on a database
     > CREATE DATABASE test;
     > GO
     > USE test;
     > GO
-    > EXEC sys.sp_cdc_enable_db;
+    > ALTER DATABASE test SET CHANGE_TRACKING = ON (CHANGE_RETENTION = 2 DAYS, AUTO_CLEANUP = ON);
     > GO
 
-    ## Enabling CDC on a specific table
+    ## Enabling Change Tracking on a specific table
     > CREATE TABLE foobar (id INTEGER PRIMARY KEY, data TEXT);
     > GO
-    > EXEC sys.sp_cdc_help_change_data_capture;
+    > ALTER TABLE foobar ENABLE CHANGE_TRACKING;
     > GO
-    > EXEC sys.sp_cdc_enable_table @source_schema = N'dbo', @source_name = N'foobar', @role_name = N'sa', @capture_instance = N'dbo_foobar';
+
+    ## Querying the current Change Tracking version
+    > SELECT CHANGE_TRACKING_CURRENT_VERSION();
     > GO
 
 Building connector images:
 
-    $ docker build --network=flow-test -t source-sqlserver:local -f source-sqlserver/Dockerfile .
+    $ docker build --network=flow-test -t source-sqlserver-ct:local -f source-sqlserver-ct/Dockerfile .
+
+Running tests:
+
+    $ ./source-sqlserver-ct/run_tests.sh

@@ -48,15 +48,14 @@ func (db *sqlserverDatabase) ReplicationDiagnostics(ctx context.Context) error {
 	}
 
 	query("SELECT * FROM sys.dm_server_services;")
-	query("SELECT * FROM sys.dm_cdc_log_scan_sessions;")
-	query("SELECT * FROM sys.dm_cdc_errors;")
-	query("EXEC msdb.dbo.sp_help_job;")
-	query("EXEC sys.sp_cdc_help_jobs;")
-	query("SELECT * FROM msdb.dbo.cdc_jobs;")
-	query("EXEC sys.sp_cdc_help_change_data_capture;")
+	query("SELECT * FROM sys.change_tracking_databases;")
+	query("SELECT * FROM sys.change_tracking_tables;")
 	return nil
 }
 
 func (db *sqlserverDatabase) PeriodicChecks(ctx context.Context) error {
+	// Intentionally empty. This method is part of the sqlcapture.Database interface
+	// and is called periodically during capture, but Change Tracking does not require
+	// any periodic maintenance or status checks.
 	return nil
 }
