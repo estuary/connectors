@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/segmentio/encoding/json"
-	"golang.org/x/sync/errgroup"
 
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
@@ -554,99 +553,22 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 		}).Info("processed replication events")
 	}()
 
-	// Commit buffering state. Depending on write patterns, commit events can be a substantial fraction
-	// of the overall WAL event stream. And unlike change events, any individual commit event may be
-	// ignored so long as we guarantee that there will be commit that gets emitted every so often, and
-	// that if the stream of changes becomes idle the last commit event gets emitted in a timely fashion.
-	//
-	// Our solution here has a couple of moving pieces in order to account for all the edge cases. The
-	// main elements in practice are the timer and `processNext` boolean: we set the timer, then when it
-	// fires we set the boolean, and then when it's true the next commit event we receive will actually be
-	// processed. Thus if the change stream is sufficiently busy, we simply process one commit every
-	// <commitBufferingInterval> milliseconds and ignore any others.
-	//
-	// However if the change stream goes idle, we need to ensure that the last commit event is processed.
-	// That's where the `event` field comes in: it's set whenever we receive a commit event and do not
-	// immediately process it, cleared by any other event, and then if there's an event still present when
-	// the timer fires we output that instead of setting `processNext`. This means that if the stream goes
-	// idle after a transaction, we will emit the final commit after at most <commitBufferingInterval>.
-	//
-	// This assumes that there is no way for a change stream to go idle after a non-commit event, but this
-	// is already true both as a property of how our source DBs work and because of how StreamToFence is
-	// implemented for all our connectors.
-	const commitBufferingInterval = 100 * time.Millisecond
-	var processCommit = func(event CommitEvent) error {
-		var cursorJSON, err = event.AppendJSON(nil)
-		if err != nil {
-			return fmt.Errorf("error serializing commit cursor: %w", err)
-		}
-		c.State.Cursor = cursorJSON
-		if reportFlush {
-			if err := c.emitState(); err != nil {
-				return fmt.Errorf("error emitting state update: %w", err)
-			}
-		}
-		return nil
-	}
-	var bufferedCommit struct {
-		sync.Mutex
-		processNext bool        // True when the next commit event should be processed immediately, false when it should be buffered.
-		event       CommitEvent // When we have a buffered commit event which hasn't yet been processed or invalidated, this is it. Otherwise it's nil.
-	}
-	var workerCtx, cancelWorkerCtx = context.WithCancel(ctx) // Context for the commit buffering worker goroutine
-	defer cancelWorkerCtx()                                  // Ensure that the worker goroutine always exits when we do
-	var workerGroup errgroup.Group
-	defer cancelWorkerCtx() // Ensure that the worker goroutine is cancelled when we return
-	workerGroup.Go(func() error {
-		var ticker = time.NewTicker(commitBufferingInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-workerCtx.Done():
-				return workerCtx.Err() // Exit the worker goroutine when the context is cancelled
-			case <-ticker.C: // Every <commitBufferingInterval> milliseconds, check if we need to process a buffered commit.
-				bufferedCommit.Lock()
-				if bufferedCommit.event == nil {
-					// No buffered commit, so we should process the next one immediately on the main thread.
-					bufferedCommit.processNext = true
-				} else {
-					// Buffered commit exists, so we should process it now.
-					if err := processCommit(bufferedCommit.event); err != nil {
-						bufferedCommit.Unlock()
-						return fmt.Errorf("error processing buffered commit: %w", err)
-					}
-					bufferedCommit.processNext = false
-					bufferedCommit.event = nil
-				}
-				bufferedCommit.Unlock()
-			}
-		}
-	})
-
 	if err := replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
-		// Flush events update the checkpoint LSN and may trigger a state update.
+		// Commit events update the checkpoint cursor and may trigger a state update.
 		if event, ok := event.(CommitEvent); ok {
 			flushCount++
-			bufferedCommit.Lock()
-			if bufferedCommit.processNext {
-				bufferedCommit.processNext = false
-				if err := processCommit(event); err != nil {
-					bufferedCommit.Unlock()
-					return fmt.Errorf("error processing immediate commit: %w", err)
-				}
-			} else {
-				bufferedCommit.event = event
+			var cursorJSON, err = event.AppendJSON(nil)
+			if err != nil {
+				return fmt.Errorf("error serializing commit cursor: %w", err)
 			}
-			bufferedCommit.Unlock()
+			c.State.Cursor = cursorJSON
+			if reportFlush {
+				if err := c.emitState(); err != nil {
+					return fmt.Errorf("error emitting state update: %w", err)
+				}
+			}
 			return nil
 		}
-
-		// Any other events clear the buffered commit event, since it is no longer valid after any other events.
-		bufferedCommit.Lock()
-		if bufferedCommit.event != nil {
-			bufferedCommit.event = nil
-		}
-		bufferedCommit.Unlock()
 
 		// The core event dispatch happens in handleReplicationEvent but it's useful to
 		// count changes separately from other stuff here.
@@ -665,22 +587,6 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 	}); err != nil {
 		return err
 	}
-
-	// Shut down the commit buffering worker goroutine, ensure that it exits,
-	// and then ensure that the final buffered commit (if any) is processed.
-	cancelWorkerCtx()
-	if err := workerGroup.Wait(); err != nil && !errors.Is(err, context.Canceled) {
-		return fmt.Errorf("error from commit buffering worker: %w", err)
-	}
-	bufferedCommit.Lock()
-	if bufferedCommit.event != nil {
-		if err := processCommit(bufferedCommit.event); err != nil {
-			bufferedCommit.Unlock()
-			return fmt.Errorf("error processing final commit: %w", err)
-		}
-		bufferedCommit.event = nil // Clear the event after processing
-	}
-	bufferedCommit.Unlock()
 
 	return nil
 }

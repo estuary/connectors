@@ -93,6 +93,7 @@ type Binding struct {
 // captures from a SQL database.
 type Driver struct {
 	ConfigSchema     json.RawMessage
+	ResourceSchema   json.RawMessage // Optional: if set, overrides the default resource schema
 	DocumentationURL string
 
 	Connect func(ctx context.Context, name string, cfg json.RawMessage) (Database, error)
@@ -144,14 +145,18 @@ func docsURLFromEnv(providedURL string) string {
 // Spec returns the specification definition of this driver.
 // Notably this includes its endpoint and resource configuration JSON schema.
 func (d *Driver) Spec(ctx context.Context, req *pc.Request_Spec) (*pc.Response_Spec, error) {
-	var resourceSchema, err = schemagen.GenerateSchema("SQL Database Resource Spec", &Resource{}).MarshalJSON()
-	if err != nil {
-		return nil, fmt.Errorf("generating resource schema: %w", err)
+	resourceSchema := d.ResourceSchema
+	if resourceSchema == nil {
+		var err error
+		resourceSchema, err = schemagen.GenerateSchema("SQL Database Resource Spec", &Resource{}).MarshalJSON()
+		if err != nil {
+			return nil, fmt.Errorf("generating resource schema: %w", err)
+		}
 	}
 	return &pc.Response_Spec{
 		Protocol:                 3032023,
 		ConfigSchemaJson:         d.ConfigSchema,
-		ResourceConfigSchemaJson: json.RawMessage(resourceSchema),
+		ResourceConfigSchemaJson: resourceSchema,
 		DocumentationUrl:         docsURLFromEnv(d.DocumentationURL),
 		ResourcePathPointers:     []string{"/namespace", "/stream"},
 	}, nil
