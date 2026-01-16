@@ -1,0 +1,91 @@
+sql> CREATE TABLE dbo.Capture_TextCollation_902496 (id VARCHAR(8) PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.Capture_TextCollation_902496 VALUES ('AAA', '1'), ('BBB', '2'), ('-J C', '3'), ('H R', '4')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/capture_textcollation_902496
+=== Run: Capture ===
+[
+  "acmeCo/test_capture/dbo/capture_textcollation_902496",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_TextCollation_902496"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "3",
+    "id": "-J C"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_textcollation_902496",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_TextCollation_902496"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "1",
+    "id": "AAA"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_textcollation_902496",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_TextCollation_902496"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "2",
+    "id": "BBB"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_textcollation_902496",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_TextCollation_902496"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "4",
+    "id": "H R"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCapture_TextCollation_902496": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
