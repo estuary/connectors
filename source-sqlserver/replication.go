@@ -15,6 +15,8 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/go/encrow"
+	"github.com/estuary/connectors/go/sqlserver/change"
+	"github.com/estuary/connectors/go/sqlserver/datatypes"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -305,7 +307,7 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 					return err
 				}
 				timedEventsSinceFlush++
-				if event, ok := event.(*sqlserverCommitEvent); ok {
+				if event, ok := event.(*sqlserverCommitEventCDC); ok {
 					latestFlushLSN = event.CommitLSN
 					timedEventsSinceFlush = 0
 				}
@@ -340,7 +342,7 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlserverCommitEvent{CommitLSN: latestFlushLSN})
+		return callback(&sqlserverCommitEventCDC{CommitLSN: latestFlushLSN})
 	}
 
 	// Given that the early-exit fast path was not taken, there must be further data for
@@ -367,7 +369,7 @@ func (rs *sqlserverReplicationStream) streamToReplicaFence(ctx context.Context, 
 
 			// Mark the fence as reached when we observe a commit event whose cursor value
 			// is greater than or equal to the fence LSN.
-			if event, ok := event.(*sqlserverCommitEvent); ok {
+			if event, ok := event.(*sqlserverCommitEventCDC); ok {
 				if bytes.Compare(event.CommitLSN, nextFenceLSN) >= 0 {
 					log.WithField("event", event).Debug("finished fenced streaming phase")
 					rs.fenceLSN = bytes.Clone(event.CommitLSN)
@@ -447,7 +449,7 @@ loop:
 				return err
 			}
 			timedEventsSinceFlush++
-			if event, ok := event.(*sqlserverCommitEvent); ok {
+			if event, ok := event.(*sqlserverCommitEventCDC); ok {
 				latestFlushLSN = event.CommitLSN
 				timedEventsSinceFlush = 0
 			}
@@ -473,7 +475,7 @@ loop:
 		// transactions, we can safely emit a synthetic FlushEvent here. This means
 		// that every StreamToFence operation ends in a flush, and is helpful since
 		// there's a lot of implicit assumptions of regular events / flushes.
-		return callback(&sqlserverCommitEvent{CommitLSN: latestFlushLSN})
+		return callback(&sqlserverCommitEventCDC{CommitLSN: latestFlushLSN})
 	}
 
 	// Given that the early-exit fast path was not taken, there must be further data for
@@ -500,7 +502,7 @@ loop:
 
 			// Mark the fence as reached when we observe a commit event whose cursor value
 			// is greater than or equal to the fence LSN.
-			if event, ok := event.(*sqlserverCommitEvent); ok {
+			if event, ok := event.(*sqlserverCommitEventCDC); ok {
 				if bytes.Compare(event.CommitLSN, nextFenceLSN) >= 0 {
 					log.WithField("event", event).Debug("finished fenced streaming phase")
 					rs.fenceLSN = bytes.Clone(event.CommitLSN)
@@ -674,7 +676,7 @@ func (rs *sqlserverReplicationStream) streamToWatermarkFence(ctx context.Context
 			}
 
 			// The flush event following the watermark change ends the stream-to-fence operation.
-			if _, ok := event.(*sqlserverCommitEvent); ok && fenceReached {
+			if _, ok := event.(*sqlserverCommitEventCDC); ok && fenceReached {
 				return nil
 			}
 		}
@@ -758,7 +760,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 		// Emit a redundant checkpoint even if we've established that there are no new
 		// changes. This ensures that the positional stream-to-fence logic will always
 		// get an opportunity to observe the latest position.
-		var event = &sqlserverCommitEvent{CommitLSN: toLSN}
+		var event = &sqlserverCommitEventCDC{CommitLSN: toLSN}
 		log.WithField("event", event).Trace("server lsn hasn't advanced, not polling any tables")
 		rs.emitEvent(ctx, event)
 		return nil
@@ -856,7 +858,7 @@ func (rs *sqlserverReplicationStream) pollChanges(ctx context.Context) error {
 		return err
 	}
 
-	var event = &sqlserverCommitEvent{CommitLSN: toLSN}
+	var event = &sqlserverCommitEventCDC{CommitLSN: toLSN}
 	log.WithField("event", event).Debug("checkpoint after polling")
 	rs.emitEvent(ctx, event)
 	rs.fromLSN = toLSN
@@ -1081,11 +1083,11 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 	}
 
 	// Preprocess result metadata for efficient row handling.
-	var outputColumnNames = make([]string, len(cnames))         // Names of all columns, with omitted columns set to ""
-	var outputColumnTypes = make([]any, len(cnames))            // Types of all columns, with omitted columns set to nil
-	var outputTranscoders = make([]jsonTranscoder, len(cnames)) // Transcoders for all columns, with omitted columns set to nil
-	var rowKeyTranscoders = make([]fdbTranscoder, len(cnames))  // Transcoders for all columns, with omitted columns set to nil
-	var deleteNullability = make([]bool, len(cnames))           // Whether nil values of a particular column should be included in delete events.
+	var outputColumnNames = make([]string, len(cnames))                   // Names of all columns, with omitted columns set to ""
+	var outputColumnTypes = make([]any, len(cnames))                      // Types of all columns, with omitted columns set to nil
+	var outputTranscoders = make([]datatypes.JSONTranscoder, len(cnames)) // Transcoders for all columns, with omitted columns set to nil
+	var rowKeyTranscoders = make([]datatypes.FDBTranscoder, len(cnames))  // Transcoders for all columns, with omitted columns set to nil
+	var deleteNullability = make([]bool, len(cnames))                     // Whether nil values of a particular column should be included in delete events.
 	for idx, name := range cnames {
 		// Computed columns always have a value of null in the change table so we should never capture them.
 		// One wonders why they're present in the change table at all, but this is a documented fact about SQL Server CDC.
@@ -1095,17 +1097,17 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 
 		outputColumnNames[idx] = name
 		outputColumnTypes[idx] = info.ColumnTypes[name]
-		outputTranscoders[idx] = rs.db.replicationJSONTranscoder(info.ColumnTypes[name])
+		outputTranscoders[idx] = datatypes.NewJSONTranscoder(info.ColumnTypes[name], rs.db.datatypesConfig)
 		deleteNullability[idx] = true // By default we assume that all columns are nullable in delete events, and only override this for specific columns below.
 		if slices.Contains(info.KeyColumns, name) {
-			rowKeyTranscoders[idx] = rs.db.replicationFDBTranscoder(info.ColumnTypes[name])
+			rowKeyTranscoders[idx] = datatypes.NewFDBTranscoder(info.ColumnTypes[name])
 		}
 
 		// Key columns should be assumed to always be present. They should also never be nil so the
 		// value shouldn't matter, but excluding key columns is the maximally safe behavior here.
 		if !slices.Contains(info.KeyColumns, name) {
 			if colInfo, ok := info.Columns[name]; ok {
-				if textType, ok := colInfo.DataType.(*sqlserverTextColumnType); ok && (textType.Type == "text" || textType.Type == "ntext") {
+				if textType, ok := colInfo.DataType.(*datatypes.TextColumnType); ok && (textType.Type == "text" || textType.Type == "ntext") {
 					// According to MS documentation, text and ntext columns are always omitted (null) in delete events.
 					deleteNullability[idx] = false
 				} else if colInfo.DataType == "image" {
@@ -1158,7 +1160,7 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 		}
 	}
 
-	var replicationEventInfo = &sqlserverChangeSharedInfo{
+	var replicationEventInfo = &change.SharedInfo{
 		StreamID:          info.StreamID,
 		Shape:             encrow.NewShape(outputColumnNames),
 		Transcoders:       outputTranscoders,
@@ -1223,9 +1225,9 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 
 		var event = &sqlserverChangeEvent{
 			Shared: replicationEventInfo,
-			Meta: sqlserverChangeMetadata{
+			Meta: sqlserverChangeMetadataCDC{
 				Operation: operation,
-				Source: sqlserverSourceInfo{
+				Source: sqlserverSourceInfoCDC{
 					SourceCommon: sqlcapture.SourceCommon{
 						Schema: info.SchemaName,
 						Table:  info.TableName,
