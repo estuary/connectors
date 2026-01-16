@@ -38,7 +38,7 @@ FOLDER_PROCESSING_SEMAPHORE = asyncio.Semaphore(5)
 # model.json metadata files are not updated after they're written.
 # So there's no need to expire cache results with a TTL to ensure
 # we capture updates to these files.
-@alru_cache(maxsize=4, ttl=None)
+@alru_cache(maxsize=32, ttl=None)
 async def fetch_model_dot_json(
     client: ADLSGen2Client,
     directory: str | None = None,
