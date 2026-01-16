@@ -19,7 +19,7 @@ from .models import (
     ModelDotJson,
     tables_from_model_dot_json,
 )
-from .shared import is_datetime_format, str_to_dt
+from .shared import call_with_cache_logging, is_datetime_format, str_to_dt
 
 
 MINIMUM_AZURE_SYNAPSE_LINK_EXPORT_INTERVAL = 300             # 5 minutes
@@ -61,8 +61,11 @@ async def get_table(
     timestamp: str,
     table_name: str,
     client: ADLSGen2Client,
+    log: Logger,
 ) -> type[BaseTable]:
-    model_dot_json = await fetch_model_dot_json(client, timestamp)
+    model_dot_json = await call_with_cache_logging(
+        fetch_model_dot_json, log, client, timestamp
+    )
     tables = tables_from_model_dot_json(model_dot_json)
 
     for table in tables:
@@ -141,6 +144,7 @@ async def read_csvs_in_folder(
     folder: str,
     table_name: str,
     client: ADLSGen2Client,
+    log: Logger,
 ) -> AsyncGenerator[dict, None]:
     folder_contents = await get_folder_contents_for_table(folder, table_name, client)
 
@@ -159,6 +163,7 @@ async def read_csvs_in_folder(
             timestamp=folder,
             table_name=table_name,
             client=client,
+            log=log,
         )
 
         csvs.sort(key=lambda c: c.last_modified_datetime)
@@ -196,7 +201,9 @@ async def fetch_changes(
 ) -> AsyncGenerator[dict | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    finalized_folders = await get_finalized_timestamp_folders(client)
+    finalized_folders = await call_with_cache_logging(
+        get_finalized_timestamp_folders, log, client
+    )
 
     for folder in finalized_folders:
         if (
@@ -211,7 +218,7 @@ async def fetch_changes(
 
         async with FOLDER_PROCESSING_SEMAPHORE:
             log.debug(f"Reading CSVs in {folder}/{table_name}.")
-            async for row in read_csvs_in_folder(folder, table_name, client):
+            async for row in read_csvs_in_folder(folder, table_name, client, log):
                 yield row
 
             log.debug(f"Read all CSVs in folder. Yielding folder name as new cursor.", {
