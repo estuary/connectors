@@ -1,0 +1,351 @@
+sql> CREATE TABLE dbo.Basics_MultipleStreams_493730_a (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.Basics_MultipleStreams_493730_b (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.Basics_MultipleStreams_493730_c (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.Basics_MultipleStreams_493730_a VALUES (0, 'zero'), (1, 'one')
+sql> INSERT INTO dbo.Basics_MultipleStreams_493730_b VALUES (2, 'two'), (3, 'three')
+sql> INSERT INTO dbo.Basics_MultipleStreams_493730_c VALUES (4, 'four'), (5, 'five')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/basics_multiplestreams_493730_a
+acmeCo/test_capture/dbo/basics_multiplestreams_493730_b
+acmeCo/test_capture/dbo/basics_multiplestreams_493730_c
+=== Run: Backfill (Only A) ===
+[
+  "acmeCo/test_capture/dbo/basics_multiplestreams_493730_a",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Basics_MultipleStreams_493730_a"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "zero",
+    "id": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/basics_multiplestreams_493730_a",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Basics_MultipleStreams_493730_a"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": 1
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FBasics_MultipleStreams_493730_a": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+=== Run: Backfill (Add B+C) ===
+[
+  "acmeCo/test_capture/dbo/basics_multiplestreams_493730_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Basics_MultipleStreams_493730_b"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/basics_multiplestreams_493730_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Basics_MultipleStreams_493730_b"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/basics_multiplestreams_493730_c",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Basics_MultipleStreams_493730_c"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": 4
+  }
+]
+[
+  "acmeCo/test_capture/dbo/basics_multiplestreams_493730_c",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Basics_MultipleStreams_493730_c"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "id": 5
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FBasics_MultipleStreams_493730_a": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FBasics_MultipleStreams_493730_b": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FBasics_MultipleStreams_493730_c": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+=== Run: No-op Capture (Removed B) ===
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FBasics_MultipleStreams_493730_a": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FBasics_MultipleStreams_493730_b": {
+      "backfilled": 0,
+      "mode": "Ignore"
+    },
+    "dbo%2FBasics_MultipleStreams_493730_c": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.Basics_MultipleStreams_493730_a VALUES (6, 'six')
+sql> INSERT INTO dbo.Basics_MultipleStreams_493730_b VALUES (7, 'seven')
+sql> INSERT INTO dbo.Basics_MultipleStreams_493730_c VALUES (8, 'eight')
+=== Run: Replication (A+C only) ===
+[
+  "acmeCo/test_capture/dbo/basics_multiplestreams_493730_a",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "Basics_MultipleStreams_493730_a",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "six",
+    "id": 6
+  }
+]
+[
+  "acmeCo/test_capture/dbo/basics_multiplestreams_493730_c",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "Basics_MultipleStreams_493730_c",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "eight",
+    "id": 8
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FBasics_MultipleStreams_493730_a": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FBasics_MultipleStreams_493730_b": {
+      "backfilled": 0,
+      "mode": "Ignore"
+    },
+    "dbo%2FBasics_MultipleStreams_493730_c": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.Basics_MultipleStreams_493730_a VALUES (9, 'nine')
+=== Run: Backfill B (Re-enabled) and Replicate A Changes ===
+[
+  "acmeCo/test_capture/dbo/basics_multiplestreams_493730_a",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "Basics_MultipleStreams_493730_a",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "nine",
+    "id": 9
+  }
+]
+[
+  "acmeCo/test_capture/dbo/basics_multiplestreams_493730_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Basics_MultipleStreams_493730_b"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/basics_multiplestreams_493730_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Basics_MultipleStreams_493730_b"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/basics_multiplestreams_493730_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Basics_MultipleStreams_493730_b"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "seven",
+    "id": 7
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FBasics_MultipleStreams_493730_a": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FBasics_MultipleStreams_493730_b": {
+      "backfilled": 3,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    },
+    "dbo%2FBasics_MultipleStreams_493730_c": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

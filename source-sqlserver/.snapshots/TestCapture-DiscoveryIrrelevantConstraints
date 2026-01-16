@@ -1,0 +1,147 @@
+sql> CREATE TABLE dbo.Capture_DiscoveryIrrelevantConstraints_771648 (id VARCHAR(8) PRIMARY KEY, foo INTEGER UNIQUE, data TEXT)
+=== Discover: Discover Tables ===
+{
+  "recommendedName": "dbo/capture_discoveryirrelevantconstraints_771648",
+  "resourceConfig": {
+    "namespace": "dbo",
+    "stream": "Capture_DiscoveryIrrelevantConstraints_771648"
+  },
+  "documentSchema": {
+    "$defs": {
+      "DboCapture_DiscoveryIrrelevantConstraints_771648": {
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "$anchor": "DboCapture_DiscoveryIrrelevantConstraints_771648",
+        "properties": {
+          "data": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "foo": {
+            "description": "(source type: int)",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 8,
+            "description": "(source type: non-nullable varchar(8))"
+          }
+        }
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "_meta": {
+              "properties": {
+                "op": {
+                  "const": "d"
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "merge"
+          }
+        },
+        "else": {
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "op",
+              "source"
+            ],
+            "properties": {
+              "before": {
+                "$ref": "#DboCapture_DiscoveryIrrelevantConstraints_771648",
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "lsn": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "The LSN at which a CDC event occurred. Only set for CDC events"
+                  },
+                  "seqval": {
+                    "type": "string",
+                    "contentEncoding": "base64",
+                    "description": "Sequence value used to order changes to a row within a transaction. Only set for CDC events"
+                  },
+                  "updateMask": {
+                    "description": "A bit mask with a bit corresponding to each captured column identified for the capture instance. Only set for CDC events"
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table",
+                  "lsn",
+                  "seqval"
+                ]
+              }
+            },
+            "reduce": {
+              "strategy": "merge"
+            }
+          }
+        }
+      },
+      {
+        "$ref": "#DboCapture_DiscoveryIrrelevantConstraints_771648"
+      }
+    ],
+    "x-infer-schema": true
+  },
+  "key": [
+    "/id"
+  ]
+}
+

@@ -1,0 +1,172 @@
+sql> CREATE TABLE dbo.Datatypes_DecimalTypes_617033 (
+		id INTEGER PRIMARY KEY,
+		a_numeric NUMERIC(10,5),
+		a_decimal DECIMAL(5,2),
+		a_money MONEY,
+		a_smallmoney SMALLMONEY
+	)
+sql> INSERT INTO dbo.Datatypes_DecimalTypes_617033 VALUES
+		(1, 12345.12, 123, $1234567891234.29, $3148.29),
+		(2, -12345.12, -123, -$1234567891234.29, -$3148.29),
+		(3, 0, 0, $0, $0),
+		(4, NULL, NULL, NULL, NULL)
+=== Discover: Discover ===
+acmeCo/test_capture/dbo/datatypes_decimaltypes_617033
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/datatypes_decimaltypes_617033",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Datatypes_DecimalTypes_617033"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "123.00",
+    "a_money": "1234567891234.2900",
+    "a_numeric": "12345.12000",
+    "a_smallmoney": "3148.2900",
+    "id": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_decimaltypes_617033",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Datatypes_DecimalTypes_617033"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "-123.00",
+    "a_money": "-1234567891234.2900",
+    "a_numeric": "-12345.12000",
+    "a_smallmoney": "-3148.2900",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_decimaltypes_617033",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Datatypes_DecimalTypes_617033"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "0.00",
+    "a_money": "0.0000",
+    "a_numeric": "0.00000",
+    "a_smallmoney": "0.0000",
+    "id": 3
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_decimaltypes_617033",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Datatypes_DecimalTypes_617033"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": null,
+    "a_money": null,
+    "a_numeric": null,
+    "a_smallmoney": null,
+    "id": 4
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDatatypes_DecimalTypes_617033": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.Datatypes_DecimalTypes_617033 VALUES
+		(101, 99999.99999, 999.99, $922337203685477.5807, $214748.3647),
+		(102, NULL, NULL, NULL, NULL)
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/dbo/datatypes_decimaltypes_617033",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "Datatypes_DecimalTypes_617033",
+        "updateMask": "Hw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": "999.99",
+    "a_money": "922337203685477.5807",
+    "a_numeric": "99999.99999",
+    "a_smallmoney": "214748.3647",
+    "id": 101
+  }
+]
+[
+  "acmeCo/test_capture/dbo/datatypes_decimaltypes_617033",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "Datatypes_DecimalTypes_617033",
+        "updateMask": "Hw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "a_decimal": null,
+    "a_money": null,
+    "a_numeric": null,
+    "a_smallmoney": null,
+    "id": 102
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FDatatypes_DecimalTypes_617033": {
+      "backfilled": 4,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
