@@ -16,6 +16,7 @@ import (
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
+	"github.com/estuary/connectors/go/sqlserver/datatypes"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	"github.com/estuary/connectors/sqlcapture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -277,6 +278,8 @@ type sqlserverDatabase struct {
 	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
 	forceResetCursor      string          // When set, this cursor will be used instead of the checkpointed one regardless of backfilling. DO NOT USE unless you know exactly what you're doing.
 
+	datatypesConfig *datatypes.Config // Configuration for datatype handling
+
 	tableStatistics map[sqlcapture.StreamID]*sqlserverTableStatistics // Cached table statistics for backfill progress tracking
 }
 
@@ -318,6 +321,11 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 	}).Debug("using datetime location from config")
 	db.datetimeLocation = loc
 
+	db.datatypesConfig = &datatypes.Config{
+		DatetimeLocation: loc,
+		RowversionAsAny:  !db.featureFlags["discover_rowversion_as_bytes"],
+	}
+
 	return nil
 }
 
@@ -334,7 +342,7 @@ func (db *sqlserverDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.
 		ExpandedStruct:            true,
 		DoNotReference:            true,
 		AllowAdditionalProperties: writeSchema,
-	}).Reflect(&sqlserverSourceInfo{})
+	}).Reflect(&sqlserverSourceInfoCDC{})
 	sourceSchema.Version = ""
 	if db.config.Advanced.SourceTag == "" {
 		sourceSchema.Properties.Delete("tag")

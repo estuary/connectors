@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/estuary/connectors/go/sqlserver/datatypes"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
@@ -165,7 +166,7 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 	for _, info := range tableMap {
 		for _, colName := range info.PrimaryKey {
 			var dataType = info.Columns[colName].DataType
-			if _, ok := dataType.(*sqlserverTextColumnType); ok {
+			if _, ok := dataType.(*datatypes.TextColumnType); ok {
 				info.UnpredictableKeyOrdering = true
 			} else if dataType == "numeric" || dataType == "decimal" {
 				info.UnpredictableKeyOrdering = true
@@ -323,7 +324,7 @@ func getColumns(ctx context.Context, conn *sql.DB, opts discoveryOptions) ([]sql
 			if slices.Contains([]string{"char", "varchar", "nchar", "nvarchar"}, typeName) {
 				fullType = fmt.Sprintf("%s(%d)", typeName, columnSize)
 			}
-			ci.DataType = &sqlserverTextColumnType{
+			ci.DataType = &datatypes.TextColumnType{
 				Type:      typeName,
 				Collation: collation,
 				FullType:  fullType,
@@ -334,7 +335,7 @@ func getColumns(ctx context.Context, conn *sql.DB, opts discoveryOptions) ([]sql
 			if maxCharLength != nil {
 				columnSize = *maxCharLength
 			}
-			ci.DataType = &sqlserverBinaryColumnType{
+			ci.DataType = &datatypes.BinaryColumnType{
 				Type:      typeName,
 				MaxLength: columnSize,
 			}
@@ -346,25 +347,6 @@ func getColumns(ctx context.Context, conn *sql.DB, opts discoveryOptions) ([]sql
 	return columns, nil
 }
 
-type sqlserverTextColumnType struct {
-	Type      string // The basic type of the column (char / varchar / nchar / nvarchar / text / ntext)
-	Collation string // The collation used by the column
-	FullType  string // The full type of the column, such as `varchar(32)` for example (used for backfill queries)
-	MaxLength int    // The exact maximum length of the column
-}
-
-func (t sqlserverTextColumnType) String() string {
-	return t.FullType
-}
-
-type sqlserverBinaryColumnType struct {
-	Type      string // The basic type of the column (binary / varbinary)
-	MaxLength int    // The exact maximum length of the column in bytes
-}
-
-func (t sqlserverBinaryColumnType) String() string {
-	return fmt.Sprintf("%s(%d)", t.Type, t.MaxLength)
-}
 
 // Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
 // overkill but shouldn't hurt, and helps to make absolutely sure that we're
@@ -530,162 +512,5 @@ func getComputedColumns(ctx context.Context, conn *sql.DB, opts discoveryOptions
 
 // TranslateDBToJSONType returns JSON schema information about the provided database column type.
 func (db *sqlserverDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isPrimaryKey bool) (*jsonschema.Schema, error) {
-	var schema columnSchema
-	if typeInfo, ok := column.DataType.(*sqlserverTextColumnType); ok {
-		if schema, ok = db.databaseTypeToJSON(typeInfo.Type); !ok {
-			return nil, fmt.Errorf("unhandled SQL Server type %q (found on column %q of table %q)", typeInfo.Type, column.Name, column.TableName)
-		}
-		// Add length constraints for char/varchar/nchar/nvarchar
-		if typeInfo.MaxLength > 0 {
-			switch typeInfo.Type {
-			case "char", "nchar":
-				// CHAR/NCHAR - fixed-length
-				var length = uint64(typeInfo.MaxLength)
-				// NOTE: In theory we might want to discover a minimum length for fixed-length
-				// CHAR(n) columns, but in practice we have observed this minimum being violated
-				// and there's no real benefit to having it right now, so we don't.
-				schema.maxLength = &length
-			case "varchar", "nvarchar":
-				// VARCHAR/NVARCHAR - variable-length with limit
-				var length = uint64(typeInfo.MaxLength)
-				schema.maxLength = &length
-			}
-		}
-	} else if typeInfo, ok := column.DataType.(*sqlserverBinaryColumnType); ok {
-		if schema, ok = db.databaseTypeToJSON(typeInfo.Type); !ok {
-			return nil, fmt.Errorf("unhandled SQL Server type %q (found on column %q of table %q)", typeInfo.Type, column.Name, column.TableName)
-		}
-		// Add length constraints for binary/varbinary
-		// Binary data is base64 encoded: every 3 bytes becomes 4 characters
-		if typeInfo.MaxLength > 0 {
-			var base64Length = uint64((typeInfo.MaxLength + 2) / 3 * 4)
-			switch typeInfo.Type {
-			case "binary":
-				// BINARY - fixed-length
-				// NOTE: As with CHAR(n) we could theoretically discover a minimum here, and
-				// we have not observed that minimum being violated in the real world for a
-				// BINARY(n) column, but since there's no real benefit we choose not to at
-				// this time.
-				schema.maxLength = &base64Length
-			case "varbinary":
-				// VARBINARY - variable-length with limit
-				schema.maxLength = &base64Length
-			}
-		}
-	} else if typeName, ok := column.DataType.(string); ok {
-		if schema, ok = db.databaseTypeToJSON(typeName); !ok {
-			return nil, fmt.Errorf("unhandled SQL Server type %q (found on column %q of table %q)", typeName, column.Name, column.TableName)
-		}
-	} else {
-		return nil, fmt.Errorf("unhandled SQL Server type %#v (found on column %q of table %q)", column.DataType, column.Name, column.TableName)
-	}
-
-	// Pass-through the column nullability and description.
-	schema.nullable = column.IsNullable
-	if column.Description != nil {
-		schema.description = *column.Description
-	}
-	return schema.toType(), nil
-}
-
-type columnSchema struct {
-	contentEncoding string
-	description     string
-	format          string
-	nullable        bool
-	extras          map[string]interface{}
-	jsonType        string
-	minLength       *uint64
-	maxLength       *uint64
-}
-
-func (s columnSchema) toType() *jsonschema.Schema {
-	var out = &jsonschema.Schema{
-		Format:      s.format,
-		Description: s.description,
-		Extras:      make(map[string]interface{}),
-		MinLength:   s.minLength,
-		MaxLength:   s.maxLength,
-	}
-	for k, v := range s.extras {
-		out.Extras[k] = v
-	}
-
-	if s.contentEncoding != "" {
-		out.Extras["contentEncoding"] = s.contentEncoding // New in 2019-09.
-	}
-
-	if s.jsonType == "" {
-		// No type constraint.
-	} else if s.nullable {
-		out.Extras["type"] = []string{s.jsonType, "null"} // Use variadic form.
-	} else {
-		out.Type = s.jsonType
-	}
-	return out
-}
-
-func (db *sqlserverDatabase) databaseTypeToJSON(typeName string) (columnSchema, bool) {
-	// A 'timestamp' in SQL Server is not a timestamp as it's usually meant, it's
-	// actually a monotonic integer ID and is also called 'rowversion'. These are
-	// 8-byte binary values which we capture as base64-encoded strings, however we
-	// used to not have a discovery type mapping for these so to preserve backwards
-	// compatibility the appropriate discovery type is feature-flagged here.
-	if db.featureFlags["discover_rowversion_as_bytes"] && typeName == "timestamp" {
-		return columnSchema{jsonType: "string", contentEncoding: "base64"}, true
-	}
-
-	var columnType, ok = sqlserverTypeToJSON[typeName]
-	return columnType, ok
-}
-
-var sqlserverTypeToJSON = map[string]columnSchema{
-	"bigint":   {jsonType: "integer"},
-	"int":      {jsonType: "integer"},
-	"smallint": {jsonType: "integer"},
-	"tinyint":  {jsonType: "integer"},
-
-	"numeric":    {jsonType: "string", format: "number"},
-	"decimal":    {jsonType: "string", format: "number"},
-	"money":      {jsonType: "string", format: "number"},
-	"smallmoney": {jsonType: "string", format: "number"},
-
-	"bit": {jsonType: "boolean"},
-
-	"float": {jsonType: "number"},
-	"real":  {jsonType: "number"},
-
-	"char":     {jsonType: "string"},
-	"varchar":  {jsonType: "string"},
-	"text":     {jsonType: "string"},
-	"nchar":    {jsonType: "string"},
-	"nvarchar": {jsonType: "string"},
-	"ntext":    {jsonType: "string"},
-
-	"binary":    {jsonType: "string", contentEncoding: "base64"},
-	"varbinary": {jsonType: "string", contentEncoding: "base64"},
-	"image":     {jsonType: "string", contentEncoding: "base64"},
-
-	"date":           {jsonType: "string", format: "date"},
-	"datetimeoffset": {jsonType: "string", format: "date-time"},
-
-	// The 'time' format in JSON schemas means the RFC3339 'full-time' grammar rule,
-	// which includes a numeric timezone offset. The TIME column in SQL Server has
-	// no associated timezone data, and it's not possible to unambiguously assign a
-	// numeric timezone offset to these HH:MM:SS time values using the configured
-	// datetime location (handwaving at one reason: how do we know if DST applies?).
-	//
-	// So we don't do that, and that's why TIME columns just get turned into strings
-	// without a specific format guarantee here.
-	"time": {jsonType: "string"},
-
-	"uniqueidentifier": {jsonType: "string", format: "uuid"},
-
-	"xml": {jsonType: "string"},
-
-	"datetime":      {jsonType: "string", format: "date-time"},
-	"datetime2":     {jsonType: "string", format: "date-time"},
-	"smalldatetime": {jsonType: "string", format: "date-time"},
-
-	"hierarchyid": {jsonType: "string", contentEncoding: "base64"},
+	return datatypes.TranslateDBToJSONType(db.datatypesConfig, column)
 }

@@ -18,6 +18,8 @@ RECONFIGURE;
 GO
 EXEC sys.sp_cdc_enable_db;
 GO
+ALTER DATABASE test SET CHANGE_TRACKING = ON (CHANGE_RETENTION = 2 DAYS, AUTO_CLEANUP = ON);
+GO
 CREATE LOGIN flow_capture WITH PASSWORD = 'we2rie1E';
 GO
 CREATE USER flow_capture FOR LOGIN flow_capture;
@@ -27,6 +29,8 @@ GO
 GRANT SELECT ON SCHEMA :: dbo TO flow_capture;
 GO
 GRANT SELECT ON SCHEMA :: cdc TO flow_capture;
+GO
+GRANT VIEW CHANGE TRACKING ON SCHEMA :: dbo TO flow_capture;
 GO
 CREATE TABLE dbo.flow_watermarks(slot INTEGER PRIMARY KEY, watermark TEXT);
 GO
