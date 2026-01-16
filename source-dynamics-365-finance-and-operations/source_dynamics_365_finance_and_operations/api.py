@@ -23,10 +23,7 @@ from .shared import call_with_cache_logging, is_datetime_format, str_to_dt
 
 
 MINIMUM_AZURE_SYNAPSE_LINK_EXPORT_INTERVAL = 300             # 5 minutes
-# CACHE_TTL is shorter than the minimum export interval allowed by Azure
-# in order to minimize how long stale data remains in the cache while
-# still picking up on any changes in Azure relatively quickly.
-CACHE_TTL = MINIMUM_AZURE_SYNAPSE_LINK_EXPORT_INTERVAL / 5   # 1 minute
+CACHE_TTL = 3600 # 1 hour
 # FOLDER_PROCESSING_SEMAPHORE is used to bound how many timestamp
 # folders are processed concurrently. Processing an unbounded number
 # of folders can easily trigger the connector to exceed its memory
