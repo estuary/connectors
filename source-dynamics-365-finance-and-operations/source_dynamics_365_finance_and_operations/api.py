@@ -1,4 +1,5 @@
 import asyncio
+from bisect import bisect_right
 from datetime import datetime
 from logging import Logger
 from typing import AsyncGenerator, cast
@@ -202,17 +203,11 @@ async def fetch_changes(
         get_finalized_timestamp_folders, log, client
     )
 
-    for folder in finalized_folders:
-        if (
-            # Do not read folders we've already read on previous sweeps.
-            str_to_dt(folder) <= log_cursor
-        ):
-            log.debug("Skipping folder", {
-                "folder": folder,
-                "log_cursor": log_cursor,
-            })
-            continue
+    # Use binary search to find the first folder after log_cursor,
+    # skipping folders we've already read on previous sweeps.
+    start_index = bisect_right(finalized_folders, log_cursor, key=str_to_dt)
 
+    for folder in finalized_folders[start_index:]:
         async with FOLDER_PROCESSING_SEMAPHORE:
             log.debug(f"Reading CSVs in {folder}/{table_name}.")
             async for row in read_csvs_in_folder(folder, table_name, client, log):
