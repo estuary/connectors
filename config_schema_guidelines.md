@@ -112,7 +112,7 @@ When you have a secret you must have it be a single type of `string`. This is cu
 
 #### The UI does NOT support encrypting entire arrays
 
-SOPS allows arrays to be encrypted like the example below but the UI does not support this. The `create` flow should work fine but `edit` will break. This is only true due to keeping scope small. If this is required talk to the UI team and it can be added.
+SOPS allows arrays to be encrypted like the example below but the UI does not support this. The `create` flow should work fine but `edit` will break. This is due to keeping the scope as small as possible. If this is required talk to the UI team and it can be added.
 
 ```
 an_array:
