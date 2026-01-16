@@ -1,20 +1,20 @@
-package main
+package datatypes
 
 import (
 	"fmt"
 	"strings"
 )
 
-// predictableCollation returns true if and only if the connector's logic for
-// "encodeCollationSortKey" will be able to accurately reproduce the database
+// PredictableCollation returns true if and only if the connector's logic for
+// EncodeCollationSortKey will be able to accurately reproduce the database
 // key ordering behavior.
-func predictableCollation(info *sqlserverTextColumnType) bool {
+func PredictableCollation(info *TextColumnType) bool {
 	var collationID = strings.ToLower(info.Type) + "/" + info.Collation
 	var _, ok = supportedTextCollations[collationID]
 	return ok
 }
 
-// encodeCollationSortKey receives a UTF-8 string and a description of the SQL Server
+// EncodeCollationSortKey receives a UTF-8 string and a description of the SQL Server
 // column type and the collation name by which it is ordered, and returns a sequence
 // of encoded bytes with the property that the *bytewise lexicographic* ordering of
 // such bytes matches the *collated text* ordering applied by SQL Server, for a given
@@ -26,8 +26,8 @@ func predictableCollation(info *sqlserverTextColumnType) bool {
 // ordering.
 //
 // If a particular collation is not available as a data table it's an error, but this
-// function is only called when predictableCollation() is true.
-func encodeCollationSortKey(info *sqlserverTextColumnType, text string) ([]byte, error) {
+// function is only called when PredictableCollation() is true.
+func EncodeCollationSortKey(info *TextColumnType, text string) ([]byte, error) {
 	var collationID = strings.ToLower(info.Type) + "/" + info.Collation
 	if collationTable, ok := supportedTextCollations[collationID]; ok {
 		return encodeCollationSortKeyUsingTable(collationTable, text), nil

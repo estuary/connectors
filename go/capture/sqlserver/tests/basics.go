@@ -1,31 +1,36 @@
-package main
+package tests
 
 import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	"github.com/estuary/connectors/sqlcapture"
 	"github.com/stretchr/testify/require"
 )
 
-// TestSpec verifies the connector's spec output against a snapshot.
-func TestSpec(t *testing.T) {
-	var _, tc = blackboxTestSetup(t)
-	tc.Spec("Get Connector Spec")
-	cupaloy.SnapshotT(t, tc.Transcript.String())
+func TestBasics(t *testing.T, setup testSetupFunc) {
+	t.Run("SimpleDiscovery", func(t *testing.T) { testSimpleDiscovery(t, setup) })
+	t.Run("SimpleCapture", func(t *testing.T) { testSimpleCapture(t, setup) })
+	t.Run("ReplicationInserts", func(t *testing.T) { testReplicationInserts(t, setup) })
+	t.Run("ReplicationUpdates", func(t *testing.T) { testReplicationUpdates(t, setup) })
+	t.Run("ReplicationDeletes", func(t *testing.T) { testReplicationDeletes(t, setup) })
+	t.Run("EmptyTable", func(t *testing.T) { testEmptyTable(t, setup) })
+	t.Run("IgnoredStreams", func(t *testing.T) { testIgnoredStreams(t, setup) })
+	t.Run("MultipleStreams", func(t *testing.T) { testMultipleStreams(t, setup) })
+	t.Run("MissingTable", func(t *testing.T) { testMissingTable(t, setup) })
+	t.Run("PrimaryKeyOverride", func(t *testing.T) { testPrimaryKeyOverride(t, setup) })
 }
 
 // TestSimpleDiscovery exercises discovery of a single, simple table.
-func TestSimpleDiscovery(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testSimpleDiscovery(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(a INTEGER PRIMARY KEY, b VARCHAR(2000), c REAL NOT NULL, d VARCHAR(255))`)
 	tc.DiscoverFull("Discover Tables")
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
 // TestSimpleCapture exercises the simplest possible backfill of a small table.
-func TestSimpleCapture(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testSimpleCapture(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
 	tc.Discover("Discover Tables")
@@ -36,8 +41,8 @@ func TestSimpleCapture(t *testing.T) {
 // TestReplicationInserts runs two captures, where the first will perform the
 // initial table scan and the second capture will use replication to receive
 // additional inserts performed after the first capture.
-func TestReplicationInserts(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testReplicationInserts(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
 	tc.Discover("Discover Tables")
@@ -50,8 +55,8 @@ func TestReplicationInserts(t *testing.T) {
 // TestReplicationUpdates runs two captures, where the first will perform the
 // initial table scan and the second capture will use replication to receive
 // additional inserts and row updates performed after the first capture.
-func TestReplicationUpdates(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testReplicationUpdates(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
 	tc.Discover("Discover Tables")
@@ -66,8 +71,8 @@ func TestReplicationUpdates(t *testing.T) {
 // TestReplicationDeletes runs two captures, where the first will perform the
 // initial table scan and the second capture will use replication to receive
 // additional inserts and deletions performed after the first capture.
-func TestReplicationDeletes(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testReplicationDeletes(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH')`)
 	tc.Discover("Discover Tables")
@@ -81,8 +86,8 @@ func TestReplicationDeletes(t *testing.T) {
 
 // TestEmptyTable leaves the table empty during the initial table backfill
 // and only adds data after replication has begun.
-func TestEmptyTable(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testEmptyTable(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	tc.Discover("Discover Tables")
 	tc.Run("Initial Backfill (Empty)", -1)
@@ -93,8 +98,8 @@ func TestEmptyTable(t *testing.T) {
 
 // TestIgnoredStreams checks that replicated changes are only reported
 // for tables which are configured in the catalog.
-func TestIgnoredStreams(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testIgnoredStreams(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME>_a VALUES (0, 'zero'), (1, 'one')`)
@@ -110,8 +115,8 @@ func TestIgnoredStreams(t *testing.T) {
 
 // TestMultipleStreams exercises captures with multiple stream configured, as
 // well as adding/removing/re-adding a stream.
-func TestMultipleStreams(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testMultipleStreams(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_c`, `(id INTEGER PRIMARY KEY, data TEXT)`)
@@ -140,8 +145,8 @@ func TestMultipleStreams(t *testing.T) {
 
 // TestMissingTable verifies that things fail cleanly if a capture
 // binding doesn't actually exist.
-func TestMissingTable(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testMissingTable(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>_a`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.CreateTable(t, `<NAME>_b`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	tc.Discover("Discover Tables")
@@ -150,73 +155,10 @@ func TestMissingTable(t *testing.T) {
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
-// Since discovered bindings for keyless tables specify the keyless backfill mode,
-// the collection key shouldn't impact correctness of the capture even if multiple
-// rows have the same collection key value.
-func TestDuplicatedScanKey(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
-	db.CreateTable(t, `<NAME>`, `(id VARCHAR(8), data VARCHAR(2000))`)
-	db.Exec(t, `INSERT INTO <NAME> VALUES ('AAA', '1'), ('BBB', '2'), ('BBB', '3'), ('CCC', '4')`)
-	tc.Discover("Discover Tables")
-	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
-	require.NoError(t, tc.Capture.EditCollection(db.Expand(`<ID>`), "key", []string{"/id"}))
-	tc.Run("Capture", -1)
-	cupaloy.SnapshotT(t, tc.Transcript.String())
-}
-
-func TestReplicationOnly(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
-	db.CreateTable(t, `<NAME>`, `(id INTEGER, data TEXT)`)
-	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one'), (2, 'two'), (3, 'three'), (4, 'four')`)
-	tc.Discover("Discover Tables")
-	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
-	require.NoError(t, tc.Capture.EditBinding(0, "resource.mode", string(sqlcapture.BackfillModeOnlyChanges)))
-	tc.Run("Backfill (no documents expected)", -1)
-	db.Exec(t, `INSERT INTO <NAME> VALUES (5, 'five'), (6, 'six'), (7, 'seven'), (8, 'eight')`)
-	tc.Run("Replication", -1)
-	cupaloy.SnapshotT(t, tc.Transcript.String())
-}
-
-func TestKeylessDiscovery(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
-	db.CreateTable(t, `<NAME>`, `(a INTEGER, b VARCHAR(2000), c REAL NOT NULL, d VARCHAR(255))`)
-	tc.DiscoverFull("Discover Tables")
-	cupaloy.SnapshotT(t, tc.Transcript.String())
-}
-
-func TestKeylessCapture(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
-	db.CreateTable(t, `<NAME>`, `(id INTEGER, data TEXT)`)
-	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one'), (2, 'two')`)
-	tc.Discover("Discover Tables")
-	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
-	tc.Run("Backfill", -1)
-	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three'), (4, 'four')`)
-	tc.Run("Replication", -1)
-	cupaloy.SnapshotT(t, tc.Transcript.String())
-}
-
-// TestCatalogPrimaryKey sets up a table with no primary key in the database
-// and instead specifies one in the catalog configuration.
-func TestCatalogPrimaryKey(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
-	db.CreateTable(t, `<NAME>`, `(id INTEGER, name TEXT, value INTEGER)`)
-	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'alice', 100), (2, 'bob', 200)`)
-	tc.Discover("Discover Tables")
-	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
-	require.NoError(t, tc.Capture.EditBinding(0, "resource.mode", string(sqlcapture.BackfillModeAutomatic)))
-	require.NoError(t, tc.Capture.EditBinding(0, "resource.primary_key", []string{"id"}))
-	require.NoError(t, tc.Capture.EditCollection(db.Expand("<ID>"), "key", []string{"/id"}))
-	tc.Run("Backfill", -1)
-	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'carol', 300), (4, 'dave', 400)`)
-	tc.Run("Replication", -1)
-	cupaloy.SnapshotT(t, tc.Transcript.String())
-}
-
 // TestPrimaryKeyOverride sets up a table with a primary key, but
 // then overrides that via the catalog configuration.
-func TestPrimaryKeyOverride(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testPrimaryKeyOverride(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, name VARCHAR(32), value INTEGER)`)
 	// Names out of id order: charlie(1), alice(2), bob(3), dave(4)
 	// By name: alice, bob, charlie, dave -> ids 2, 3, 1, 4

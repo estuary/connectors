@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/go/capture/sqlserver/datatypes"
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -31,6 +32,7 @@ func main() {
 
 var sqlserverDriver = &sqlcapture.Driver{
 	ConfigSchema:     configSchema(),
+	ResourceSchema:   resourceSchema(),
 	DocumentationURL: "https://go.estuary.dev/source-sqlserver",
 	Connect:          connectSQLServer,
 }
@@ -38,38 +40,9 @@ var sqlserverDriver = &sqlcapture.Driver{
 const defaultPort = "1433"
 
 var featureFlagDefaults = map[string]bool{
-	// When set, discovered collection schemas will request that schema inference be
-	// used _in addition to_ the full column/types discovery we already do.
-	"use_schema_inference": true,
-
-	// When set, discovered collection schemas will be emitted as SourcedSchema messages
-	// so that Flow can have access to 'official' schema information from the source DB.
-	"emit_sourced_schemas": true,
-
-	// When set, discovery queries will use a variant with all identifiers capitalized.
-	// We believe this should probably be a safe change (and it's required for discovery
-	// to work in the Turkish_CI_AS locale), but didn't want to release it unconditionally
-	// on a Friday without much testing so it's gated behind a flag for now.
-	"uppercase_discovery_queries": false,
-
-	// When true, the capture will use a fence mechanism based on observing CDC worker runs
-	// and LSN positions rather than the old watermark write mechanism.
-	"read_only": true,
-
-	// When true, the connector will tolerate missed changes in the CDC stream and will not
-	// trigger an automatic re-backfill if changes go missing. This may be useful if the CDC
-	// event data starts to expire before it can be captured, but should generally only be
-	// needed in exceptional circumstances when recovering from some sort of major breakage.
-	"tolerate_missed_changes": false,
-
-	// Force use of the 'replica fence' mechanism, which is normally used automatically
-	// when the target database is detected as a replica.
-	"replica_fencing": false,
-
-	// Discover ROWVERSION / TIMESTAMP column types as {type: string, format: base64}.
-	// Captures without this setting will discover them as the catch-all type {} though
-	// the actual value will be a base64 string either way.
-	"discover_rowversion_as_bytes": false,
+	// Intentionally empty: all desired behaviors should be the default for a new connector.
+	// Feature flags should only be added when backwards-compatibility requires gating a
+	// behavior change for existing captures.
 }
 
 // Config tells the connector how to connect to and interact with the source database.
@@ -87,17 +60,12 @@ type Config struct {
 }
 
 type advancedConfig struct {
-	DiscoverOnlyEnabled         bool   `json:"discover_only_enabled,omitempty" jsonschema:"title=Discover Only CDC-Enabled Tables,description=When set the connector will only discover tables which have already had CDC capture instances enabled."`
-	SkipBackfills               string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
-	BackfillChunkSize           int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
-	PollingInterval             string `json:"polling_interval,omitempty" jsonschema:"title=CDC Polling Interval,default=500ms,description=The interval at which the connector polls for CDC changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
-	AutomaticChangeTableCleanup bool   `json:"change_table_cleanup,omitempty" jsonschema:"title=Automatic Change Table Cleanup,default=false,description=When set the connector will delete CDC change table entries as soon as they are persisted into Flow. Requires DBO permissions to use."`
-	AutomaticCaptureInstances   bool   `json:"capture_instance_management,omitempty" jsonschema:"title=Automatic Capture Instance Management,default=false,description=When set the connector will respond to alterations of captured tables by automatically creating updated capture instances and deleting the old ones. Requires DBO permissions to use."`
-	Filegroup                   string `json:"filegroup,omitempty" jsonschema:"title=CDC Instance Filegroup,description=When set the connector will create new CDC instances with the specified 'filegroup_name' argument. Has no effect if CDC instances are managed manually."`
-	RoleName                    string `json:"role_name,omitempty" jsonschema:"title=CDC Instance Access Role,description=When set the connector will create new CDC instances with the specified 'role_name' argument as the gating role. When unset the capture user name is used as the 'role_name' instead. Has no effect if CDC instances are managed manually."`
-	SourceTag                   string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
-	FeatureFlags                string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
-	WatermarksTable             string `json:"watermarksTable,omitempty" jsonschema:"default=dbo.flow_watermarks,description=This property is deprecated for new captures as they will no longer use watermark writes by default. The name of the table used for watermark writes during backfills. Must be fully-qualified in '<schema>.<table>' form."`
+	DiscoverNonEnabled bool   `json:"discover_tables_without_ct,omitempty" jsonschema:"title=Discover Tables Without Change Tracking,description=When set the connector will discover all tables even if they do not have Change Tracking enabled. By default only CT-enabled tables are discovered."`
+	SkipBackfills      string `json:"skip_backfills,omitempty" jsonschema:"title=Skip Backfills,description=A comma-separated list of fully-qualified table names which should not be backfilled."`
+	BackfillChunkSize  int    `json:"backfill_chunk_size,omitempty" jsonschema:"title=Backfill Chunk Size,default=50000,description=The number of rows which should be fetched from the database in a single backfill query."`
+	PollingInterval    string `json:"polling_interval,omitempty" jsonschema:"title=Change Tracking Polling Interval,default=500ms,description=The interval at which the connector polls for Change Tracking changes. Accepts duration strings like '500ms' or '30s' or '1m'. Defaults to 500ms when unspecified." jsonschema_extras:"pattern=^[0-9]+(ms|s|m|h)$"`
+	SourceTag          string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
+	FeatureFlags       string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 type tunnelConfig struct {
@@ -134,12 +102,11 @@ func (c *Config) Validate() error {
 			return fmt.Errorf("invalid 'polling_interval' configuration %q: %w", c.Advanced.PollingInterval, err)
 		} else if parsedInterval < 100*time.Millisecond {
 			return fmt.Errorf("invalid 'polling_interval' configuration %q: must be at least 100ms", c.Advanced.PollingInterval)
+		} else if parsedInterval > sqlcapture.StreamingFenceInterval {
+			return fmt.Errorf("invalid 'polling_interval' configuration %q: must not exceed %s", c.Advanced.PollingInterval, sqlcapture.StreamingFenceInterval)
 		}
 	}
 
-	if c.Advanced.WatermarksTable != "" && !strings.Contains(c.Advanced.WatermarksTable, ".") {
-		return fmt.Errorf("invalid 'watermarksTable' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", c.Advanced.WatermarksTable)
-	}
 	if c.Advanced.SkipBackfills != "" {
 		for _, skipStreamID := range strings.Split(c.Advanced.SkipBackfills, ",") {
 			if !strings.Contains(skipStreamID, ".") {
@@ -154,9 +121,6 @@ func (c *Config) Validate() error {
 func (c *Config) SetDefaults() {
 	// Note these are 1:1 with 'omitempty' in Config field tags,
 	// which cause these fields to be emitted as non-required.
-	if c.Advanced.WatermarksTable == "" {
-		c.Advanced.WatermarksTable = "dbo.flow_watermarks"
-	}
 	if c.Advanced.BackfillChunkSize <= 0 {
 		c.Advanced.BackfillChunkSize = 50000
 	}
@@ -185,7 +149,7 @@ func (c *Config) ToURI() string {
 	}
 
 	var params = make(url.Values)
-	params.Add("app name", "Flow CDC Connector")
+	params.Add("app name", "Estuary Change Tracking Connector")
 	params.Add("encrypt", "true")
 	params.Add("TrustServerCertificate", "true")
 	params.Add("database", c.Database)
@@ -207,6 +171,23 @@ func configSchema() json.RawMessage {
 	return json.RawMessage(configSchema)
 }
 
+// CTResource is the resource configuration for the Change Tracking capture. It is only
+// used for schema reflection, so that we can completely omit the backfill mode option.
+type CTResource struct {
+	Namespace string `json:"namespace" jsonschema:"title=Schema,description=The schema (namespace) in which the table resides.,readOnly=true"`
+	Stream    string `json:"stream" jsonschema:"title=Table Name,description=The name of the table to be captured.,readOnly=true"`
+	Priority  int    `json:"priority,omitempty" jsonschema:"title=Backfill Priority,description=An optional integer priority for this binding. The highest priority binding(s) will be backfilled completely before any others. The default priority is zero. Negative priorities are allowed and will cause a binding to be backfilled after others."`
+}
+
+func resourceSchema() json.RawMessage {
+	var schema = schemagen.GenerateSchema("SQL Server CT Resource Spec", &CTResource{})
+	var resourceSchema, err = schema.MarshalJSON()
+	if err != nil {
+		panic(err)
+	}
+	return json.RawMessage(resourceSchema)
+}
+
 func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sqlcapture.Database, error) {
 	var config Config
 	if err := pf.UnmarshalStrict(cfg, &config); err != nil {
@@ -214,14 +195,9 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 	}
 	config.SetDefaults()
 
+	// Parse pseudo-flags for cursor overrides. These are internal mechanisms for Estuary support
+	// to use and are not exposed as real config options.
 	var featureFlags = common.ParseFeatureFlags(config.Advanced.FeatureFlags, featureFlagDefaults)
-	if config.Advanced.FeatureFlags != "" {
-		log.WithField("flags", featureFlags).Info("parsed feature flags")
-	}
-
-	// This is a bit of an ugly hack to allow us to specify a single _value_ as part of a feature flag.
-	// The alternative would be that we'd have to add a visible advanced option for what is really just
-	// an internal mechanism for us to use.
 	var initialBackfillCursor string
 	var forceResetCursor string
 	for flag, value := range featureFlags {
@@ -231,6 +207,12 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 		if strings.HasPrefix(flag, "force_reset_cursor=") && value {
 			forceResetCursor = strings.TrimPrefix(flag, "force_reset_cursor=")
 		}
+	}
+	if config.Advanced.FeatureFlags != "" {
+		log.WithFields(log.Fields{
+			"initialBackfillCursor": initialBackfillCursor,
+			"forceResetCursor":      forceResetCursor,
+		}).Info("parsed feature flags")
 	}
 
 	// If SSH Endpoint is configured, then try to start a tunnel before establishing connections
@@ -258,7 +240,6 @@ func connectSQLServer(ctx context.Context, name string, cfg json.RawMessage) (sq
 
 	var db = &sqlserverDatabase{
 		config:                &config,
-		featureFlags:          featureFlags,
 		initialBackfillCursor: initialBackfillCursor,
 		forceResetCursor:      forceResetCursor,
 	}
@@ -272,10 +253,11 @@ type sqlserverDatabase struct {
 	config *Config
 	conn   *sql.DB
 
-	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
-	datetimeLocation      *time.Location  // The location in which to interpret DATETIME column values as timestamps.
-	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
-	forceResetCursor      string          // When set, this cursor will be used instead of the checkpointed one regardless of backfilling. DO NOT USE unless you know exactly what you're doing.
+	datetimeLocation      *time.Location // The location in which to interpret DATETIME column values as timestamps.
+	initialBackfillCursor string         // When set, this CT version will be used instead of the current version when initializing newly-added tables
+	forceResetCursor      string         // When set, this CT version will override all existing table versions. DO NOT USE unless you know exactly what you're doing.
+
+	datatypesConfig *datatypes.Config // Configuration for datatype handling
 
 	tableStatistics map[sqlcapture.StreamID]*sqlserverTableStatistics // Cached table statistics for backfill progress tracking
 }
@@ -318,6 +300,10 @@ func (db *sqlserverDatabase) connect(ctx context.Context) error {
 	}).Debug("using datetime location from config")
 	db.datetimeLocation = loc
 
+	db.datatypesConfig = &datatypes.Config{
+		DatetimeLocation: loc,
+	}
+
 	return nil
 }
 
@@ -334,7 +320,7 @@ func (db *sqlserverDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.
 		ExpandedStruct:            true,
 		DoNotReference:            true,
 		AllowAdditionalProperties: writeSchema,
-	}).Reflect(&sqlserverSourceInfo{})
+	}).Reflect(&sqlserverSourceInfoCT{})
 	sourceSchema.Version = ""
 	if db.config.Advanced.SourceTag == "" {
 		sourceSchema.Properties.Delete("tag")
@@ -343,7 +329,8 @@ func (db *sqlserverDatabase) SourceMetadataSchema(writeSchema bool) *jsonschema.
 }
 
 func (db *sqlserverDatabase) FallbackCollectionKey() []string {
-	return []string{"/_meta/source/lsn", "/_meta/source/seqval"}
+	// Change Tracking requires primary keys, so this should never be used.
+	return []string{}
 }
 
 func (db *sqlserverDatabase) RequestTxIDs(schema, table string) {}

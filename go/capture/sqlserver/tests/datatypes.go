@@ -1,4 +1,4 @@
-package main
+package tests
 
 import (
 	"fmt"
@@ -8,12 +8,29 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/go/capture/blackbox"
+	"github.com/estuary/connectors/go/capture/sqlserver/datatypes"
 	"github.com/stretchr/testify/require"
 )
 
+func TestDatatypes(t *testing.T, setup testSetupFunc) {
+	t.Run("IntegerTypes", func(t *testing.T) { testIntegerTypes(t, setup) })
+	t.Run("DecimalTypes", func(t *testing.T) { testDecimalTypes(t, setup) })
+	t.Run("FloatingPointTypes", func(t *testing.T) { testFloatingPointTypes(t, setup) })
+	t.Run("BooleanTypes", func(t *testing.T) { testBooleanTypes(t, setup) })
+	t.Run("StringTypes", func(t *testing.T) { testStringTypes(t, setup) })
+	t.Run("BinaryTypes", func(t *testing.T) { testBinaryTypes(t, setup) })
+	t.Run("TemporalTypes", func(t *testing.T) { testTemporalTypes(t, setup) })
+	t.Run("MiscTypes", func(t *testing.T) { testMiscTypes(t, setup) })
+	t.Run("NotNullTypes", func(t *testing.T) { testNotNullTypes(t, setup) })
+	t.Run("ScanKeyTypes", func(t *testing.T) { testScanKeyTypes(t, setup) })
+	t.Run("OversizedFields", func(t *testing.T) { testOversizedFields(t, setup) })
+	t.Run("BitNotNullDeletion", func(t *testing.T) { testBitNotNullDeletion(t, setup) })
+	t.Run("RowversionTypes", func(t *testing.T) { testRowversionTypes(t, setup) })
+}
+
 // TestIntegerTypes exercises integer column types.
-func TestIntegerTypes(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testIntegerTypes(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_integer INTEGER,
@@ -36,8 +53,8 @@ func TestIntegerTypes(t *testing.T) {
 }
 
 // TestDecimalTypes exercises decimal and money column types.
-func TestDecimalTypes(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testDecimalTypes(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_numeric NUMERIC(10,5),
@@ -60,8 +77,8 @@ func TestDecimalTypes(t *testing.T) {
 }
 
 // TestFloatingPointTypes exercises float and real column types.
-func TestFloatingPointTypes(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testFloatingPointTypes(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_float FLOAT,
@@ -83,8 +100,8 @@ func TestFloatingPointTypes(t *testing.T) {
 }
 
 // TestBooleanTypes exercises the bit column type.
-func TestBooleanTypes(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testBooleanTypes(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_bit BIT
@@ -104,8 +121,8 @@ func TestBooleanTypes(t *testing.T) {
 }
 
 // TestStringTypes exercises character and text column types.
-func TestStringTypes(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testStringTypes(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_char CHAR(6),
@@ -130,8 +147,8 @@ func TestStringTypes(t *testing.T) {
 }
 
 // TestBinaryTypes exercises binary column types.
-func TestBinaryTypes(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testBinaryTypes(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_binary BINARY(8),
@@ -152,8 +169,8 @@ func TestBinaryTypes(t *testing.T) {
 }
 
 // TestTemporalTypes exercises date and time column types.
-func TestTemporalTypes(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testTemporalTypes(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	// Set timezone to America/Chicago to match the old test behavior
 	require.NoError(t, tc.Capture.EditConfig("timezone", "America/Chicago"))
 	db.CreateTable(t, `<NAME>`, `(
@@ -180,8 +197,8 @@ func TestTemporalTypes(t *testing.T) {
 }
 
 // TestMiscTypes exercises uniqueidentifier, xml, and hierarchyid column types.
-func TestMiscTypes(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testMiscTypes(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_uniqueidentifier UNIQUEIDENTIFIER,
@@ -203,8 +220,8 @@ func TestMiscTypes(t *testing.T) {
 }
 
 // TestNotNullTypes exercises NOT NULL variants of various types to verify schema generation.
-func TestNotNullTypes(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testNotNullTypes(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(
 		id INTEGER PRIMARY KEY,
 		a_integer INTEGER NOT NULL,
@@ -227,7 +244,7 @@ func TestNotNullTypes(t *testing.T) {
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
-func TestScanKeyTypes(t *testing.T) {
+func testScanKeyTypes(t *testing.T, setup testSetupFunc) {
 	for _, testCase := range []struct {
 		Name       string
 		ColumnType string
@@ -276,7 +293,7 @@ func TestScanKeyTypes(t *testing.T) {
 		}},
 	} {
 		t.Run(testCase.Name, func(t *testing.T) {
-			var db, tc = blackboxTestSetup(t)
+			var db, tc = setup(t)
 			db.CreateTable(t, `<NAME>`, fmt.Sprintf(`(k %s PRIMARY KEY, v TEXT)`, testCase.ColumnType))
 			db.Exec(t, `INSERT INTO <NAME> VALUES `+strings.Join(testCase.Values, ", "))
 
@@ -299,17 +316,17 @@ func TestScanKeyTypes(t *testing.T) {
 // So to a first approximation, we should expect that those column types are
 // the ones we need to worry about truncating because they're the ones which
 // can grow arbitrarily large.
-func TestOversizedFields(t *testing.T) {
+func testOversizedFields(t *testing.T, setup testSetupFunc) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
-	var db, tc = blackboxTestSetup(t)
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, v_text TEXT, v_varchar VARCHAR(max), v_binary VARBINARY(max), v_xml XML)`)
 
 	// Use REPLICATE to generate large strings server-side, avoiding query length limits.
-	// The alphabet is 26 chars, so we need truncateColumnThreshold/26 repetitions for ~8MB.
+	// The alphabet is 26 chars, so we need TruncateColumnThreshold/26 repetitions for ~8MB.
 	// Must cast input to VARCHAR(MAX) or REPLICATE truncates at 8000 bytes.
-	var reps = truncateColumnThreshold / 26
+	var reps = datatypes.TruncateColumnThreshold / 26
 	var largeText = fmt.Sprintf(`REPLICATE(CAST('ABCDEFGHIJKLMNOPQRSTUVWXYZ' AS VARCHAR(MAX)), %d)`, reps)
 	var largeXML = fmt.Sprintf(`'<data>' + REPLICATE(CAST('ABCDEFGHIJKLMNOPQRSTUVWXYZ' AS VARCHAR(MAX)), %d) + '</data>'`, reps)
 	var largeBinary = fmt.Sprintf(`CONVERT(VARBINARY(MAX), REPLICATE(CAST('ABCDEFGHIJKLMNOPQRSTUVWXYZ' AS VARCHAR(MAX)), %d))`, reps)
@@ -324,8 +341,8 @@ func TestOversizedFields(t *testing.T) {
 }
 
 // TestBitNotNullDeletion exercises deletions from a table with BIT NOT NULL columns.
-func TestBitNotNullDeletion(t *testing.T) {
-	var db, tc = blackboxTestSetup(t)
+func testBitNotNullDeletion(t *testing.T, setup testSetupFunc) {
+	var db, tc = setup(t)
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, v_a BIT, v_b BIT NOT NULL, v_c BIT NOT NULL DEFAULT 0, v_d BIT NOT NULL DEFAULT 1)`)
 
 	// Backfill
@@ -344,10 +361,10 @@ func TestBitNotNullDeletion(t *testing.T) {
 // TestRowversionTypes exercises the TIMESTAMP / ROWVERSION column type using both names.
 // We test this separately from the main datatypes test because these IDs are usually
 // tracked implicitly by the database and aren't specified by the client.
-func TestRowversionTypes(t *testing.T) {
+func testRowversionTypes(t *testing.T, setup testSetupFunc) {
 	for _, columnType := range []string{"timestamp", "rowversion"} {
 		t.Run(columnType, func(t *testing.T) {
-			var db, tc = blackboxTestSetup(t)
+			var db, tc = setup(t)
 			db.CreateTable(t, `<NAME>`, fmt.Sprintf(`(id INTEGER PRIMARY KEY, data VARCHAR(32), rv %s)`, columnType))
 
 			require.NoError(t, tc.Capture.EditConfig("advanced.feature_flags", "discover_rowversion_as_bytes"))
