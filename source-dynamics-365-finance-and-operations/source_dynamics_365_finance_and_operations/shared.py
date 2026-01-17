@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from logging import Logger
 from typing import Any, Callable, Protocol, TypeVar, runtime_checkable
@@ -32,14 +33,15 @@ async def call_with_cache_logging(
     **kwargs: Any
 ) -> T_co:
     """Call a cached function and log on cache miss."""
+    if not log.isEnabledFor(logging.DEBUG):
+        return await cached_func(*args, **kwargs)
+
     info_before = cached_func.cache_info()
     result = await cached_func(*args, **kwargs)
     info_after = cached_func.cache_info()
 
-    func_name = cached_func.__wrapped__.__name__
-
     if info_after.misses > info_before.misses:
-        log.debug(f"Cache miss: {func_name}", {
+        log.debug(f"Cache miss: {cached_func.__wrapped__.__name__}", {
             "hits": info_after.hits,
             "misses": info_after.misses,
             "currsize": info_after.currsize,
