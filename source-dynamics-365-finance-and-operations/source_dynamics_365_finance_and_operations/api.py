@@ -1,8 +1,11 @@
 import asyncio
 from bisect import bisect_right
 from datetime import datetime
+from enum import StrEnum
 from logging import Logger
-from typing import AsyncGenerator, cast
+from typing import AsyncGenerator, Literal, cast, overload
+
+import orjson
 
 # Some functions that send a request to Azure for listing files or reading
 # metadata files are wrapped with the alru_cache decorator. alru_cache
@@ -18,7 +21,6 @@ from .adls_gen2_client import ADLSGen2Client, ADLSPathMetadata
 from .models import (
     ModelDotJson,
     TableMetadata,
-    metadata_from_model_dot_json,
 )
 from .shared import call_with_cache_logging, is_datetime_format, str_to_dt
 
@@ -35,24 +37,57 @@ CACHE_TTL = 3600 # 1 hour
 FOLDER_PROCESSING_SEMAPHORE = asyncio.Semaphore(5)
 
 
+class ModelFormat(StrEnum):
+    BYTES = "bytes"
+    PYDANTIC = "pydantic"
+
+
 # model.json metadata files are not updated after they're written.
 # So there's no need to expire cache results with a TTL to ensure
 # we capture updates to these files.
 @alru_cache(maxsize=32, ttl=None)
-async def fetch_model_dot_json(
+async def _fetch_model_dot_json_bytes(
     client: ADLSGen2Client,
     directory: str | None = None,
-) -> ModelDotJson:
-    if directory:
-        path = f"{directory}/model.json"
-    else:
-        path = "model.json"
+) -> bytes:
+    path = f"{directory}/model.json" if directory else "model.json"
+    return await client.read_file(path)
 
-    model_dot_json = ModelDotJson.model_validate_json(
-        await client.read_file(path)
+
+@overload
+async def fetch_model_dot_json(
+    client: ADLSGen2Client,
+    log: Logger,
+    directory: str | None = None,
+    *,
+    format: Literal[ModelFormat.BYTES] = ...,
+) -> bytes: ...
+
+
+@overload
+async def fetch_model_dot_json(
+    client: ADLSGen2Client,
+    log: Logger,
+    directory: str | None = None,
+    *,
+    format: Literal[ModelFormat.PYDANTIC],
+) -> ModelDotJson: ...
+
+
+async def fetch_model_dot_json(
+    client: ADLSGen2Client,
+    log: Logger,
+    directory: str | None = None,
+    *,
+    format: ModelFormat = ModelFormat.BYTES,
+) -> bytes | ModelDotJson:
+    raw_bytes = await call_with_cache_logging(
+        _fetch_model_dot_json_bytes, log, client, directory
     )
 
-    return model_dot_json
+    if format == ModelFormat.PYDANTIC:
+        return ModelDotJson.model_validate_json(raw_bytes)
+    return raw_bytes
 
 
 async def get_table_metadata(
@@ -61,14 +96,19 @@ async def get_table_metadata(
     client: ADLSGen2Client,
     log: Logger,
 ) -> TableMetadata:
-    model_dot_json = await call_with_cache_logging(
-        fetch_model_dot_json, log, client, timestamp
-    )
-    tables = metadata_from_model_dot_json(model_dot_json)
+    raw_bytes = await fetch_model_dot_json(client, log, timestamp)
+    data = orjson.loads(raw_bytes)
 
-    for table in tables:
-        if table.name == table_name:
-            return table
+    for entity in data["entities"]:
+        if entity["name"] == table_name:
+            return TableMetadata(
+                name=entity["name"],
+                field_names=[attr["name"] for attr in entity["attributes"]],
+                boolean_fields=frozenset(
+                    attr["name"] for attr in entity["attributes"]
+                    if attr["dataType"] == "boolean"
+                ),
+            )
 
     raise KeyError(f"Table {table_name} not found in timestamp folder {timestamp}.")
 
