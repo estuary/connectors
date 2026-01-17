@@ -16,9 +16,9 @@ from estuary_cdk.http import HTTPError
 
 from .adls_gen2_client import ADLSGen2Client, ADLSPathMetadata
 from .models import (
-    BaseTable,
     ModelDotJson,
-    tables_from_model_dot_json,
+    TableMetadata,
+    metadata_from_model_dot_json,
 )
 from .shared import call_with_cache_logging, is_datetime_format, str_to_dt
 
@@ -55,22 +55,22 @@ async def fetch_model_dot_json(
     return model_dot_json
 
 
-async def get_table(
+async def get_table_metadata(
     timestamp: str,
     table_name: str,
     client: ADLSGen2Client,
     log: Logger,
-) -> type[BaseTable]:
+) -> TableMetadata:
     model_dot_json = await call_with_cache_logging(
         fetch_model_dot_json, log, client, timestamp
     )
-    tables = tables_from_model_dot_json(model_dot_json)
+    tables = metadata_from_model_dot_json(model_dot_json)
 
     for table in tables:
         if table.name == table_name:
             return table
 
-    raise KeyError(f"Table {table_name} not found for in timestamp folder {timestamp}.")
+    raise KeyError(f"Table {table_name} not found in timestamp folder {timestamp}.")
 
 
 async def get_in_progress_timestamp_folder(
@@ -157,7 +157,7 @@ async def read_csvs_in_folder(
             csvs.append(metadata)
 
     if csvs:
-        table_model = await get_table(
+        table_metadata = await get_table_metadata(
             timestamp=folder,
             table_name=table_name,
             client=client,
@@ -167,8 +167,8 @@ async def read_csvs_in_folder(
         csvs.sort(key=lambda c: c.last_modified_datetime)
 
         for csv in csvs:
-            async for row in client.stream_csv(csv.name, table_model.field_names):
-                yield transform_row(row, table_model.boolean_fields)
+            async for row in client.stream_csv(csv.name, table_metadata.field_names):
+                yield transform_row(row, table_metadata.boolean_fields)
 
 
 def transform_row(row: dict[str, str], boolean_fields: frozenset[str]) -> dict[str, str | bool | dict[str, str]]:

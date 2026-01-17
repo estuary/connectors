@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from typing import ClassVar, Literal, Annotated
 
 from estuary_cdk.capture.common import (
@@ -60,36 +61,19 @@ class ModelDotJson(BaseModel, extra="allow"):
 
 class BaseTable(BaseCSVRow, extra="allow"):
     """
-    Used for schema generation and table metadata. Not used to validate actual
-    documents - we yield raw dicts to avoid Pydantic's serialization/validation
-    overhead that's not necessary in this connector.
+    Used for schema generation only. The Pydantic model is needed to generate
+    JSON schemas for Resources. Not used to validate actual documents - we
+    yield raw dicts to avoid Pydantic's serialization/validation overhead
+    that's not necessary in this connector.
     """
     name: ClassVar[str]
-    field_names: ClassVar[list[str]]
-    field_types: ClassVar[dict[str, str]]
-    # Pre-computed set of boolean field names for efficient conversion.
-    # Avoids iterating all fields per row - only iterate boolean fields.
-    boolean_fields: ClassVar[frozenset[str]]
 
     Id: str
     IsDelete: bool | None
 
 
 def model_from_entity(entity: ModelDotJson.Entity) -> type[BaseTable]:
-    field_names = [attr.name for attr in entity.attributes]
-    field_types = {attr.name: attr.dataType for attr in entity.attributes}
-    boolean_fields = frozenset(
-        attr.name for attr in entity.attributes if attr.dataType == "boolean"
-    )
-
-    attrs = {
-        'name': entity.name,
-        'field_names': field_names,
-        'field_types': field_types,
-        'boolean_fields': boolean_fields,
-    }
-
-    return type(entity.name, (BaseTable,), attrs)
+    return type(entity.name, (BaseTable,), {'name': entity.name})
 
 
 def tables_from_model_dot_json(model_dot_json: ModelDotJson) -> list[type[BaseTable]]:
@@ -101,3 +85,29 @@ def tables_from_model_dot_json(model_dot_json: ModelDotJson) -> list[type[BaseTa
         )
 
     return tables
+
+
+@dataclass(frozen=True, slots=True)
+class TableMetadata:
+    """
+    Lightweight metadata container for runtime CSV processing.
+    """
+    name: str
+    field_names: list[str]
+    # Pre-computed set of boolean field names for efficient conversion.
+    # Avoids iterating all fields per row - only iterate boolean fields.
+    boolean_fields: frozenset[str]
+
+
+def metadata_from_entity(entity: ModelDotJson.Entity) -> TableMetadata:
+    return TableMetadata(
+        name=entity.name,
+        field_names=[attr.name for attr in entity.attributes],
+        boolean_fields=frozenset(
+            attr.name for attr in entity.attributes if attr.dataType == "boolean"
+        ),
+    )
+
+
+def metadata_from_model_dot_json(model_dot_json: ModelDotJson) -> list[TableMetadata]:
+    return [metadata_from_entity(entity) for entity in model_dot_json.entities]
