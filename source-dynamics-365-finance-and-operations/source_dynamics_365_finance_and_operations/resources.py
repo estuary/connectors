@@ -15,8 +15,7 @@ from .models import (
 )
 
 from .adls_gen2_client import ADLSGen2Client
-from .api import fetch_model_dot_json, fetch_changes
-from .shared import call_with_cache_logging
+from .api import fetch_model_dot_json, fetch_changes, ModelFormat
 
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
@@ -96,7 +95,7 @@ async def all_resources(
     )
 
     tables = tables_from_model_dot_json(
-        await call_with_cache_logging(fetch_model_dot_json, log, adls_client)
+        await fetch_model_dot_json(adls_client, log, format=ModelFormat.PYDANTIC)
     )
 
     return resources(log, config, adls_client, tables)

@@ -97,17 +97,3 @@ class TableMetadata:
     # Pre-computed set of boolean field names for efficient conversion.
     # Avoids iterating all fields per row - only iterate boolean fields.
     boolean_fields: frozenset[str]
-
-
-def metadata_from_entity(entity: ModelDotJson.Entity) -> TableMetadata:
-    return TableMetadata(
-        name=entity.name,
-        field_names=[attr.name for attr in entity.attributes],
-        boolean_fields=frozenset(
-            attr.name for attr in entity.attributes if attr.dataType == "boolean"
-        ),
-    )
-
-
-def metadata_from_model_dot_json(model_dot_json: ModelDotJson) -> list[TableMetadata]:
-    return [metadata_from_entity(entity) for entity in model_dot_json.entities]
