@@ -12,7 +12,7 @@ click = "^8.1.7"
 setuptools = "^78.1.1"
 asyncio = "^3.4.3"
 urllib3 = "^2.2.4"
-aiohttp = "^3.11.11"
+aiohttp = "^3.13.3"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"
