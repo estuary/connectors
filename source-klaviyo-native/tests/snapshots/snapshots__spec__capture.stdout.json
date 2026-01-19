@@ -11,6 +11,14 @@
               "format": "duration",
               "title": "Window size",
               "type": "string"
+            },
+            "custom_event_streams": {
+              "description": "Define additional event streams with custom filters. Each stream captures events matching the specified filters.",
+              "items": {
+                "$ref": "#/$defs/CustomEventStream"
+              },
+              "title": "Custom Event Streams",
+              "type": "array"
             }
           },
           "title": "Advanced",
@@ -36,6 +44,59 @@
             "access_token"
           ],
           "title": "ApiKey",
+          "type": "object"
+        },
+        "CustomEventStream": {
+          "properties": {
+            "name": {
+              "description": "A unique name for this custom event binding. The binding will be named 'custom_<name>'.",
+              "title": "Stream Name",
+              "type": "string"
+            },
+            "metric_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Filter events by metric ID. Adds 'equals(metric_id,\"<value>\")' to the API request's query filter.",
+              "title": "Metric ID"
+            },
+            "profile_id": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Filter events by profile ID. Adds 'equals(profile_id,\"<value>\")' to the API request's query filter.",
+              "title": "Profile ID"
+            },
+            "profile": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "description": "Filter events by profile. Adds 'has(profile,\"<value>\")' to the API request's query filter.",
+              "title": "Profile"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "title": "CustomEventStream",
           "type": "object"
         }
       },
