@@ -321,7 +321,7 @@ class TicketChildResource(ZendeskResource):
     @classmethod
     def _add_ticket_id(cls, values: dict[str, Any], info: ValidationInfo) -> dict[str, Any]:
         if info.context and isinstance(info.context, TicketChildResourceValidationContext):
-            if 'ticket_id' not in values:
+            if values.get("ticket_id") is None:
                 values['ticket_id'] = info.context.ticket_id
         else:
             raise RuntimeError("TicketChildResource requires either a TicketChildResourceValidationContext containing the ticket_id.")
