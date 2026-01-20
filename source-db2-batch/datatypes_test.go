@@ -152,6 +152,57 @@ func TestStringTypes(t *testing.T) {
 	})
 }
 
+// TestCharForBitDataTypes exercises discovery and capture of CHAR and VARCHAR columns
+// both with and without the FOR BIT DATA attribute. Columns with FOR BIT DATA should
+// be treated as binary data (base64 encoded) rather than text strings.
+func TestCharForBitDataTypes(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testControlClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY NOT NULL,
+        char_col CHAR(16),
+        varchar_col VARCHAR(100),
+        char_bit_col CHAR(16) FOR BIT DATA,
+        varchar_bit_col VARCHAR(100) FOR BIT DATA
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "ID")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for _, row := range [][]any{
+			// Regular text values - same data in all columns
+			{0, "Hello", "Hello", []byte("Hello"), []byte("Hello")},
+			{1, "A", "A", []byte("A"), []byte("A")},
+
+			// Binary data that wouldn't be valid text
+			{2, "text only", "text only", []byte{0x00, 0xFF, 0x7F, 0x80}, []byte{0x00, 0xFF, 0x7F, 0x80}},
+			{3, "more text", "more text", []byte{0xDE, 0xAD, 0xBE, 0xEF}, []byte{0xDE, 0xAD, 0xBE, 0xEF}},
+
+			// Empty and null values
+			{4, "", "", []byte{}, []byte{}},
+			{5, nil, nil, nil, nil},
+
+			// Long values
+			{6, "1234567890123456", "1234567890123456789012345678901234567890",
+				[]byte("1234567890123456"), []byte("1234567890123456789012345678901234567890")},
+
+			// Whitespace handling
+			{7, "  padded  ", "  padded  ", []byte("  padded  "), []byte("  padded  ")},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf(`
+                INSERT INTO %s (
+                    id, char_col, varchar_col, char_bit_col, varchar_bit_col
+                ) VALUES (?, ?, ?, ?, ?)`, tableName),
+				row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
 // TestDBCSTypes exercises discovery and capture of the double-byte character set types
 // GRAPHIC, VARGRAPHIC, and DBCLOB.
 func TestDBCSTypes(t *testing.T) {

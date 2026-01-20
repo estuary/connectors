@@ -1,0 +1,257 @@
+# ================================
+# Collection "acmeCo/test/test/charforbitdatatypes_169146": 9 Documents
+# ================================
+{
+  "type": "object",
+  "required": [
+    "CHAR_BIT_COL",
+    "CHAR_COL",
+    "ID",
+    "VARCHAR_BIT_COL",
+    "VARCHAR_COL",
+    "_meta"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "CHAR_BIT_COL": {
+      "description": "(source type: CHARACTER FOR BIT DATA)",
+      "contentEncoding": "base64",
+      "type": [
+        "string"
+      ]
+    },
+    "CHAR_COL": {
+      "maxLength": 16,
+      "description": "(source type: CHARACTER)",
+      "type": [
+        "string"
+      ]
+    },
+    "ID": {
+      "type": "integer",
+      "description": "(source type: non-nullable INTEGER)"
+    },
+    "VARCHAR_BIT_COL": {
+      "description": "(source type: VARCHAR FOR BIT DATA)",
+      "contentEncoding": "base64",
+      "type": [
+        "string"
+      ]
+    },
+    "VARCHAR_COL": {
+      "maxLength": 100,
+      "description": "(source type: VARCHAR)",
+      "type": [
+        "string"
+      ]
+    },
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-db2-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document was executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "CHAR_BIT_COL": "SGVsbG8gICAgICAgICAgIA==",
+  "CHAR_COL": "Hello           ",
+  "ID": 0,
+  "VARCHAR_BIT_COL": "SGVsbG8=",
+  "VARCHAR_COL": "Hello",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test/charforbitdatatypes_169146",
+      "schema": "TEST",
+      "table": "CHARFORBITDATATYPES_169146"
+    }
+  }
+}
+{
+  "CHAR_BIT_COL": "QSAgICAgICAgICAgICAgIA==",
+  "CHAR_COL": "A               ",
+  "ID": 1,
+  "VARCHAR_BIT_COL": "QQ==",
+  "VARCHAR_COL": "A",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test/charforbitdatatypes_169146",
+      "schema": "TEST",
+      "table": "CHARFORBITDATATYPES_169146"
+    }
+  }
+}
+{
+  "CHAR_BIT_COL": "AP9/gCAgICAgICAgICAgIA==",
+  "CHAR_COL": "text only       ",
+  "ID": 2,
+  "VARCHAR_BIT_COL": "AP9/gA==",
+  "VARCHAR_COL": "text only",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test/charforbitdatatypes_169146",
+      "schema": "TEST",
+      "table": "CHARFORBITDATATYPES_169146"
+    }
+  }
+}
+{
+  "CHAR_BIT_COL": "3q2+7yAgICAgICAgICAgIA==",
+  "CHAR_COL": "more text       ",
+  "ID": 3,
+  "VARCHAR_BIT_COL": "3q2+7w==",
+  "VARCHAR_COL": "more text",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test/charforbitdatatypes_169146",
+      "schema": "TEST",
+      "table": "CHARFORBITDATATYPES_169146"
+    }
+  }
+}
+{
+  "CHAR_BIT_COL": "ICAgICAgICAgICAgICAgIA==",
+  "CHAR_COL": "                ",
+  "ID": 4,
+  "VARCHAR_BIT_COL": "",
+  "VARCHAR_COL": "",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 4,
+    "row_id": 4,
+    "source": {
+      "resource": "test/charforbitdatatypes_169146",
+      "schema": "TEST",
+      "table": "CHARFORBITDATATYPES_169146"
+    }
+  }
+}
+{
+  "CHAR_BIT_COL": null,
+  "CHAR_COL": null,
+  "ID": 5,
+  "VARCHAR_BIT_COL": null,
+  "VARCHAR_COL": null,
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 5,
+    "row_id": 5,
+    "source": {
+      "resource": "test/charforbitdatatypes_169146",
+      "schema": "TEST",
+      "table": "CHARFORBITDATATYPES_169146"
+    }
+  }
+}
+{
+  "CHAR_BIT_COL": "MTIzNDU2Nzg5MDEyMzQ1Ng==",
+  "CHAR_COL": "1234567890123456",
+  "ID": 6,
+  "VARCHAR_BIT_COL": "MTIzNDU2Nzg5MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MA==",
+  "VARCHAR_COL": "1234567890123456789012345678901234567890",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 6,
+    "row_id": 6,
+    "source": {
+      "resource": "test/charforbitdatatypes_169146",
+      "schema": "TEST",
+      "table": "CHARFORBITDATATYPES_169146"
+    }
+  }
+}
+{
+  "CHAR_BIT_COL": "ICBwYWRkZWQgICAgICAgIA==",
+  "CHAR_COL": "  padded        ",
+  "ID": 7,
+  "VARCHAR_BIT_COL": "ICBwYWRkZWQgIA==",
+  "VARCHAR_COL": "  padded  ",
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 7,
+    "row_id": 7,
+    "source": {
+      "resource": "test/charforbitdatatypes_169146",
+      "schema": "TEST",
+      "table": "CHARFORBITDATATYPES_169146"
+    }
+  }
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test/charforbitdatatypes_169146":{"CursorNames":["ID"],"CursorValues":[7],"DocumentCount":8,"LastPolled":"<TIMESTAMP>"}}}
+
