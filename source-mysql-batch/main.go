@@ -10,6 +10,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/estuary/connectors/go/capture/mysql/spatial"
 	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
@@ -92,9 +93,40 @@ func (c *Config) SetDefaults() {
 	}
 }
 
-func translateMySQLValue(val any) (any, error) {
-	if val, ok := val.([]byte); ok {
-		return string(val), nil
+func translateMySQLValue(val any, fieldType byte, fieldFlag uint16) (any, error) {
+	if bs, ok := val.([]byte); ok {
+		// For binary column types (blobs, geometry, and binary/varbinary), keep as
+		// []byte so that JSON encoding will base64-encode the data. For text column
+		// types, convert to string.
+		//
+		// BINARY/VARBINARY columns use MYSQL_TYPE_STRING/MYSQL_TYPE_VAR_STRING with
+		// the BINARY_FLAG set to distinguish them from CHAR/VARCHAR.
+		//
+		// TEXT types (TINYTEXT, TEXT, MEDIUMTEXT, LONGTEXT) are stored internally as
+		// BLOB types but without the BINARY_FLAG. BLOB types have the BINARY_FLAG set.
+		switch fieldType {
+		case mysql.MYSQL_TYPE_GEOMETRY:
+			// Parse MySQL's internal geometry format and return as WKT string
+			wkt, err := spatial.ParseToWKT(bs)
+			if err != nil {
+				return nil, fmt.Errorf("parsing spatial value: %w", err)
+			}
+			return wkt, nil
+		case mysql.MYSQL_TYPE_TINY_BLOB, mysql.MYSQL_TYPE_MEDIUM_BLOB, mysql.MYSQL_TYPE_LONG_BLOB, mysql.MYSQL_TYPE_BLOB:
+			// TEXT vs BLOB: TEXT types don't have BINARY_FLAG, BLOB types do
+			if fieldFlag&mysql.BINARY_FLAG != 0 {
+				return bs, nil
+			}
+			return string(bs), nil
+		case mysql.MYSQL_TYPE_STRING, mysql.MYSQL_TYPE_VAR_STRING:
+			// CHAR/VARCHAR vs BINARY/VARBINARY: binary types have BINARY_FLAG
+			if fieldFlag&mysql.BINARY_FLAG != 0 {
+				return bs, nil
+			}
+			return string(bs), nil
+		default:
+			return string(bs), nil
+		}
 	}
 	return val, nil
 }

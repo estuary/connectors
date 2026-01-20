@@ -1,0 +1,14 @@
+# ================================
+# Collection "acmeCo/test/test/spatialtypes_70263912": 6 Documents
+# ================================
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SpatialTypes_70263912","cursor":"backfill:0"}},"geometry_col":"POINT(1 1)","id":101,"linestring_col":"LINESTRING(0 0,1 1,2 2)","point_col":"POINT(1 1)","polygon_col":"POLYGON((0 0,1 1,1 0,0 0))"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SpatialTypes_70263912","cursor":"backfill:1"}},"geometry_col":"POINT(2 2)","id":102,"linestring_col":"LINESTRING(2 2,3 3,4 4)","point_col":"POINT(2 2)","polygon_col":"POLYGON((1 1,2 2,2 1,1 1))"}
+{"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"SpatialTypes_70263912","cursor":"backfill:2"}},"geometry_col":null,"id":103,"linestring_col":null,"point_col":null,"polygon_col":null}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SpatialTypes_70263912","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"geometry_col":"POINT(1 1)","id":201,"linestring_col":"LINESTRING(0 0,1 1,2 2)","point_col":"POINT(1 1)","polygon_col":"POLYGON((0 0,1 1,1 0,0 0))"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SpatialTypes_70263912","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"geometry_col":"POINT(2 2)","id":202,"linestring_col":"LINESTRING(2 2,3 3,4 4)","point_col":"POINT(2 2)","polygon_col":"POLYGON((1 1,2 2,2 1,1 1))"}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"SpatialTypes_70263912","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"geometry_col":null,"id":203,"linestring_col":null,"point_col":null,"polygon_col":null}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test%2FSpatialTypes_70263912":{"backfilled":3,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","geometry_col","point_col","linestring_col","polygon_col"],"types":{"geometry_col":"geometry","id":{"type":"int"},"linestring_col":"linestring","point_col":"point","polygon_col":"polygon"}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+

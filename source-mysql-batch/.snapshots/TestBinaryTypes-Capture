@@ -137,13 +137,13 @@
       "table": "binarytypes_537491"
     }
   },
-  "binary_col": "binary_data_1234",
-  "blob_col": "blob_data",
+  "binary_col": "YmluYXJ5X2RhdGFfMTIzNA==",
+  "blob_col": "YmxvYl9kYXRh",
   "id": 0,
-  "longblob_col": "longblob_data",
-  "mediumblob_col": "mediumblob_data",
-  "tinyblob_col": "tinyblob_data",
-  "varbinary_col": "varbinary_data"
+  "longblob_col": "bG9uZ2Jsb2JfZGF0YQ==",
+  "mediumblob_col": "bWVkaXVtYmxvYl9kYXRh",
+  "tinyblob_col": "dGlueWJsb2JfZGF0YQ==",
+  "varbinary_col": "dmFyYmluYXJ5X2RhdGE="
 }
 {
   "_meta": {
@@ -156,13 +156,13 @@
       "table": "binarytypes_537491"
     }
   },
-  "binary_col": "short\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
-  "blob_col": "short",
+  "binary_col": "c2hvcnQAAAAAAAAAAAAAAA==",
+  "blob_col": "c2hvcnQ=",
   "id": 1,
-  "longblob_col": "short",
-  "mediumblob_col": "short",
-  "tinyblob_col": "short",
-  "varbinary_col": "short"
+  "longblob_col": "c2hvcnQ=",
+  "mediumblob_col": "c2hvcnQ=",
+  "tinyblob_col": "c2hvcnQ=",
+  "varbinary_col": "c2hvcnQ="
 }
 {
   "_meta": {
@@ -175,7 +175,7 @@
       "table": "binarytypes_537491"
     }
   },
-  "binary_col": "\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000\u0000",
+  "binary_col": "AAAAAAAAAAAAAAAAAAAAAA==",
   "blob_col": "",
   "id": 2,
   "longblob_col": "",

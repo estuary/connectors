@@ -753,3 +753,44 @@ func TestPartialUpdateRowsEvent(t *testing.T) {
 	cs.Capture(ctx, t, nil)
 	cupaloy.SnapshotT(t, cs.Summary())
 }
+
+// TestSpatialTypes verifies that spatial type values captured via backfill
+// and via binlog replication produce identical results.
+func TestSpatialTypes(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+	var uniqueID = "70263912"
+	var tableName = tb.CreateTable(ctx, t, uniqueID, `(
+		id INTEGER PRIMARY KEY,
+		geometry_col GEOMETRY,
+		point_col POINT,
+		linestring_col LINESTRING,
+		polygon_col POLYGON
+	)`)
+
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+	cs.Validator = &st.OrderedCaptureValidator{}
+	sqlcapture.TestShutdownAfterCaughtUp = true
+	t.Cleanup(func() { sqlcapture.TestShutdownAfterCaughtUp = false })
+
+	t.Run("Discovery", func(t *testing.T) {
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+
+	// Insert rows for backfill capture (IDs 101-103)
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES
+		(101, ST_GeomFromText('POINT(1 1)'), ST_GeomFromText('POINT(1 1)'), ST_GeomFromText('LINESTRING(0 0, 1 1, 2 2)'), ST_GeomFromText('POLYGON((0 0, 1 1, 1 0, 0 0))')),
+		(102, ST_GeomFromText('POINT(2 2)'), ST_GeomFromText('POINT(2 2)'), ST_GeomFromText('LINESTRING(2 2, 3 3, 4 4)'), ST_GeomFromText('POLYGON((1 1, 2 2, 2 1, 1 1))')),
+		(103, NULL, NULL, NULL, NULL)
+	`, tableName))
+	cs.Capture(ctx, t, nil)
+
+	// Insert rows for replication capture (IDs 201-203) with identical values
+	tb.Query(ctx, t, fmt.Sprintf(`INSERT INTO %s VALUES
+		(201, ST_GeomFromText('POINT(1 1)'), ST_GeomFromText('POINT(1 1)'), ST_GeomFromText('LINESTRING(0 0, 1 1, 2 2)'), ST_GeomFromText('POLYGON((0 0, 1 1, 1 0, 0 0))')),
+		(202, ST_GeomFromText('POINT(2 2)'), ST_GeomFromText('POINT(2 2)'), ST_GeomFromText('LINESTRING(2 2, 3 3, 4 4)'), ST_GeomFromText('POLYGON((1 1, 2 2, 2 1, 1 1))')),
+		(203, NULL, NULL, NULL, NULL)
+	`, tableName))
+	cs.Capture(ctx, t, nil)
+
+	cupaloy.SnapshotT(t, cs.Summary())
+}
