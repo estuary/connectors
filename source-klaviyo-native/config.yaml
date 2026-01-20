@@ -2,6 +2,14 @@ credentials:
     credentials_title: API Key
     access_token_sops: ENC[AES256_GCM,data:ahq3zFIiztn/QIx/UB10KRRPJdBzvQM3CjgiVa/4977qtYIaug==,iv:urvMFErNkLbL3/ZOaw1e0sCz1Jxbkj30QCyxOtzDon8=,tag:JCn2QwJIaa4qYOlv6cysmw==,type:str]
 start_date: "2025-08-12T00:00:00Z"
+advanced:
+    custom_event_streams:
+        - name: profile_id_abc_events
+          profile_id: abc
+        - name: metric_id_123_events
+          metric_id: "123"
+        - name: profile_zyw_events
+          profile: zyw
 sops:
     kms: []
     gcp_kms:
@@ -11,8 +19,8 @@ sops:
     azure_kv: []
     hc_vault: []
     age: []
-    lastmodified: "2025-08-12T16:43:43Z"
-    mac: ENC[AES256_GCM,data:RA9K1tI9OntWwRJWY1mct5LAiC/miIuSqX/jItBRbBbZAIt4KhnWNOdC1GJ5rCJceQNCdEI5992kJbCf/6Ki/cNbR6YjdvVdyXUQ4Zby4D80IKVOlCfGcbaXTPBCUT6wNLEitIayRF8KVo3PqVowe6siQs16Uy34C4jv7pF4c7s=,iv:W9pLf2w6EgRvjQQrox2CGNomb45VZPH0YaId4TRWiMk=,tag:9yN0sszqflbobU3uLUSdbQ==,type:str]
+    lastmodified: "2026-01-19T03:38:17Z"
+    mac: ENC[AES256_GCM,data:8r8qrCti8UnrvdG4oNUnEhtxPJw1sE6NZTdaKFYM9darlYJPJT/ssl2Z5460dh9+uzcDblzKCIwpm9+rH1YNN6xTz1TSo78K3uiiWCqdTl0eOeDWuGb3xni6LYBa8ADW65Ev9DDyaOv7B0DVNH7N/6TtC76V+kHjdkIPEsTBs0o=,iv:HEMZHibqDz2HvpuLWl+ATdgfIovjQ91KcfoIdZTQRoI=,tag:iSdvQha1+f6pVPc862dzaw==,type:str]
     pgp: []
     encrypted_suffix: _sops
     version: 3.9.0
