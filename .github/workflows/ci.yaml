@@ -98,6 +98,7 @@ jobs:
           - source-snowflake
           - source-sqlserver
           - source-sqlserver-batch
+          - source-sqlserver-ct
           - source-test
           - source-azure-blob-storage
           - materialize-azure-blob-parquet
@@ -196,6 +197,7 @@ jobs:
             "source-sftp",
             "source-sqlserver",
             "source-sqlserver-batch",
+            "source-sqlserver-ct",
             "source-mongodb"
             ]'), matrix.connector)
         run: |
@@ -216,7 +218,8 @@ jobs:
           contains(fromJson('[
             "source-postgres",
             "source-redshift-batch",
-            "source-sqlserver"
+            "source-sqlserver",
+            "source-sqlserver-ct"
             ]'), matrix.connector)
         run: |
           ${{ matrix.connector }}/run_tests.sh
