@@ -217,7 +217,11 @@ func generateDB2Resource(cfg *Config, resourceName, schemaName, tableName, table
 func translateDB2Value(cfg *Config, val any, databaseTypeName string) (any, error) {
 	switch strings.ToUpper(databaseTypeName) {
 	case "CHAR", "VARCHAR", "CLOB", "GRAPHIC", "VARGRAPHIC", "DBCLOB", "XML":
-		// String types may come through as []byte, convert to string
+		// String types may come through as []byte, convert to string.
+		//
+		// Note: (VAR)CHAR FOR BIT DATA columns are sort of CHAR and sort of not. These
+		// appear to have database type names like "CHAR () FOR BIT DATA" which don't match
+		// here, and so the []byte value remains a []byte and gets base64 encoded.
 		if bs, ok := val.([]byte); ok {
 			return string(bs), nil
 		}

@@ -325,7 +325,7 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 
 	fmt.Fprintf(query, "SELECT TABSCHEMA, TABNAME, COLNAME, COLNO,")
 	fmt.Fprintf(query, " CASE WHEN NULLS = 'Y' THEN 1 ELSE 0 END,")
-	fmt.Fprintf(query, " TYPENAME, LENGTH")
+	fmt.Fprintf(query, " TYPENAME, LENGTH, CODEPAGE")
 	fmt.Fprintf(query, " FROM SYSCAT.COLUMNS")
 	fmt.Fprintf(query, " WHERE 1=1")
 	if len(discoverSchemas) > 0 {
@@ -363,19 +363,32 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 		var isNullable bool
 		var typeName string
 		var charMaxLength sql.NullInt64
-		if err := rows.Scan(&tableSchema, &tableName, &columnName, &columnIndex, &isNullable, &typeName, &charMaxLength); err != nil {
+		var codepage int
+		if err := rows.Scan(&tableSchema, &tableName, &columnName, &columnIndex, &isNullable, &typeName, &charMaxLength, &codepage); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 
-		var dataType, ok = databaseTypeToJSON[strings.ToLower(typeName)]
+		// Type names should be all-caps, but normalize to lowercase for mapping lookup just in case
+		var typeNameLower = strings.ToLower(typeName)
+
+		var dataType, ok = databaseTypeToJSON[typeNameLower]
 		if !ok {
 			dataType = basicColumnType{description: fmt.Sprintf("using catch-all schema for unknown type %q", typeName)}
 		}
 		dataType.nullable = isNullable
 
-		if charMaxLength.Valid && charMaxLength.Int64 > 0 {
-			switch strings.ToLower(typeName) {
-			case "character", "varchar":
+		var describedType = typeName
+		switch typeNameLower {
+		case "character", "varchar":
+			// CODEPAGE=0 indicates FOR BIT DATA, which should be treated as binary
+			if codepage == 0 {
+				dataType = basicColumnType{
+					jsonTypes:       []string{"string"},
+					contentEncoding: "base64",
+					nullable:        isNullable,
+				}
+				describedType += " FOR BIT DATA"
+			} else if charMaxLength.Valid && charMaxLength.Int64 > 0 {
 				var length = uint64(charMaxLength.Int64)
 				dataType.maxLength = &length
 			}
@@ -389,7 +402,7 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 		if !isNullable {
 			nullabilityDescription = "non-nullable "
 		}
-		dataType.description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, typeName)
+		dataType.description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, describedType)
 
 		var column = &discoveredColumn{
 			Schema:   strings.TrimSpace(tableSchema),
