@@ -33,7 +33,7 @@ func main() {
 var sqlserverDriver = &sqlcapture.Driver{
 	ConfigSchema:     configSchema(),
 	ResourceSchema:   resourceSchema(),
-	DocumentationURL: "https://go.estuary.dev/source-sqlserver",
+	DocumentationURL: "https://go.estuary.dev/source-sqlserver-ct",
 	Connect:          connectSQLServer,
 }
 
