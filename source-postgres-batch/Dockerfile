@@ -14,7 +14,6 @@ RUN go mod download
 COPY go                 ./go
 COPY source-boilerplate ./source-boilerplate
 
-RUN go install -v ./go/...
 RUN go install -v ./source-boilerplate/...
 RUN go install -v github.com/jackc/pgx/v5
 
