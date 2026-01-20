@@ -57,7 +57,7 @@ on:
       - "source-airtable-native/**"
       - "source-ada/**"
       - "source-zoho/**"
-      - "source-iterable-native"
+      - "source-iterable-native/**"
 
   pull_request:
     branches: [main]
