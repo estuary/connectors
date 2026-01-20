@@ -153,7 +153,7 @@
     ],
     "title": "SQL Server CT Resource Spec"
   },
-  "documentationUrl": "https://go.estuary.dev/source-sqlserver",
+  "documentationUrl": "https://go.estuary.dev/source-sqlserver-ct",
   "resourcePathPointers": [
     "/namespace",
     "/stream"
