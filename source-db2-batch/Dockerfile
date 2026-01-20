@@ -25,7 +25,6 @@ ENV LD_LIBRARY_PATH=${IBM_DB_HOME}/lib
 COPY go                 ./go
 COPY source-boilerplate ./source-boilerplate
 
-RUN go install -v ./go/...
 RUN go install -v ./source-boilerplate/...
 
 COPY source-db2-batch ./source-db2-batch

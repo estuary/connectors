@@ -15,7 +15,6 @@ COPY go                 ./go
 COPY source-boilerplate ./source-boilerplate
 COPY sqlcapture         ./sqlcapture
 
-RUN go install -v ./go/...
 RUN go install -v ./source-boilerplate/...
 
 # Run tests and build the connector
