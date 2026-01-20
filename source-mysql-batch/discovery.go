@@ -469,6 +469,7 @@ var databaseTypeToJSON = map[string]basicColumnType{
 	"mediumtext": {jsonTypes: []string{"string"}},
 	"longtext":   {jsonTypes: []string{"string"}},
 
+	// TODO: Consider adding contentEncoding: "base64"
 	"binary":     {jsonTypes: []string{"string"}},
 	"varbinary":  {jsonTypes: []string{"string"}},
 	"tinyblob":   {jsonTypes: []string{"string"}},
@@ -487,6 +488,16 @@ var databaseTypeToJSON = map[string]basicColumnType{
 	"year":      {jsonTypes: []string{"integer"}},
 
 	"json": {},
+
+	// Spatial types - output as WKT (Well-Known Text) strings
+	"geometry":           {jsonTypes: []string{"string"}},
+	"point":              {jsonTypes: []string{"string"}},
+	"linestring":         {jsonTypes: []string{"string"}},
+	"polygon":            {jsonTypes: []string{"string"}},
+	"multipoint":         {jsonTypes: []string{"string"}},
+	"multilinestring":    {jsonTypes: []string{"string"}},
+	"multipolygon":       {jsonTypes: []string{"string"}},
+	"geometrycollection": {jsonTypes: []string{"string"}},
 }
 
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)

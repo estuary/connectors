@@ -85,20 +85,36 @@ Binding 0:
             ]
           },
           "geometry_col": {
-            "description": "using catch-all schema (source type: geometry)"
+            "description": "(source type: geometry)",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "id": {
             "type": "integer",
             "description": "(source type: non-nullable int)"
           },
           "linestring_col": {
-            "description": "using catch-all schema (source type: linestring)"
+            "description": "(source type: linestring)",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "point_col": {
-            "description": "using catch-all schema (source type: point)"
+            "description": "(source type: point)",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "polygon_col": {
-            "description": "using catch-all schema (source type: polygon)"
+            "description": "(source type: polygon)",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "x-infer-schema": true

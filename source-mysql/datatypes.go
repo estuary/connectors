@@ -9,6 +9,7 @@ import (
 	"time"
 	"unsafe"
 
+	"github.com/estuary/connectors/go/capture/mysql/spatial"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	"github.com/google/uuid"
@@ -58,6 +59,8 @@ func (db *mysqlDatabase) constructJSONTranscoder(isBackfill bool, columnType any
 		return jsonTranscoderFunc(transcodeYearValue), nil
 	case "uuid": // The 'UUID' column type is only in MariaDB
 		return jsonTranscoderFunc(transcodeUUIDValue), nil
+	case "geometry", "point", "linestring", "polygon", "multipoint", "multilinestring", "multipolygon", "geometrycollection":
+		return jsonTranscoderFunc(transcodeSpatialValue), nil
 	default:
 		return &mysqlDefaultTranscoder{
 			ShouldComplain: true,
@@ -243,6 +246,22 @@ func transcodeUUIDValue(buf []byte, val any) ([]byte, error) {
 		} else {
 			return nil, fmt.Errorf("error parsing UUID: %w", err)
 		}
+	}
+	return json.Append(buf, val, 0)
+}
+
+func transcodeSpatialValue(buf []byte, val any) ([]byte, error) {
+	// Spatial values arrive as []byte from both backfill and replication.
+	// Parse MySQL's internal geometry format and output as WKT string.
+	if str, ok := val.(string); ok {
+		val = []byte(str)
+	}
+	if bs, ok := val.([]byte); ok {
+		wkt, err := spatial.ParseToWKT(bs)
+		if err != nil {
+			return nil, fmt.Errorf("parsing spatial value: %w", err)
+		}
+		return json.Append(buf, wkt, 0)
 	}
 	return json.Append(buf, val, 0)
 }

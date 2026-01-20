@@ -788,4 +788,14 @@ var mysqlTypeToJSON = map[string]columnSchema{
 	"json": {},
 
 	"uuid": {jsonType: "string", format: "uuid"}, // Only present in MariaDB
+
+	// Spatial types - output as WKT (Well-Known Text) strings
+	"geometry":           {jsonType: "string"},
+	"point":              {jsonType: "string"},
+	"linestring":         {jsonType: "string"},
+	"polygon":            {jsonType: "string"},
+	"multipoint":         {jsonType: "string"},
+	"multilinestring":    {jsonType: "string"},
+	"multipolygon":       {jsonType: "string"},
+	"geometrycollection": {jsonType: "string"},
 }
