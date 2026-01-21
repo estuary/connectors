@@ -1,3 +1,52 @@
+"""
+Priority-based capture system for Stripe connected accounts.
+
+This module provides infrastructure for efficiently capturing data from many
+Stripe connected accounts by using a priority queue to fairly distribute work.
+Accounts that are furthest behind (still backfilling) get priority over those
+that are caught up (incremental only).
+
+Use `open_binding_with_priority_queue` instead of the standard `open_binding`
+when capturing from Stripe connected accounts. See resources.py for examples.
+
+Architecture
+------------
+┌─────────────────────────────────────────────────────────────────────────┐
+│                        PriorityQueueManager                             │
+│  Orchestrates the entire system. Creates and manages all components.    │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  ┌──────────────────┐    ┌──────────────────┐    ┌──────────────────┐  │
+│  │ PriorityCalculator│    │  WorkItemManager │    │  SubtaskExecutor │  │
+│  │                  │    │                  │    │                  │  │
+│  │ Determines which │───▶│ Creates WorkItems│───▶│ Runs incremental │  │
+│  │ accounts need    │    │ for prioritized  │    │ and backfill     │  │
+│  │ work and in what │    │ accounts         │    │ tasks            │  │
+│  │ order            │    │                  │    │                  │  │
+│  └──────────────────┘    └──────────────────┘    └──────────────────┘  │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                      Worker Pool (N workers)                     │   │
+│  │  Each worker pulls WorkItems from queue and executes via        │   │
+│  │  SubtaskExecutor. Workers run concurrently.                     │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+│                                                                         │
+│  ┌─────────────────────────────────────────────────────────────────┐   │
+│  │                      Priority Evaluation Loop                    │   │
+│  │  Periodically re-evaluates priorities and updates work queue.   │   │
+│  │  Cancels work for accounts that are no longer priority.         │   │
+│  └─────────────────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+Data Flow
+---------
+1. PriorityCalculator.select_prioritized_accounts() picks top N accounts
+2. WorkItemManager.generate_work_items() creates WorkItems for new accounts
+3. WorkItems are added to the async priority queue
+4. Workers pull WorkItems and execute via SubtaskExecutor
+5. Every 15 seconds, priorities are re-evaluated and queue is refreshed
+"""
+
 import asyncio
 import heapq
 from datetime import datetime, timedelta, UTC
@@ -21,8 +70,12 @@ from estuary_cdk.capture.common import (
     FetchSnapshotFn,
 )
 
-# To avoid storing all fetch_changes and fetch_page function in memory, factory functions
-# are used to create the fetch functions on demand for a specific account.
+# =============================================================================
+# PROTOCOLS AND TYPE DEFINITIONS
+# =============================================================================
+# Factory protocols allow creating fetch functions on-demand for each account,
+# avoiding the memory cost of storing functions for all accounts upfront.
+
 class FetchChangesFnFactory(Protocol):
     """Factory function for creating incremental fetch functions for a specific account."""
     def __call__(self, account_id: str) -> FetchChangesFn[BaseDocument]:
@@ -35,9 +88,14 @@ class FetchPageFnFactory(Protocol):
         ...
 
 
+# =============================================================================
+# DATA CLASSES
+# =============================================================================
+
 class PriorityLevel(IntEnum):
-    BACKFILL = 0
-    INCREMENTAL = 1
+    """Priority levels for work items. Lower value = higher priority."""
+    BACKFILL = 0      # Accounts still backfilling get highest priority
+    INCREMENTAL = 1   # Accounts caught up only need incremental updates
 
 
 class WorkItemPriority(NamedTuple):
@@ -116,7 +174,24 @@ class PriorityQueueConfig:
 DEFAULT_CONFIG = PriorityQueueConfig()
 
 
+# =============================================================================
+# PRIORITY CALCULATION
+# =============================================================================
+
 class PriorityCalculator:
+    """
+    Determines work priority for connected accounts.
+
+    Used by WorkItemManager to decide which accounts should be processed and
+    in what order. Accounts are prioritized by:
+
+    1. Backfill status - accounts with incomplete backfills get priority (level 0)
+    2. Incremental cursor age - older cursors mean higher priority (level 1)
+
+    Attributes:
+        resource_state: Current connector state containing inc and backfill dicts
+    """
+
     def __init__(self, resource_state: ResourceState):
         self.resource_state = resource_state
 
@@ -174,11 +249,33 @@ class PriorityCalculator:
         return {priority.account_id for priority in selected_accounts}
 
 
+# =============================================================================
+# WORK ITEM MANAGEMENT
+# =============================================================================
+
 class WorkItemManager:
+    """
+    Creates and tracks WorkItems for connected accounts.
+
+    Responsibilities:
+    - Generate WorkItems for prioritized accounts (via generate_work_items)
+    - Track which accounts have active work in progress
+    - Signal cancellation when accounts are deprioritized
+
+    Works with PriorityCalculator to determine which accounts need work,
+    then creates WorkItem objects containing the fetch functions and state
+    needed by SubtaskExecutor to run the actual capture tasks.
+
+    Attributes:
+        priority_calculator: Used to determine account priorities
+        active_work_by_account: Maps account_id -> active WorkItem
+    """
+
     def __init__(self, priority_calculator: PriorityCalculator):
         self.priority_calculator = priority_calculator
         self.active_work_by_account: Dict[str, WorkItem] = {}
     
+
     def generate_work_items(
         self,
         all_account_ids: List[str],
@@ -263,7 +360,30 @@ class WorkItemManager:
         self.active_work_by_account.pop(work_item.account_id, None)
 
 
+# =============================================================================
+# TASK EXECUTION
+# =============================================================================
+
 class SubtaskExecutor:
+    """
+    Executes incremental and backfill tasks for a WorkItem.
+
+    When a worker pulls a WorkItem from the queue, SubtaskExecutor handles
+    spawning and running the actual async tasks:
+    - One incremental task (always)
+    - One backfill task (if backfill is incomplete)
+
+    The tasks run concurrently via asyncio.gather. Each task can be cancelled
+    via the WorkItem's cancellation_event when the account is deprioritized.
+
+    Attributes:
+        binding: The capture binding configuration
+        binding_index: Index of this binding in the capture
+        resource_state: Current connector state for checkpointing
+        prefix: Task name prefix for logging
+        main_task: Parent task for spawning child tasks
+    """
+
     def __init__(
         self,
         binding: CaptureBinding[ResourceConfig],
@@ -333,6 +453,10 @@ class SubtaskExecutor:
 
         await asyncio.gather(*subtasks)
 
+
+# =============================================================================
+# ORCHESTRATION
+# =============================================================================
 
 class PriorityQueueManager:
     """
@@ -436,6 +560,14 @@ class PriorityQueueManager:
                 await self._refresh_work_queue()
 
     async def _refresh_work_queue(self):
+        """
+        Re-evaluate priorities and update the work queue.
+
+        This is called periodically to:
+        1. Generate new work items for accounts that gained priority
+        2. Cancel work for accounts that lost priority (were bumped by others)
+        3. Add new work items to the queue for workers to pick up
+        """
         new_work_items, prioritized_account_ids = self.work_item_manager.generate_work_items(
             self.all_account_ids,
             self.config.max_subtask_count,
@@ -444,6 +576,9 @@ class PriorityQueueManager:
             self.resource_state
         )
 
+        # Cancel work for accounts that are no longer in the top priority set.
+        # This happens when other accounts have fallen further behind and need
+        # to be processed first (fairness).
         current_account_ids = set(self.work_item_manager.active_work_by_account.keys())
         accounts_to_cancel = current_account_ids - prioritized_account_ids
 
@@ -477,10 +612,12 @@ class PriorityQueueManager:
             )
 
 
-# Both _binding_incremental_task_with_work_item and _binding_backfill_task_with_work_item
-# are adapted from estuary_cdk.capture.common._binding_incremental_task and
-# estuary_cdk.capture.common._binding_backfill_task respectively, with modifications to support
-# work item cancellation.
+# =============================================================================
+# ASYNC TASK IMPLEMENTATIONS
+# =============================================================================
+# These functions are adapted from estuary_cdk.capture.common._binding_incremental_task
+# and _binding_backfill_task, with modifications to support work item cancellation.
+
 async def _binding_incremental_task_with_work_item(
     binding: CaptureBinding[ResourceConfig],
     binding_index: int,
@@ -489,6 +626,19 @@ async def _binding_incremental_task_with_work_item(
     task: Task,
     work_item: WorkItem,
 ):
+    """
+    Run incremental replication for a single account.
+
+    This task runs in a loop:
+    1. Sleep until the configured interval has elapsed since last cursor
+    2. Fetch changes and emit documents
+    3. Checkpoint the new cursor position
+    4. Repeat
+
+    The task can be stopped by either:
+    - Global stop (connector shutting down)
+    - Work item cancellation (account deprioritized)
+    """
     connector_state = ConnectorState(
         bindingStateV1={binding.stateKey: ResourceState(inc={work_item.account_id: state})}
     )
@@ -700,9 +850,10 @@ async def _binding_backfill_task_with_work_item(
     task.log.info("completed backfill", {"subtask_id": work_item.account_id})
 
 
-# open_binding_with_priority_queue is a custom open_binding function that uses a queue-based worker system.
-# It is based on estuary_cdk.capture.common.open_binding, but adapted to work with
-# the QueueBasedPriorityManager and WorkItemManager classes defined above.
+# =============================================================================
+# PUBLIC API
+# =============================================================================
+
 def open_binding_with_priority_queue(
     binding: CaptureBinding[ResourceConfig],
     binding_index: int,
