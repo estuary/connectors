@@ -39,7 +39,10 @@ def test_get_json_schema():
         'i': Obj(data_type=Obj(name='DOUBLE'), is_repeated=True),
         'j': Obj(data_type=Obj(name='BOOLEAN'), is_repeated=True),
     })
-    instance = CustomQueryMixin(config={'query': Obj(fields=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'])})
+    instance = CustomQueryMixin(config={
+        'query': Obj(fields=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']),
+        'primary_key': '',
+    })
     instance.cursor_field = None
     instance.google_ads_client = Obj(get_fields_metadata=query_object)
     schema = instance.get_json_schema()
@@ -59,5 +62,46 @@ def test_get_json_schema():
             'h': {'type': ['null', 'array'], 'items': {'type': 'integer'}},
             'i': {'type': ['null', 'array'], 'items': {'type': 'number'}},
             'j': {'type': ['null', 'array'], 'items': {'type': 'boolean'}},
+        }
+    }
+
+
+def test_get_json_schema_primary_keys_not_nullable():
+    """Primary key fields should not have null in their type."""
+    query_object = MagicMock(return_value={
+        'a': Obj(data_type=Obj(name='ENUM'), is_repeated=False, enum_values=['a', 'aa']),
+        'b': Obj(data_type=Obj(name='ENUM'), is_repeated=True,  enum_values=['b', 'bb']),
+        'c': Obj(data_type=Obj(name='MESSAGE'), is_repeated=False),
+        'd': Obj(data_type=Obj(name='MESSAGE'), is_repeated=True),
+        'e': Obj(data_type=Obj(name='STRING'), is_repeated=False),
+        'f': Obj(data_type=Obj(name='DATE'), is_repeated=False),
+        'g': Obj(data_type=Obj(name='STRING'), is_repeated=True),
+        'h': Obj(data_type=Obj(name='INT64'), is_repeated=True),
+        'i': Obj(data_type=Obj(name='DOUBLE'), is_repeated=True),
+        'j': Obj(data_type=Obj(name='BOOLEAN'), is_repeated=True),
+    })
+    instance = CustomQueryMixin(config={
+        'query': Obj(fields=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']),
+        'primary_key': 'a, b, c, d, e, f, g, h, i, j',
+    })
+    instance.cursor_field = None
+    instance.google_ads_client = Obj(get_fields_metadata=query_object)
+    schema = instance.get_json_schema()
+
+    assert schema == {
+        '$schema': 'http://json-schema.org/draft-07/schema#',
+        'additionalProperties': True,
+        'type': 'object',
+        'properties': {
+            'a': {'type': 'string', 'enum': ['a', 'aa']},
+            'b': {'type': 'array', 'items': {'type': 'string', 'enum': ['b', 'bb']}},
+            'c': {'type': 'string', 'protobuf_message': True},
+            'd': {'type': 'array', 'protobuf_message': True},
+            'e': {'type': 'string'},
+            'f': {'type': 'string', 'format': 'date'},
+            'g': {'type': 'array', 'items': {'type': 'string'}},
+            'h': {'type': 'array', 'items': {'type': 'integer'}},
+            'i': {'type': 'array', 'items': {'type': 'number'}},
+            'j': {'type': 'array', 'items': {'type': 'boolean'}},
         }
     }
