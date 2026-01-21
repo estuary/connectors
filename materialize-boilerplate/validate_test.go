@@ -383,7 +383,7 @@ func TestValidate(t *testing.T) {
 			existing,
 		)
 
-		require.ErrorContains(t, err, "changing from delta updates to standard updates is not allowed")
+		require.ErrorContains(t, err, "Changing from delta updates to standard updates is not allowed. Please click the backfill button first before disabling delta updates.")
 
 		// Disabled -> enabled binding also errors.
 		_, err2 := validator.ValidateBinding(
