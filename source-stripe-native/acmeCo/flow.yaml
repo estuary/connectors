@@ -1,170 +1,173 @@
----
 collections:
   acmeCo/Accounts:
     schema: Accounts.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/ApplicationFees:
     schema: ApplicationFees.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/ApplicationFeesRefunds:
     schema: ApplicationFeesRefunds.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/BalanceTransactions:
     schema: BalanceTransactions.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/BankAccounts:
     schema: BankAccounts.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Cards:
     schema: Cards.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Charges:
     schema: Charges.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/CheckoutSessions:
     schema: CheckoutSessions.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/CheckoutSessionsLine:
     schema: CheckoutSessionsLine.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Coupons:
     schema: Coupons.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/CreditNotes:
     schema: CreditNotes.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/CreditNotesLines:
     schema: CreditNotesLines.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/CustomerBalanceTransaction:
     schema: CustomerBalanceTransaction.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Customers:
     schema: Customers.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Disputes:
     schema: Disputes.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/EarlyFraudWarning:
     schema: EarlyFraudWarning.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Events:
     schema: Events.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/ExternalAccountCards:
     schema: ExternalAccountCards.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/ExternalBankAccount:
     schema: ExternalBankAccount.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Files:
     schema: Files.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/FilesLink:
     schema: FilesLink.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/InvoiceItems:
     schema: InvoiceItems.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/InvoiceLineItems:
     schema: InvoiceLineItems.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Invoices:
     schema: Invoices.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/PaymentIntents:
     schema: PaymentIntents.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/PaymentMethods:
     schema: PaymentMethods.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Payouts:
     schema: Payouts.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Persons:
     schema: Persons.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Plans:
     schema: Plans.schema.yaml
     key:
-      - /id
+    - /id
+  acmeCo/Prices:
+    schema: Prices.schema.yaml
+    key:
+    - /id
   acmeCo/Products:
     schema: Products.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/PromotionCode:
     schema: PromotionCode.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Refunds:
     schema: Refunds.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Reviews:
     schema: Reviews.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/SetupAttempts:
     schema: SetupAttempts.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/SetupIntents:
     schema: SetupIntents.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/SubscriptionItems:
     schema: SubscriptionItems.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/SubscriptionSchedule:
     schema: SubscriptionSchedule.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Subscriptions:
     schema: Subscriptions.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/TopUps:
     schema: TopUps.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/TransferReversals:
     schema: TransferReversals.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/Transfers:
     schema: Transfers.schema.yaml
     key:
-      - /id
+    - /id
   acmeCo/UsageRecords:
     schema: UsageRecords.schema.yaml
     key:
-      - /subscription_item
+    - /subscription_item

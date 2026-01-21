@@ -1,11 +1,13 @@
 from copy import deepcopy
 from datetime import datetime, UTC, timedelta
 from logging import Logger
+from typing import cast
 import functools
 import re
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import (
+    FetchPageFn,
     Resource,
     open_binding,
     ResourceConfig,
@@ -21,6 +23,7 @@ from .api import (
     API,
     fetch_incremental,
     fetch_backfill,
+    fetch_backfill_prices,
     fetch_incremental_substreams,
     fetch_backfill_substreams,
     fetch_incremental_no_events,
@@ -33,12 +36,17 @@ from .models import (
     ConnectorState,
     EndpointConfig,
     ListResult,
+    Prices,
     STREAMS,
     REGIONAL_STREAMS,
     SPLIT_CHILD_STREAM_NAMES,
 )
 
 DISABLED_MESSAGE_REGEX = r"Your account is not set up to use"
+
+# Backfill suffixes for Prices stream - must separately backfill active and inactive prices
+# due to Stripe API limitation (no way to query both in one request)
+PRICES_BACKFILL_SUFFIXES = ["_active", "_inactive"]
 
 
 async def check_accessibility(
@@ -195,9 +203,18 @@ async def all_resources(
             is_accessible_stream = await check_accessibility(http, log, url)
 
         if is_accessible_stream:
+            # Prices requires special handling due to multi-backfill requirements
+            if base_stream == Prices:
+                resource = prices_object(
+                    http,
+                    config.start_date,
+                    platform_account_id,
+                    connected_account_ids,
+                    all_account_ids,
+                )
             # If the stream class does not have an EVENT_TYPES attribute, then it does not have any associated events.
-            resource = (
-                base_object(
+            elif hasattr(base_stream, "EVENT_TYPES"):
+                resource = base_object(
                     base_stream,
                     http,
                     config.start_date,
@@ -206,8 +223,8 @@ async def all_resources(
                     all_account_ids,
                     initial_state,
                 )
-                if hasattr(base_stream, "EVENT_TYPES")
-                else no_events_object(
+            else:
+                resource = no_events_object(
                     base_stream,
                     http,
                     config.start_date,
@@ -216,7 +233,6 @@ async def all_resources(
                     all_account_ids,
                     initial_state,
                 )
-            )
             all_streams.append(resource)
 
             children = element.get("children", [])
@@ -310,6 +326,104 @@ def _create_initial_state(account_ids: str | list[str]) -> ResourceState:
         )
 
     return initial_state
+
+
+def _create_prices_initial_state(account_ids: str | list[str]) -> ResourceState:
+    """
+    Creates initial state for Prices stream with separate backfill subtasks for active/inactive.
+
+    Single account mode:
+    - Incremental: Incremental (standard, not a dict)
+    - Backfill: {"_active": Backfill, "_inactive": Backfill} (subtask dict)
+
+    Connected accounts mode:
+    - Incremental: {account_id: Incremental} (dict keyed by account)
+    - Backfill: {account_id_active: Backfill, account_id_inactive: Backfill} (composite keys)
+    """
+    cutoff = datetime.now(tz=UTC)
+
+    if isinstance(account_ids, str):
+        # Single account mode - use subtask dict for backfill (keyed by suffix only)
+        initial_state = ResourceState(
+            inc=ResourceState.Incremental(cursor=cutoff),
+            backfill={
+                suffix: ResourceState.Backfill(next_page=None, cutoff=cutoff)
+                for suffix in PRICES_BACKFILL_SUFFIXES
+            },
+        )
+    else:
+        # Connected accounts mode - use composite keys for backfill
+        initial_state = ResourceState(
+            inc={
+                account_id: ResourceState.Incremental(cursor=cutoff)
+                for account_id in account_ids
+            },
+            backfill={
+                f"{account_id}{suffix}": ResourceState.Backfill(next_page=None, cutoff=cutoff)
+                for account_id in account_ids
+                for suffix in PRICES_BACKFILL_SUFFIXES
+            },
+        )
+
+    return initial_state
+
+
+async def _reconcile_prices_state(
+    account_ids: list[str],
+    binding: CaptureBinding[ResourceConfig],
+    state: ResourceState,
+    initial_state: ResourceState,
+    task: Task,
+):
+    """
+    Reconciles state for newly discovered connected accounts for Prices stream.
+
+    Similar to _reconcile_connector_state but handles composite backfill keys.
+    """
+    if (
+        isinstance(state.inc, dict)
+        and isinstance(state.backfill, dict)
+        and isinstance(initial_state.inc, dict)
+        and isinstance(initial_state.backfill, dict)
+    ):
+        should_checkpoint = False
+
+        for account_id in account_ids:
+            inc_state_exists = account_id in state.inc
+            # Check if ANY backfill suffix exists for this account
+            backfill_state_exists = any(
+                f"{account_id}{suffix}" in state.backfill
+                for suffix in PRICES_BACKFILL_SUFFIXES
+            )
+
+            if not inc_state_exists and not backfill_state_exists:
+                task.log.info(
+                    f"Initializing new subtask state for account id {account_id}."
+                )
+                state.inc[account_id] = deepcopy(initial_state.inc[account_id])
+                for suffix in PRICES_BACKFILL_SUFFIXES:
+                    state_key = f"{account_id}{suffix}"
+                    state.backfill[state_key] = deepcopy(initial_state.backfill[state_key])
+                should_checkpoint = True
+            elif not inc_state_exists and backfill_state_exists:
+                task.log.info(
+                    f"Backfilling subtask for account id {account_id} due to missing incremental state."
+                )
+                state.inc[account_id] = deepcopy(initial_state.inc[account_id])
+                for suffix in PRICES_BACKFILL_SUFFIXES:
+                    state_key = f"{account_id}{suffix}"
+                    state.backfill[state_key] = deepcopy(initial_state.backfill[state_key])
+                should_checkpoint = True
+
+        if should_checkpoint:
+            task.log.info(
+                f"Checkpointing state to ensure any new state is persisted for {binding.stateKey}."
+            )
+            await task.checkpoint(
+                ConnectorState(
+                    bindingStateV1={binding.stateKey: state},
+                )
+            )
 
 
 def base_object(
@@ -781,5 +895,113 @@ def no_events_object(
         open=open,
         initial_state=initial_state,
         initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
+        schema_inference=True,
+    )
+
+
+def prices_object(
+    http: HTTPSession,
+    start_date: datetime,
+    platform_account_id: str,
+    connected_account_ids: list[str],
+    all_account_ids: list[str],
+) -> Resource:
+    """
+    Prices stream with multi-backfill support for active and inactive prices.
+
+    Due to Stripe API limitations, the /v1/prices endpoint requires the `active` parameter
+    to filter by status - there's no way to fetch both active and inactive prices in a
+    single request. This factory creates a Resource that uses:
+    - 1 incremental task per account (events contain both active and inactive prices)
+    - 2 backfill tasks per account (one for active, one for inactive prices)
+    """
+    initial_state = _create_prices_initial_state(
+        all_account_ids if connected_account_ids else platform_account_id
+    )
+
+    async def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        if not connected_account_ids:
+            # Single account mode - use standard open_binding with subtask dict for fetch_page
+            fetch_changes_fn = functools.partial(
+                fetch_incremental,
+                Prices,
+                platform_account_id,
+                None,
+                http,
+            )
+            fetch_page_fns: dict[str, FetchPageFn[Prices]] = {
+                suffix: cast(
+                    FetchPageFn[Prices],
+                    functools.partial(
+                        fetch_backfill_prices,
+                        Prices,
+                        start_date,
+                        platform_account_id,
+                        None,
+                        suffix == "_active",  # active=True for "_active", False for "_inactive"
+                        http,
+                    ),
+                )
+                for suffix in PRICES_BACKFILL_SUFFIXES
+            }
+            open_binding(
+                binding,
+                binding_index,
+                state,
+                task,
+                fetch_changes=fetch_changes_fn,
+                fetch_page=fetch_page_fns,
+            )
+        else:
+            # Connected accounts mode - use priority queue with multi-backfill support
+            await _reconcile_prices_state(
+                all_account_ids, binding, state, initial_state, task
+            )
+
+            def fetch_changes_factory(account_id: str):
+                return functools.partial(
+                    fetch_incremental,
+                    Prices,
+                    platform_account_id,
+                    account_id,
+                    http,
+                )
+
+            def fetch_page_factory_with_suffix(account_id: str, suffix: str):
+                active = suffix == "_active"
+                return functools.partial(
+                    fetch_backfill_prices,
+                    Prices,
+                    start_date,
+                    platform_account_id,
+                    account_id,
+                    active,
+                    http,
+                )
+
+            open_binding_with_priority_queue(
+                binding,
+                binding_index,
+                state,
+                task,
+                all_account_ids,
+                fetch_changes_factory=fetch_changes_factory,
+                fetch_page_factory=fetch_page_factory_with_suffix,
+                backfill_subtask_suffixes=PRICES_BACKFILL_SUFFIXES,
+            )
+
+    return Resource(
+        name=Prices.NAME,
+        key=["/id"],
+        model=Prices,
+        open=open,
+        initial_state=initial_state,
+        initial_config=ResourceConfig(name=Prices.NAME, interval=timedelta(minutes=5)),
         schema_inference=True,
     )

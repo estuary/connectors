@@ -41,6 +41,6 @@ required:
 - id
 - object
 - created
-title: Plans
+title: Prices
 type: object
 x-infer-schema: true

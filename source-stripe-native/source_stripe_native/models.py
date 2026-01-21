@@ -535,6 +535,16 @@ class Products(BaseStripeObjectWithEvents):
     }
 
 
+class Prices(BaseStripeObjectWithEvents):
+    NAME: ClassVar[str] = "Prices"
+    SEARCH_NAME: ClassVar[str] = "prices"
+    EVENT_TYPES: ClassVar[dict[str, Literal["c", "u", "d"]]] = {
+        "price.created": "c",
+        "price.updated": "u",
+        "price.deleted": "d",
+    }
+
+
 class PromotionCode(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "PromotionCode"
     SEARCH_NAME: ClassVar[str] = "promotion_codes"
@@ -764,6 +774,7 @@ STREAMS = [
     {"stream": Payouts},
     {"stream": Plans},
     {"stream": Products},
+    {"stream": Prices},
     {"stream": PromotionCode},
     {"stream": Refunds},
     {"stream": Reviews},

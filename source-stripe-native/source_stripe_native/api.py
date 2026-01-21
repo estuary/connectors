@@ -18,6 +18,7 @@ from .models import (
     EventResult,
     BackfillResult,
     ListResult,
+    Prices,
     StripeChildObject,
     StripeObjectNoEvents,
     StripeObjectWithEvents,
@@ -270,6 +271,75 @@ async def fetch_backfill(
     async for _ in processor:
         # Consume any remaining items in the processor to ensure we don't leave any
         # unprocessed items in the stream.
+        pass
+
+    remainder = processor.get_remainder()
+    if remainder.has_more and last_doc:
+        yield last_doc.id
+    else:
+        return
+
+
+async def fetch_backfill_prices(
+    cls: type[Prices],
+    start_date: datetime,
+    platform_account_id: str | None,
+    connected_account_id: str | None,
+    active: bool,
+    http: HTTPSession,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[Prices | str, None]:
+    """
+    Variant of fetch_backfill specifically for Prices.
+
+    The Stripe Prices API requires an `active` parameter to filter by active/inactive status.
+    There is no way to fetch both active and inactive prices in a single request, so we need
+    separate backfill tasks for each.
+    """
+    assert isinstance(cutoff, datetime)
+
+    url = f"{API}/{cls.SEARCH_NAME}"
+    parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
+    parameters["active"] = "true" if active else "false"
+    headers = {}
+    account_id = (
+        connected_account_id
+        if connected_account_id and cls.NAME not in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+        else platform_account_id
+    )
+    if account_id:
+        headers["Stripe-Account"] = account_id
+
+    if page:
+        parameters["starting_after"] = page
+
+    _, body = await http.request_stream(log, url, params=parameters, headers=headers)
+    processor = IncrementalJsonProcessor(
+        body(),
+        "data.item",
+        cls,
+        BackfillResult[cls]
+    )
+
+    last_doc: Prices | None = None
+    async for doc in processor:
+        last_doc = doc
+        doc_ts = _s_to_dt(doc.created) if doc.created is not None else None
+
+        if account_id:
+            doc.account_id = account_id
+
+        if doc_ts == start_date:
+            yield doc
+            return
+        elif doc_ts is not None and doc_ts < start_date:
+            return
+        elif doc_ts is None or doc_ts < cutoff:
+            yield doc
+
+    async for _ in processor:
         pass
 
     remainder = processor.get_remainder()
