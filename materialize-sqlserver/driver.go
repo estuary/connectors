@@ -38,6 +38,7 @@ type AuthType string
 const (
 	UserPassword AuthType = "UserPassword"
 	AWSIAM       AuthType = "AWSIAM"
+	AzureIAM     AuthType = "AzureIAM"
 )
 
 type UserPasswordConfig struct {
@@ -57,6 +58,8 @@ func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
 	}
 	subSchemas = append(subSchemas,
 		schemagen.OneOfSubSchema("AWS IAM", iam.AWSConfig{}, string(AWSIAM)))
+	subSchemas = append(subSchemas,
+		schemagen.OneOfSubSchema("Azure IAM", iam.AzureConfig{}, string(AzureIAM)))
 
 	schema := schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword), subSchemas...)
 	return schema
@@ -70,6 +73,8 @@ func (c *CredentialsConfig) Validate() error {
 		}
 		return nil
 	case AWSIAM:
+		fallthrough
+	case AzureIAM:
 		if err := c.ValidateIAM(); err != nil {
 			return err
 		}
@@ -100,7 +105,7 @@ type config struct {
 	Database    string             `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
 	Schema      string             `json:"schema,omitempty" jsonschema:"title=Database Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
 	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
-	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=6"`
+	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,x-iam-azure-scope=https://database.windows.net/.default,order=6"`
 
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
@@ -176,6 +181,8 @@ func (c *config) ToURI() *url.URL {
 			userInfo = url.UserPassword(c.User, pass)
 		case AWSIAM:
 			userInfo = url.User(c.User)
+		case AzureIAM:
+			userInfo = nil
 		}
 	}
 
@@ -219,6 +226,11 @@ func (c *config) ToSQLConnector(ctx context.Context) (driver.Connector, error) {
 			}
 
 			return mssqldb.NewConnectorWithAccessTokenProvider(uri.String(), tokenProvider)
+		case AzureIAM:
+			token := c.Credentials.AzureToken()
+			return mssqldb.NewAccessTokenConnector(uri.String(), func() (string, error) {
+				return token, nil
+			})
 		}
 	}
 
