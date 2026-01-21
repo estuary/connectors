@@ -45,6 +45,13 @@ Data Flow
 3. WorkItems are added to the async priority queue
 4. Workers pull WorkItems and execute via SubtaskExecutor
 5. Every 15 seconds, priorities are re-evaluated and queue is refreshed
+
+Key Concepts
+------------
+- WorkItem: Unit of work for one account (1 incremental + N backfill tasks)
+- BackfillVariant: A single backfill subtask (supports multi-backfill streams
+  like Prices which need separate "_active" and "_inactive" backfills)
+- Composite state keys: "{account_id}{suffix}" format for multi-backfill streams
 """
 
 import asyncio
@@ -70,6 +77,7 @@ from estuary_cdk.capture.common import (
     FetchSnapshotFn,
 )
 
+
 # =============================================================================
 # PROTOCOLS AND TYPE DEFINITIONS
 # =============================================================================
@@ -85,6 +93,15 @@ class FetchChangesFnFactory(Protocol):
 class FetchPageFnFactory(Protocol):
     """Factory function for creating backfill fetch functions for a specific account."""
     def __call__(self, account_id: str) -> Optional[Union[FetchPageFn[BaseDocument], RecurringFetchPageFn[BaseDocument]]]:
+        ...
+
+
+class FetchPageFnFactoryWithSuffix(Protocol):
+    """Factory function for creating backfill fetch functions with suffix support.
+
+    Used when multiple backfill subtasks are needed per account (e.g., active/inactive prices).
+    """
+    def __call__(self, account_id: str, suffix: str) -> Optional[Union[FetchPageFn[BaseDocument], RecurringFetchPageFn[BaseDocument]]]:
         ...
 
 
@@ -140,6 +157,21 @@ class WorkItemPriority(NamedTuple):
 
 
 @dataclass
+class BackfillVariant:
+    """Represents a single backfill variant (e.g., active prices, inactive prices).
+
+    Used when multiple backfill subtasks are needed per account.
+    """
+    suffix: str  # e.g., "_active", "_inactive", or "" for single-backfill mode
+    fetch_fn: Union[FetchPageFn[BaseDocument], RecurringFetchPageFn[BaseDocument]]
+    state: ResourceState.Backfill
+
+    def state_key(self, account_id: str) -> str:
+        """Returns the composite state key for this backfill variant."""
+        return f"{account_id}{self.suffix}"
+
+
+@dataclass
 class WorkItem:
     account_id: str
     priority: WorkItemPriority
@@ -147,10 +179,11 @@ class WorkItem:
     incremental_fetch_fn: FetchChangesFn[BaseDocument]
     incremental_state: ResourceState.Incremental
 
-    backfill_fetch_fn: Optional[Union[FetchPageFn[BaseDocument], RecurringFetchPageFn[BaseDocument]]] = None
-    backfill_state: Optional[ResourceState.Backfill] = None
+    # Support for multiple backfill variants per account (e.g., active/inactive prices).
+    # Empty list means no backfill work needed.
+    backfill_variants: list[BackfillVariant] = field(default_factory=list)
 
-    # Shared cancellation for both subtasks of this work item.
+    # Shared cancellation for all subtasks of this work item.
     cancellation_event: asyncio.Event = field(default_factory=asyncio.Event)
 
     def __lt__(self, other):
@@ -161,7 +194,7 @@ class WorkItem:
         return self.priority < other.priority
 
     def has_backfill_work(self) -> bool:
-        return self.backfill_fetch_fn is not None and self.backfill_state is not None
+        return len(self.backfill_variants) > 0
 
 
 @dataclass
@@ -188,12 +221,22 @@ class PriorityCalculator:
     1. Backfill status - accounts with incomplete backfills get priority (level 0)
     2. Incremental cursor age - older cursors mean higher priority (level 1)
 
+    For multi-backfill streams (like Prices with "_active" and "_inactive" suffixes),
+    an account needs backfill if ANY of its backfill variants are incomplete.
+
     Attributes:
         resource_state: Current connector state containing inc and backfill dicts
+        backfill_subtask_suffixes: List of suffixes for multi-backfill streams
+            (e.g., ["_active", "_inactive"]), or None for standard single-backfill
     """
 
-    def __init__(self, resource_state: ResourceState):
+    def __init__(
+        self,
+        resource_state: ResourceState,
+        backfill_subtask_suffixes: list[str] | None = None,
+    ):
         self.resource_state = resource_state
+        self.backfill_subtask_suffixes = backfill_subtask_suffixes
 
     def get_account_priority(self, account_id: str) -> WorkItemPriority:
         """
@@ -202,9 +245,20 @@ class PriorityCalculator:
         Priority order:
         1. Accounts with incomplete backfills (priority_level=0)
         2. Accounts with incremental cursors, ordered by datetime (priority_level=1, older timestamp = higher priority)
+
+        For multi-backfill accounts, considers account as needing backfill if ANY suffix is incomplete.
         """
-        if isinstance(self.resource_state.backfill, dict) and self.resource_state.backfill.get(account_id):
-            return WorkItemPriority(level=PriorityLevel.BACKFILL, cursor_timestamp=None, account_id=account_id)
+        if isinstance(self.resource_state.backfill, dict):
+            if self.backfill_subtask_suffixes:
+                # Check if ANY backfill variant needs work
+                for suffix in self.backfill_subtask_suffixes:
+                    composite_key = f"{account_id}{suffix}"
+                    if self.resource_state.backfill.get(composite_key):
+                        return WorkItemPriority(level=PriorityLevel.BACKFILL, cursor_timestamp=None, account_id=account_id)
+            else:
+                # Original behavior for single backfill
+                if self.resource_state.backfill.get(account_id):
+                    return WorkItemPriority(level=PriorityLevel.BACKFILL, cursor_timestamp=None, account_id=account_id)
 
         if isinstance(self.resource_state.inc, dict):
             inc_state = self.resource_state.inc.get(account_id)
@@ -219,6 +273,22 @@ class PriorityCalculator:
             f"Account {account_id} has no state in inc or backfill. This should not happen "
             "after state reconciliation. Check _reconcile_connector_state implementation and usage."
         )
+
+    def _count_incomplete_backfills(self, account_id: str) -> int:
+        """Count how many backfill variants are still incomplete for an account."""
+        if not isinstance(self.resource_state.backfill, dict):
+            return 0
+
+        if self.backfill_subtask_suffixes:
+            count = 0
+            for suffix in self.backfill_subtask_suffixes:
+                composite_key = f"{account_id}{suffix}"
+                if self.resource_state.backfill.get(composite_key):
+                    count += 1
+            return count
+        else:
+            # Single backfill mode
+            return 1 if self.resource_state.backfill.get(account_id) else 0
 
     def select_prioritized_accounts(self, all_account_ids: List[str], max_subtask_count: int) -> set[str]:
         account_priorities = [
@@ -235,7 +305,9 @@ class PriorityCalculator:
         for account in top_priority_accounts:
             match account.level:
                 case PriorityLevel.BACKFILL:
-                    subtask_count += 2
+                    # Count actual number of incomplete backfills for accurate subtask counting
+                    incomplete_backfills = self._count_incomplete_backfills(account.account_id)
+                    subtask_count += 1 + incomplete_backfills  # 1 incremental + N backfills
                 case PriorityLevel.INCREMENTAL:
                     subtask_count += 1
                 case _:
@@ -269,19 +341,24 @@ class WorkItemManager:
     Attributes:
         priority_calculator: Used to determine account priorities
         active_work_by_account: Maps account_id -> active WorkItem
+        backfill_subtask_suffixes: Suffixes for multi-backfill streams
     """
 
-    def __init__(self, priority_calculator: PriorityCalculator):
+    def __init__(
+        self,
+        priority_calculator: PriorityCalculator,
+        backfill_subtask_suffixes: list[str] | None = None,
+    ):
         self.priority_calculator = priority_calculator
         self.active_work_by_account: Dict[str, WorkItem] = {}
-    
+        self.backfill_subtask_suffixes = backfill_subtask_suffixes
 
     def generate_work_items(
         self,
         all_account_ids: List[str],
         max_subtask_count: int,
         fetch_changes_factory: FetchChangesFnFactory,
-        fetch_page_factory: FetchPageFnFactory,
+        fetch_page_factory: Union[FetchPageFnFactory, FetchPageFnFactoryWithSuffix],
         resource_state: ResourceState,
     ) -> tuple[list[WorkItem], set[str]]:
         work_items: list[WorkItem] = []
@@ -303,22 +380,21 @@ class WorkItemManager:
     def _create_work_item_for_account(
         self, account_id: str,
         fetch_changes_factory: FetchChangesFnFactory,
-        fetch_page_factory: FetchPageFnFactory,
+        fetch_page_factory: Union[FetchPageFnFactory, FetchPageFnFactoryWithSuffix],
         resource_state: ResourceState
     ) -> WorkItem:
         priority = self.priority_calculator.get_account_priority(account_id)
 
         incremental_fetch_fn, incremental_state = self._get_incremental_work(account_id, fetch_changes_factory, resource_state)
 
-        backfill_fetch_fn, backfill_state = self._get_backfill_work(account_id, fetch_page_factory, resource_state)
+        backfill_variants = self._get_backfill_work(account_id, fetch_page_factory, resource_state)
 
         return WorkItem(
             account_id=account_id,
             priority=priority,
             incremental_fetch_fn=incremental_fetch_fn,
             incremental_state=incremental_state,
-            backfill_fetch_fn=backfill_fetch_fn,
-            backfill_state=backfill_state
+            backfill_variants=backfill_variants,
         )
 
     def _get_incremental_work(
@@ -336,17 +412,44 @@ class WorkItemManager:
         raise RuntimeError(f"Account {account_id} is missing incremental state. This should not happen after state reconciliation.")
 
     def _get_backfill_work(
-        self, account_id: str,
-        fetch_page_factory: FetchPageFnFactory,
+        self,
+        account_id: str,
+        fetch_page_factory: Union[FetchPageFnFactory, FetchPageFnFactoryWithSuffix],
         resource_state: ResourceState
-    ) -> tuple[Optional[Union[FetchPageFn[BaseDocument], RecurringFetchPageFn[BaseDocument]]], Optional[ResourceState.Backfill]]:
-        if isinstance(resource_state.backfill, dict):
+    ) -> list[BackfillVariant]:
+        """Returns list of BackfillVariants - empty list if no backfill needed."""
+        variants: list[BackfillVariant] = []
+
+        if not isinstance(resource_state.backfill, dict):
+            return variants
+
+        if self.backfill_subtask_suffixes:
+            # Multi-backfill mode: create a variant for each suffix with incomplete backfill
+            for suffix in self.backfill_subtask_suffixes:
+                composite_key = f"{account_id}{suffix}"
+                backfill_state = resource_state.backfill.get(composite_key)
+                if backfill_state:
+                    # Factory with suffix support
+                    fetch_page_fn = cast(FetchPageFnFactoryWithSuffix, fetch_page_factory)(account_id, suffix)
+                    if fetch_page_fn:
+                        variants.append(BackfillVariant(
+                            suffix=suffix,
+                            fetch_fn=fetch_page_fn,
+                            state=backfill_state,
+                        ))
+        else:
+            # Original single-backfill mode
             backfill_state = resource_state.backfill.get(account_id)
             if backfill_state:
-                fetch_page_fn = fetch_page_factory(account_id)
-                return fetch_page_fn, backfill_state
+                fetch_page_fn = cast(FetchPageFnFactory, fetch_page_factory)(account_id)
+                if fetch_page_fn:
+                    variants.append(BackfillVariant(
+                        suffix="",  # Empty suffix for backward compatibility
+                        fetch_fn=fetch_page_fn,
+                        state=backfill_state,
+                    ))
 
-        return None, None
+        return variants
 
     def cancel_work_for_account(self, account_id: str):
         if account_id in self.active_work_by_account:
@@ -371,7 +474,7 @@ class SubtaskExecutor:
     When a worker pulls a WorkItem from the queue, SubtaskExecutor handles
     spawning and running the actual async tasks:
     - One incremental task (always)
-    - One backfill task (if backfill is incomplete)
+    - Zero or more backfill tasks (one per BackfillVariant)
 
     The tasks run concurrently via asyncio.gather. Each task can be cancelled
     via the WorkItem's cancellation_event when the account is deprioritized.
@@ -408,43 +511,48 @@ class SubtaskExecutor:
             work_item
         )
 
-    async def _execute_backfill_subtask(self, work_item: WorkItem, task: Task):
-        if not work_item.has_backfill_work():
-            return
-
-        assert work_item.backfill_fetch_fn is not None
-        assert work_item.backfill_state is not None
-
+    async def _execute_backfill_variant(
+        self,
+        work_item: WorkItem,
+        variant: BackfillVariant,
+        task: Task
+    ):
+        """Execute a single backfill variant."""
         self.main_task.connector_status.inc_backfilling(self.binding_index)
 
-        await _binding_backfill_task_with_work_item(
-            self.binding,
-            self.binding_index,
-            work_item.backfill_fetch_fn,
-            work_item.backfill_state,
-            self.resource_state.last_initialized,
-            self.resource_state.is_connector_initiated,
-            task,
-            work_item
-        )
+        try:
+            await _binding_backfill_task_with_variant(
+                self.binding,
+                self.binding_index,
+                variant,
+                work_item.account_id,
+                self.resource_state.last_initialized,
+                self.resource_state.is_connector_initiated,
+                task,
+                work_item
+            )
 
-        # Update the resource state to reflect backfill completion.
-        # This ensures PriorityCalculator sees the completed backfill during periodic re-prioritization.
-        if isinstance(self.resource_state.backfill, dict):
-            self.resource_state.backfill[work_item.account_id] = None
-
-        self.main_task.connector_status.dec_backfilling(self.binding_index)
+            # Update the resource state to reflect this variant's completion.
+            # This ensures PriorityCalculator sees the completed backfill during periodic re-prioritization.
+            if isinstance(self.resource_state.backfill, dict):
+                state_key = variant.state_key(work_item.account_id)
+                self.resource_state.backfill[state_key] = None
+        finally:
+            self.main_task.connector_status.dec_backfilling(self.binding_index)
 
     async def execute_work_item(self, work_item: WorkItem, task: Task):
         subtasks: list[asyncio.Task] = []
 
-        if work_item.has_backfill_work():
+        # Spawn a backfill task for each variant
+        for variant in work_item.backfill_variants:
+            state_key = variant.state_key(work_item.account_id)
             backfill_task = task.spawn_child(
-                f"backfill.{work_item.account_id}",
-                lambda t: self._execute_backfill_subtask(work_item, t)
+                f"backfill.{state_key}",
+                lambda t, v=variant: self._execute_backfill_variant(work_item, v, t)
             )
             subtasks.append(backfill_task)
 
+        # Spawn single incremental task
         incremental_task = task.spawn_child(
             f"incremental.{work_item.account_id}",
             lambda t: self._execute_incremental_subtask(work_item, t)
@@ -475,9 +583,10 @@ class PriorityQueueManager:
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         fetch_changes_factory: FetchChangesFnFactory,
-        fetch_page_factory: FetchPageFnFactory,
+        fetch_page_factory: Union[FetchPageFnFactory, FetchPageFnFactoryWithSuffix],
         prefix: str,
-        config: Optional[PriorityQueueConfig] = None
+        config: Optional[PriorityQueueConfig] = None,
+        backfill_subtask_suffixes: list[str] | None = None,
     ):
         self.all_account_ids: list[str] = all_account_ids
         self.resource_state: ResourceState = resource_state
@@ -490,13 +599,14 @@ class PriorityQueueManager:
         self.fetch_changes_factory = fetch_changes_factory
         self.fetch_page_factory = fetch_page_factory
         self.prefix = prefix
+        self.backfill_subtask_suffixes = backfill_subtask_suffixes
 
         self.work_queue: asyncio.PriorityQueue = asyncio.PriorityQueue(maxsize=self.config.work_queue_size)
         self.workers: List[asyncio.Task] = []
         self.priority_evaluation_task: Optional[asyncio.Task] = None
 
-        self.priority_calculator = PriorityCalculator(resource_state)
-        self.work_item_manager = WorkItemManager(self.priority_calculator)
+        self.priority_calculator = PriorityCalculator(resource_state, backfill_subtask_suffixes)
+        self.work_item_manager = WorkItemManager(self.priority_calculator, backfill_subtask_suffixes)
         self.subtask_executor = SubtaskExecutor(
             binding, binding_index, resource_state, prefix, task
         )
@@ -649,6 +759,7 @@ async def _binding_incremental_task_with_work_item(
         "resuming incremental replication", {"state": state, "subtask_id": work_item.account_id}
     )
 
+    # If we ran recently, wait until the interval has fully elapsed before fetching.
     if isinstance(state.cursor, datetime):
         lag = datetime.now(tz=UTC) - state.cursor
 
@@ -665,6 +776,7 @@ async def _binding_incremental_task_with_work_item(
 
     while True:
         try:
+            # Check for stop/cancel before sleeping
             if task.stopping.event.is_set() or work_item.cancellation_event.is_set():
                 task.log.debug(
                     "incremental replication is idle and is yielding to stop",
@@ -672,9 +784,11 @@ async def _binding_incremental_task_with_work_item(
                 )
                 return
 
+            # Sleep for the configured interval, but wake early if stopped/cancelled.
+            # We wait on both events simultaneously so we can respond to either.
             global_stop = asyncio.create_task(task.stopping.event.wait())
             work_cancelled = asyncio.create_task(work_item.cancellation_event.wait())
-            
+
             done, pending = await asyncio.wait(
                 [global_stop, work_cancelled],
                 timeout=sleep_for.total_seconds(),
@@ -777,26 +891,36 @@ async def _binding_incremental_task_with_work_item(
         )
 
 
-async def _binding_backfill_task_with_work_item(
+async def _binding_backfill_task_with_variant(
     binding: CaptureBinding[ResourceConfig],
     binding_index: int,
-    fetch_page: Union[FetchPageFn[BaseDocument], RecurringFetchPageFn[BaseDocument]],
-    state: ResourceState.Backfill,
+    variant: BackfillVariant,
+    account_id: str,
     last_initialized: Optional[datetime],
     is_connector_initiated: bool,
     task: Task,
     work_item: WorkItem,
 ):
+    """
+    Backfill task that uses composite state keys for multi-backfill support.
+
+    Similar to _binding_backfill_task_with_work_item but uses variant.state_key(account_id)
+    for checkpointing instead of just account_id.
+    """
+    state_key = variant.state_key(account_id)
+    state = variant.state
+    fetch_page = variant.fetch_fn
+
     connector_state = ConnectorState(
         bindingStateV1={
-            binding.stateKey: ResourceState(backfill={work_item.account_id: state})
+            binding.stateKey: ResourceState(backfill={state_key: state})
         }
     )
 
     if state.next_page is not None:
-        task.log.info("resuming backfill", {"state": state, "subtask_id": work_item.account_id})
+        task.log.info("resuming backfill", {"state": state, "subtask_id": state_key})
     else:
-        task.log.info("beginning backfill", {"state": state, "subtask_id": work_item.account_id})
+        task.log.info("beginning backfill", {"state": state, "subtask_id": state_key})
 
     while True:
         # Yield to the event loop to prevent starvation.
@@ -804,10 +928,10 @@ async def _binding_backfill_task_with_work_item(
 
         # Check both global stopping and work item cancellation
         if task.stopping.event.is_set():
-            task.log.debug("backfill is yielding to stop", {"subtask_id": work_item.account_id})
+            task.log.debug("backfill is yielding to stop", {"subtask_id": state_key})
             return
         elif work_item.cancellation_event.is_set():
-            task.log.info("backfill is yielding to work item cancellation", {"subtask_id": work_item.account_id})
+            task.log.info("backfill is yielding to work item cancellation", {"subtask_id": state_key})
             return
 
         # Track if fetch_page returns without having yielded a PageCursor.
@@ -843,11 +967,11 @@ async def _binding_backfill_task_with_work_item(
     await task.checkpoint(
         ConnectorState(
             bindingStateV1={
-                binding.stateKey: ResourceState(backfill={work_item.account_id: None})
+                binding.stateKey: ResourceState(backfill={state_key: None})
             }
         )
     )
-    task.log.info("completed backfill", {"subtask_id": work_item.account_id})
+    task.log.info("completed backfill", {"subtask_id": state_key})
 
 
 # =============================================================================
@@ -861,10 +985,11 @@ def open_binding_with_priority_queue(
     task: Task,
     all_account_ids: list[str],
     fetch_changes_factory: FetchChangesFnFactory,
-    fetch_page_factory: FetchPageFnFactory,
+    fetch_page_factory: Union[FetchPageFnFactory, FetchPageFnFactoryWithSuffix],
     fetch_snapshot: Optional[FetchSnapshotFn[BaseDocument]] = None,
     tombstone: Optional[BaseDocument] = None,
     config: Optional[PriorityQueueConfig] = None,
+    backfill_subtask_suffixes: list[str] | None = None,
 ):
     task.connector_status.inc_binding_count()
     prefix = ".".join(binding.resourceConfig.path())
@@ -878,7 +1003,8 @@ def open_binding_with_priority_queue(
         fetch_changes_factory=fetch_changes_factory,
         fetch_page_factory=fetch_page_factory,
         prefix=prefix,
-        config=config
+        config=config,
+        backfill_subtask_suffixes=backfill_subtask_suffixes,
     )
 
     priority_manager.start_workers()
