@@ -5480,10 +5480,7 @@
           ]
         },
         "customer.id": {
-          "type": [
-            "integer",
-            "null"
-          ]
+          "type": "integer"
         },
         "metrics.conversions": {
           "type": [
@@ -5499,10 +5496,7 @@
           "format": "date"
         },
         "segments.date": {
-          "type": [
-            "string",
-            "null"
-          ],
+          "type": "string",
           "format": "date"
         },
         "_meta": {

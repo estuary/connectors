@@ -291,7 +291,7 @@ def stream_instance(query, api_mock, **kwargs):
         api=api_mock,
         conversion_window_days=conversion_window_days,
         start_date=start_date,
-        config={"query": GAQL.parse(query), "table_name": "whatever_table"},
+        config={"query": GAQL.parse(query), "table_name": "whatever_table", "primary_key": "some_primary_key"},
         **kwargs,
     )
     return instance

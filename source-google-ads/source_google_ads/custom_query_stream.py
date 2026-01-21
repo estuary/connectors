@@ -96,6 +96,15 @@ class CustomQueryMixin:
 
             local_json_schema["properties"][field] = field_value
 
+        # Primary key fields should not be nullable
+        for pk in self.primary_key:
+            if pk in local_json_schema["properties"]:
+                prop = local_json_schema["properties"][pk]
+                field_type = prop.get("type")
+                if isinstance(field_type, list) and "null" in field_type:
+                    non_null_types = [t for t in field_type if t != "null"]
+                    prop["type"] = non_null_types[0] if len(non_null_types) == 1 else non_null_types
+
         return local_json_schema
 
 

@@ -46,9 +46,7 @@ properties:
     - boolean
     - 'null'
   customer.id:
-    type:
-    - integer
-    - 'null'
+    type: integer
   metrics.conversions:
     type:
     - number
@@ -59,9 +57,7 @@ properties:
     - 'null'
     format: date
   segments.date:
-    type:
-    - string
-    - 'null'
+    type: string
     format: date
   _meta:
     type: object
