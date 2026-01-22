@@ -190,12 +190,19 @@ func newSftpSource(ctx context.Context, cfg config) (filesource.Store, error) {
 	// rather than at runtime. We can verify that the configured root directory is actually a
 	// directory - note that Stat here will follow symlinks, so a symlink to a directory works as
 	// the configured "root" directory.
-	info, err := client.Stat(cfg.Directory)
-	if err != nil {
-		return nil, fmt.Errorf("error reading directory '%s': %w", cfg.Directory, err)
-	}
-
-	if !info.IsDir() {
+	//
+	// Some SFTP servers like AWS Transfer Family may reject Stat operations due to permission
+	// restrictions. In that case, fall back to RealPath and ReadDir to validate the user
+	// provided an actual directory.
+	info, statErr := client.Stat(cfg.Directory)
+	if statErr != nil {
+		if _, err := client.RealPath(cfg.Directory); err != nil {
+			return nil, fmt.Errorf("resolving directory '%s': %w", cfg.Directory, statErr)
+		}
+		if _, err := client.ReadDir(cfg.Directory); err != nil {
+			return nil, fmt.Errorf("reading directory '%s': %w", cfg.Directory, err)
+		}
+	} else if !info.IsDir() {
 		log.WithFields(log.Fields{
 			"Name":    info.Name(),
 			"IsDir":   info.IsDir(),
