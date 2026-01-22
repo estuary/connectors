@@ -225,6 +225,19 @@ jobs:
           ${{ matrix.connector }}/run_tests.sh
         env:
           GCP_SERVICE_ACCOUNT_KEY: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+          # The estuary/flow repository contains a few large files in Git LFS. This can
+          # present an issue with Go module checksums when using a commit-tagged version,
+          # because a commit-tagged version will be fetched from VCS using `git archive`
+          # and the resulting data will differ depending on whether Git LFS is installed
+          # on the machine running the build, and so there are two "valid" checksums but
+          # only one can match what's in go.sum / sum.golang.org
+          #
+          # When we're using a proper release version this isn't an issue, because there's
+          # a prebuilt zip file available from proxy.golang.org which will be the same for
+          # everyone. But we set this here so that the behavior in the GitHub CI runner
+          # (which has LFS installed) will match the Docker builder we use (which doesn't)
+          # even when using a commit pseudo-version.
+          GIT_LFS_SKIP_SMUDGE: 1
 
       - name: Build ${{ matrix.connector }} Docker Image
         uses: docker/build-push-action@v2
