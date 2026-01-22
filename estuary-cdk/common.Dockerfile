@@ -26,6 +26,7 @@ FROM base AS runner
 ARG CONNECTOR_NAME
 ARG CONNECTOR_TYPE
 ARG DOCS_URL
+ARG ENCRYPTION_URL="https://config-encryption.estuary.dev/v1/encrypt-config"
 # The USAGE_RATE arg is required, because GH actions doesn't seem to have a way to conditionally
 # pass it only for the connectors that should have a 0 rate. Comes from `usage_rate` in the
 # `python.yaml` workflow matrix.
@@ -47,6 +48,7 @@ COPY --from=builder /opt/venv /opt/venv
 COPY --from=ghcr.io/estuary/network-tunnel:dev /flow-network-tunnel /usr/bin/flow-network-tunnel
 
 ENV DOCS_URL=${DOCS_URL}
+ENV ENCRYPTION_URL=${ENCRYPTION_URL}
 ENV CONNECTOR_NAME=${CONNECTOR_NAME}
 
 CMD ["/bin/sh", "-c", "/opt/venv/bin/python -m $(echo \"$CONNECTOR_NAME\" | tr '-' '_')"]

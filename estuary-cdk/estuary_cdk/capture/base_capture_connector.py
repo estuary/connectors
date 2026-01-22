@@ -1,6 +1,7 @@
 import abc
 import asyncio
 import json
+import os
 import sys
 from datetime import UTC, datetime, timedelta
 from typing import Any, Awaitable, BinaryIO, Callable, Generic
@@ -26,6 +27,10 @@ from ..utils import format_error_message, sort_dict
 from . import Request, Response, Task, request, response
 from ._emit import emit_bytes
 from .common import _ConnectorState
+
+# Default encryption service URL, can be overridden via ENCRYPTION_URL environment variable
+# for local testing with docker gateway addresses like http://172.18.0.1:port
+ENCRYPTION_URL = os.getenv("ENCRYPTION_URL") or "https://config-encryption.estuary.dev/v1/encrypt-config"
 
 
 class BaseCaptureConnector(
@@ -162,7 +167,6 @@ class BaseCaptureConnector(
         config: EndpointConfig,
     ) -> dict[str, Any]:
         assert isinstance(config, BaseModel)
-        ENCRYPTION_URL = "https://config-encryption.estuary.dev/v1/encrypt-config"
 
         # mode="json" converts Python-specific concepts (like datetimes) to valid JSON.
         # include=config.model_fields_set ensures only the fields that are explicitly set on the
