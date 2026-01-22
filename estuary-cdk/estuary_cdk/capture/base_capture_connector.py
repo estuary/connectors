@@ -73,6 +73,43 @@ class BaseCaptureConnector(
     async def acknowledge(self, acknowledge: request.Acknowledge) -> None:
         return None  # No-op.
 
+    async def migrate_connector_state(
+        self,
+        log: FlowLogger,
+        open: request.Open[EndpointConfig, ResourceConfig, _ConnectorState],
+    ) -> tuple[_ConnectorState, bool]:
+        """
+        Migrate the full connector state across all bindings before processing begins.
+
+        Override this method to perform state migrations that affect multiple bindings
+        or require atomic updates across the entire connector state. This ensures
+        migrations complete before individual binding tasks start, preventing
+        interleaved checkpoints from causing state conflicts.
+
+        This method receives the full open request, providing access to:
+        - open.state: The connector state with all bindings
+        - open.capture.config: The endpoint configuration
+        - open.capture.bindings: The binding definitions
+
+        Common use cases:
+        - Migrating from flat to dict-based state structures
+        - Restructuring state keys or formats based on config changes
+        - Adding new required state fields
+        - Consolidating or splitting state entries
+
+        Args:
+            log: Logger for the migration process
+            open: The open request containing state, config, and bindings
+
+        Returns:
+            tuple of (migrated_state, state_was_modified)
+            - migrated_state: The transformed state (same object or new instance)
+            - state_was_modified: True if state was changed and needs checkpointing
+
+        Default implementation returns (open.state, False) for backward compatibility.
+        """
+        return (open.state, False)
+
     async def handle(
         self,
         log: FlowLogger,
@@ -94,6 +131,15 @@ class BaseCaptureConnector(
             await self._emit(Response(applied=await self.apply(log, apply)))
 
         elif open := request.open:
+            # Migrate state across all bindings before opening
+            migrated_state, state_was_modified = await self.migrate_connector_state(log, open)
+
+            if state_was_modified:
+                # Checkpoint the migrated state with full replacement to clear old structures
+                await self._checkpoint(migrated_state, merge_patch=False)
+                # Update the open request to use migrated state
+                open.state = migrated_state
+
             opened, capture = await self.open(log, open)
             await self._emit(Response(opened=opened))
 
