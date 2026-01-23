@@ -2,15 +2,18 @@
 # Copyright (c) 2023 Airbyte, Inc., all rights reserved.
 #
 
-from datetime import date
+import json
 import logging
+from datetime import date
 
 import pendulum
 import pytest
 from airbyte_cdk.utils import AirbyteTracedException
 from freezegun import freeze_time
+from google.ads.googleads.v19.common.types.ad_asset import AdTextAsset
 from google.auth import exceptions
 from pendulum.tz.timezone import Timezone
+from proto import Message
 from source_google_ads.google_ads import GoogleAds
 from source_google_ads.models import Customer
 from source_google_ads.streams import IncrementalGoogleAdsStream, chunk_date_range, get_date_params
@@ -237,3 +240,37 @@ def test_get_date_params_without_end_date(customers):
         assert mock_start_date == start_date
         # There is a Google limitation where we capture only a 15-day date range
         assert end_date == "2021-11-15"
+
+
+def test_protobuf_to_json_with_real_message():
+    """Test _protobuf_to_json with an actual proto-plus message from Google Ads API."""
+    msg = AdTextAsset()
+    msg.text = "Hello World"
+
+    result = GoogleAds._protobuf_to_json(msg)
+
+    # Assert raw JSON string format (includes default values from proto-plus)
+    expected = '{\n  "text": "Hello World",\n  "pinnedField": 0,\n  "assetPerformanceLabel": 0\n}'
+    assert result == expected
+
+    # Also verify it parses correctly
+    parsed = json.loads(result)
+    assert parsed["text"] == "Hello World"
+    assert parsed["pinnedField"] == 0
+    assert parsed["assetPerformanceLabel"] == 0
+
+
+def test_get_field_value_serializes_protobuf_to_json():
+    """Test that get_field_value serializes proto.Message fields to JSON."""
+    msg = AdTextAsset()
+    msg.text = "Test Text"
+
+    result = GoogleAds._protobuf_to_json(msg)
+
+    # Assert raw JSON string format (includes default values from proto-plus)
+    expected = '{\n  "text": "Test Text",\n  "pinnedField": 0,\n  "assetPerformanceLabel": 0\n}'
+    assert result == expected
+
+    # Also verify it parses correctly
+    parsed = json.loads(result)
+    assert parsed["text"] == "Test Text"
