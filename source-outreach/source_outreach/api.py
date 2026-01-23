@@ -19,7 +19,7 @@ DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 API = "https://api.outreach.io/api/v2"
 MAX_PAGE_SIZE = 1000
 MIN_PAGE_SIZE = 1
-
+NEXT_PAGE_QUERY_PARAMETER = "page[after]"
 
 def _dt_to_str(dt: datetime) -> str:
     return dt.strftime(DATETIME_STRING_FORMAT)
@@ -36,7 +36,7 @@ def _extract_page_cursor(links: OutreachResponse.Links | None) -> str | None:
     parsed_url = urlparse(links.next)
     params = parse_qs(parsed_url.query)
 
-    cursor_list = params.get('page[after]')
+    cursor_list = params.get(NEXT_PAGE_QUERY_PARAMETER)
     return cursor_list[0] if cursor_list else None
 
 
@@ -51,6 +51,30 @@ def _should_retry_request(
     # the API server sent a response. To get around these timeouts,
     # the connector should make a new request for less data.
     return status != 502
+
+
+def _build_query_params(
+    cursor_field: str,
+    start_dt: datetime,
+    extra_params: dict[str, str | int | bool] | None,
+) -> dict[str, str | int | bool]:
+    params: dict[str, str | int | bool] = {
+        "sort": cursor_field,
+        "newFilterSyntax": "true",
+        f"filter[{cursor_field}][gte]": _dt_to_str(start_dt),
+    }
+
+    if extra_params:
+        params.update(extra_params)
+
+    return params
+
+
+def _extract_resource_cursor(
+    resource: OutreachResource,
+    cursor_field: str,
+) -> datetime:
+    return _str_to_dt(getattr(resource, 'attributes')[cursor_field])
 
 
 async def _do_request(
@@ -96,23 +120,16 @@ async def backfill_resources(
 
     url = f"{API}/{path}"
 
-    params: dict[str, str | int] = {
-        "sort": cursor_field,
-        "newFilterSyntax": "true",
-        f"filter[{cursor_field}][gte]": _dt_to_str(start_date),
-    }
-
-    if extra_params:
-        params.update(extra_params)
+    params = _build_query_params(cursor_field, start_date, extra_params)
 
     if page is not None:
         assert isinstance(page, str)
-        params["page[after]"] = page
+        params[NEXT_PAGE_QUERY_PARAMETER] = page
 
     response = await _do_request(http, url, params, log)
 
     for resource in response.data:
-        resource_dt = _str_to_dt(getattr(resource, 'attributes')[cursor_field])
+        resource_dt = _extract_resource_cursor(resource, cursor_field)
         if resource_dt >= cutoff:
             return
 
@@ -120,9 +137,7 @@ async def backfill_resources(
 
     next_page_cursor = _extract_page_cursor(response.links)
 
-    if not next_page_cursor:
-        return
-    else:
+    if next_page_cursor:
         yield next_page_cursor
 
 
@@ -138,14 +153,7 @@ async def fetch_resources(
 
     url = f"{API}/{path}"
 
-    params: dict[str, str | int | bool] = {
-        "sort": cursor_field,
-        "newFilterSyntax": "true",
-        f"filter[{cursor_field}][gte]": _dt_to_str(log_cursor),
-    }
-
-    if extra_params:
-        params.update(extra_params)
+    params = _build_query_params(cursor_field, log_cursor, extra_params)
 
     last_seen_dt = log_cursor
 
@@ -155,12 +163,12 @@ async def fetch_resources(
         if (
             last_seen_dt > log_cursor
             and response.data
-            and _str_to_dt(getattr(response.data[0], 'attributes')[cursor_field]) > last_seen_dt
+            and _extract_resource_cursor(response.data[0], cursor_field) > last_seen_dt
         ):
             yield last_seen_dt
 
         for resource in response.data:
-            resource_dt = _str_to_dt(getattr(resource, 'attributes')[cursor_field])
+            resource_dt = _extract_resource_cursor(resource, cursor_field)
             if resource_dt > last_seen_dt:
                 last_seen_dt = resource_dt
 
@@ -174,4 +182,4 @@ async def fetch_resources(
                 yield last_seen_dt
             break
         else:
-            params["page[after]"] = next_page_cursor
+            params[NEXT_PAGE_QUERY_PARAMETER] = next_page_cursor
