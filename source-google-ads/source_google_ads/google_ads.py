@@ -21,6 +21,7 @@ from google.ads.googleads.v19.services.types.google_ads_service import (
 from google.api_core.exceptions import ServerError, TooManyRequests
 from google.auth import exceptions
 from proto.marshal.collections import Repeated, RepeatedComposite
+from proto import Message
 
 REPORT_MAPPING = {
     "accounts": "customer",
@@ -169,6 +170,11 @@ class GoogleAds:
         return query_template
 
     @staticmethod
+    def _protobuf_to_json(message: Message) -> str:
+        """Serialize a proto-plus message to JSON string."""
+        return type(message).to_json(message)
+
+    @staticmethod
     def get_field_value(
         field_value: GoogleAdsRow, field: str, schema_type: Mapping[str, Any]
     ) -> str:
@@ -222,7 +228,10 @@ class GoogleAds:
             if isinstance(field_value, Enum):
                 field_value = field_value.name
             elif isinstance(field_value, (Repeated, RepeatedComposite)):
-                field_value = [str(value) for value in field_value]
+                field_value = [
+                    GoogleAds._protobuf_to_json(v) if isinstance(v, Message) else str(v)
+                    for v in field_value
+                ]
 
         # Google Ads has a lot of entities inside itself and we cannot process them all separately, because:
         # 1. It will take a long time
@@ -237,13 +246,8 @@ class GoogleAds:
             isinstance(field_value, (list, int, float, str, bool, dict))
             or field_value is None
         ):
-            field_value = str(field_value)
-        # In case of custom query field has MESSAGE type it represents protobuf
-        # message and could be anything, convert it to a string or array of
-        # string if it has "repeated" flag on metadata
-        if schema_type.get("protobuf_message"):
-            if "array" in schema_type.get("type"):
-                field_value = [str(field) for field in field_value]
+            if isinstance(field_value, Message):
+                field_value = GoogleAds._protobuf_to_json(field_value)
             else:
                 field_value = str(field_value)
 

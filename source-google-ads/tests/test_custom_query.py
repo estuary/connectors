@@ -54,8 +54,8 @@ def test_get_json_schema():
         'properties': {
             'a': {'type': 'string', 'enum': ['a', 'aa']},
             'b': {'type': ['null', 'array'], 'items': {'type': 'string', 'enum': ['b', 'bb']}},
-            'c': {'type': ['string', 'null'], 'protobuf_message': True},
-            'd': {'type': ['array', 'null'], 'protobuf_message': True},
+            'c': {'type': ['string', 'null']},
+            'd': {'type': ['array', 'null']},
             'e': {'type': ['string', 'null']},
             'f': {'type': ['string', 'null'], 'format': 'date'},
             'g': {'type': ['null', 'array'], 'items': {'type': 'string'}},
@@ -95,8 +95,8 @@ def test_get_json_schema_primary_keys_not_nullable():
         'properties': {
             'a': {'type': 'string', 'enum': ['a', 'aa']},
             'b': {'type': 'array', 'items': {'type': 'string', 'enum': ['b', 'bb']}},
-            'c': {'type': 'string', 'protobuf_message': True},
-            'd': {'type': 'array', 'protobuf_message': True},
+            'c': {'type': 'string'},
+            'd': {'type': 'array'},
             'e': {'type': 'string'},
             'f': {'type': 'string', 'format': 'date'},
             'g': {'type': 'array', 'items': {'type': 'string'}},
