@@ -4,7 +4,7 @@ from typing import Any, AsyncGenerator
 from urllib.parse import urlparse, parse_qs
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
-from estuary_cdk.http import HTTPError, HTTPSession
+from estuary_cdk.http import Headers, HTTPError, HTTPSession
 
 from .models import (
     OutreachResource,
@@ -42,7 +42,7 @@ def _extract_page_cursor(links: OutreachResponse.Links | None) -> str | None:
 
 def _should_retry_request(
     status: int,
-    headers: dict[str, Any],
+    headers: Headers,
     body: bytes,
     attempt: int,
 ) -> bool:
