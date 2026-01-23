@@ -77,6 +77,17 @@ def _extract_resource_cursor(
     return _str_to_dt(getattr(resource, 'attributes')[cursor_field])
 
 
+# _raise_if_unordered performs a sanity check to confirm
+# the Outreach API returned sorted records.
+def _raise_if_unordered(
+    resource_id: int,
+    previous_dt: datetime | None,
+    resource_dt: datetime,
+) -> None:
+    if previous_dt and resource_dt < previous_dt:
+        raise RuntimeError(f"Outreach API returned records out of order for {resource_id} with {resource_dt} < {previous_dt}.")
+
+
 async def _do_request(
     http: HTTPSession,
     url: str,
@@ -128,11 +139,17 @@ async def backfill_resources(
 
     response = await _do_request(http, url, params, log)
 
+    previous_dt: datetime | None = None
+
     for resource in response.data:
         resource_dt = _extract_resource_cursor(resource, cursor_field)
+
+        _raise_if_unordered(resource.id, previous_dt, resource_dt)
+
         if resource_dt >= cutoff:
             return
 
+        previous_dt = resource_dt
         yield resource
 
     next_page_cursor = _extract_page_cursor(response.links)
@@ -169,6 +186,9 @@ async def fetch_resources(
 
         for resource in response.data:
             resource_dt = _extract_resource_cursor(resource, cursor_field)
+
+            _raise_if_unordered(resource.id, last_seen_dt, resource_dt)
+
             if resource_dt > last_seen_dt:
                 last_seen_dt = resource_dt
 
