@@ -1,9 +1,10 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from logging import Logger
 from typing import Any, AsyncGenerator
 from urllib.parse import urlparse, parse_qs
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
+import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.http import Headers, HTTPError, HTTPSession
 
 from .models import (
@@ -11,6 +12,7 @@ from .models import (
     OutreachResponse,
     CursorField,
 )
+from .shared import now
 
 
 DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
@@ -56,6 +58,7 @@ def _should_retry_request(
 def _build_query_params(
     cursor_field: str,
     start_dt: datetime,
+    end_dt: datetime | None,
     extra_params: dict[str, str | int | bool] | None,
 ) -> dict[str, str | int | bool]:
     params: dict[str, str | int | bool] = {
@@ -63,6 +66,9 @@ def _build_query_params(
         "newFilterSyntax": "true",
         f"filter[{cursor_field}][gte]": _dt_to_str(start_dt),
     }
+
+    if end_dt is not None:
+        params[f"filter[{cursor_field}][lte]"] = _dt_to_str(end_dt)
 
     if extra_params:
         params.update(extra_params)
@@ -131,7 +137,7 @@ async def backfill_resources(
 
     url = f"{API}/{path}"
 
-    params = _build_query_params(cursor_field, start_date, extra_params)
+    params = _build_query_params(cursor_field, start_date, None, extra_params)
 
     if page is not None:
         assert isinstance(page, str)
@@ -163,14 +169,20 @@ async def fetch_resources(
     path: str,
     extra_params: dict[str, str | int | bool] | None,
     cursor_field: CursorField,
+    horizon: timedelta | None,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[OutreachResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
+    upper_bound = now() - horizon if horizon else now()
+
+    if log_cursor >= upper_bound:
+        return
+
     url = f"{API}/{path}"
 
-    params = _build_query_params(cursor_field, log_cursor, extra_params)
+    params = _build_query_params(cursor_field, log_cursor, upper_bound, extra_params)
 
     last_seen_dt = log_cursor
 
@@ -189,10 +201,14 @@ async def fetch_resources(
 
             _raise_if_unordered(resource.id, last_seen_dt, resource_dt)
 
+            if resource_dt > upper_bound:
+                log.info(f"Outreach API returned record {resource.id} with {cursor_field}={resource_dt} beyond the requested upper bound {upper_bound}.")
+                continue
+
             if resource_dt > last_seen_dt:
                 last_seen_dt = resource_dt
 
-            if resource_dt > log_cursor:
+            if resource_dt > log_cursor and cache.should_yield(path, resource.id, resource_dt):
                 yield resource
 
         next_page_cursor = _extract_page_cursor(response.links)
