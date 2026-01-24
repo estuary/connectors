@@ -36,6 +36,11 @@ class ExportJobError(Exception):
         )
 
 
+class ExportJobCancelledOrFailedError(ExportJobError):
+    """Exception raised when an export job enters a failed or cancelled state."""
+    ...
+
+
 class TruncatedExportJobError(ExportJobError):
     ...
 

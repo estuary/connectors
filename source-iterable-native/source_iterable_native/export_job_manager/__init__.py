@@ -9,6 +9,7 @@ from estuary_cdk.http import HTTPError, HTTPSession
 from ..models import EventValidationContext, TExportResource
 from ..shared import BASE_URL, dt_to_str
 from .models import (
+    ExportJobCancelledOrFailedError,
     ExportJobError,
     ExportJobState,
     ExportJobTimeoutError,
@@ -26,6 +27,7 @@ ATTEMPT_LOG_THRESHOLD = 10
 MAX_CONCURRENT_JOBS = 4
 MAX_WAIT_SECONDS = 24 * 60 * 60  # 24 hours
 MAX_FILES_PER_PAGE = 10
+MAX_JOB_RETRIES = 3
 
 
 def _is_url_expired_error(e: HTTPError) -> bool:
@@ -189,7 +191,7 @@ class ExportJobManager:
                     attempt += 1
                 case ExportJobState.FAILED | ExportJobState.CANCELLING | ExportJobState.CANCELLED:
                     msg = f"Unanticipated state {response.jobState} for export job {job_id}."
-                    raise ExportJobError(msg, data_type, start, end)
+                    raise ExportJobCancelledOrFailedError(msg, data_type, start, end)
                 case ExportJobState.COMPLETED:
                     if response.exportTruncated:
                         msg = f"Job {job_id} completed but was truncated. Try requesting a smaller date window and try again."
@@ -209,8 +211,31 @@ class ExportJobManager:
         validation_context: EventValidationContext | None = None,
     ) -> AsyncGenerator[TExportResource, None]:
         async with self.semaphore:
-            job_id = await self._submit(data_type, start, end)
-            await self._wait_for_completion(job_id, data_type, start, end)
+            attempt = 0
+            while True:
+                job_id = await self._submit(data_type, start, end)
+                try:
+                    await self._wait_for_completion(job_id, data_type, start, end)
+                    break
+                except ExportJobCancelledOrFailedError:
+                    attempt += 1
+                    if attempt <= MAX_JOB_RETRIES:
+                        self.log.warning(f"Export job failed or was cancelled, retrying.", {
+                            "job_id": job_id,
+                            "attempt": attempt,
+                            "max_retries": MAX_JOB_RETRIES,
+                            "data_type": data_type,
+                            "start": start,
+                            "end": end,
+                        })
+                    else:
+                        self.log.error(f"Export job failed after {MAX_JOB_RETRIES} retries.", {
+                            "job_id": job_id,
+                            "data_type": data_type,
+                            "start": start,
+                            "end": end,
+                        })
+                        raise
 
         async for doc in self._fetch_results(
             job_id,
