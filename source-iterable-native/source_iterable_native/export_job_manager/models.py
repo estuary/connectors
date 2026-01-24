@@ -5,7 +5,7 @@ from typing import Any
 from pydantic import AwareDatetime, BaseModel
 
 
-class ExportJobError(BaseException):
+class ExportJobError(Exception):
     """Exception raised for errors when executing a export job."""
     def __init__(self, message: str, data_type: str, start: datetime, end: datetime | None, error: str | None = None):
         self.message = message
@@ -27,7 +27,7 @@ class ExportJobError(BaseException):
         super().__init__(self.details)
 
     def __str__(self):
-        return f"{self.__class__.__name__}: {self.message}"
+        return self.message
 
     def __repr__(self):
         return (
