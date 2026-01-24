@@ -101,9 +101,9 @@ async def snapshot_list_users(
 
     for list_id in list_ids:
         params = {"listId": list_id}
-        _, lines = await http.request_lines(log, url, params=params)
+        response = await http.request(log, url, params=params)
 
-        async for user_id in lines():
+        for user_id in response.splitlines():
             if user_id:
                 yield ListUsers(
                     list_id=list_id,
