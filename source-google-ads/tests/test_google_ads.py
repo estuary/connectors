@@ -10,7 +10,7 @@ import pendulum
 import pytest
 from airbyte_cdk.utils import AirbyteTracedException
 from freezegun import freeze_time
-from google.ads.googleads.v19.common.types.ad_asset import AdTextAsset
+from google.ads.googleads.v21.common.types.ad_asset import AdTextAsset
 from google.auth import exceptions
 from pendulum.tz.timezone import Timezone
 from proto import Message

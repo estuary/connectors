@@ -5,7 +5,7 @@
 import json
 
 from google.ads.googleads.errors import GoogleAdsException
-from google.ads.googleads.v19.errors.types.errors import GoogleAdsFailure
+from google.ads.googleads.v21.errors.types.errors import GoogleAdsFailure
 from source_google_ads.google_ads import GRPC_TIMEOUT
 
 class MockSearchRequest:

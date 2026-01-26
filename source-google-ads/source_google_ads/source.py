@@ -12,7 +12,7 @@ from airbyte_cdk.sources import AbstractSource
 from airbyte_cdk.sources.streams import Stream
 from airbyte_cdk.utils import AirbyteTracedException
 from google.ads.googleads.errors import GoogleAdsException
-from google.ads.googleads.v19.errors.types.authorization_error import (
+from google.ads.googleads.v21.errors.types.authorization_error import (
     AuthorizationErrorEnum,
 )
 from pendulum import parse, today
@@ -52,7 +52,7 @@ class SourceGoogleAds(AbstractSource):
             try:
                 query["query"] = GAQL.parse(str(query["query"]))
             except ValueError:
-                message = f"The custom GAQL query {query['table_name']} failed. Validate your GAQL query with the Google Ads query validator. https://developers.google.com/google-ads/api/fields/v19/query_validator"
+                message = f"The custom GAQL query {query['table_name']} failed. Validate your GAQL query with the Google Ads query validator. https://developers.google.com/google-ads/api/fields/v21/query_validator"
                 raise AirbyteTracedException(
                     message=message, failure_type=FailureType.config_error
                 )
