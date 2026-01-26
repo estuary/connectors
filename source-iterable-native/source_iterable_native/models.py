@@ -61,6 +61,13 @@ class EndpointConfig(BaseModel):
             ge=timedelta(seconds=5),
             le=timedelta(days=365),
         )]
+        list_users_timeout: Annotated[timedelta, Field(
+            description="HTTP request timeout for fetching users of a list in ISO 8601 format. E.g. PT30M means 30 minutes, PT1H means 1 hour. Default is 30 minutes if unset.",
+            title="list_users Request Timeout",
+            default_factory=lambda: timedelta(minutes=30),
+            ge=timedelta(minutes=5),
+            le=timedelta(hours=4),
+        )]
 
     advanced: Advanced = Field(
         default_factory=Advanced,  # type: ignore

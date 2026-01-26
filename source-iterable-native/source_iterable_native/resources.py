@@ -112,22 +112,23 @@ def full_refresh_resources(
             all_bindings
     ):
         if issubclass(stream, Templates):
-            snapshot_fn = snapshot_templates
+            snapshot_fn = functools.partial(snapshot_templates, http, stream)
         elif issubclass(stream, ListUsers):
-            snapshot_fn = snapshot_list_users
+            snapshot_fn = functools.partial(
+                snapshot_list_users,
+                http,
+                stream,
+                config.advanced.list_users_timeout,
+            )
         else:
-            snapshot_fn = snapshot_resources
+            snapshot_fn = functools.partial(snapshot_resources, http, stream)
 
         open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_snapshot=functools.partial(
-                snapshot_fn,
-                http,
-                stream,
-            ),
+            fetch_snapshot=snapshot_fn,
             tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d"))
         )
 
