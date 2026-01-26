@@ -103,6 +103,9 @@ class BaseCaptureConnector(
                 await asyncio.sleep(24 * 60 * 60)  # 24 hours
                 stopping.event.set()
 
+                await asyncio.sleep(60 * 60)  # 1 hour
+                log.warning("Graceful exit has not finished in one hour")
+
             # Rotate OAuth2 tokens for credentials with periodically expiring tokens.
             if isinstance(self.token_source, TokenSource) and isinstance(
                 self.token_source.credentials, RotatingOAuth2Credentials
@@ -112,7 +115,7 @@ class BaseCaptureConnector(
             # Gracefully exit after a moderate period of time.
             # We don't do this within the TaskGroup because we don't
             # want to block on it.
-            asyncio.create_task(periodic_stop())
+            periodic_stop_task = asyncio.create_task(periodic_stop())
 
             async with asyncio.TaskGroup() as tg:
 
@@ -126,6 +129,10 @@ class BaseCaptureConnector(
                 )
                 log.event.status("Capture started")
                 await capture(task)
+
+            # Cancel the periodic_stop task if tasks exited gracefully
+            # before the warning timeout.
+            _ = periodic_stop_task.cancel()
 
             # When capture() completes, the connector exits.
             if stopping.first_error:
