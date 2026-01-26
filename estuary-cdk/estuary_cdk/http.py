@@ -98,6 +98,7 @@ class HTTPSession(abc.ABC):
      * `json` is a JSON-encoded request body (if set, `form` cannot be)
      * `form` is a form URL-encoded request body (if set, `json` cannot be)
      * `should_retry` determines whether 5xx errors are retried or bubbled up. If not provided, all 5xx errors are retried.
+     * `timeout` is an aiohttp.ClientTimeout for the request. If not provided, the default aiohttp timeout is used.
     """
 
     async def request(
@@ -111,6 +112,7 @@ class HTTPSession(abc.ABC):
         with_token: bool = True,
         headers: dict[str, Any] | None = None,
         should_retry: ShouldRetryProtocol | None = None,
+        timeout: aiohttp.ClientTimeout | None = None,
     ) -> bytes:
         """Request a url and return its body as bytes"""
 
@@ -130,6 +132,7 @@ class HTTPSession(abc.ABC):
                     with_token,
                     headers,
                     should_retry,
+                    timeout,
                 )
 
                 async for chunk in body_generator():
@@ -174,6 +177,7 @@ class HTTPSession(abc.ABC):
         delim: bytes = b"\n",
         headers: dict[str, Any] | None = None,
         should_retry: ShouldRetryProtocol | None = None,
+        timeout: aiohttp.ClientTimeout | None = None,
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and return its response as streaming lines, as they arrive"""
 
@@ -187,6 +191,7 @@ class HTTPSession(abc.ABC):
             with_token,
             headers,
             should_retry,
+            timeout,
         )
 
         async def gen() -> AsyncGenerator[bytes, None]:
@@ -213,11 +218,21 @@ class HTTPSession(abc.ABC):
         with_token: bool = True,
         headers: dict[str, Any] | None = None,
         should_retry: ShouldRetryProtocol | None = None,
+        timeout: aiohttp.ClientTimeout | None = None,
     ) -> tuple[Headers, BodyGeneratorFunction]:
         """Request a url and and return the raw response as a stream of bytes"""
 
         return await self._request_stream(
-            log, url, method, params, json, form, with_token, headers, should_retry
+            log,
+            url,
+            method,
+            params,
+            json,
+            form,
+            with_token,
+            headers,
+            should_retry,
+            timeout,
         )
 
     @abc.abstractmethod
@@ -232,6 +247,7 @@ class HTTPSession(abc.ABC):
         with_token: bool,
         headers: dict[str, Any] | None = None,
         should_retry: ShouldRetryProtocol | None = None,
+        timeout: aiohttp.ClientTimeout | None = None,
     ) -> HeadersAndBodyGenerator: ...
 
 
@@ -481,6 +497,7 @@ class HTTPMixin(Mixin, HTTPSession):
         form: dict[str, Any] | None,
         with_token: bool,
         headers: dict[str, Any],
+        timeout: aiohttp.ClientTimeout | None,
     ):
         if with_token and self.token_source is not None:
             token_type, token = await self.token_source.fetch_token(log, self)
@@ -499,6 +516,7 @@ class HTTPMixin(Mixin, HTTPSession):
             method=method,
             params=params,
             url=url,
+            timeout=timeout,
         )
 
         return resp
@@ -551,6 +569,7 @@ class HTTPMixin(Mixin, HTTPSession):
         with_token: bool,
         headers: dict[str, Any] | None = None,
         should_retry: ShouldRetryProtocol | None = None,
+        timeout: aiohttp.ClientTimeout | None = None,
     ) -> HeadersAndBodyGenerator:
         if headers is None:
             headers = {}
@@ -574,6 +593,7 @@ class HTTPMixin(Mixin, HTTPSession):
                     form,
                     with_token,
                     headers,
+                    timeout,
                 ),
             )
 
