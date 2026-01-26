@@ -4,6 +4,8 @@ from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import AsyncGenerator
 
+import aiohttp
+
 from estuary_cdk import emitted_changes_cache as cache
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
@@ -90,6 +92,7 @@ async def snapshot_templates(
 async def snapshot_list_users(
     http: HTTPSession,
     model: type[ListUsers],
+    total_request_timeout: timedelta,
     log: Logger,
 ) -> AsyncGenerator[ListUsers, None]:
     list_ids: list[int] = []
@@ -99,9 +102,17 @@ async def snapshot_list_users(
 
     url = f"{BASE_URL}/{model.path}"
 
+    # We use an extended timeout for the /lists/getUsers endpoint since it can take
+    # Iterable more than 5 minutes (aiohttp's default total timeout) to respond with
+    # all users in a list. We also preserve the default sock_connect timeout.
+    request_timeout = aiohttp.ClientTimeout(
+        total=total_request_timeout.total_seconds(),
+        sock_connect=30
+    )
+
     for list_id in list_ids:
         params = {"listId": list_id}
-        response = await http.request(log, url, params=params)
+        response = await http.request(log, url, params=params, timeout=request_timeout)
 
         for user_id in response.splitlines():
             if user_id:
