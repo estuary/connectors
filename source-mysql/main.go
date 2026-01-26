@@ -159,6 +159,7 @@ type advancedConfig struct {
 	DiscoverSchemas          []string `json:"discover_schemas,omitempty" jsonschema:"title=Discovery Schema Selection,description=If this is specified only tables in the selected schema(s) will be automatically discovered. Omit all entries to discover tables from all schemas."`
 	SourceTag                string   `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
 	FeatureFlags             string   `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	StatementTimeout         string   `json:"statement_timeout,omitempty" jsonschema:"title=Statement Timeout,description=Overrides the default statement timeout used by the connector. The default of zero disables statement timeouts entirely.,enum=,enum=30s,enum=1m,enum=5m,enum=30m,default="`
 
 	// Deprecated config options which no longer do much of anything.
 	WatermarksTable   string `json:"watermarks_table,omitempty" jsonschema:"title=Watermarks Table Name,default=flow.watermarks,description=This property is deprecated and will be removed in the near future. Previously named the table to be used for watermark writes. Currently the only effect of this setting is to exclude the watermarks table from discovery if present."`
@@ -191,6 +192,11 @@ func (c *Config) Validate() error {
 			if !strings.Contains(skipStreamID, ".") {
 				return fmt.Errorf("invalid 'skipBackfills' configuration: table name %q must be fully-qualified as \"<schema>.<table>\"", skipStreamID)
 			}
+		}
+	}
+	if c.Advanced.StatementTimeout != "" {
+		if _, err := time.ParseDuration(c.Advanced.StatementTimeout); err != nil {
+			return fmt.Errorf("invalid statement timeout %q: %w", c.Advanced.StatementTimeout, err)
 		}
 	}
 	return nil
@@ -345,6 +351,37 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 
 	if err := db.queryDatabaseVersion(); err != nil {
 		logrus.WithField("err", err).Warn("failed to query database version")
+	}
+
+	// Apply statement timeout. MySQL and MariaDB use different variable names
+	// and units, so we need to handle them separately. The default of zero
+	// disables statement timeouts, overriding any database-level default.
+	var statementTimeout time.Duration
+	if db.config.Advanced.StatementTimeout != "" {
+		// The timeout string is validated in Config.Validate so this shouldn't fail.
+		statementTimeout, _ = time.ParseDuration(db.config.Advanced.StatementTimeout)
+	}
+
+	var setTimeoutQuery string
+	if db.versionProduct == "MariaDB" {
+		// MariaDB uses max_statement_time in seconds (as a double)
+		setTimeoutQuery = fmt.Sprintf("SET SESSION max_statement_time = %.3f;", statementTimeout.Seconds())
+	} else {
+		// MySQL uses max_execution_time in milliseconds
+		setTimeoutQuery = fmt.Sprintf("SET SESSION max_execution_time = %d;", statementTimeout.Milliseconds())
+	}
+
+	if _, err := db.conn.Execute(setTimeoutQuery); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"err":     err,
+			"timeout": statementTimeout.String(),
+			"query":   setTimeoutQuery,
+		}).Warn("failed to set statement timeout")
+	} else if statementTimeout > 0 {
+		logrus.WithFields(logrus.Fields{
+			"timeout": statementTimeout.String(),
+			"product": db.versionProduct,
+		}).Info("configured statement timeout")
 	}
 
 	return nil
