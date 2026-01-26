@@ -28,6 +28,11 @@ func (db *oracleDatabase) SetupPrerequisites(ctx context.Context) []error {
 }
 
 func (db *oracleDatabase) prerequisiteArchiveLogRetention(ctx context.Context) error {
+	if db.featureFlags["skip_archive_retention_check"] {
+		log.Warn("skipping archive log retention check due to feature flag")
+		return nil
+	}
+
 	if err := db.switchToCDB(ctx); err != nil {
 		return err
 	}

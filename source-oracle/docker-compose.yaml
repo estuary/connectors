@@ -18,6 +18,7 @@ services:
       - flow-test
     volumes:
       - oracle_data:/opt/oracle/oradata
+      - ./docker-initdb.sql:/container-entrypoint-initdb.d/docker-initdb.sql
 
 networks:
   flow-test:

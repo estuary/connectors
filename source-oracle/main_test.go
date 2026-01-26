@@ -19,6 +19,13 @@ import (
 	_ "github.com/sijms/go-ora/v2"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+)
+
+var (
+	// Config file for tests. Files with ".sops." in the name are decrypted with sops;
+	// others are read as plaintext YAML. Default is testdata/config.local.yaml for local Docker testing.
+	dbConfig = flag.String("db_config", "testdata/config.local.yaml", "Path to database config file (use .sops. in name for encrypted configs)")
 )
 
 func TestMain(m *testing.M) {
@@ -35,7 +42,7 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-func oracleTestBackend(t testing.TB, configFile string) *testBackend {
+func oracleTestBackend(t testing.TB) *testBackend {
 	t.Helper()
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
@@ -43,15 +50,32 @@ func oracleTestBackend(t testing.TB, configFile string) *testBackend {
 	}
 
 	var ctx = context.Background()
-	var sops = exec.CommandContext(ctx, "sops", "--decrypt", "--output-type", "json", configFile)
-	var configRaw, err = sops.Output()
-	require.NoError(t, err)
-	var jq = exec.CommandContext(ctx, "jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
-	jq.Stdin = bytes.NewReader(configRaw)
-	cleanedConfig, err := jq.Output()
-	require.NoError(t, err)
 	var config Config
-	err = json.Unmarshal(cleanedConfig, &config)
+	var configJSON []byte
+	var configFile = *dbConfig
+
+	if strings.Contains(configFile, ".sops.") {
+		// Use sops to decrypt config file to JSON
+		var sops = exec.CommandContext(ctx, "sops", "--decrypt", "--output-type", "json", configFile)
+		var configRaw, err = sops.Output()
+		require.NoError(t, err)
+		// Strip _sops suffix from keys
+		var jq = exec.CommandContext(ctx, "jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+		jq.Stdin = bytes.NewReader(configRaw)
+		configJSON, err = jq.Output()
+		require.NoError(t, err)
+	} else {
+		// Read plaintext YAML config and convert to JSON
+		var configRaw, err = os.ReadFile(configFile)
+		require.NoError(t, err)
+		var generic map[string]any
+		err = yaml.Unmarshal(configRaw, &generic)
+		require.NoError(t, err)
+		configJSON, err = json.Marshal(generic)
+		require.NoError(t, err)
+	}
+
+	var err = json.Unmarshal(configJSON, &config)
 	require.NoError(t, err)
 
 	config.Advanced.BackfillChunkSize = 16
@@ -64,7 +88,7 @@ func oracleTestBackend(t testing.TB, configFile string) *testBackend {
 	config.Advanced.DictionaryMode = DictionaryModeOnline
 
 	// Open control connection
-	db, err := connectOracle(ctx, "test", cleanedConfig)
+	db, err := connectOracle(ctx, "test", configJSON)
 	t.Logf("opening control connection: addr=%q, user=%q", config.Address, config.User)
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close(ctx) })
@@ -164,34 +188,11 @@ func (tb *testBackend) Delete(ctx context.Context, t testing.TB, table string, w
 func (tb *testBackend) Query(ctx context.Context, t testing.TB, fatal bool, query string, args ...any) {
 	t.Helper()
 	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
-	var rows, err = tb.control.QueryContext(ctx, query, args...)
+	var _, err = tb.control.ExecContext(ctx, query, args...)
 	if err != nil {
 		if fatal {
 			t.Fatalf("unable to execute query: %v", err)
-		} else {
-			return
 		}
-	}
-	defer rows.Close()
-	// Log the response, doing a bit of extra work to make it readable
-	cols, err := rows.Columns()
-	if err != nil {
-		t.Fatalf("unable to get columns: %v", err)
-	}
-	for rows.Next() {
-		var fields = make(map[string]any)
-		var fieldsPtr = make([]any, len(cols))
-		for idx, col := range cols {
-			fields[col] = new(any)
-			fieldsPtr[idx] = fields[col]
-		}
-		if err := rows.Scan(fieldsPtr...); err != nil {
-			t.Fatalf("error scanning query: %v", err)
-		}
-		log.WithField("row", fields).Debug("query result row")
-	}
-	if err := rows.Err(); err != nil {
-		t.Fatalf("error running query: %v", err)
 	}
 }
 
@@ -226,12 +227,12 @@ func argsTuple(row []any) string {
 
 // TestGeneric runs the generic sqlcapture test suite.
 func TestGeneric(t *testing.T) {
-	var tb = oracleTestBackend(t, "config.pdb.yaml")
+	var tb = oracleTestBackend(t)
 	tests.Run(context.Background(), t, tb)
 }
 
 func TestCapitalizedTables(t *testing.T) {
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	tb.Query(ctx, t, false, fmt.Sprintf(`DROP TABLE "%s"."USERS"`, tb.config.User))
 	tb.Query(ctx, t, true, fmt.Sprintf(`CREATE TABLE "%s"."USERS" (id INTEGER PRIMARY KEY, data VARCHAR(2000) NOT NULL)`, tb.config.User))
 	var cs = tb.CaptureSpec(ctx, t)

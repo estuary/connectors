@@ -1,0 +1,11 @@
+# Local testing config for Docker-based Oracle instance
+# Start the database with: docker compose -f ./source-oracle/docker-compose.yaml up -d
+# See docker-compose.yaml for setup instructions (archivelog mode, user creation)
+user: C##FLOW_TEST_LOGMINER
+password: secret1234
+address: localhost:1521
+database: FREE
+advanced:
+  discover_schemas:
+    - C##FLOW_TEST_LOGMINER
+  feature_flags: skip_archive_retention_check
