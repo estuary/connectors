@@ -30,7 +30,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	AscendingKeys bool `json:"ascendingKeys"`
+	AscendingKeys   bool   `json:"ascendingKeys"`
+	MinimumModified string `json:"minimum_modified,omitempty"`
 }
 
 func (c config) Validate() error {
@@ -62,7 +63,8 @@ func (c config) PathRegex() string {
 }
 
 type gcStore struct {
-	gcs *storage.Client
+	gcs             *storage.Client
+	minimumModified *time.Time
 }
 
 func newGCStore(ctx context.Context, cfg config) (*gcStore, error) {
@@ -83,7 +85,16 @@ func newGCStore(ctx context.Context, cfg config) (*gcStore, error) {
 		return nil, err
 	}
 
-	return &gcStore{gcs: client}, nil
+	var minimumModified *time.Time = nil
+	if cfg.Advanced.MinimumModified != "" {
+		if minFilter, err := time.Parse(time.RFC3339, cfg.Advanced.MinimumModified); err != nil {
+			return nil, fmt.Errorf("invalid minimum_modified: %w (value: %s)", err, cfg.Advanced.MinimumModified)
+		} else {
+			minimumModified = &minFilter
+		}
+	}
+
+	return &gcStore{gcs: client, minimumModified: minimumModified}, nil
 }
 
 // validateBucket verifies that we can list objects in the bucket and read an object in the bucket.
@@ -149,6 +160,15 @@ func (s *gcStore) List(ctx context.Context, query filesource.Query) (filesource.
 				IsPrefix: true,
 			}, nil
 		} else {
+			if s.minimumModified != nil && obj.Updated.Before(*s.minimumModified) {
+				return filesource.ObjectInfo{
+					// Objects with size zero are always skipped, so we use this mechanism to skip
+					// these files
+					Size:    0,
+					ModTime: obj.Updated,
+					Path:    filesource.PartsToPath(bucket, obj.Name),
+				}, nil
+			}
 			return filesource.ObjectInfo{
 				Path:            filesource.PartsToPath(bucket, obj.Name),
 				IsPrefix:        false,
@@ -230,11 +250,16 @@ func main() {
 			"advanced": {
 				"properties": {
 				  "ascendingKeys": {
-					"type":        "boolean",
-					"title":       "Ascending Keys",
-					"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/fOMT4s.",
-					"default":     false
-				  }
+            "type":        "boolean",
+            "title":       "Ascending Keys",
+            "description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering. For more information see https://go.estuary.dev/fOMT4s.",
+            "default":     false
+				  },
+          "minimum_modified": {
+            "type": "string",
+            "title": "Capture Files Newer Than",
+            "description": "Only capture files which have been created or modified after the specified RFC3339 date-time."
+          }
 				},
 				"additionalProperties": false,
 				"type": "object",
