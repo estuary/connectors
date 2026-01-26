@@ -36,6 +36,10 @@ var featureFlagDefaults = map[string]bool{
 	// When set, discovered collection schemas will be emitted as SourcedSchema messages
 	// so that Flow can have access to 'official' schema information from the source DB.
 	"emit_sourced_schemas": true,
+
+	// When set, skips the archive log retention prerequisite check. This is useful for
+	// testing with a local Docker database.
+	"skip_archive_retention_check": false,
 }
 
 type sshForwarding struct {

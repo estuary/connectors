@@ -626,8 +626,8 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 		}
 		if cpJSON, err := json.Marshal(cp); err != nil {
 			return fmt.Errorf("marshalling checkpoint: %w", err)
-		} else {
-			s.events <- &sqlcapture.OldFlushEvent{Cursor: cpJSON}
+		} else if err := s.emitEvent(ctx, &sqlcapture.OldFlushEvent{Cursor: cpJSON}); err != nil {
+			return err
 		}
 
 		if s.smartMode && s.dictionaryMode == DictionaryModeExtract && int64(s.lastDDLSCN) < endSCN {
@@ -687,18 +687,21 @@ func (s *replicationStream) capturePendingTransaction(ctx context.Context, tx tr
 	return s.poll(ctx, startSCN, endSCN, transactions)
 }
 
+func (s *replicationStream) emitEvent(ctx context.Context, event sqlcapture.DatabaseEvent) error {
+	select {
+	case s.events <- event:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 func (s *replicationStream) decodeAndEmitMessage(ctx context.Context, msg logminerMessage) error {
 	var event, err = s.decodeMessage(msg)
 	if err != nil {
 		return fmt.Errorf("decode message: %w", err)
 	}
-
-	select {
-	case <-ctx.Done():
-		return ctx.Err()
-	case s.events <- event:
-		return nil
-	}
+	return s.emitEvent(ctx, event)
 }
 
 // in WHERE AST, columns are quoted with backticks for some reason. This function
@@ -1081,9 +1084,9 @@ func (s *replicationStream) Acknowledge(ctx context.Context, cursor json.RawMess
 
 func (s *replicationStream) Close(ctx context.Context) error {
 	logrus.Debug("replication stream close requested")
+	s.cancel()
 	s.transactionsStmt.Close()
 	s.conn.Close()
-	s.cancel()
 	return <-s.errCh
 }
 

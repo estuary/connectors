@@ -18,7 +18,7 @@ import (
 
 func TestViewDiscovery(t *testing.T) {
 	var unique = "18110541"
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var tableName = tb.CreateTable(ctx, t, unique, "(id INTEGER PRIMARY KEY, grp INTEGER, data VARCHAR(2000))")
 
 	var view = strings.ToUpper(fmt.Sprintf(`"t%s"`, unique+"_simpleview"))
@@ -43,7 +43,7 @@ func TestViewDiscovery(t *testing.T) {
 
 func TestAllTypes(t *testing.T) {
 	var unique = "18110541"
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var typesAndValues = [][]any{
 		{"nvchar2", "NVARCHAR2(2000)", "nvarchar2 value with unicode characters ❤️ \\ 🔥️'')"},
 		{"vcahr2", "VARCHAR2(2000)", "varchar2 value"},
@@ -102,7 +102,7 @@ func TestAllTypes(t *testing.T) {
 
 func TestIntegerKey(t *testing.T) {
 	var unique = "12319541"
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var typesAndValues = [][]any{
 		{"num18", "NUMBER(18, 0) PRIMARY KEY", 999999999999999999},
 	}
@@ -137,7 +137,7 @@ func TestIntegerKey(t *testing.T) {
 
 func TestNullValues(t *testing.T) {
 	var unique = "18110541"
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var typesAndValues = [][]any{
 		{"nvchar2", "NVARCHAR2(2000)", NewRawTupleValue("NULL")},
 		{"vcahr2", "VARCHAR2(2000)", NewRawTupleValue("NULL")},
@@ -194,7 +194,7 @@ func TestNullValues(t *testing.T) {
 
 func TestUnsupportedTypes(t *testing.T) {
 	var unique = "18110541"
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var typesAndValues = [][]any{
 		{"nvchar2", "NVARCHAR2(2000)", "nvarchar2 value with unicode characters ❤️ \\ 🔥️'')"},
 		{"anycol", "ANYDATA", NewRawTupleValue("NULL")},
@@ -230,7 +230,7 @@ func TestUnsupportedTypes(t *testing.T) {
 
 func TestStringKey(t *testing.T) {
 	var unique = "18110541"
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	// Integer keys are output as string, format: integer by default
 	var tableName = tb.CreateTable(ctx, t, unique, "(id integer)")
 
@@ -251,7 +251,7 @@ func TestStringKey(t *testing.T) {
 
 func TestLongStrings(t *testing.T) {
 	var unique = "18110541"
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var fire, ice, normalString string
 	for i := 0; i < 250; i++ {
 		fire += "🔥️"
@@ -279,7 +279,7 @@ func TestSkipBackfills(t *testing.T) {
 	// Set up three tables with some data in them, a catalog which captures all three,
 	// but a configuration which specifies that tables A and C should skip backfilling
 	// and only capture new changes.
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var uniqueA, uniqueB, uniqueC = "18110541", "24310805", "38410024"
 	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
@@ -303,7 +303,7 @@ func TestSkipBackfills(t *testing.T) {
 
 func TestTruncatedTables(t *testing.T) {
 	// Set up two tables with some data in them
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var uniqueA, uniqueB = "14026504", "29415894"
 	var tableA = tb.CreateTable(ctx, t, uniqueA, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
 	var tableB = tb.CreateTable(ctx, t, uniqueB, "(id INTEGER PRIMARY KEY, data VARCHAR(2000))")
@@ -329,7 +329,7 @@ func TestTruncatedTables(t *testing.T) {
 func TestTrickyColumnNames(t *testing.T) {
 	// Create a table with some 'difficult' column names (a reserved word, a capitalized
 	// name, and one containing special characters which also happens to be the primary key).
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var uniqueA, uniqueB = "39256824", "42531495"
 	var tableA = tb.CreateTable(ctx, t, uniqueA, `("`+"`"+`Meta/'wtf'~ID`+"`"+`" INTEGER PRIMARY KEY, data VARCHAR(2000))`)
 	var tableB = tb.CreateTable(ctx, t, uniqueB, `("table" INTEGER PRIMARY KEY, data VARCHAR(2000))`)
@@ -354,7 +354,7 @@ func TestTrickyColumnNames(t *testing.T) {
 // TestCursorResume sets up a capture with a (string, int) primary key and
 // and repeatedly restarts it after each row of capture output.
 func TestCursorResume(t *testing.T) {
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var uniqueID = "95911555"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(epoch VARCHAR(8), count INTEGER, data VARCHAR(2000), PRIMARY KEY (epoch, count))")
 	tb.Insert(ctx, t, tableName, [][]any{
@@ -374,7 +374,7 @@ func TestCursorResume(t *testing.T) {
 }
 
 func TestCaptureCapitalization(t *testing.T) {
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 
 	var uniqueA, uniqueB = "69943814", "73423348"
 	var tablePrefix = "test"
@@ -400,7 +400,7 @@ func TestCaptureCapitalization(t *testing.T) {
 }
 
 func TestSchemaChangesExtract(t *testing.T) {
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	tb.config.Advanced.DictionaryMode = DictionaryModeExtract
 	var uniqueID = "83287013"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
@@ -432,7 +432,7 @@ type doc struct {
 }
 
 func TestSchemaChangesSmartMultiple(t *testing.T) {
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	tb.config.Advanced.DictionaryMode = DictionaryModeSmart
 	var uniqueID1 = "47287013"
 	var uniqueID2 = "94367083"
@@ -494,7 +494,7 @@ func TestSchemaChangesSmartMultiple(t *testing.T) {
 }
 
 func TestSchemaChangesOnline(t *testing.T) {
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var uniqueID = "23135019"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
 	tb.Insert(ctx, t, tableName, [][]any{{1900, "AA", "No Such State", 20000}})
@@ -517,7 +517,7 @@ func TestSchemaChangesOnline(t *testing.T) {
 }
 
 func TestCrossSCNTransactions(t *testing.T) {
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var uniqueID = "23135019"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(year INTEGER, state VARCHAR(2000), fullname VARCHAR(2000), population INTEGER, PRIMARY KEY (year, state))")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
@@ -559,7 +559,7 @@ func TestCrossSCNTransactions(t *testing.T) {
 
 // TestSourceTag verifies the output of a capture with /advanced/source_tag set
 func TestSourceTag(t *testing.T) {
-	var tb, ctx = oracleTestBackend(t, "config.pdb.yaml"), context.Background()
+	var tb, ctx = oracleTestBackend(t), context.Background()
 	var uniqueID = "66567212"
 	var tableName = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, data TEXT)")
 	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
