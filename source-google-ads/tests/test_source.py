@@ -11,7 +11,7 @@ import pytest
 from airbyte_cdk import AirbyteLogger
 from freezegun import freeze_time
 from google.ads.googleads.errors import GoogleAdsException
-from google.ads.googleads.v19.errors.types.authorization_error import (
+from google.ads.googleads.v21.errors.types.authorization_error import (
     AuthorizationErrorEnum,
 )
 from pendulum import today

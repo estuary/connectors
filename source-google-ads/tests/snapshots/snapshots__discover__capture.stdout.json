@@ -5449,8 +5449,11 @@
           "type": "string",
           "enum": [
             "CONTENT",
+            "DISCOVER",
+            "GMAIL",
             "GOOGLE_OWNED_CHANNELS",
             "GOOGLE_TV",
+            "MAPS",
             "MIXED",
             "SEARCH",
             "SEARCH_PARTNERS",

@@ -14,7 +14,7 @@ import pendulum
 from airbyte_cdk.models import FailureType
 from airbyte_cdk.utils import AirbyteTracedException
 from google.ads.googleads.client import GoogleAdsClient
-from google.ads.googleads.v19.services.types.google_ads_service import (
+from google.ads.googleads.v21.services.types.google_ads_service import (
     GoogleAdsRow,
     SearchGoogleAdsResponse,
 )
@@ -43,7 +43,7 @@ REPORT_MAPPING = {
     "keyword_report": "keyword_view",
     "geo_target_constant": "geo_target_constant",
 }
-API_VERSION = "v19"
+API_VERSION = "v21"
 GRPC_TIMEOUT = 300.0
 REQUEST_TIMEOUT = 420.0
 logger = logging.getLogger("airbyte")
