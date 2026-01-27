@@ -1,0 +1,16 @@
+captures:
+  acmeCo/source-ringcentral:
+    endpoint:
+      local:
+        command:
+          - python
+          - -m
+          - source_ringcentral
+        config:
+          start_date: "2026-01-01T00:00:00Z"
+          credentials:
+            credentials_title: "Private App Credentials"
+            jwt: placeholder
+            client_id: placeholder
+            client_secret: placeholder
+    bindings: []
