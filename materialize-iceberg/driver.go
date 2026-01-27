@@ -129,6 +129,7 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 			c:                   emr,
 			bucket:              bucket,
 			ssmClient:           ssmClient,
+			tokenURL:            catalog.TokenURL(),
 		},
 		ssmClient: ssmClient,
 		templates: parseTemplates(),

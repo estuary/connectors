@@ -30,6 +30,7 @@ type emrClient struct {
 	c                   *emr.Client
 	bucket              blob.Bucket
 	ssmClient           *ssm.Client
+	tokenURL            string
 }
 
 func (e *emrClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr) {
@@ -101,6 +102,7 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 	| --credential-secret-name | Name of the secret in Systems Manager if using client credentials auth               | Optional |
 	| --scope                  | Scope if using client credentials auth                                               | Optional |
 	| --signing-name           | Signing name to use when authenticating with AWS SigV4. Either 'glue' or 's3tables'. | Optional |
+	| --oauth2-server-uri      | OAuth2 token endpoint URI.                                                           | Optional |
 	***/
 	getStatus := func() (*python.StatusOutput, error) {
 		var status python.StatusOutput
@@ -128,6 +130,10 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 		"--catalog-url", e.catalogURL,
 		"--warehouse", e.warehouse,
 		"--region", e.cfg.Region,
+	}
+
+	if e.tokenURL != "" {
+		args = append(args, "--oauth2-server-uri", e.tokenURL)
 	}
 
 	if e.catalogAuth.AuthType == catalogAuthTypeClientCredential {
