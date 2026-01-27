@@ -7,7 +7,6 @@ from typing import AsyncGenerator
 import aiohttp
 
 from estuary_cdk import emitted_changes_cache as cache
-from estuary_cdk.buffer_ordered import buffer_ordered
 from estuary_cdk.capture.common import LogCursor, PageCursor
 from estuary_cdk.http import HTTPSession
 from estuary_cdk.incremental_csv_processor import IncrementalCSVProcessor
@@ -44,7 +43,6 @@ MAX_CAMPAIGNS_PER_METRICS_REQUEST = 400
 # so we capture any late arriving attributions.
 CAMPAIGN_METRICS_LOOKBACK_WINDOW = timedelta(days=15)
 
-MAX_LIST_USERS_CONCURRENCY = 5
 
 async def snapshot_resources(
     http: HTTPSession,
@@ -112,33 +110,22 @@ async def snapshot_list_users(
         sock_connect=30
     )
 
-    # The /lists/getUsers endpoint has a rate limit of 5 requests per minute.
-    rate_limit_interval = 60 / 5  # 12 seconds between requests
-
-    # The API can take > 12 seconds to respond when a list has many thousands
-    # of users. To improve concurrency, we use buffer_ordered to process
-    # multiple lists concurrently while maintaining result order.
-    async def _fetch_users_in_list(list_id: int) -> list[tuple[int, str]]:
+    for list_id in list_ids:
         params = {"listId": list_id}
         response = await http.request(log, url, params=params, timeout=request_timeout)
 
-        return [
-            (list_id, user_id.decode())
-            for user_id in response.splitlines()
-            if user_id
-        ]
+        for user_id in response.splitlines():
+            if user_id:
+                yield ListUsers(
+                    list_id=list_id,
+                    user_id=user_id.decode(),
+                )
 
-    async def _generate_requests():
-        for i, list_id in enumerate(list_ids):
-            if i > 0:
-                # If this isn't the first list, wait the rate_limit_interval before
-                # allowing another list's users to be fetched.
-                await asyncio.sleep(rate_limit_interval)
-            yield _fetch_users_in_list(list_id)
-
-    async for users in buffer_ordered(_generate_requests(), MAX_LIST_USERS_CONCURRENCY):
-        for list_id, user_id in users:
-            yield ListUsers(list_id=list_id, user_id=user_id)
+        # The /lists/getUsers endpoint has a fairly strict rate limit of 5 requests
+        # per minute. Managing different rate limits per endpoint is currently not
+        # supported by the CDK, so we do the simplest solution here and sleep long
+        # enough to not get rate limited.
+        await asyncio.sleep(60 / 5)
 
 
 async def _paginate_through_campaigns(
