@@ -77,6 +77,11 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
 		}
 	}
 
+	// Initialize the pending transactions map if not restored from checkpoint
+	if cp.PendingTransactions == nil {
+		cp.PendingTransactions = make(map[XID]*checkpointTx)
+	}
+
 	var startSCN SCN
 	if cp.SCN != 0 {
 		startSCN = cp.SCN
@@ -130,7 +135,7 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
 		smartMode:      smartMode,
 		dictionaryMode: dictionaryMode,
 
-		pendingTransactions: make(map[XID]checkpointTx),
+		pendingTransactions: cp.PendingTransactions,
 
 		transactionsStmt: transactionsStmt,
 	}
@@ -365,7 +370,7 @@ type replicationStream struct {
 	transactionsStmt *sql.Stmt
 
 	// Transactions being tracked, a mapping of XIDs to starting SCN and message count of transactions which have not yet finished (commit or rollback)
-	pendingTransactions map[XID]checkpointTx
+	pendingTransactions map[XID]*checkpointTx
 
 	// The 'active tables' set, guarded by a mutex so it can be modified from
 	// the main goroutine while it's read by the replication goroutine.
@@ -384,7 +389,7 @@ type checkpointTx struct {
 
 type checkpoint struct {
 	SCN                 SCN
-	PendingTransactions map[XID]checkpointTx
+	PendingTransactions map[XID]*checkpointTx
 }
 
 func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.Duration, callback func(event sqlcapture.DatabaseEvent) error) error {
@@ -574,7 +579,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 
 			for xid, startSCN := range newPendingTxs {
 				if _, ok := s.pendingTransactions[xid]; !ok {
-					s.pendingTransactions[xid] = checkpointTx{
+					s.pendingTransactions[xid] = &checkpointTx{
 						StartSCN:     startSCN,
 						MessageCount: 0,
 					}
@@ -582,7 +587,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 			}
 
 			for xid := range rollbackedXIDs {
-				delete(s.pendingTransactions, xid)
+				s.pendingTransactions[xid] = nil
 			}
 		}
 
@@ -630,6 +635,14 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 			return err
 		}
 
+		// Clean up nil entries from the in-memory map after checkpoint emission.
+		// These entries were set to nil to signal deletion via JSON merge-patch semantics.
+		for xid, tx := range s.pendingTransactions {
+			if tx == nil {
+				delete(s.pendingTransactions, xid)
+			}
+		}
+
 		if s.smartMode && s.dictionaryMode == DictionaryModeExtract && int64(s.lastDDLSCN) < endSCN {
 			s.dictionaryMode = DictionaryModeOnline
 			logrus.WithFields(logrus.Fields{
@@ -649,8 +662,8 @@ func (s *replicationStream) handleTransactionBoundaries(ctx context.Context, msg
 	}
 
 	if msg.Op == opCommit {
-		if tx, ok := s.pendingTransactions[msg.XID]; ok {
-			delete(s.pendingTransactions, msg.XID)
+		if tx, ok := s.pendingTransactions[msg.XID]; ok && tx != nil {
+			s.pendingTransactions[msg.XID] = nil
 			if tx.MessageCount > 0 {
 				return s.capturePendingTransaction(ctx, transaction{XID: msg.XID, StartSCN: tx.StartSCN}, msg)
 			} else {
@@ -662,14 +675,13 @@ func (s *replicationStream) handleTransactionBoundaries(ctx context.Context, msg
 	}
 
 	if msg.Op == opRollback {
-		delete(s.pendingTransactions, msg.XID)
+		s.pendingTransactions[msg.XID] = nil
 		return nil
 	}
 
 	// Emittable messages for pending transactions are ignored until their commit is seen
-	if tx, ok := s.pendingTransactions[msg.XID]; ok {
+	if tx, ok := s.pendingTransactions[msg.XID]; ok && tx != nil {
 		tx.MessageCount += 1
-		s.pendingTransactions[msg.XID] = tx
 		return nil
 	}
 
