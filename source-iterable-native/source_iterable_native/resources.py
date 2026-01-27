@@ -3,7 +3,11 @@ from datetime import timedelta
 from logging import Logger
 
 from estuary_cdk.capture import Task
-from estuary_cdk.capture.common import BaseDocument, Resource, open_binding
+from estuary_cdk.capture.common import (
+    BaseDocument,
+    Resource,
+    open_binding,
+)
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
@@ -12,12 +16,13 @@ from .api import (
     backfill_export_resources,
     fetch_campaign_metrics,
     fetch_campaigns,
+    fetch_list_users,
     fetch_export_resources,
-    snapshot_list_users,
     snapshot_resources,
     snapshot_templates,
 )
 from .export_job_manager import ExportJobManager
+from .list_users_task import open_list_users_binding
 from .models import (
     BaseUsers,
     CampaignMetrics,
@@ -67,7 +72,6 @@ FULL_REFRESH_RESOURCES: list[type[IterableResource]] = [
     MetadataTables,
     Templates,
     Lists,
-    ListUsers,
 ]
 
 
@@ -113,13 +117,6 @@ def full_refresh_resources(
     ):
         if issubclass(stream, Templates):
             snapshot_fn = functools.partial(snapshot_templates, http, stream)
-        elif issubclass(stream, ListUsers):
-            snapshot_fn = functools.partial(
-                snapshot_list_users,
-                http,
-                stream,
-                config.advanced.list_users_timeout,
-            )
         else:
             snapshot_fn = functools.partial(snapshot_resources, http, stream)
 
@@ -402,6 +399,48 @@ def campaign_metrics(
     )
 
 
+def list_users(
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+) -> Resource:
+    def open(
+            binding: CaptureBinding[ResourceConfig],
+            binding_index: int,
+            state: ResourceState,
+            task: Task,
+            all_bindings
+    ):
+        open_list_users_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_list_users,
+                http,
+                config.advanced.list_users_timeout,
+            ),
+        )
+
+    cutoff = now()
+
+    return Resource(
+        name=ListUsers.name,
+        key=["/list_id", "/user_id"],
+        model=ListUsers,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=cutoff),
+        ),
+        initial_config=ResourceConfig(
+            name=ListUsers.name, interval=ListUsers.interval
+        ),
+        schema_inference=True,
+        disable=ListUsers.disable,
+    )
+
+
 async def all_resources(
     log: Logger,
     http: HTTPMixin,
@@ -422,6 +461,7 @@ async def all_resources(
 
     return [
         *full_refresh_resources(log, http, config),
+        list_users(log, http, config),
         users(log, http, config, export_job_manager),
         events(log, http, config, export_job_manager),
         campaigns(log, http, config),
