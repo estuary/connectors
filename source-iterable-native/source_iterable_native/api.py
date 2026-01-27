@@ -1,5 +1,7 @@
 import asyncio
+import bisect
 import itertools
+import time
 from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import AsyncGenerator
@@ -42,7 +44,7 @@ MAX_CAMPAIGNS_PER_METRICS_REQUEST = 400
 # Fetch metrics for campaigns in a final state within the past 15 days
 # so we capture any late arriving attributions.
 CAMPAIGN_METRICS_LOOKBACK_WINDOW = timedelta(days=15)
-
+LIST_USERS_RATE_LIMIT_INTERVAL = 60 / 5 # 12 seconds
 
 async def snapshot_resources(
     http: HTTPSession,
@@ -89,18 +91,14 @@ async def snapshot_templates(
                 yield doc
 
 
-async def snapshot_list_users(
+async def _fetch_users_in_list(
+    list_id: int,
     http: HTTPSession,
-    model: type[ListUsers],
     total_request_timeout: timedelta,
+    start_time: float,
     log: Logger,
 ) -> AsyncGenerator[ListUsers, None]:
-    list_ids: list[int] = []
-
-    async for l in snapshot_resources(http, Lists, log):
-        list_ids.append(l.id)
-
-    url = f"{BASE_URL}/{model.path}"
+    url = f"{BASE_URL}/{ListUsers.path}"
 
     # We use an extended timeout for the /lists/getUsers endpoint since it can take
     # Iterable more than 5 minutes (aiohttp's default total timeout) to respond with
@@ -110,22 +108,100 @@ async def snapshot_list_users(
         sock_connect=30
     )
 
-    for list_id in list_ids:
-        params = {"listId": list_id}
-        response = await http.request(log, url, params=params, timeout=request_timeout)
+    log.debug(
+        "fetching users in list",
+        {"list_id": list_id},
+    )
 
-        for user_id in response.splitlines():
-            if user_id:
-                yield ListUsers(
-                    list_id=list_id,
-                    user_id=user_id.decode(),
+    # Track emitted user_ids for this list to deduplicate on retry.
+    # We use a set instead of an index because the /lists/getUsers endpoint
+    # returns users in a non-deterministic order between requests.
+    emitted_user_ids: set[str] = set()
+
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        try:
+            params = {"listId": list_id}
+            _, lines = await http.request_lines(
+                log, url, params=params, timeout=request_timeout
+            )
+
+            async for line in lines():
+                user_id = line.decode()
+                if user_id and user_id not in emitted_user_ids:
+                    emitted_user_ids.add(user_id)
+                    yield ListUsers(list_id=list_id, user_id=user_id)
+
+            break
+
+        except (
+            asyncio.TimeoutError,
+            aiohttp.ClientPayloadError,
+            aiohttp.ServerDisconnectedError,
+            aiohttp.ClientOSError,
+            ConnectionResetError,
+        ) as e:
+            if attempt < max_attempts:
+                log.warning(
+                    "error streaming list users (will retry)",
+                    {
+                        "list_id": list_id,
+                        "attempt": attempt,
+                        "error": str(e),
+                    },
                 )
+            else:
+                raise
 
-        # The /lists/getUsers endpoint has a fairly strict rate limit of 5 requests
-        # per minute. Managing different rate limits per endpoint is currently not
-        # supported by the CDK, so we do the simplest solution here and sleep long
-        # enough to not get rate limited.
-        await asyncio.sleep(60 / 5)
+    log.debug(
+        "finished processing list",
+        {
+            "list_id": list_id,
+            "user_count": len(emitted_user_ids),
+            "elapsed_seconds": round(time.monotonic() - start_time, 2),
+        },
+    )
+
+
+async def backfill_list_users(
+    http: HTTPSession,
+    total_request_timeout: timedelta,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+) -> AsyncGenerator[ListUsers | PageCursor, None]:
+    all_list_ids: list[int] = sorted([l.id async for l in snapshot_resources(http, Lists, log)])
+    last_completed_list_id = page
+
+    if last_completed_list_id is None:
+        next_list_index = 0
+    else:
+        assert isinstance(last_completed_list_id, int)
+        next_list_index = bisect.bisect(all_list_ids, last_completed_list_id)
+
+    if next_list_index >= len(all_list_ids):
+        return
+
+    list_id = all_list_ids[next_list_index]
+    start_time = time.monotonic()
+
+    async for doc in _fetch_users_in_list(
+        list_id,
+        http,
+        total_request_timeout,
+        start_time,
+        log,
+    ):
+        yield doc
+
+    yield list_id
+
+    # The /lists/getUsers endpoint has a rate limit of 5 requests per minute,
+    # and we sleep before returning in order to abide by that rate limit.
+    elapsed = time.monotonic() - start_time
+    remaining_sleep = LIST_USERS_RATE_LIMIT_INTERVAL - elapsed
+    if remaining_sleep > 0:
+        await asyncio.sleep(remaining_sleep)
 
 
 async def _paginate_through_campaigns(

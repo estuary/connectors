@@ -12,7 +12,7 @@ from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
     LogCursor,
     Logger,
-    ResourceConfig,
+    ResourceConfigWithSchedule,
     ResourceState,
 )
 from estuary_cdk.http import AccessToken
@@ -190,12 +190,11 @@ class Templates(IterableResource):
 class ListUsers(IterableResource):
     name: ClassVar[str] = "list_users"
     path: ClassVar[str] = "lists/getUsers"
-    # The lists/getUsers endpoint has pretty strict rate limits, and
-    # we need to make as many requests as there are lists to complete
-    # a snapshot. This can take hours, so to make the garden path
-    # easier for most users, we disable this stream and use a larger
-    # interval by default.
-    interval: ClassVar[timedelta] = timedelta(hours=4)
+    # Since list_users has a backfill task but not an incremental task,
+    # the interval has no effect. Instead, the schedule
+    # dictates how frequently the stream re-backfills all records.
+    interval: ClassVar[timedelta] = timedelta(hours=24)
+    schedule: ClassVar[str] = "55 23 * * *"
     disable: ClassVar[bool] = True
 
     list_id: int

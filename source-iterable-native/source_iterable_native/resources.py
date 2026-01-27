@@ -3,7 +3,11 @@ from datetime import timedelta
 from logging import Logger
 
 from estuary_cdk.capture import Task
-from estuary_cdk.capture.common import BaseDocument, Resource, open_binding
+from estuary_cdk.capture.common import (
+    BaseDocument,
+    Resource,
+    open_binding,
+)
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
@@ -12,8 +16,8 @@ from .api import (
     backfill_export_resources,
     fetch_campaign_metrics,
     fetch_campaigns,
+    backfill_list_users,
     fetch_export_resources,
-    snapshot_list_users,
     snapshot_resources,
     snapshot_templates,
 )
@@ -33,7 +37,7 @@ from .models import (
     MessageTypes,
     MetadataTables,
     ProjectType,
-    ResourceConfig,
+    ResourceConfigWithSchedule,
     ResourceState,
     Templates,
     UsersWithEmails,
@@ -67,7 +71,6 @@ FULL_REFRESH_RESOURCES: list[type[IterableResource]] = [
     MetadataTables,
     Templates,
     Lists,
-    ListUsers,
 ]
 
 
@@ -105,7 +108,7 @@ def full_refresh_resources(
 
     def open(
             stream: type[IterableResource],
-            binding: CaptureBinding[ResourceConfig],
+            binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -113,13 +116,6 @@ def full_refresh_resources(
     ):
         if issubclass(stream, Templates):
             snapshot_fn = functools.partial(snapshot_templates, http, stream)
-        elif issubclass(stream, ListUsers):
-            snapshot_fn = functools.partial(
-                snapshot_list_users,
-                http,
-                stream,
-                config.advanced.list_users_timeout,
-            )
         else:
             snapshot_fn = functools.partial(snapshot_resources, http, stream)
 
@@ -139,7 +135,7 @@ def full_refresh_resources(
             model=BaseDocument,
             open=functools.partial(open, stream),
             initial_state=ResourceState(),
-            initial_config=ResourceConfig(
+            initial_config=ResourceConfigWithSchedule(
                 name=stream.name, interval=stream.interval
             ),
             schema_inference=True,
@@ -159,7 +155,7 @@ def users(
 ) -> Resource:
     def open(
             stream: type[BaseUsers],
-            binding: CaptureBinding[ResourceConfig],
+            binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -217,7 +213,7 @@ def users(
             },
             backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
         ),
-        initial_config=ResourceConfig(
+        initial_config=ResourceConfigWithSchedule(
             name=stream.name, interval=stream.interval
         ),
         schema_inference=True,
@@ -233,7 +229,7 @@ def events(
 ) -> Resource:
     def open(
             stream: type[ExportResource],
-            binding: CaptureBinding[ResourceConfig],
+            binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -309,7 +305,7 @@ def events(
                 for event_type in EventTypes
             },
         ),
-        initial_config=ResourceConfig(
+        initial_config=ResourceConfigWithSchedule(
             name=stream.name, interval=stream.interval
         ),
         schema_inference=True,
@@ -323,7 +319,7 @@ def campaigns(
         config: EndpointConfig,
 ) -> Resource:
     def open(
-            binding: CaptureBinding[ResourceConfig],
+            binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -355,7 +351,7 @@ def campaigns(
             inc=ResourceState.Incremental(cursor=cutoff),
             backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
         ),
-        initial_config=ResourceConfig(
+        initial_config=ResourceConfigWithSchedule(
             name=Campaigns.name, interval=Campaigns.interval
         ),
         schema_inference=True,
@@ -369,7 +365,7 @@ def campaign_metrics(
         config: EndpointConfig,
 ) -> Resource:
     def open(
-            binding: CaptureBinding[ResourceConfig],
+            binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -394,11 +390,55 @@ def campaign_metrics(
         initial_state=ResourceState(
             inc=ResourceState.Incremental(cursor=EPOCH),
         ),
-        initial_config=ResourceConfig(
+        initial_config=ResourceConfigWithSchedule(
             name=CampaignMetrics.name, interval=CampaignMetrics.interval
         ),
         schema_inference=True,
         disable=CampaignMetrics.disable
+    )
+
+
+def list_users(
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+) -> Resource:
+    def open(
+            binding: CaptureBinding[ResourceConfigWithSchedule],
+            binding_index: int,
+            state: ResourceState,
+            task: Task,
+            all_bindings
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_page=functools.partial(
+                backfill_list_users,
+                http,
+                config.advanced.list_users_timeout,
+            )
+        )
+
+    cutoff = now()
+
+    return Resource(
+        name=ListUsers.name,
+        key=["/list_id", "/user_id"],
+        model=ListUsers,
+        open=open,
+        initial_state=ResourceState(
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
+        ),
+        initial_config=ResourceConfigWithSchedule(
+            name=ListUsers.name,
+            interval=ListUsers.interval,
+            schedule=ListUsers.schedule,
+        ),
+        schema_inference=True,
+        disable=ListUsers.disable,
     )
 
 
@@ -422,6 +462,7 @@ async def all_resources(
 
     return [
         *full_refresh_resources(log, http, config),
+        list_users(log, http, config),
         users(log, http, config, export_job_manager),
         events(log, http, config, export_job_manager),
         campaigns(log, http, config),

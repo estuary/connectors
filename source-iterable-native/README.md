@@ -26,6 +26,11 @@ Some endpoints have different rate limits that aren't (currently) managed by the
 
 The connector manually sleeps between requests to these endpoints to avoid hitting rate limits.
 
+
+### `/lists/getUsers` challenges
+
+The `/lists/getUsers` endpoint has limitations that make capturing data from it challenging. It has a restrictive 5 requests per minute rate limit. The response includes all users in a list, and it can take the Iterable API multiple minutes to respond with all user ids; we've observed responses take 80+ minutes for lists with over a million users. There's no pagination, so all users must be fetched in a single request, and the ordering of users within the response is non-deterministic.
+
 ---
 
 ## Design Decisions
@@ -61,3 +66,13 @@ The connector conditionally fetches metrics for campaigns depending on the campa
 - **Pre-launch campaigns** (Draft, Recurring, Scheduled): Skipped (no metrics)
 - **In-progress campaigns** (Ready, Running, Recalling): Always fetched
 - **Final state campaigns** (Aborted, Archived, Finished, Recalled): Fetched if the campaign ended within 15 days to capture late-arriving attributions
+
+### `list_users` Stream
+
+The `list_users` stream captures list membership data (which users belong to which lists) via the `/lists/getUsers` endpoint. This endpoint has [challenging API limitations](#listsgetusers-challenges) that make snapshotting the entire set of lists' users unfeasible; the snapshot would take hours to days to complete, and would prevent the connector from gracefully exiting in a timely manner.
+
+Instead of taking a snapshot of all lists' users in a single invocation, the connector uses periodic, scheduled backfills to fetch updates to lists' users. On each `backfill_list_users` invocation, the connector fetches a single list's users, then yields control back to the CDK. This keeps the connector more responsive during graceful shutdowns and able to make incremental progress when backfilling `list_users`.
+
+#### Retry and Deduplication
+
+Because responses can take 80+ minutes and may fail mid-stream, the connector retries failed requests up to three times and tracks emitted user IDs in memory in order to deduplicate after a retry.

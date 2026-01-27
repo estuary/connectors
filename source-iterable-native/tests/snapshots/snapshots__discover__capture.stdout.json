@@ -297,7 +297,8 @@
     "recommendedName": "list_users",
     "resourceConfig": {
       "name": "list_users",
-      "interval": "PT4H"
+      "interval": "P1D",
+      "schedule": "55 23 * * *"
     },
     "documentSchema": {
       "$defs": {
@@ -325,18 +326,32 @@
           "type": "object"
         }
       },
+      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
+        },
+        "list_id": {
+          "title": "List Id",
+          "type": "integer"
+        },
+        "user_id": {
+          "title": "User Id",
+          "type": "string"
         }
       },
-      "title": "BaseDocument",
+      "required": [
+        "list_id",
+        "user_id"
+      ],
+      "title": "ListUsers",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/_meta/row_id"
+      "/list_id",
+      "/user_id"
     ],
     "disable": true
   },
