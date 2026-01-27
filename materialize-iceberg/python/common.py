@@ -1,5 +1,6 @@
 import argparse
 import json
+import sys
 from dataclasses import dataclass
 from typing import Optional
 from urllib.parse import urlparse
@@ -109,6 +110,11 @@ def common_args() -> argparse.Namespace:
         required=False,
         help="Signing name to use when authenticating with AWS SigV4. Either 'glue' or 's3tables'.",
     )
+    parser.add_argument(
+        "--oauth2-server-uri",
+        required=False,
+        help="OAuth2 token endpoint URI.",
+    )
     return parser.parse_args()
 
 
@@ -134,6 +140,12 @@ def get_spark_session(args: argparse.Namespace) -> SparkSession:
         .config("spark.sql.catalog.estuary.uri", args.catalog_url)
         .config("spark.sql.catalog.estuary.warehouse", args.warehouse)
     )
+
+    if args.oauth2_server_uri is not None:
+        builder = builder.config(
+            "spark.sql.catalog.estuary.oauth2-server-uri",
+            args.oauth2_server_uri
+        )
 
     if args.credential_secret_name:
         credential = (

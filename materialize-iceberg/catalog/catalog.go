@@ -179,6 +179,7 @@ func WithSigV4(signingName, awsAccessKeyID, awsSecretAccessKey, awsRegion, sessi
 type Catalog struct {
 	rHttp      *resty.Client
 	isS3tables bool
+	tokenURL   string
 }
 
 func New(ctx context.Context, catalogUrl string, warehouse string, opts ...CatalogOption) (*Catalog, error) {
@@ -191,6 +192,8 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse catalog url: %w", err)
 	}
+
+	var tokenURL string
 
 	var rHttp *resty.Client
 	if cfg.useClientCredential {
@@ -206,6 +209,8 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 				TokenURL:     parsedCatalogUrl.JoinPath(cfg.oauth2ServerUri).String(),
 				Scopes:       scopes,
 			}
+
+			tokenURL = clientCredCfg.TokenURL
 			rHttp = resty.NewWithClient(clientCredCfg.Client(ctx))
 		} else {
 			rHttp = resty.New().SetAuthToken(cfg.credential)
@@ -231,6 +236,7 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 	rc := &Catalog{
 		rHttp:      rHttp.SetBaseURL(baseURL.String()),
 		isS3tables: cfg.signingName == "s3tables",
+		tokenURL:   tokenURL,
 	}
 
 	type configResponse struct {
@@ -262,6 +268,11 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 	}
 
 	return rc, nil
+}
+
+// TokenURL is the OAuth2 token endpoint URI, when OAuth2 Client Credentials are being used.
+func (c *Catalog) TokenURL() string {
+	return c.tokenURL
 }
 
 func (c *Catalog) ListNamespaces(ctx context.Context) ([]string, error) {
