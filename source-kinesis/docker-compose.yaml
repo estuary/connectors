@@ -4,10 +4,10 @@ services:
   db:
     image: 'localstack/localstack:latest'
     environment:
-      - SERVICES=kinesis
+      - SERVICES=kinesis,glue
       - KINESIS_ERROR_PROBABILITY=0 # This option is interesting, but will likely cause test flakes.
       - KINESIS_LATENCY=5 # ms
-    healthcheck: 
+    healthcheck:
       test: "AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=test aws --endpoint-url=http://localhost:4566 kinesis list-streams"
       interval: 1s
       timeout: 1s
