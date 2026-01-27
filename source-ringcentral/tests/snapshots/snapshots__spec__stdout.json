@@ -1,0 +1,138 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "Advanced": {
+          "properties": {
+            "lookback_window": {
+              "default": 24,
+              "description": "Number of hours to look back when fetching call logs during incremental sync. Call log records can be updated after creation, so the connector re-fetches records within this window once per day to capture updates. Default is 24 hours.",
+              "maximum": 168,
+              "minimum": 1,
+              "title": "Call Log Lookback Window (Hours)",
+              "type": "integer"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
+        "JWTCredentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "default": "",
+              "secret": true,
+              "title": "Access Token",
+              "type": "string",
+              "x-hidden-field": true
+            },
+            "client_id": {
+              "description": "Client ID from your RingCentral JWT Auth app.",
+              "secret": true,
+              "title": "Client ID",
+              "type": "string"
+            },
+            "client_secret": {
+              "description": "Client Secret from your RingCentral JWT Auth app.",
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            },
+            "jwt": {
+              "description": "JWT credential from your RingCentral Developer Console. Create one at https://developers.ringcentral.com/console/my-credentials and authorize it for your JWT Auth app.",
+              "secret": true,
+              "title": "JWT Credential",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret",
+            "jwt"
+          ],
+          "title": "JWTCredentials",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "Private App Credentials": "#/$defs/JWTCredentials"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/JWTCredentials"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. Defaults to 7 days ago.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-ringcentral",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
