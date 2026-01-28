@@ -12,6 +12,7 @@ import (
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -57,6 +58,11 @@ func (d *driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
+	_, err = connectGlue(ctx, &config)
+	if err != nil {
+		log.WithField("err", err).Warn("unable to connect to glue schema registry, disabling glue schema integration")
+	}
+
 	streams, err := listStreams(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("listing streams: %w", err)
@@ -93,6 +99,11 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
 
+	_, err = connectGlue(ctx, &config)
+	if err != nil {
+		log.WithField("err", err).Warn("unable to connect to glue schema registry, disabling glue schema integration")
+	}
+
 	streams, err := listStreams(ctx, client)
 	if err != nil {
 		return nil, fmt.Errorf("listing streams: %w", err)
@@ -108,6 +119,7 @@ func (d *driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 
 func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) error {
 	var ctx = stream.Context()
+
 	var config Config
 	if err := pf.UnmarshalStrict(open.Capture.ConfigJson, &config); err != nil {
 		return fmt.Errorf("parsing config json: %w", err)
@@ -128,16 +140,23 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		return err
 	}
 
+	glueClient, err := connectGlue(ctx, &config)
+	if err != nil {
+		log.WithField("err", err).Warn("unable to connect to glue schema registry, disabling glue schema integration")
+	}
+
 	streams, err := listStreams(ctx, client)
 	if err != nil {
 		return err
 	}
 
 	var c = &capture{
-		client:      client,
-		stream:      stream,
-		updateState: make(map[boilerplate.StateKey]map[string]*string),
-		stats:       make(map[string]map[string]shardStats),
+		client:          client,
+		stream:          stream,
+		updateState:     make(map[boilerplate.StateKey]map[string]*string),
+		stats:           make(map[string]map[string]shardStats),
+		glueClient:      glueClient,
+		glueSchemaCache: make(map[string]string),
 	}
 
 	if err := stream.Ready(false); err != nil {
