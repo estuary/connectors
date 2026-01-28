@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
@@ -28,8 +29,8 @@ type capture struct {
 
 	stats map[string]map[string]shardStats
 
-	glueClient       *glue.Client
-	glueSchemaCache  map[string]string // schemaVersionID -> schemaDefinition
+	glueClient      *glue.Client
+	glueSchemaCache map[string]string // schemaVersionID -> schemaDefinition
 }
 
 type shardStats struct {
@@ -417,48 +418,57 @@ func (c *capture) readShard(
 	}
 }
 
-func (c *capture) getGlueSchemaForRecord(ctx context.Context, data []byte) ([]byte, string, error) {
+// getGlueSchemaForRecord parses the AWS Glue Schema Registry header and fetches the schema.
+// Returns the payload (data without header), schema definition, whether schema was from cache, and error.
+//
+// AWS Glue Schema Registry header format:
+//   - Byte 0: Header version (expected: 3)
+//   - Byte 1: Compression type (0 = none)
+//   - Bytes 2-17: Schema version UUID (16 bytes)
+//   - Bytes 18+: Payload
+//
+// Ref: https://github.com/awslabs/aws-glue-schema-registry
+func (c *capture) getGlueSchemaForRecord(ctx context.Context, data []byte) ([]byte, string, bool, error) {
+	if len(data) < 18 {
+		return nil, "", false, fmt.Errorf("data too short for Glue header: got %d bytes, need at least 18", len(data))
+	}
+
 	headerVersion := data[0]
 	if headerVersion != 3 {
-		return nil, "", fmt.Errorf("invalid header received for glue record: got %s expected 3", string(headerVersion))
+		return nil, "", false, fmt.Errorf("invalid header version for glue record: got %d expected 3", headerVersion)
 	}
 
 	compression := data[1]
 	if compression != 0 {
-		return nil, "", fmt.Errorf("compressed glue schema headers are not supported")
+		return nil, "", false, fmt.Errorf("compressed glue schema headers are not supported")
 	}
 
 	if c.glueClient == nil {
-		return nil, "", fmt.Errorf("got message with glue header, but glue connection previously failed")
+		return nil, "", false, fmt.Errorf("got message with glue header, but glue connection previously failed")
 	}
 
 	schemaIDBytes := data[2:18]
 	payload := data[18:]
-	schemaVersionID := fmt.Sprintf(
-		"%x-%x-%x-%x-%x",
-		schemaIDBytes[0:4],
-		schemaIDBytes[4:6],
-		schemaIDBytes[6:8],
-		schemaIDBytes[8:10],
-		schemaIDBytes[10:16],
-	)
+
+	schemaUUID, err := uuid.FromBytes(schemaIDBytes)
+	if err != nil {
+		return nil, "", false, fmt.Errorf("parsing schema version UUID: %w", err)
+	}
+	schemaVersionID := schemaUUID.String()
 
 	// Check cache first
 	c.mu.Lock()
 	if cachedSchema, ok := c.glueSchemaCache[schemaVersionID]; ok {
 		c.mu.Unlock()
-		return payload, cachedSchema, nil
+		return payload, cachedSchema, true, nil
 	}
 	c.mu.Unlock()
 
-	// Use a fresh context with timeout to isolate from parent context issues
-	glueCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-	out, err := c.glueClient.GetSchemaVersion(glueCtx, &glue.GetSchemaVersionInput{
+	out, err := c.glueClient.GetSchemaVersion(ctx, &glue.GetSchemaVersionInput{
 		SchemaVersionId: aws.String(schemaVersionID),
 	})
 	if err != nil {
-		return nil, "", err
+		return nil, "", false, err
 	}
 
 	schemaDefinition := aws.ToString(out.SchemaDefinition)
@@ -468,21 +478,21 @@ func (c *capture) getGlueSchemaForRecord(ctx context.Context, data []byte) ([]by
 	c.glueSchemaCache[schemaVersionID] = schemaDefinition
 	c.mu.Unlock()
 
-	return payload, schemaDefinition, nil
+	return payload, schemaDefinition, false, nil
 }
 
 type AvroSchema struct {
-	Type      interface{} `json:"type"`
-	Name      string      `json:"name,omitempty"`
-	LogicalType string    `json:"logicalType,omitempty"`
-	Fields    []struct {
+	Type        interface{} `json:"type"`
+	Name        string      `json:"name,omitempty"`
+	LogicalType string      `json:"logicalType,omitempty"`
+	Fields      []struct {
 		Name    string      `json:"name"`
 		Type    interface{} `json:"type"`
 		Default interface{} `json:"default,omitempty"`
 	} `json:"fields,omitempty"`
-	Items   interface{}   `json:"items,omitempty"`   // For array types
-	Values  interface{}   `json:"values,omitempty"`  // For map types
-	Symbols []string      `json:"symbols,omitempty"` // For enum types
+	Items   interface{} `json:"items,omitempty"`   // For array types
+	Values  interface{} `json:"values,omitempty"`  // For map types
+	Symbols []string    `json:"symbols,omitempty"` // For enum types
 }
 
 func convertAvroType(avroType interface{}) (map[string]interface{}, bool) {
@@ -524,7 +534,7 @@ func convertAvroType(avroType interface{}) (map[string]interface{}, bool) {
 		case "map":
 			values, _ := convertAvroType(t["values"])
 			return map[string]interface{}{
-				"type": "object",
+				"type":                 "object",
 				"additionalProperties": values,
 			}, false
 
@@ -667,12 +677,14 @@ func (c *capture) processRecords(
 
 		doc := map[string]json.RawMessage{}
 
-		// If payload is not JSON, we try to parse the Glue header
+		// Check for Glue Schema Registry header (version byte = 3)
+		// Header is 18 bytes: 1 version + 1 compression + 16 UUID
 		var payload []byte
 		var glueSchema string
+		var schemaFromCache bool
 		var err error
-		if r.Data[0] != '{' {
-			payload, glueSchema, err = c.getGlueSchemaForRecord(ctx, r.Data)
+		if len(r.Data) >= 18 && r.Data[0] == 3 {
+			payload, glueSchema, schemaFromCache, err = c.getGlueSchemaForRecord(ctx, r.Data)
 			if err != nil {
 				return fmt.Errorf(
 					"parsing glue header for record with sequenceNumber %q and partitionKey %q: %w",
@@ -683,15 +695,15 @@ func (c *capture) processRecords(
 			payload = r.Data
 		}
 
-		// If we have a Glue schema, convert it to JSON Schema and emit it
-		if glueSchema != "" {
+		// If we have a Glue schema that wasn't already emitted, convert it to JSON Schema and emit it
+		if glueSchema != "" && !schemaFromCache {
 			jsonSchema, err := avroToJSONSchema(glueSchema)
 			if err != nil {
-				log.WithError(err).Warn("failed to convert Avro schema to JSON Schema")
+				return fmt.Errorf("failed to convert avro to JSONSchema: %w", err)
 			} else {
 				schemaBytes, err := json.Marshal(jsonSchema)
 				if err != nil {
-					log.WithError(err).Warn("failed to marshal JSON Schema")
+					return fmt.Errorf("failed to marshal JSON Schema: %w", err)
 				} else {
 					if err := c.stream.SourcedSchema(bindingIndex, schemaBytes); err != nil {
 						return fmt.Errorf("emitting sourced schema: %w", err)

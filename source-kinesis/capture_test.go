@@ -42,14 +42,16 @@ func testConfig(t *testing.T) Config {
 			Region:             region,
 			AWSAccessKeyID:     os.Getenv("AWS_ACCESS_KEY_ID"),
 			AWSSecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
-			AWSSessionToken:    os.Getenv("AWS_SESSION_TOKEN"),
 		}
 	}
 
 	return Config{
-		Region:             "local",
+		Region:             "us-east-1",
 		AWSAccessKeyID:     "x",
 		AWSSecretAccessKey: "x",
+		Advanced: advancedConfig{
+			Endpoint: "http://localhost:4566",
+		},
 	}
 }
 
@@ -243,47 +245,24 @@ func TestCaptureParsing(t *testing.T) {
 }
 
 // testGlueConfig returns a config for Glue tests.
-// If AWS credentials are provided, it uses real AWS.
-// Otherwise, it attempts to use localstack and skips if Glue is not available.
+// Uses testConfig and additionally checks if Glue is available when using localstack.
 func testGlueConfig(t *testing.T) Config {
 	t.Helper()
-	if os.Getenv("TEST_DATABASE") != "yes" {
-		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
-	}
+	conf := testConfig(t)
 
-	if useRealAWS() {
-		region := os.Getenv("AWS_REGION")
-		if region == "" {
-			region = "us-east-1"
+	// If using localstack, check if Glue is available (requires Pro)
+	if !useRealAWS() {
+		ctx := context.Background()
+		glueClient, err := connectGlue(ctx, &conf)
+		if err != nil {
+			t.Skipf("skipping Glue test: unable to connect to Glue (localstack Pro required): %v", err)
 		}
-		return Config{
-			Region:             region,
-			AWSAccessKeyID:     os.Getenv("AWS_ACCESS_KEY_ID"),
-			AWSSecretAccessKey: os.Getenv("AWS_SECRET_ACCESS_KEY"),
-			AWSSessionToken:    os.Getenv("AWS_SESSION_TOKEN"),
+
+		// Try a simple Glue operation to verify it's actually working
+		_, err = glueClient.ListRegistries(ctx, &glue.ListRegistriesInput{})
+		if err != nil {
+			t.Skipf("skipping Glue test: Glue not available (localstack Pro required): %v", err)
 		}
-	}
-
-	// Using localstack - check if Glue is available (requires Pro)
-	conf := Config{
-		Region:             "local",
-		AWSAccessKeyID:     "x",
-		AWSSecretAccessKey: "x",
-	}
-
-	// Try to connect to Glue to check if it's available
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	glueClient, err := connectGlue(ctx, &conf)
-	if err != nil {
-		t.Skipf("skipping Glue test: unable to connect to Glue (localstack Pro required): %v", err)
-	}
-
-	// Try a simple Glue operation to verify it's actually working
-	_, err = glueClient.ListRegistries(ctx, &glue.ListRegistriesInput{})
-	if err != nil {
-		t.Skipf("skipping Glue test: Glue not available (localstack Pro required): %v", err)
 	}
 
 	return conf
@@ -366,7 +345,7 @@ func TestCaptureGlueSchema(t *testing.T) {
 	require.NoError(t, err, "failed to create stream")
 	awaitStreamActive(t, ctx, client, testStream)
 
-	// Small delay to ensure stream is fully propagated
+	// Small delay to ensure stream is fully propagated in AWS
 	time.Sleep(2 * time.Second)
 
 	resourceJson, err := json.Marshal(resource{

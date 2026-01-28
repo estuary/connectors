@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"slices"
 	"sync"
 	"time"
@@ -26,7 +27,6 @@ type Config struct {
 	Region             string `json:"region" jsonschema:"title=AWS Region,description=The name of the AWS region where the Kinesis stream is located"`
 	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=AWS Access Key ID,description=Part of the AWS credentials that will be used to connect to Kinesis"`
 	AWSSecretAccessKey string `json:"awsSecretAccessKey" jsonschema:"title=AWS Secret Access Key,description=Part of the AWS credentials that will be used to connect to Kinesis" jsonschema_extras:"secret=true"`
-	AWSSessionToken    string `json:"awsSessionToken,omitempty" jsonschema:"title=AWS Session Token,description=Optional session token for temporary credentials" jsonschema_extras:"secret=true"`
 
 	Advanced advancedConfig `json:"advanced,omitempty"`
 }
@@ -70,9 +70,12 @@ func getAwsCfg(ctx context.Context, cfg *Config) (*aws.Config, error) {
 		},
 	}
 
+	// Session token can be provided via environment variable for testing with temporary credentials
+	sessionToken := os.Getenv("AWS_SESSION_TOKEN")
+
 	opts := []func(*awsConfig.LoadOptions) error{
 		awsConfig.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, cfg.AWSSessionToken),
+			credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, sessionToken),
 		),
 		awsConfig.WithRegion(cfg.Region),
 		awsConfig.WithHTTPClient(httpClient),
