@@ -1,4 +1,5 @@
 pub mod server;
+pub mod signature;
 pub mod transactor;
 
 use std::collections::{HashMap, HashSet};
@@ -16,13 +17,11 @@ use proto_flow::{
     },
     flow::{capture_spec::Binding as ApplyBinding, CaptureSpec, CollectionSpec},
 };
-use schemars::{
-    gen,
-    schema::{self, RootSchema},
-    JsonSchema,
-};
+use schemars::{generate, JsonSchema, Schema};
 use serde::{Deserialize, Serialize};
 use tokio::io::{self, AsyncBufReadExt};
+
+pub use signature::{SignatureAlgorithm, WebhookSignatureConfig, WebhookSignatureVerifier};
 
 #[derive(Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "camelCase")]
@@ -58,6 +57,19 @@ pub struct EndpointConfig {
     #[serde(default)]
     #[schemars(default, schema_with = "cors_schema")]
     allowed_cors_origins: Vec<String>,
+
+    /// Configuration for verifying webhook signatures.
+    /// If set, incoming requests must include valid signature headers.
+    #[serde(default)]
+    #[schemars(
+        default = "signature_config_schema_default",
+        schema_with = "webhook_signature_schema"
+    )]
+    signature_config: WebhookSignatureConfig,
+}
+
+fn signature_config_schema_default() -> serde_json::Value {
+    serde_json::json!({ "provider": "none" })
 }
 
 /// Sets the default value that's used only in the JSON schema. This is _not_ the default that's used
@@ -67,7 +79,7 @@ fn paths_schema_default() -> Vec<String> {
     vec!["/webhook-data".to_string()]
 }
 
-fn paths_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
+fn paths_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
     serde_json::from_value(serde_json::json!({
         "title": "URL paths",
         "type": "array",
@@ -80,7 +92,7 @@ fn paths_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
     .unwrap()
 }
 
-fn cors_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
+fn cors_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
     // This schema is a little more permissive than would otherwise be ideal.
     // We'd like to use something like `oneOf: [{format: hostname}, {const: '*'}]`,
     // but the UI does not handle that construct well.
@@ -95,12 +107,117 @@ fn cors_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
     .unwrap()
 }
 
-fn require_auth_token_schema(_gen: &mut gen::SchemaGenerator) -> schema::Schema {
+fn require_auth_token_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
     serde_json::from_value(serde_json::json!({
         "title": "Authentication token",
         "type": ["string", "null"],
         "secret": true,
         "order": 2
+    }))
+    .unwrap()
+}
+
+fn webhook_signature_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
+    serde_json::from_value(serde_json::json!({
+        "title": "Signature Verification",
+        "description": "Configuration for verifying webhook signatures.",
+        "type": "object",
+        "order": 4,
+        "default": { "provider": "none" },
+        "discriminator": {
+            "propertyName": "provider"
+        },
+        "oneOf": [
+            {
+                "title": "None",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "const": "none",
+                        "default": "none",
+                        "order": 0
+                    }
+                },
+                "required": ["provider"]
+            },
+            {
+                "title": "Twilio SendGrid",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "const": "twilio",
+                        "default": "twilio",
+                        "order": 0
+                    },
+                    "publicKey": {
+                        "type": "string",
+                        "title": "Public Key",
+                        "description": "PEM-encoded ECDSA public key from Twilio SendGrid Event Webhook settings.",
+                        "secret": true,
+                        "multiline": true,
+                        "order": 1
+                    },
+                    "maxSignatureAge": {
+                        "type": "integer",
+                        "title": "Max Signature Age",
+                        "description": "Maximum age of a signed request in seconds before it is rejected. Defaults to 300 (5 minutes).",
+                        "default": 300,
+                        "minimum": 1,
+                        "maximum": 259200,
+                        "order": 2
+                    }
+                },
+                "required": ["provider", "publicKey"]
+            },
+            {
+                "title": "Custom",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "const": "custom",
+                        "default": "custom",
+                        "order": 0
+                    },
+                    "algorithm": {
+                        "type": "string",
+                        "title": "Algorithm",
+                        "enum": ["ecdsa"],
+                        "default": "ecdsa",
+                        "order": 1
+                    },
+                    "publicKey": {
+                        "type": "string",
+                        "title": "Public Key",
+                        "description": "PEM-encoded public key.",
+                        "secret": true,
+                        "multiline": true,
+                        "order": 2
+                    },
+                    "signatureHeader": {
+                        "type": "string",
+                        "title": "Signature Header",
+                        "description": "HTTP header containing the base64-encoded signature.",
+                        "order": 3
+                    },
+                    "timestampHeader": {
+                        "type": "string",
+                        "title": "Timestamp Header",
+                        "description": "Optional HTTP header containing the timestamp.",
+                        "order": 4
+                    },
+                    "maxSignatureAge": {
+                        "type": "integer",
+                        "title": "Max Signature Age",
+                        "description": "Maximum age of a signed request in seconds before it is rejected. Only applies when a Timestamp Header is configured. Defaults to 300 (5 minutes).",
+                        "default": 300,
+                        "minimum": 1,
+                        "maximum": 259200,
+                        "order": 5
+                    }
+                },
+                "required": ["provider", "algorithm", "publicKey", "signatureHeader"]
+            }
+        ]
     }))
     .unwrap()
 }
@@ -156,10 +273,25 @@ impl Binding {
 
 pub struct HttpIngestConnector {}
 
-fn schema_for<T: JsonSchema>() -> RootSchema {
-    schemars::gen::SchemaSettings::draft2019_09()
+fn schema_for<T: JsonSchema>() -> Schema {
+    schemars::generate::SchemaSettings::draft2019_09()
+        .with_transform(remove_default_from_objects)
         .into_generator()
         .into_root_schema_for::<T>()
+}
+
+/// Removes "default": null from schemas that have "type": "object".
+/// This is needed because schemars adds "default": null for Option<T> fields
+/// with #[serde(default)], which causes UI issues when combined with "type": "object".
+fn remove_default_from_objects(schema: &mut Schema) {
+    if let Some(serde_json::Value::String(t)) = schema.get("type") {
+        if t == "object" {
+            if let Some(serde_json::Value::Null) = schema.get("default") {
+                schema.remove("default");
+            }
+        }
+    }
+    schemars::transform::transform_subschemas(&mut remove_default_from_objects, schema);
 }
 
 pub async fn run_connector(
@@ -362,6 +494,9 @@ async fn do_validate(
     let _ = server::parse_cors_allowed_origins(&config.allowed_cors_origins)
         .context("invalid allowedCorsOrigins value")?;
 
+    // Ensure that signature verification keys are valid
+    let _: Box<dyn WebhookSignatureVerifier> = config.signature_config.try_into()?;
+
     let response = Response {
         validated: Some(Validated { bindings: output }),
         ..Default::default()
@@ -515,6 +650,7 @@ mod test {
             require_auth_token: None,
             paths: vec!["/foo".to_string(), "/bar/baz".to_string()],
             allowed_cors_origins: Vec::new(),
+            signature_config: WebhookSignatureConfig::default(),
         };
         let result = generate_discover_response(config).unwrap();
         insta::assert_json_snapshot!(result);
