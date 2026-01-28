@@ -54,14 +54,79 @@ For example, to capture webhooks from Segment, you'll want to set the `key` to `
 
 ### Webhook signature verification
 
-This connector does not yet support webhook signature verification. If this is a requirement for your use case, please contact [`support@estuary.dev`](mailto://support@estuary.dev) and let us know.
+This connector supports ECDSA P-256 signature verification for webhook providers. Configuration varies by provider.
+
+#### Twilio SendGrid
+
+For Twilio SendGrid webhooks, use the streamlined configuration that only requires your verification key:
+
+```json
+{
+  "signatureConfig": {
+    "provider": "twilio",
+    "publicKey": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----"
+  }
+}
+```
+
+The verification key can be found in your SendGrid Event Webhook settings.
+
+#### Custom Providers
+
+For other webhook providers that use ECDSA P-256 signatures, use the "custom" configuration to specify custom headers:
+
+```json
+{
+  "signatureConfig": {
+    "provider": "custom",
+    "algorithm": "ecdsa",
+    "publicKey": "-----BEGIN PUBLIC KEY-----\n...\n-----END PUBLIC KEY-----",
+    "signatureHeader": "X-Custom-Signature",
+    "timestampHeader": "X-Custom-Timestamp"
+  }
+}
+```
+
+- **provider**: Set to `"custom"` for custom configuration
+- **algorithm**: The signature algorithm (currently only `"ecdsa"` is supported)
+- **publicKey**: PEM-encoded ECDSA P-256 public key from your webhook provider
+- **signatureHeader**: HTTP header containing the base64-encoded DER signature
+- **timestampHeader**: (optional) HTTP header containing the timestamp to prepend to the body before verification
+
+When configured, requests missing valid signatures will be rejected with a 401 Unauthorized response.
+
+If your use case requires a different verification scheme, please contact [`support@estuary.dev`](mailto://support@estuary.dev) and let us know.
 
 ## Endpoint Configuration reference
 
 | Property | Title | Description | Type | Required/Default |
 |---|---|---|---|---|
 | **** | EndpointConfig |  | object | Required |
-| `/require_auth_token` |  | Optional bearer token to authenticate webhook requests.<br><br>WARNING: If this is empty or unset, then anyone who knows the URL of the connector will be able to write data to your collections. | null, string | `null` |
+| `/requireAuthToken` | Authentication token | Optional bearer token to authenticate webhook requests.<br><br>WARNING: If this is empty or unset, then anyone who knows the URL of the connector will be able to write data to your collections. | null, string | `null` |
+| `/signatureConfig` | Signature Verification | Configuration for verifying webhook signatures. | object | `{"provider": "none"}` |
+
+### Signature Config: None
+
+| Property | Title | Description | Type | Required/Default |
+|---|---|---|---|---|
+| `/signatureConfig/provider` |  | Provider identifier | string | Required (`"none"`) |
+
+### Signature Config: Twilio SendGrid
+
+| Property | Title | Description | Type | Required/Default |
+|---|---|---|---|---|
+| `/signatureConfig/provider` |  | Provider identifier | string | Required (`"twilio"`) |
+| `/signatureConfig/publicKey` | Verification Key | PEM-encoded ECDSA public key from Twilio SendGrid Event Webhook settings. | string | Required |
+
+### Signature Config: Custom
+
+| Property | Title | Description | Type | Required/Default |
+|---|---|---|---|---|
+| `/signatureConfig/provider` |  | Provider identifier | string | Required (`"custom"`) |
+| `/signatureConfig/algorithm` | Algorithm | The signature verification algorithm. | string | Required (`"ecdsa"`) |
+| `/signatureConfig/publicKey` | Public Key | PEM-encoded public key. | string | Required |
+| `/signatureConfig/signatureHeader` | Signature Header | HTTP header containing the base64-encoded signature. | string | Required |
+| `/signatureConfig/timestampHeader` | Timestamp Header | Optional HTTP header containing the timestamp. | string | `null` |
 
 ## Resource configuration reference
 
@@ -70,5 +135,4 @@ This connector does not yet support webhook signature verification. If this is a
 | **** | ResourceConfig |  | object | Required |
 | `/idFromHeader` |  | Set the &#x2F;&#x5F;meta&#x2F;webhookId from the given HTTP header in each request.<br><br>If not set, then a random id will be generated automatically. If set, then each request will be required to have the header, and the header value will be used as the value of &#x60;&#x2F;&#x5F;meta&#x2F;webhookId&#x60;. | null, string |  |
 | `/path` |  | The URL path to use for adding documents to this binding. Defaults to the name of the collection. | null, string |  |
-
 
