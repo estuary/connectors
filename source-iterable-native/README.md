@@ -26,6 +26,11 @@ Some endpoints have different rate limits that aren't (currently) managed by the
 
 The connector manually sleeps between requests to these endpoints to avoid hitting rate limits.
 
+
+### `/lists/getUsers` challenges
+
+The `/lists/getUsers` endpoint has limitations that make capturing data from it challenging. It has a restrictive 5 requests per minute rate limit. The response includes all users in a list, and it can take the Iterable API multiple minutes to respond with all user ids; we've observed responses take 80+ minutes for lists with over a million users. There's no pagination, so all users must be fetched in a single request, and the ordering of users within the response is non-deterministic.
+
 ---
 
 ## Design Decisions
@@ -61,3 +66,29 @@ The connector conditionally fetches metrics for campaigns depending on the campa
 - **Pre-launch campaigns** (Draft, Recurring, Scheduled): Skipped (no metrics)
 - **In-progress campaigns** (Ready, Running, Recalling): Always fetched
 - **Final state campaigns** (Aborted, Archived, Finished, Recalled): Fetched if the campaign ended within 15 days to capture late-arriving attributions
+
+### `list_users` Stream
+
+The `list_users` stream captures list membership data (which users belong to which lists) via the `/lists/getUsers` endpoint. This endpoint has [challenging API limitations](#listsgetusers-challenges) that make snapshotting the entire set of lists' users unfeasible; the snapshot would take hours to days to complete, and would prevent the connector from gracefully exiting in a timely manner.
+
+#### Incremental Capture Design
+
+So instead of a snapshot, `list_users` uses a custom incremental task that relaxes some of the safeguards the CDK has in place. The custom incremental task cycles through all lists, fetching a single list's users on each invocation.
+
+The custom incremental task relaxes the following CDK safeguards:
+- requiring yielded incremental `LogCursor`s to be the same type
+- require sequential `LogCursors` to be strictly increasing
+
+It's not obvious that relaxing these safeguards is a wise CDK-wide change, so for now these safeguards are only relaxed for this connector's `list_users` stream.
+
+#### Cursor Format
+
+The stream uses a mixed cursor strategy:
+
+- **datetime cursor**: Cycle complete, sleep until next interval
+- **tuple cursor**: Mid-cycle checkpoint containing `("{cycle_start}|{last_list_id}",)`.
+
+
+#### Retry and Deduplication
+
+Because responses can take 80+ minutes and may fail mid-stream, the connector retries failed requests up to three times and tracks emitted user IDs in memory in order to deduplicate after a retry.
