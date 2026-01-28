@@ -9,19 +9,78 @@
         "description": "Google Cloud Project ID that owns the BigQuery dataset(s).",
         "order": 0
       },
-      "credentials_json": {
-        "type": "string",
-        "title": "Service Account JSON",
-        "description": "The JSON credentials of the service account to use for authorization.",
-        "multiline": true,
-        "order": 1,
-        "secret": true
-      },
       "dataset": {
         "type": "string",
         "title": "Dataset",
         "description": "BigQuery dataset to discover tables within.",
         "order": 2
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-bigquery-batch/credentials-json-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "CredentialsJSON",
+                "default": "CredentialsJSON",
+                "order": 0
+              },
+              "credentials_json": {
+                "type": "string",
+                "title": "Service Account JSON",
+                "description": "The JSON credentials of the service account to use for authorization.",
+                "multiline": true,
+                "order": 0,
+                "secret": true
+              }
+            },
+            "type": "object",
+            "required": [
+              "credentials_json"
+            ],
+            "title": "Credentials JSON"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/gcp-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "GCPIAM",
+                "default": "GCPIAM",
+                "order": 0
+              },
+              "gcp_service_account_to_impersonate": {
+                "type": "string",
+                "title": "Service Account",
+                "description": "GCP Service Account email for Cloud SQL IAM authentication"
+              },
+              "gcp_workload_identity_pool_audience": {
+                "type": "string",
+                "title": "Workload Identity Pool Audience",
+                "description": "GCP Workload Identity Pool Audience in the format //iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"
+              }
+            },
+            "type": "object",
+            "required": [
+              "gcp_service_account_to_impersonate",
+              "gcp_workload_identity_pool_audience"
+            ],
+            "title": "GCP IAM"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "default": {
+          "auth_type": "CredentialsJSON"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
+        "order": 3,
+        "x-iam-auth": true
       },
       "advanced": {
         "properties": {
@@ -57,8 +116,8 @@
     "type": "object",
     "required": [
       "project_id",
-      "credentials_json",
-      "dataset"
+      "dataset",
+      "credentials"
     ],
     "title": "Batch BigQuery"
   },
