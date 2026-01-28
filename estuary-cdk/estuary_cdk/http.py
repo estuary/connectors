@@ -98,7 +98,7 @@ class HTTPSession(abc.ABC):
      * `json` is a JSON-encoded request body (if set, `form` cannot be)
      * `form` is a form URL-encoded request body (if set, `json` cannot be)
      * `should_retry` determines whether 5xx errors are retried or bubbled up. If not provided, all 5xx errors are retried.
-     * `timeout` is an aiohttp.ClientTimeout for the request. If not provided, the default aiohttp timeout is used.
+     * `timeout` is an aiohttp.ClientTimeout for the request. If not provided, the default aiohttp session timeout is used.
     """
 
     async def request(
@@ -509,6 +509,10 @@ class HTTPMixin(Mixin, HTTPSession):
             )
             headers[self.token_source.authorization_header] = header_value
 
+        # Only pass timeout if explicitly provided. Otherwise, omit the
+        # timeout argument and rely on the session's default timeout.
+        optional_kwargs: dict[str, Any] = {"timeout": timeout} if timeout is not None else {}
+
         resp = await self.inner.request(
             headers=headers,
             json=json,
@@ -516,7 +520,7 @@ class HTTPMixin(Mixin, HTTPSession):
             method=method,
             params=params,
             url=url,
-            timeout=timeout,
+            **optional_kwargs,
         )
 
         return resp
