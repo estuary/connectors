@@ -3,20 +3,26 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
 	"strings"
 	"text/template"
 
+	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
+	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	networkTunnel "github.com/estuary/connectors/go/network-tunnel"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/invopop/jsonschema"
 	mssqldb "github.com/microsoft/go-mssqldb"
 	log "github.com/sirupsen/logrus"
 	"go.gazette.dev/core/consumer/protocol"
@@ -25,6 +31,56 @@ import (
 var featureFlagDefaults = map[string]bool{
 	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
+}
+
+type AuthType string
+
+const (
+	UserPassword AuthType = "UserPassword"
+	AWSIAM       AuthType = "AWSIAM"
+	AzureIAM     AuthType = "AzureIAM"
+)
+
+type UserPasswordConfig struct {
+	Password string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=1"`
+}
+
+type CredentialsConfig struct {
+	AuthType AuthType `json:"auth_type"`
+
+	UserPasswordConfig
+	iam.IAMConfig
+}
+
+func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
+	subSchemas := []schemagen.OneOfSubSchemaT{
+		schemagen.OneOfSubSchema("Password", UserPasswordConfig{}, string(UserPassword)),
+	}
+	subSchemas = append(subSchemas,
+		schemagen.OneOfSubSchema("AWS IAM", iam.AWSConfig{}, string(AWSIAM)))
+	subSchemas = append(subSchemas,
+		schemagen.OneOfSubSchema("Azure IAM", iam.AzureConfig{}, string(AzureIAM)))
+
+	schema := schemagen.OneOfSchema("Authentication", "", "auth_type", string(UserPassword), subSchemas...)
+	return schema
+}
+
+func (c *CredentialsConfig) Validate() error {
+	switch c.AuthType {
+	case UserPassword:
+		if c.Password == "" {
+			return errors.New("missing 'password'")
+		}
+		return nil
+	case AWSIAM:
+		fallthrough
+	case AzureIAM:
+		if err := c.ValidateIAM(); err != nil {
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("unknown 'auth_type'")
 }
 
 type sshForwarding struct {
@@ -43,12 +99,13 @@ type advancedConfig struct {
 
 // config represents the endpoint configuration for sql server.
 type config struct {
-	Address    string `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 1433 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
-	User       string `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
-	Password   string `json:"password" jsonschema:"title=Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
-	Database   string `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
-	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
-	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+	Address     string             `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 1433 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
+	User        string             `json:"user" jsonschema:"title=User,description=Database user to connect as." jsonschema_extras:"order=1"`
+	Password    string             `json:"password" jsonschema:"-" jsonschema_extras:"secret=true,order=2"`
+	Database    string             `json:"database" jsonschema:"title=Database,description=Name of the logical database to materialize to." jsonschema_extras:"order=3"`
+	Schema      string             `json:"schema,omitempty" jsonschema:"title=Database Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=4"`
+	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=5"`
+	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,x-iam-azure-scope=https://database.windows.net/.default,order=6"`
 
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
@@ -62,13 +119,20 @@ func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"address", c.Address},
 		{"user", c.User},
-		{"password", c.Password},
 		{"database", c.Database},
 	}
 	for _, req := range requiredProperties {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	if c.Credentials == nil {
+		if c.Password == "" {
+			return errors.New("missing 'password'")
+		}
+	} else if err := c.Credentials.Validate(); err != nil {
+		return err
 	}
 
 	if err := c.DBTJobTrigger.Validate(); err != nil {
@@ -89,7 +153,7 @@ func (c config) FeatureFlags() (string, map[string]bool) {
 const defaultPort = "1433"
 
 // ToURI converts the Config to a DSN string.
-func (c *config) ToURI() string {
+func (c *config) ToURI() *url.URL {
 	var address = c.Address
 	// If SSH Tunnel is configured, we are going to create a tunnel from localhost:1433
 	// to address through the bastion server, so we use the tunnel's address
@@ -109,14 +173,68 @@ func (c *config) ToURI() string {
 	params.Add("TrustServerCertificate", "true")
 	params.Add("database", c.Database)
 
-	var uri = url.URL{
+	userInfo := url.UserPassword(c.User, c.Password)
+	if c.Credentials != nil {
+		switch c.Credentials.AuthType {
+		case UserPassword:
+			pass := c.Credentials.Password
+			userInfo = url.UserPassword(c.User, pass)
+		case AWSIAM:
+			userInfo = url.User(c.User)
+		case AzureIAM:
+			userInfo = nil
+		}
+	}
+
+	var uri = &url.URL{
 		Scheme:   "sqlserver",
 		Host:     address,
-		User:     url.UserPassword(c.User, c.Password),
+		User:     userInfo,
 		RawQuery: params.Encode(),
 	}
 
-	return uri.String()
+	return uri
+}
+
+// ToSQLConnector converts the Config to a sql Connector for use with OpenDB.
+func (c *config) ToSQLConnector(ctx context.Context) (driver.Connector, error) {
+	uri := c.ToURI()
+
+	if c.Credentials != nil {
+		switch c.Credentials.AuthType {
+		case AWSIAM:
+			credProvider, err := c.Credentials.AWSCredentialsProvider()
+			if err != nil {
+				return nil, err
+			}
+
+			// In the case of a network tunnel, we want to use the RDS Proxy
+			// endpoint when building the token.
+			endpoint := c.Address
+			if !strings.Contains(endpoint, ":") {
+				endpoint = endpoint + ":" + defaultPort
+			}
+
+			tokenProvider := func(ctx context.Context) (string, error) {
+				token, err := auth.BuildAuthToken(
+					ctx,
+					endpoint,
+					c.Credentials.AWSRegion,
+					c.User,
+					credProvider)
+				return token, err
+			}
+
+			return mssqldb.NewConnectorWithAccessTokenProvider(uri.String(), tokenProvider)
+		case AzureIAM:
+			token := c.Credentials.AzureToken()
+			return mssqldb.NewAccessTokenConnector(uri.String(), func() (string, error) {
+				return token, nil
+			})
+		}
+	}
+
+	return mssqldb.NewConnector(uri.String())
 }
 
 type tableConfig struct {
@@ -191,10 +309,13 @@ func newSqlServerDriver() *sql.Driver[config, tableConfig] {
 			if cfg.Schema != "" {
 				metaBase = append(metaBase, cfg.Schema)
 			}
-			db, err := stdsql.Open("sqlserver", cfg.ToURI())
+
+			connector, err := cfg.ToSQLConnector(ctx)
 			if err != nil {
-				return nil, fmt.Errorf("opening db: %w", err)
+				return nil, err
 			}
+
+			db := stdsql.OpenDB(connector)
 			defer db.Close()
 
 			collation, err := getCollation(ctx, db)
@@ -266,15 +387,18 @@ func prepareNewTransactor(
 		var d = &transactor{templates: templates, cfg: cfg, be: be}
 		d.store.fence = fence
 
+		connector, err := ep.Config.ToSQLConnector(ctx)
+		if err != nil {
+			return nil, err
+		}
+
 		// Establish connections.
-		if db, err := stdsql.Open("sqlserver", cfg.ToURI()); err != nil {
-			return nil, fmt.Errorf("load sql.Open: %w", err)
-		} else if d.load.conn, err = db.Conn(ctx); err != nil {
+		db := stdsql.OpenDB(connector)
+		if d.load.conn, err = db.Conn(ctx); err != nil {
 			return nil, fmt.Errorf("load db.Conn: %w", err)
 		}
-		if db, err := stdsql.Open("sqlserver", cfg.ToURI()); err != nil {
-			return nil, fmt.Errorf("store sql.Open: %w", err)
-		} else if d.store.conn, err = db.Conn(ctx); err != nil {
+
+		if d.store.conn, err = db.Conn(ctx); err != nil {
 			return nil, fmt.Errorf("store db.Conn: %w", err)
 		}
 

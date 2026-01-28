@@ -15,13 +15,6 @@
         "description": "Database user to connect as.",
         "order": 1
       },
-      "password": {
-        "type": "string",
-        "title": "Password",
-        "description": "Password for the specified database user.",
-        "order": 2,
-        "secret": true
-      },
       "database": {
         "type": "string",
         "title": "Database",
@@ -40,6 +33,101 @@
         "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
         "default": false,
         "order": 5
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/materialize-sqlserver/user-password-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "UserPassword",
+                "default": "UserPassword",
+                "order": 0
+              },
+              "password": {
+                "type": "string",
+                "title": "Password",
+                "description": "Password for the specified database user.",
+                "order": 1,
+                "secret": true
+              }
+            },
+            "type": "object",
+            "required": [
+              "password"
+            ],
+            "title": "Password"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/aws-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AWSIAM",
+                "default": "AWSIAM",
+                "order": 0
+              },
+              "aws_region": {
+                "type": "string",
+                "title": "AWS Region",
+                "description": "AWS Region of your resource"
+              },
+              "aws_role_arn": {
+                "type": "string",
+                "title": "AWS Role ARN",
+                "description": "AWS Role which has access to the resource which will be assumed by Flow"
+              }
+            },
+            "type": "object",
+            "required": [
+              "aws_region",
+              "aws_role_arn"
+            ],
+            "title": "AWS IAM"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/azure-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AzureIAM",
+                "default": "AzureIAM",
+                "order": 0
+              },
+              "azure_client_id": {
+                "type": "string",
+                "title": "Azure Client ID",
+                "description": "Azure App Registration Client ID for Azure Active Directory authentication"
+              },
+              "azure_tenant_id": {
+                "type": "string",
+                "title": "Azure Tenant ID",
+                "description": "Azure Tenant ID for Azure Active Directory authentication"
+              }
+            },
+            "type": "object",
+            "required": [
+              "azure_client_id",
+              "azure_tenant_id"
+            ],
+            "title": "Azure IAM"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "default": {
+          "auth_type": "UserPassword"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
+        "order": 6,
+        "x-iam-auth": true,
+        "x-iam-azure-scope": "https://database.windows.net/.default"
       },
       "dbt_job_trigger": {
         "properties": {
@@ -155,8 +243,8 @@
     "required": [
       "address",
       "user",
-      "password",
-      "database"
+      "database",
+      "credentials"
     ],
     "title": "SQL Connection"
   },
