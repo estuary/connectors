@@ -19,12 +19,6 @@
         "description": "Part of the AWS credentials that will be used to connect to Kinesis",
         "secret": true
       },
-      "awsSessionToken": {
-        "type": "string",
-        "title": "AWS Session Token",
-        "description": "Optional session token for temporary credentials",
-        "secret": true
-      },
       "advanced": {
         "properties": {
           "endpoint": {
