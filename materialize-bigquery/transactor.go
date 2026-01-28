@@ -20,7 +20,6 @@ import (
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 )
 
 type checkpointItem struct {
@@ -71,7 +70,12 @@ func prepareNewTransactor(
 			return nil, err
 		}
 
-		bucket, err := blob.NewGCSBucket(ctx, cfg.Bucket, option.WithCredentialsJSON([]byte(cfg.CredentialsJSON)))
+		credOption, err := cfg.CredentialsClientOption()
+		if err != nil {
+			return nil, err
+		}
+
+		bucket, err := blob.NewGCSBucket(ctx, cfg.Bucket, credOption)
 		if err != nil {
 			return nil, fmt.Errorf("creating GCS bucket: %w", err)
 		}

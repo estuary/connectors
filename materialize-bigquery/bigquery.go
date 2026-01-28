@@ -3,38 +3,95 @@ package connector
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
 	"cloud.google.com/go/bigquery"
+	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
+	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
 	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
 )
 
 var featureFlagDefaults = map[string]bool{
 	// When set, object and array field types will be materialized as JSON
 	// columns, instead of the historical behavior of strings.
-	"objects_and_arrays_as_json": true,
-	"datetime_keys_as_string":    true,
+	"objects_and_arrays_as_json":       true,
+	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
 }
 
+type AuthType string
+
+const (
+	CredentialsJSON AuthType = "CredentialsJSON"
+	GCPIAM          AuthType = "GCPIAM"
+)
+
+type CredentialsJSONConfig struct {
+	CredentialsJSON string `json:"credentials_json" jsonschema:"title=Service Account JSON,description=The JSON credentials of the service account to use for authorization." jsonschema_extras:"secret=true,multiline=true,order=0"`
+}
+
+type CredentialsConfig struct {
+	AuthType AuthType `json:"auth_type"`
+
+	CredentialsJSONConfig
+	iam.IAMConfig
+}
+
+func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
+	subSchemas := []schemagen.OneOfSubSchemaT{
+		schemagen.OneOfSubSchema("Credentials JSON", CredentialsJSONConfig{}, string(CredentialsJSON)),
+	}
+	subSchemas = append(subSchemas,
+		schemagen.OneOfSubSchema("GCP IAM", iam.GCPConfig{}, string(GCPIAM)))
+
+	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(CredentialsJSON), subSchemas...)
+}
+
+func (c *CredentialsConfig) Validate() error {
+	switch c.AuthType {
+	case CredentialsJSON:
+		if c.CredentialsJSON == "" {
+			return errors.New("missing 'credentials_json'")
+		}
+
+		// Sanity check: Are the provided credentials valid JSON? A common error is to upload
+		// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
+		// directly to bigquery.NewClient.
+		if !json.Valid([]byte(c.CredentialsJSON)) {
+			return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
+		}
+		return nil
+	case GCPIAM:
+		if err := c.ValidateIAM(); err != nil {
+			return err
+		}
+		return nil
+	}
+	return fmt.Errorf("unknown 'auth_type'")
+}
+
 type config struct {
-	ProjectID        string           `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset." jsonschema_extras:"order=0"`
-	CredentialsJSON  string           `json:"credentials_json" jsonschema:"title=Service Account JSON,description=The JSON credentials of the service account to use for authorization." jsonschema_extras:"secret=true,multiline=true,order=1"`
-	Region           string           `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region." jsonschema_extras:"order=2"`
-	Dataset          string           `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=3"`
-	Bucket           string           `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery." jsonschema_extras:"order=4"`
-	BucketPath       string           `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket." jsonschema_extras:"order=5"`
-	BillingProjectID string           `json:"billing_project_id,omitempty" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. Defaults to Project ID if not specified." jsonschema_extras:"order=6"`
-	HardDelete       bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=7"`
-	Schedule         m.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
-	DBTJobTrigger    dbt.JobConfig    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt job when new data is available"`
+	ProjectID        string             `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset." jsonschema_extras:"order=0"`
+	CredentialsJSON  string             `json:"credentials_json" jsonschema:"-" jsonschema_extras:"secret=true,multiline=true,order=1"`
+	Region           string             `json:"region" jsonschema:"title=Region,description=Region where both the Bucket and the BigQuery dataset is located. They both need to be within the same region." jsonschema_extras:"order=2"`
+	Dataset          string             `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables." jsonschema_extras:"order=3"`
+	Bucket           string             `json:"bucket" jsonschema:"title=Bucket,description=Google Cloud Storage bucket that is going to be used to store specfications & temporary data before merging into BigQuery." jsonschema_extras:"order=4"`
+	BucketPath       string             `json:"bucket_path,omitempty" jsonschema:"title=Bucket Path,description=A prefix that will be used to store objects to Google Cloud Storage's bucket." jsonschema_extras:"order=5"`
+	BillingProjectID string             `json:"billing_project_id,omitempty" jsonschema:"title=Billing Project ID,description=Billing Project ID connected to the BigQuery dataset. Defaults to Project ID if not specified." jsonschema_extras:"order=6"`
+	HardDelete       bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=7"`
+	Credentials      *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=8"`
+	Schedule         m.ScheduleConfig   `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	DBTJobTrigger    dbt.JobConfig      `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt job when new data is available"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
@@ -48,7 +105,6 @@ type advancedConfig struct {
 func (c config) Validate() error {
 	var requiredProperties = [][]string{
 		{"project_id", c.ProjectID},
-		{"credentials_json", c.CredentialsJSON},
 		{"dataset", c.Dataset},
 		{"region", c.Region},
 		{"bucket", c.Bucket},
@@ -59,11 +115,15 @@ func (c config) Validate() error {
 		}
 	}
 
-	// Sanity check: Are the provided credentials valid JSON? A common error is to upload
-	// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
-	// directly to bigquery.NewClient.
-	if !json.Valid([]byte(c.CredentialsJSON)) {
-		return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
+	if c.Credentials == nil {
+		// Sanity check: Are the provided credentials valid JSON? A common error is to upload
+		// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
+		// directly to bigquery.NewClient.
+		if !json.Valid([]byte(c.CredentialsJSON)) {
+			return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
+		}
+	} else if err := c.Credentials.Validate(); err != nil {
+		return err
 	}
 
 	if err := c.Schedule.Validate(); err != nil {
@@ -83,11 +143,31 @@ func (c config) effectiveBucketPath() string {
 	return strings.TrimPrefix(c.BucketPath, "/")
 }
 
+func (c config) CredentialsClientOption() (option.ClientOption, error) {
+	if c.Credentials == nil {
+		return option.WithCredentialsJSON([]byte(c.CredentialsJSON)), nil
+	}
+
+	switch c.Credentials.AuthType {
+	case CredentialsJSON:
+		return option.WithCredentialsJSON([]byte(c.Credentials.CredentialsJSON)), nil
+	case GCPIAM:
+		return option.WithTokenSource(oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: c.Credentials.GoogleToken()},
+		)), nil
+	}
+	return nil, fmt.Errorf("unknown 'auth_type'")
+}
+
 func (c config) client(ctx context.Context, ep *sql.Endpoint[config]) (*client, error) {
 	var clientOpts []option.ClientOption
 
+	credOption, err := c.CredentialsClientOption()
+	if err != nil {
+		return nil, err
+	}
 	clientOpts = append(clientOpts,
-		option.WithCredentialsJSON([]byte(c.CredentialsJSON)),
+		credOption,
 		option.WithUserAgent("EstuaryFlow (GPN:Estuary;)"),
 	)
 
