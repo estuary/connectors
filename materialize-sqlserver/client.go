@@ -28,10 +28,12 @@ type client struct {
 }
 
 func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
-	db, err := stdsql.Open("sqlserver", ep.Config.ToURI())
+	connector, err := ep.Config.ToSQLConnector(ctx)
 	if err != nil {
 		return nil, err
 	}
+
+	db := stdsql.OpenDB(connector)
 
 	return &client{
 		db: db,
@@ -42,11 +44,13 @@ func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error
 func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	db, err := stdsql.Open("sqlserver", cfg.ToURI())
+	connector, err := cfg.ToSQLConnector(ctx)
 	if err != nil {
 		errs.Err(err)
 		return errs
 	}
+
+	db := stdsql.OpenDB(connector)
 
 	// Use a reasonable timeout for this connection test. It is not uncommon for a misconfigured
 	// connection (wrong host, wrong port, etc.) to hang for several minutes on Ping and we want to
