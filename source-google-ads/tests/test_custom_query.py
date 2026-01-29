@@ -41,7 +41,7 @@ def test_get_json_schema():
     })
     instance = CustomQueryMixin(config={
         'query': Obj(fields=['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j']),
-        'primary_key': '',
+        'primary_key': 'a',
     })
     instance.cursor_field = None
     instance.google_ads_client = Obj(get_fields_metadata=query_object)
@@ -62,12 +62,13 @@ def test_get_json_schema():
             'h': {'type': ['null', 'array'], 'items': {'type': 'integer'}},
             'i': {'type': ['null', 'array'], 'items': {'type': 'number'}},
             'j': {'type': ['null', 'array'], 'items': {'type': 'boolean'}},
-        }
+        },
+        'required': ['a'],
     }
 
 
 def test_get_json_schema_primary_keys_not_nullable():
-    """Primary key fields should not have null in their type."""
+    """Primary key fields should not have null in their type and must be required."""
     query_object = MagicMock(return_value={
         'a': Obj(data_type=Obj(name='ENUM'), is_repeated=False, enum_values=['a', 'aa']),
         'b': Obj(data_type=Obj(name='ENUM'), is_repeated=True,  enum_values=['b', 'bb']),
@@ -103,5 +104,6 @@ def test_get_json_schema_primary_keys_not_nullable():
             'h': {'type': 'array', 'items': {'type': 'integer'}},
             'i': {'type': 'array', 'items': {'type': 'number'}},
             'j': {'type': 'array', 'items': {'type': 'boolean'}},
-        }
+        },
+        'required': ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'],
     }
