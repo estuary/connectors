@@ -5515,6 +5515,10 @@
         }
       },
       "additionalProperties": true,
+      "required": [
+        "customer.id",
+        "segments.date"
+      ],
       "x-infer-schema": true
     },
     "key": [

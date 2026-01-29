@@ -45,6 +45,7 @@ class CustomQueryMixin:
             "type": "object",
             "properties": {},
             "additionalProperties": True,
+            "required": [],
         }
         # full list {'ENUM', 'STRING', 'DATE', 'DOUBLE', 'RESOURCE_NAME', 'INT32', 'INT64', 'BOOLEAN', 'MESSAGE'}
 
@@ -95,7 +96,7 @@ class CustomQueryMixin:
 
             local_json_schema["properties"][field] = field_value
 
-        # Primary key fields should not be nullable
+        # Primary key fields should not be nullable and must be required
         for pk in self.primary_key:
             if pk in local_json_schema["properties"]:
                 prop = local_json_schema["properties"][pk]
@@ -103,6 +104,7 @@ class CustomQueryMixin:
                 if isinstance(field_type, list) and "null" in field_type:
                     non_null_types = [t for t in field_type if t != "null"]
                     prop["type"] = non_null_types[0] if len(non_null_types) == 1 else non_null_types
+                local_json_schema["required"].append(pk)
 
         return local_json_schema
 
