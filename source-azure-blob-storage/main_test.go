@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -41,10 +42,12 @@ func TestAzureBlobStore_newAzureBlobStore(t *testing.T) {
 
 func TestAzureBlobStore_getConfigSchema(t *testing.T) {
 	parserJsonSchema := []byte(`{"type": "object", "properties": {"name": {"type": "string"}}}`)
+	data := getConfigSchema(parserJsonSchema)
 
-	result := getConfigSchema(parserJsonSchema)
+	formatted, err := json.MarshalIndent(data, "", "  ")
+	require.NoError(t, err)
 
-	cupaloy.SnapshotT(t, string(result))
+	cupaloy.SnapshotT(t, string(formatted))
 }
 
 func TestAzureBlobStore_List(t *testing.T) {
