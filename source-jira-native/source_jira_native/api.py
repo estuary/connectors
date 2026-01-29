@@ -896,7 +896,9 @@ def _build_jql(
     # Otherwise, omitting the `project in (p1,p2,...)` is the same as requesting
     # issues for all projects.
     if projects:
-        projects_jql = f"project in ({projects})"
+        # Quote each project key to handle reserved JQL keywords (e.g., "TO", "AND", "OR").
+        quoted_projects = ",".join(f'"{p}"' for p in projects.split(","))
+        projects_jql = f"project in ({quoted_projects})"
         jql_components.append(projects_jql)
 
     if additional_jql:
