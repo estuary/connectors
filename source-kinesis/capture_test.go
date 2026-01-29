@@ -406,6 +406,138 @@ func TestCaptureGlueSchema(t *testing.T) {
 	cupaloy.SnapshotT(t, capture.Summary())
 }
 
+func TestCaptureGlueSchemaJSON(t *testing.T) {
+	ctx := context.Background()
+
+	conf := testGlueConfig(t)
+	client, err := connect(ctx, &conf)
+	require.NoError(t, err)
+
+	glueClient, err := connectGlue(ctx, &conf)
+	require.NoError(t, err)
+
+	// Use unique names when testing against real AWS to avoid conflicts
+	suffix := ""
+	if useRealAWS() {
+		suffix = fmt.Sprintf("-%d", time.Now().UnixNano())
+	}
+	testStream := "test-stream-glue-json" + suffix
+	registryName := "test-registry-json" + suffix
+	schemaName := "test-schema-json" + suffix
+
+	cleanup := func() {
+		_, _ = client.DeleteStream(ctx, &kinesis.DeleteStreamInput{StreamName: aws.String(testStream)})
+		_, _ = glueClient.DeleteSchema(ctx, &glue.DeleteSchemaInput{
+			SchemaId: &glueTypes.SchemaId{
+				RegistryName: aws.String(registryName),
+				SchemaName:   aws.String(schemaName),
+			},
+		})
+		_, _ = glueClient.DeleteRegistry(ctx, &glue.DeleteRegistryInput{
+			RegistryId: &glueTypes.RegistryId{
+				RegistryName: aws.String(registryName),
+			},
+		})
+	}
+	cleanup()
+	t.Cleanup(cleanup)
+
+	// Wait for stream to be fully deleted if it existed
+	awaitStreamDeleted(t, ctx, client, testStream)
+
+	// Create Glue schema registry
+	_, err = glueClient.CreateRegistry(ctx, &glue.CreateRegistryInput{
+		RegistryName: aws.String(registryName),
+	})
+	require.NoError(t, err, "failed to create glue registry")
+
+	// Create a JSON Schema in Glue
+	jsonSchema := `{
+		"type": "object",
+		"properties": {
+			"id": {"type": "integer"},
+			"name": {"type": "string"},
+			"value": {"type": "number"}
+		},
+		"required": ["id", "name"]
+	}`
+
+	createSchemaRes, err := glueClient.CreateSchema(ctx, &glue.CreateSchemaInput{
+		RegistryId: &glueTypes.RegistryId{
+			RegistryName: aws.String(registryName),
+		},
+		SchemaName:       aws.String(schemaName),
+		DataFormat:       glueTypes.DataFormatJson,
+		Compatibility:    glueTypes.CompatibilityNone,
+		SchemaDefinition: aws.String(jsonSchema),
+	})
+	require.NoError(t, err, "failed to create glue schema")
+
+	schemaVersionId := aws.ToString(createSchemaRes.SchemaVersionId)
+
+	// Create Kinesis stream
+	_, err = client.CreateStream(ctx, &kinesis.CreateStreamInput{
+		StreamName: aws.String(testStream),
+		ShardCount: aws.Int32(1),
+	})
+	require.NoError(t, err, "failed to create stream")
+	awaitStreamActive(t, ctx, client, testStream)
+
+	// Small delay to ensure stream is fully propagated in AWS
+	time.Sleep(2 * time.Second)
+
+	resourceJson, err := json.Marshal(resource{
+		Stream: testStream,
+	})
+	require.NoError(t, err)
+
+	binding := &pf.CaptureSpec_Binding{
+		ResourceConfigJson: resourceJson,
+		ResourcePath:       []string{testStream},
+		StateKey:           fmt.Sprintf("%s.v0", testStream),
+	}
+
+	capture := st.CaptureSpec{
+		Driver:       new(driver),
+		EndpointSpec: conf,
+		Bindings:     []*pf.CaptureSpec_Binding{binding},
+		Validator:    &st.SortedCaptureValidator{IncludeSourcedSchemas: true},
+		Sanitizers: map[string]*regexp.Regexp{
+			"<SEQUENCE_NUM>":       regexp.MustCompile(`\d{56}`),
+			"test-stream-glue-json": regexp.MustCompile(`test-stream-glue-json-\d+`),
+		},
+	}
+
+	// Create records with Glue schema header
+	testDocs := []map[string]any{
+		{"id": 1, "name": "first", "value": 1.5},
+		{"id": 2, "name": "second", "value": 2.5},
+		{"id": 3, "name": "third", "value": 3.5},
+	}
+
+	for i, doc := range testDocs {
+		payload, err := json.Marshal(doc)
+		require.NoError(t, err)
+
+		// Build Glue header
+		header := buildGlueHeader(t, schemaVersionId)
+		data := append(header, payload...)
+
+		_, err = client.PutRecord(ctx, &kinesis.PutRecordInput{
+			StreamName:   aws.String(testStream),
+			Data:         data,
+			PartitionKey: aws.String(fmt.Sprintf("partition-%d", i)),
+		})
+		require.NoError(t, err, "failed to put record %d", i)
+	}
+
+	// Wait for records to be available in Kinesis
+	time.Sleep(5 * time.Second)
+
+	advanceCaptureWithTimeout(t, &capture, 10*time.Second)
+	cupaloy.SnapshotT(t, capture.Summary())
+}
+
 // buildGlueHeader creates a Glue schema registry header from a schema version UUID string.
 // The header format is:
 // - Byte 0: Header version (3)
