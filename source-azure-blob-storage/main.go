@@ -279,117 +279,127 @@ func (l *azureBlobListing) getPage() (*azblob.ListBlobsFlatResponse, error) {
 }
 
 func getConfigSchema(parserSchema json.RawMessage) json.RawMessage {
+	var parserOrderSchema map[string]any
+	err := json.Unmarshal(parserSchema, &parserOrderSchema)
+	if err != nil {
+		panic(fmt.Errorf("unable to parse parser schema: %w", err))
+	}
+	parserOrderSchema["order"] = 4
 
-	return json.RawMessage(`{
+	schema := map[string]any{
 		"$schema": "http://json-schema.org/draft-07/schema#",
-		"title": "Azure Blob Storage Source",
-		"type": "object",
-		"properties": {
-			"credentials": {
-				"type": "object",
-				"title": "Credentials",
+		"title":   "Azure Blob Storage Source",
+		"type":    "object",
+		"properties": map[string]any{
+			"containerName": map[string]any{
+				"type":        "string",
+				"title":       "Container Name",
+				"description": "The name of the Azure Blob Storage container to read from.",
+				"order":       1,
+			},
+			"matchKeys": map[string]any{
+				"type":        "string",
+				"title":       "Match Keys",
+				"format":      "regex",
+				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
+				"order":       2,
+			},
+			"credentials": map[string]any{
+				"type":        "object",
+				"title":       "Credentials",
 				"description": "Azure credentials used to authenticate with Azure Blob Storage.",
-				"order": 0,
-				"oneOf": [
-					{
+				"order":       3,
+				"oneOf": []any{
+					map[string]any{
 						"title": "OAuth2 Credentials",
-						"required": [
+						"required": []string{
 							"azureClientID",
 							"azureClientSecret",
 							"azureTenantID",
 							"azureSubscriptionID",
-							"storageAccountName"
-						],
-						"properties": {
-							"azureClientID": {
-								"type": "string",
-								"title": "Azure Client ID",
+							"storageAccountName",
+						},
+						"properties": map[string]any{
+							"azureClientID": map[string]any{
+								"type":        "string",
+								"title":       "Azure Client ID",
 								"description": "The client ID used to authenticate with Azure Blob Storage.",
-								"order": 0
+								"order":       0,
 							},
-							"azureClientSecret": {
-								"type": "string",
-								"title": "Azure Client Secret",
+							"azureClientSecret": map[string]any{
+								"type":        "string",
+								"title":       "Azure Client Secret",
 								"description": "The client secret used to authenticate with Azure Blob Storage.",
-								"secret": true,
-								"order": 1
+								"secret":      true,
+								"order":       1,
 							},
-							"azureTenantID": {
-								"type": "string",
-								"title": "Azure Tenant ID",
+							"azureTenantID": map[string]any{
+								"type":        "string",
+								"title":       "Azure Tenant ID",
 								"description": "The ID of the Azure tenant where the Azure Blob Storage account is located.",
-								"order": 2
+								"order":       2,
 							},
-							"azureSubscriptionID": {
-								"type": "string",
-								"title": "Azure Subscription ID",
+							"azureSubscriptionID": map[string]any{
+								"type":        "string",
+								"title":       "Azure Subscription ID",
 								"description": "The ID of the Azure subscription that contains the Azure Blob Storage account.",
-								"order": 3
+								"order":       3,
 							},
-							"storageAccountName": {
-								"type": "string",
-								"title": "Storage Account Name",
+							"storageAccountName": map[string]any{
+								"type":        "string",
+								"title":       "Storage Account Name",
 								"description": "The name of the Azure Blob Storage account.",
-								"order": 1
-							}
-						}
+								"order":       4,
+							},
+						},
 					},
-					{
+					map[string]any{
 						"title": "Connection String",
-						"required": [
+						"required": []string{
 							"ConnectionString",
-							"storageAccountName"
-						],
-						"properties": {
-							"ConnectionString": {
-								"type": "string",
-								"title": "Connection String",
+							"storageAccountName",
+						},
+						"properties": map[string]any{
+							"ConnectionString": map[string]any{
+								"type":        "string",
+								"title":       "Connection String",
 								"description": "The connection string used to authenticate with Azure Blob Storage.",
-								"order": 0
+								"order":       0,
 							},
-							"storageAccountName": {
-								"type": "string",
-								"title": "Storage Account Name",
+							"storageAccountName": map[string]any{
+								"type":        "string",
+								"title":       "Storage Account Name",
 								"description": "The name of the Azure Blob Storage account.",
-								"order": 1
-							}
-						}
-					}
-				],
-				"title": "Credentials",
-				"description": "Azure credentials used to authenticate with Azure Blob Storage."
+								"order":       1,
+							},
+						},
+					},
+				},
 			},
-			"containerName": {
-				"type": "string",
-				"title": "Container Name",
-				"description": "The name of the Azure Blob Storage container to read from.",
-				"order": 1
-			},
-			"matchKeys": {
-				"type": "string",
-				"title": "Match Keys",
-				"format": "regex",
-				"description": "Filter applied to all object keys under the prefix. If provided, only objects whose absolute path matches this regex will be read. For example, you can use \".*\\.json\" to only capture json files.",
-				"order": 2
-			},
-			"advanced": {
-				"properties": {
-				  "ascendingKeys": {
-					"type":        "boolean",
-					"title":       "Ascending Keys",
-					"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
-					"default":     false
-				  }
+			"parser": parserOrderSchema,
+			"advanced": map[string]any{
+				"properties": map[string]any{
+					"ascendingKeys": map[string]any{
+						"type":        "boolean",
+						"title":       "Ascending Keys",
+						"description": "Improve sync speeds by listing files from the end of the last sync, rather than listing the entire bucket prefix. This requires that you write objects in ascending lexicographic order, such as an RFC-3339 timestamp, so that key ordering matches modification time ordering.",
+						"default":     false,
+					},
 				},
 				"additionalProperties": false,
-				"type": "object",
-				"description": "Options for advanced users. You should not typically need to modify these.",
-				"advanced": true,
-				"order": 3
+				"type":                 "object",
+				"title":                "Advanced",
+				"description":          "Options for advanced users. You should not typically need to modify these.",
+				"advanced":             true,
+				"order":                5,
 			},
-			"parser": ` + string(parserSchema) + `
-		}
-	}`)
+		},
+	}
+	schemaBytes, err := json.Marshal(schema)
+	if err != nil {
+		panic(fmt.Errorf("generating schema %w", err))
+	}
+	return json.RawMessage(schemaBytes)
 }
 
 func main() {
