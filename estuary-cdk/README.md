@@ -29,12 +29,44 @@ The CDK's `common` module implements common strategies for capturing data, inclu
 
 - Capturing from a logical log of changes, implemented as common.FetchChangesFn.
 - Capturing from an enumerated backfill of a resource, implemented as common.FetchPageFn (which can happen concurrently with fetching incremental changes).
-- Capturing a "snapshot" of a resource and emitting it if it's content has changed, implemented as common.FetchSnapshotFn.
+- Capturing a "snapshot" of a resource and emitting it if its content has changed, implemented as common.FetchSnapshotFn.
+
+## Notable Functionality
+
+### HTTP Client (`http.py`)
+- **HTTPMixin** — Async HTTP client with automatic retries, rate limiting, and error handling
+- **TokenSource** — OAuth2 token management supporting multiple flows (authorization code, client credentials, refresh tokens, Google service accounts)
+
+### Capture Strategies (`capture/common.py`)
+- **FetchPageFn** — Paginated backfills that can be run concurrently with FetchChangesFns
+- **FetchChangesFn** — Incremental change capture
+- **FetchSnapshotFn** — Periodic full snapshots, only emitting documents when the snapshot changes
+- **Resource** — Binds document models to fetch functions and manages state
+
+### Stream Processing
+- **incremental_json_processor** — Streaming JSON parser
+- **incremental_csv_processor** — Streaming CSV parser
+- **gunzip_stream** / **unzip_stream** — Compressed data handling
+
+### Third-Party Connector Support
+- **CaptureShim** (`shim_airbyte_cdk.py`) — Wraps Airbyte CDK connectors to run within the Estuary framework
+
+## Runtime Behavior
+
+### Graceful Exit
+The CDK implements a graceful shutdown: when the connector receives a stop signal, it allows all bindings to finish their current `FetchPageFn`, `FetchChangesFn`, or `FetchSnapshotFn` invocation before exiting.
+
+**Important:** Fetch functions should avoid blocking for extended periods. Long-running operations (e.g., waiting on slow API responses or large batch jobs) can prevent the connector from exiting in a timely manner. If an operation may take a long time, consider breaking it into smaller incremental steps.
+
+### Snapshot Bindings
+Snapshot bindings store a digest of the previous snapshot in their state and compare it against the current snapshot to detect changes. To avoid emitting duplicate data, `FetchSnapshotFn` implementations should yield documents in a consistent order.
+
+When a snapshot captures fewer documents than the previous run, the CDK emits minimal documents with `_meta/op: "d"` for the missing keys. This deletion inference mechanism enables standard-updates materializations to maintain a complete view of what exists in the source system.
 
 ## Why Another Connector Kit?
 
 Good question! Within the Python ecosystem, there are Singer taps, Meltano's singer-sdk, and Airbyte's CDK.
-We tried not to have to write a new one. We really did. This CDK started out as a wrapping shim around Airbyte's CDK (or Singer taps), and that's still supported today.  
+We tried not to have to write a new one. We really did. This CDK started out as a wrapping shim around Airbyte's CDK (or Singer taps), and that's still supported today.
 
 But... it's awkward, for a few reasons:
 
