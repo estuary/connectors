@@ -345,27 +345,6 @@ def issues(
         task: Task,
         all_bindings,
     ):
-        # issues previously used a single incremental cursor, however the stream has since moved to use
-        # two subtasks with their own cursors. The below migrates captures with the old single cursor
-        # state over to state for the two separate subtasks.
-        if isinstance(state.inc, ResourceState.Incremental) and isinstance(state.inc.cursor, datetime):
-            migrated_inc_state: dict[str, ResourceState.Incremental | None] = {
-                REALTIME: ResourceState.Incremental(cursor=state.inc.cursor),
-                LOOKBACK: ResourceState.Incremental(cursor=state.inc.cursor - ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON),
-            }
-            state.inc = migrated_inc_state
-
-            await task.checkpoint(
-                ConnectorState(
-                    bindingStateV1={binding.stateKey: state}
-                ),
-                # Merging in the new incremental state leaves the non-subtask state in the connector's state. Pydantic
-                # raises a validation error since there should never be _both_ non-subtask and subtask state for a binding's
-                # incremental state. To ensure the non-subtask state is cleared after the migration, merge_patch is set to
-                # False when checkpointing the migrated state.
-                merge_patch=False,
-            )
-
         common.open_binding(
             binding,
             binding_index,
@@ -429,27 +408,6 @@ def issue_child_resources(
         task: Task,
         all_bindings,
     ):
-        # issue child streams previously used a single incremental cursor, however these streams have
-        # since moved to use two subtasks with their own cursors. The below migrates captures with the
-        # old single cursor state over to state for the two separate subtasks.
-        if isinstance(state.inc, ResourceState.Incremental) and isinstance(state.inc.cursor, datetime):
-            migrated_inc_state: dict[str, ResourceState.Incremental | None] = {
-                REALTIME: ResourceState.Incremental(cursor=state.inc.cursor),
-                LOOKBACK: ResourceState.Incremental(cursor=state.inc.cursor - ISSUE_SEARCH_EVENTUAL_CONSISTENCY_HORIZON),
-            }
-            state.inc = migrated_inc_state
-
-            await task.checkpoint(
-                ConnectorState(
-                    bindingStateV1={binding.stateKey: state}
-                ),
-                # Merging in the new incremental state leaves the non-subtask state in the connector's state. Pydantic
-                # raises a validation error since there should never be _both_ non-subtask and subtask state for a binding's
-                # incremental state. To ensure the non-subtask state is cleared after the migration, merge_patch is set to
-                # False when checkpointing the migrated state.
-                merge_patch=False,
-            )
-
         common.open_binding(
             binding,
             binding_index,
