@@ -22,6 +22,7 @@ collections:
         numberCastToString: { type: [number, string], format: number }
         integerWithUserDDL: { type: integer }
         fieldWithProjection: { type: string }
+        nonAsciiκόσμε: { type: string }
       required: [key1, key2, key!binary]
     key: [/key1, /key2, /key!binary]
     projections:

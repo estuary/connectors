@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS projectID.dataset.key_value (
 		integerGt64Bit BIGNUMERIC(38,0),
 		integerWithUserDDL DECIMAL(20),
 		multiple JSON,
+		nonAscii_____ STRING,
 		number FLOAT64,
 		numberCastToString STRING,
 		object JSON,
@@ -35,8 +36,8 @@ CLUSTER BY theKey;
 --- End projectID.dataset.delta_updates createTargetTable ---
 
 --- Begin projectID.dataset.key_value storeInsert ---
-INSERT INTO projectID.dataset.key_value (key1, key2, key_binary, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
-SELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20 FROM flow_temp_table_0;
+INSERT INTO projectID.dataset.key_value (key1, key2, key_binary, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, nonAscii_____, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
+SELECT c0, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21 FROM flow_temp_table_0;
 --- End projectID.dataset.key_value storeInsert ---
 
 --- Begin projectID.dataset.delta_updates storeInsert ---
@@ -147,10 +148,10 @@ ON
 WHEN MATCHED AND r._flow_delete THEN
 	DELETE
 WHEN MATCHED THEN
-	UPDATE SET l.`array` = r.c3, l.binary = r.c4, l.boolean = r.c5, l.field_with_projection = r.c6, l.flow_published_at = r.c7, l.integer = r.c8, l.integerGt64Bit = r.c9, l.integerWithUserDDL = r.c10, l.multiple = r.c11, l.number = r.c12, l.numberCastToString = r.c13, l.object = r.c14, l.string = r.c15, l.stringInteger = r.c16, l.stringInteger39Chars = r.c17, l.stringInteger66Chars = r.c18, l.stringNumber = r.c19, l.flow_document = r.c20
+	UPDATE SET l.`array` = r.c3, l.binary = r.c4, l.boolean = r.c5, l.field_with_projection = r.c6, l.flow_published_at = r.c7, l.integer = r.c8, l.integerGt64Bit = r.c9, l.integerWithUserDDL = r.c10, l.multiple = r.c11, l.nonAscii_____ = r.c12, l.number = r.c13, l.numberCastToString = r.c14, l.object = r.c15, l.string = r.c16, l.stringInteger = r.c17, l.stringInteger39Chars = r.c18, l.stringInteger66Chars = r.c19, l.stringNumber = r.c20, l.flow_document = r.c21
 WHEN NOT MATCHED AND NOT r._flow_delete THEN
-	INSERT (key1, key2, key_binary, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
-	VALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10, r.c11, r.c12, r.c13, r.c14, r.c15, r.c16, r.c17, r.c18, r.c19, r.c20);
+	INSERT (key1, key2, key_binary, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, nonAscii_____, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
+	VALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10, r.c11, r.c12, r.c13, r.c14, r.c15, r.c16, r.c17, r.c18, r.c19, r.c20, r.c21);
 --- End projectID.dataset.key_value storeUpdate ---
 
 --- Begin projectID.dataset.key_value loadQuery ---
@@ -177,6 +178,7 @@ TO_JSON(STRUCT(
 	l.integerGt64Bit AS integerGt64Bit, 
 	l.integerWithUserDDL AS integerWithUserDDL, 
 	l.multiple AS multiple, 
+	l.nonAscii_____ AS nonAsciiκόσμε, 
 	l.number AS number, 
 	CAST(l.numberCastToString AS STRING) AS numberCastToString, 
 	l.object AS object, 

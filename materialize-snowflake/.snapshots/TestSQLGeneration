@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS "a-schema".key_value (
 	integerGt64Bit INTEGER,
 	integerWithUserDDL DECIMAL(20),
 	multiple VARIANT,
+	nonAsciiκόσμε TEXT,
 	number FLOAT,
 	numberCastToString TEXT,
 	object VARIANT,
@@ -42,6 +43,7 @@ COMMENT ON COLUMN "a-schema".key_value.integer IS 'auto-generated projection of 
 COMMENT ON COLUMN "a-schema".key_value.integerGt64Bit IS 'auto-generated projection of JSON at: /integerGt64Bit with inferred types: [integer]';
 COMMENT ON COLUMN "a-schema".key_value.integerWithUserDDL IS 'auto-generated projection of JSON at: /integerWithUserDDL with inferred types: [integer]';
 COMMENT ON COLUMN "a-schema".key_value.multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]';
+COMMENT ON COLUMN "a-schema".key_value.nonAsciiκόσμε IS 'auto-generated projection of JSON at: /nonAsciiκόσμε with inferred types: [string]';
 COMMENT ON COLUMN "a-schema".key_value.number IS 'auto-generated projection of JSON at: /number with inferred types: [number]';
 COMMENT ON COLUMN "a-schema".key_value.numberCastToString IS 'auto-generated projection of JSON at: /numberCastToString with inferred types: [number string]';
 COMMENT ON COLUMN "a-schema".key_value.object IS 'auto-generated projection of JSON at: /object with inferred types: [object]';
@@ -122,6 +124,7 @@ OBJECT_CONSTRUCT(
 	'integerGt64Bit', "a-schema".key_value.integerGt64Bit,
 	'integerWithUserDDL', "a-schema".key_value.integerWithUserDDL,
 	'multiple', "a-schema".key_value.multiple,
+	'nonAsciiκόσμε', "a-schema".key_value.nonAsciiκόσμε,
 	'number', "a-schema".key_value.number,
 	'numberCastToString', TO_VARCHAR("a-schema".key_value.numberCastToString),
 	'object', "a-schema".key_value.object,
@@ -144,7 +147,7 @@ AND "a-schema".key_value."key!binary" = r."key!binary" AND "a-schema".key_value.
 --- Begin "a-schema".key_value mergeInto ---
 MERGE INTO "a-schema".key_value AS l
 USING (
-	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS field_with_projection, $1[7] AS flow_published_at, $1[8] AS integer, $1[9] AS integerGt64Bit, $1[10] AS integerWithUserDDL, NULLIF($1[11], PARSE_JSON('null')) AS multiple, $1[12] AS number, $1[13] AS numberCastToString, NULLIF($1[14], PARSE_JSON('null')) AS object, $1[15] AS string, $1[16] AS stringInteger, $1[17] AS stringInteger39Chars, $1[18] AS stringInteger66Chars, $1[19] AS stringNumber, $1[20] AS flow_document, $1[21] AS _flow_delete
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS field_with_projection, $1[7] AS flow_published_at, $1[8] AS integer, $1[9] AS integerGt64Bit, $1[10] AS integerWithUserDDL, NULLIF($1[11], PARSE_JSON('null')) AS multiple, $1[12] AS nonAsciiκόσμε, $1[13] AS number, $1[14] AS numberCastToString, NULLIF($1[15], PARSE_JSON('null')) AS object, $1[16] AS string, $1[17] AS stringInteger, $1[18] AS stringInteger39Chars, $1[19] AS stringInteger66Chars, $1[20] AS stringNumber, $1[21] AS flow_document, $1[22] AS _flow_delete
 	FROM test-file
 ) AS r
 ON 
@@ -154,17 +157,17 @@ ON
 WHEN MATCHED AND r._flow_delete=true THEN
 	DELETE
 WHEN MATCHED THEN
-	UPDATE SET l.array = r.array, l.binary = r.binary, l.boolean = r.boolean, l.field_with_projection = r.field_with_projection, l.flow_published_at = r.flow_published_at, l.integer = r.integer, l.integerGt64Bit = r.integerGt64Bit, l.integerWithUserDDL = r.integerWithUserDDL, l.multiple = r.multiple, l.number = r.number, l.numberCastToString = r.numberCastToString, l.object = r.object, l.string = r.string, l.stringInteger = r.stringInteger, l.stringInteger39Chars = r.stringInteger39Chars, l.stringInteger66Chars = r.stringInteger66Chars, l.stringNumber = r.stringNumber, l.flow_document = r.flow_document
+	UPDATE SET l.array = r.array, l.binary = r.binary, l.boolean = r.boolean, l.field_with_projection = r.field_with_projection, l.flow_published_at = r.flow_published_at, l.integer = r.integer, l.integerGt64Bit = r.integerGt64Bit, l.integerWithUserDDL = r.integerWithUserDDL, l.multiple = r.multiple, l.nonAsciiκόσμε = r.nonAsciiκόσμε, l.number = r.number, l.numberCastToString = r.numberCastToString, l.object = r.object, l.string = r.string, l.stringInteger = r.stringInteger, l.stringInteger39Chars = r.stringInteger39Chars, l.stringInteger66Chars = r.stringInteger66Chars, l.stringNumber = r.stringNumber, l.flow_document = r.flow_document
 WHEN NOT MATCHED AND r._flow_delete=false THEN
-	INSERT (key1, key2, "key!binary", array, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
-	VALUES (r.key1, r.key2, r."key!binary", r.array, r.binary, r.boolean, r.field_with_projection, r.flow_published_at, r.integer, r.integerGt64Bit, r.integerWithUserDDL, r.multiple, r.number, r.numberCastToString, r.object, r.string, r.stringInteger, r.stringInteger39Chars, r.stringInteger66Chars, r.stringNumber, r.flow_document);
+	INSERT (key1, key2, "key!binary", array, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, nonAsciiκόσμε, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
+	VALUES (r.key1, r.key2, r."key!binary", r.array, r.binary, r.boolean, r.field_with_projection, r.flow_published_at, r.integer, r.integerGt64Bit, r.integerWithUserDDL, r.multiple, r.nonAsciiκόσμε, r.number, r.numberCastToString, r.object, r.string, r.stringInteger, r.stringInteger39Chars, r.stringInteger66Chars, r.stringNumber, r.flow_document);
 --- End "a-schema".key_value mergeInto ---
 
 --- Begin "a-schema".key_value copyInto ---
 COPY INTO "a-schema".key_value (
-	key1, key2, "key!binary", array, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document
+	key1, key2, "key!binary", array, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, nonAsciiκόσμε, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document
 ) FROM (
-	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS field_with_projection, $1[7] AS flow_published_at, $1[8] AS integer, $1[9] AS integerGt64Bit, $1[10] AS integerWithUserDDL, NULLIF($1[11], PARSE_JSON('null')) AS multiple, $1[12] AS number, $1[13] AS numberCastToString, NULLIF($1[14], PARSE_JSON('null')) AS object, $1[15] AS string, $1[16] AS stringInteger, $1[17] AS stringInteger39Chars, $1[18] AS stringInteger66Chars, $1[19] AS stringNumber, $1[20] AS flow_document
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS field_with_projection, $1[7] AS flow_published_at, $1[8] AS integer, $1[9] AS integerGt64Bit, $1[10] AS integerWithUserDDL, NULLIF($1[11], PARSE_JSON('null')) AS multiple, $1[12] AS nonAsciiκόσμε, $1[13] AS number, $1[14] AS numberCastToString, NULLIF($1[15], PARSE_JSON('null')) AS object, $1[16] AS string, $1[17] AS stringInteger, $1[18] AS stringInteger39Chars, $1[19] AS stringInteger66Chars, $1[20] AS stringNumber, $1[21] AS flow_document
 	FROM test-file
 );
 --- End "a-schema".key_value copyInto ---
@@ -182,9 +185,9 @@ COPY INTO "a-schema".delta_updates (
 CREATE PIPE db.schema.flow_pipe_0_tableName_00000000_0
   COMMENT = 'Pipe for table [a-schema key_value]'
   AS COPY INTO "a-schema".key_value (
-	key1, key2, "key!binary", array, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document
+	key1, key2, "key!binary", array, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, nonAsciiκόσμε, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document
 ) FROM (
-	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS field_with_projection, $1[7] AS flow_published_at, $1[8] AS integer, $1[9] AS integerGt64Bit, $1[10] AS integerWithUserDDL, NULLIF($1[11], PARSE_JSON('null')) AS multiple, $1[12] AS number, $1[13] AS numberCastToString, NULLIF($1[14], PARSE_JSON('null')) AS object, $1[15] AS string, $1[16] AS stringInteger, $1[17] AS stringInteger39Chars, $1[18] AS stringInteger66Chars, $1[19] AS stringNumber, $1[20] AS flow_document
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS field_with_projection, $1[7] AS flow_published_at, $1[8] AS integer, $1[9] AS integerGt64Bit, $1[10] AS integerWithUserDDL, NULLIF($1[11], PARSE_JSON('null')) AS multiple, $1[12] AS nonAsciiκόσμε, $1[13] AS number, $1[14] AS numberCastToString, NULLIF($1[15], PARSE_JSON('null')) AS object, $1[16] AS string, $1[17] AS stringInteger, $1[18] AS stringInteger39Chars, $1[19] AS stringInteger66Chars, $1[20] AS stringNumber, $1[21] AS flow_document
 	FROM @flow_v1
 );
 --- End "a-schema".key_value createPipe ---
