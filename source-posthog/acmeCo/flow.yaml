@@ -1,0 +1,31 @@
+collections:
+  acmeCo/Annotations:
+    schema: Annotations.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/Cohorts:
+    schema: Cohorts.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/Events:
+    schema: Events.schema.yaml
+    key:
+    - /_meta/project_id
+    - /uuid
+  acmeCo/FeatureFlags:
+    schema: FeatureFlags.schema.yaml
+    key:
+    - /_meta/project_id
+    - /id
+  acmeCo/Organizations:
+    schema: Organizations.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/Persons:
+    schema: Persons.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/Projects:
+    schema: Projects.schema.yaml
+    key:
+    - /_meta/row_id

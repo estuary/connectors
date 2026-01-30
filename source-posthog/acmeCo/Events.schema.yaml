@@ -1,0 +1,45 @@
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+      project_id:
+        anyOf:
+        - type: integer
+        - type: 'null'
+        default: null
+        description: The PostHog project this document belongs to
+        title: Project Id
+    title: Meta
+    type: object
+additionalProperties: true
+description: PostHog event.
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  uuid:
+    title: Uuid
+    type: string
+  timestamp:
+    format: date-time
+    title: Timestamp
+    type: string
+required:
+- uuid
+- timestamp
+title: Event
+type: object
+x-infer-schema: true

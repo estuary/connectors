@@ -59,6 +59,7 @@ on:
       - "source-zoho/**"
       - "source-iterable-native/**"
       - "source-ringcentral/**"
+      - "source-posthog/**"
 
   pull_request:
     branches: [main]
@@ -119,6 +120,7 @@ on:
       - "source-zoho/**"
       - "source-iterable-native/**"
       - "source-ringcentral/**"
+      - "source-posthog/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -347,6 +349,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-ringcentral
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-posthog
             type: capture
             version: v1
             usage_rate: "1.0"

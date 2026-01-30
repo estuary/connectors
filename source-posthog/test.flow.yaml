@@ -1,0 +1,40 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-posthog:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_posthog
+        config: config.yaml
+    bindings:
+    - resource:
+        name: Annotations
+        interval: PT5M
+      target: acmeCo/Annotations
+    - resource:
+        name: Cohorts
+        interval: PT5M
+      target: acmeCo/Cohorts
+    - resource:
+        name: Organizations
+        interval: PT5M
+      target: acmeCo/Organizations
+    - resource:
+        name: Persons
+        interval: PT5M
+      target: acmeCo/Persons
+    - resource:
+        name: Projects
+        interval: PT5M
+      target: acmeCo/Projects
+    - resource:
+        name: Events
+        interval: PT5M
+      target: acmeCo/Events
+    - resource:
+        name: FeatureFlags
+        interval: PT5M
+      target: acmeCo/FeatureFlags

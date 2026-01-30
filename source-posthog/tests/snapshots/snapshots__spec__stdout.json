@@ -1,0 +1,125 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AccessToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "AccessToken",
+          "type": "object"
+        },
+        "Advanced": {
+          "properties": {
+            "base_url": {
+              "default": "https://app.posthog.com",
+              "description": "PostHog API base URL. Use https://eu.posthog.com for EU cloud.",
+              "title": "Base URL",
+              "type": "string"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "description": "PostHog Personal API Key (starts with phx_). ",
+          "discriminator": {
+            "mapping": {
+              "Private App Credentials": "#/$defs/AccessToken"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/AccessToken"
+            }
+          ],
+          "order": 0,
+          "title": "Personal API Key"
+        },
+        "organization_id": {
+          "description": "PostHog Organization UUID. The connector captures data from all projects in this organization.",
+          "order": 1,
+          "title": "Organization ID",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
+          "format": "date-time",
+          "order": 2,
+          "title": "Start Date",
+          "type": "string"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "order": 3,
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "credentials",
+        "organization_id"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "description": "ResourceConfig is a common resource configuration shape.",
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfig",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-posthog",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
