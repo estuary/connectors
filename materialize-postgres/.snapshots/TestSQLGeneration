@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS key_value (
 		"integerGt64Bit" NUMERIC,
 		"integerWithUserDDL" DECIMAL(20),
 		multiple JSON,
+		"nonAsciiκόσμε" TEXT,
 		number DOUBLE PRECISION,
 		"numberCastToString" TEXT,
 		object JSON,
@@ -41,6 +42,7 @@ COMMENT ON COLUMN key_value."integer" IS 'auto-generated projection of JSON at: 
 COMMENT ON COLUMN key_value."integerGt64Bit" IS 'auto-generated projection of JSON at: /integerGt64Bit with inferred types: [integer]';
 COMMENT ON COLUMN key_value."integerWithUserDDL" IS 'auto-generated projection of JSON at: /integerWithUserDDL with inferred types: [integer]';
 COMMENT ON COLUMN key_value.multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]';
+COMMENT ON COLUMN key_value."nonAsciiκόσμε" IS 'auto-generated projection of JSON at: /nonAsciiκόσμε with inferred types: [string]';
 COMMENT ON COLUMN key_value.number IS 'auto-generated projection of JSON at: /number with inferred types: [number]';
 COMMENT ON COLUMN key_value."numberCastToString" IS 'auto-generated projection of JSON at: /numberCastToString with inferred types: [number string]';
 COMMENT ON COLUMN key_value.object IS 'auto-generated projection of JSON at: /object with inferred types: [object]';
@@ -129,6 +131,7 @@ SELECT 0,
 		'integerGt64Bit', r."integerGt64Bit",
 		'integerWithUserDDL', r."integerWithUserDDL",
 		'multiple', r.multiple,
+		'nonAsciiκόσμε', r."nonAsciiκόσμε",
 		'number', r.number,
 		'numberCastToString', CAST(r."numberCastToString" AS TEXT),
 		'object', r.object,
@@ -168,6 +171,7 @@ INSERT INTO key_value (
 		"integerGt64Bit",
 		"integerWithUserDDL",
 		multiple,
+		"nonAsciiκόσμε",
 		number,
 		"numberCastToString",
 		object,
@@ -177,7 +181,7 @@ INSERT INTO key_value (
 		"stringInteger66Chars",
 		"stringNumber",
 		flow_document
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21);
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22);
 --- End key_value storeInsert ---
 
 --- Begin delta_updates storeInsert ---
@@ -201,15 +205,16 @@ UPDATE key_value SET
 		"integerGt64Bit" = $10,
 		"integerWithUserDDL" = $11,
 		multiple = $12,
-		number = $13,
-		"numberCastToString" = $14,
-		object = $15,
-		string = $16,
-		"stringInteger" = $17,
-		"stringInteger39Chars" = $18,
-		"stringInteger66Chars" = $19,
-		"stringNumber" = $20,
-		flow_document = $21
+		"nonAsciiκόσμε" = $13,
+		number = $14,
+		"numberCastToString" = $15,
+		object = $16,
+		string = $17,
+		"stringInteger" = $18,
+		"stringInteger39Chars" = $19,
+		"stringInteger66Chars" = $20,
+		"stringNumber" = $21,
+		flow_document = $22
 	 WHERE key1 = $1
 	 AND   key2 = $2
 	 AND   "key!binary" = $3;

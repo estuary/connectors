@@ -17,7 +17,7 @@ import (
 // https://docs.snowflake.com/en/sql-reference/identifiers-syntax.html for some details about how
 // Snowflake handles unquoted identifiers. Crucially, unquoted identifiers are resolved as
 // UPPERCASE, making this historical quoting important for backward compatibility.
-var simpleIdentifierRegexp = regexp.MustCompile(`^[_\pL]+[_\pL\pN]*$`)
+var simpleIdentifierRegexp = regexp.MustCompile(`^[_A-Za-z]+[_0-9A-Za-z]*$`)
 
 func isSimpleIdentifier(s string) bool {
 	return simpleIdentifierRegexp.MatchString(s) && !slices.Contains(SF_RESERVED_WORDS, strings.ToLower(s))
