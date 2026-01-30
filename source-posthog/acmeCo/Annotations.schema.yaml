@@ -1,0 +1,61 @@
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+description: PostHog annotation.
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  id:
+    title: Id
+    type: integer
+  project_id:
+    title: Project Id
+    type: integer
+  content:
+    title: Content
+    type: string
+  date_marker:
+    format: date-time
+    title: Date Marker
+    type: string
+  scope:
+    default: project
+    title: Scope
+    type: string
+  creation_type:
+    default: USR
+    title: Creation Type
+    type: string
+  created_at:
+    anyOf:
+    - format: date-time
+      type: string
+    - type: 'null'
+    default: null
+    title: Created At
+required:
+- id
+- project_id
+- content
+- date_marker
+title: Annotation
+type: object
+x-infer-schema: true

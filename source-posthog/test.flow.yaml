@@ -1,0 +1,50 @@
+# Test configuration for local connector development
+# Run with: flowctl preview --source test.flow.yaml
+
+import:
+  - acmeCo/flow.yaml
+
+captures:
+  acmeCo/source-posthog:
+    endpoint:
+      local:
+        command:
+          - poetry
+          - run
+          - python
+          - "-m"
+          - source_posthog
+        config:
+          personal_api_key: ${POSTHOG_PERSONAL_API_KEY}
+          organization_id: ${POSTHOG_ORGANIZATION_ID}
+          advanced:
+            base_url: "https://app.posthog.com"
+    bindings:
+      - resource:
+          name: Organizations
+          interval: PT30S
+        target: acmeCo/Organizations
+      - resource:
+          name: Projects
+          interval: PT30S
+        target: acmeCo/Projects
+      - resource:
+          name: Events
+          interval: PT30S
+        target: acmeCo/Events
+      - resource:
+          name: Persons
+          interval: PT30S
+        target: acmeCo/Persons
+      - resource:
+          name: Cohorts
+          interval: PT30S
+        target: acmeCo/Cohorts
+      - resource:
+          name: FeatureFlags
+          interval: PT30S
+        target: acmeCo/FeatureFlags
+      - resource:
+          name: Annotations
+          interval: PT30S
+        target: acmeCo/Annotations
