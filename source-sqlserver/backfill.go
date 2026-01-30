@@ -10,6 +10,9 @@ import (
 	"time"
 
 	"github.com/estuary/connectors/go/encrow"
+	"github.com/estuary/connectors/go/sqlserver/backfill"
+	"github.com/estuary/connectors/go/sqlserver/change"
+	"github.com/estuary/connectors/go/sqlserver/datatypes"
 	"github.com/estuary/connectors/sqlcapture"
 	log "github.com/sirupsen/logrus"
 )
@@ -52,61 +55,31 @@ func (db *sqlserverDatabase) ShouldBackfill(streamID sqlcapture.StreamID) bool {
 // ScanTableChunk fetches a chunk of rows from the specified table, resuming from the `resumeAfter` row key if non-nil.
 func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture.DiscoveryInfo, state *sqlcapture.TableState, callback func(event sqlcapture.ChangeEvent) error) (bool, []byte, error) {
 	var keyColumns = state.KeyColumns
-	var resumeAfter = state.Scanned
 	var schema, table = info.Schema, info.Name
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 
-	var columnTypes = make(map[string]interface{})
+	var columnTypes = make(map[string]any)
 	for name, column := range info.Columns {
 		columnTypes[name] = column.DataType
 	}
 
-	var computedColumns []string
+	// Computed column values cannot be captured via CDC, so we have to exclude them from
+	// backfills as well or we'd end up with incorrect/stale values. Better not to have a
+	// property at all in those circumstances.
+	var excludeColumns []string
 	if details, ok := info.ExtraDetails.(*sqlserverTableDiscoveryDetails); ok {
-		computedColumns = details.ComputedColumns
+		excludeColumns = details.ComputedColumns
 	}
 
 	// Compute backfill query and arguments list
-	var query string
-	var args []any
-	switch state.Mode {
-	case sqlcapture.TableStateKeylessBackfill:
-		log.WithFields(log.Fields{
-			"stream": streamID,
-			"offset": state.BackfilledCount,
-		}).Debug("scanning keyless table chunk")
-		query = db.keylessScanQuery(info, schema, table)
-		args = []any{state.BackfilledCount}
-	case sqlcapture.TableStatePreciseBackfill, sqlcapture.TableStateUnfilteredBackfill:
-		if resumeAfter != nil {
-			var resumeKey, err = sqlcapture.UnpackTuple(resumeAfter, decodeKeyFDB)
-			if err != nil {
-				return false, nil, fmt.Errorf("error unpacking resume key for %q: %w", streamID, err)
-			}
-			if len(resumeKey) != len(keyColumns) {
-				return false, nil, fmt.Errorf("expected %d resume-key values but got %d", len(keyColumns), len(resumeKey))
-			}
-			log.WithFields(log.Fields{
-				"stream":     streamID,
-				"keyColumns": keyColumns,
-				"resumeKey":  resumeKey,
-			}).Debug("scanning subsequent table chunk")
-			query = db.buildScanQuery(false, keyColumns, columnTypes, schema, table)
-			args = resumeKey
-		} else {
-			log.WithFields(log.Fields{
-				"stream":     streamID,
-				"keyColumns": keyColumns,
-			}).Debug("scanning initial table chunk")
-			query = db.buildScanQuery(true, keyColumns, columnTypes, schema, table)
-		}
-	default:
-		return false, nil, fmt.Errorf("invalid backfill mode %q", state.Mode)
+	query, args, err := backfill.BuildBackfillQuery(state, schema, table, columnTypes, db.config.Advanced.BackfillChunkSize)
+	if err != nil {
+		return false, nil, err
 	}
 
 	log.WithFields(log.Fields{"query": query, "args": args}).Debug("executing query")
 
-	// Set up watchdog timer
+	// Set up watchdog timer and run the query
 	var watchdogCtx, cancelWatchdog = context.WithCancel(ctx)
 	defer cancelWatchdog()
 	var watchdogTimer = time.AfterFunc(backfillQueryTimeout, func() {
@@ -126,33 +99,29 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	if err != nil {
 		return false, nil, err
 	}
-	var vals = make([]any, len(cnames))
-	var vptrs = make([]any, len(vals))
-	for idx := range vals {
-		vptrs[idx] = &vals[idx]
-	}
 
 	// Preprocess result metadata for efficient row handling.
-	var outputColumnNames = make([]string, len(cnames))         // Names of all columns, with omitted columns set to ""
-	var outputColumnTypes = make([]any, len(cnames))            // Types of all columns, with omitted columns set to nil
-	var outputTranscoders = make([]jsonTranscoder, len(cnames)) // Transcoders for all columns, with omitted columns set to nil
-	var rowKeyTranscoders = make([]fdbTranscoder, len(cnames))  // Transcoders for all columns, with omitted columns set to nil
+	var outputColumnNames = make([]string, len(cnames))                   // Names of all columns, with omitted columns set to ""
+	var outputTranscoders = make([]datatypes.JSONTranscoder, len(cnames)) // Transcoders for all columns, with omitted columns set to nil
+	var rowKeyTranscoders = make([]datatypes.FDBTranscoder, len(cnames))  // Transcoders for all columns, with omitted columns set to nil
 	for idx, name := range cnames {
-		// Computed column values cannot be captured via CDC, so we have to exclude them from
-		// backfills as well or we'd end up with incorrect/stale values. Better not to have a
-		// property at all in those circumstances.
-		if slices.Contains(computedColumns, name) {
-			continue
+		if slices.Contains(excludeColumns, name) {
+			continue // Leave outputColumnNames[idx] unset for this column
 		}
 
 		outputColumnNames[idx] = name
-		outputColumnTypes[idx] = columnTypes[name]
-		outputTranscoders[idx] = db.backfillJSONTranscoder(columnTypes[name])
+		outputTranscoders[idx] = datatypes.NewJSONTranscoder(columnTypes[name], db.datatypesConfig)
 		if slices.Contains(keyColumns, name) {
-			rowKeyTranscoders[idx] = db.backfillFDBTranscoder(columnTypes[name])
+			rowKeyTranscoders[idx] = datatypes.NewFDBTranscoder(columnTypes[name])
 		}
 	}
 	outputColumnNames = append(outputColumnNames, "_meta") // Add '_meta' property to the row shape
+
+	var backfillEventInfo = &change.SharedInfo{
+		StreamID:    streamID,
+		Shape:       encrow.NewShape(outputColumnNames),
+		Transcoders: outputTranscoders,
+	}
 
 	var keyIndices []int // The indices of the key columns in the row values. Only set for keyed backfills.
 	if state.Mode != sqlcapture.TableStateKeylessBackfill {
@@ -165,11 +134,6 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 			keyIndices[idx] = resultIndex
 		}
 	}
-	var backfillEventInfo = &sqlserverChangeSharedInfo{
-		StreamID:    streamID,
-		Shape:       encrow.NewShape(outputColumnNames),
-		Transcoders: outputTranscoders,
-	}
 
 	// Preallocate reusable buffers for change event processing
 	var reused struct {
@@ -179,6 +143,12 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 	}
 	reused.lsn = LSN{}
 	reused.seqval = make([]byte, 10) // Sequence values are always 10 bytes, though we only use the last 8 for backfills
+
+	var vals = make([]any, len(cnames))
+	var vptrs = make([]any, len(vals))
+	for idx := range vals {
+		vptrs[idx] = &vals[idx]
+	}
 
 	// Iterate over the result set yielding each row as a change event.
 	var resultRows int               // Count of rows received within the current backfill chunk
@@ -191,10 +161,10 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 			return false, nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 
+		rowKey = rowKey[:0]
 		if state.Mode == sqlcapture.TableStateKeylessBackfill {
-			rowKey = []byte(fmt.Sprintf("B%019d", rowOffset)) // A 19 digit decimal number is sufficient to hold any 63-bit integer
+			rowKey = fmt.Appendf(rowKey, "B%019d", rowOffset) // A 19 digit decimal number is sufficient to hold any 63-bit integer
 		} else {
-			rowKey = rowKey[:0]
 			for _, n := range keyIndices {
 				rowKey, err = rowKeyTranscoders[n].TranscodeFDB(rowKey, vals[n])
 				if err != nil {
@@ -206,9 +176,9 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		binary.BigEndian.PutUint64(reused.seqval[2:], uint64(rowOffset))
 		reused.event = sqlserverChangeEvent{
 			Shared: backfillEventInfo,
-			Meta: sqlserverChangeMetadata{
+			Meta: sqlserverChangeMetadataCDC{
 				Operation: sqlcapture.InsertOp,
-				Source: sqlserverSourceInfo{
+				Source: sqlserverSourceInfoCDC{
 					SourceCommon: sqlcapture.SourceCommon{
 						Schema:   schema,
 						Snapshot: true,
@@ -234,69 +204,6 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 		err = fmt.Errorf("backfill query canceled after %s due to lack of progress for table %q", backfillQueryTimeout.String(), streamID)
 	}
 	return backfillComplete, rowKey, err
-}
-
-func (db *sqlserverDatabase) keylessScanQuery(_ *sqlcapture.DiscoveryInfo, schemaName, tableName string) string {
-	var query = new(strings.Builder)
-	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
-	fmt.Fprintf(query, " ORDER BY %%%%physloc%%%%")
-	fmt.Fprintf(query, " OFFSET @p1 ROWS FETCH FIRST %d ROWS ONLY;", db.config.Advanced.BackfillChunkSize)
-	return query.String()
-}
-
-func (db *sqlserverDatabase) buildScanQuery(start bool, keyColumns []string, columnTypes map[string]interface{}, schemaName, tableName string) string {
-	var pkey []string
-	var args []string
-	for idx, colName := range keyColumns {
-		var quotedName = quoteColumnName(colName)
-		if _, ok := columnTypes[colName].(*sqlserverTextColumnType); ok {
-			args = append(args, fmt.Sprintf("@KeyColumn%d", idx+1))
-		} else {
-			args = append(args, fmt.Sprintf("@p%d", idx+1))
-		}
-		pkey = append(pkey, quotedName)
-	}
-
-	var query = new(strings.Builder)
-	fmt.Fprintf(query, "BEGIN ")
-	if !start {
-		for idx, colName := range keyColumns {
-			if textInfo, ok := columnTypes[colName].(*sqlserverTextColumnType); ok {
-				fmt.Fprintf(query, "DECLARE @KeyColumn%[1]d AS %[2]s = @p%[1]d; ", idx+1, textInfo.FullType)
-			}
-		}
-	}
-	fmt.Fprintf(query, "SELECT * FROM [%s].[%s]", schemaName, tableName)
-	if !start {
-		for i := range pkey {
-			if i == 0 {
-				fmt.Fprintf(query, " WHERE (")
-			} else {
-				fmt.Fprintf(query, ") OR (")
-			}
-
-			for j := 0; j < i; j++ {
-				fmt.Fprintf(query, "%s = %s AND ", pkey[j], args[j])
-			}
-			fmt.Fprintf(query, "%s > %s", pkey[i], args[i])
-		}
-		fmt.Fprintf(query, ")")
-	}
-	fmt.Fprintf(query, " ORDER BY %s", strings.Join(pkey, ", "))
-	fmt.Fprintf(query, " OFFSET 0 ROWS FETCH FIRST %d ROWS ONLY;", db.config.Advanced.BackfillChunkSize)
-	fmt.Fprintf(query, " END")
-	return query.String()
-}
-
-func quoteColumnName(name string) string {
-	// From https://learn.microsoft.com/en-us/sql/relational-databases/databases/database-identifiers
-	// it appears to always be valid to take an identifier for which quoting is optional and enclose
-	// it in brackets.
-	//
-	// It is not immediately clear whether there are any special characters which need further
-	// escaping in a bracket delimited identifier, but for now adding brackets is strictly better
-	// than not adding brackets.
-	return `[` + name + `]`
 }
 
 type sqlserverTableStatistics struct {

@@ -1,0 +1,323 @@
+sql> CREATE TABLE dbo.Capture_UUIDCaptureOrder_149232 (id UNIQUEIDENTIFIER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.Capture_UUIDCaptureOrder_149232 VALUES
+		('00ffffff-ffff-ffff-ffff-ffffffffffff', 'sixteen'),
+		('ff00ffff-ffff-ffff-ffff-ffffffffffff', 'fifteen'),
+		('ffff00ff-ffff-ffff-ffff-ffffffffffff', 'fourteen'),
+		('ffffff00-ffff-ffff-ffff-ffffffffffff', 'thirteen'),
+		('ffffffff-00ff-ffff-ffff-ffffffffffff', 'twelve'),
+		('ffffffff-ff00-ffff-ffff-ffffffffffff', 'eleven'),
+		('ffffffff-ffff-00ff-ffff-ffffffffffff', 'ten'),
+		('ffffffff-ffff-ff00-ffff-ffffffffffff', 'nine'),
+		('ffffffff-ffff-ffff-00ff-ffffffffffff', 'seven'),
+		('ffffffff-ffff-ffff-ff00-ffffffffffff', 'eight'),
+		('ffffffff-ffff-ffff-ffff-00ffffffffff', 'one'),
+		('ffffffff-ffff-ffff-ffff-ff00ffffffff', 'two'),
+		('ffffffff-ffff-ffff-ffff-ffff00ffffff', 'three'),
+		('ffffffff-ffff-ffff-ffff-ffffff00ffff', 'four'),
+		('ffffffff-ffff-ffff-ffff-ffffffff00ff', 'five'),
+		('ffffffff-ffff-ffff-ffff-ffffffffff00', 'six')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232
+=== Run: Capture ===
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "sixteen",
+    "id": "00ffffff-ffff-ffff-ffff-ffffffffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "fifteen",
+    "id": "ff00ffff-ffff-ffff-ffff-ffffffffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "fourteen",
+    "id": "ffff00ff-ffff-ffff-ffff-ffffffffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "thirteen",
+    "id": "ffffff00-ffff-ffff-ffff-ffffffffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "twelve",
+    "id": "ffffffff-00ff-ffff-ffff-ffffffffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "eleven",
+    "id": "ffffffff-ff00-ffff-ffff-ffffffffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "ten",
+    "id": "ffffffff-ffff-00ff-ffff-ffffffffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "nine",
+    "id": "ffffffff-ffff-ff00-ffff-ffffffffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "seven",
+    "id": "ffffffff-ffff-ffff-00ff-ffffffffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "eight",
+    "id": "ffffffff-ffff-ffff-ff00-ffffffffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "one",
+    "id": "ffffffff-ffff-ffff-ffff-00ffffffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": "ffffffff-ffff-ffff-ffff-ff00ffffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": "ffffffff-ffff-ffff-ffff-ffff00ffffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "four",
+    "id": "ffffffff-ffff-ffff-ffff-ffffff00ffff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "id": "ffffffff-ffff-ffff-ffff-ffffffff00ff"
+  }
+]
+[
+  "acmeCo/test_capture/dbo/capture_uuidcaptureorder_149232",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Capture_UUIDCaptureOrder_149232"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "six",
+    "id": "ffffffff-ffff-ffff-ffff-ffffffffff00"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCapture_UUIDCaptureOrder_149232": {
+      "backfilled": 16,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

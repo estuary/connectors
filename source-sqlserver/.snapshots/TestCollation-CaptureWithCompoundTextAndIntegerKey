@@ -1,0 +1,540 @@
+sql> CREATE TABLE dbo.Collation_CaptureWithCompoundTextAndIntegerKey_316379 (k1 VARCHAR(32), k2 INTEGER, k3 VARCHAR(8), k4 INTEGER, data TEXT, PRIMARY KEY (k1, k2, k3, k4))
+sql> INSERT INTO dbo.Collation_CaptureWithCompoundTextAndIntegerKey_316379 VALUES
+			('aaa', 100, 'b', 0, 'data'), ('aaa', 100, 'c', 0, 'data'),
+			('aaa', 200, 'b', 0, 'data'), ('aaa', 200, 'c', 0, 'data'),
+			('zzz', 100, 'b', 0, 'data'), ('zzz', 100, 'c', 0, 'data'),
+			('zzz', 200, 'b', 0, 'data'), ('zzz', 200, 'c', 0, 'data')
+sql> INSERT INTO dbo.Collation_CaptureWithCompoundTextAndIntegerKey_316379 VALUES
+			('aaa', 100, 'b', 1, 'data'), ('aaa', 100, 'c', 1, 'data'),
+			('aaa', 200, 'b', 1, 'data'), ('aaa', 200, 'c', 1, 'data'),
+			('zzz', 100, 'b', 1, 'data'), ('zzz', 100, 'c', 1, 'data'),
+			('zzz', 200, 'b', 1, 'data'), ('zzz', 200, 'c', 1, 'data')
+sql> INSERT INTO dbo.Collation_CaptureWithCompoundTextAndIntegerKey_316379 VALUES
+			('aaa', 100, 'b', 2, 'data'), ('aaa', 100, 'c', 2, 'data'),
+			('aaa', 200, 'b', 2, 'data'), ('aaa', 200, 'c', 2, 'data'),
+			('zzz', 100, 'b', 2, 'data'), ('zzz', 100, 'c', 2, 'data'),
+			('zzz', 200, 'b', 2, 'data'), ('zzz', 200, 'c', 2, 'data')
+=== Discover: Discover ===
+acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "aaa",
+    "k2": 100,
+    "k3": "b",
+    "k4": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "aaa",
+    "k2": 100,
+    "k3": "b",
+    "k4": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "aaa",
+    "k2": 100,
+    "k3": "b",
+    "k4": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "aaa",
+    "k2": 100,
+    "k3": "c",
+    "k4": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "aaa",
+    "k2": 100,
+    "k3": "c",
+    "k4": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "aaa",
+    "k2": 100,
+    "k3": "c",
+    "k4": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "aaa",
+    "k2": 200,
+    "k3": "b",
+    "k4": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "aaa",
+    "k2": 200,
+    "k3": "b",
+    "k4": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "aaa",
+    "k2": 200,
+    "k3": "b",
+    "k4": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "aaa",
+    "k2": 200,
+    "k3": "c",
+    "k4": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "aaa",
+    "k2": 200,
+    "k3": "c",
+    "k4": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "aaa",
+    "k2": 200,
+    "k3": "c",
+    "k4": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "zzz",
+    "k2": 100,
+    "k3": "b",
+    "k4": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "zzz",
+    "k2": 100,
+    "k3": "b",
+    "k4": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "zzz",
+    "k2": 100,
+    "k3": "b",
+    "k4": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "zzz",
+    "k2": 100,
+    "k3": "c",
+    "k4": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "zzz",
+    "k2": 100,
+    "k3": "c",
+    "k4": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "zzz",
+    "k2": 100,
+    "k3": "c",
+    "k4": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "zzz",
+    "k2": 200,
+    "k3": "b",
+    "k4": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "zzz",
+    "k2": 200,
+    "k3": "b",
+    "k4": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "zzz",
+    "k2": 200,
+    "k3": "b",
+    "k4": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "zzz",
+    "k2": 200,
+    "k3": "c",
+    "k4": 0
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "zzz",
+    "k2": 200,
+    "k3": "c",
+    "k4": 1
+  }
+]
+[
+  "acmeCo/test_capture/dbo/collation_capturewithcompoundtextandintegerkey_316379",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Collation_CaptureWithCompoundTextAndIntegerKey_316379"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "data",
+    "k1": "zzz",
+    "k2": 200,
+    "k3": "c",
+    "k4": 2
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FCollation_CaptureWithCompoundTextAndIntegerKey_316379": {
+      "backfilled": 24,
+      "key_columns": [
+        "k1",
+        "k2",
+        "k3",
+        "k4"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+

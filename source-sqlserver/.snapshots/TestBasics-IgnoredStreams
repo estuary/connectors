@@ -1,0 +1,92 @@
+sql> CREATE TABLE dbo.Basics_IgnoredStreams_350181_a (id INTEGER PRIMARY KEY, data TEXT)
+sql> CREATE TABLE dbo.Basics_IgnoredStreams_350181_b (id INTEGER PRIMARY KEY, data TEXT)
+sql> INSERT INTO dbo.Basics_IgnoredStreams_350181_a VALUES (0, 'zero'), (1, 'one')
+sql> INSERT INTO dbo.Basics_IgnoredStreams_350181_b VALUES (2, 'two'), (3, 'three')
+=== Discover: Discover Tables ===
+acmeCo/test_capture/dbo/basics_ignoredstreams_350181_a
+acmeCo/test_capture/dbo/basics_ignoredstreams_350181_b
+=== Run: Backfill (Without A) ===
+[
+  "acmeCo/test_capture/dbo/basics_ignoredstreams_350181_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Basics_IgnoredStreams_350181_b"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "two",
+    "id": 2
+  }
+]
+[
+  "acmeCo/test_capture/dbo/basics_ignoredstreams_350181_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "snapshot": true,
+        "table": "Basics_IgnoredStreams_350181_b"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "three",
+    "id": 3
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FBasics_IgnoredStreams_350181_b": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO dbo.Basics_IgnoredStreams_350181_a VALUES (4, 'four')
+sql> INSERT INTO dbo.Basics_IgnoredStreams_350181_b VALUES (5, 'five')
+=== Run: Replication (Without A) ===
+[
+  "acmeCo/test_capture/dbo/basics_ignoredstreams_350181_b",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "lsn": "REDACTED",
+        "schema": "dbo",
+        "seqval": "REDACTED",
+        "table": "Basics_IgnoredStreams_350181_b",
+        "updateMask": "Aw=="
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "data": "five",
+    "id": 5
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "dbo%2FBasics_IgnoredStreams_350181_b": {
+      "backfilled": 2,
+      "key_columns": [
+        "id"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
