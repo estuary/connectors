@@ -1,0 +1,1708 @@
+[
+  [
+    "acmeCo/Annotations",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "content": "Test annotation created via API",
+      "created_at": "2026-02-10T03:46:39.387068Z",
+      "created_by": {
+        "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
+        "email": "nicolas@estuary.dev",
+        "first_name": "Nicolas",
+        "hedgehog_config": null,
+        "id": 405869,
+        "is_email_verified": true,
+        "last_name": "Lazo",
+        "role_at_organization": "engineering",
+        "uuid": "019c2351-c716-0000-37ba-0f2c008d919e"
+      },
+      "creation_type": "USR",
+      "dashboard_id": null,
+      "dashboard_item": null,
+      "dashboard_name": null,
+      "date_marker": "2025-02-01T00:00:00Z",
+      "deleted": false,
+      "id": 317326,
+      "insight_derived_name": null,
+      "insight_name": null,
+      "insight_short_id": null,
+      "scope": "project",
+      "updated_at": "2026-02-10T03:46:39.387255Z"
+    }
+  ],
+  [
+    "acmeCo/Cohorts",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "cohort_type": null,
+      "count": 0,
+      "created_at": "2026-02-10T03:46:30.230619Z",
+      "created_by": {
+        "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
+        "email": "nicolas@estuary.dev",
+        "first_name": "Nicolas",
+        "hedgehog_config": null,
+        "id": 405869,
+        "is_email_verified": true,
+        "last_name": "Lazo",
+        "role_at_organization": "engineering",
+        "uuid": "019c2351-c716-0000-37ba-0f2c008d919e"
+      },
+      "deleted": false,
+      "description": "Test cohort created via API",
+      "errors_calculating": 0,
+      "experiment_set": [],
+      "filters": {
+        "properties": {
+          "type": "OR",
+          "values": [
+            {
+              "type": "AND",
+              "values": [
+                {
+                  "key": "$browser",
+                  "operator": "exact",
+                  "type": "person",
+                  "value": [
+                    "Chrome"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "groups": [
+        {
+          "action_id": null,
+          "count": null,
+          "count_operator": null,
+          "days": null,
+          "end_date": null,
+          "event_id": null,
+          "label": null,
+          "properties": [
+            {
+              "key": "$browser",
+              "operator": "exact",
+              "type": "person",
+              "value": [
+                "Chrome"
+              ]
+            }
+          ],
+          "start_date": null
+        }
+      ],
+      "id": 216029,
+      "is_calculating": false,
+      "is_static": false,
+      "last_calculation": "redacted",
+      "last_error_message": null,
+      "name": "Test Cohort 1",
+      "pending_version": "redacted",
+      "query": null,
+      "version": "redacted"
+    }
+  ],
+  [
+    "acmeCo/Organizations",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "allow_publicly_shared_resources": true,
+      "available_product_features": [
+        {
+          "description": "Ingest, search, and analyze logs from your applications.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "logs",
+          "limit": null,
+          "name": "Logs",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Create as many surveys as you want.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "surveys_unlimited_surveys",
+          "limit": null,
+          "name": "Unlimited surveys",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Rating scale (for NPS and the like), multiple choice, single choice, emoji rating, link, free text.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "surveys_all_question_types",
+          "limit": null,
+          "name": "All question types",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Ask multiple questions in a single survey.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "surveys_multiple_questions",
+          "limit": null,
+          "name": "Multiple questions",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Target by URL, user property, or feature flag when used with Feature flags.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "surveys_user_targeting",
+          "limit": null,
+          "name": "Advanced user targeting",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Sample users to only survey a portion of the users who match the criteria.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "surveys_user_sampling",
+          "limit": null,
+          "name": "User sampling",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Add custom HTML to your survey text.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "surveys_text_html",
+          "limit": null,
+          "name": "Custom HTML text",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Using Popover or Feedback button surveys? No more code required. But if want to create your own UI, we have a full API.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "surveys_api_mode",
+          "limit": null,
+          "name": "API mode",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "See feedback summarized and broken down per response, plus completion rates and drop offs.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "surveys_results_analysis",
+          "limit": null,
+          "name": "Aggregated results",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Use our templates to get started quickly with NPS, customer satisfaction surveys, user interviews, and more.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "surveys_templates",
+          "limit": null,
+          "name": "Templates",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Track user sentiment in distinct iterations of a survey.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "surveys_recurring",
+          "limit": null,
+          "name": "Recurring Surveys",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Activate surveys based on user events.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "surveys_events",
+          "limit": null,
+          "name": "Event based Surveys",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Keep a historical record of your data.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "surveys_data_retention",
+          "limit": 1,
+          "name": "Data retention",
+          "note": null,
+          "unit": "year"
+        },
+        {
+          "description": "PostHog AI builds insights, automates manual tasks, and routes more complex tasks to other AI agents for specialized work.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "posthog_ai",
+          "limit": null,
+          "name": "PostHog AI",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Zapier lets you connect PostHog with thousands of the most popular apps, so you can automate your work and have more time for what matters most\u2014no code required.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "zapier",
+          "limit": null,
+          "name": "Zapier",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Get notified about new actions in Slack.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "slack_integration",
+          "limit": null,
+          "name": "Slack",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Get notified about new actions in Microsoft Teams.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "microsoft_teams_integration",
+          "limit": null,
+          "name": "Microsoft Teams",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Get notified about new actions in Discord.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "discord_integration",
+          "limit": null,
+          "name": "Discord",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Use transformations to filter or modify your incoming data (destinations not included, see the data pipelines addon for product analytics).",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "apps",
+          "limit": null,
+          "name": "Transformations",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Schedule regular data exports to your warehouse or other tools like BigQuery, Redshift, and more.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_pipelines_batch_exports",
+          "limit": null,
+          "name": "Batch exports",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Create as many feature flags as you need.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "unlimited_flags",
+          "limit": null,
+          "name": "Unlimited feature flags",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Turn features on and off for specific users.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "boolean_flags",
+          "limit": null,
+          "name": "Boolean feature flags",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Create three or more variants of a feature flag to test or release different versions of a feature.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "multivariate_flags",
+          "limit": null,
+          "name": "Multivariate feature flags & experiments",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Persist feature flags across authentication events so that flag values don't change when an anonymous user logs in and becomes identified.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "persist_flags_cross_authentication",
+          "limit": null,
+          "name": "Persist flags across authentication",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Use JSON payloads to change text, visuals, or entire blocks of code without subsequent deployments.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "feature_flag_payloads",
+          "limit": null,
+          "name": "Test changes without code",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Customize your rollout strategy by user or group properties, cohort, or trafic percentage.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "multiple_release_conditions",
+          "limit": null,
+          "name": "Multiple release conditions",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "For any release condition, specify which flag value the users or groups in that condition should receive.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "release_condition_overrides",
+          "limit": null,
+          "name": "Release condition overrides",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Target feature flag release conditions by group properties, not just user properties.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "targeting_by_group",
+          "limit": null,
+          "name": "Flag targeting by groups",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Bootstrap flags on initialization so all flags are available immediately, without having to make extra network requests.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "local_evaluation_and_bootstrapping",
+          "limit": null,
+          "name": "Local evaluation & bootstrapping",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "See how many times a flag has been evaluated, how many times each variant has been returned, and what values users received.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "flag_usage_stats",
+          "limit": null,
+          "name": "Flag usage stats",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Test changes to your product and evaluate the impacts those changes make.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "experimentation",
+          "limit": null,
+          "name": "Experiments",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Measure the impact of a change on a aggregate values or a series of events, like a signup flow.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "funnel_experiments",
+          "limit": null,
+          "name": "Funnel & trend experiments",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Track additional metrics to see how your experiment affects other parts of your app or different flows.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "secondary_metrics",
+          "limit": null,
+          "name": "Secondary experiment metrics",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Get a statistical analysis of your experiment results to see if the results are significant, or if they're likely just due to chance.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "statistical_analysis",
+          "limit": null,
+          "name": "Statistical analysis",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Keep a historical record of your data.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "feature_flags_data_retention",
+          "limit": 1,
+          "name": "Data retention",
+          "note": null,
+          "unit": "year"
+        },
+        {
+          "description": "Keep a historical record of your data.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_data_retention",
+          "limit": null,
+          "name": "Data retention",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Overview dashboard with usage metrics, costs, and performance.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_dashboard",
+          "limit": null,
+          "name": "LLM analytics dashboard",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Full interaction timelines grouping related LLM calls.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_traces",
+          "limit": null,
+          "name": "Traces",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Track individual LLM requests with conversation history.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_generations",
+          "limit": null,
+          "name": "Generations",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Capture atomic operations like vector searches and tool calls.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_spans",
+          "limit": null,
+          "name": "Spans",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Test and debug LLM interactions.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_playground",
+          "limit": null,
+          "name": "LLM playground",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Python SDK support for OpenAI, Anthropic, Google Gemini, LangChain, and more.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_python_sdk",
+          "limit": null,
+          "name": "Python SDK",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Node.js SDK support for OpenAI, Anthropic, Google Gemini, Vercel AI SDK, LangChain, and more.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_node_sdk",
+          "limit": null,
+          "name": "Node.js SDK",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Automatic cost calculation per request.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_cost_tracking",
+          "limit": null,
+          "name": "Cost tracking",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Track input, output, and cached token usage.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_token_usage",
+          "limit": null,
+          "name": "Token usage",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Monitor response times and performance.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_latency_monitoring",
+          "limit": null,
+          "name": "Latency monitoring",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Analyze LLM usage with dashboards, funnels, retention, and custom SQL queries.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_product_analytics",
+          "limit": null,
+          "name": "Product analytics integration",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Monitor, debug, and resolve LLM-generated errors automatically.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_error_tracking",
+          "limit": null,
+          "name": "Error tracking integration",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Watch session recordings to see exactly how users interact with your LLM features.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_session_replay",
+          "limit": null,
+          "name": "Session replay integration",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Exclude sensitive data from tracking.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_privacy_mode",
+          "limit": null,
+          "name": "Privacy mode",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Add metadata and custom properties.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "llm_analytics_custom_properties",
+          "limit": null,
+          "name": "Custom properties",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Record and replay mobile app sessions.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "mobile_replay",
+          "limit": null,
+          "name": "Mobile session replay",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Sync data from Stripe, Hubspot, Zendesk, Snowflake, Postgres, and more.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_warehouse_integrations",
+          "limit": null,
+          "name": "One-click integrations",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Create views to model your data and streamline queries.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_warehouse_views",
+          "limit": null,
+          "name": "Custom views",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Link directly to your data sources such as S3, Google Cloud Storage, and Cloudflare R2. Data stays on your servers.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_warehouse_direct_linking",
+          "limit": null,
+          "name": "Direct linking",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Join data from any source, including your PostHog analytics data, to easily get the answers you need.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_warehouse_joins",
+          "limit": null,
+          "name": "Cross-source joins",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Query all your business and product data directly inside PostHog.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_warehouse_unified_querying",
+          "limit": null,
+          "name": "Unified querying",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Create insights from the data you import and add them to your PostHog dashboards.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_warehouse_insights_visualization",
+          "limit": null,
+          "name": "Data visualization",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Sync only the data that has changed since the last sync.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_warehouse_incremental_sync",
+          "limit": null,
+          "name": "Incremental sync",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Choose how often you want to sync your data - daily, weekly, or monthly.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_warehouse_sync_frequency",
+          "limit": null,
+          "name": "Sync frequency",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Automatically capture unhandled exceptions in your code.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "error_tracking_exception_autocapture",
+          "limit": null,
+          "name": "Exception autocapture",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Upload source maps to get code context.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "error_tracking_stack_trace_demangling",
+          "limit": null,
+          "name": "Stack trace demangling",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Watch a users session when they encounter an error.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "error_tracking_issue_recordings",
+          "limit": null,
+          "name": "Linked recordings",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Get notified of new issues by email, Slack, or webhook.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "error_tracking_destinations",
+          "limit": 2,
+          "name": "Alert",
+          "note": null,
+          "unit": "alerts"
+        },
+        {
+          "description": "Debug issues faster by browsing the user's console.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "console_logs",
+          "limit": null,
+          "name": "Console logs",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "See your end-user's network performance and information alongside session recordings.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "recordings_performance",
+          "limit": null,
+          "name": "Network performance on recordings",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Analyze performance and network calls.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "session_replay_network_payloads",
+          "limit": null,
+          "name": "Network monitor",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Create playlists of certain session recordings to easily find and watch them again in the future.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "recordings_playlists",
+          "limit": null,
+          "name": "Recording playlists",
+          "note": "unlimited",
+          "unit": null
+        },
+        {
+          "description": "Keep a historical record of your data. Up to 5 years of retention available with add-on packages.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "session_replay_data_retention",
+          "limit": 1,
+          "name": "Data retention",
+          "note": null,
+          "unit": "month"
+        },
+        {
+          "description": "Disable capturing data from any DOM element with HTML attributes or a customizable config.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_mask_sensitive_data",
+          "limit": null,
+          "name": "Block sensitive data",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Share replays directly via URL or embed via iframe.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_sharing_embedding",
+          "limit": null,
+          "name": "Share and embed",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "See a history of everything that happened in a user's session.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_product_analytics_integration",
+          "limit": null,
+          "name": "Event timeline",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Filter by person properties to quickly find relevant recordings.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_filter_person_properties",
+          "limit": null,
+          "name": "Filter person properties",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Filter by events to quickly find relevant recordings.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_filter_events",
+          "limit": null,
+          "name": "Filter events",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Freeze snapshots of recordings and explore the DOM with your browser dev tools.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_dom_explorer",
+          "limit": null,
+          "name": "DOM Explorer",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Restrict the percentage of sessions that will be recorded.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "session_replay_sampling",
+          "limit": null,
+          "name": "Sample recorded sessions",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Only record sessions longer than the minimum duration.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_recording_duration_minimum",
+          "limit": null,
+          "name": "Minimum duration",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Only record sessions for users that have the flag enabled.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_feature_flag_based_recording",
+          "limit": null,
+          "name": "Record via feature flag",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Record sessions on your web app.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_web_sdk",
+          "limit": null,
+          "name": "Web recordings",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Record sessions on your Android app.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_android_sdk",
+          "limit": null,
+          "name": "Android recordings",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Record sessions on your iOS app.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_ios_sdk",
+          "limit": null,
+          "name": "iOS recordings",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Record sessions on your React Native app.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_react_native_sdk",
+          "limit": null,
+          "name": "React Native recordings",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Record sessions on your Flutter app.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "replay_flutter_sdk",
+          "limit": null,
+          "name": "Flutter recordings",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Enhance your user data with properties and attribution data. Great for tracking user behavior across devices and sessions and tracking person changes over time.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "enhanced_persons",
+          "limit": null,
+          "name": "Identified events",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Send emails to your users with workflows.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "workflows_emails",
+          "limit": null,
+          "name": "Workflow emails",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Save trends, funnels, and other insights for easy reference by your whole team.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "dashboards",
+          "limit": null,
+          "name": "Dashboards",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Visualize user dropoff between a sequence of events. See conversion rate over time, use flexible step ordering, set exclusion steps, and more.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "funnels",
+          "limit": null,
+          "name": "Funnels",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Plot any number of events or actions over time.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "graphs_trends",
+          "limit": null,
+          "name": "Graphs & trends",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Customize columns across the app.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "customize_columns",
+          "limit": null,
+          "name": "Customize columns",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Limited paths excludes: customizing path insights by setting the maximum number of paths, number of people on each path, how path names appear",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "paths",
+          "limit": null,
+          "name": "User paths",
+          "note": "Limited",
+          "unit": null
+        },
+        {
+          "description": "Keep a historical record of your data.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "product_analytics_data_retention",
+          "limit": 1,
+          "name": "Data retention",
+          "note": null,
+          "unit": "year"
+        },
+        {
+          "description": "Set up alerts to notify you when certain events happen.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "alerts",
+          "limit": 2,
+          "name": "Alerts",
+          "note": null,
+          "unit": "alert"
+        },
+        {
+          "description": "Track users across devices and sessions.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "tracked_users",
+          "limit": null,
+          "name": "Tracked users",
+          "note": "Unlimited",
+          "unit": null
+        },
+        {
+          "description": "PostHog doesn't charge per seat add your entire team!",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "team_members",
+          "limit": null,
+          "name": "Team members",
+          "note": "Unlimited",
+          "unit": null
+        },
+        {
+          "description": "Organize environments within a project. Share dashboards, insights and more across environments without duplicating work.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "organizations_projects",
+          "limit": 1,
+          "name": "Projects",
+          "note": null,
+          "unit": "project"
+        },
+        {
+          "description": "Create separate silos of data within a project. Data belongs to a single environment and all queries are environment-specific.",
+          "entitlement_only": true,
+          "is_plan_default": true,
+          "key": "environments",
+          "limit": 2,
+          "name": "Environments",
+          "note": null,
+          "unit": "environment"
+        },
+        {
+          "description": "Access your data via our developer-friendly API.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "api_access",
+          "limit": null,
+          "name": "API access",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Log in to PostHog with your Google, Github, or Gitlab account.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "social_sso",
+          "limit": null,
+          "name": "SSO via Google, Github, or Gitlab",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Get help from other users and PostHog team members in our Community forums.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "community_support",
+          "limit": null,
+          "name": "Community support",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Secure your PostHog account with two-factor authentication.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "2fa",
+          "limit": null,
+          "name": "2FA",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Get help from our team!",
+          "entitlement_only": true,
+          "is_plan_default": true,
+          "key": "support_response_time",
+          "limit": null,
+          "name": "Target support response time",
+          "note": "Community support only",
+          "unit": null
+        },
+        {
+          "description": "Configure settings for publicly shared resources like insights and dashboards.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "shared_resource_configurations",
+          "limit": 1,
+          "name": "Shared resource configurations",
+          "note": null,
+          "unit": "configuration"
+        },
+        {
+          "description": "Instantly send data to hundreds of third-party tools to trigger automations, send emails, enhance ads, and more.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_pipelines_real_time",
+          "limit": null,
+          "name": "100+ realtime destinations",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Send data to internal tools like Slack so you get notified whenever important events happen.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_pipelines_slack",
+          "limit": null,
+          "name": "Trigger notifications & webhooks",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Transform, enrich, sample, or drop events as they arrive \u2014 before ingestion, at no extra cost.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_pipelines_transform",
+          "limit": null,
+          "name": "Free event transformation",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Get a massive free allowance every month to try the integrations you need, and only pay for usage at scale.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_pipelines_free_allowance",
+          "limit": null,
+          "name": "Only pay for what you use",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Send your data to 100+ destinations with workflows.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "workflows_destinations",
+          "limit": null,
+          "name": "Workflow destinations",
+          "note": null,
+          "unit": null
+        },
+        {
+          "description": "Sync free historical rows in the first 7 days for each new source.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "data_warehouse_historical_rows",
+          "limit": null,
+          "name": "Free historical syncs",
+          "note": null,
+          "unit": null
+        }
+      ],
+      "created_at": "2026-02-03T11:44:47.890984Z",
+      "customer_id": null,
+      "default_anonymize_ips": false,
+      "default_experiment_stats_method": "bayesian",
+      "default_role_id": null,
+      "enforce_2fa": null,
+      "id": "019c2351-c712-0000-8470-cf277880e65a",
+      "is_active": true,
+      "is_ai_data_processing_approved": false,
+      "is_member_join_email_enabled": true,
+      "is_not_active_reason": null,
+      "logo_media_id": null,
+      "member_count": 1,
+      "members_can_invite": true,
+      "members_can_use_personal_api_keys": true,
+      "membership_level": 15,
+      "metadata": {
+        "instance_tag": "none"
+      },
+      "name": "Estuary",
+      "plugins_access_level": 3,
+      "projects": [
+        {
+          "id": 304748,
+          "name": "Default project",
+          "organization_id": "019c2351-c712-0000-8470-cf277880e65a"
+        }
+      ],
+      "slug": "estuary-dcro",
+      "teams": [
+        {
+          "access_control": false,
+          "api_token": "phc_LBtLjvA9nNdXVxUypMYevTWAWCI4h7xBCtCMjTxncDf",
+          "completed_snippet_onboarding": false,
+          "has_completed_onboarding_for": {
+            "product_analytics": true
+          },
+          "id": 304748,
+          "ingested_event": true,
+          "is_demo": false,
+          "name": "Default project",
+          "organization": "019c2351-c712-0000-8470-cf277880e65a",
+          "project_id": 304748,
+          "timezone": "UTC",
+          "uuid": "019c2351-c720-0000-990d-d080c67e1de8"
+        }
+      ],
+      "updated_at": "2026-02-09T13:40:22.622469Z"
+    }
+  ],
+  [
+    "acmeCo/Persons",
+    {
+      "$virt_initial_channel_type": "Unknown",
+      "$virt_initial_referring_domain_type": null,
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2026-02-06T11:39:15Z",
+      "id": "66c138ff-6ce2-5223-8006-6f0d0eea9ced",
+      "is_identified": 0,
+      "last_seen_at": null,
+      "properties": "{\"name\":\"Test User 2\",\"email\":\"user-2@example.com\",\"$current_url\":\"https://example.com\",\"$geoip_latitude\":-36,\"$geoip_city_name\":null,\"$geoip_longitude\":-59.9964,\"$geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_postal_code\":\"1772\",\"$creator_event_uuid\":\"019c32bf-c9d2-74b0-bb21-aa8b536dc198\",\"$geoip_country_code\":\"AR\",\"$geoip_country_name\":\"Argentina\",\"$initial_current_url\":\"https://example.com\",\"$geoip_continent_code\":\"SA\",\"$geoip_continent_name\":\"South America\",\"$geoip_accuracy_radius\":10,\"$geoip_city_confidence\":null,\"$initial_geoip_latitude\":-36,\"$initial_geoip_city_name\":null,\"$initial_geoip_longitude\":-59.9964,\"$initial_geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_subdivision_1_code\":\"B\",\"$geoip_subdivision_1_name\":\"Buenos Aires\",\"$geoip_subdivision_2_code\":null,\"$geoip_subdivision_2_name\":null,\"$initial_geoip_postal_code\":\"1772\",\"$initial_geoip_country_code\":\"AR\",\"$initial_geoip_country_name\":\"Argentina\",\"$initial_geoip_continent_code\":\"SA\",\"$initial_geoip_continent_name\":\"South America\",\"$initial_geoip_accuracy_radius\":10,\"$initial_geoip_city_confidence\":null,\"$initial_geoip_subdivision_1_code\":\"B\",\"$initial_geoip_subdivision_1_name\":\"Buenos Aires\",\"$initial_geoip_subdivision_2_code\":null,\"$initial_geoip_subdivision_2_name\":null}"
+    }
+  ],
+  [
+    "acmeCo/Persons",
+    {
+      "$virt_initial_channel_type": "Unknown",
+      "$virt_initial_referring_domain_type": null,
+      "_meta": {
+        "op": "c",
+        "row_id": 1,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2026-02-03T16:07:37Z",
+      "id": "602301e5-4074-5bfb-9fec-63d69c928678",
+      "is_identified": 0,
+      "last_seen_at": null,
+      "properties": "{\"name\":\"Test User\",\"email\":\"user@example.com\",\"$current_url\":\"https://example.com\",\"$geoip_latitude\":-36,\"$geoip_city_name\":null,\"$geoip_longitude\":-59.9964,\"$geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_postal_code\":\"1772\",\"$creator_event_uuid\":\"019c2442-66ff-7fd0-9504-768135539eeb\",\"$geoip_country_code\":\"AR\",\"$geoip_country_name\":\"Argentina\",\"$initial_current_url\":\"https://example.com\",\"$geoip_continent_code\":\"SA\",\"$geoip_continent_name\":\"South America\",\"$geoip_accuracy_radius\":5,\"$geoip_city_confidence\":null,\"$initial_geoip_latitude\":-36,\"$initial_geoip_city_name\":null,\"$initial_geoip_longitude\":-59.9964,\"$initial_geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_subdivision_1_code\":\"B\",\"$geoip_subdivision_1_name\":\"Buenos Aires\",\"$geoip_subdivision_2_code\":null,\"$geoip_subdivision_2_name\":null,\"$initial_geoip_postal_code\":\"1772\",\"$initial_geoip_country_code\":\"AR\",\"$initial_geoip_country_name\":\"Argentina\",\"$initial_geoip_continent_code\":\"SA\",\"$initial_geoip_continent_name\":\"South America\",\"$initial_geoip_accuracy_radius\":5,\"$initial_geoip_city_confidence\":null,\"$initial_geoip_subdivision_1_code\":\"B\",\"$initial_geoip_subdivision_1_name\":\"Buenos Aires\",\"$initial_geoip_subdivision_2_code\":null,\"$initial_geoip_subdivision_2_name\":null}"
+    }
+  ],
+  [
+    "acmeCo/Projects",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "access_control": false,
+      "api_token": "phc_LBtLjvA9nNdXVxUypMYevTWAWCI4h7xBCtCMjTxncDf",
+      "completed_snippet_onboarding": false,
+      "has_completed_onboarding_for": {
+        "product_analytics": true
+      },
+      "id": 304748,
+      "ingested_event": true,
+      "is_demo": false,
+      "name": "Default project",
+      "organization": "019c2351-c712-0000-8470-cf277880e65a",
+      "timezone": "UTC",
+      "uuid": "019c2351-c720-0000-990d-d080c67e1de8"
+    }
+  ],
+  [
+    "acmeCo/Events",
+    {
+      "$group_0": "",
+      "$group_1": "",
+      "$group_2": "",
+      "$group_3": "",
+      "$group_4": "",
+      "$session_id": "",
+      "$window_id": "",
+      "_meta": {
+        "project_id": 304748,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2026-02-03T16:07:48.544000Z",
+      "distinct_id": "user_123",
+      "elements_chain": "",
+      "elements_chain_elements": [],
+      "elements_chain_href": "",
+      "elements_chain_ids": [],
+      "elements_chain_texts": [],
+      "event": "test_event",
+      "event_issue_id": null,
+      "event_person_id": "602301e5-4074-5bfb-9fec-63d69c928678",
+      "issue_id": null,
+      "person_id": "602301e5-4074-5bfb-9fec-63d69c928678",
+      "person_mode": "full",
+      "properties": "{\"$current_url\":\"https://example.com\",\"custom_property\":\"value\",\"$set\":{\"email\":\"user@example.com\",\"name\":\"Test User\",\"$geoip_city_name\":null,\"$geoip_city_confidence\":null,\"$geoip_subdivision_2_name\":null,\"$geoip_subdivision_2_code\":null,\"$geoip_subdivision_1_name\":\"Buenos Aires\",\"$geoip_subdivision_1_code\":\"B\",\"$geoip_country_name\":\"Argentina\",\"$geoip_country_code\":\"AR\",\"$geoip_continent_name\":\"South America\",\"$geoip_continent_code\":\"SA\",\"$geoip_postal_code\":\"1772\",\"$geoip_latitude\":-36,\"$geoip_longitude\":-59.9964,\"$geoip_accuracy_radius\":5,\"$geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$current_url\":\"https://example.com\"},\"$ip\":\"2800:2148:6080:706:1479:a5e7:e0d0:c77d\",\"$set_once\":{\"$initial_geoip_city_name\":null,\"$initial_geoip_city_confidence\":null,\"$initial_geoip_subdivision_2_name\":null,\"$initial_geoip_subdivision_2_code\":null,\"$initial_geoip_subdivision_1_name\":\"Buenos Aires\",\"$initial_geoip_subdivision_1_code\":\"B\",\"$initial_geoip_country_name\":\"Argentina\",\"$initial_geoip_country_code\":\"AR\",\"$initial_geoip_continent_name\":\"South America\",\"$initial_geoip_continent_code\":\"SA\",\"$initial_geoip_postal_code\":\"1772\",\"$initial_geoip_latitude\":-36,\"$initial_geoip_longitude\":-59.9964,\"$initial_geoip_accuracy_radius\":5,\"$initial_geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$initial_current_url\":\"https://example.com\"},\"$geoip_country_name\":\"Argentina\",\"$geoip_country_code\":\"AR\",\"$geoip_continent_name\":\"South America\",\"$geoip_continent_code\":\"SA\",\"$geoip_postal_code\":\"1772\",\"$geoip_latitude\":-36,\"$geoip_longitude\":-59.9964,\"$geoip_accuracy_radius\":5,\"$geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_subdivision_1_code\":\"B\",\"$geoip_subdivision_1_name\":\"Buenos Aires\",\"$transformations_succeeded\":[\"GeoIP (019c2351-c856-0000-d8c7-8db005fcdfc9)\"]}",
+      "timestamp": "2026-02-03T16:07:37.471000Z",
+      "uuid": "019c2442-66ff-7fd0-9504-768135539eeb"
+    }
+  ],
+  [
+    "acmeCo/Events",
+    {
+      "$group_0": "",
+      "$group_1": "",
+      "$group_2": "",
+      "$group_3": "",
+      "$group_4": "",
+      "$session_id": "",
+      "$window_id": "",
+      "_meta": {
+        "project_id": 304748,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2026-02-06T11:39:20.759000Z",
+      "distinct_id": "user_234",
+      "elements_chain": "",
+      "elements_chain_elements": [],
+      "elements_chain_href": "",
+      "elements_chain_ids": [],
+      "elements_chain_texts": [],
+      "event": "test_event 2",
+      "event_issue_id": null,
+      "event_person_id": "66c138ff-6ce2-5223-8006-6f0d0eea9ced",
+      "issue_id": null,
+      "person_id": "66c138ff-6ce2-5223-8006-6f0d0eea9ced",
+      "person_mode": "full",
+      "properties": "{\"$set\":{\"email\":\"user-2@example.com\",\"name\":\"Test User 2\",\"$geoip_city_name\":null,\"$geoip_city_confidence\":null,\"$geoip_subdivision_2_name\":null,\"$geoip_subdivision_2_code\":null,\"$geoip_subdivision_1_name\":\"Buenos Aires\",\"$geoip_subdivision_1_code\":\"B\",\"$geoip_country_name\":\"Argentina\",\"$geoip_country_code\":\"AR\",\"$geoip_continent_name\":\"South America\",\"$geoip_continent_code\":\"SA\",\"$geoip_postal_code\":\"1772\",\"$geoip_latitude\":-36,\"$geoip_longitude\":-59.9964,\"$geoip_accuracy_radius\":10,\"$geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$current_url\":\"https://example.com\"},\"$current_url\":\"https://example.com\",\"custom_property\":\"value 2\",\"$ip\":\"2800:810:595:1027:945f:998:9b52:6828\",\"$set_once\":{\"$initial_geoip_city_name\":null,\"$initial_geoip_city_confidence\":null,\"$initial_geoip_subdivision_2_name\":null,\"$initial_geoip_subdivision_2_code\":null,\"$initial_geoip_subdivision_1_name\":\"Buenos Aires\",\"$initial_geoip_subdivision_1_code\":\"B\",\"$initial_geoip_country_name\":\"Argentina\",\"$initial_geoip_country_code\":\"AR\",\"$initial_geoip_continent_name\":\"South America\",\"$initial_geoip_continent_code\":\"SA\",\"$initial_geoip_postal_code\":\"1772\",\"$initial_geoip_latitude\":-36,\"$initial_geoip_longitude\":-59.9964,\"$initial_geoip_accuracy_radius\":10,\"$initial_geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$initial_current_url\":\"https://example.com\"},\"$geoip_country_name\":\"Argentina\",\"$geoip_country_code\":\"AR\",\"$geoip_continent_name\":\"South America\",\"$geoip_continent_code\":\"SA\",\"$geoip_postal_code\":\"1772\",\"$geoip_latitude\":-36,\"$geoip_longitude\":-59.9964,\"$geoip_accuracy_radius\":10,\"$geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_subdivision_1_code\":\"B\",\"$geoip_subdivision_1_name\":\"Buenos Aires\",\"$transformations_succeeded\":[\"GeoIP (019c2351-c856-0000-d8c7-8db005fcdfc9)\"]}",
+      "timestamp": "2026-02-06T11:39:15.794000Z",
+      "uuid": "019c32bf-c9d2-74b0-bb21-aa8b536dc198"
+    }
+  ],
+  [
+    "acmeCo/FeatureFlags",
+    {
+      "_meta": {
+        "project_id": 304748,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "analytics_dashboards": [],
+      "bucketing_identifier": "distinct_id",
+      "can_edit": true,
+      "created_at": "2026-02-10T02:54:57.187802Z",
+      "created_by": {
+        "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
+        "email": "nicolas@estuary.dev",
+        "first_name": "Nicolas",
+        "hedgehog_config": null,
+        "id": 405869,
+        "is_email_verified": true,
+        "last_name": "Lazo",
+        "role_at_organization": "engineering",
+        "uuid": "019c2351-c716-0000-37ba-0f2c008d919e"
+      },
+      "deleted": false,
+      "ensure_experience_continuity": false,
+      "evaluation_runtime": "all",
+      "evaluation_tags": [],
+      "experiment_set": [],
+      "features": [],
+      "filters": {
+        "groups": [
+          {
+            "properties": [],
+            "rollout_percentage": 100
+          }
+        ]
+      },
+      "has_encrypted_payloads": false,
+      "has_enriched_analytics": false,
+      "id": 581591,
+      "is_remote_configuration": false,
+      "key": "test-flag-1",
+      "last_called_at": null,
+      "last_modified_by": {
+        "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
+        "email": "nicolas@estuary.dev",
+        "first_name": "Nicolas",
+        "hedgehog_config": null,
+        "id": 405869,
+        "is_email_verified": true,
+        "last_name": "Lazo",
+        "role_at_organization": "engineering",
+        "uuid": "019c2351-c716-0000-37ba-0f2c008d919e"
+      },
+      "name": "Test Flag 1",
+      "performed_rollback": false,
+      "rollback_conditions": null,
+      "status": "ACTIVE",
+      "surveys": [],
+      "tags": [],
+      "updated_at": "2026-02-10T02:54:57.528838Z",
+      "usage_dashboard": 1266175,
+      "user_access_level": "manager",
+      "version": "redacted"
+    }
+  ],
+  [
+    "acmeCo/FeatureFlags",
+    {
+      "_meta": {
+        "project_id": 304748,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "analytics_dashboards": [],
+      "bucketing_identifier": "distinct_id",
+      "can_edit": true,
+      "created_at": "2026-02-10T02:55:06.884876Z",
+      "created_by": {
+        "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
+        "email": "nicolas@estuary.dev",
+        "first_name": "Nicolas",
+        "hedgehog_config": null,
+        "id": 405869,
+        "is_email_verified": true,
+        "last_name": "Lazo",
+        "role_at_organization": "engineering",
+        "uuid": "019c2351-c716-0000-37ba-0f2c008d919e"
+      },
+      "deleted": false,
+      "ensure_experience_continuity": false,
+      "evaluation_runtime": "all",
+      "evaluation_tags": [],
+      "experiment_set": [],
+      "features": [],
+      "filters": {
+        "groups": [
+          {
+            "properties": [],
+            "rollout_percentage": 100
+          }
+        ]
+      },
+      "has_encrypted_payloads": false,
+      "has_enriched_analytics": false,
+      "id": 581592,
+      "is_remote_configuration": false,
+      "key": "test-flag-2",
+      "last_called_at": null,
+      "last_modified_by": {
+        "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
+        "email": "nicolas@estuary.dev",
+        "first_name": "Nicolas",
+        "hedgehog_config": null,
+        "id": 405869,
+        "is_email_verified": true,
+        "last_name": "Lazo",
+        "role_at_organization": "engineering",
+        "uuid": "019c2351-c716-0000-37ba-0f2c008d919e"
+      },
+      "name": "Test Flag 2",
+      "performed_rollback": false,
+      "rollback_conditions": null,
+      "status": "ACTIVE",
+      "surveys": [],
+      "tags": [],
+      "updated_at": "2026-02-10T02:55:07.324017Z",
+      "usage_dashboard": 1266176,
+      "user_access_level": "manager",
+      "version": "redacted"
+    }
+  ],
+  [
+    "acmeCo/FeatureFlags",
+    {
+      "_meta": {
+        "project_id": 304748,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "analytics_dashboards": [],
+      "bucketing_identifier": "distinct_id",
+      "can_edit": true,
+      "created_at": "2026-02-10T02:55:16.873313Z",
+      "created_by": {
+        "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
+        "email": "nicolas@estuary.dev",
+        "first_name": "Nicolas",
+        "hedgehog_config": null,
+        "id": 405869,
+        "is_email_verified": true,
+        "last_name": "Lazo",
+        "role_at_organization": "engineering",
+        "uuid": "019c2351-c716-0000-37ba-0f2c008d919e"
+      },
+      "deleted": false,
+      "ensure_experience_continuity": false,
+      "evaluation_runtime": "all",
+      "evaluation_tags": [],
+      "experiment_set": [],
+      "features": [],
+      "filters": {
+        "groups": [
+          {
+            "properties": [],
+            "rollout_percentage": 100
+          }
+        ]
+      },
+      "has_encrypted_payloads": false,
+      "has_enriched_analytics": false,
+      "id": 581593,
+      "is_remote_configuration": false,
+      "key": "test-flag-3",
+      "last_called_at": null,
+      "last_modified_by": {
+        "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
+        "email": "nicolas@estuary.dev",
+        "first_name": "Nicolas",
+        "hedgehog_config": null,
+        "id": 405869,
+        "is_email_verified": true,
+        "last_name": "Lazo",
+        "role_at_organization": "engineering",
+        "uuid": "019c2351-c716-0000-37ba-0f2c008d919e"
+      },
+      "name": "Test Flag 3",
+      "performed_rollback": false,
+      "rollback_conditions": null,
+      "status": "ACTIVE",
+      "surveys": [],
+      "tags": [],
+      "updated_at": "2026-02-10T02:55:17.776415Z",
+      "usage_dashboard": 1266177,
+      "user_access_level": "manager",
+      "version": "redacted"
+    }
+  ],
+  [
+    "acmeCo/FeatureFlags",
+    {
+      "_meta": {
+        "project_id": 304748,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "analytics_dashboards": [],
+      "bucketing_identifier": "distinct_id",
+      "can_edit": true,
+      "created_at": "2026-02-10T02:55:21.201339Z",
+      "created_by": {
+        "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
+        "email": "nicolas@estuary.dev",
+        "first_name": "Nicolas",
+        "hedgehog_config": null,
+        "id": 405869,
+        "is_email_verified": true,
+        "last_name": "Lazo",
+        "role_at_organization": "engineering",
+        "uuid": "019c2351-c716-0000-37ba-0f2c008d919e"
+      },
+      "deleted": false,
+      "ensure_experience_continuity": false,
+      "evaluation_runtime": "all",
+      "evaluation_tags": [],
+      "experiment_set": [],
+      "features": [],
+      "filters": {
+        "groups": [
+          {
+            "properties": [],
+            "rollout_percentage": 100
+          }
+        ]
+      },
+      "has_encrypted_payloads": false,
+      "has_enriched_analytics": false,
+      "id": 581594,
+      "is_remote_configuration": false,
+      "key": "test-flag-4",
+      "last_called_at": null,
+      "last_modified_by": {
+        "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
+        "email": "nicolas@estuary.dev",
+        "first_name": "Nicolas",
+        "hedgehog_config": null,
+        "id": 405869,
+        "is_email_verified": true,
+        "last_name": "Lazo",
+        "role_at_organization": "engineering",
+        "uuid": "019c2351-c716-0000-37ba-0f2c008d919e"
+      },
+      "name": "Test Flag 4",
+      "performed_rollback": false,
+      "rollback_conditions": null,
+      "status": "ACTIVE",
+      "surveys": [],
+      "tags": [],
+      "updated_at": "2026-02-10T02:55:21.445176Z",
+      "usage_dashboard": 1266179,
+      "user_access_level": "manager",
+      "version": "redacted"
+    }
+  ],
+  [
+    "acmeCo/FeatureFlags",
+    {
+      "_meta": {
+        "project_id": 304748,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "analytics_dashboards": [],
+      "bucketing_identifier": "distinct_id",
+      "can_edit": true,
+      "created_at": "2026-02-10T02:55:24.836113Z",
+      "created_by": {
+        "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
+        "email": "nicolas@estuary.dev",
+        "first_name": "Nicolas",
+        "hedgehog_config": null,
+        "id": 405869,
+        "is_email_verified": true,
+        "last_name": "Lazo",
+        "role_at_organization": "engineering",
+        "uuid": "019c2351-c716-0000-37ba-0f2c008d919e"
+      },
+      "deleted": false,
+      "ensure_experience_continuity": false,
+      "evaluation_runtime": "all",
+      "evaluation_tags": [],
+      "experiment_set": [],
+      "features": [],
+      "filters": {
+        "groups": [
+          {
+            "properties": [],
+            "rollout_percentage": 100
+          }
+        ]
+      },
+      "has_encrypted_payloads": false,
+      "has_enriched_analytics": false,
+      "id": 581595,
+      "is_remote_configuration": false,
+      "key": "test-flag-5",
+      "last_called_at": null,
+      "last_modified_by": {
+        "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
+        "email": "nicolas@estuary.dev",
+        "first_name": "Nicolas",
+        "hedgehog_config": null,
+        "id": 405869,
+        "is_email_verified": true,
+        "last_name": "Lazo",
+        "role_at_organization": "engineering",
+        "uuid": "019c2351-c716-0000-37ba-0f2c008d919e"
+      },
+      "name": "Test Flag 5",
+      "performed_rollback": false,
+      "rollback_conditions": null,
+      "status": "ACTIVE",
+      "surveys": [],
+      "tags": [],
+      "updated_at": "2026-02-10T02:55:25.138306Z",
+      "usage_dashboard": 1266180,
+      "user_access_level": "manager",
+      "version": "redacted"
+    }
+  ]
+]
