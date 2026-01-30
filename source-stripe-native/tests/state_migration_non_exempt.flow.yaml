@@ -1,0 +1,19 @@
+---
+# Minimal flow file for testing non-exempt stream state (should NOT migrate)
+import:
+  - ../acmeCo/flow.yaml
+captures:
+  acmeCo/source-stripe-native:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_stripe_native
+        config: ../config.yaml
+    bindings:
+      - resource:
+          name: Persons
+        target: acmeCo/Persons
+    shards:
+      logLevel: debug

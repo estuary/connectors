@@ -1,21 +1,20 @@
-from datetime import datetime, timezone, timedelta
-from pydantic import BaseModel, Field, AwareDatetime, AliasChoices
+from datetime import datetime, timedelta, timezone
 from typing import (
-    Literal,
-    Generic,
-    TypeVar,
     ClassVar,
     Dict,
+    Generic,
     List,
+    Literal,
+    TypeVar,
 )
 
-from estuary_cdk.flow import AccessToken
-
 from estuary_cdk.capture.common import (
-    ConnectorState as GenericConnectorState,
     BaseDocument,
     ResourceState,
 )
+from estuary_cdk.capture.common import ConnectorState as GenericConnectorState
+from estuary_cdk.flow import AccessToken
+from pydantic import AliasChoices, AwareDatetime, BaseModel, Field
 
 
 def default_start_date():
@@ -170,16 +169,14 @@ class Events(BaseStripeObjectWithEvents):
     EVENT_TYPES: ClassVar[dict[str, Literal["c", "u", "d"]]] = {}
 
 
-# Could not verify Accounts events are generated in test mode, but suspect
-# they are generated in Stripe's live mode.
-class Accounts(BaseStripeObjectWithEvents):
+# Accounts uses the list endpoint for incremental capture since Stripe's event
+# generation for accounts is inconsistent. Scheduled backfill provides guaranteed
+# eventual consistency.
+class Accounts(BaseStripeObjectNoEvents):
     NAME: ClassVar[str] = "Accounts"
     SEARCH_NAME: ClassVar[str] = "accounts"
-    EVENT_TYPES: ClassVar[dict[str, Literal["c", "u", "d"]]] = {
-        "account.updated": "u",
-    }
 
-    # Accounts docs returned in account.updated events may not have a created field.
+    # The /v1/account endpoint (platform account) may not include a created field.
     created: int = Field(
         default=None,
         # Don't schematize the default value.
@@ -187,8 +184,8 @@ class Accounts(BaseStripeObjectWithEvents):
     )
 
 
-# Could not verify Persons events are generated in test mode, but suspect
-# they are generated in Stripe's live mode.
+# Persons events may not consistently appear in Stripe's event table.
+# Scheduled backfill provides guaranteed eventual consistency.
 class Persons(BaseStripeChildObject):
     """
     Parent Stream: Accounts
@@ -203,8 +200,8 @@ class Persons(BaseStripeChildObject):
     }
 
 
-# Could not verify the ExternalAccountCards event types are actually generated
-# by the Stripe API.
+# ExternalAccountCards events may not consistently appear in Stripe's event table.
+# Scheduled backfill provides guaranteed eventual consistency.
 class ExternalAccountCards(BaseStripeChildObject):
     """
     Parent Stream: Accounts
@@ -219,8 +216,8 @@ class ExternalAccountCards(BaseStripeChildObject):
     }
 
 
-# Could not verify the ExternalBankAccounts event types are actually generated
-# by the Stripe API.
+# ExternalBankAccount events may not consistently appear in Stripe's event table.
+# Scheduled backfill provides guaranteed eventual consistency.
 class ExternalBankAccount(BaseStripeChildObject):
     """
     Parent Stream: Accounts
@@ -816,10 +813,18 @@ SPLIT_CHILD_STREAM_NAMES = [
     ExternalBankAccount.NAME,
 ]
 
-# Streams that should not use the Stripe-Account header or have account_id set from the parent account
-# These streams either represent accounts themselves or are directly related to accounts in a way
-# that they should be accessed from the platform account context rather than a connected account
+# Streams that should not create per-account subtasks when capture_connected_accounts=true.
+# Only Accounts needs this because /v1/accounts lists all connected accounts from the platform.
+# Other streams need per-account subtasks to query each connected account's events.
+# This is also used in api.py for Stripe-Account header logic.
 CONNECTED_ACCOUNT_EXEMPT_STREAMS = [
+    "Accounts",
+]
+
+# Streams that should have scheduled backfills for eventual consistency.
+# These streams may have unreliable event generation in Stripe's Events API,
+# so scheduled backfills ensure we don't miss any data.
+SCHEDULED_BACKFILL_STREAMS = [
     "Accounts",
     "ExternalAccountCards",
     "ExternalBankAccount",
