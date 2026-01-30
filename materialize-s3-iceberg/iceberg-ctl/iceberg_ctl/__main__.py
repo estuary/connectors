@@ -1,5 +1,7 @@
 import asyncio
 import json
+import os
+import resource
 import sys
 import time
 import traceback
@@ -427,11 +429,17 @@ def append_files(
             time.sleep(attempt * 2)
             attempt += 1
 
-    log(f"append_files: reloading table to verify update")
-    tbl = catalog.load_table(table)
-    log(f"append_files: table reloaded, operation complete")
-    print(f"{table} updated with flow_checkpoints_v1 property of {tbl.properties.get('flow_checkpoints_v1')} from {cp} after {attempt} attempts")
+    print(f"{table} updated to {next_checkpoint} after {attempt} attempts")
 
 
 if __name__ == "__main__":
+    try:
+        # Configure Python memory limits based on PYMEMLIMIT environment variable.
+        # This variable is used so that Go and Python limits can be tuned in the
+        # same place in the connector Dockerfile.
+        if pymemlimit := os.getenv("PYMEMLIMIT"):
+            limit_bytes = int(pymemlimit) * 1024 * 1024
+            resource.setrlimit(resource.RLIMIT_AS, (limit_bytes, resource.RLIM_INFINITY))
+    except (ValueError, OSError) as e:
+        print(f"warning: failed to set memory limit from PYMEMLIMIT={pymemlimit}: {e}", file=sys.stderr, flush=True)
     run(auto_envvar_prefix="ICEBERG")
