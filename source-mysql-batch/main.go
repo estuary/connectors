@@ -146,6 +146,14 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 		address = "localhost:3306"
 	}
 
+	// We want to protect against hangs during the initial connection process, but
+	// use a more lenient timeout for normal operation. This timer enforces a strict
+	// deadline on connection establishment only.
+	var connectionTimer = time.AfterFunc(60*time.Second, func() {
+		log.WithField("addr", address).Fatal("failed to connect before deadline")
+	})
+	defer connectionTimer.Stop()
+
 	var conn *client.Conn
 
 	const mysqlErrorCodeSecureTransportRequired = 3159 // From https://dev.mysql.com/doc/mysql-errors/8.4/en/server-error-reference.html
@@ -155,7 +163,11 @@ func connectMySQL(ctx context.Context, cfg *Config) (*client.Conn, error) {
 		return nil
 	}
 	var withTimeouts = func(c *client.Conn) error {
-		c.ReadTimeout = 60 * time.Second
+		// Some polling queries can take a long time to start yielding results,
+		// especially for large tables with unindexed cursor columns. While we
+		// recommend that users add indexes as necessary, it's better to be
+		// forgiving of these delays on our end.
+		c.ReadTimeout = 30 * time.Minute
 		c.WriteTimeout = 60 * time.Second
 		return nil
 	}
