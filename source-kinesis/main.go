@@ -156,7 +156,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		updateState:     make(map[boilerplate.StateKey]map[string]*string),
 		stats:           make(map[string]map[string]shardStats),
 		glueClient:      glueClient,
-		glueSchemaCache: make(map[string]glueSchemaInfo),
+		glueSchemaCache: make(map[string]struct{}),
 	}
 
 	if err := stream.Ready(false); err != nil {

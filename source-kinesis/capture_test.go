@@ -79,7 +79,7 @@ func TestDiscover(t *testing.T) {
 			ShardCount: aws.Int32(2),
 		})
 		require.NoError(t, err, "failed to create stream")
-		awaitStreamActive(t, ctx, client, s)
+		awaitStreamCreated(t, ctx, client, s)
 	}
 
 	cs := &st.CaptureSpec{
@@ -114,7 +114,7 @@ func TestCapture(t *testing.T) {
 			ShardCount: aws.Int32(2),
 		})
 		require.NoError(t, err, "failed to create stream")
-		awaitStreamActive(t, ctx, client, s)
+		awaitStreamCreated(t, ctx, client, s)
 	}
 
 	bindings := []*pf.CaptureSpec_Binding{}
@@ -167,14 +167,14 @@ func TestCapture(t *testing.T) {
 		AdjacentShardToMerge: aws.String("shardId-000000000001"),
 	})
 	require.NoError(t, err)
-	awaitStreamActive(t, ctx, client, testStreams[0])
+	awaitStreamCreated(t, ctx, client, testStreams[0])
 	_, err = client.SplitShard(ctx, &kinesis.SplitShardInput{
 		StreamName:         aws.String(testStreams[1]),
 		ShardToSplit:       aws.String("shardId-000000000001"),
 		NewStartingHashKey: aws.String("255000000000000000000000000000000000000"),
 	})
 	require.NoError(t, err)
-	awaitStreamActive(t, ctx, client, testStreams[1])
+	awaitStreamCreated(t, ctx, client, testStreams[1])
 	advanceCapture(t, &capture)
 
 	// New data added after the shard changes is captured.
@@ -203,7 +203,7 @@ func TestCaptureParsing(t *testing.T) {
 		ShardCount: aws.Int32(2),
 	})
 	require.NoError(t, err, "failed to create stream")
-	awaitStreamActive(t, ctx, client, testStream)
+	awaitStreamCreated(t, ctx, client, testStream)
 
 	resourceJson, err := json.Marshal(resource{
 		Stream: testStream,
@@ -343,10 +343,7 @@ func TestCaptureGlueSchema(t *testing.T) {
 		ShardCount: aws.Int32(1),
 	})
 	require.NoError(t, err, "failed to create stream")
-	awaitStreamActive(t, ctx, client, testStream)
-
-	// Small delay to ensure stream is fully propagated in AWS
-	time.Sleep(2 * time.Second)
+	awaitStreamCreated(t, ctx, client, testStream)
 
 	resourceJson, err := json.Marshal(resource{
 		Stream: testStream,
@@ -481,10 +478,7 @@ func TestCaptureGlueSchemaJSON(t *testing.T) {
 		ShardCount: aws.Int32(1),
 	})
 	require.NoError(t, err, "failed to create stream")
-	awaitStreamActive(t, ctx, client, testStream)
-
-	// Small delay to ensure stream is fully propagated in AWS
-	time.Sleep(2 * time.Second)
+	awaitStreamCreated(t, ctx, client, testStream)
 
 	resourceJson, err := json.Marshal(resource{
 		Stream: testStream,
@@ -593,34 +587,22 @@ func advanceCaptureWithTimeout(t testing.TB, cs *st.CaptureSpec, shutdownDelay t
 	})
 }
 
-func awaitStreamActive(t *testing.T, ctx context.Context, client *kinesis.Client, stream string) {
+func awaitStreamCreated(t *testing.T, ctx context.Context, client *kinesis.Client, stream string) {
 	t.Helper()
 
-	for {
-		res, err := client.DescribeStream(ctx, &kinesis.DescribeStreamInput{
-			StreamName: &stream,
-		})
-		require.NoError(t, err)
-
-		if res.StreamDescription.StreamStatus == "ACTIVE" {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
+	waiter := kinesis.NewStreamExistsWaiter(client)
+	err := waiter.Wait(ctx, &kinesis.DescribeStreamInput{
+		StreamName: &stream,
+	}, 2*time.Minute)
+	require.NoError(t, err, "timed out waiting for stream %s to be created", stream)
 }
 
 func awaitStreamDeleted(t *testing.T, ctx context.Context, client *kinesis.Client, stream string) {
 	t.Helper()
 
-	for i := 0; i < 60; i++ {
-		_, err := client.DescribeStream(ctx, &kinesis.DescribeStreamInput{
-			StreamName: &stream,
-		})
-		if err != nil {
-			// Stream doesn't exist, we're done
-			return
-		}
-		time.Sleep(2 * time.Second)
-	}
-	t.Fatalf("Timed out waiting for stream %s to be deleted", stream)
+	waiter := kinesis.NewStreamNotExistsWaiter(client)
+	err := waiter.Wait(ctx, &kinesis.DescribeStreamInput{
+		StreamName: &stream,
+	}, 2*time.Minute)
+	require.NoError(t, err, "timed out waiting for stream %s to be deleted", stream)
 }
