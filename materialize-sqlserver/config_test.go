@@ -19,13 +19,13 @@ func TestConfig(t *testing.T) {
 		Database: "namegame",
 	}
 	require.NoError(t, validConfig.Validate())
-	var uri = validConfig.ToURI()
+	var uri = validConfig.ToURI().String()
 	require.Equal(t, "sqlserver://youser:shmassword@post.toast:1234?TrustServerCertificate=true&app+name=Flow+Materialization+Connector&database=namegame&encrypt=true", uri)
 
 	var noPort = validConfig
 	noPort.Address = "post.toast"
 	require.NoError(t, noPort.Validate())
-	uri = noPort.ToURI()
+	uri = noPort.ToURI().String()
 	require.Equal(t, "sqlserver://youser:shmassword@post.toast:1433?TrustServerCertificate=true&app+name=Flow+Materialization+Connector&database=namegame&encrypt=true", uri)
 
 	var noAddress = validConfig
@@ -70,7 +70,7 @@ func TestConfigURI(t *testing.T) {
 			if err := cfg.Validate(); err != nil {
 				valid = err.Error()
 			}
-			var uri = cfg.ToURI()
+			var uri = cfg.ToURI().String()
 			cupaloy.SnapshotT(t, fmt.Sprintf("%s\n%s", uri, valid))
 		})
 	}

@@ -46,7 +46,9 @@ func TestValidateAndApply(t *testing.T) {
 		Table: "target",
 	}
 
-	db, err := stdsql.Open("sqlserver", cfg.ToURI())
+	uri := cfg.ToURI().String()
+
+	db, err := stdsql.Open("sqlserver", uri)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -79,7 +81,9 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		Table: "target",
 	}
 
-	db, err := stdsql.Open("sqlserver", cfg.ToURI())
+	uri := cfg.ToURI().String()
+
+	db, err := stdsql.Open("sqlserver", uri)
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -151,7 +155,9 @@ func TestApplyChanges(t *testing.T) {
 	resourceConfigJson, err := json.Marshal(resourceConfig)
 	require.NoError(t, err)
 
-	db, err := stdsql.Open("sqlserver", cfg.ToURI())
+	uri := cfg.ToURI().String()
+
+	db, err := stdsql.Open("sqlserver", uri)
 	require.NoError(t, err)
 	defer db.Close()
 
