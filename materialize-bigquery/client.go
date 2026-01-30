@@ -18,7 +18,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/api/iterator"
-	"google.golang.org/api/option"
 )
 
 var _ sql.SchemaManager = (*client)(nil)
@@ -209,7 +208,11 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	if bucket, err := blob.NewGCSBucket(ctx, cfg.Bucket, option.WithCredentialsJSON([]byte(cfg.CredentialsJSON))); err != nil {
+	credOption, err := cfg.CredentialsClientOption()
+	if err != nil {
+		errs.Err(err)
+	}
+	if bucket, err := blob.NewGCSBucket(ctx, cfg.Bucket, credOption); err != nil {
 		errs.Err(fmt.Errorf("creating GCS bucket: %w", err))
 	} else if err := bucket.CheckPermissions(ctx, blob.CheckPermissionsConfig{Prefix: cfg.effectiveBucketPath()}); err != nil {
 		errs.Err(err)
