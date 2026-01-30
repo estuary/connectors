@@ -3,7 +3,8 @@
     "recommendedName": "Accounts",
     "resourceConfig": {
       "name": "Accounts",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": "0 0 * * *"
     },
     "documentSchema": {
       "$defs": {
@@ -1271,7 +1272,8 @@
     "recommendedName": "ExternalAccountCards",
     "resourceConfig": {
       "name": "ExternalAccountCards",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": "0 0 * * *"
     },
     "documentSchema": {
       "$defs": {
@@ -1343,7 +1345,8 @@
     "recommendedName": "ExternalBankAccount",
     "resourceConfig": {
       "name": "ExternalBankAccount",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": "0 0 * * *"
     },
     "documentSchema": {
       "$defs": {
@@ -2017,7 +2020,8 @@
     "recommendedName": "Persons",
     "resourceConfig": {
       "name": "Persons",
-      "interval": "PT5M"
+      "interval": "PT5M",
+      "schedule": "0 0 * * *"
     },
     "documentSchema": {
       "$defs": {
