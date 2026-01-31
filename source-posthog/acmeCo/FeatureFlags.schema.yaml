@@ -1,0 +1,66 @@
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+description: PostHog feature flag.
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  id:
+    title: Id
+    type: integer
+  project_id:
+    title: Project Id
+    type: integer
+  key:
+    title: Key
+    type: string
+  name:
+    default: ''
+    title: Name
+    type: string
+  active:
+    default: true
+    title: Active
+    type: boolean
+  filters:
+    additionalProperties: true
+    title: Filters
+    type: object
+  rollout_percentage:
+    anyOf:
+    - type: integer
+    - type: 'null'
+    default: null
+    title: Rollout Percentage
+  created_at:
+    anyOf:
+    - format: date-time
+      type: string
+    - type: 'null'
+    default: null
+    title: Created At
+required:
+- id
+- project_id
+- key
+title: FeatureFlag
+type: object
+x-infer-schema: true

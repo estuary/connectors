@@ -1,0 +1,68 @@
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+description: PostHog cohort.
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  id:
+    title: Id
+    type: integer
+  project_id:
+    title: Project Id
+    type: integer
+  name:
+    title: Name
+    type: string
+  description:
+    default: ''
+    title: Description
+    type: string
+  groups:
+    items:
+      additionalProperties: true
+      type: object
+    title: Groups
+    type: array
+  is_static:
+    default: false
+    title: Is Static
+    type: boolean
+  count:
+    anyOf:
+    - type: integer
+    - type: 'null'
+    default: null
+    title: Count
+  created_at:
+    anyOf:
+    - format: date-time
+      type: string
+    - type: 'null'
+    default: null
+    title: Created At
+required:
+- id
+- project_id
+- name
+title: Cohort
+type: object
+x-infer-schema: true
