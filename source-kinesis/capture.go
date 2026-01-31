@@ -7,9 +7,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/glue"
+	glueTypes "github.com/aws/aws-sdk-go-v2/service/glue/types"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis/types"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
+	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/exp/maps"
@@ -25,6 +29,9 @@ type capture struct {
 	updateState map[boilerplate.StateKey]map[string]*string
 
 	stats map[string]map[string]shardStats
+
+	glueClient      *glue.Client
+	glueSchemaCache map[string]struct{} // tracks emitted schema version IDs
 }
 
 type shardStats struct {
@@ -383,7 +390,7 @@ func (c *capture) readShard(
 			lastSequence = res.Records[len(res.Records)-1].SequenceNumber
 		}
 
-		if err := c.processRecords(res.Records, stream, stateKey, bindingIndex, shard); err != nil {
+		if err := c.processRecords(ctx, res.Records, stream, stateKey, bindingIndex, shard); err != nil {
 			return fmt.Errorf("processing records for stream %s: %w", stream.name, err)
 		}
 		c.updateStats(stream.name, shard.shardId, len(res.Records), int(*res.MillisBehindLatest))
@@ -412,7 +419,79 @@ func (c *capture) readShard(
 	}
 }
 
+// getGlueSchemaForRecord parses the AWS Glue Schema Registry header and fetches the schema.
+// Returns the payload (data without header), schema definition, data format, whether schema was from cache, and error.
+//
+// AWS Glue Schema Registry header format:
+//   - Byte 0: Header version (expected: 3)
+//   - Byte 1: Compression type (0 = none)
+//   - Bytes 2-17: Schema version UUID (16 bytes)
+//   - Bytes 18+: Payload
+//
+// Ref: https://github.com/awslabs/aws-glue-schema-registry
+// getGlueSchemaForRecord parses a Glue header from data and returns the JSON Schema if this
+// is a newly-seen schema version. Returns nil if the schema was already cached.
+// The caller should use data[18:] as the payload after this call succeeds.
+func (c *capture) getGlueSchemaForRecord(ctx context.Context, data []byte) (json.RawMessage, error) {
+	compression := data[1]
+	if compression != 0 {
+		return nil, fmt.Errorf("compressed glue schema headers are not supported")
+	}
+
+	if c.glueClient == nil {
+		return nil, fmt.Errorf("got message with glue header, but glue connection previously failed")
+	}
+
+	schemaUUID, err := uuid.FromBytes(data[2:18])
+	if err != nil {
+		return nil, fmt.Errorf("parsing schema version UUID: %w", err)
+	}
+	schemaVersionID := schemaUUID.String()
+
+	// Check cache first - if cached, no schema to emit
+	c.mu.Lock()
+	if _, ok := c.glueSchemaCache[schemaVersionID]; ok {
+		c.mu.Unlock()
+		return nil, nil
+	}
+	c.mu.Unlock()
+
+	out, err := c.glueClient.GetSchemaVersion(ctx, &glue.GetSchemaVersionInput{
+		SchemaVersionId: aws.String(schemaVersionID),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	schemaDefinition := aws.ToString(out.SchemaDefinition)
+
+	// Cache the schema
+	c.mu.Lock()
+	c.glueSchemaCache[schemaVersionID] = struct{}{}
+	c.mu.Unlock()
+
+	// Convert to JSON Schema based on the data format
+	switch out.DataFormat {
+	case glueTypes.DataFormatAvro:
+		jsonSchemaObj, err := avroToJSONSchema(schemaDefinition)
+		if err != nil {
+			return nil, fmt.Errorf("converting avro to JSON Schema: %w", err)
+		}
+		return json.Marshal(jsonSchemaObj)
+
+	case glueTypes.DataFormatJson:
+		if !json.Valid([]byte(schemaDefinition)) {
+			return nil, fmt.Errorf("invalid JSON Schema from Glue")
+		}
+		return json.RawMessage(schemaDefinition), nil
+
+	default:
+		return nil, fmt.Errorf("unsupported Glue schema format: %s", out.DataFormat)
+	}
+}
+
 func (c *capture) processRecords(
+	ctx context.Context,
 	records []types.Record,
 	stream kinesisStream,
 	stateKey boilerplate.StateKey,
@@ -428,7 +507,28 @@ func (c *capture) processRecords(
 		lastSequence = *r.SequenceNumber
 
 		doc := map[string]json.RawMessage{}
-		if err := json.Unmarshal(r.Data, &doc); err != nil {
+
+		// Check for Glue Schema Registry header (version byte = 3)
+		// Header is 18 bytes: 1 version + 1 compression + 16 UUID
+		payload := r.Data
+		if len(r.Data) >= 18 && r.Data[0] == 3 {
+			jsonSchema, err := c.getGlueSchemaForRecord(ctx, r.Data)
+			if err != nil {
+				return fmt.Errorf(
+					"parsing glue header for record with sequenceNumber %q and partitionKey %q: %w",
+					*r.SequenceNumber, *r.PartitionKey, err,
+				)
+			}
+			payload = r.Data[18:]
+
+			if jsonSchema != nil {
+				if err := c.stream.SourcedSchema(bindingIndex, jsonSchema); err != nil {
+					return fmt.Errorf("emitting sourced schema: %w", err)
+				}
+			}
+		}
+
+		if err := json.Unmarshal(payload, &doc); err != nil {
 			return fmt.Errorf(
 				"unmarshalling record with sequenceNumber %q and partitionKey %q: %w",
 				*r.SequenceNumber, *r.PartitionKey, err,

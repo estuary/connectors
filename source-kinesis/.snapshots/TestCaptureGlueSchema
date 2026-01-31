@@ -1,0 +1,12 @@
+# ================================
+# Collection "": 3 Documents
+# ================================
+{"properties":{"id":{"type":"integer"},"name":{"type":"string"},"value":{"type":"number"}},"required":["id","name","value"],"type":"object"}
+{"_meta":{"partition_key":"partition-0","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000000","stream":"test-stream-glue"}},"id":1,"name":"first","value":1.5}
+{"_meta":{"partition_key":"partition-1","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000000","stream":"test-stream-glue"}},"id":2,"name":"second","value":2.5}
+{"_meta":{"partition_key":"partition-2","sequence_number":"<SEQUENCE_NUM>","source":{"shard":"shardId-000000000000","stream":"test-stream-glue"}},"id":3,"name":"third","value":3.5}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test-stream-glue.v0":{"shardId-000000000000":"<SEQUENCE_NUM>"}}}
+

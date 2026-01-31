@@ -4,12 +4,14 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	"os"
 	"slices"
 	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/ratelimit"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
+	"github.com/aws/aws-sdk-go-v2/service/glue"
 	"github.com/aws/aws-sdk-go-v2/service/kinesis"
 	"golang.org/x/sync/errgroup"
 
@@ -43,15 +45,18 @@ func (c *Config) Validate() error {
 	return nil
 }
 
-func connect(ctx context.Context, cfg *Config) (*kinesis.Client, error) {
+func getAwsCfg(ctx context.Context, cfg *Config) (*aws.Config, error) {
 	var err = cfg.Validate()
 	if err != nil {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
+	// Session token can be provided via environment variable for testing with temporary credentials
+	sessionToken := os.Getenv("AWS_SESSION_TOKEN")
+
 	opts := []func(*awsConfig.LoadOptions) error{
 		awsConfig.WithCredentialsProvider(
-			credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, ""),
+			credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, sessionToken),
 		),
 		awsConfig.WithRegion(cfg.Region),
 		awsConfig.WithRetryer(func() aws.Retryer {
@@ -67,6 +72,20 @@ func connect(ctx context.Context, cfg *Config) (*kinesis.Client, error) {
 		}),
 	}
 
+	awsCfg, err := awsConfig.LoadDefaultConfig(ctx, opts...)
+	if err != nil {
+		return nil, fmt.Errorf("creating aws config: %w", err)
+	}
+
+	return &awsCfg, nil
+}
+
+func connect(ctx context.Context, cfg *Config) (*kinesis.Client, error) {
+	awsCfg, err := getAwsCfg(ctx, cfg)
+	if err != nil {
+		return nil, err
+	}
+
 	var clientOpts []func(*kinesis.Options)
 	if cfg.Advanced.Endpoint != "" {
 		clientOpts = append(clientOpts, func(o *kinesis.Options) {
@@ -74,12 +93,23 @@ func connect(ctx context.Context, cfg *Config) (*kinesis.Client, error) {
 		})
 	}
 
-	awsCfg, err := awsConfig.LoadDefaultConfig(ctx, opts...)
+	return kinesis.NewFromConfig(*awsCfg, clientOpts...), nil
+}
+
+func connectGlue(ctx context.Context, cfg *Config) (*glue.Client, error) {
+	awsCfg, err := getAwsCfg(ctx, cfg)
 	if err != nil {
-		return nil, fmt.Errorf("creating aws config: %w", err)
+		return nil, err
 	}
 
-	return kinesis.NewFromConfig(awsCfg, clientOpts...), nil
+	var clientOpts []func(*glue.Options)
+	if cfg.Advanced.Endpoint != "" {
+		clientOpts = append(clientOpts, func(o *glue.Options) {
+			o.BaseEndpoint = &cfg.Advanced.Endpoint
+		})
+	}
+
+	return glue.NewFromConfig(*awsCfg, clientOpts...), nil
 }
 
 type kinesisStream struct {
