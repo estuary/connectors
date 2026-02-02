@@ -69,9 +69,16 @@ from .models import (
     Workflow,
     WorkflowsResponse,
 )
+from .shared import (
+    chunk_props,
+    dt_to_ms,
+    dt_to_str,
+    ms_to_dt,
+    str_to_dt,
+)
 
 
-# Hubspot returns a 500 internal server error if querying for data
+# Hubspot returns a 500 internal server error if querying for data at the EPOCH.
 EPOCH_PLUS_ONE_SECOND = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=1)
 HUB = "https://api.hubapi.com"
 MARKETING_EMAILS_PAGE_SIZE = 300
@@ -282,7 +289,7 @@ async def fetch_page_with_associations(
     # If this calculation results in more than one chunk of properties to retrieve based on the
     # cumulative byte lengths, we will issue multiple requests for different sets of properties and
     # combine the results together in the output documents.
-    chunked_properties = _chunk_props(
+    chunked_properties = chunk_props(
         properties_to_fetch,
         5 * 1024,
     )
@@ -754,14 +761,14 @@ async def fetch_search_objects(
             {
                 "propertyName": last_modified_property_name,
                 "operator": "BETWEEN",
-                "value": _dt_to_str(since),
-                "highValue": _dt_to_str(until),
+                "value": dt_to_str(since),
+                "highValue": dt_to_str(until),
             }
             if until
             else {
                 "propertyName": last_modified_property_name,
                 "operator": "GTE",
-                "value": _dt_to_str(since),
+                "value": dt_to_str(since),
             }
         )
 
@@ -904,7 +911,7 @@ async def fetch_search_objects_modified_at(
             {
                 "propertyName": last_modified_property_name,
                 "operator": "EQ",
-                "value": _dt_to_str(modified),
+                "value": dt_to_str(modified),
             }
         ]
 
@@ -1016,7 +1023,7 @@ def fetch_recent_companies(
             await http.request(log, url, params=params)
         )
         return (
-            (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.companyId))
+            (ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.companyId))
             for r in result.results
         ), result.hasMore and result.offset
 
@@ -1069,7 +1076,7 @@ def fetch_recent_contacts(
             await http.request(log, url, params=params)
         )
         return (
-            (_ms_to_dt(int(r.properties.lastmodifieddate.value)), str(r.vid))
+            (ms_to_dt(int(r.properties.lastmodifieddate.value)), str(r.vid))
             for r in result.contacts
         ), result.has_more and result.time_offset
 
@@ -1117,7 +1124,7 @@ def fetch_recent_deals(
         )
 
         return (
-            (_ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.dealId))
+            (ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.dealId))
             for r in result.results
         ), result.hasMore and result.offset
 
@@ -1158,7 +1165,7 @@ async def _fetch_engagements(
         await http.request(log, url, params=params)
     )
     return (
-        (_ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
+        (ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
         for r in result.results
     ), result.hasMore and result.offset
 
@@ -1221,7 +1228,7 @@ def fetch_recent_tickets(
         result = TypeAdapter(list[OldRecentTicket]).validate_json(
             await http.request(log, url, params=params)
         )
-        return ((_ms_to_dt(r.timestamp), str(r.objectId)) for r in result), None
+        return ((ms_to_dt(r.timestamp), str(r.objectId)) for r in result), None
 
     return fetch_changes_with_associations(
         Names.tickets, Ticket, do_fetch, log, http, with_history, since, until
@@ -1433,7 +1440,7 @@ async def fetch_email_events_page(
 
     url = f"{HUB}/email/public/v1/events"
     input: Dict[str, Any] = {
-        "endTimestamp": _dt_to_ms(cutoff) - 1,  # endTimestamp is inclusive.
+        "endTimestamp": dt_to_ms(cutoff) - 1,  # endTimestamp is inclusive.
         "limit": 1000,
     }
     if page:
@@ -1456,11 +1463,11 @@ async def _fetch_email_events(
     url = f"{HUB}/email/public/v1/events"
 
     input: Dict[str, Any] = {
-        "startTimestamp": _dt_to_ms(since),
+        "startTimestamp": dt_to_ms(since),
         "limit": 1000,
     }
     if until:
-        input["endTimestamp"] = _dt_to_ms(until)
+        input["endTimestamp"] = dt_to_ms(until)
 
     while True:
         result = EmailEventsResponse.model_validate_json(
@@ -1529,9 +1536,9 @@ async def _fetch_marketing_emails_updated_between(
         "limit": MARKETING_EMAILS_PAGE_SIZE,
         "sort": "updatedAt",
         # updatedAfter is an exclusive lower bound filter on the updatedAt field.
-        "updatedAfter": _dt_to_str(start),
+        "updatedAfter": dt_to_str(start),
         # updatedBefore is an exclusive upper bound filter on the updatedAt field.
-        "updatedBefore": _dt_to_str(end),
+        "updatedBefore": dt_to_str(end),
     }
 
     # The /marketing/v3/emails API has a bug: when "includeStats=true", HubSpot returns
@@ -1788,7 +1795,7 @@ async def fetch_contact_lists(
 
     async for item in _request_contact_lists_in_time_range(http, log, True, start_date):
         log.debug("processing contact list", {"listId": item.listId})
-        timestamp = _ms_to_dt(int(item.additionalProperties["hs_lastmodifieddate"]))
+        timestamp = ms_to_dt(int(item.additionalProperties["hs_lastmodifieddate"]))
 
         if cache.should_yield(Names.contact_lists, item.listId, timestamp):
             yield item
@@ -2086,42 +2093,3 @@ async def fetch_campaigns(
             yield item
 
     yield now
-
-
-def _ms_to_dt(ms: int) -> datetime:
-    return datetime.fromtimestamp(ms / 1000.0, tz=UTC)
-
-
-def _dt_to_ms(dt: datetime) -> int:
-    return int(dt.timestamp() * 1000)
-
-
-def _str_to_dt(s: str) -> datetime:
-    return datetime.fromisoformat(s.replace("Z", "+00:00"))
-
-
-def _dt_to_str(dt: datetime) -> str:
-    return dt.strftime("%Y-%m-%dT%H:%M:%S.%fZ")
-
-
-def _chunk_props(props: list[str], max_bytes: int) -> list[list[str]]:
-    result: list[list[str]] = []
-
-    current_chunk: list[str] = []
-    current_size = 0
-
-    for p in props:
-        sz = len(p.encode("utf-8"))
-
-        if current_size + sz > max_bytes:
-            result.append(current_chunk)
-            current_chunk = []
-            current_size = 0
-
-        current_chunk.append(p)
-        current_size += sz
-
-    if current_chunk:
-        result.append(current_chunk)
-
-    return result
