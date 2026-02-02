@@ -5,20 +5,16 @@ from logging import Logger
 from typing import (
     Annotated,
     AsyncGenerator,
-    TYPE_CHECKING,
     ClassVar,
-    Literal,
     Any,
     TypeVar,
     Generic,
 )
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field, PrivateAttr, model_validator, ValidatorFunctionWrapHandler, ConfigDict
 
 from estuary_cdk.capture.common import (
     AccessToken,
     BaseDocument,
-    LongLivedClientCredentialsOAuth2Credentials,
-    OAuth2Spec,
     ResourceState,
 )
 from estuary_cdk.capture.common import (
@@ -46,56 +42,61 @@ scopes = [
     "read_marketplace_fulfillment_orders",
 ]
 
-OAUTH2_SPEC = OAuth2Spec(
-    provider="shopify",
-    authUrlTemplate=(
-        r"https://{{{ config.store }}}.myshopify.com/admin/oauth/authorize"
-        r"?client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}"
-        "&scope="
-        + ",".join(scopes)
-        + r"&state={{{#urlencode}}}{{{ state }}}{{{/urlencode}}}"
-        r"&redirect_uri={{{#urlencode}}}{{{ redirect_uri }}}{{{/urlencode}}}"
-    ),
-    accessTokenUrlTemplate=(
-        r"https://{{{ config.store }}}.myshopify.com/admin/oauth/access_token"
-        r"?client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}"
-        r"&client_secret={{{#urlencode}}}{{{ client_secret }}}{{{/urlencode}}}"
-        r"&code={{{#urlencode}}}{{{ code }}}{{{/urlencode}}}"
-    ),
-    accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
-    accessTokenBody=(
-        r"client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}"
-        r"&client_secret={{{#urlencode}}}{{{ client_secret }}}{{{/urlencode}}}"
-        r"&code={{{#urlencode}}}{{{ code }}}{{{/urlencode}}}"
-    ),
-    accessTokenResponseMap={
-        "access_token": "/access_token",
-    },
-)
+# TODO(justin): OAuth support is temporarily removed for multi-store. Will revisit once the
+# OAuth app is approved and UI/runtime is ready to support OAuth inside array items with credentials.
+# OAUTH2_SPEC = OAuth2Spec(
+#     provider="shopify",
+#     authUrlTemplate=(
+#         r"https://{{{ config.store }}}.myshopify.com/admin/oauth/authorize"
+#         r"?client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}"
+#         "&scope="
+#         + ",".join(scopes)
+#         + r"&state={{{#urlencode}}}{{{ state }}}{{{/urlencode}}}"
+#         r"&redirect_uri={{{#urlencode}}}{{{ redirect_uri }}}{{{/urlencode}}}"
+#     ),
+#     accessTokenUrlTemplate=(
+#         r"https://{{{ config.store }}}.myshopify.com/admin/oauth/access_token"
+#         r"?client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}"
+#         r"&client_secret={{{#urlencode}}}{{{ client_secret }}}{{{/urlencode}}}"
+#         r"&code={{{#urlencode}}}{{{ code }}}{{{/urlencode}}}"
+#     ),
+#     accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
+#     accessTokenBody=(
+#         r"client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}"
+#         r"&client_secret={{{#urlencode}}}{{{ client_secret }}}{{{/urlencode}}}"
+#         r"&code={{{#urlencode}}}{{{ code }}}{{{/urlencode}}}"
+#     ),
+#     accessTokenResponseMap={
+#         "access_token": "/access_token",
+#     },
+# )
 
 
-if TYPE_CHECKING:
-    OAuth2Credentials = LongLivedClientCredentialsOAuth2Credentials
-else:
-    OAuth2Credentials = LongLivedClientCredentialsOAuth2Credentials.for_provider(
-        OAUTH2_SPEC.provider
+def default_start_date() -> datetime:
+    return datetime.now(tz=UTC) - timedelta(days=30)
+
+
+class StoreConfig(BaseModel):
+    """Configuration for a single Shopify store."""
+
+    store: str = Field(
+        title="Store Name",
+        description="Shopify store name (the prefix of your admin URL, e.g., 'mystore' for mystore.myshopify.com)",
+        min_length=1,
     )
-
-
-def default_start_date():
-    dt = datetime.now(tz=UTC) - timedelta(days=30)
-    return dt
+    credentials: AccessToken = Field(
+        title="Authentication",
+        description="Access Token credentials for this store.",
+    )
 
 
 class EndpointConfig(BaseModel):
-    store: str = Field(
-        title="Shopify Store",
-        description="Shopify store ID. Use the prefix of your admin URL e.g. https://{YOUR_STORE}.myshopify.com/admin",
+    stores: list[StoreConfig] = Field(
+        title="Shopify Stores",
+        description="One or more Shopify stores to capture. Each store requires its own credentials.",
+        min_length=1,
     )
-    credentials: AccessToken | OAuth2Credentials = Field(
-        discriminator="credentials_title",
-        title="Authentication",
-    )
+
     start_date: AwareDatetime = Field(
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
         title="Start Date",
@@ -120,6 +121,40 @@ class EndpointConfig(BaseModel):
         json_schema_extra={"advanced": True},
     )
 
+    _was_migrated: bool = PrivateAttr(default=False)
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def transform_legacy_config(
+        cls,
+        data: Any,
+        handler: ValidatorFunctionWrapHandler,
+    ) -> "EndpointConfig":
+        was_migrated = False
+
+        if isinstance(data, dict):
+            # Migrate flat config to stores list
+            if "stores" not in data and "store" in data and "credentials" in data:
+                data = data.copy()
+                store = data.pop("store")
+                credentials = data.pop("credentials")
+                data["stores"] = [{"store": store, "credentials": credentials}]
+                was_migrated = True
+
+        instance = handler(data)
+        instance._was_migrated = was_migrated
+
+        return instance
+
+    @model_validator(mode="after")
+    def validate_unique_store_names(self) -> "EndpointConfig":
+        store_names = [s.store for s in self.stores]
+        duplicates = [name for name in store_names if store_names.count(name) > 1]
+        if duplicates:
+            raise ValueError(
+                f"Duplicate store names are not allowed: {', '.join(set(duplicates))}"
+            )
+        return self
 
 ConnectorState = GenericConnectorState[ResourceState]
 
@@ -333,7 +368,7 @@ class SortKey(StrEnum):
     UPDATED_AT = "UPDATED_AT"
 
 
-class ShopifyGraphQLResource(BaseDocument, extra="allow"):
+class ShopifyGraphQLResource(BaseDocument):
     QUERY: ClassVar[str] = ""
     QUERY_ROOT: ClassVar[str] = ""
     FRAGMENTS: ClassVar[list[str]] = []
@@ -341,6 +376,22 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
     SORT_KEY: ClassVar[SortKey | None] = None
     SHOULD_USE_BULK_QUERIES: ClassVar[bool] = True
     QUALIFYING_SCOPES: ClassVar[set[str]] = set()
+
+    model_config = ConfigDict(extra="allow", validate_assignment=True)
+
+    class Meta(BaseDocument.Meta):
+        model_config = ConfigDict(validate_assignment=True)
+
+        store: str | None = Field(
+            default=None,
+            description="The Shopify store this document belongs to",
+        )
+
+    meta_: Meta = Field(  # type: ignore[override]
+        default_factory=lambda: ShopifyGraphQLResource.Meta(op="u"),
+        alias="_meta",
+        description="Document metadata",
+    )
 
     id: str
 
@@ -415,10 +466,12 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
         query = f"""
         {{
             {cls.QUERY_ROOT}(
-                query: "updated_at:>='{lower_bound}' AND updated_at:<='{upper_bound}' {"AND " + query.strip() if query else ""}"
+                query: "updated_at:>='{lower_bound}' AND updated_at:<='{upper_bound}' {
+            "AND " + query.strip() if query else ""
+        }"
                 {f"sortKey: {cls.SORT_KEY}" if cls.SORT_KEY else ""}
                 {f"first: {first}" if first else ""}
-                {f"after: \"{after}\"" if after else ""}
+                {f'after: "{after}"' if after else ""}
             ) {{
                 edges {{
                     node {{
@@ -429,10 +482,14 @@ class ShopifyGraphQLResource(BaseDocument, extra="allow"):
                         {cls.QUERY}
                     }}
                 }}
-                {f"""pageInfo {{
+                {
+            '''pageInfo {
                     hasNextPage
                     endCursor
-                }}""" if first else ""}
+                }'''
+            if first
+            else ""
+        }
             }}
         }}
         """
@@ -464,7 +521,7 @@ class BaseResponseData(BaseModel, Generic[TShopifyGraphQLResource]):
     def edges(self) -> list[Edge[TShopifyGraphQLResource]]:
         raise NotImplementedError("edges property must be implemented by subclass")
 
-    @property 
+    @property
     def page_info(self) -> PageInfo:
         raise NotImplementedError("page_info property must be implemented by subclass")
 
@@ -476,7 +533,9 @@ class BaseResponseData(BaseModel, Generic[TShopifyGraphQLResource]):
 # create_response_data_model dynamically creates a model for the data field of
 # each response. Models are created dynamically since the query root/field name
 # under the "data" field is different for each query.
-def create_response_data_model(resource_type: type[TShopifyGraphQLResource]) -> type[BaseResponseData[TShopifyGraphQLResource]]:
+def create_response_data_model(
+    resource_type: type[TShopifyGraphQLResource],
+) -> type[BaseResponseData[TShopifyGraphQLResource]]:
     """Factory function to create typed GraphQL data field models."""
     query_root = resource_type.QUERY_ROOT
 
@@ -492,6 +551,8 @@ def create_response_data_model(resource_type: type[TShopifyGraphQLResource]) -> 
         "page_info": property(get_page_info),
     }
 
-    DataModel = type(f"{query_root.title()}Data", (BaseResponseData[resource_type],), class_dict)
+    DataModel = type(
+        f"{query_root.title()}Data", (BaseResponseData[resource_type],), class_dict
+    )
 
     return DataModel

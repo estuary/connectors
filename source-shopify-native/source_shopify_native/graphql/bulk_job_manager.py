@@ -72,7 +72,7 @@ class BulkJobManager:
         job_statuses: dict[str, BulkOperationStatuses] = {}
         for job_details in running_jobs:
             job_id = job_details.id
-            self.log.info(f"Cancelling bulk job {job_id}.")
+            self.log.info(f"[{self.client.store}] Cancelling bulk job {job_id}.")
             status = await self._cancel(job_id)
             job_statuses[job_id] = status
 
@@ -81,10 +81,10 @@ class BulkJobManager:
             while True:
                 match status:
                     case BulkOperationStatuses.CANCELED | BulkOperationStatuses.COMPLETED:
-                        self.log.info(f"Bulk job {job_id} is {status}.")
+                        self.log.info(f"[{self.client.store}] Bulk job {job_id} is {status}.")
                         break
                     case BulkOperationStatuses.CANCELING:
-                        self.log.info(f"Waiting for bulk job {job_id} to be CANCELED.")
+                        self.log.info(f"[{self.client.store}] Waiting for bulk job {job_id} to be CANCELED.")
                         await asyncio.sleep(5)
 
                         details = await self._get_job(job_id)
@@ -170,7 +170,7 @@ class BulkJobManager:
             }}
         """
 
-        self.log.debug(f"Trying to cancel job {job_id}.")
+        self.log.debug(f"[{self.client.store}] Trying to cancel job {job_id}.")
 
         data = await self.client.request(
             query,
@@ -182,12 +182,12 @@ class BulkJobManager:
 
         match status:
             case BulkOperationStatuses.CANCELED:
-                self.log.debug(f"Bulk job {job_id} has been cancelled.")
+                self.log.debug(f"[{self.client.store}] Bulk job {job_id} has been cancelled.")
             case BulkOperationStatuses.CANCELING:
-                self.log.debug(f"Bulk job {job_id} is being cancelled.")
+                self.log.debug(f"[{self.client.store}] Bulk job {job_id} is being cancelled.")
             case _:
                 self.log.debug(
-                    f"Could not cancel bulk job {job_id}.",
+                    f"[{self.client.store}] Could not cancel bulk job {job_id}.",
                     {
                         "status": status,
                         "errors": data.bulkOperationCancel.userErrors,
@@ -211,7 +211,7 @@ class BulkJobManager:
                 details = await self._get_job(job_id)
                 match details.status:
                     case BulkOperationStatuses.COMPLETED:
-                        self.log.info(f"Job {job_id} has completed.", {
+                        self.log.info(f"[{self.client.store}] Job {job_id} has completed.", {
                             "stream": model.NAME,
                             "details": details,
                         })
@@ -219,7 +219,7 @@ class BulkJobManager:
                     case BulkOperationStatuses.CREATED | BulkOperationStatuses.RUNNING:
                         if not is_running:
                             self.log.info(
-                                f"Job {job_id} is {details.status}. Sleeping to await job completion.", {
+                                f"[{self.client.store}] Job {job_id} is {details.status}. Sleeping to await job completion.", {
                                     "stream": model.NAME,
                                 }
                             )
@@ -230,7 +230,7 @@ class BulkJobManager:
 
                         if total_sleep > SIX_HOURS:
                             self.log.warning(
-                                f"Shopify has been working on job {job_id} for over {SIX_HOURS / (60 * 60)} hours. "
+                                f"[{self.client.store}] Shopify has been working on job {job_id} for over {SIX_HOURS / (60 * 60)} hours. "
                                 "This is likely due to a large amount of data being processed within the job. "
                                 "Consider reducing how much data is processed in a single job by reducing the advanced date window setting in the config.", {
                                     "stream": model.NAME,
@@ -309,7 +309,7 @@ class BulkJobManager:
             if is_ongoing_query_conflict:
                 msg = (
                     "Another application is submitting bulk query operations to Shopify's API, preventing"
-                    " this connector from extracting data. Please prevent prevent the other application from"
+                    " this connector from extracting data. Please prevent the other application from"
                     " submitting bulk query operations to Shopify."
                 )
                 raise BulkJobError(
@@ -319,7 +319,7 @@ class BulkJobManager:
             else:
                 errors = [error.message for error in errors]
                 for error in errors:
-                    self.log.warning(error)
+                    self.log.warning(f"[{self.client.store}] {error}")
 
                 raise BulkJobError(
                     message="Errors when submitting query.",

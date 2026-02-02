@@ -25,6 +25,7 @@ async def bulk_fetch_incremental(
     window_size: timedelta,
     bulk_job_manager: gql.bulk_job_manager.BulkJobManager,
     model: type[ShopifyGraphQLResource],
+    store: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ShopifyGraphQLResource | LogCursor, None]:
@@ -37,13 +38,14 @@ async def bulk_fetch_incremental(
 
     if url is None:
         log.info(
-            f"Bulk query job found no results between {log_cursor} and {end} for this query."
+            f"[{store}] Bulk query job found no results between {log_cursor} and {end}."
         )
         yield end
         return
 
     _, lines = await http.request_lines(log, url)
     async for record in model.process_result(log, lines()):
+        record.setdefault("_meta", {})["store"] = store
         resource = model.model_validate(record)
         yield resource
 
@@ -55,6 +57,7 @@ async def bulk_fetch_full_refresh(
     start_date: datetime,
     bulk_job_manager: gql.bulk_job_manager.BulkJobManager,
     model: type[ShopifyGraphQLResource],
+    store: str,
     log: Logger,
 ) -> AsyncGenerator[ShopifyGraphQLResource, None]:
     end = datetime.now(tz=UTC)
@@ -64,12 +67,13 @@ async def bulk_fetch_full_refresh(
 
     if url is None:
         log.info(
-            f"Bulk query job found no results between {start_date} and {end} for {model.__name__}."
+            f"[{store}] Bulk query job found no results between {start_date} and {end} for {model.__name__}."
         )
         return
 
     _, lines = await http.request_lines(log, url)
     async for record in model.process_result(log, lines()):
+        record.setdefault("_meta", {})["store"] = store
         resource = model.model_validate(record)
         yield resource
 
@@ -80,6 +84,7 @@ async def _paginate_through_resources(
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
     start: datetime,
     end: datetime,
+    store: str,
     log: Logger,
 ) -> AsyncGenerator[TShopifyGraphQLResource, None]:
     after: str | None = None
@@ -92,9 +97,15 @@ async def _paginate_through_resources(
             after=after,
         )
 
-        data = await client.request(query, data_model,log)
+        data = await client.request(query, data_model, log)
 
         for doc in data.nodes:
+            doc.meta_.store = store
+            # meta_ is populated via default_factory when not in the GraphQL response,
+            # so Pydantic does not include it in model_fields_set. We must add it
+            # manually or the entire _meta object (including store) is omitted when
+            # the CDK serializes with exclude_unset=True.
+            doc.model_fields_set.add("meta_")
             yield doc
 
         page_info = data.page_info
@@ -108,6 +119,7 @@ async def fetch_incremental_unsorted(
     client: ShopifyGraphQLClient,
     model: type[TShopifyGraphQLResource],
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    store: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TShopifyGraphQLResource | LogCursor, None]:
@@ -122,6 +134,7 @@ async def fetch_incremental_unsorted(
         data_model=data_model,
         start=log_cursor,
         end=end,
+        store=store,
         log=log,
     ):
         cursor_value = doc.get_cursor_value()
@@ -139,6 +152,7 @@ async def fetch_incremental(
     client: ShopifyGraphQLClient,
     model: type[TShopifyGraphQLResource],
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    store: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TShopifyGraphQLResource | LogCursor, None]:
@@ -154,6 +168,7 @@ async def fetch_incremental(
         data_model=data_model,
         start=log_cursor,
         end=end,
+        store=store,
         log=log,
     ):
         cursor_value = doc.get_cursor_value()
@@ -180,6 +195,7 @@ async def backfill_incremental(
     client: ShopifyGraphQLClient,
     model: type[TShopifyGraphQLResource],
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    store: str,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
@@ -199,6 +215,7 @@ async def backfill_incremental(
         data_model=data_model,
         start=start,
         end=cutoff,
+        store=store,
         log=log,
     ):
         cursor_value = doc.get_cursor_value()
