@@ -1,98 +1,121 @@
----
 collections:
   acmeCo/abandoned_checkouts:
     schema: abandoned_checkouts.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/custom_collection_metafields:
     schema: custom_collection_metafields.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/custom_collections:
     schema: custom_collections.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/customer_metafields:
     schema: customer_metafields.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/customers:
     schema: customers.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/fulfillment_orders:
     schema: fulfillment_orders.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/fulfillments:
     schema: fulfillments.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/inventory_items:
     schema: inventory_items.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/inventory_levels:
     schema: inventory_levels.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/location_metafields:
     schema: location_metafields.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/locations:
     schema: locations.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/order_agreements:
     schema: order_agreements.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/order_metafields:
     schema: order_metafields.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/order_refunds:
     schema: order_refunds.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/order_risks:
     schema: order_risks.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/order_transactions:
     schema: order_transactions.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/orders:
     schema: orders.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/product_media:
     schema: product_media.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/product_metafields:
     schema: product_metafields.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/product_variant_metafields:
     schema: product_variant_metafields.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/product_variants:
     schema: product_variants.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/products:
     schema: products.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/smart_collection_metafields:
     schema: smart_collection_metafields.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id
   acmeCo/smart_collections:
     schema: smart_collections.schema.yaml
     key:
-      - /id
+    - /_meta/store
+    - /id

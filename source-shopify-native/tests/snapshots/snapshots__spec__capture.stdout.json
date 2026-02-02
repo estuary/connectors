@@ -68,31 +68,52 @@
           "title": "OAuth",
           "type": "object",
           "x-oauth2-provider": "shopify"
+        },
+        "StoreConfig": {
+          "description": "Configuration for a single Shopify store.",
+          "properties": {
+            "store": {
+              "description": "Shopify store name (the prefix of your admin URL, e.g., 'mystore' for mystore.myshopify.com)",
+              "minLength": 1,
+              "title": "Store Name",
+              "type": "string"
+            },
+            "credentials": {
+              "discriminator": {
+                "mapping": {
+                  "OAuth Credentials": "#/$defs/LongLivedClientCredentialsOAuth2Credentials",
+                  "Private App Credentials": "#/$defs/AccessToken"
+                },
+                "propertyName": "credentials_title"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/AccessToken"
+                },
+                {
+                  "$ref": "#/$defs/LongLivedClientCredentialsOAuth2Credentials"
+                }
+              ],
+              "title": "Authentication"
+            }
+          },
+          "required": [
+            "store",
+            "credentials"
+          ],
+          "title": "StoreConfig",
+          "type": "object"
         }
       },
       "properties": {
-        "store": {
-          "description": "Shopify store ID. Use the prefix of your admin URL e.g. https://{YOUR_STORE}.myshopify.com/admin",
-          "title": "Shopify Store",
-          "type": "string"
-        },
-        "credentials": {
-          "discriminator": {
-            "mapping": {
-              "OAuth Credentials": "#/$defs/LongLivedClientCredentialsOAuth2Credentials",
-              "Private App Credentials": "#/$defs/AccessToken"
-            },
-            "propertyName": "credentials_title"
+        "stores": {
+          "description": "One or more Shopify stores to capture. Each store requires its own credentials.",
+          "items": {
+            "$ref": "#/$defs/StoreConfig"
           },
-          "oneOf": [
-            {
-              "$ref": "#/$defs/AccessToken"
-            },
-            {
-              "$ref": "#/$defs/LongLivedClientCredentialsOAuth2Credentials"
-            }
-          ],
-          "title": "Authentication"
+          "minItems": 1,
+          "title": "Shopify Stores",
+          "type": "array"
         },
         "start_date": {
           "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
@@ -108,8 +129,7 @@
         }
       },
       "required": [
-        "store",
-        "credentials"
+        "stores"
       ],
       "title": "EndpointConfig",
       "type": "object"

@@ -47,7 +47,7 @@ class ShopifyGraphQLClient:
     def __init__(self, http: HTTPSession, store: str):
         self.http = http
         self.url = f"https://{store}.myshopify.com/admin/api/{VERSION}/graphql.json"
-        # maximum_available and restore_rate can be different depending on the 
+        # maximum_available and restore_rate can be different depending on the
         # user's Shopify tier, and they are refreshed each time we receive a
         # successful response.
         self.maximum_available = DEFAULT_MAXIMUM_AVAILABLE

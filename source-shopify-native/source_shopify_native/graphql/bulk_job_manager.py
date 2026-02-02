@@ -309,7 +309,7 @@ class BulkJobManager:
             if is_ongoing_query_conflict:
                 msg = (
                     "Another application is submitting bulk query operations to Shopify's API, preventing"
-                    " this connector from extracting data. Please prevent prevent the other application from"
+                    " this connector from extracting data. Please prevent the other application from"
                     " submitting bulk query operations to Shopify."
                 )
                 raise BulkJobError(
