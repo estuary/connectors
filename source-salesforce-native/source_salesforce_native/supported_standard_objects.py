@@ -2738,12 +2738,24 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "ListViewChart": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
+    "LiveAgentSession": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "LiveChatButton": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "LiveChatdeployment": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
     "LiveChatSensitiveDataRule": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "LiveChatTranscript": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP,
         "enabled_by_default": True,
+    },    
+    "LiveChatTranscriptEvent": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "LoanApplicant": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
@@ -4639,6 +4651,9 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "TenantUsageEntitlement": {
+        "cursor_field": CursorFields.SYSTEM_MODSTAMP
+    },
+    "Territory2Type": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "TestSuiteMembership": {
