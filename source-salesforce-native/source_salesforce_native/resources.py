@@ -12,7 +12,7 @@ from .supported_standard_objects import (
     CUSTOM_OBJECT_WITH_SYSTEM_MODSTAMP_DETAILS,
     CUSTOM_OBJECT_WITH_CREATED_DATE_DETAILS,
     CUSTOM_OBJECT_WITH_LAST_MODIFIED_DATE_DETAILS,
-    SUPPORTED_STANDARD_OBJECTS,
+    get_standard_object_details,
 )
 
 from .bulk_job_manager import BulkJobManager
@@ -240,7 +240,7 @@ async def _object_to_resource(
     elif is_custom_object_with_created_date:
         details = CUSTOM_OBJECT_WITH_CREATED_DATE_DETAILS
     else:
-        details = SUPPORTED_STANDARD_OBJECTS.get(name, None)
+        details = get_standard_object_details(name)
 
     if details is None:
         return
