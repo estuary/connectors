@@ -172,7 +172,7 @@ require (
 	github.com/duckdb/duckdb-go-bindings/linux-amd64 v0.1.21 // indirect
 	github.com/duckdb/duckdb-go-bindings/linux-arm64 v0.1.21 // indirect
 	github.com/duckdb/duckdb-go-bindings/windows-amd64 v0.1.21 // indirect
-	github.com/dvsekhvalnov/jose2go v1.6.0 // indirect
+	github.com/dvsekhvalnov/jose2go v1.7.0 // indirect
 	github.com/elastic/elastic-transport-go/v8 v8.6.0 // indirect
 	github.com/envoyproxy/go-control-plane/envoy v1.35.0 // indirect
 	github.com/envoyproxy/protoc-gen-validate v1.2.1 // indirect
