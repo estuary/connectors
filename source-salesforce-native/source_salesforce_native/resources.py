@@ -50,6 +50,7 @@ CUSTOM_OBJECT_FEED_SUFFIX = '__Feed'
 CUSTOM_OBJECT_METADATA_SUFFIX = '__mdt'
 CUSTOM_OBJECT_HISTORY_SUFFIX = '__History'
 CUSTOM_OBJECT_SHARE_SUFFIX = '__Share'
+CUSTOM_OBJECT_HISTORICAL_DATA_SUFFIX = '_hd'
 BUILD_RESOURCE_SEMAPHORE_LIMIT = 15
 
 
@@ -223,6 +224,7 @@ async def _object_to_resource(
         name.endswith(CUSTOM_OBJECT_SUFFIX)
         or name.endswith(CUSTOM_OBJECT_FEED_SUFFIX)
         or name.endswith(CUSTOM_OBJECT_METADATA_SUFFIX)
+        or name.endswith(CUSTOM_OBJECT_HISTORICAL_DATA_SUFFIX)
     )
 
     is_custom_object_with_last_modified_date = (
