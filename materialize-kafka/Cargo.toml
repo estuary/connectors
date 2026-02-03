@@ -30,7 +30,7 @@ schemars = "0.8"
 base64 = "0.22"
 xxhash-rust = { version = "0.8", features = ["xxh3"] }
 apache-avro = { version = "0.17" }
-bytes = "1.8"
+bytes = "1.11"
 reqwest = { version = "0.12", features = ["json"] }
 futures = "0.3"
 prost = "0.13"
