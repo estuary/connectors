@@ -4,7 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/estuary/connectors/go/sqlserver/change"
+	"github.com/estuary/connectors/go/capture/sqlserver/change"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/segmentio/encoding/json"
 )

@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/estuary/connectors/go/sqlserver/datatypes"
+	"github.com/estuary/connectors/go/capture/sqlserver/datatypes"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
@@ -346,7 +346,6 @@ func getColumns(ctx context.Context, conn *sql.DB, opts discoveryOptions) ([]sql
 	}
 	return columns, nil
 }
-
 
 // Joining on the 6-tuple {CONSTRAINT,TABLE}_{CATALOG,SCHEMA,NAME} is probably
 // overkill but shouldn't hurt, and helps to make absolutely sure that we're
