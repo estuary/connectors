@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/estuary/connectors/go/sqlserver/datatypes"
+	"github.com/estuary/connectors/go/capture/sqlserver/datatypes"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/stretchr/testify/require"
 )

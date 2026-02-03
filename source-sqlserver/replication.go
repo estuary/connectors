@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/estuary/connectors/go/capture/sqlserver/change"
+	"github.com/estuary/connectors/go/capture/sqlserver/datatypes"
 	"github.com/estuary/connectors/go/encrow"
-	"github.com/estuary/connectors/go/sqlserver/change"
-	"github.com/estuary/connectors/go/sqlserver/datatypes"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"

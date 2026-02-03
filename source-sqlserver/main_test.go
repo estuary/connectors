@@ -16,7 +16,7 @@ import (
 
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/go/capture/blackbox"
-	"github.com/estuary/connectors/go/sqlserver/tests"
+	"github.com/estuary/connectors/go/capture/sqlserver/tests"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 )

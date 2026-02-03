@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/estuary/connectors/go/capture/sqlserver/backfill"
+	"github.com/estuary/connectors/go/capture/sqlserver/change"
+	"github.com/estuary/connectors/go/capture/sqlserver/datatypes"
 	"github.com/estuary/connectors/go/encrow"
-	"github.com/estuary/connectors/go/sqlserver/backfill"
-	"github.com/estuary/connectors/go/sqlserver/change"
-	"github.com/estuary/connectors/go/sqlserver/datatypes"
 	"github.com/estuary/connectors/sqlcapture"
 	log "github.com/sirupsen/logrus"
 )
