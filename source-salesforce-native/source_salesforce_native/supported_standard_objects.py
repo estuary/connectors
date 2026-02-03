@@ -5060,3 +5060,14 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
         "cursor_field": CursorFields.LAST_MODIFIED_DATE
     },
 }
+
+
+_SUPPORTED_OBJECTS_LOWER_MAP = {k.lower(): k for k in SUPPORTED_STANDARD_OBJECTS}
+
+
+def get_standard_object_details(name: str) -> ObjectDetails | None:
+    """Case-insensitive lookup of standard object details."""
+    canonical_name = _SUPPORTED_OBJECTS_LOWER_MAP.get(name.lower())
+    if canonical_name:
+        return SUPPORTED_STANDARD_OBJECTS[canonical_name]
+    return None
