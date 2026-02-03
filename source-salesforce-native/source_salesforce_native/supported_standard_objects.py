@@ -2744,7 +2744,7 @@ SUPPORTED_STANDARD_OBJECTS: dict[str, ObjectDetails] = {
     "LiveChatButton": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
-    "LiveChatdeployment": {
+    "LiveChatDeployment": {
         "cursor_field": CursorFields.SYSTEM_MODSTAMP
     },
     "LiveChatSensitiveDataRule": {
