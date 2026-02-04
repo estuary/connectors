@@ -1,18 +1,19 @@
+---
 $defs:
   Meta:
     properties:
       op:
         default: u
-        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        description: "Operation type (c: Create, u: Update, d: Delete)"
         enum:
-        - c
-        - u
-        - d
+          - c
+          - u
+          - d
         title: Op
         type: string
       row_id:
         default: -1
-        description: Row ID of the Document, counting up from zero, or -1 if not known
+        description: "Row ID of the Document, counting up from zero, or -1 if not known"
         title: Row Id
         type: integer
     title: Meta
@@ -20,7 +21,10 @@ $defs:
 additionalProperties: true
 properties:
   _meta:
-    $ref: '#/$defs/Meta'
+    $ref: "#/$defs/Meta"
+    default:
+      op: u
+      row_id: -1
     description: Document metadata
   id:
     title: Id
@@ -30,16 +34,16 @@ properties:
     type: string
   account_id:
     anyOf:
-    - type: string
-    - type: 'null'
+      - type: string
+      - type: "null"
     description: The account ID associated with the resource.
     title: Account Id
   created:
     title: Created
     type: integer
 required:
-- id
-- object
+  - id
+  - object
 title: Accounts
 type: object
 x-infer-schema: true

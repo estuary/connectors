@@ -10,9 +10,8 @@ from estuary_cdk.capture import (
     request,
     response,
 )
+from estuary_cdk.capture.common import ResourceConfig
 from estuary_cdk.flow import ValidationError
-
-from estuary_cdk.capture.common import ResourceConfigWithSchedule
 
 from .resources import all_resources
 from .models import (
@@ -22,30 +21,30 @@ from .models import (
 
 
 class Connector(
-    BaseCaptureConnector[EndpointConfig, ResourceConfigWithSchedule, ConnectorState],
+    BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState],
 ):
     def request_class(self):
-        return Request[EndpointConfig, ResourceConfigWithSchedule, ConnectorState]
+        return Request[EndpointConfig, ResourceConfig, ConnectorState]
 
     async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
             documentationUrl="https://go.estuary.dev/source-stripe-native",
             configSchema=EndpointConfig.model_json_schema(),
             oauth2=None,
-            resourceConfigSchema=ResourceConfigWithSchedule.model_json_schema(),
-            resourcePathPointers=ResourceConfigWithSchedule.PATH_POINTERS,
+            resourceConfigSchema=ResourceConfig.model_json_schema(),
+            resourcePathPointers=ResourceConfig.PATH_POINTERS,
         )
 
     async def discover(
         self, log: Logger, discover: request.Discover[EndpointConfig]
-    ) -> response.Discovered[ResourceConfigWithSchedule]:
+    ) -> response.Discovered[ResourceConfig]:
         resources = await all_resources(log, self, discover.config, should_fetch_connected_accounts=False)
         return common.discovered(resources)
 
     async def validate(
         self,
         log: Logger,
-        validate: request.Validate[EndpointConfig, ResourceConfigWithSchedule],
+        validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
         if (
             not validate.lastCapture
@@ -83,7 +82,7 @@ class Connector(
     async def open(
         self,
         log: Logger,
-        open: request.Open[EndpointConfig, ResourceConfigWithSchedule, ConnectorState],
+        open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
         resources = await all_resources(log, self, open.capture.config)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
