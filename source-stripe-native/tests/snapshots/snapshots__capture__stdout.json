@@ -175,6 +175,44 @@
     }
   ],
   [
+    "acmeCo/Cards",
+    {
+      "_meta": {
+        "op": "u",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
+      "address_city": null,
+      "address_country": null,
+      "address_line1": null,
+      "address_line1_check": null,
+      "address_line2": null,
+      "address_state": null,
+      "address_zip": null,
+      "address_zip_check": null,
+      "allow_redisplay": "unspecified",
+      "brand": "Visa",
+      "country": "US",
+      "customer": "cus_OsDZA9pqByjT9H",
+      "cvc_check": "pass",
+      "dynamic_last4": null,
+      "email": null,
+      "exp_month": 5,
+      "exp_year": 2025,
+      "fingerprint": "RIa1hFrmo5OK93gL",
+      "funding": "credit",
+      "id": "card_1PBuDHLzZ0uyKPmdYnUUV7jF",
+      "last4": "4242",
+      "metadata": {},
+      "name": null,
+      "object": "card",
+      "phone": null,
+      "regulated_status": "unregulated",
+      "tokenization_method": null,
+      "wallet": null
+    }
+  ],
+  [
     "acmeCo/Charges",
     {
       "_meta": {
@@ -295,6 +333,31 @@
     }
   ],
   [
+    "acmeCo/CustomerBalanceTransaction",
+    {
+      "_meta": {
+        "op": "u",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
+      "amount": -1000,
+      "checkout_session": null,
+      "created": 1715194504,
+      "credit_note": "cn_1PEFdsLzZ0uyKPmdEiJG0LBY",
+      "currency": "usd",
+      "customer": "cus_Q3fCJO6pdqbdAr",
+      "customer_account": null,
+      "description": null,
+      "ending_balance": -1000,
+      "id": "cbtxn_1PEFdsLzZ0uyKPmd4dYYJUI9",
+      "invoice": null,
+      "livemode": false,
+      "metadata": {},
+      "object": "customer_balance_transaction",
+      "type": "credit_note"
+    }
+  ],
+  [
     "acmeCo/Customers",
     {
       "_meta": {
@@ -338,6 +401,106 @@
       "shipping": null,
       "tax_exempt": "none",
       "test_clock": null
+    }
+  ],
+  [
+    "acmeCo/ExternalBankAccount",
+    {
+      "_meta": {
+        "op": "u",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "account": "acct_1PDugNPwuHD69DFD",
+      "account_holder_name": "Jenny Rosen",
+      "account_holder_type": "individual",
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
+      "account_type": null,
+      "available_payout_methods": [
+        "standard"
+      ],
+      "bank_name": "STRIPE TEST BANK",
+      "country": "BR",
+      "currency": "brl",
+      "default_for_currency": true,
+      "fingerprint": "FfkcPo9saEcVWPmL",
+      "future_requirements": {
+        "currently_due": [],
+        "errors": [],
+        "past_due": [],
+        "pending_verification": []
+      },
+      "id": "ba_1PEBMiPwuHD69DFDrbKh6UkV",
+      "last4": "1234",
+      "metadata": {},
+      "object": "bank_account",
+      "requirements": {
+        "currently_due": [],
+        "errors": [],
+        "past_due": [],
+        "pending_verification": []
+      },
+      "routing_number": "110-0000",
+      "status": "new"
+    }
+  ],
+  [
+    "acmeCo/PaymentMethods",
+    {
+      "_meta": {
+        "op": "u",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "account_id": "acct_1O4Om6LzZ0uyKPmd",
+      "allow_redisplay": "unspecified",
+      "billing_details": {
+        "address": {
+          "city": null,
+          "country": null,
+          "line1": null,
+          "line2": null,
+          "postal_code": null,
+          "state": null
+        },
+        "email": null,
+        "name": null,
+        "phone": null,
+        "tax_id": null
+      },
+      "card": {
+        "brand": "visa",
+        "checks": {
+          "address_line1_check": null,
+          "address_postal_code_check": null,
+          "cvc_check": "pass"
+        },
+        "country": "US",
+        "display_brand": "visa",
+        "exp_month": 5,
+        "exp_year": 2025,
+        "fingerprint": "RIa1hFrmo5OK93gL",
+        "funding": "credit",
+        "generated_from": null,
+        "last4": "4242",
+        "networks": {
+          "available": [
+            "visa"
+          ],
+          "preferred": null
+        },
+        "regulated_status": "unregulated",
+        "three_d_secure_usage": {
+          "supported": true
+        },
+        "wallet": null
+      },
+      "created": 1714635475,
+      "customer": "cus_OsDZA9pqByjT9H",
+      "customer_account": null,
+      "id": "card_1PBuDHLzZ0uyKPmdYnUUV7jF",
+      "livemode": false,
+      "metadata": {},
+      "object": "payment_method",
+      "type": "card"
     }
   ]
 ]
