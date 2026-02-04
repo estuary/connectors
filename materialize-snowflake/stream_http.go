@@ -284,6 +284,7 @@ func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
 		"rows":               blob.Chunks[0].EPS.Rows,
 		"length":             blob.Chunks[0].ChunkLength,
 		"lengthUncompressed": blob.Chunks[0].ChunkLengthUncompressed,
+		"blobToken":          blob.Chunks[0].Channels[0].OffsetToken,
 	}).Info("registered bdec file")
 
 	return nil
@@ -363,7 +364,7 @@ func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, 
 		"table":  table,
 		"token":  token,
 		"took":   time.Since(ts).String(),
-	}).Debug("channel offset token persisted")
+	}).Info("channel offset token persisted")
 
 	return nil
 }
