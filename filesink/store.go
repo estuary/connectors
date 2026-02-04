@@ -92,7 +92,7 @@ type S3StoreConfig struct {
 
 	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=4"`
 
-	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=5"`
+	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=1s,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=5"`
 	Prefix         string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects." jsonschema_extras:"order=6"`
 	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=7"`
 
