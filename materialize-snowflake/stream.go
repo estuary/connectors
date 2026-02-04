@@ -91,6 +91,14 @@ func (sm *streamManager) addBinding(ctx context.Context, schema string, table st
 		channel:       channel,
 	}
 
+	log.WithFields(log.Fields{
+		"schema":      schema,
+		"table":       table,
+		"offsetToken": channel.OffsetToken,
+		"clientSeq":   channel.ClientSequencer,
+		"rowSeq":      channel.RowSequencer,
+	}).Info("opened streaming channel")
+
 	return nil
 }
 
@@ -224,6 +232,12 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata) error
 	for _, blob := range blobs {
 		blobToken := blob.Chunks[0].Channels[0].OffsetToken
 		currentChannelToken := thisChannel.OffsetToken
+		log.WithFields(log.Fields{
+			"schema":              schema,
+			"table":               table,
+			"currentChannelToken": thisChannel.OffsetToken,
+			"blobToken":           blobToken,
+		}).Info("evaluating blob registration")
 		if shouldWrite, err := shouldWriteNextToken(blobToken, currentChannelToken); err != nil {
 			return fmt.Errorf("shouldWriteNextToken: %w", err)
 		} else if !shouldWrite {
@@ -438,6 +452,7 @@ func shouldWriteNextToken(next string, current *string) (bool, error) {
 		// Maybe this should be more strict and error out unless `next` is the
 		// first one in the sequence, but that would block cases where a user
 		// has manually dropped a table for some reason.
+		log.WithField("nextToken", next).Info("no current token persisted; blob will be registered")
 		return true, nil
 	}
 
@@ -451,13 +466,24 @@ func shouldWriteNextToken(next string, current *string) (bool, error) {
 		return false, err
 	}
 
+	ll := log.WithFields(log.Fields{
+		"nextToken":    next,
+		"currentToken": currentToken,
+		"currentBase":  currentBase,
+		"currentN":     currentN,
+		"nextBase":     nextBase,
+		"nextN":        nextN,
+	})
+
 	if nextBase != currentBase && nextN != 0 {
 		return false, fmt.Errorf("expected blob token %s to start a new sequence (current: %s)", next, currentToken)
 	} else if nextBase == currentBase && nextN <= currentN {
+		ll.Info("skipping already persisted blob")
 		return false, nil
 	} else if nextBase == currentBase && nextN != currentN+1 {
 		return false, fmt.Errorf("expected blob token %s to be written immediately after %s", next, currentToken)
 	}
+	ll.Info("blob will be registered")
 
 	return true, nil
 }
