@@ -91,6 +91,7 @@
       "uploadInterval": {
         "type": "string",
         "enum": [
+          "1s",
           "5m",
           "15m",
           "30m",
