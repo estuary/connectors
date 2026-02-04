@@ -148,12 +148,14 @@ type templates struct {
 }
 
 func renderTemplates(dialect sql.Dialect, keyDistributionOptimization bool) templates {
-	// Conditionally add flow_key_hash column to schema definitions
+	// Conditionally add flow_key_hash column to schema definitions.
+	// Only include for regular tables (Binding >= 0), not for the checkpoints table (Binding == -1).
+	// The checkpoints table has very few rows and doesn't benefit from key distribution.
 	hashColumnDef := ""
 	hashKeyPrefix := ""
 	if keyDistributionOptimization {
-		hashColumnDef = "flow_key_hash INT64 NOT NULL,"
-		hashKeyPrefix = "flow_key_hash, "
+		hashColumnDef = "{{ if ge $.Binding 0 }}flow_key_hash INT64 NOT NULL,{{ end }}"
+		hashKeyPrefix = "{{ if ge $.Binding 0 }}flow_key_hash, {{ end }}"
 	}
 
 	var tplAll = sql.MustParseTemplate(dialect, "root", fmt.Sprintf(`
