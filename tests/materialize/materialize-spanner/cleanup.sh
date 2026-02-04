@@ -43,6 +43,7 @@ dropTable "many_columns"
 dropTable "timezone_datetimes_standard"
 dropTable "perf_simple"
 dropTable "perf_uuid_key"
+dropTable "flow_checkpoints_v1"
 
 echo "dropping all tables in Spanner database '$SPANNER_DATABASE'..."
 gcloud spanner databases ddl update "$SPANNER_DATABASE" \
