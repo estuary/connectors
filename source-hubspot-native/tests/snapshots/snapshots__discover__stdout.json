@@ -1574,12 +1574,19 @@
           "title": "Calculated",
           "type": "boolean"
         },
+        "type": {
+          "title": "Type",
+          "type": "string"
+        },
         "hubspotObject": {
           "default": "unknown",
           "title": "Hubspotobject",
           "type": "string"
         }
       },
+      "required": [
+        "type"
+      ],
       "title": "Property",
       "type": "object",
       "x-infer-schema": true

@@ -193,6 +193,7 @@ class Names(StrEnum):
 class Property(BaseDocument, extra="allow"):
     name: str = ""
     calculated: bool = False
+    type: str
     hubspotObject: str = "unknown"  # Added by us.
 
 
