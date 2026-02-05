@@ -22,7 +22,7 @@ from estuary_cdk.capture import (
     request,
     response,
 )
-from estuary_cdk.flow import AccessToken, ConnectorSpec
+from estuary_cdk.flow import AccessToken, ConnectorSpec, ValidationError
 from estuary_cdk.http import TokenSource
 
 from .api import validate_credentials
@@ -72,7 +72,7 @@ class Connector(BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorSt
         validation = await validate_credentials(self, config, log)
 
         if not validation.valid:
-            raise ValueError(validation.error)
+            raise ValidationError([validation.error])
 
         # Proceed with normal resource validation
         resources = await all_resources(log, self, config)
