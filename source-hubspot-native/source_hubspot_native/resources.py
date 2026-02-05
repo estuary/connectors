@@ -91,6 +91,7 @@ from .models import (
     ResourceState,
     Ticket,
     Workflow,
+    ConnectorState,
 )
 
 
@@ -352,13 +353,18 @@ def crm_object_with_associations(
     fetch_delayed: FetchDelayedFn,
 ) -> Resource:
 
-    def open(
+    async def open(
         binding: CaptureBinding[HubspotResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        # Emit a sourced schema to increase the inferred schema's complexity limit.
+        properties = await fetch_properties(task.log, http, object_name)
+        task.sourced_schema(binding_index, cls.sourced_schema(properties.results))
+        await task.checkpoint(state=ConnectorState())
+
         open_binding(
             binding,
             binding_index,
