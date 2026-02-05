@@ -188,6 +188,17 @@ class Names(StrEnum):
     campaigns = auto()
 
 
+class PropertyTypes(StrEnum):
+    bool = "bool"
+    enumeration = "enumeration"
+    date = "date"
+    datetime = "datetime"
+    string = "string"
+    number = "number"
+    object_coordinates = "object_coordinates"
+    json = "json"
+
+
 # A Property is a HubSpot or HubSpot-user defined attribute that's
 # attached to a HubSpot CRM object.
 class Property(BaseDocument, extra="allow"):
@@ -319,6 +330,100 @@ class BaseCRMObject(BaseDocument, extra="allow"):
 
         delattr(self, "associations")
         return self
+
+
+    # sourced_schema builds a schema to be included in a SourcedSchema response to
+    # the runtime. This ultimately tells Flow what each field's type is & causes resulting columns
+    # to be included in materializations even when we haven't seen data for that field yet.
+    # Emitting SourcedSchema responses also increased the inferred schema's complexity limit
+    # from 1,000 to 10,000, which helps when CRMObjects have enough custom properties that the total
+    # property count exceeds the default complexity limit. 
+    @classmethod
+    def sourced_schema(cls, properties: list[Property]) -> dict[str, Any]:
+        schema = {
+            "additionalProperties": False,
+            "type": "object",
+            "properties": {
+                "archived": {
+                    "type": "boolean"
+                },
+                "createdAt": {
+                    "format": "date-time",
+                    "maxLength": 32,
+                    "minLength": 16,
+                    "type": "string"
+                },
+                "id": {
+                    "maximum": 100000000000,
+                    "minimum": 10000000000,
+                    "title": "Id",
+                    "type": "integer"
+                },
+                "updatedAt": {
+                    "format": "date-time",
+                    "maxLength": 32,
+                    "minLength": 16,
+                    "type": "string"
+                },
+            },
+            "required": [
+                "archived",
+                "createdAt",
+                "id",
+                "properties",
+                "updatedAt",
+            ]
+        }
+
+        properties_schema = {
+            "additionalProperties": False,
+            "type": "object",
+            "properties": {},
+        }
+
+        required_properties: list[str] = []
+
+        for prop in properties:
+            property_schema: dict[str, Any] = {
+                "type": "string",
+                # Include conservative maxLength and minLength annotations to preserve them
+                # in the inferred schema. Omitting them would be interpreted as "infinite"
+                # and remove them from the inferred schema.
+                "maxLength": 4,
+                "minLength": 2,
+            }
+            match prop.type:
+                case (
+                    # HubSpot represents bool fields as strings. These fields are
+                    # usually one of "Yes", "No", "True", or "False".
+                    PropertyTypes.bool |
+                    PropertyTypes.enumeration |
+                    PropertyTypes.string |
+                    PropertyTypes.object_coordinates |
+                    PropertyTypes.json
+                ):
+                    pass
+                case PropertyTypes.number:
+                    # Since number fields can be formatted as integers or floats, include
+                    # the "format: integer" annotation. If the field is a float, schema inference
+                    # will update the format to "number".
+                    property_schema["format"] = "integer"
+                case PropertyTypes.date | PropertyTypes.datetime:
+                    # Omit date and datetime fields. These can be either millisecond unix timestamps
+                    # or ISO 8601 formatted strings. HubSpot's property metadata is insufficient to
+                    # distinguish between the two, so we rely on schema inference to pick these up.
+                    continue
+                case _:
+                    # Omit fields of all other types from the sourced schema.
+                    # This should be uncommon and only happen when HubSpot adds a new property type.
+                    continue
+
+            properties_schema["properties"][prop.name] = property_schema
+            required_properties.append(prop.name)
+
+        schema["properties"]["properties"] = properties_schema
+        schema["properties"]["properties"]["required"] = required_properties
+        return schema
 
 
 # CRMObject is a generic, concrete subclass of BaseCRMObject.
