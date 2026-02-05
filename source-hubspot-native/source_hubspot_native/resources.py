@@ -6,7 +6,7 @@ import re
 from typing import AsyncGenerator, Iterable
 
 from estuary_cdk.capture import Task
-from estuary_cdk.capture.common import Resource, open_binding, ReductionStrategy, ResourceConfig
+from estuary_cdk.capture.common import BaseDocument, Resource, open_binding, ReductionStrategy, ResourceConfig
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
@@ -416,7 +416,7 @@ def properties(http: HTTPSession, object_names: Iterable[str]) -> Resource:
             state,
             task,
             fetch_snapshot=snapshot,
-            tombstone=Property(_meta=Property.Meta(op="d")),
+            tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d")),
         )
 
     return Resource(
