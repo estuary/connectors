@@ -26,18 +26,6 @@ properties:
   id:
     title: Id
     type: string
-  project_id:
-    title: Project Id
-    type: integer
-  distinct_ids:
-    items:
-      type: string
-    title: Distinct Ids
-    type: array
-  properties:
-    type: object
-    additionalProperties: true
-    title: Properties
   created_at:
     anyOf:
     - format: date-time
@@ -47,7 +35,6 @@ properties:
     title: Created At
 required:
 - id
-- project_id
 title: Person
 type: object
 x-infer-schema: true

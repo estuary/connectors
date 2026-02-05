@@ -36,6 +36,13 @@ class Connector(BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorSt
     def request_class(self):
         return Request[EndpointConfig, ResourceConfig, ConnectorState]
 
+    def _configure_auth(self, config: EndpointConfig) -> None:
+        """Configure token source for API authentication."""
+        self.token_source = TokenSource(
+            oauth_spec=None,
+            credentials=AccessToken(access_token=config.personal_api_key),
+        )
+
     async def spec(self, _: Logger, __: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
             configSchema=EndpointConfig.model_json_schema(),
@@ -48,10 +55,7 @@ class Connector(BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorSt
         self, log: Logger, discover: request.Discover[EndpointConfig]
     ) -> response.Discovered[ResourceConfig]:
         config = discover.config
-        self.token_source = TokenSource(
-            oauth_spec=None,
-            credentials=AccessToken(access_token=config.personal_api_key),
-        )
+        self._configure_auth(config)
 
         resources = await all_resources(log, self, config)
         return common.discovered(resources)
@@ -62,19 +66,10 @@ class Connector(BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorSt
         validate: request.Validate[EndpointConfig, ResourceConfig],
     ) -> response.Validated:
         config = validate.config
+        self._configure_auth(config)
 
-        # Configure authentication
-        self.token_source = TokenSource(
-            oauth_spec=None,
-            credentials=AccessToken(access_token=config.personal_api_key),
-        )
-
-        # Validate organization access and get project IDs
-        validation = await validate_credentials(
-            http=self,
-            config=config,
-            log=log,
-        )
+        # Validate organization access
+        validation = await validate_credentials(self, config, log)
 
         if not validation.valid:
             raise ValueError(validation.error)
@@ -90,10 +85,7 @@ class Connector(BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorSt
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
         config = open.capture.config
-        self.token_source = TokenSource(
-            oauth_spec=None,
-            credentials=AccessToken(access_token=config.personal_api_key),
-        )
+        self._configure_auth(config)
 
         resources = await all_resources(log, self, config)
         resolved = common.resolve_bindings(open.capture.bindings, resources)

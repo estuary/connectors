@@ -90,9 +90,6 @@ class TestCaptureIntegration:
 
     def test_capture_events(self, request):
         """Test that Events capture returns data with project_id field."""
-        # Incremental resources (Events) require 2 sessions to capture data -
-        # session 1 runs snapshot resources, session 2 runs incremental.
-        # Assumes test data exists in PostHog
         result = subprocess.run(
             [
                 "flowctl",
@@ -100,13 +97,13 @@ class TestCaptureIntegration:
                 "--source",
                 request.fspath.dirname + "/../test.flow.local.yaml",
                 "--sessions",
-                "2",
+                "1",
                 "--delay",
-                "15s",
+                "10s",  # Events may take longer
             ],
             capture_output=True,
             text=True,
-            timeout=180,
+            timeout=120,
         )
 
         assert result.returncode == 0, f"flowctl preview failed: {result.stderr}"
@@ -132,7 +129,7 @@ class TestCaptureIntegration:
             except json.JSONDecodeError:
                 continue
 
-        assert events_found, "No Events documents found in capture output"
+        assert events_found, "No Events documents found in capture output (run scripts/inject_mock_data.py to populate test data)"
 
     def test_capture_all_resources(self, request):
         """Test full capture workflow with all bindings."""

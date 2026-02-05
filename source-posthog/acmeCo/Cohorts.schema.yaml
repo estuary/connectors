@@ -26,43 +26,8 @@ properties:
   id:
     title: Id
     type: integer
-  project_id:
-    title: Project Id
-    type: integer
-  name:
-    title: Name
-    type: string
-  description:
-    default: ''
-    title: Description
-    type: string
-  groups:
-    items:
-      additionalProperties: true
-      type: object
-    title: Groups
-    type: array
-  is_static:
-    default: false
-    title: Is Static
-    type: boolean
-  count:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Count
-  created_at:
-    anyOf:
-    - format: date-time
-      type: string
-    - type: 'null'
-    default: null
-    title: Created At
 required:
 - id
-- project_id
-- name
 title: Cohort
 type: object
 x-infer-schema: true

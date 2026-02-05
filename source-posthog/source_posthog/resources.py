@@ -3,9 +3,10 @@
 import functools
 from datetime import UTC, datetime, timedelta
 from logging import Logger
+from typing import Any
 
 from estuary_cdk.capture import Task, common
-from estuary_cdk.flow import CaptureBinding
+from estuary_cdk.capture.common import BaseDocument
 from estuary_cdk.http import HTTPSession
 
 from .api import (
@@ -19,13 +20,37 @@ from .api import (
     snapshot_projects,
 )
 from .models import (
+    Annotation,
+    BasePostHogEntity,
+    Cohort,
     EndpointConfig,
-    INCREMENTAL_RESOURCES,
+    Event,
+    FeatureFlag,
+    Organization,
+    Person,
+    Project,
     ResourceConfig,
     ResourceState,
-    SNAPSHOT_RESOURCES,
     default_start_date,
 )
+
+# Standard tombstone for snapshot resources (CDK convention)
+TOMBSTONE = BaseDocument(_meta=BaseDocument.Meta(op="d"))
+
+# Snapshot resources: (resource_type, model_class)
+SNAPSHOT_RESOURCES: list[tuple[str, type[BasePostHogEntity]]] = [
+    ("organizations", Organization),
+    ("projects", Project),
+    ("persons", Person),
+    ("cohorts", Cohort),
+    ("feature_flags", FeatureFlag),
+    ("annotations", Annotation),
+]
+
+# Incremental resources: (resource_type, model_class)
+INCREMENTAL_RESOURCES: list[tuple[str, type[BasePostHogEntity]]] = [
+    ("events", Event),
+]
 
 
 async def all_resources(
@@ -47,24 +72,23 @@ async def all_resources(
     snapshot_fetchers = {
         "organizations": functools.partial(snapshot_organizations, http, config),
         "projects": functools.partial(snapshot_projects, http, config),
-        "persons": functools.partial(snapshot_persons, http, config, project_ids),
-        "cohorts": functools.partial(snapshot_cohorts, http, config, project_ids),
-        "feature_flags": functools.partial(snapshot_feature_flags, http, config, project_ids),
-        "annotations": functools.partial(snapshot_annotations, http, config, project_ids),
+        "persons": functools.partial(snapshot_persons, http, config),
+        "cohorts": functools.partial(snapshot_cohorts, http, config),
+        "feature_flags": functools.partial(snapshot_feature_flags, http, config),
+        "annotations": functools.partial(snapshot_annotations, http, config),
     }
 
     incremental_fetchers = {
-        "events": functools.partial(fetch_events, http, config, project_ids),
+        "events": functools.partial(fetch_events, http, config),
     }
 
     def open_snapshot_binding(
         resource_type: str,
-        tombstone: object,
-        binding: CaptureBinding[ResourceConfig],
+        binding: Any,
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings: list[CaptureBinding[ResourceConfig]],
+        all_bindings: Any,
     ):
         common.open_binding(
             binding,
@@ -72,16 +96,16 @@ async def all_resources(
             state,
             task,
             fetch_snapshot=snapshot_fetchers[resource_type],
-            tombstone=tombstone,
+            tombstone=TOMBSTONE,
         )
 
     def open_incremental_binding(
         resource_type: str,
-        binding: CaptureBinding[ResourceConfig],
+        binding: Any,
         binding_index: int,
         state: ResourceState,
         task: Task,
-        all_bindings: list[CaptureBinding[ResourceConfig]],
+        all_bindings: Any,
     ):
         common.open_binding(
             binding,
@@ -94,13 +118,13 @@ async def all_resources(
     resources = []
 
     # Add snapshot resources
-    for resource_type, model_class, key_field, name, tombstone in SNAPSHOT_RESOURCES:
+    for resource_type, model_class in SNAPSHOT_RESOURCES:
         resources.append(
             common.Resource(
-                name=name,
-                key=[key_field],
+                name=model_class.resource_name,
+                key=["/id"],
                 model=model_class,
-                open=functools.partial(open_snapshot_binding, resource_type, tombstone),
+                open=functools.partial(open_snapshot_binding, resource_type),
                 initial_state=ResourceState(
                     snapshot=ResourceState.Snapshot(
                         updated_at=datetime.min.replace(tzinfo=UTC),
@@ -109,25 +133,25 @@ async def all_resources(
                     )
                 ),
                 initial_config=ResourceConfig(
-                    name=name,
-                    interval=timedelta(seconds=30),
+                    name=model_class.resource_name,
+                    interval=timedelta(minutes=5),
                 ),
                 schema_inference=True,
             )
         )
 
     # Add incremental resources
-    for resource_type, model_class, key_field, name in INCREMENTAL_RESOURCES:
+    for resource_type, model_class in INCREMENTAL_RESOURCES:
         resources.append(
             common.Resource(
-                name=name,
-                key=[key_field],
+                name=model_class.resource_name,
+                key=["/id"],
                 model=model_class,
                 open=functools.partial(open_incremental_binding, resource_type),
                 initial_state=ResourceState(inc=ResourceState.Incremental(cursor=start_date)),
                 initial_config=ResourceConfig(
-                    name=name,
-                    interval=timedelta(seconds=30),
+                    name=model_class.resource_name,
+                    interval=timedelta(minutes=5),
                 ),
                 schema_inference=True,
             )

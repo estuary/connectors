@@ -24,6 +24,14 @@
               "default": null,
               "description": "Start date for historical data capture (ISO 8601 format). If not specified, captures from 30 days ago.",
               "title": "Start Date"
+            },
+            "page_size": {
+              "default": 10000,
+              "description": "Number of records to fetch per API request (1000-50000). Higher values are faster but use more memory.",
+              "maximum": 50000,
+              "minimum": 1000,
+              "title": "Page Size",
+              "type": "integer"
             }
           },
           "title": "Advanced",

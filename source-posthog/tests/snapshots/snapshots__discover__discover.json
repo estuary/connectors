@@ -3,7 +3,7 @@
     "recommendedName": "Organizations",
     "resourceConfig": {
       "name": "Organizations",
-      "interval": "PT30S"
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -41,65 +41,10 @@
         "id": {
           "title": "Id",
           "type": "string"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "slug": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Slug"
-        },
-        "created_at": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Created At"
-        },
-        "updated_at": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Updated At"
-        },
-        "membership_level": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Membership Level"
         }
       },
       "required": [
-        "id",
-        "name"
+        "id"
       ],
       "title": "Organization",
       "type": "object",
@@ -113,7 +58,7 @@
     "recommendedName": "Projects",
     "resourceConfig": {
       "name": "Projects",
-      "interval": "PT30S"
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -151,57 +96,10 @@
         "id": {
           "title": "Id",
           "type": "integer"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "organization": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Organization"
-        },
-        "api_token": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Api Token"
-        },
-        "timezone": {
-          "default": "UTC",
-          "title": "Timezone",
-          "type": "string"
-        },
-        "created_at": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Created At"
         }
       },
       "required": [
-        "id",
-        "name"
+        "id"
       ],
       "title": "Project",
       "type": "object",
@@ -215,7 +113,7 @@
     "recommendedName": "Persons",
     "resourceConfig": {
       "name": "Persons",
-      "interval": "PT30S"
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -254,22 +152,6 @@
           "title": "Id",
           "type": "string"
         },
-        "project_id": {
-          "title": "Project Id",
-          "type": "integer"
-        },
-        "distinct_ids": {
-          "items": {
-            "type": "string"
-          },
-          "title": "Distinct Ids",
-          "type": "array"
-        },
-        "properties": {
-          "type": "object",
-          "additionalProperties": true,
-          "title": "Properties"
-        },
         "created_at": {
           "anyOf": [
             {
@@ -285,8 +167,7 @@
         }
       },
       "required": [
-        "id",
-        "project_id"
+        "id"
       ],
       "title": "Person",
       "type": "object",
@@ -300,7 +181,7 @@
     "recommendedName": "Cohorts",
     "resourceConfig": {
       "name": "Cohorts",
-      "interval": "PT30S"
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -338,63 +219,10 @@
         "id": {
           "title": "Id",
           "type": "integer"
-        },
-        "project_id": {
-          "title": "Project Id",
-          "type": "integer"
-        },
-        "name": {
-          "title": "Name",
-          "type": "string"
-        },
-        "description": {
-          "default": "",
-          "title": "Description",
-          "type": "string"
-        },
-        "groups": {
-          "items": {
-            "additionalProperties": true,
-            "type": "object"
-          },
-          "title": "Groups",
-          "type": "array"
-        },
-        "is_static": {
-          "default": false,
-          "title": "Is Static",
-          "type": "boolean"
-        },
-        "count": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Count"
-        },
-        "created_at": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Created At"
         }
       },
       "required": [
-        "id",
-        "project_id",
-        "name"
+        "id"
       ],
       "title": "Cohort",
       "type": "object",
@@ -408,7 +236,7 @@
     "recommendedName": "FeatureFlags",
     "resourceConfig": {
       "name": "FeatureFlags",
-      "interval": "PT30S"
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -446,60 +274,10 @@
         "id": {
           "title": "Id",
           "type": "integer"
-        },
-        "project_id": {
-          "title": "Project Id",
-          "type": "integer"
-        },
-        "key": {
-          "title": "Key",
-          "type": "string"
-        },
-        "name": {
-          "default": "",
-          "title": "Name",
-          "type": "string"
-        },
-        "active": {
-          "default": true,
-          "title": "Active",
-          "type": "boolean"
-        },
-        "filters": {
-          "additionalProperties": true,
-          "title": "Filters",
-          "type": "object"
-        },
-        "rollout_percentage": {
-          "anyOf": [
-            {
-              "type": "integer"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Rollout Percentage"
-        },
-        "created_at": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Created At"
         }
       },
       "required": [
-        "id",
-        "project_id",
-        "key"
+        "id"
       ],
       "title": "FeatureFlag",
       "type": "object",
@@ -513,7 +291,7 @@
     "recommendedName": "Annotations",
     "resourceConfig": {
       "name": "Annotations",
-      "interval": "PT30S"
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -551,49 +329,10 @@
         "id": {
           "title": "Id",
           "type": "integer"
-        },
-        "project_id": {
-          "title": "Project Id",
-          "type": "integer"
-        },
-        "content": {
-          "title": "Content",
-          "type": "string"
-        },
-        "date_marker": {
-          "format": "date-time",
-          "title": "Date Marker",
-          "type": "string"
-        },
-        "scope": {
-          "default": "project",
-          "title": "Scope",
-          "type": "string"
-        },
-        "creation_type": {
-          "default": "USR",
-          "title": "Creation Type",
-          "type": "string"
-        },
-        "created_at": {
-          "anyOf": [
-            {
-              "format": "date-time",
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Created At"
         }
       },
       "required": [
-        "id",
-        "project_id",
-        "content",
-        "date_marker"
+        "id"
       ],
       "title": "Annotation",
       "type": "object",
@@ -607,7 +346,7 @@
     "recommendedName": "Events",
     "resourceConfig": {
       "name": "Events",
-      "interval": "PT30S"
+      "interval": "PT5M"
     },
     "documentSchema": {
       "$defs": {
@@ -646,42 +385,14 @@
           "title": "Id",
           "type": "string"
         },
-        "project_id": {
-          "title": "Project Id",
-          "type": "integer"
-        },
-        "event": {
-          "title": "Event",
-          "type": "string"
-        },
-        "distinct_id": {
-          "title": "Distinct Id",
-          "type": "string"
-        },
-        "properties": {
-          "type": "object",
-          "additionalProperties": true,
-          "title": "Properties"
-        },
         "timestamp": {
           "format": "date-time",
           "title": "Timestamp",
           "type": "string"
-        },
-        "elements": {
-          "items": {
-            "additionalProperties": true,
-            "type": "object"
-          },
-          "title": "Elements",
-          "type": "array"
         }
       },
       "required": [
         "id",
-        "project_id",
-        "event",
-        "distinct_id",
         "timestamp"
       ],
       "title": "Event",

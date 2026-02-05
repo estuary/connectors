@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 
 from source_posthog.models import EndpointConfig
 
+from .data_injection import PostHogClient
+
 # Load .env from project root
 env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(env_path)
@@ -61,3 +63,14 @@ def project_id() -> int:
     if not pid:
         pytest.skip("POSTHOG_PROJECT_ID required")
     return int(pid)
+
+
+@pytest.fixture
+def posthog_client(personal_api_key: str, base_url: str) -> PostHogClient:
+    """Create a PostHog API client for testing."""
+    project_api_key = os.environ.get("POSTHOG_PROJECT_API_KEY", "")
+    return PostHogClient(
+        personal_api_key=personal_api_key,
+        base_url=base_url,
+        project_api_key=project_api_key,
+    )

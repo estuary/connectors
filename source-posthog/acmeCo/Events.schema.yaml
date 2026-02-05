@@ -26,34 +26,12 @@ properties:
   id:
     title: Id
     type: string
-  project_id:
-    title: Project Id
-    type: integer
-  event:
-    title: Event
-    type: string
-  distinct_id:
-    title: Distinct Id
-    type: string
-  properties:
-    type: object
-    additionalProperties: true
-    title: Properties
   timestamp:
     format: date-time
     title: Timestamp
     type: string
-  elements:
-    items:
-      additionalProperties: true
-      type: object
-    title: Elements
-    type: array
 required:
 - id
-- project_id
-- event
-- distinct_id
 - timestamp
 title: Event
 type: object

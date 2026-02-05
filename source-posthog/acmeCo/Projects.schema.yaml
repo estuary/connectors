@@ -26,35 +26,8 @@ properties:
   id:
     title: Id
     type: integer
-  name:
-    title: Name
-    type: string
-  organization:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Organization
-  api_token:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Api Token
-  timezone:
-    default: UTC
-    title: Timezone
-    type: string
-  created_at:
-    anyOf:
-    - format: date-time
-      type: string
-    - type: 'null'
-    default: null
-    title: Created At
 required:
 - id
-- name
 title: Project
 type: object
 x-infer-schema: true

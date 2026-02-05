@@ -26,41 +26,8 @@ properties:
   id:
     title: Id
     type: integer
-  project_id:
-    title: Project Id
-    type: integer
-  key:
-    title: Key
-    type: string
-  name:
-    default: ''
-    title: Name
-    type: string
-  active:
-    default: true
-    title: Active
-    type: boolean
-  filters:
-    additionalProperties: true
-    title: Filters
-    type: object
-  rollout_percentage:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Rollout Percentage
-  created_at:
-    anyOf:
-    - format: date-time
-      type: string
-    - type: 'null'
-    default: null
-    title: Created At
 required:
 - id
-- project_id
-- key
 title: FeatureFlag
 type: object
 x-infer-schema: true

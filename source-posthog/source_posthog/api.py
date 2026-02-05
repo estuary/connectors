@@ -5,13 +5,13 @@ PostHog API client functions.
 import json
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from logging import Logger
 from typing import Any
-from urllib.parse import urljoin
 
 from estuary_cdk.capture.common import BaseDocument
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPMixin, HTTPSession
+from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from .models import (
     Annotation,
@@ -21,8 +21,31 @@ from .models import (
     FeatureFlag,
     Organization,
     Person,
+    PostHogEntity,
     Project,
+    ProjectEntity,
+    RestResponseMeta,
 )
+
+
+def _parse_timestamp(value: str | datetime | None) -> datetime | None:
+    """Parse timestamp from HogQL response, handling Z suffix."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if value.endswith("Z"):
+        value = value[:-1] + "+00:00"
+    return datetime.fromisoformat(value)
+
+
+def _parse_json_properties(value: str | dict | None) -> dict:
+    """Parse properties from HogQL response (may be JSON string or dict)."""
+    if not value:
+        return {}
+    if isinstance(value, dict):
+        return value
+    return json.loads(value)
 
 
 @dataclass
@@ -52,19 +75,18 @@ async def validate_credentials(
     Returns ValidationResult with project IDs if validation succeeds.
     """
     organization_id = config.organization_id
-    url = urljoin(config.advanced.base_url, "api/organizations/")
 
     try:
-        response = await http.request(log, url)
-        data = json.loads(response)
-        results = data.get("results", [])
+        orgs: list[Organization] = []
+        async for org in fetch_entity(Organization, http, config, log):
+            orgs.append(org)
     except Exception as e:
         return ValidationResult(
             valid=False,
             error=f"Failed to fetch organizations: {e}",
         )
 
-    if not results:
+    if not orgs:
         return ValidationResult(
             valid=False,
             error="API key has no access to any organizations",
@@ -73,9 +95,12 @@ async def validate_credentials(
     # Find the specified organization
     target_org = None
     accessible_names = []
-    for org in results:
-        accessible_names.append(f"{org.get('name')} ({org.get('id')})")
-        if org.get("id") == organization_id:
+    for org in orgs:
+        # Access name via model_extra since it's not an explicit field
+        org_data = org.model_dump()
+        org_name = org_data.get("name", org.id)
+        accessible_names.append(f"{org_name} ({org.id})")
+        if org.id == organization_id:
             target_org = org
             break
 
@@ -86,8 +111,9 @@ async def validate_credentials(
             f"Accessible organizations: {accessible_names}",
         )
 
-    # Extract project IDs from the organization
-    projects = target_org.get("projects", [])
+    # Extract project IDs from the organization (projects is in extra fields)
+    org_data = target_org.model_dump()
+    projects = org_data.get("projects", [])
     if not projects:
         return ValidationResult(
             valid=False,
@@ -95,7 +121,7 @@ async def validate_credentials(
         )
 
     project_ids = [proj.get("id") for proj in projects]
-    org_name = target_org.get("name")
+    org_name = org_data.get("name")
 
     log.info(
         f"Validated organization '{org_name}' ({organization_id}) "
@@ -110,6 +136,12 @@ async def validate_credentials(
     )
 
 
+# Cache for project IDs per organization (avoids re-fetching on retry).
+# Note: @functools.cache doesn't work with async - it caches the coroutine
+# object, not the result, causing "cannot reuse already awaited coroutine".
+_project_ids_cache: dict[str, list[int]] = {}
+
+
 async def fetch_project_ids(
     http: HTTPSession,
     config: EndpointConfig,
@@ -119,23 +151,101 @@ async def fetch_project_ids(
     Fetch all project IDs for an organization.
 
     Returns list of project IDs belonging to the specified organization.
+    Results are cached per organization_id for retry safety.
     """
-    organization_id = config.organization_id
-    url = urljoin(config.advanced.base_url, "api/organizations/")
+    org_id = config.organization_id
+    if org_id in _project_ids_cache:
+        return _project_ids_cache[org_id]
 
-    response = await http.request(log, url)
-    data = json.loads(response)
-    results = data.get("results", [])
+    result = await validate_credentials(http, config, log)
+    project_ids = result.project_ids if result.valid and result.project_ids else []
+    _project_ids_cache[org_id] = project_ids
+    return project_ids
 
-    for org in results:
-        if org.get("id") == organization_id:
-            projects = org.get("projects", [])
-            project_ids = [proj.get("id") for proj in projects]
-            log.info(f"Found {len(project_ids)} projects in org {organization_id}")
-            return project_ids
 
-    log.warning(f"Organization {organization_id} not found")
-    return []
+# =============================================================================
+# Generic REST API Fetchers (using IncrementalJsonProcessor)
+# =============================================================================
+
+
+async def _fetch_from_url[T: PostHogEntity | ProjectEntity](
+    url: str,
+    model: type[T],
+    http: HTTPSession,
+    log: Logger,
+) -> AsyncGenerator[T, None]:
+    """
+    Fetch paginated results from a URL using IncrementalJsonProcessor.
+
+    Handles pagination automatically via the 'next' field in response metadata.
+    Yields validated model instances.
+    """
+    current_url: str | None = url
+
+    while current_url is not None:
+        _, body = await http.request_stream(log, current_url)
+        processor: IncrementalJsonProcessor[T, RestResponseMeta] = IncrementalJsonProcessor(
+            body(), "results.item", model, remainder_cls=RestResponseMeta
+        )
+
+        async for item in processor:
+            yield item
+
+        remainder = processor.get_remainder()
+        current_url = remainder.next if remainder else None
+
+
+async def fetch_entity[T: PostHogEntity](
+    model: type[T],
+    http: HTTPSession,
+    config: EndpointConfig,
+    log: Logger,
+) -> AsyncGenerator[T, None]:
+    """
+    Fetch all instances of a PostHogEntity from the REST API.
+
+    Uses the model's api_path to construct the URL.
+    """
+    url = model.get_api_endpoint_url(config.advanced.base_url)
+    count = 0
+
+    async for item in _fetch_from_url(url, model, http, log):
+        yield item
+        count += 1
+
+    log.info(f"Fetched {count} {model.resource_name}")
+
+
+async def fetch_project_entity[T: ProjectEntity](
+    model: type[T],
+    http: HTTPSession,
+    config: EndpointConfig,
+    log: Logger,
+) -> AsyncGenerator[T, None]:
+    """
+    Fetch all instances of a ProjectEntity across all projects.
+
+    Iterates over projects fetched via fetch_entity and fetches from each project's endpoint.
+    """
+    total_count = 0
+
+    async for project in fetch_entity(Project, http, config, log):
+        url = model.get_api_endpoint_url(config.advanced.base_url, project.id)
+        count = 0
+
+        async for item in _fetch_from_url(url, model, http, log):
+            yield item
+            count += 1
+
+        log.info(f"Fetched {count} {model.resource_name} from project {project.id}")
+        total_count += count
+
+    log.info(f"Fetched {total_count} total {model.resource_name}")
+
+
+# =============================================================================
+# Snapshot Functions (REST API)
+# =============================================================================
 
 
 async def snapshot_organizations(
@@ -143,22 +253,9 @@ async def snapshot_organizations(
     config: EndpointConfig,
     log: Logger,
 ) -> AsyncGenerator[Organization, None]:
-    """
-    Fetch all organizations from PostHog (snapshot resource).
-
-    Yields Organization objects. No cursor needed - CDK handles snapshot state.
-    """
-    url = urljoin(config.advanced.base_url, "api/organizations/")
-
-    response = await http.request(log, url)
-    data = json.loads(response)
-    results = data.get("results", [])
-
-    for item in results:
-        org = Organization.model_validate(item)
-        yield org
-
-    log.info(f"Fetched {len(results)} organizations")
+    """Fetch all organizations from PostHog."""
+    async for item in fetch_entity(Organization, http, config, log):
+        yield item
 
 
 async def snapshot_projects(
@@ -166,36 +263,65 @@ async def snapshot_projects(
     config: EndpointConfig,
     log: Logger,
 ) -> AsyncGenerator[Project, None]:
+    """Fetch all projects from PostHog."""
+    async for item in fetch_entity(Project, http, config, log):
+        yield item
+
+
+async def _query_hogql(
+    http: HTTPMixin,
+    base_url: str,
+    project_id: int,
+    query: str,
+    log: Logger,
+    name: str = "connector_query",
+) -> dict[str, Any]:
     """
-    Fetch all projects from PostHog (snapshot resource).
+    Execute a HogQL query via the Query API.
 
-    Yields Project objects. No cursor needed - CDK handles snapshot state.
+    Returns the full response including results, columns, and metadata.
     """
-    url = urljoin(config.advanced.base_url, "api/projects/")
+    url = f"{base_url}/api/projects/{project_id}/query/"
+    payload = {
+        "query": {
+            "kind": "HogQLQuery",
+            "query": query,
+        },
+        "name": name,
+    }
 
-    response = await http.request(log, url)
-    data = json.loads(response)
-    results = data.get("results", [])
+    response = await http.request(
+        log,
+        url,
+        method="POST",
+        json=payload,
+    )
+    return json.loads(response)
 
-    for item in results:
-        project = Project.model_validate(item)
-        yield project
 
-    log.info(f"Fetched {len(results)} projects")
+def _format_cursor(cursor: datetime | None) -> str:
+    """Format datetime cursor for HogQL WHERE clause."""
+    if cursor is None:
+        return ""
+    return cursor.strftime("%Y-%m-%d %H:%M:%S")
 
 
 async def fetch_events(
-    http: HTTPSession,
+    http: HTTPMixin,
     config: EndpointConfig,
-    project_ids: list[int],
     log: Logger,
     cursor: datetime,
 ) -> AsyncGenerator[Event | datetime, None]:
     """
-    Fetch events from PostHog across all projects in the organization.
+    Fetch events from PostHog across all projects using HogQL Query API.
 
+    Uses timestamp-based pagination for efficient querying of large datasets.
     Yields Event objects (with project_id) and finally yields the new cursor datetime.
     """
+    base_url = config.advanced.base_url.rstrip("/")
+    page_size = config.advanced.page_size
+    project_ids = await fetch_project_ids(http, config, log)
+
     log.info(
         f"fetch_events called with cursor: {cursor.isoformat()} for {len(project_ids)} projects"
     )
@@ -204,117 +330,150 @@ async def fetch_events(
     total_doc_count = 0
 
     for project_id in project_ids:
-        url = urljoin(config.advanced.base_url, f"api/projects/{project_id}/events/")
-        params: dict[str, Any] = {
-            "after": cursor.isoformat(),
-            "limit": 100,
-        }
-
         doc_count = 0
+        page_cursor = cursor
 
         while True:
-            response = await http.request(log, url, params=params)
-            data = json.loads(response)
-            results = data.get("results", [])
+            # HogQL query with timestamp-based pagination
+            query = f"""
+                SELECT
+                    uuid as id,
+                    event,
+                    timestamp,
+                    distinct_id,
+                    properties,
+                    elements_chain
+                FROM {Event.table_name}
+                WHERE timestamp > toDateTime('{_format_cursor(page_cursor)}')
+                ORDER BY timestamp ASC
+                LIMIT {page_size}
+            """
 
-            if not results:
+            result = await _query_hogql(http, base_url, project_id, query, log, name="fetch_events")
+
+            columns = result.get("columns", [])
+            rows = result.get("results", [])
+
+            if not rows:
                 break
 
-            for item in results:
-                item["project_id"] = project_id
-                event = Event.model_validate(item)
-                event.meta_ = BaseDocument.Meta(op="c")
+            for row in rows:
+                row_dict = dict(zip(columns, row, strict=False))
+                ts = _parse_timestamp(row_dict.pop("timestamp"))
+                props = _parse_json_properties(row_dict.pop("properties"))
+
+                event = Event(
+                    **row_dict,
+                    timestamp=ts,
+                    properties=props,
+                    meta_=BaseDocument.Meta(op="c"),
+                    project_id=project_id,
+                )
                 yield event
                 doc_count += 1
 
-                if event.timestamp > last_timestamp:
-                    last_timestamp = event.timestamp
+                if ts and ts > last_timestamp:
+                    last_timestamp = ts
 
-            # Check for pagination
-            next_url = data.get("next")
-            if not next_url:
+            # Timestamp-based pagination: use the last event's timestamp
+            last_row = dict(zip(columns, rows[-1], strict=False))
+            page_cursor = _parse_timestamp(last_row.get("timestamp"))
+
+            # If we got fewer rows than page_size, we've reached the end
+            if len(rows) < page_size:
                 break
-
-            # Update params for next page
-            params = {}
-            url = next_url
 
         log.info(f"Fetched {doc_count} events from project {project_id}")
         total_doc_count += doc_count
 
     log.info(f"Fetched {total_doc_count} total events across all projects")
-
-    if total_doc_count == 0:
-        # If there were no events, we may need to move the cursor forward to keep it from going
-        # stale. Use a conservative time horizon to account for any API delays in event ingestion.
-        last_timestamp = datetime.now(tz=UTC) - timedelta(minutes=5)
-
-        if last_timestamp <= cursor:
-            # Common case: caught up with frequent events, most recent event is newer than our
-            # conservative horizon. No cursor update needed.
-            log.debug(
-                f"not updating cursor since last_timestamp ({last_timestamp}) <= cursor ({cursor})"
-            )
-            return
-        elif last_timestamp - cursor < timedelta(hours=6):
-            # Only emit an updated checkpoint when there are no documents if the current cursor
-            # is sufficiently old. Emitting a checkpoint with no documents will trigger an
-            # immediate re-invocation of this task, so avoid doing it too frequently.
-            log.debug(
-                f"not updating cursor since it's less than 6 hours newer than prior "
-                f"(new: {last_timestamp} vs prior: {cursor})"
-            )
-            return
-    else:
-        # Bump cursor by 1ms to avoid re-fetching the last event on the next round.
-        # Assumes all events with the same timestamp were retrieved together.
-        last_timestamp += timedelta(milliseconds=1)
-
-    yield last_timestamp
+    # CDK requires cursor to always advance beyond the previous cursor.
+    # Use current time when no events found, or when last_timestamp hasn't advanced.
+    new_cursor = datetime.now(tz=UTC)
+    if total_doc_count > 0 and last_timestamp > cursor:
+        new_cursor = last_timestamp
+    yield new_cursor
 
 
 async def snapshot_persons(
-    http: HTTPSession,
+    http: HTTPMixin,
     config: EndpointConfig,
-    project_ids: list[int],
     log: Logger,
 ) -> AsyncGenerator[Person, None]:
     """
-    Fetch all persons from PostHog across all projects (snapshot resource).
+    Fetch all persons from PostHog across all projects using HogQL Query API.
 
+    Uses created_at-based pagination for efficient querying.
     Yields Person objects with project_id. No cursor needed - CDK handles snapshot state.
+
+    Note: HogQL persons table doesn't include distinct_ids directly.
+    We query person_distinct_ids separately if needed.
     """
+    base_url = config.advanced.base_url.rstrip("/")
+    page_size = config.advanced.page_size
+    project_ids = await fetch_project_ids(http, config, log)
+
     total_doc_count = 0
 
     for project_id in project_ids:
-        url = urljoin(config.advanced.base_url, f"api/projects/{project_id}/persons/")
-        params: dict[str, Any] = {
-            "limit": 100,
-        }
-
         doc_count = 0
+        last_created_at: datetime | None = None
 
         while True:
-            response = await http.request(log, url, params=params)
-            data = json.loads(response)
-            results = data.get("results", [])
+            # Build WHERE clause for pagination
+            where_clause = ""
+            if last_created_at:
+                where_clause = f"WHERE created_at > toDateTime('{_format_cursor(last_created_at)}')"
 
-            if not results:
+            # HogQL query for persons with distinct_ids via subquery
+            query = f"""
+                SELECT
+                    p.id,
+                    p.created_at,
+                    p.properties,
+                    p.is_identified,
+                    groupArray(pdi.distinct_id) as distinct_ids
+                FROM {Person.table_name} p
+                LEFT JOIN person_distinct_ids pdi ON p.id = pdi.person_id
+                {where_clause}
+                GROUP BY p.id, p.created_at, p.properties, p.is_identified
+                ORDER BY p.created_at ASC
+                LIMIT {page_size}
+            """
+
+            result = await _query_hogql(
+                http, base_url, project_id, query, log, name="snapshot_persons"
+            )
+
+            columns = result.get("columns", [])
+            rows = result.get("results", [])
+
+            if not rows:
                 break
 
-            for item in results:
-                item["project_id"] = project_id
-                person = Person.model_validate(item)
+            for row in rows:
+                row_dict = dict(zip(columns, row, strict=False))
+                created = _parse_timestamp(row_dict.pop("created_at"))
+                props = _parse_json_properties(row_dict.pop("properties"))
+                is_id = bool(row_dict.pop("is_identified", 0))
+
+                person = Person(
+                    **row_dict,
+                    created_at=created,
+                    properties=props,
+                    is_identified=is_id,
+                    project_id=project_id,
+                )
                 yield person
                 doc_count += 1
 
-            # Check for pagination
-            next_url = data.get("next")
-            if not next_url:
-                break
+            # Pagination: use last person's created_at
+            last_row = dict(zip(columns, rows[-1], strict=False))
+            last_created_at = _parse_timestamp(last_row.get("created_at"))
 
-            params = {}
-            url = next_url
+            # If we got fewer rows than page_size, we've reached the end
+            if len(rows) < page_size:
+                break
 
         log.info(f"Fetched {doc_count} persons from project {project_id}")
         total_doc_count += doc_count
@@ -325,91 +484,28 @@ async def snapshot_persons(
 async def snapshot_cohorts(
     http: HTTPSession,
     config: EndpointConfig,
-    project_ids: list[int],
     log: Logger,
 ) -> AsyncGenerator[Cohort, None]:
-    """
-    Fetch all cohorts from PostHog across all projects (snapshot resource).
-
-    Yields Cohort objects with project_id. No cursor needed - CDK handles snapshot state.
-    """
-    total_count = 0
-
-    for project_id in project_ids:
-        url = urljoin(config.advanced.base_url, f"api/projects/{project_id}/cohorts/")
-
-        response = await http.request(log, url)
-        data = json.loads(response)
-        results = data.get("results", [])
-
-        for item in results:
-            item["project_id"] = project_id
-            cohort = Cohort.model_validate(item)
-            yield cohort
-
-        log.info(f"Fetched {len(results)} cohorts from project {project_id}")
-        total_count += len(results)
-
-    log.info(f"Fetched {total_count} total cohorts across all projects")
+    """Fetch all cohorts from PostHog across all projects."""
+    async for item in fetch_project_entity(Cohort, http, config, log):
+        yield item
 
 
 async def snapshot_feature_flags(
     http: HTTPSession,
     config: EndpointConfig,
-    project_ids: list[int],
     log: Logger,
 ) -> AsyncGenerator[FeatureFlag, None]:
-    """
-    Fetch all feature flags from PostHog across all projects (snapshot resource).
-
-    Yields FeatureFlag objects with project_id. No cursor needed - CDK handles snapshot state.
-    """
-    total_count = 0
-
-    for project_id in project_ids:
-        url = urljoin(config.advanced.base_url, f"api/projects/{project_id}/feature_flags/")
-
-        response = await http.request(log, url)
-        data = json.loads(response)
-        results = data.get("results", [])
-
-        for item in results:
-            item["project_id"] = project_id
-            flag = FeatureFlag.model_validate(item)
-            yield flag
-
-        log.info(f"Fetched {len(results)} feature flags from project {project_id}")
-        total_count += len(results)
-
-    log.info(f"Fetched {total_count} total feature flags across all projects")
+    """Fetch all feature flags from PostHog across all projects."""
+    async for item in fetch_project_entity(FeatureFlag, http, config, log):
+        yield item
 
 
 async def snapshot_annotations(
     http: HTTPSession,
     config: EndpointConfig,
-    project_ids: list[int],
     log: Logger,
 ) -> AsyncGenerator[Annotation, None]:
-    """
-    Fetch all annotations from PostHog across all projects (snapshot resource).
-
-    Yields Annotation objects with project_id. No cursor needed - CDK handles snapshot state.
-    """
-    total_count = 0
-
-    for project_id in project_ids:
-        url = urljoin(config.advanced.base_url, f"api/projects/{project_id}/annotations/")
-
-        response = await http.request(log, url)
-        data = json.loads(response)
-        results = data.get("results", [])
-
-        for item in results:
-            item["project_id"] = project_id
-            annotation = Annotation.model_validate(item)
-            yield annotation
-
-        log.info(f"Fetched {len(results)} annotations from project {project_id}")
-        total_count += len(results)
-
-    log.info(f"Fetched {total_count} total annotations across all projects")
+    """Fetch all annotations from PostHog across all projects."""
+    async for item in fetch_project_entity(Annotation, http, config, log):
+        yield item

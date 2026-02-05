@@ -26,36 +26,8 @@ properties:
   id:
     title: Id
     type: integer
-  project_id:
-    title: Project Id
-    type: integer
-  content:
-    title: Content
-    type: string
-  date_marker:
-    format: date-time
-    title: Date Marker
-    type: string
-  scope:
-    default: project
-    title: Scope
-    type: string
-  creation_type:
-    default: USR
-    title: Creation Type
-    type: string
-  created_at:
-    anyOf:
-    - format: date-time
-      type: string
-    - type: 'null'
-    default: null
-    title: Created At
 required:
 - id
-- project_id
-- content
-- date_marker
 title: Annotation
 type: object
 x-infer-schema: true

@@ -1,9 +1,17 @@
 """
 Pydantic models for PostHog connector configuration and data types.
+
+Uses a generic hierarchy to minimize boilerplate:
+- PostHogEntity[T]: Plain REST API entities (Organization, Project)
+- ProjectEntity[T]: Project-scoped REST API entities (Cohort, FeatureFlag, Annotation)
+- HogQLEntity[T]: HogQL-queried entities (Event, Person)
 """
 
+import functools
+from abc import ABCMeta
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Any
+from typing import Annotated, ClassVar
+from urllib.parse import urljoin
 
 from estuary_cdk.capture.common import (
     BaseDocument,
@@ -18,21 +26,27 @@ from pydantic import AwareDatetime, BaseModel, Field
 # Use CDK's generic ConnectorState with ResourceState
 ConnectorState = GenericConnectorState[ResourceState]
 
+# Primary key type constraint
+type PostHogPrimaryKey = int | str
+
 # Re-exported from estuary_cdk for convenience
 __all__ = [
     "Annotation",
+    "BasePostHogEntity",
     "Cohort",
     "ConnectorState",
     "EndpointConfig",
     "Event",
     "FeatureFlag",
-    "INCREMENTAL_RESOURCES",
+    "HogQLEntity",
     "Organization",
     "Person",
+    "PostHogEntity",
     "Project",
+    "ProjectEntity",
     "ResourceConfig",
     "ResourceState",
-    "SNAPSHOT_RESOURCES",
+    "RestResponseMeta",
     "default_start_date",
 ]
 
@@ -81,6 +95,18 @@ class EndpointConfig(BaseModel):
             ),
         ]
 
+        page_size: Annotated[
+            int,
+            Field(
+                default=10000,
+                description="Number of records to fetch per API request (1000-50000). "
+                "Higher values are faster but use more memory.",
+                title="Page Size",
+                ge=1000,
+                le=50000,
+            ),
+        ]
+
     advanced: Annotated[
         Advanced,
         Field(
@@ -91,118 +117,136 @@ class EndpointConfig(BaseModel):
     ]
 
 
-# Data models for PostHog resources
-# PostHog includes system defined properties prefixed with a $ e.g. $ip,
-# $geoip_time_zone according to how the PostHog project is configured. The set
-# of included fields can vary widely between projects. User defined custom
-# properties lack the $ prefix e.g. country, plan. Therefor we set extra="allow"
-# to let schema inference do its thing.
-class Project(BaseDocument, extra="allow"):
-    """PostHog project."""
-
-    id: int
-    name: str
-    organization_id: str | None = Field(alias="organization", default=None)
-    api_token: str | None = None
-    timezone: str = "UTC"
-    created_at: AwareDatetime | None = None
+# =============================================================================
+# Entity Base Classes
+# =============================================================================
 
 
-class Event(BaseDocument, extra="allow"):
-    """PostHog event."""
+class BasePostHogEntity[T: PostHogPrimaryKey](BaseDocument, extra="allow", metaclass=ABCMeta):
+    """Base class for all PostHog entities."""
 
-    id: str
-    project_id: int
-    event: str
-    distinct_id: str
-    properties: dict[str, Any] = Field(default_factory=dict)
-    timestamp: AwareDatetime
-    elements: list[dict[str, Any]] = Field(default_factory=list)
+    resource_name: ClassVar[str]
+
+    id: T
 
 
-class Person(BaseDocument, extra="allow"):
-    """PostHog person."""
+class PostHogEntity[T: PostHogPrimaryKey](BasePostHogEntity[T], metaclass=ABCMeta):
+    """Entity fetched from plain REST API endpoint."""
 
-    id: str
-    project_id: int
-    distinct_ids: list[str] = Field(default_factory=list)
-    properties: dict[str, Any] = Field(default_factory=dict)
-    created_at: AwareDatetime | None = None
+    api_path: ClassVar[str]
 
-
-class Cohort(BaseDocument, extra="allow"):
-    """PostHog cohort."""
-
-    id: int
-    project_id: int
-    name: str
-    description: str = ""
-    groups: list[dict[str, Any]] = Field(default_factory=list)
-    is_static: bool = False
-    count: int | None = None
-    created_at: AwareDatetime | None = None
+    @classmethod
+    def get_api_endpoint_url(cls, base_url: str) -> str:
+        """Build API endpoint URL for this entity type."""
+        return functools.reduce(urljoin, [base_url, "api/", cls.api_path + "/"])
 
 
-class FeatureFlag(BaseDocument, extra="allow"):
-    """PostHog feature flag."""
+class ProjectEntity[T: PostHogPrimaryKey](BasePostHogEntity[T], metaclass=ABCMeta):
+    """Entity fetched from project-scoped REST API endpoint."""
 
-    id: int
-    project_id: int
-    key: str
-    name: str = ""
-    active: bool = True
-    filters: dict[str, Any] = Field(default_factory=dict)
-    rollout_percentage: int | None = None
-    created_at: AwareDatetime | None = None
+    api_path: ClassVar[str]
 
-
-class Annotation(BaseDocument, extra="allow"):
-    """PostHog annotation."""
-
-    id: int
-    project_id: int
-    content: str
-    date_marker: AwareDatetime
-    scope: str = "project"
-    creation_type: str = "USR"
-    created_at: AwareDatetime | None = None
+    @classmethod
+    def get_api_endpoint_url(cls, base_url: str, project_id: int) -> str:
+        """Build API endpoint URL for this entity type within a project."""
+        return functools.reduce(
+            urljoin,
+            [base_url, "api/", "projects/", f"{project_id}/", cls.api_path + "/"],
+        )
 
 
-class Organization(BaseDocument, extra="allow"):
+class HogQLEntity[T: PostHogPrimaryKey](BasePostHogEntity[T], metaclass=ABCMeta):
+    """Entity fetched via HogQL Query API."""
+
+    table_name: ClassVar[str]
+
+
+# =============================================================================
+# REST API Entities
+# =============================================================================
+
+
+class Organization(PostHogEntity[str]):
     """PostHog organization."""
 
-    id: str
-    name: str
-    slug: str | None = None
-    created_at: AwareDatetime | None = None
-    updated_at: AwareDatetime | None = None
-    membership_level: int | None = None
+    resource_name: ClassVar[str] = "Organizations"
+    api_path: ClassVar[str] = "organizations"
+
+
+class Project(PostHogEntity[int]):
+    """PostHog project."""
+
+    resource_name: ClassVar[str] = "Projects"
+    api_path: ClassVar[str] = "projects"
+
+
+# =============================================================================
+# Project-Scoped REST API Entities
+# =============================================================================
+
+
+class Cohort(ProjectEntity[int]):
+    """PostHog cohort."""
+
+    resource_name: ClassVar[str] = "Cohorts"
+    api_path: ClassVar[str] = "cohorts"
+
+
+class FeatureFlag(ProjectEntity[int]):
+    """PostHog feature flag."""
+
+    resource_name: ClassVar[str] = "FeatureFlags"
+    api_path: ClassVar[str] = "feature_flags"
+
+
+class Annotation(ProjectEntity[int]):
+    """PostHog annotation."""
+
+    resource_name: ClassVar[str] = "Annotations"
+    api_path: ClassVar[str] = "annotations"
+
+
+# =============================================================================
+# HogQL Entities
+# =============================================================================
+
+
+class Event(HogQLEntity[str]):
+    """PostHog event."""
+
+    resource_name: ClassVar[str] = "Events"
+    table_name: ClassVar[str] = "events"
+
+    timestamp: AwareDatetime  # Used for incremental cursor
+
+
+class Person(HogQLEntity[str]):
+    """PostHog person."""
+
+    resource_name: ClassVar[str] = "Persons"
+    table_name: ClassVar[str] = "persons"
+
+    created_at: AwareDatetime | None = None  # Used for pagination
+
+
+# =============================================================================
+# API Response Metadata
+# =============================================================================
+
+
+class RestResponseMeta(BaseModel):
+    """Metadata from paginated REST API responses."""
+
+    next: str | None = None
+    previous: str | None = None
+    count: int | None = None
+
+
+# =============================================================================
+# Utilities
+# =============================================================================
 
 
 def default_start_date() -> datetime:
     """Return default start date (30 days ago)."""
     return datetime.now(tz=UTC) - timedelta(days=30)
-
-
-# Resource type definitions: (resource_type, model_class, key_field, name, tombstone)
-# Tombstones use project_id=0 for project-scoped resources.
-SNAPSHOT_RESOURCES: list[tuple[str, type[BaseDocument], str, str, BaseDocument]] = [
-    ("organizations", Organization, "/id", "Organizations", Organization(id="", name="")),
-    ("projects", Project, "/id", "Projects", Project(id=0, name="")),
-    ("persons", Person, "/id", "Persons", Person(id="", project_id=0)),
-    ("cohorts", Cohort, "/id", "Cohorts", Cohort(id=0, project_id=0, name="")),
-    ("feature_flags", FeatureFlag, "/id", "FeatureFlags", FeatureFlag(id=0, project_id=0, key="")),
-    (
-        "annotations",
-        Annotation,
-        "/id",
-        "Annotations",
-        # datetime(1, 1, 1, 0, 0, tzinfo=UTC)
-        Annotation(id=0, project_id=0, content="", date_marker=datetime.min.replace(tzinfo=UTC)),
-    ),
-]
-
-# Incremental resource definitions: (resource_type, model_class, key_field, name)
-INCREMENTAL_RESOURCES: list[tuple[str, type[BaseDocument], str, str]] = [
-    ("events", Event, "/id", "Events"),
-]

@@ -26,38 +26,8 @@ properties:
   id:
     title: Id
     type: string
-  name:
-    title: Name
-    type: string
-  slug:
-    anyOf:
-    - type: string
-    - type: 'null'
-    default: null
-    title: Slug
-  created_at:
-    anyOf:
-    - format: date-time
-      type: string
-    - type: 'null'
-    default: null
-    title: Created At
-  updated_at:
-    anyOf:
-    - format: date-time
-      type: string
-    - type: 'null'
-    default: null
-    title: Updated At
-  membership_level:
-    anyOf:
-    - type: integer
-    - type: 'null'
-    default: null
-    title: Membership Level
 required:
 - id
-- name
 title: Organization
 type: object
 x-infer-schema: true

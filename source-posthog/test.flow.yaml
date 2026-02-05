@@ -19,6 +19,7 @@ captures:
           organization_id: ${POSTHOG_ORGANIZATION_ID}
           advanced:
             base_url: "https://app.posthog.com"
+            page_size: 10000
     bindings:
       - resource:
           name: Organizations
