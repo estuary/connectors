@@ -6,11 +6,11 @@
 {"_meta":{"op":"c","source":{"schema":"test","snapshot":true,"table":"BooleanType_Enabled_467504","cursor":"backfill:2"}},"id":3,"v_bool":true}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"BooleanType_Enabled_467504","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":4,"v_bool":false}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"BooleanType_Enabled_467504","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":5,"v_bool":true}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"BooleanType_Enabled_467504","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":6,"v_added_bool":1,"v_bool":true}
-{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"BooleanType_Enabled_467504","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":7,"v_added_bool":0,"v_bool":false}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"BooleanType_Enabled_467504","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":6,"v_added_bool":true,"v_bool":true}
+{"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"BooleanType_Enabled_467504","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":7,"v_added_bool":false,"v_bool":false}
 {"_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"test","table":"BooleanType_Enabled_467504","cursor":"binlog.000123:56789:123","txid":"11111111-1111-1111-1111-111111111111:111"}},"id":8,"v_added_bool":null,"v_bool":true}
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FBooleanType_Enabled_467504":{"backfilled":3,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","v_bool","v_added_bool"],"types":{"id":{"type":"int"},"v_added_bool":"boolean","v_bool":{"type":"boolean"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FBooleanType_Enabled_467504":{"backfilled":3,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","v_bool","v_added_bool"],"types":{"id":{"type":"int"},"v_added_bool":{"type":"boolean"},"v_bool":{"type":"boolean"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 

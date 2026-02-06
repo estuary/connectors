@@ -12,5 +12,5 @@
 # ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"test%2FBooleanType_Disabled_960868":{"backfilled":3,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","v_bool","v_added_bool"],"types":{"id":{"type":"int"},"v_added_bool":"boolean","v_bool":{"type":"tinyint"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
+{"bindingStateV1":{"test%2FBooleanType_Disabled_960868":{"backfilled":3,"key_columns":["id"],"metadata":{"charset":"utf8mb4","schema":{"columns":["id","v_bool","v_added_bool"],"types":{"id":{"type":"int"},"v_added_bool":{"type":"tinyint"},"v_bool":{"type":"tinyint"}}}},"mode":"Active"}},"cursor":"binlog.000123:56789"}
 
