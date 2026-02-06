@@ -25,6 +25,8 @@ def test_capture(request, snapshot):
     result = subprocess.run(
         [
             "flowctl",
+            "--profile",
+            "local",
             "preview",
             "--source",
             request.fspath.dirname + "/../test.flow.yaml",
@@ -56,6 +58,8 @@ def test_discover(request, snapshot):
     result = subprocess.run(
         [
             "flowctl",
+            "--profile",
+            "local",
             "raw",
             "discover",
             "--source",
@@ -77,6 +81,8 @@ def test_spec(request, snapshot):
     result = subprocess.run(
         [
             "flowctl",
+            "--profile",
+            "local",
             "raw",
             "spec",
             "--source",
