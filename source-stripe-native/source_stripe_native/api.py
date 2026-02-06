@@ -180,11 +180,9 @@ async def fetch_incremental(
 
     if max_ts != log_cursor:
         yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
-    elif connected_account_id and end > log_cursor:
-        # If there were no events and we are capturing a connected account, move the cursor
-        # forward. This is necessary since we can't process all connected accounts in a single
-        # connector invocation, and we try to fairly rotated which connected accounts are processed
-        # based on how old their incremental cursors are.
+    else:
+        # No events were found. Advance the cursor to avoid re-processing the same
+        # time window. This is safe because the early return guard ensures end > log_cursor.
         yield end
 
 
@@ -374,11 +372,9 @@ async def fetch_incremental_substreams(
             break
     if max_ts != log_cursor:
         yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
-    elif connected_account_id and end > log_cursor:
-        # If there were no events and we are capturing a connected account, move the cursor
-        # forward. This is necessary since we can't process all connected accounts in a single
-        # connector invocation, and we try to fairly rotated which connected accounts are processed
-        # based on how old their incremental cursors are.
+    else:
+        # No events were found. Advance the cursor to avoid re-processing the same
+        # time window. This is safe because the early return guard ensures end > log_cursor.
         yield end
 
 
@@ -619,6 +615,13 @@ async def fetch_incremental_no_events(
 
     end = datetime.now(tz=UTC) - LAG
 
+    # Note: Unlike the Events API-based fetch functions, this function does not have an
+    # early return guard when `end < log_cursor`. This is because this function queries
+    # the resource list endpoint directly (not the Events API) without time-bounded
+    # parameters - it fetches records in reverse chronological order and stops when it
+    # reaches records older than log_cursor. The guard at the end (`elif end > log_cursor`)
+    # ensures we don't yield a backwards cursor.
+
     while iterating:
         _, body = await http.request_stream(log, url, params=parameters, headers=headers)
         processor = IncrementalJsonProcessor(
@@ -660,12 +663,14 @@ async def fetch_incremental_no_events(
 
     if max_ts != log_cursor:
         yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
-    elif connected_account_id and end > log_cursor:
-        # If there were no events and we are capturing a connected account, move the cursor
-        # forward. This is necessary since we can't process all connected accounts in a single
-        # connector invocation, and we try to fairly rotated which connected accounts are processed
-        # based on how old their incremental cursors are.
+    elif end > log_cursor:
+        # No new documents were found. Advance the cursor to `end` (now - LAG) to avoid
+        # re-processing the same time window. This function polls the list endpoint directly
+        # (not the Events API), so documents are filtered by their `created` timestamp.
+        # Only yield if `end` is actually ahead of the current cursor.
         yield end
+    # Otherwise, don't yield a cursor - the cursor is already ahead of `end`,
+    # so let the task sleep and try again later.
 
 
 async def fetch_incremental_usage_records(
@@ -762,11 +767,9 @@ async def fetch_incremental_usage_records(
 
     if max_ts != log_cursor:
         yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
-    elif connected_account_id and end > log_cursor:
-        # If there were no events and we are capturing a connected account, move the cursor
-        # forward. This is necessary since we can't process all connected accounts in a single
-        # connector invocation, and we try to fairly rotated which connected accounts are processed
-        # based on how old their incremental cursors are.
+    else:
+        # No events were found. Advance the cursor to avoid re-processing the same
+        # time window. This is safe because the early return guard ensures end > log_cursor.
         yield end
 
 
