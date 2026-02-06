@@ -438,6 +438,50 @@ func TestAddLegacyTextColumn(t *testing.T) {
 	cupaloy.SnapshotT(t, cs.Summary())
 }
 
+// TestBooleanType exercises boolean column handling across backfill, replication, and
+// DDL alteration paths under both tinyint1_as_bool flag settings. MySQL's `BOOLEAN`
+// column type is actually an alias for `TINYINT(1)`, so the feature flag controls
+// whether we emit true/false or 0/1 for these columns.
+func TestBooleanType(t *testing.T) {
+	var tb, ctx = mysqlTestBackend(t), context.Background()
+
+	for _, tc := range []struct {
+		name  string
+		flags string
+	}{
+		{"Enabled", "tinyint1_as_bool"},
+		{"Disabled", "no_tinyint1_as_bool"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var uniqueID = uniqueTableID(t)
+			var table = tb.CreateTable(ctx, t, uniqueID, "(id INTEGER PRIMARY KEY, v_bool BOOLEAN)")
+			tb.Insert(ctx, t, table, [][]any{{1, true}, {2, false}, {3, true}})
+
+			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
+			cs.EndpointSpec.(*Config).Advanced.FeatureFlags = tc.flags
+			cs.Validator = &st.OrderedCaptureValidator{}
+			setShutdownAfterCaughtUp(t, true)
+
+			// Initial backfill with the original v_bool column
+			cs.Capture(ctx, t, nil)
+
+			// Replication inserts on the original column
+			tb.Insert(ctx, t, table, [][]any{{4, false}, {5, true}})
+			cs.Capture(ctx, t, nil)
+
+			// Add a new boolean column via ALTER TABLE and insert via replication
+			tb.Query(ctx, t, fmt.Sprintf("ALTER TABLE %s ADD COLUMN v_added_bool BOOLEAN;", table))
+			tb.Insert(ctx, t, table, [][]any{
+				{6, true, true},
+				{7, false, false},
+				{8, true, nil},
+			})
+			cs.Capture(ctx, t, nil)
+			cupaloy.SnapshotT(t, cs.Summary())
+		})
+	}
+}
+
 func TestAddBinaryColumn(t *testing.T) {
 	var tb, ctx = mysqlTestBackend(t), context.Background()
 	var uniqueID = "58901622"
