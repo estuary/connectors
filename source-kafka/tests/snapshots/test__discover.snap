@@ -245,3 +245,89 @@ expression: snap
     "json-schema-topic"
   ]
 }
+{
+  "documentSchema": {
+    "if": {
+      "properties": {
+        "_meta": {
+          "properties": {
+            "op": {
+              "const": "d"
+            }
+          }
+        }
+      }
+    },
+    "properties": {
+      "_meta": {
+        "properties": {
+          "offset": {
+            "description": "The offset of the message within the partition",
+            "type": "integer"
+          },
+          "op": {
+            "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete.",
+            "enum": [
+              "c",
+              "u",
+              "d"
+            ]
+          },
+          "partition": {
+            "description": "The partition the message was read from",
+            "type": "integer"
+          },
+          "topic": {
+            "description": "The topic the message was read from",
+            "type": "string"
+          }
+        },
+        "required": [
+          "offset",
+          "op",
+          "partition",
+          "topic"
+        ],
+        "type": "object"
+      },
+      "idx": {
+        "type": "integer"
+      },
+      "nested": {
+        "properties": {
+          "sub_id": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sub_id"
+        ],
+        "type": "object"
+      }
+    },
+    "required": [
+      "_meta",
+      "idx",
+      "nested"
+    ],
+    "then": {
+      "reduce": {
+        "delete": true,
+        "strategy": "merge"
+      }
+    },
+    "type": "object",
+    "x-infer-schema": true
+  },
+  "key": [
+    "/idx",
+    "/nested/sub_id"
+  ],
+  "recommendedName": "protobuf-topic",
+  "resourceConfig": {
+    "topic": "protobuf-topic"
+  },
+  "resourcePath": [
+    "protobuf-topic"
+  ]
+}

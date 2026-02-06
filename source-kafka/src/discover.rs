@@ -14,10 +14,8 @@ use serde_json::json;
 
 use crate::{
     configuration::{EndpointConfig, Resource, SchemaRegistryConfig},
-    schema_registry::{
-        RegisteredSchema::{Avro, Json, Protobuf},
-        SchemaRegistryClient, TopicSchema,
-    },
+    protobuf::protobuf_key_schema_to_shape,
+    schema_registry::{RegisteredSchema, SchemaRegistryClient, TopicSchema},
     KAFKA_METADATA_TIMEOUT,
 };
 
@@ -68,14 +66,6 @@ pub async fn do_discover(req: Discover) -> Result<Vec<discovered::Binding>> {
                 Some(s) => s,
                 None => &TopicSchema::default(),
             };
-
-            if matches!(&registered_schema.key, Some(Protobuf))
-                || matches!(&registered_schema.value, Some(Protobuf))
-            {
-                // TODO(whb): At some point we may want to support protobuf
-                // schemas.
-                return None;
-            }
 
             let (collection_schema, key_ptrs) =
                 match topic_schema_to_collection_spec(registered_schema) {
@@ -153,9 +143,20 @@ fn topic_schema_to_collection_spec(
     let mut collection_schema: RootSchema = serde_json::from_value(doc_schema_json).unwrap();
 
     let mut key_shape = match &topic_schema.key {
-        Some(Avro(schema)) => avro_key_schema_to_shape(schema)?,
-        Some(Json(schema)) => json_key_schema_to_shape(schema)?,
-        Some(Protobuf) => todo!("protobuf schemas are not yet supported"),
+        Some(RegisteredSchema::Avro(schema)) => avro_key_schema_to_shape(schema)?,
+        Some(RegisteredSchema::Json(schema)) => json_key_schema_to_shape(schema)?,
+        Some(RegisteredSchema::Protobuf(proto_schema)) => {
+            let root_msg = proto_schema
+                .descriptor_pool
+                .get_message_by_name(&proto_schema.message_name)
+                .ok_or_else(|| {
+                    anyhow::anyhow!(
+                        "protobuf message '{}' not found in descriptor pool",
+                        proto_schema.message_name
+                    )
+                })?;
+            protobuf_key_schema_to_shape(&root_msg)
+        }
         None => Shape::nothing(),
     };
 
@@ -339,6 +340,7 @@ mod tests {
     use insta::assert_snapshot;
 
     use super::*;
+    use crate::schema_registry::RegisteredSchema::{Avro, Json};
 
     #[test]
     fn test_topic_schema_to_collection_spec() {

@@ -338,8 +338,29 @@ async fn parse_datum(
                     }
                 }
                 RegisteredSchema::Json(_) => Ok(serde_json::from_slice(&datum[5..])?),
-                RegisteredSchema::Protobuf => {
-                    anyhow::bail!("decoding protobuf messages is not yet supported")
+                RegisteredSchema::Protobuf(proto_schema) => {
+                    // Parse message indexes (bytes after schema ID)
+                    let (indexes, payload_offset) = crate::protobuf::parse_message_indexes(&datum[5..])?;
+
+                    // Resolve message descriptor using indexes
+                    let descriptor = crate::protobuf::resolve_message_from_indexes(
+                        &proto_schema.descriptor_pool,
+                        &proto_schema.message_name,
+                        &indexes,
+                    )?;
+
+                    // Decode to DynamicMessage
+                    let message = crate::protobuf::decode_protobuf_message(&descriptor, &datum[5 + payload_offset..])?;
+
+                    // Convert to JSON using prost-reflect's Serialize implementation
+                    let json_value = serde_json::to_value(&message)?;
+
+                    // For keys that are not objects, wrap in a synthetic _key field
+                    if is_key && !json_value.is_object() {
+                        Ok(serde_json::Map::from_iter([("_key".to_string(), json_value)]).into())
+                    } else {
+                        Ok(json_value)
+                    }
                 }
             }
         }

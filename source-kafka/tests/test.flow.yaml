@@ -25,3 +25,6 @@ captures:
       - resource:
           topic: json-raw-topic
         target: acmeCo/json-raw-topic
+      - resource:
+          topic: protobuf-topic
+        target: acmeCo/protobuf-topic

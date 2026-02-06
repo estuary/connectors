@@ -3,6 +3,10 @@ use std::time::Duration;
 use anyhow::Result;
 use apache_avro::types::{Record, Value};
 use apache_avro::Schema;
+use base64::engine::general_purpose::STANDARD as base64_engine;
+use base64::Engine;
+use prost::Message as ProstMessage;
+use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, Value as ProtoValue};
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::message::{Header, OwnedHeaders, ToBytes};
 use rdkafka::producer::{FutureProducer, FutureRecord};
@@ -11,6 +15,7 @@ use schema_registry_converter::async_impl::avro::AvroEncoder;
 use schema_registry_converter::async_impl::json::JsonEncoder;
 use schema_registry_converter::async_impl::schema_registry::SrSettings;
 use schema_registry_converter::schema_registry_common::SubjectNameStrategy;
+use serde::Deserialize;
 use serde_json::json;
 
 #[test]
@@ -108,6 +113,12 @@ async fn test_capture_resume() {
             "1": 1,
             "2": 1
           }
+        },
+        "protobuf-topic": {
+          "partitions": {
+            "1": 1,
+            "2": 1
+          }
         }
       }
     });
@@ -155,6 +166,7 @@ async fn setup_test() {
         (&AvroTestDataEncoder::new(), "avro-topic"),
         (&JsonSchemaTestDataEncoder::new(), "json-schema-topic"),
         (&JsonRawTestDataEncoder::new(), "json-raw-topic"),
+        (&ProtobufTestDataEncoder::new(), "protobuf-topic"),
     ];
 
     let http = reqwest::Client::default();
@@ -510,5 +522,149 @@ impl TestDataEncoder for JsonRawTestDataEncoder {
 
     fn schema_type_string(&self) -> Option<String> {
         None
+    }
+}
+
+struct ProtobufTestDataEncoder {
+    schema_registry_endpoint: String,
+}
+
+impl ProtobufTestDataEncoder {
+    fn new() -> Self {
+        Self {
+            schema_registry_endpoint: "http://localhost:8081".to_string(),
+        }
+    }
+
+    async fn get_schema_info(&self, subject: &str) -> (u32, MessageDescriptor) {
+        #[derive(Deserialize)]
+        struct VersionResponse {
+            id: u32,
+        }
+
+        #[derive(Deserialize)]
+        struct SchemaResponse {
+            schema: String,
+        }
+
+        let http = reqwest::Client::default();
+
+        // First, get the schema ID from the subject
+        let version_resp: VersionResponse = http
+            .get(format!(
+                "{}/subjects/{}/versions/latest",
+                self.schema_registry_endpoint, subject
+            ))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+
+        // Then get the serialized schema using the schema ID
+        let schema_resp: SchemaResponse = http
+            .get(format!(
+                "{}/schemas/ids/{}?format=serialized",
+                self.schema_registry_endpoint, version_resp.id
+            ))
+            .send()
+            .await
+            .unwrap()
+            .json()
+            .await
+            .unwrap();
+
+        // Decode the FileDescriptorProto from base64
+        let decoded_bytes = base64_engine.decode(&schema_resp.schema).unwrap();
+        let file_descriptor_proto =
+            prost_types::FileDescriptorProto::decode(decoded_bytes.as_slice()).unwrap();
+
+        let file_descriptor_set = prost_types::FileDescriptorSet {
+            file: vec![file_descriptor_proto],
+        };
+
+        let pool = DescriptorPool::from_file_descriptor_set(file_descriptor_set).unwrap();
+
+        // Get the first message type in the file
+        let message_desc = pool.all_messages().next().unwrap();
+
+        (version_resp.id, message_desc)
+    }
+
+    fn encode_confluent_protobuf(&self, schema_id: u32, message: &DynamicMessage) -> Vec<u8> {
+        let message_bytes = message.encode_to_vec();
+        let mut buf = Vec::with_capacity(1 + 4 + 1 + message_bytes.len());
+        // Magic byte
+        buf.push(0x00);
+        // Schema ID (big-endian)
+        buf.extend_from_slice(&schema_id.to_be_bytes());
+        // Message index array length = 0 (means use first/only message type)
+        buf.push(0x00);
+        // Protobuf message bytes
+        buf.extend_from_slice(&message_bytes);
+        buf
+    }
+}
+
+#[async_trait::async_trait]
+impl TestDataEncoder for ProtobufTestDataEncoder {
+    async fn key_for_idx<'a>(&'a self, idx: usize, topic: &'a str) -> Vec<u8> {
+        let (schema_id, message_desc) = self.get_schema_info(&format!("{}-key", topic)).await;
+
+        // Create ProtoKey message using DynamicMessage
+        let mut message = DynamicMessage::new(message_desc.clone());
+        message.set_field_by_name("idx", ProtoValue::I32(idx as i32));
+
+        // Create nested message
+        let nested_desc = message_desc
+            .get_field_by_name("nested")
+            .unwrap()
+            .kind()
+            .as_message()
+            .unwrap()
+            .clone();
+        let mut nested = DynamicMessage::new(nested_desc);
+        nested.set_field_by_name("sub_id", ProtoValue::I32(idx as i32));
+        message.set_field_by_name("nested", ProtoValue::Message(nested));
+
+        self.encode_confluent_protobuf(schema_id, &message)
+    }
+
+    async fn payload_for_idx<'a>(&'a self, idx: usize, topic: &'a str) -> Vec<u8> {
+        let (schema_id, message_desc) = self.get_schema_info(&format!("{}-value", topic)).await;
+
+        // Create ProtoValue message using DynamicMessage
+        let mut message = DynamicMessage::new(message_desc);
+        message.set_field_by_name("value", ProtoValue::String(format!("value-{}", idx)));
+
+        self.encode_confluent_protobuf(schema_id, &message)
+    }
+
+    fn key_schema_string(&self) -> String {
+        r#"syntax = "proto3";
+
+message ProtoKey {
+  int32 idx = 1;
+  NestedKey nested = 2;
+}
+
+message NestedKey {
+  int32 sub_id = 1;
+}"#
+        .to_string()
+    }
+
+    fn payload_schema_string(&self) -> String {
+        r#"syntax = "proto3";
+
+message ProtoValue {
+  string value = 1;
+}"#
+        .to_string()
+    }
+
+    fn schema_type_string(&self) -> Option<String> {
+        Some("PROTOBUF".to_string())
     }
 }
