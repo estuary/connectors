@@ -10,8 +10,9 @@ from estuary_cdk.capture import (
     request,
     response,
 )
-from estuary_cdk.capture.common import ResourceConfigWithSchedule
 from estuary_cdk.flow import ValidationError
+
+from estuary_cdk.capture.common import ResourceConfigWithSchedule
 
 from .resources import all_resources
 from .models import (

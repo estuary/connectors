@@ -18,7 +18,7 @@ def test_capture(request, snapshot):
             "--sessions",
             "1",
             "--delay",
-            "120s",
+            "280s",
         ],
         stdout=subprocess.PIPE,
         text=True,
@@ -45,7 +45,7 @@ def test_capture(request, snapshot):
             rec["invoice_pdf"] = "redacted"
         elif typ == "acmeCo/CreditNotes":
             rec["pdf"] = "redacted"
-            
+
 
     # Sort lines to keep a consistent ordering of captured bindings.
     sorted_unique_lines = sorted(unique_stream_lines, key=lambda l: l[0])

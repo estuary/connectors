@@ -1,41 +1,48 @@
-from copy import deepcopy
-from datetime import datetime, UTC, timedelta
-from logging import Logger
 import functools
 import re
-from estuary_cdk.flow import CaptureBinding
+from copy import deepcopy
+from datetime import UTC, datetime, timedelta
+from logging import Logger
+
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import (
+    ConnectorState,
     Resource,
-    open_binding,
     ResourceConfig,
+    ResourceConfigWithSchedule,
     ResourceState,
+    open_binding,
 )
+from estuary_cdk.flow import CaptureBinding
 
-from .priority_capture import (
-    open_binding_with_priority_queue,
-)
-from estuary_cdk.http import HTTPSession, HTTPMixin, TokenSource, HTTPError
+# Default backfill schedule for exempt streams - runs daily at midnight UTC
+DEFAULT_SCHEDULE = "0 0 * * *"
+
+from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
 from .api import (
     API,
-    fetch_incremental,
     fetch_backfill,
-    fetch_incremental_substreams,
     fetch_backfill_substreams,
-    fetch_incremental_no_events,
     fetch_backfill_usage_records,
+    fetch_incremental,
+    fetch_incremental_no_events,
+    fetch_incremental_substreams,
     fetch_incremental_usage_records,
 )
-
 from .models import (
+    CONNECTED_ACCOUNT_EXEMPT_STREAMS,
+    REGIONAL_STREAMS,
+    SCHEDULED_BACKFILL_STREAMS,
+    SPLIT_CHILD_STREAM_NAMES,
+    STREAMS,
     Accounts,
     ConnectorState,
     EndpointConfig,
     ListResult,
-    STREAMS,
-    REGIONAL_STREAMS,
-    SPLIT_CHILD_STREAM_NAMES,
+)
+from .priority_capture import (
+    open_binding_with_priority_queue,
 )
 
 DISABLED_MESSAGE_REGEX = r"Your account is not set up to use"
@@ -129,7 +136,9 @@ async def _reconcile_connector_state(
                     f"Initializing new subtask state for account id {account_id}."
                 )
                 state.inc[account_id] = deepcopy(initial_state.inc[account_id])
-                state.backfill[account_id] = deepcopy(initial_state.backfill[account_id])
+                state.backfill[account_id] = deepcopy(
+                    initial_state.backfill[account_id]
+                )
                 should_checkpoint = True
             elif not inc_state_exists and backfill_state_exists:
                 # Note: This case is to fix a legacy issue where the incremental state was not initialized
@@ -139,7 +148,9 @@ async def _reconcile_connector_state(
                     f"Backfilling subtask for account id {account_id} due to missing incremental state."
                 )
                 state.inc[account_id] = deepcopy(initial_state.inc[account_id])
-                state.backfill[account_id] = deepcopy(initial_state.backfill[account_id])
+                state.backfill[account_id] = deepcopy(
+                    initial_state.backfill[account_id]
+                )
                 should_checkpoint = True
 
         if should_checkpoint:
@@ -154,7 +165,10 @@ async def _reconcile_connector_state(
 
 
 async def all_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig, should_fetch_connected_accounts: bool = True,
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+    should_fetch_connected_accounts: bool = True,
 ) -> list[Resource]:
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
     is_restricted_api_key = config.credentials.access_token.startswith("rk_")
@@ -172,12 +186,15 @@ async def all_resources(
     platform_account_id = await _fetch_platform_account_id(http, log)
     connected_account_ids = []
     if config.capture_connected_accounts and should_fetch_connected_accounts:
-        log.info("Fetching connected account IDs. This may take multiple minutes if there are many connected accounts.")
+        log.info(
+            "Fetching connected account IDs. This may take multiple minutes if there are many connected accounts."
+        )
         connected_account_ids = await _fetch_connected_account_ids(http, log)
         log.info(
-            f"Found {len(connected_account_ids)} connected account IDs.", {
+            f"Found {len(connected_account_ids)} connected account IDs.",
+            {
                 "connected_account_ids": connected_account_ids,
-            }
+            },
         )
 
     all_account_ids = [platform_account_id, *connected_account_ids]
@@ -312,6 +329,96 @@ def _create_initial_state(account_ids: str | list[str]) -> ResourceState:
     return initial_state
 
 
+def _create_initial_state_for_exempt_stream() -> ResourceState:
+    """
+    Create initial state for subtask-exempt streams.
+    These streams use non-dict state (single cursor) since they always query
+    the platform account, regardless of connected accounts.
+    """
+    cutoff = datetime.now(tz=UTC)
+    return ResourceState(
+        inc=ResourceState.Incremental(cursor=cutoff),
+        backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
+    )
+
+
+def build_subtask_to_flat_migration_patch(
+    old_keys: set[str],
+    cutoff: datetime,
+) -> dict:
+    """
+    Build an RFC 7396 merge patch for migrating from subtask-based (dict) state
+    to flat (single-cursor) state.
+
+    The returned dict contains:
+    - Deletion markers (None) for all old account keys
+    - New flat state fields (cursor, cutoff, next_page)
+
+    This hybrid structure is valid as a merge patch but won't pass Pydantic validation,
+    so it must be used with model_construct().
+    """
+    deletion_markers = dict.fromkeys(old_keys, None)
+
+    return {
+        "inc": {**deletion_markers, "cursor": cutoff},
+        "backfill": {**deletion_markers, "cutoff": cutoff, "next_page": None},
+    }
+
+
+async def _maybe_migrate_exempt_state(
+    stream_name: str,
+    binding: CaptureBinding[ResourceConfig],
+    state: ResourceState,
+    platform_account_id: str,
+    task: Task,
+) -> ResourceState:
+    """
+    Check if an exempt stream needs state migration and perform it if necessary.
+
+    Migrates from subtask-based state (dict) to single-cursor state using
+    model_construct to build an RFC 7396 merge patch for atomic, crash-safe migration.
+    """
+    if stream_name not in CONNECTED_ACCOUNT_EXEMPT_STREAMS or not isinstance(
+        state.inc, dict
+    ):
+        return state
+
+    task.log.info(
+        f"Migrating {stream_name} from dict state to non-dict state. "
+        "This will trigger a re-backfill."
+    )
+
+    # Determine the cursor to preserve (platform account, or earliest fallback)
+    inc_state = state.inc.get(platform_account_id)
+    if inc_state is None and state.inc:
+        valid_cursors = [v for v in state.inc.values() if v is not None]
+        if valid_cursors:
+            inc_state = min(valid_cursors, key=lambda x: x.cursor)
+
+    cutoff = inc_state.cursor if inc_state else datetime.now(tz=UTC)
+    assert isinstance(cutoff, datetime)
+
+    # Collect all old keys to delete from inc and backfill dicts
+    old_keys = set(state.inc.keys())
+    if isinstance(state.backfill, dict):
+        old_keys.update(state.backfill.keys())
+
+    migration_patch = build_subtask_to_flat_migration_patch(old_keys, cutoff)
+    # Use model_construct to bypass Pydantic validation since the hybrid structure
+    # (deletion markers + new values) wouldn't pass normal validation
+    migration_state = ResourceState.model_construct(**migration_patch)
+    await task.checkpoint(
+        ConnectorState(bindingStateV1={binding.stateKey: migration_state})
+    )
+
+    # Return clean single-cursor state for the connector to use
+    return ResourceState(
+        inc=ResourceState.Incremental(cursor=cutoff),
+        backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
+        last_initialized=state.last_initialized,
+    )
+
+
 def base_object(
     cls,
     http: HTTPSession,
@@ -324,6 +431,16 @@ def base_object(
     """Base Object handles the default case from source-stripe-native
     It requires a single, parent stream with a valid Event API Type
     """
+    is_exempt = cls.NAME in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+    needs_schedule = cls.NAME in SCHEDULED_BACKFILL_STREAMS
+
+    # Exempt streams should use non-dict state since they always query
+    # the platform account regardless of connected accounts
+    effective_initial_state = (
+        _create_initial_state_for_exempt_stream()
+        if is_exempt and connected_account_ids
+        else initial_state
+    )
 
     async def open(
         binding: CaptureBinding[ResourceConfig],
@@ -332,7 +449,14 @@ def base_object(
         task: Task,
         all_bindings,
     ):
-        if not connected_account_ids:
+        # Exempt streams should not use per-account subtasks even when
+        # connected accounts exist. They always query the platform account.
+        if not connected_account_ids or is_exempt:
+            # Migrate state if needed (for existing captures with dict state).
+            state = await _maybe_migrate_exempt_state(
+                cls.NAME, binding, state, platform_account_id, task
+            )
+
             fetch_changes_fns = functools.partial(
                 fetch_incremental,
                 cls,
@@ -395,8 +519,12 @@ def base_object(
         key=["/id"],
         model=cls,
         open=open,
-        initial_state=initial_state,
-        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
+        initial_state=effective_initial_state,
+        initial_config=ResourceConfigWithSchedule(
+            name=cls.NAME,
+            interval=timedelta(minutes=5),
+            schedule=DEFAULT_SCHEDULE if needs_schedule else "",
+        ),
         schema_inference=True,
     )
 
@@ -415,6 +543,16 @@ def child_object(
     It requires both the parent and child stream, with the parent stream having
     a valid Event API Type
     """
+    is_exempt = child_cls.NAME in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+    needs_schedule = child_cls.NAME in SCHEDULED_BACKFILL_STREAMS
+
+    # Exempt streams should use non-dict state since they always query
+    # the platform account regardless of connected accounts
+    effective_initial_state = (
+        _create_initial_state_for_exempt_stream()
+        if is_exempt and connected_account_ids
+        else initial_state
+    )
 
     async def open(
         binding: CaptureBinding[ResourceConfig],
@@ -423,7 +561,11 @@ def child_object(
         task: Task,
         all_bindings,
     ):
-        if not connected_account_ids:
+        if not connected_account_ids or is_exempt:
+            # Migrate state if needed (for existing captures with dict state).
+            state = await _maybe_migrate_exempt_state(
+                child_cls.NAME, binding, state, platform_account_id, task
+            )
             fetch_changes_fns = functools.partial(
                 fetch_incremental_substreams,
                 cls,
@@ -485,15 +627,16 @@ def child_object(
                 fetch_page_factory=fetch_page_factory,
             )
 
-
     return Resource(
         name=child_cls.NAME,
         key=["/id"],
         model=child_cls,
         open=open,
-        initial_state=initial_state,
-        initial_config=ResourceConfig(
-            name=child_cls.NAME, interval=timedelta(minutes=5)
+        initial_state=effective_initial_state,
+        initial_config=ResourceConfigWithSchedule(
+            name=child_cls.NAME,
+            interval=timedelta(minutes=5),
+            schedule=DEFAULT_SCHEDULE if needs_schedule else "",
         ),
         schema_inference=True,
     )
@@ -514,6 +657,16 @@ def split_child_object(
     but incrementally replicates based off events that contain the child stream resource directly
     in the API response. Meaning, the stream behaves like a non-chid stream incrementally.
     """
+    is_exempt = child_cls.NAME in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+    needs_schedule = child_cls.NAME in SCHEDULED_BACKFILL_STREAMS
+
+    # Exempt streams should use non-dict state since they always query
+    # the platform account regardless of connected accounts
+    effective_initial_state = (
+        _create_initial_state_for_exempt_stream()
+        if is_exempt and connected_account_ids
+        else initial_state
+    )
 
     async def open(
         binding: CaptureBinding[ResourceConfig],
@@ -522,7 +675,11 @@ def split_child_object(
         task: Task,
         all_bindings,
     ):
-        if not connected_account_ids:
+        if not connected_account_ids or is_exempt:
+            # Migrate state if needed (for existing captures with dict state).
+            state = await _maybe_migrate_exempt_state(
+                child_cls.NAME, binding, state, platform_account_id, task
+            )
             fetch_changes_fns = functools.partial(
                 fetch_incremental,
                 child_cls,
@@ -582,15 +739,16 @@ def split_child_object(
                 fetch_page_factory=fetch_page_factory,
             )
 
-
     return Resource(
         name=child_cls.NAME,
         key=["/id"],
         model=child_cls,
         open=open,
-        initial_state=initial_state,
-        initial_config=ResourceConfig(
-            name=child_cls.NAME, interval=timedelta(minutes=5)
+        initial_state=effective_initial_state,
+        initial_config=ResourceConfigWithSchedule(
+            name=child_cls.NAME,
+            interval=timedelta(minutes=5),
+            schedule=DEFAULT_SCHEDULE if needs_schedule else "",
         ),
         schema_inference=True,
     )
@@ -610,6 +768,16 @@ def usage_records(
     This is required since Usage Records is a child stream from SubscriptionItem
     and requires special processing.
     """
+    is_exempt = child_cls.NAME in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+    needs_schedule = child_cls.NAME in SCHEDULED_BACKFILL_STREAMS
+
+    # Exempt streams should use non-dict state since they always query
+    # the platform account regardless of connected accounts
+    effective_initial_state = (
+        _create_initial_state_for_exempt_stream()
+        if is_exempt and connected_account_ids
+        else initial_state
+    )
 
     async def open(
         binding: CaptureBinding[ResourceConfig],
@@ -618,7 +786,11 @@ def usage_records(
         task: Task,
         all_bindings,
     ):
-        if not connected_account_ids:
+        if not connected_account_ids or is_exempt:
+            # Migrate state if needed (for existing captures with dict state).
+            state = await _maybe_migrate_exempt_state(
+                child_cls.NAME, binding, state, platform_account_id, task
+            )
             fetch_changes_fns = functools.partial(
                 fetch_incremental_usage_records,
                 cls,
@@ -685,9 +857,11 @@ def usage_records(
         key=["/subscription_item"],  # Note: This is different from other resources
         model=child_cls,
         open=open,
-        initial_state=initial_state,
-        initial_config=ResourceConfig(
-            name=child_cls.NAME, interval=timedelta(minutes=5)
+        initial_state=effective_initial_state,
+        initial_config=ResourceConfigWithSchedule(
+            name=child_cls.NAME,
+            interval=timedelta(minutes=5),
+            schedule=DEFAULT_SCHEDULE if needs_schedule else "",
         ),
         schema_inference=True,
     )
@@ -707,6 +881,16 @@ def no_events_object(
     It requires a single, parent stream with a valid list all API endpoint.
     It works very similar to the base object, but without the use of the Events APi.
     """
+    is_exempt = cls.NAME in CONNECTED_ACCOUNT_EXEMPT_STREAMS
+    needs_schedule = cls.NAME in SCHEDULED_BACKFILL_STREAMS
+
+    # Exempt streams should use non-dict state since they always query
+    # the platform account regardless of connected accounts
+    effective_initial_state = (
+        _create_initial_state_for_exempt_stream()
+        if is_exempt and connected_account_ids
+        else initial_state
+    )
 
     async def open(
         binding: CaptureBinding[ResourceConfig],
@@ -715,7 +899,14 @@ def no_events_object(
         task: Task,
         all_bindings,
     ):
-        if not connected_account_ids:
+        # Exempt streams should not use per-account subtasks even when
+        # connected accounts exist. They always query the platform account.
+        if not connected_account_ids or is_exempt:
+            # Migrate state if needed (for existing captures with dict state).
+            state = await _maybe_migrate_exempt_state(
+                cls.NAME, binding, state, platform_account_id, task
+            )
+
             fetch_changes_fns = functools.partial(
                 fetch_incremental_no_events,
                 cls,
@@ -773,13 +964,16 @@ def no_events_object(
                 fetch_page_factory=fetch_page_factory,
             )
 
-
     return Resource(
         name=cls.NAME,
         key=["/id"],
         model=cls,
         open=open,
-        initial_state=initial_state,
-        initial_config=ResourceConfig(name=cls.NAME, interval=timedelta(minutes=5)),
+        initial_state=effective_initial_state,
+        initial_config=ResourceConfigWithSchedule(
+            name=cls.NAME,
+            interval=timedelta(minutes=5),
+            schedule=DEFAULT_SCHEDULE if needs_schedule else "",
+        ),
         schema_inference=True,
     )
