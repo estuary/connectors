@@ -361,7 +361,7 @@ def crm_object_with_associations(
         all_bindings,
     ):
         # Emit a sourced schema to increase the inferred schema's complexity limit.
-        properties = await fetch_properties(task.log, http, object_name)
+        properties = await fetch_properties(task.log, http, path_component)
         task.sourced_schema(binding_index, cls.sourced_schema(properties.results))
         await task.checkpoint(state=ConnectorState())
 
