@@ -22,18 +22,6 @@ struct FetchedSchema {
 }
 
 #[derive(Deserialize, Debug)]
-#[serde(rename_all = "camelCase")]
-struct FetchedProtobufSchema {
-    #[serde(default = "SchemaType::default")]
-    #[allow(dead_code)]
-    schema_type: SchemaType,
-    #[allow(dead_code)]
-    schema: String,
-    schema_bytes: Option<String>,
-    references: Option<serde_json::Value>,
-}
-
-#[derive(Deserialize, Debug)]
 struct FetchedLatestVersion {
     id: u32,
 }
@@ -179,8 +167,9 @@ impl SchemaRegistryClient {
     }
 
     async fn fetch_protobuf_schema(&self, id: u32, schema_text: &str) -> Result<RegisteredSchema> {
-        // Fetch the schema with serialized format to get the FileDescriptorSet bytes
-        let fetched: FetchedProtobufSchema = self
+        // Fetch the schema with serialized format to get the FileDescriptorProto bytes
+        // When format=serialized is used, the schema field contains base64-encoded FileDescriptorProto
+        let fetched: FetchedSchema = self
             .make_request(format!("{}/schemas/ids/{}?format=serialized", self.endpoint, id).as_str())
             .await?;
 
@@ -188,20 +177,23 @@ impl SchemaRegistryClient {
             anyhow::bail!("schema references are not yet supported, and requested protobuf schema with id {} has references", id);
         }
 
-        let schema_bytes = fetched.schema_bytes.ok_or_else(|| {
-            anyhow::anyhow!("schema registry did not return schema_bytes for protobuf schema id {}", id)
-        })?;
+        // With format=serialized, the schema field contains base64-encoded FileDescriptorProto
+        let decoded_bytes = base64.decode(&fetched.schema)
+            .context("failed to decode base64 schema from serialized format")?;
 
-        let decoded_bytes = base64.decode(&schema_bytes)
-            .context("failed to decode base64 schema_bytes")?;
+        // The schema registry returns a FileDescriptorProto, not a FileDescriptorSet
+        // We need to wrap it in a FileDescriptorSet for prost-reflect
+        let file_descriptor_proto = prost_types::FileDescriptorProto::decode(decoded_bytes.as_slice())
+            .context("failed to decode FileDescriptorProto from schema bytes")?;
 
-        let file_descriptor_set = prost_types::FileDescriptorSet::decode(decoded_bytes.as_slice())
-            .context("failed to decode FileDescriptorSet from schema_bytes")?;
+        let file_descriptor_set = prost_types::FileDescriptorSet {
+            file: vec![file_descriptor_proto],
+        };
 
         let descriptor_pool = DescriptorPool::from_file_descriptor_set(file_descriptor_set)
             .context("failed to create DescriptorPool from FileDescriptorSet")?;
 
-        // Extract the message name from the schema text.
+        // Extract the message name from the original schema text.
         // Protobuf schema text format has the message name as the first message definition.
         let message_name = extract_protobuf_message_name(schema_text)
             .context("failed to extract message name from protobuf schema")?;
