@@ -3052,6 +3052,7 @@ dependencies = [
  "insta",
  "json",
  "lazy_static",
+ "prost",
  "prost-reflect",
  "prost-types",
  "proto-flow",
