@@ -408,17 +408,10 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		return nil, err
 	}
 
-	var checkpointClear = make(checkpoint)
 	for _, b := range t.bindings {
-		checkpointClear[b.target.StateKey] = nil
 		delete(t.cp, b.target.StateKey)
 	}
-	var checkpointJSON, err = json.Marshal(checkpointClear)
-	if err != nil {
-		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
-	}
-
-	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
+	return nil, nil
 }
 
 func (t *transactor) Destroy() {
