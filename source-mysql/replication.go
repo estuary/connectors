@@ -1046,7 +1046,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
 			var newName = alter.NewColDefinition.Name.String()
-			var newType = translateDataType(meta, alter.NewColDefinition.Type)
+			var newType = translateDataType(meta, alter.NewColDefinition.Type, rs.db.featureFlags)
 			var newIndex = oldIndex
 			if alter.First {
 				newIndex = 0
@@ -1071,7 +1071,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			colName = meta.Schema.Columns[oldIndex] // Use the actual column name from the metadata
 			meta.Schema.Columns = slices.Delete(meta.Schema.Columns, oldIndex, oldIndex+1)
 
-			var newType = translateDataType(meta, alter.NewColDefinition.Type)
+			var newType = translateDataType(meta, alter.NewColDefinition.Type, rs.db.featureFlags)
 			var newIndex = oldIndex
 			if alter.First {
 				newIndex = 0
@@ -1102,7 +1102,7 @@ func (rs *mysqlReplicationStream) handleAlterTable(ctx context.Context, stmt *sq
 			var newCols []string
 			for _, col := range alter.Columns {
 				newCols = append(newCols, col.Name.String())
-				var dataType = translateDataType(meta, col.Type)
+				var dataType = translateDataType(meta, col.Type, rs.db.featureFlags)
 				meta.Schema.ColumnTypes[col.Name.String()] = dataType
 			}
 
@@ -1151,12 +1151,20 @@ func findColumnIndex(columns []string, name string) int {
 	return -1
 }
 
-func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType) any {
+func translateDataType(meta *mysqlTableMetadata, t *sqlparser.ColumnType, featureFlags map[string]bool) any {
 	switch typeName := strings.ToLower(t.Type); typeName {
 	case "enum":
 		return &mysqlColumnType{Type: typeName, EnumValues: append([]string{""}, unquoteEnumValues(t.EnumValues)...)}
 	case "set":
 		return &mysqlColumnType{Type: typeName, EnumValues: unquoteEnumValues(t.EnumValues)}
+	case "boolean", "bool":
+		// MySQL's BOOLEAN/BOOL is an alias for TINYINT(1). Since we're parsing the actual
+		// DDL query here, we get the raw keyword, unlike in discovery where we receive the
+		// resolved `tinyint` type. So we need to handle that mapping ourselves.
+		if featureFlags["tinyint1_as_bool"] {
+			return &mysqlColumnType{Type: "boolean"}
+		}
+		return &mysqlColumnType{Type: "tinyint"}
 	case "tinyint", "smallint", "mediumint", "int", "bigint":
 		return &mysqlColumnType{Type: typeName, Unsigned: t.Unsigned}
 	case "char", "varchar", "tinytext", "text", "mediumtext", "longtext":
