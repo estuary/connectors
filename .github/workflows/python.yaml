@@ -59,7 +59,7 @@ on:
       - "source-zoho/**"
       - "source-iterable-native/**"
       - "source-ringcentral/**"
-
+      - "source-hackernews/**"
   pull_request:
     branches: [main]
     paths:

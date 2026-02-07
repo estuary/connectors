@@ -1,0 +1,28 @@
+---
+import:
+  - acmeCo/flow.yaml
+captures:
+  acmeCo/source-hackernews:
+    endpoint:
+      local:
+        command:
+          - python
+          - "-m"
+          - source_hackernews
+        config: config.yaml
+    bindings:
+      - resource:
+          name: items
+          interval: PT300S  # 5 minutes for items
+        target: acmeCo/items
+      - resource:
+          name: users
+          interval: PT600S  # 10 minutes for users
+        target: acmeCo/users
+      - resource:
+          name: updates
+          interval: PT60S   # 1 minute for updates
+        target: acmeCo/updates
+    interval: 2m
+    shards:
+      logLevel: debug
