@@ -257,7 +257,22 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, recov
 			// This should be a relatively infrequent occurrence, so the
 			// performance impact + increased data transfer should be tolerable.
 			if err := sm.writeRenamed(ctx, thisChannel, blob); err != nil {
-				return fmt.Errorf("writeRenamed: %w", err)
+				var apiError *streamingApiError
+				if errors.As(err, &apiError) && apiError.Code == 35 {
+					// Allow for progress on recovery commits by skipping blobs
+					// returning error code 35, which seems to indicate some
+					// kind of inconsistency between the blob and the table.
+					// This is safe as long as the blob has been previously
+					// registered, and we're dealing with some stale state.
+					log.WithFields(log.Fields{
+						"schema":    schema,
+						"table":     table,
+						"blobToken": blobToken,
+						"err":       err,
+					}).Warn("skipping recovery blob registration due to error code 35")
+				} else {
+					return fmt.Errorf("writeRenamed: %w", err)
+				}
 			}
 		} else if err := sm.c.write(ctx, blob); err != nil {
 			var apiError *streamingApiError

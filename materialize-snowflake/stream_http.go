@@ -442,6 +442,7 @@ var streamingIngestResponseCodes = map[int]string{
 	32: "malformed request: invalid column in ep_info",
 	33: "malformed request: invalid ep_info (generic)",
 	34: "malformed request: invalid blob name",
+	35: "the channel must be reopened", // Not documented, but we've been told it means the same as 36.
 	36: "the channel must be reopened",
 	37: "malformed request: missing role in request",
 	38: "malformed request: blob has wrong format or extension",
