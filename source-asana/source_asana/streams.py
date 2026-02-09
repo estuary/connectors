@@ -453,6 +453,12 @@ class Stories(AsanaStream):
         story_gid = stream_slice["story_gid"]
         return f"stories/{story_gid}"
 
+    def _handle_object_type(self, prop: str, value: MutableMapping[str, Any]) -> str:
+        if prop == "target":
+            # Nested object fields must be explicitly requested via opt_fields.
+            return "target.gid,target.name,target.resource_type,target.resource_subtype"
+        return super()._handle_object_type(prop, value)
+
     def stream_slices(self, **kwargs) -> Iterable[Optional[Mapping[str, Any]]]:
         # This streams causes tests to timeout (> 2hrs), so we limit stream slices to 100 to make tests less noisy
         if self.test_mode:
