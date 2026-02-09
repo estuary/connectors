@@ -1,12 +1,10 @@
+use std::io::Write;
+use std::process::{Command, Stdio};
 use std::time::Duration;
 
 use anyhow::Result;
 use apache_avro::types::{Record, Value};
 use apache_avro::Schema;
-use base64::engine::general_purpose::STANDARD as base64_engine;
-use base64::Engine;
-use prost::Message as ProstMessage;
-use prost_reflect::{DescriptorPool, DynamicMessage, MessageDescriptor, Value as ProtoValue};
 use rdkafka::admin::{AdminClient, AdminOptions, NewTopic, TopicReplication};
 use rdkafka::message::{Header, OwnedHeaders, ToBytes};
 use rdkafka::producer::{FutureProducer, FutureRecord};
@@ -15,7 +13,6 @@ use schema_registry_converter::async_impl::avro::AvroEncoder;
 use schema_registry_converter::async_impl::json::JsonEncoder;
 use schema_registry_converter::async_impl::schema_registry::SrSettings;
 use schema_registry_converter::schema_registry_common::SubjectNameStrategy;
-use serde::Deserialize;
 use serde_json::json;
 
 #[test]
@@ -162,11 +159,11 @@ async fn setup_test() {
     let num_partitions = 3;
     let topic_replication = 1;
 
+    // Test cases using the TestDataEncoder trait
     let test_cases: &[(&dyn TestDataEncoder, &str)] = &[
         (&AvroTestDataEncoder::new(), "avro-topic"),
         (&JsonSchemaTestDataEncoder::new(), "json-schema-topic"),
         (&JsonRawTestDataEncoder::new(), "json-raw-topic"),
-        (&ProtobufTestDataEncoder::new(), "protobuf-topic"),
     ];
 
     let http = reqwest::Client::default();
@@ -200,7 +197,7 @@ async fn setup_test() {
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
 
-        // Registry schemas if the encoder uses schemas.
+        // Register schemas if the encoder uses schemas.
         if let Some(schema_type) = enc.schema_type_string() {
             for (topic, suffix, schema) in [
                 (topic, "key", &enc.key_schema_string()),
@@ -265,6 +262,243 @@ async fn setup_test() {
             )
             .await;
         }
+    }
+
+    // Protobuf test case: uses Confluent's official kafka-protobuf-console-producer
+    // to validate our decoder against Confluent's actual wire format implementation.
+    setup_protobuf_test(
+        &admin,
+        &opts,
+        &http,
+        schema_registry_endpoint,
+        num_messages,
+        num_partitions,
+        topic_replication,
+        &producer,
+    )
+    .await;
+}
+
+async fn setup_protobuf_test(
+    admin: &AdminClient<rdkafka::client::DefaultClientContext>,
+    opts: &AdminOptions,
+    http: &reqwest::Client,
+    schema_registry_endpoint: &str,
+    num_messages: usize,
+    num_partitions: i32,
+    topic_replication: i32,
+    producer: &FutureProducer,
+) {
+    let topic = "protobuf-topic";
+    let temp_topic = format!("protobuf-temp-{}", std::process::id());
+    let enc = ProtobufTestDataEncoder::new();
+
+    // Delete and recreate the main topic
+    admin.delete_topics(&[topic], opts).await.unwrap();
+    admin
+        .create_topics(
+            &[NewTopic::new(
+                topic,
+                num_partitions,
+                TopicReplication::Fixed(topic_replication),
+            )],
+            opts,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    // Delete and recreate temp topic for capturing Confluent-encoded bytes
+    let _ = admin.delete_topics(&[&temp_topic], opts).await;
+    admin
+        .create_topics(
+            &[NewTopic::new(
+                &temp_topic,
+                1, // Single partition for predictable ordering
+                TopicReplication::Fixed(topic_replication),
+            )],
+            opts,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    // Delete existing schemas
+    for suffix in ["key", "value"] {
+        http.delete(format!(
+            "{}/subjects/{}-{}",
+            schema_registry_endpoint, topic, suffix
+        ))
+        .send()
+        .await
+        .unwrap();
+
+        http.delete(format!(
+            "{}/subjects/{}-{}?permanent=true",
+            schema_registry_endpoint, topic, suffix
+        ))
+        .send()
+        .await
+        .unwrap();
+    }
+
+    // Also delete temp topic schemas
+    for suffix in ["key", "value"] {
+        http.delete(format!(
+            "{}/subjects/{}-{}",
+            schema_registry_endpoint, temp_topic, suffix
+        ))
+        .send()
+        .await
+        .unwrap();
+
+        http.delete(format!(
+            "{}/subjects/{}-{}?permanent=true",
+            schema_registry_endpoint, temp_topic, suffix
+        ))
+        .send()
+        .await
+        .unwrap();
+    }
+
+    // Produce messages to temp topic using Confluent's official protobuf serializer
+    produce_to_temp_topic(&enc, &temp_topic, num_messages);
+
+    // Wait a bit for messages to be available
+    tokio::time::sleep(Duration::from_millis(500)).await;
+
+    // Copy schemas from temp topic to main topic
+    // The Confluent producer registered schemas with the temp topic name
+    for suffix in ["key", "value"] {
+        // Get the schema from temp topic
+        let schema_resp = http
+            .get(format!(
+                "{}/subjects/{}-{}/versions/latest",
+                schema_registry_endpoint, temp_topic, suffix
+            ))
+            .send()
+            .await
+            .unwrap()
+            .json::<serde_json::Value>()
+            .await
+            .unwrap();
+
+        let schema = schema_resp["schema"].as_str().unwrap();
+
+        // Register the same schema for the main topic
+        let register_result = http
+            .post(format!(
+                "{}/subjects/{}-{}/versions",
+                schema_registry_endpoint, topic, suffix
+            ))
+            .json(&json!({"schema": schema, "schemaType": "PROTOBUF"}))
+            .send()
+            .await
+            .unwrap();
+
+        assert!(
+            register_result.status().is_success(),
+            "Failed to register {} schema for {}: {:?}",
+            suffix,
+            topic,
+            register_result.text().await
+        );
+    }
+
+    // Consume the raw Confluent-encoded bytes from temp topic
+    let encoded_messages = consume_raw_messages(&temp_topic, num_messages).await;
+
+    // Re-produce the Confluent-encoded bytes to the main topic with controlled metadata
+    for (idx, (key, value)) in encoded_messages.into_iter().enumerate() {
+        send_message(
+            topic,
+            &key,
+            Some(&value),
+            idx,
+            num_partitions,
+            producer,
+        )
+        .await;
+    }
+
+    // Produce tombstone (deletion) records.
+    // We need to use Confluent-encoded keys for tombstones too.
+    // Re-use the key bytes from the first num_partitions messages.
+    let tombstone_keys = consume_raw_messages(&temp_topic, num_partitions as usize).await;
+    for (idx, (key, _)) in tombstone_keys.into_iter().enumerate() {
+        send_message(
+            topic,
+            &key,
+            None::<&[u8]>,
+            idx,
+            num_partitions,
+            producer,
+        )
+        .await;
+    }
+
+    // Clean up temp topic
+    let _ = admin.delete_topics(&[&temp_topic], opts).await;
+}
+
+fn produce_to_temp_topic(enc: &ProtobufTestDataEncoder, temp_topic: &str, num_messages: usize) {
+    // Build input lines in the format: key_json|value_json
+    let mut input_lines = String::new();
+    for idx in 0..num_messages {
+        let key_json = format!(r#"{{"idx":{},"nested":{{"subId":{}}}}}"#, idx, idx);
+        let value_json = format!(r#"{{"value":"value-{}"}}"#, idx);
+        input_lines.push_str(&format!("{}|{}\n", key_json, value_json));
+    }
+
+    let key_schema = enc.key_schema_string().replace('\n', " ");
+    let value_schema = enc.payload_schema_string().replace('\n', " ");
+
+    let mut child = Command::new("docker")
+        .args([
+            "exec",
+            "-i",
+            "schema-registry",
+            "kafka-protobuf-console-producer",
+            "--broker-list",
+            "db:29092",
+            "--topic",
+            temp_topic,
+            "--property",
+            "schema.registry.url=http://schema-registry:8081",
+            "--property",
+            "parse.key=true",
+            "--property",
+            "key.separator=|",
+            "--property",
+            &format!("key.schema={}", key_schema),
+            "--property",
+            &format!("value.schema={}", value_schema),
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to spawn kafka-protobuf-console-producer");
+
+    let stdin = child.stdin.as_mut().expect("failed to get stdin");
+    stdin
+        .write_all(input_lines.as_bytes())
+        .expect("failed to write to stdin");
+    drop(child.stdin.take());
+
+    let output = child
+        .wait_with_output()
+        .expect("failed to wait for producer");
+
+    if !output.status.success() {
+        panic!(
+            "kafka-protobuf-console-producer failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 }
 
@@ -525,120 +759,11 @@ impl TestDataEncoder for JsonRawTestDataEncoder {
     }
 }
 
-struct ProtobufTestDataEncoder {
-    schema_registry_endpoint: String,
-}
+struct ProtobufTestDataEncoder {}
 
 impl ProtobufTestDataEncoder {
     fn new() -> Self {
-        Self {
-            schema_registry_endpoint: "http://localhost:8081".to_string(),
-        }
-    }
-
-    async fn get_schema_info(&self, subject: &str) -> (u32, MessageDescriptor) {
-        #[derive(Deserialize)]
-        struct VersionResponse {
-            id: u32,
-        }
-
-        #[derive(Deserialize)]
-        struct SchemaResponse {
-            schema: String,
-        }
-
-        let http = reqwest::Client::default();
-
-        // First, get the schema ID from the subject
-        let version_resp: VersionResponse = http
-            .get(format!(
-                "{}/subjects/{}/versions/latest",
-                self.schema_registry_endpoint, subject
-            ))
-            .send()
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap();
-
-        // Then get the serialized schema using the schema ID
-        let schema_resp: SchemaResponse = http
-            .get(format!(
-                "{}/schemas/ids/{}?format=serialized",
-                self.schema_registry_endpoint, version_resp.id
-            ))
-            .send()
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap();
-
-        // Decode the FileDescriptorProto from base64
-        let decoded_bytes = base64_engine.decode(&schema_resp.schema).unwrap();
-        let file_descriptor_proto =
-            prost_types::FileDescriptorProto::decode(decoded_bytes.as_slice()).unwrap();
-
-        let file_descriptor_set = prost_types::FileDescriptorSet {
-            file: vec![file_descriptor_proto],
-        };
-
-        let pool = DescriptorPool::from_file_descriptor_set(file_descriptor_set).unwrap();
-
-        // Get the first message type in the file
-        let message_desc = pool.all_messages().next().unwrap();
-
-        (version_resp.id, message_desc)
-    }
-
-    fn encode_confluent_protobuf(&self, schema_id: u32, message: &DynamicMessage) -> Vec<u8> {
-        let message_bytes = message.encode_to_vec();
-        let mut buf = Vec::with_capacity(1 + 4 + 1 + message_bytes.len());
-        // Magic byte
-        buf.push(0x00);
-        // Schema ID (big-endian)
-        buf.extend_from_slice(&schema_id.to_be_bytes());
-        // Message index array length = 0 (means use first/only message type)
-        buf.push(0x00);
-        // Protobuf message bytes
-        buf.extend_from_slice(&message_bytes);
-        buf
-    }
-}
-
-#[async_trait::async_trait]
-impl TestDataEncoder for ProtobufTestDataEncoder {
-    async fn key_for_idx<'a>(&'a self, idx: usize, topic: &'a str) -> Vec<u8> {
-        let (schema_id, message_desc) = self.get_schema_info(&format!("{}-key", topic)).await;
-
-        // Create ProtoKey message using DynamicMessage
-        let mut message = DynamicMessage::new(message_desc.clone());
-        message.set_field_by_name("idx", ProtoValue::I32(idx as i32));
-
-        // Create nested message
-        let nested_desc = message_desc
-            .get_field_by_name("nested")
-            .unwrap()
-            .kind()
-            .as_message()
-            .unwrap()
-            .clone();
-        let mut nested = DynamicMessage::new(nested_desc);
-        nested.set_field_by_name("sub_id", ProtoValue::I32(idx as i32));
-        message.set_field_by_name("nested", ProtoValue::Message(nested));
-
-        self.encode_confluent_protobuf(schema_id, &message)
-    }
-
-    async fn payload_for_idx<'a>(&'a self, idx: usize, topic: &'a str) -> Vec<u8> {
-        let (schema_id, message_desc) = self.get_schema_info(&format!("{}-value", topic)).await;
-
-        // Create ProtoValue message using DynamicMessage
-        let mut message = DynamicMessage::new(message_desc);
-        message.set_field_by_name("value", ProtoValue::String(format!("value-{}", idx)));
-
-        self.encode_confluent_protobuf(schema_id, &message)
+        Self {}
     }
 
     fn key_schema_string(&self) -> String {
@@ -663,8 +788,39 @@ message ProtoValue {
 }"#
         .to_string()
     }
+}
 
-    fn schema_type_string(&self) -> Option<String> {
-        Some("PROTOBUF".to_string())
+/// Consume raw bytes from a Kafka topic using rdkafka
+async fn consume_raw_messages(topic: &str, num_messages: usize) -> Vec<(Vec<u8>, Vec<u8>)> {
+    use rdkafka::consumer::{Consumer, StreamConsumer};
+    use rdkafka::Message;
+
+    let consumer: StreamConsumer = ClientConfig::new()
+        .set("bootstrap.servers", "localhost:9092")
+        .set("group.id", format!("test-consumer-{}", std::process::id()))
+        .set("auto.offset.reset", "earliest")
+        .set("enable.auto.commit", "false")
+        .create()
+        .expect("Failed to create consumer");
+
+    consumer
+        .subscribe(&[topic])
+        .expect("Failed to subscribe to topic");
+
+    let mut messages = Vec::with_capacity(num_messages);
+    let timeout = Duration::from_secs(10);
+    let start = std::time::Instant::now();
+
+    while messages.len() < num_messages && start.elapsed() < timeout {
+        match tokio::time::timeout(Duration::from_secs(1), consumer.recv()).await {
+            Ok(Ok(msg)) => {
+                let key = msg.key().map(|k| k.to_vec()).unwrap_or_default();
+                let value = msg.payload().map(|v| v.to_vec()).unwrap_or_default();
+                messages.push((key, value));
+            }
+            _ => continue,
+        }
     }
+
+    messages
 }
