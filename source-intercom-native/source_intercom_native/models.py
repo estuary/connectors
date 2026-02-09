@@ -150,7 +150,12 @@ class Contact(TimestampedResource):
 
 
 class ContactTagsResponse(BaseModel, extra="allow"):
-    class Tag(BaseModel, extra="forbid"):
+    # ContactTagsResponse.Tag describes only the fields
+    # necessary to construct a NestedTag model instance.
+    # Extra fields from the API are allowed but discarded during
+    # hydration since the contacts returned by the /contacts/search
+    # endpoint do not contain those additional fields in nested tags.
+    class Tag(BaseModel, extra="allow"):
         id: str
         type: str
         name: str
