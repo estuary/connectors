@@ -1931,6 +1931,38 @@
             "integer"
           ]
         },
+        "target": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "properties": {
+            "gid": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "resource_type": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "resource_subtype": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "name": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          }
+        },
         "_meta": {
           "type": "object",
           "properties": {
