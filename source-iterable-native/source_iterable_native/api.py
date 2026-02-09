@@ -10,7 +10,7 @@ import aiohttp
 
 from estuary_cdk import emitted_changes_cache as cache
 from estuary_cdk.capture.common import LogCursor, PageCursor
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import Headers, HTTPError, HTTPSession
 from estuary_cdk.incremental_csv_processor import IncrementalCSVProcessor
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
@@ -45,6 +45,7 @@ MAX_CAMPAIGNS_PER_METRICS_REQUEST = 400
 # so we capture any late arriving attributions.
 CAMPAIGN_METRICS_LOOKBACK_WINDOW = timedelta(days=15)
 LIST_USERS_RATE_LIMIT_INTERVAL = 60 / 5 # 12 seconds
+GENERIC_API_ERROR_RESPONSE = "An error occurred. Please try again later."
 
 async def snapshot_resources(
     http: HTTPSession,
@@ -91,6 +92,22 @@ async def snapshot_templates(
                 yield doc
 
 
+def _should_retry_list_users_500_response(
+    status: int,
+    headers: Headers,
+    body: bytes,
+    attempt: int,
+) -> bool:
+    if (
+        status == 500 and
+        attempt >= 5 and
+        GENERIC_API_ERROR_RESPONSE in body.decode()
+    ):
+        return False
+
+    return status >= 500
+
+
 async def _fetch_users_in_list(
     list_id: int,
     http: HTTPSession,
@@ -123,7 +140,11 @@ async def _fetch_users_in_list(
         try:
             params = {"listId": list_id}
             _, lines = await http.request_lines(
-                log, url, params=params, timeout=request_timeout
+                log=log,
+                url=url,
+                params=params,
+                timeout=request_timeout,
+                should_retry=_should_retry_list_users_500_response,
             )
 
             async for line in lines():
@@ -152,7 +173,18 @@ async def _fetch_users_in_list(
                 )
             else:
                 raise
+        except HTTPError as e:
+            if (
+                e.code == 500 and
+                GENERIC_API_ERROR_RESPONSE in e.message
+            ):
+                log.info(
+                    f"Iterable API consistently returned 500 errors fetching users of list {list_id}. Skipping this list's users."
+                )
 
+                return
+            else:
+                raise
     log.debug(
         "finished processing list",
         {
