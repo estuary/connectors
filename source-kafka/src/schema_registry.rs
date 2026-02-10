@@ -180,7 +180,7 @@ impl SchemaRegistryClient {
                 Ok(RegisteredSchema::Json(schema))
             }
             SchemaType::Protobuf => {
-                self.fetch_protobuf_schema(id, &fetched.schema, &fetched.references).await
+                self.fetch_protobuf_schema(id, &fetched.references).await
             }
         }
     }
@@ -188,7 +188,6 @@ impl SchemaRegistryClient {
     async fn fetch_protobuf_schema(
         &self,
         id: u32,
-        schema_text: &str,
         references: &[SchemaReference],
     ) -> Result<RegisteredSchema> {
         // Resolve all referenced schemas first (depth-first for topological order).
@@ -208,6 +207,22 @@ impl SchemaRegistryClient {
         let main_descriptor = prost_types::FileDescriptorProto::decode(decoded_bytes.as_slice())
             .context("failed to decode FileDescriptorProto from schema bytes")?;
 
+        // Extract the message name from the FileDescriptorProto directly.
+        let package = main_descriptor.package.as_deref().unwrap_or("");
+        let first_message = main_descriptor
+            .message_type
+            .first()
+            .context("no message types found in protobuf schema")?;
+        let name = first_message
+            .name
+            .as_deref()
+            .context("message type has no name in protobuf schema")?;
+        let message_name = if package.is_empty() {
+            name.to_string()
+        } else {
+            format!("{}.{}", package, name)
+        };
+
         // Build FileDescriptorSet with dependencies first, then the main schema.
         let mut files = dependency_descriptors;
         files.push(main_descriptor);
@@ -216,9 +231,6 @@ impl SchemaRegistryClient {
 
         let descriptor_pool = DescriptorPool::from_file_descriptor_set(file_descriptor_set)
             .context("failed to create DescriptorPool from FileDescriptorSet")?;
-
-        let message_name = extract_protobuf_message_name(schema_text)
-            .context("failed to extract message name from protobuf schema")?;
 
         Ok(RegisteredSchema::Protobuf(ProtobufSchema {
             descriptor_pool,
@@ -373,120 +385,3 @@ impl SchemaRegistryClient {
     }
 }
 
-/// Extracts the first message name from a protobuf schema text.
-/// The schema text is expected to be in standard .proto format.
-/// Returns the fully-qualified message name (with package prefix if present).
-fn extract_protobuf_message_name(schema_text: &str) -> Option<String> {
-    let mut package = String::new();
-    let mut in_message = false;
-    let mut brace_depth = 0;
-
-    for line in schema_text.lines() {
-        let line = line.trim();
-
-        // Skip empty lines and comments
-        if line.is_empty() || line.starts_with("//") {
-            continue;
-        }
-
-        // Extract package name
-        if line.starts_with("package ") {
-            let pkg = line
-                .trim_start_matches("package ")
-                .trim_end_matches(';')
-                .trim();
-            package = pkg.to_string();
-            continue;
-        }
-
-        // Track brace depth
-        brace_depth += line.chars().filter(|&c| c == '{').count() as i32;
-        brace_depth -= line.chars().filter(|&c| c == '}').count() as i32;
-
-        // Look for top-level message definition (at brace_depth 0 before the line is processed)
-        if !in_message && brace_depth <= 1 && line.starts_with("message ") {
-            let name_part = line.trim_start_matches("message ");
-            let name = name_part
-                .split(|c: char| c.is_whitespace() || c == '{')
-                .next()?
-                .trim();
-
-            if package.is_empty() {
-                return Some(name.to_string());
-            } else {
-                return Some(format!("{}.{}", package, name));
-            }
-        }
-
-        if line.starts_with("message ") {
-            in_message = true;
-        }
-    }
-
-    None
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_extract_protobuf_message_name() {
-        // Simple message without package
-        let schema1 = r#"
-            syntax = "proto3";
-            message TestMessage {
-                string field1 = 1;
-            }
-        "#;
-        assert_eq!(
-            extract_protobuf_message_name(schema1),
-            Some("TestMessage".to_string())
-        );
-
-        // Message with package
-        let schema2 = r#"
-            syntax = "proto3";
-            package com.example.test;
-            message MyRecord {
-                int32 id = 1;
-                string name = 2;
-            }
-        "#;
-        assert_eq!(
-            extract_protobuf_message_name(schema2),
-            Some("com.example.test.MyRecord".to_string())
-        );
-
-        // Message with nested message (should return top-level)
-        let schema3 = r#"
-            syntax = "proto3";
-            package mypackage;
-            message OuterMessage {
-                message InnerMessage {
-                    string value = 1;
-                }
-                InnerMessage inner = 1;
-            }
-        "#;
-        assert_eq!(
-            extract_protobuf_message_name(schema3),
-            Some("mypackage.OuterMessage".to_string())
-        );
-
-        // With comments
-        let schema4 = r#"
-            syntax = "proto3";
-            // This is a comment
-            package test;
-            // Another comment
-            message CommentedMessage {
-                string field = 1;
-            }
-        "#;
-        assert_eq!(
-            extract_protobuf_message_name(schema4),
-            Some("test.CommentedMessage".to_string())
-        );
-    }
-}
