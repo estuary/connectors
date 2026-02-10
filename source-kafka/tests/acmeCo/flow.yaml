@@ -100,3 +100,28 @@ collections:
     key:
       - /_meta/partition
       - /_meta/offset
+  acmeCo/protobuf-ref-topic:
+    schema:
+      properties:
+        _meta:
+          properties:
+            offset:
+              description: The offset of the message within the partition
+              type: integer
+            partition:
+              description: The partition the message was read from
+              type: integer
+            topic:
+              description: The topic the message was read from
+              type: string
+          required:
+            - partition
+            - offset
+          type: object
+      required:
+        - _meta
+      type: object
+      x-infer-schema: true
+    key:
+      - /_meta/partition
+      - /_meta/offset

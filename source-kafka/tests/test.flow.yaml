@@ -28,3 +28,6 @@ captures:
       - resource:
           topic: protobuf-topic
         target: acmeCo/protobuf-topic
+      - resource:
+          topic: protobuf-ref-topic
+        target: acmeCo/protobuf-ref-topic

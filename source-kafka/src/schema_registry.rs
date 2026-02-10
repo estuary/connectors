@@ -12,13 +12,30 @@ const TOPIC_KEY_SUFFIX: &str = "-key";
 const TOPIC_VALUE_SUFFIX: &str = "-value";
 const CONCURRENT_SCHEMA_REQUESTS: usize = 10;
 
+#[derive(Deserialize, Debug, Clone)]
+struct SchemaReference {
+    name: String,    // import path, e.g. "common/types.proto"
+    subject: String, // Schema Registry subject
+    version: u32,    // version of the referenced schema
+}
+
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 struct FetchedSchema {
     #[serde(default = "SchemaType::default")]
     schema_type: SchemaType,
     schema: String,
-    references: Option<serde_json::Value>, // TODO(whb): Schema reference support is not yet implemented.
+    #[serde(default)]
+    references: Vec<SchemaReference>,
+}
+
+#[derive(Deserialize, Debug)]
+struct FetchedSubjectVersion {
+    id: u32,
+    #[allow(dead_code)]
+    schema: String,
+    #[serde(default)]
+    references: Vec<SchemaReference>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -145,56 +162,61 @@ impl SchemaRegistryClient {
             .make_request(format!("{}/schemas/ids/{}", self.endpoint, id).as_str())
             .await?;
 
-        if fetched.references.is_some() {
-            anyhow::bail!("schema references are not yet supported, and requested schema with id {} has references", id);
-        }
-
         match fetched.schema_type {
             SchemaType::Avro => {
+                if !fetched.references.is_empty() {
+                    anyhow::bail!("schema references are not yet supported for Avro schemas (schema id {})", id);
+                }
                 let schema = apache_avro::Schema::parse_str(&fetched.schema)
                     .context("failed to parse fetched avro schema")?;
                 Ok(RegisteredSchema::Avro(schema))
             }
             SchemaType::Json => {
+                if !fetched.references.is_empty() {
+                    anyhow::bail!("schema references are not yet supported for JSON schemas (schema id {})", id);
+                }
                 let schema = serde_json::from_str(&fetched.schema)
                     .context("failed to parse fetched json schema")?;
                 Ok(RegisteredSchema::Json(schema))
             }
             SchemaType::Protobuf => {
-                self.fetch_protobuf_schema(id, &fetched.schema).await
+                self.fetch_protobuf_schema(id, &fetched.schema, &fetched.references).await
             }
         }
     }
 
-    async fn fetch_protobuf_schema(&self, id: u32, schema_text: &str) -> Result<RegisteredSchema> {
-        // Fetch the schema with serialized format to get the FileDescriptorProto bytes
-        // When format=serialized is used, the schema field contains base64-encoded FileDescriptorProto
+    async fn fetch_protobuf_schema(
+        &self,
+        id: u32,
+        schema_text: &str,
+        references: &[SchemaReference],
+    ) -> Result<RegisteredSchema> {
+        // Resolve all referenced schemas first (depth-first for topological order).
+        let dependency_descriptors = self.resolve_protobuf_references(references).await?;
+
+        // Fetch the main schema with serialized format to get FileDescriptorProto bytes.
         let fetched: FetchedSchema = self
-            .make_request(format!("{}/schemas/ids/{}?format=serialized", self.endpoint, id).as_str())
+            .make_request(
+                format!("{}/schemas/ids/{}?format=serialized", self.endpoint, id).as_str(),
+            )
             .await?;
 
-        if fetched.references.is_some() {
-            anyhow::bail!("schema references are not yet supported, and requested protobuf schema with id {} has references", id);
-        }
-
-        // With format=serialized, the schema field contains base64-encoded FileDescriptorProto
-        let decoded_bytes = base64.decode(&fetched.schema)
+        let decoded_bytes = base64
+            .decode(&fetched.schema)
             .context("failed to decode base64 schema from serialized format")?;
 
-        // The schema registry returns a FileDescriptorProto, not a FileDescriptorSet
-        // We need to wrap it in a FileDescriptorSet for prost-reflect
-        let file_descriptor_proto = prost_types::FileDescriptorProto::decode(decoded_bytes.as_slice())
+        let main_descriptor = prost_types::FileDescriptorProto::decode(decoded_bytes.as_slice())
             .context("failed to decode FileDescriptorProto from schema bytes")?;
 
-        let file_descriptor_set = prost_types::FileDescriptorSet {
-            file: vec![file_descriptor_proto],
-        };
+        // Build FileDescriptorSet with dependencies first, then the main schema.
+        let mut files = dependency_descriptors;
+        files.push(main_descriptor);
+
+        let file_descriptor_set = prost_types::FileDescriptorSet { file: files };
 
         let descriptor_pool = DescriptorPool::from_file_descriptor_set(file_descriptor_set)
             .context("failed to create DescriptorPool from FileDescriptorSet")?;
 
-        // Extract the message name from the original schema text.
-        // Protobuf schema text format has the message name as the first message definition.
         let message_name = extract_protobuf_message_name(schema_text)
             .context("failed to extract message name from protobuf schema")?;
 
@@ -202,6 +224,104 @@ impl SchemaRegistryClient {
             descriptor_pool,
             message_name,
         }))
+    }
+
+    /// Recursively resolves all protobuf schema references from the Schema Registry.
+    /// Returns FileDescriptorProtos in dependency-first (topological) order.
+    async fn resolve_protobuf_references(
+        &self,
+        references: &[SchemaReference],
+    ) -> Result<Vec<prost_types::FileDescriptorProto>> {
+        let mut result = Vec::new();
+        let mut visited = HashSet::new();
+        self.resolve_protobuf_references_inner(references, &mut result, &mut visited)
+            .await?;
+        Ok(result)
+    }
+
+    async fn resolve_protobuf_references_inner(
+        &self,
+        references: &[SchemaReference],
+        result: &mut Vec<prost_types::FileDescriptorProto>,
+        visited: &mut HashSet<String>,
+    ) -> Result<()> {
+        for reference in references {
+            // prost-reflect has google well-known types built in.
+            if reference.name.starts_with("google/protobuf/") {
+                continue;
+            }
+
+            let visit_key = format!("{}:{}", reference.subject, reference.version);
+            if !visited.insert(visit_key) {
+                continue;
+            }
+
+            // Fetch the referenced schema by subject+version to get its ID and nested references.
+            let subject_version: FetchedSubjectVersion = self
+                .make_request(
+                    format!(
+                        "{}/subjects/{}/versions/{}",
+                        self.endpoint, reference.subject, reference.version
+                    )
+                    .as_str(),
+                )
+                .await
+                .with_context(|| {
+                    format!(
+                        "failed to fetch referenced schema subject={} version={}",
+                        reference.subject, reference.version
+                    )
+                })?;
+
+            // Recurse into nested references first (depth-first = topological order).
+            Box::pin(self.resolve_protobuf_references_inner(
+                &subject_version.references,
+                result,
+                visited,
+            ))
+            .await?;
+
+            // Fetch the serialized FileDescriptorProto for this reference.
+            let fetched: FetchedSchema = self
+                .make_request(
+                    format!(
+                        "{}/schemas/ids/{}?format=serialized",
+                        self.endpoint, subject_version.id
+                    )
+                    .as_str(),
+                )
+                .await
+                .with_context(|| {
+                    format!(
+                        "failed to fetch serialized schema for reference {} (id={})",
+                        reference.name, subject_version.id
+                    )
+                })?;
+
+            let decoded_bytes = base64.decode(&fetched.schema).with_context(|| {
+                format!(
+                    "failed to decode base64 schema for reference {}",
+                    reference.name
+                )
+            })?;
+
+            let mut file_descriptor_proto =
+                prost_types::FileDescriptorProto::decode(decoded_bytes.as_slice()).with_context(
+                    || {
+                        format!(
+                            "failed to decode FileDescriptorProto for reference {}",
+                            reference.name
+                        )
+                    },
+                )?;
+
+            // Override the name to match the import path so prost-reflect resolves dependencies.
+            file_descriptor_proto.name = Some(reference.name.clone());
+
+            result.push(file_descriptor_proto);
+        }
+
+        Ok(())
     }
 
     async fn fetch_latest_version(&self, subject: &str) -> Result<u32> {
