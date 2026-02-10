@@ -277,6 +277,21 @@ async fn setup_test() {
         &producer,
     )
     .await;
+
+    // Protobuf with schema references test case: registers a shared proto as a separate
+    // subject, then registers the main schema with a references array pointing to it.
+    // Verifies the connector can recursively resolve references and decode messages.
+    setup_protobuf_ref_test(
+        &admin,
+        &opts,
+        &http,
+        schema_registry_endpoint,
+        num_messages,
+        num_partitions,
+        topic_replication,
+        &producer,
+    )
+    .await;
 }
 
 async fn setup_protobuf_test(
@@ -499,6 +514,230 @@ fn produce_to_temp_topic(enc: &ProtobufTestDataEncoder, temp_topic: &str, num_me
             "kafka-protobuf-console-producer failed: {}",
             String::from_utf8_lossy(&output.stderr)
         );
+    }
+}
+
+async fn setup_protobuf_ref_test(
+    admin: &AdminClient<rdkafka::client::DefaultClientContext>,
+    opts: &AdminOptions,
+    http: &reqwest::Client,
+    schema_registry_endpoint: &str,
+    num_messages: usize,
+    num_partitions: i32,
+    topic_replication: i32,
+    producer: &FutureProducer,
+) {
+    let topic = "protobuf-ref-topic";
+
+    // Delete and recreate the topic.
+    admin.delete_topics(&[topic], opts).await.unwrap();
+    admin
+        .create_topics(
+            &[NewTopic::new(
+                topic,
+                num_partitions,
+                TopicReplication::Fixed(topic_replication),
+            )],
+            opts,
+        )
+        .await
+        .unwrap()
+        .into_iter()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+
+    // Delete existing schemas for the topic and the shared subject.
+    for subject in [
+        format!("{}-key", topic),
+        format!("{}-value", topic),
+        "protobuf-ref-common".to_string(),
+    ] {
+        http.delete(format!(
+            "{}/subjects/{}",
+            schema_registry_endpoint, subject
+        ))
+        .send()
+        .await
+        .unwrap();
+
+        http.delete(format!(
+            "{}/subjects/{}?permanent=true",
+            schema_registry_endpoint, subject
+        ))
+        .send()
+        .await
+        .unwrap();
+    }
+
+    // Register the shared/common proto as its own subject.
+    let common_schema =
+        r#"syntax = "proto3"; message CommonType { string common_field = 1; }"#;
+    let resp = http
+        .post(format!(
+            "{}/subjects/protobuf-ref-common/versions",
+            schema_registry_endpoint
+        ))
+        .json(&json!({"schema": common_schema, "schemaType": "PROTOBUF"}))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "Failed to register common schema: {:?}",
+        resp.text().await
+    );
+
+    // Register key schema (simple, no references).
+    let key_schema = r#"syntax = "proto3"; message RefKey { int32 idx = 1; }"#;
+    let resp = http
+        .post(format!(
+            "{}/subjects/{}-key/versions",
+            schema_registry_endpoint, topic
+        ))
+        .json(&json!({"schema": key_schema, "schemaType": "PROTOBUF"}))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "Failed to register key schema: {:?}",
+        resp.text().await
+    );
+
+    // Register value schema WITH a reference to the common schema.
+    let value_schema = r#"syntax = "proto3"; import "common.proto"; message RefValue { CommonType common = 1; string value = 2; }"#;
+    let resp = http
+        .post(format!(
+            "{}/subjects/{}-value/versions",
+            schema_registry_endpoint, topic
+        ))
+        .json(&json!({
+            "schema": value_schema,
+            "schemaType": "PROTOBUF",
+            "references": [{
+                "name": "common.proto",
+                "subject": "protobuf-ref-common",
+                "version": 1
+            }]
+        }))
+        .send()
+        .await
+        .unwrap();
+    assert!(
+        resp.status().is_success(),
+        "Failed to register value schema with references: {:?}",
+        resp.text().await
+    );
+
+    // Get the assigned schema IDs.
+    let key_info: serde_json::Value = http
+        .get(format!(
+            "{}/subjects/{}-key/versions/latest",
+            schema_registry_endpoint, topic
+        ))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let key_schema_id = key_info["id"].as_u64().unwrap() as u32;
+
+    let value_info: serde_json::Value = http
+        .get(format!(
+            "{}/subjects/{}-value/versions/latest",
+            schema_registry_endpoint, topic
+        ))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let value_schema_id = value_info["id"].as_u64().unwrap() as u32;
+
+    // Produce messages with manually constructed Confluent wire-format bytes.
+    for idx in 0..num_messages {
+        let key = encode_confluent_protobuf(key_schema_id, &encode_ref_key(idx as i32));
+        let value = encode_confluent_protobuf(
+            value_schema_id,
+            &encode_ref_value(idx),
+        );
+        send_message(topic, &key, Some(&value), idx, num_partitions, producer).await;
+    }
+
+    // Produce tombstone (deletion) records.
+    for idx in 0..num_partitions {
+        let key =
+            encode_confluent_protobuf(key_schema_id, &encode_ref_key(idx));
+        send_message(
+            topic,
+            &key,
+            None::<&[u8]>,
+            idx as usize,
+            num_partitions,
+            producer,
+        )
+        .await;
+    }
+}
+
+/// Wrap protobuf bytes in Confluent wire format:
+/// [magic:0x00][schema_id:4 bytes BE][msg_index_array_len:0x00][proto_bytes]
+fn encode_confluent_protobuf(schema_id: u32, proto_bytes: &[u8]) -> Vec<u8> {
+    let mut buf = Vec::with_capacity(6 + proto_bytes.len());
+    buf.push(0x00); // magic byte
+    buf.extend_from_slice(&schema_id.to_be_bytes());
+    buf.push(0x00); // message index array length 0 = first message
+    buf.extend_from_slice(proto_bytes);
+    buf
+}
+
+/// Encode RefKey { idx: n } as raw protobuf bytes.
+fn encode_ref_key(idx: i32) -> Vec<u8> {
+    if idx == 0 {
+        return Vec::new(); // default value, no fields encoded
+    }
+    let mut buf = Vec::new();
+    buf.push(0x08); // field 1, wire type 0 (varint)
+    encode_unsigned_varint(idx as u64, &mut buf);
+    buf
+}
+
+/// Encode RefValue { common: CommonType { common_field: "common-N" }, value: "value-N" }
+/// as raw protobuf bytes.
+fn encode_ref_value(idx: usize) -> Vec<u8> {
+    let common_field_str = format!("common-{}", idx);
+    let value_str = format!("value-{}", idx);
+
+    // Inner: CommonType { common_field: "common-N" }
+    let mut inner = Vec::new();
+    inner.push(0x0A); // field 1, wire type 2 (length-delimited)
+    encode_unsigned_varint(common_field_str.len() as u64, &mut inner);
+    inner.extend_from_slice(common_field_str.as_bytes());
+
+    let mut buf = Vec::new();
+    // Field 1: CommonType (message, length-delimited)
+    buf.push(0x0A); // field 1, wire type 2
+    encode_unsigned_varint(inner.len() as u64, &mut buf);
+    buf.extend_from_slice(&inner);
+
+    // Field 2: string value
+    buf.push(0x12); // field 2, wire type 2 (length-delimited)
+    encode_unsigned_varint(value_str.len() as u64, &mut buf);
+    buf.extend_from_slice(value_str.as_bytes());
+
+    buf
+}
+
+fn encode_unsigned_varint(mut value: u64, buf: &mut Vec<u8>) {
+    loop {
+        if value < 0x80 {
+            buf.push(value as u8);
+            return;
+        }
+        buf.push((value & 0x7F) as u8 | 0x80);
+        value >>= 7;
     }
 }
 
