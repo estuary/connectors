@@ -143,6 +143,7 @@ type writeResponse struct {
 				Channel         string `json:"channel"`
 				ClientSequencer int    `json:"client_sequencer"`
 				StatusCode      int    `json:"status_code"`
+				Message         string `json:"message"`
 			} `json:"channels"`
 			Database string `json:"database"`
 			Schema   string `json:"schema"`
@@ -208,7 +209,7 @@ func (s *streamClient) configure(ctx context.Context) (*streamConfig, error) {
 	})
 	if err != nil {
 		return nil, err
-	} else if err := getErrorByCode(res.StatusCode); err != nil {
+	} else if err := getErrorByCodeMessage(res.StatusCode, res.Message); err != nil {
 		return nil, fmt.Errorf("request was not successful: %w", err)
 	} else if res.Message != "Success" {
 		return nil, fmt.Errorf("unexpected response message: %s", res.Message)
@@ -237,7 +238,7 @@ func (s *streamClient) openChannel(ctx context.Context, schema, table, name stri
 	})
 	if err != nil && res == nil {
 		return nil, err
-	} else if codeErr := getErrorByCode(res.StatusCode); codeErr != nil {
+	} else if codeErr := getErrorByCodeMessage(res.StatusCode, res.Message); codeErr != nil {
 		return nil, fmt.Errorf("request returned error code: %w", codeErr)
 	} else if err != nil {
 		return nil, fmt.Errorf("error opening channel with a non-error status code: %w", err)
@@ -262,7 +263,7 @@ func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
 	})
 	if err != nil {
 		return err
-	} else if err := getErrorByCode(res.StatusCode); err != nil {
+	} else if err := getErrorByCodeMessage(res.StatusCode, res.Message); err != nil {
 		return fmt.Errorf("request was not successful: %w", err)
 	} else if res.Message != "Success" {
 		return fmt.Errorf("unexpected response message: %s", res.Message)
@@ -271,7 +272,7 @@ func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
 	for _, blob := range res.Blobs {
 		for _, chunk := range blob.Chunks {
 			for _, channel := range chunk.Channels {
-				if err := getErrorByCode(channel.StatusCode); err != nil {
+				if err := getErrorByCodeMessage(channel.StatusCode, channel.Message); err != nil {
 					return fmt.Errorf("failed to write chunk (schema: %s, table %s): %w", chunk.Schema, chunk.Table, err)
 				}
 			}
@@ -318,7 +319,7 @@ func (s *streamClient) channelStatus(ctx context.Context, clientSeq int, schema,
 	})
 	if err != nil {
 		return nil, err
-	} else if err := getErrorByCode(res.StatusCode); err != nil {
+	} else if err := getErrorByCodeMessage(res.StatusCode, res.Message); err != nil {
 		return nil, fmt.Errorf("request was not successful: %w", err)
 	} else if res.Message != "Success" {
 		return nil, fmt.Errorf("unexpected response message: %s", res.Message)
@@ -480,6 +481,18 @@ func getErrorByCode(code int) error {
 	}
 
 	return fmt.Errorf("unknown status message for code %d", code)
+}
+
+func getErrorByCodeMessage(code int, message string) error {
+	if code == 0 || message == "Success" {
+		return nil
+	}
+
+	if message != "" {
+		return &streamingApiError{Code: code, Message: message}
+	}
+
+	return getErrorByCode(code)
 }
 
 func generateBlobMetadata(
