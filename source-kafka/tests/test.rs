@@ -34,6 +34,8 @@ async fn test_discover() {
 
     let output = std::process::Command::new("flowctl")
         .args([
+            "--profile",
+            "local",
             "raw",
             "discover",
             "--source",
@@ -65,6 +67,8 @@ async fn test_capture() {
 
     let output = std::process::Command::new("flowctl")
         .args([
+            "--profile",
+            "local",
             "preview",
             "--source",
             "tests/test.flow.yaml",
@@ -116,12 +120,20 @@ async fn test_capture_resume() {
             "1": 1,
             "2": 1
           }
+        },
+        "protobuf-ref-topic": {
+          "partitions": {
+            "1": 1,
+            "2": 1
+          }
         }
       }
     });
 
     let output = std::process::Command::new("flowctl")
         .args([
+            "--profile",
+            "local",
             "preview",
             "--source",
             "tests/test.flow.yaml",
@@ -383,24 +395,25 @@ async fn setup_protobuf_test(
     // Produce messages to temp topic using Confluent's official protobuf serializer
     produce_to_temp_topic(&enc, &temp_topic, num_messages);
 
-    // Wait a bit for messages to be available
-    tokio::time::sleep(Duration::from_millis(500)).await;
-
-    // Copy schemas from temp topic to main topic
-    // The Confluent producer registered schemas with the temp topic name
+    // Copy schemas from temp topic to main topic.
+    // The Confluent producer registered schemas with the temp topic name.
+    // Retry in a loop since the producer may not have registered schemas yet.
     for suffix in ["key", "value"] {
-        // Get the schema from temp topic
-        let schema_resp = http
-            .get(format!(
-                "{}/subjects/{}-{}/versions/latest",
-                schema_registry_endpoint, temp_topic, suffix
-            ))
-            .send()
-            .await
-            .unwrap()
-            .json::<serde_json::Value>()
-            .await
-            .unwrap();
+        let schema_resp = loop {
+            let resp = http
+                .get(format!(
+                    "{}/subjects/{}-{}/versions/latest",
+                    schema_registry_endpoint, temp_topic, suffix
+                ))
+                .send()
+                .await
+                .unwrap();
+
+            if resp.status().is_success() {
+                break resp.json::<serde_json::Value>().await.unwrap();
+            }
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        };
 
         let schema = schema_resp["schema"].as_str().unwrap();
 
