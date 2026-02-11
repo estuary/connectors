@@ -1,12 +1,12 @@
 import asyncio
 from logging import Logger
-from pydantic import BaseModel
-from typing import Any, Generic, TypeVar
+from typing import TypeVar
 
 from estuary_cdk.http import HTTPSession
 from source_shopify_native.models import (
     GraphQLErrorCode,
     GraphQLResponse,
+    StoreValidationContext,
 )
 
 from .common import VERSION
@@ -47,20 +47,22 @@ class ShopifyGraphQLClient:
     def __init__(self, http: HTTPSession, store: str):
         self.http = http
         self.url = f"https://{store}.myshopify.com/admin/api/{VERSION}/graphql.json"
-        # maximum_available and restore_rate can be different depending on the 
+        self.store = store
+        # maximum_available and restore_rate can be different depending on the
         # user's Shopify tier, and they are refreshed each time we receive a
         # successful response.
         self.maximum_available = DEFAULT_MAXIMUM_AVAILABLE
         self.restore_rate = DEFAULT_RESTORE_RATE
 
-    async def request(self, query: str, data_model: type[T], log: Logger,) -> T:
+    async def request(self, query: str, data_model: type[T], log: Logger, context: StoreValidationContext | None = None) -> T:
         retry_count = 0
         retry_delay = INITIAL_RETRY_DELAY
         while True:
             response = GraphQLResponse[data_model].model_validate_json(
                 await self.http.request(
                     log, self.url, method="POST", json={"query": query}
-                )
+                ),
+                context=context,
             )
 
             if response.extensions and response.extensions.cost:

@@ -36,63 +36,38 @@
           "title": "Advanced",
           "type": "object"
         },
-        "LongLivedClientCredentialsOAuth2Credentials": {
+        "StoreConfig": {
+          "description": "Configuration for a single Shopify store.",
           "properties": {
-            "credentials_title": {
-              "const": "OAuth Credentials",
-              "default": "OAuth Credentials",
-              "title": "Credentials Title",
+            "store": {
+              "description": "Shopify store name (the prefix of your admin URL, e.g., 'mystore' for mystore.myshopify.com)",
+              "minLength": 1,
+              "title": "Store Name",
               "type": "string"
             },
-            "client_id": {
-              "secret": true,
-              "title": "Client Id",
-              "type": "string"
-            },
-            "client_secret": {
-              "secret": true,
-              "title": "Client Secret",
-              "type": "string"
-            },
-            "access_token": {
-              "secret": true,
-              "title": "Access Token",
-              "type": "string"
+            "credentials": {
+              "$ref": "#/$defs/AccessToken",
+              "description": "Access Token credentials for this store.",
+              "title": "Authentication"
             }
           },
           "required": [
-            "client_id",
-            "client_secret",
-            "access_token"
+            "store",
+            "credentials"
           ],
-          "title": "OAuth",
-          "type": "object",
-          "x-oauth2-provider": "shopify"
+          "title": "StoreConfig",
+          "type": "object"
         }
       },
       "properties": {
-        "store": {
-          "description": "Shopify store ID. Use the prefix of your admin URL e.g. https://{YOUR_STORE}.myshopify.com/admin",
-          "title": "Shopify Store",
-          "type": "string"
-        },
-        "credentials": {
-          "discriminator": {
-            "mapping": {
-              "OAuth Credentials": "#/$defs/LongLivedClientCredentialsOAuth2Credentials",
-              "Private App Credentials": "#/$defs/AccessToken"
-            },
-            "propertyName": "credentials_title"
+        "stores": {
+          "description": "One or more Shopify stores to capture. Each store requires its own credentials.",
+          "items": {
+            "$ref": "#/$defs/StoreConfig"
           },
-          "oneOf": [
-            {
-              "$ref": "#/$defs/AccessToken"
-            },
-            {
-              "$ref": "#/$defs/LongLivedClientCredentialsOAuth2Credentials"
-            }
-          ],
-          "title": "Authentication"
+          "minItems": 1,
+          "title": "Shopify Stores",
+          "type": "array"
         },
         "start_date": {
           "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
@@ -108,8 +83,7 @@
         }
       },
       "required": [
-        "store",
-        "credentials"
+        "stores"
       ],
       "title": "EndpointConfig",
       "type": "object"
@@ -151,18 +125,6 @@
       "type": "object"
     },
     "documentationUrl": "https://go.estuary.dev/source-shopify-native",
-    "oauth2": {
-      "provider": "shopify",
-      "authUrlTemplate": "https://{{{ config.store }}}.myshopify.com/admin/oauth/authorize?client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}&scope=read_locales,read_products,read_orders,read_locations,read_inventory,read_customers,read_own_subscription_contracts,read_assigned_fulfillment_orders,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders,read_marketplace_fulfillment_orders&state={{{#urlencode}}}{{{ state }}}{{{/urlencode}}}&redirect_uri={{{#urlencode}}}{{{ redirect_uri }}}{{{/urlencode}}}",
-      "accessTokenUrlTemplate": "https://{{{ config.store }}}.myshopify.com/admin/oauth/access_token?client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}&client_secret={{{#urlencode}}}{{{ client_secret }}}{{{/urlencode}}}&code={{{#urlencode}}}{{{ code }}}{{{/urlencode}}}",
-      "accessTokenBody": "client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}&client_secret={{{#urlencode}}}{{{ client_secret }}}{{{/urlencode}}}&code={{{#urlencode}}}{{{ code }}}{{{/urlencode}}}",
-      "accessTokenHeaders": {
-        "content-type": "application/x-www-form-urlencoded"
-      },
-      "accessTokenResponseMap": {
-        "access_token": "/access_token"
-      }
-    },
     "resourcePathPointers": [
       "/name"
     ]

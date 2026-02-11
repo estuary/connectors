@@ -1,37 +1,96 @@
+import asyncio
 import functools
-from datetime import datetime, timedelta, UTC
+from copy import deepcopy
+from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from logging import Logger
 
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import (
-    CaptureBinding,
     Resource,
     ResourceConfig,
     ResourceState,
     open_binding,
 )
-from estuary_cdk.flow import ValidationError
-from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
+from estuary_cdk.flow import AccessToken, CaptureBinding, ValidationError
+from estuary_cdk.http import HTTPError, HTTPMixin, RateLimiter, TokenSource
+from pydantic import AwareDatetime
 
 import source_shopify_native.graphql as gql
+from .graphql.bulk_job_manager import BulkJobManager
 
+from .api import (
+    backfill_incremental,
+    bulk_fetch_incremental,
+    fetch_incremental,
+    fetch_incremental_unsorted,
+)
+from .utils import dt_to_str
 from .models import (
-    OAUTH2_SPEC,
     AccessScopes,
-    AccessToken,
+    ConnectorState,
     EndpointConfig,
-    ShopifyGraphQLResource,
-    ShopDetails,
     PlanName,
+    ShopDetails,
+    ShopifyGraphQLResource,
+    StoreConfig,
     create_response_data_model,
 )
-from .api import (
-    bulk_fetch_incremental,
-    fetch_incremental_unsorted,
-    fetch_incremental,
-    backfill_incremental,
-)
-from.graphql.common import dt_to_str
+
+
+class StoreInitError(Exception):
+    """Raised when one or more stores fail to initialize.
+
+    Current behavior is fail-fast: any single store failure blocks the entire capture.
+    This surfaces configuration errors clearly rather than silently skipping a store.
+    TODO: Consider graceful degradation — continue with healthy stores and surface
+    errors for failed ones without blocking the entire capture.
+    """
+
+    def __init__(
+        self, failed_stores: dict[str, Exception], initialized_stores: list[str]
+    ):
+        self.failed_stores = failed_stores
+        self.initialized_stores = initialized_stores
+        store_errors = "\n".join(
+            f"  - {store}: {error}" for store, error in failed_stores.items()
+        )
+        super().__init__(
+            f"Failed to initialize {len(failed_stores)} store(s):\n{store_errors}"
+        )
+
+
+class StoreHTTP(HTTPMixin):
+    """Per-store HTTP wrapper that shares a parent session with per-store auth and rate limiting.
+
+    Sets the three attributes that HTTPMixin's methods depend on:
+    - inner: shared aiohttp.ClientSession from the parent (for connection pooling)
+    - rate_limiter: independent per-store rate limiter
+    - token_source: per-store authentication credentials
+
+    All HTTP methods (request, request_lines, etc.) are inherited via the class hierarchy.
+    """
+
+    def __init__(self, http: HTTPMixin, token_source: TokenSource):
+        # super().__init__() is intentionally not called. HTTPMixin is a pure
+        # attribute-based mixin whose initialization happens via _mixin_enter()
+        # context manager hooks (estuary_cdk/http.py:481), not constructors.
+        # We directly set the three attributes that HTTPMixin's methods depend on.
+        self.inner = http.inner
+        self.rate_limiter = RateLimiter()
+        self.token_source = token_source
+
+
+@dataclass(frozen=True, slots=True)
+class StoreContext:
+    """Context for a single Shopify store containing HTTP client, GraphQL client, and available resources."""
+
+    http: StoreHTTP
+    client: gql.ShopifyGraphQLClient
+    bulk_job_manager: BulkJobManager
+    scopes: set[str]
+    available_resources: set[type[ShopifyGraphQLResource]]
+
 
 AUTHORIZATION_HEADER = "X-Shopify-Access-Token"
 
@@ -63,49 +122,290 @@ INCREMENTAL_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.SubscriptionContracts,
 ]
 
-
-PII_RESOURCES: list[type[ShopifyGraphQLResource]] = [
+PII_RESOURCES: set[type[ShopifyGraphQLResource]] = {
     gql.Customers,
     gql.Orders,
     gql.FulfillmentOrders,
-]
+}
 
 
-async def _can_access_pii(
-    http: HTTPMixin,
-    url: str,
+async def _create_store_context(
     log: Logger,
-) -> bool:
-    response = ShopDetails.model_validate_json(
-        await http.request(
-            log, url, method="POST", json={"query": ShopDetails.query()}
-        )
+    http: HTTPMixin,
+    store_config: StoreConfig,
+    should_cancel_ongoing_job: bool,
+) -> StoreContext:
+    """Create context for a single store."""
+    token_source = TokenSource(
+        oauth_spec=None,
+        credentials=store_config.credentials,
+        authorization_header=AUTHORIZATION_HEADER,
+    )
+    store_http = StoreHTTP(http, token_source)
+    client = gql.ShopifyGraphQLClient(store_http, store_config.store)
+    bulk_job_manager = BulkJobManager(client, log)
+
+    if should_cancel_ongoing_job:
+        await bulk_job_manager.cancel_current()
+
+    granted_scopes = await _get_granted_scopes(store_http, client.url, log)
+
+    # OAuth apps can always access PII; AccessToken apps depend on plan
+    can_access_pii = True
+    uses_access_token = isinstance(store_config.credentials, AccessToken)
+    if uses_access_token:
+        can_access_pii = await _check_plan_allows_pii(store_http, client.url, log)
+
+    available_resources = _get_available_resources(
+        granted_scopes, uses_access_token, can_access_pii
     )
 
+    store_context = StoreContext(
+        http=store_http,
+        client=client,
+        bulk_job_manager=bulk_job_manager,
+        scopes=granted_scopes,
+        available_resources=available_resources,
+    )
+
+    return store_context
+
+
+def _get_available_resources(
+    granted_scopes: set[str],
+    uses_access_token: bool,
+    can_access_pii: bool,
+) -> set[type[ShopifyGraphQLResource]]:
+    """Determine which resources are available based on scopes and plan."""
+    available: set[type[ShopifyGraphQLResource]] = set()
+
+    for resource in INCREMENTAL_RESOURCES:
+        # Skip if none of the qualifying scopes are granted
+        if resource.QUALIFYING_SCOPES.isdisjoint(granted_scopes):
+            continue
+        # Skip PII resources for AccessToken auth when plan doesn't allow PII
+        if uses_access_token and resource in PII_RESOURCES and not can_access_pii:
+            continue
+        available.add(resource)
+
+    return available
+
+
+def _create_initial_state(
+    store_ids: list[str],
+    start_date: AwareDatetime,
+    use_backfill: bool,
+) -> ResourceState:
+    """Create initial state for a resource.
+
+    State format is always dictionary-based: {"inc": {"store_id": {"cursor": "..."}}}
+
+    This ensures consistency across all captures (new and legacy) and allows
+    seamless addition of stores without requiring backfill when only state format changes.
+
+    Args:
+        store_ids: List of store IDs to create state for.
+        start_date: The start date for data replication.
+        use_backfill: Whether to create backfill state (for non-bulk queries with SORT_KEY).
+    """
+    cutoff = datetime.now(tz=UTC)
+
+    if use_backfill:
+        return ResourceState(
+            inc={sid: ResourceState.Incremental(cursor=cutoff) for sid in store_ids},
+            backfill={
+                sid: ResourceState.Backfill(
+                    next_page=dt_to_str(start_date), cutoff=cutoff
+                )
+                for sid in store_ids
+            },
+        )
+    return ResourceState(
+        inc={sid: ResourceState.Incremental(cursor=start_date) for sid in store_ids},
+    )
+
+
+def _migrate_flat_to_dict_state(
+    state: ResourceState,
+    store_id: str,
+    log: Logger,
+) -> bool:
+    """Migrate legacy flat state format to dict-based format.
+
+    Converts:
+    - Flat: {"inc": {"cursor": "..."}, "backfill": {...}}
+    - Dict: {"inc": {"store_id": {"cursor": "..."}}, "backfill": {"store_id": {...}}}
+
+    Args:
+        state: The resource state to migrate (modified in place).
+        store_id: The store ID to use as the key for migrated state.
+        log: Logger for info messages.
+
+    Returns:
+        True if migration was performed, False if state was already dict-based.
+    """
+    if not isinstance(state.inc, ResourceState.Incremental):
+        return False  # Already dict-based or None
+
+    log.info(f"Migrating from flat to dict state using store: {store_id}")
+
+    # Convert incremental state to dict format
+    state.inc = {store_id: state.inc, "cursor": None}
+
+    # Convert backfill state
+    if isinstance(state.backfill, ResourceState.Backfill):
+        state.backfill = {store_id: state.backfill, "cutoff": None, "next_page": None}
+    elif state.backfill is None:
+        # Completed backfill in flat mode → represent as dict with None entry
+        state.backfill = {store_id: None}
+
+    return True
+
+
+def _add_missing_store_entries(
+    state: ResourceState,
+    store_ids: list[str],
+    initial_state: ResourceState,
+    log: Logger,
+) -> bool:
+    """Add state entries for newly configured stores.
+
+    Evaluates inc and backfill independently per store — a store may need one
+    without the other (e.g. inc exists from migration but backfill was None and
+    needs to be initialized for a new store).
+
+    Args:
+        state: The resource state to update (modified in place).
+        store_ids: List of all store IDs that should have state entries.
+        initial_state: Initial state template to copy for new stores.
+        log: Logger for info messages.
+
+    Returns:
+        True if any entries were added, False otherwise.
+
+    Raises:
+        RuntimeError: If state is not in expected dict-based format.
+    """
+    if not isinstance(state.inc, dict):
+        raise RuntimeError(
+            f"Cannot add store entries: state.inc is not dict-based (got {type(state.inc).__name__}). "
+            "This indicates a bug in state migration."
+        )
+    if isinstance(state.backfill, ResourceState.Backfill):
+        raise RuntimeError(
+            f"Cannot add store entries: state.backfill is not dict-based (got {type(state.backfill).__name__}). "
+            "This indicates a bug in state migration."
+        )
+    if not isinstance(initial_state.inc, dict):
+        raise RuntimeError(
+            f"Cannot add store entries: initial_state.inc is not dict-based (got {type(initial_state.inc).__name__}). "
+            "This indicates a bug in state creation."
+        )
+
+    # Narrow backfill dicts for the loop. None means the resource doesn't use backfill.
+    initial_backfill = (
+        initial_state.backfill if isinstance(initial_state.backfill, dict) else None
+    )
+    if initial_backfill is not None and not isinstance(state.backfill, dict):
+        state.backfill = {}
+    state_backfill = state.backfill if isinstance(state.backfill, dict) else None
+
+    added_any = False
+
+    for store_id in store_ids:
+        needs_inc = store_id not in state.inc
+        needs_backfill = state_backfill is not None and store_id not in state_backfill
+
+        if not needs_inc and not needs_backfill:
+            continue
+
+        log.info(
+            f"Adding missing state entries for store: {store_id}",
+            {
+                "needs_inc": needs_inc,
+                "needs_backfill": needs_backfill,
+            },
+        )
+
+        if needs_inc:
+            state.inc[store_id] = deepcopy(initial_state.inc[store_id])
+        if needs_backfill and initial_backfill is not None:
+            state_backfill[store_id] = deepcopy(initial_backfill[store_id])
+
+        added_any = True
+
+    return added_any
+
+
+async def _reconcile_connector_state(
+    store_ids: list[str],
+    binding: CaptureBinding[ResourceConfig],
+    state: ResourceState,
+    initial_state: ResourceState,
+    task: Task,
+    legacy_store_id: str,
+) -> None:
+    """Reconcile connector state: migrate format if needed and add missing stores.
+
+    This handles two scenarios:
+    1. Migration from flat to dict-based state (legacy single-store captures)
+    2. Adding missing store entries for newly configured stores
+
+    Args:
+        store_ids: List of all store IDs that should have state entries.
+        binding: The capture binding being reconciled.
+        state: The current resource state (modified in place).
+        initial_state: Initial state template for new stores.
+        task: The capture task for logging and checkpointing.
+        legacy_store_id: The store ID to use as the key when migrating flat state.
+            Set from config._legacy_store (the actual legacy store name) when config
+            was migrated, or config.stores[0].store as a fallback.
+
+    Raises:
+        RuntimeError: If initial_state or state is in an unexpected format.
+    """
+    if not isinstance(initial_state.inc, dict):
+        raise RuntimeError(
+            f"Invalid initial_state for {binding.stateKey}: expected dict-based inc, "
+            f"got {type(initial_state.inc).__name__}. This indicates a bug in state creation."
+        )
+
+    # Step 1: Migrate flat state to dict-based if needed
+    migrated = _migrate_flat_to_dict_state(state, legacy_store_id, task.log)
+
+    # Step 2: Add missing store entries
+    added = _add_missing_store_entries(state, store_ids, initial_state, task.log)
+
+    # Step 3: Checkpoint if any changes were made
+    if migrated or added:
+        task.log.info(f"Checkpointing reconciled state for {binding.stateKey}")
+        await task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
+
+
+async def _check_plan_allows_pii(http: HTTPMixin, url: str, log: Logger) -> bool:
+    """Check if the Shopify plan allows access to PII data."""
+    response = ShopDetails.model_validate_json(
+        await http.request(log, url, method="POST", json={"query": ShopDetails.query()})
+    )
     plan = response.data.shop.plan
 
     if plan.partnerDevelopment or plan.shopifyPlus:
         return True
 
-    match plan.displayName:
-        case PlanName.BASIC | PlanName.STARTER:
-            return False
-        case _:
-            if plan.displayName in PlanName:
-                return True
-            else:
-                log.warning(
-                    f"Shopify plan '{plan.displayName}' is not recognized. "
-                    f"Assuming access to PII is supported on the {plan.displayName} plan."
-                )
-                return True
+    if plan.displayName in (PlanName.BASIC, PlanName.STARTER):
+        return False
+
+    if plan.displayName in PlanName:
+        return True
+
+    log.warning(
+        f"Shopify plan '{plan.displayName}' is not recognized. "
+        f"Assuming PII access is supported."
+    )
+    return True
 
 
-async def _get_granted_scopes(
-    http: HTTPMixin,
-    url: str,
-    log: Logger,
-) -> set[str]:
+async def _get_granted_scopes(http: HTTPMixin, url: str, log: Logger) -> set[str]:
     """Query the currentAppInstallation to determine which scopes are granted."""
     response = AccessScopes.model_validate_json(
         await http.request(
@@ -117,190 +417,240 @@ async def _get_granted_scopes(
     return scopes
 
 
-def _incremental_resources(
+async def _validate_store(
+    log: Logger,
+    http: HTTPMixin,
+    store_config: StoreConfig,
+) -> str | None:
+    """Validate credentials for a single store. Returns an error message or None."""
+    token_source = TokenSource(
+        oauth_spec=None,
+        credentials=store_config.credentials,
+        authorization_header=AUTHORIZATION_HEADER,
+    )
+    store_http = StoreHTTP(http, token_source)
+    client = gql.ShopifyGraphQLClient(store_http, store_config.store)
+    bulk_job_manager = BulkJobManager(client, log)
+
+    try:
+        await bulk_job_manager.check_connectivity()
+    except HTTPError as err:
+        if err.code == 401:
+            return (
+                f"Store '{store_config.store}': Invalid credentials. "
+                f"Please confirm the provided credentials are correct.\n\n{err.message}"
+            )
+        return f"Store '{store_config.store}': Encountered error validating access token.\n\n{err.message}"
+
+    return None
+
+
+async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
+    """Validate credentials for all configured stores in parallel."""
+    results = await asyncio.gather(
+        *[_validate_store(log, http, store_config) for store_config in config.stores],
+        return_exceptions=True,
+    )
+
+    errors: list[str] = []
+    for store_config, result in zip(config.stores, results):
+        if isinstance(result, Exception):
+            raise RuntimeError(
+                f"Store '{store_config.store}': {result}"
+            ) from result
+        if result is not None:
+            errors.append(result)
+
+    if errors:
+        raise ValidationError(errors)
+
+
+async def all_resources(
+    log: Logger,
     http: HTTPMixin,
     config: EndpointConfig,
-    client: gql.ShopifyGraphQLClient,
-    bulk_job_manager: gql.bulk_job_manager.BulkJobManager,
-    resource_models: list[type[ShopifyGraphQLResource]],
-    granted_scopes: set[str],
+    should_cancel_ongoing_job: bool = False,
+    use_store_in_key: bool = True,
 ) -> list[Resource]:
-    def open(
-        model: type[ShopifyGraphQLResource],
-        binding: CaptureBinding[ResourceConfig],
-        binding_index: int,
-        state: ResourceState,
-        task: Task,
-        _all_bindings=None,
-    ):
-        # Warn if FulfillmentOrders has partial scope coverage (data may be incomplete).
-        if model == gql.FulfillmentOrders:
-            fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
-            has_partial_coverage = fo_scopes.intersection(granted_scopes) and not fo_scopes.issubset(granted_scopes)
-            if has_partial_coverage:
-                missing = fo_scopes.difference(granted_scopes)
-                task.log.warning(
-                    f"FulfillmentOrders stream enabled with partial scopes. Missing: {missing}. "
-                    "Only fulfillment orders matching granted scope types will be captured."
-                )
+    """Discover all available resources across all configured stores.
 
-        data_model = create_response_data_model(model)
+    State format is always dictionary-based: {"inc": {"store_id": {...}}}
 
-        if model.SHOULD_USE_BULK_QUERIES:
-            open_binding(
-                binding,
-                binding_index,
-                state,
-                task,
-                fetch_changes=functools.partial(
-                    bulk_fetch_incremental,
-                    http,
-                    config.advanced.window_size,
-                    bulk_job_manager,
-                    model,
-                ),
-            )
+    Collection key format depends on use_store_in_key:
+    - True: ["/_meta/store", "/id"]
+    - False: ["/id"]
+    """
+    store_contexts: dict[str, StoreContext] = {}
+
+    # Initialize all store contexts in parallel
+    results = await asyncio.gather(
+        *[
+            _create_store_context(log, http, store_config, should_cancel_ongoing_job)
+            for store_config in config.stores
+        ],
+        return_exceptions=True,
+    )
+
+    failed_stores: dict[str, Exception] = {}
+    for store_config, result in zip(config.stores, results):
+        if isinstance(result, Exception):
+            log.error(f"Failed to initialize store '{store_config.store}': {result}")
+            failed_stores[store_config.store] = result
         else:
-            # Non-bulk queries cannot be used for queries that have nested
-            # connections. Any query with "edges { node { blah } }" in it
-            # contains a nested connection.
-            if "edges" in model.QUERY.lower():
-                raise RuntimeError("Implementation error: Non-bulk queries cannot contain nested connections.")
-
-            if model.SORT_KEY is None:
-                open_binding(
-                    binding,
-                    binding_index,
-                    state,
-                    task,
-                    fetch_changes=functools.partial(
-                        fetch_incremental_unsorted,
-                        client,
-                        model,
-                        data_model,
-                    ),
+            excluded = [
+                m.NAME
+                for m in INCREMENTAL_RESOURCES
+                if m not in result.available_resources
+            ]
+            if excluded:
+                log.info(
+                    f"Store '{store_config.store}' excluding {len(excluded)} stream(s) due to missing scopes or plan restrictions"
                 )
-            else:
-                open_binding(
-                    binding,
-                    binding_index,
-                    state,
-                    task,
-                    fetch_changes=functools.partial(
-                        fetch_incremental,
-                        client,
-                        model,
-                        data_model,
-                    ),
-                    fetch_page=functools.partial(
-                        backfill_incremental,
-                        client,
-                        model,
-                        data_model,
-                    )
-                )
+            store_contexts[store_config.store] = result
 
-    cutoff = datetime.now(tz=UTC)
+    if not store_contexts:
+        raise StoreInitError(failed_stores, [])
 
+    if failed_stores:
+        raise StoreInitError(failed_stores, list(store_contexts.keys()))
+
+    # Determine which resources are available across all stores (union)
+    all_available: set[type[ShopifyGraphQLResource]] = set()
+    for ctx in store_contexts.values():
+        all_available.update(ctx.available_resources)
+
+    log.info(
+        f"Discovered {len(all_available)} stream(s) across {len(store_contexts)} store(s)"
+    )
+
+    # Build resources
     resources: list[Resource] = []
+    key = ["/_meta/store", "/id"] if use_store_in_key else ["/id"]
 
-    for model in resource_models:
-        if model.SHOULD_USE_BULK_QUERIES or model.SORT_KEY is None:
-            initial_state = ResourceState(
-                inc=ResourceState.Incremental(cursor=config.start_date)
-            )
-        else:
-            initial_state = ResourceState(
-                inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(next_page=dt_to_str(config.start_date), cutoff=cutoff)
-            )
+    for model in INCREMENTAL_RESOURCES:
+        stores_with_access = [
+            store_id
+            for store_id, ctx in store_contexts.items()
+            if model in ctx.available_resources
+        ]
+
+        if not stores_with_access:
+            continue
+
+        use_backfill = not model.SHOULD_USE_BULK_QUERIES and model.SORT_KEY is not None
+        initial_state = _create_initial_state(
+            stores_with_access, config.start_date, use_backfill
+        )
+        legacy_store_id = config._legacy_store or config.stores[0].store
+
+        def create_open_fn(
+            model: type[ShopifyGraphQLResource],
+            stores_with_access: list[str],
+            initial_state: ResourceState,
+            legacy_store_id: str,
+        ):
+            async def open(
+                binding: CaptureBinding[ResourceConfig],
+                binding_index: int,
+                state: ResourceState,
+                task: Task,
+                _all_bindings,
+            ):
+                await _reconcile_connector_state(
+                    stores_with_access,
+                    binding,
+                    state,
+                    initial_state,
+                    task,
+                    legacy_store_id=legacy_store_id,
+                )
+
+                # Warn if FulfillmentOrders has partial scope coverage
+                if model == gql.FulfillmentOrders:
+                    fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
+                    for store_id in stores_with_access:
+                        granted = store_contexts[store_id].scopes
+                        if fo_scopes & granted and not fo_scopes <= granted:
+                            missing = fo_scopes - granted
+                            task.log.warning(
+                                f"Store '{store_id}': FulfillmentOrders has partial scopes. "
+                                f"Missing: {missing}. Only matching fulfillment orders will be captured."
+                            )
+
+                if not model.SHOULD_USE_BULK_QUERIES and "edges" in model.QUERY.lower():
+                    raise RuntimeError(
+                        "Non-bulk queries cannot contain nested connections."
+                    )
+
+                data_model = create_response_data_model(model)
+
+                # Subtask creation is driven by fetch_changes/fetch_page dict keys
+                # (from stores_with_access), NOT by state keys. Orphaned state for
+                # removed stores is inert and intentionally preserved.
+                fetch_changes: dict[str, functools.partial] = {}
+                fetch_page: dict[str, functools.partial] = {}
+
+                for store_id in stores_with_access:
+                    ctx = store_contexts[store_id]
+
+                    if model.SHOULD_USE_BULK_QUERIES:
+                        fetch_changes[store_id] = functools.partial(
+                            bulk_fetch_incremental,
+                            ctx.http,
+                            config.advanced.window_size,
+                            ctx.bulk_job_manager,
+                            model,
+                            store_id,
+                        )
+                    elif model.SORT_KEY is None:
+                        fetch_changes[store_id] = functools.partial(
+                            fetch_incremental_unsorted,
+                            ctx.client,
+                            model,
+                            data_model,
+                            store_id,
+                        )
+                    else:
+                        fetch_changes[store_id] = functools.partial(
+                            fetch_incremental,
+                            ctx.client,
+                            model,
+                            data_model,
+                            store_id,
+                        )
+                        fetch_page[store_id] = functools.partial(
+                            backfill_incremental,
+                            ctx.client,
+                            model,
+                            data_model,
+                            store_id,
+                        )
+
+                open_binding(
+                    binding,
+                    binding_index,
+                    state,
+                    task,
+                    fetch_changes=fetch_changes,
+                    fetch_page=fetch_page if fetch_page else None,
+                )
+
+            return open
 
         resources.append(
             Resource(
                 name=model.NAME,
-                key=["/id"],
+                key=key,
                 model=ShopifyGraphQLResource,
-                open=functools.partial(open, model),
+                open=create_open_fn(
+                    model, stores_with_access, initial_state, legacy_store_id
+                ),
                 initial_state=initial_state,
-                initial_config=ResourceConfig(name=model.NAME, interval=timedelta(minutes=5)),
                 schema_inference=True,
+                initial_config=ResourceConfig(
+                    name=model.NAME, interval=timedelta(minutes=5)
+                ),
             )
         )
-
-    return resources
-
-
-async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
-    http.token_source = TokenSource(
-        oauth_spec=OAUTH2_SPEC,
-        credentials=config.credentials,
-        authorization_header=AUTHORIZATION_HEADER,
-    )
-    client = gql.ShopifyGraphQLClient(http, config.store)
-    bulk_job_manager = gql.bulk_job_manager.BulkJobManager(client, log)
-
-    try:
-        await bulk_job_manager._get_running_jobs()
-    except HTTPError as err:
-        msg = "Unknown error occurred."
-        if err.code == 401:
-            msg = f"Invalid credentials. Please confirm the provided credentials are correct.\n\n{err.message}"
-        else:
-            msg = f"Encountered error validating access token.\n\n{err.message}"
-
-        raise ValidationError([msg])
-
-
-async def all_resources(
-        log: Logger,
-        http: HTTPMixin,
-        config: EndpointConfig,
-        should_cancel_ongoing_job: bool = False
-) -> list[Resource]:
-    http.token_source = TokenSource(
-        oauth_spec=OAUTH2_SPEC,
-        credentials=config.credentials,
-        authorization_header=AUTHORIZATION_HEADER,
-    )
-    client = gql.ShopifyGraphQLClient(http, config.store)
-    bulk_job_manager = gql.bulk_job_manager.BulkJobManager(client, log)
-
-    # Before opening bindings, cancel any ongoing bulk query jobs before the
-    # connector starts submitting its own bulk query jobs.
-    if should_cancel_ongoing_job:
-        await bulk_job_manager.cancel_current()
-
-    # Query the access token's granted scopes to filter available streams.
-    granted_scopes = await _get_granted_scopes(http, client.url, log)
-
-    # Filter streams to only those whose required scope is granted.
-    # Uses set intersection to check if ANY of the required scopes are granted (OR logic).
-    available_models: list[type[ShopifyGraphQLResource]] = []
-    excluded_streams: list[tuple[str, set[str]]] = []
-    for model in INCREMENTAL_RESOURCES:
-        if model.QUALIFYING_SCOPES & granted_scopes:
-            available_models.append(model)
-        else:
-            excluded_streams.append((model.NAME, model.QUALIFYING_SCOPES))
-
-    if excluded_streams:
-        log.warning(
-            f"Excluding {len(excluded_streams)} stream(s) due to missing scopes: "
-            f"{', '.join(f'{name} (needs one of {scopes})' for name, scopes in excluded_streams)}"
-        )
-
-    resources = [
-        *_incremental_resources(http, config, client, bulk_job_manager, available_models, granted_scopes),
-    ]
-
-    # If the user is authenticating with an access token from their custom Shopify app,
-    # they may not be able to access certain PII data.
-    # https://help.shopify.com/en/manual/apps/app-types/custom-apps
-    # https://community.shopify.com/c/shopify-discussions/no-more-customer-pii-in-custom-app-integrations-for-shopify/td-p/2496209
-    if isinstance(config.credentials, AccessToken) and not await _can_access_pii(http, client.url, log):
-        for model in PII_RESOURCES:
-            resources = [
-                r for r in resources if r.name != model.NAME
-            ]
 
     return resources
