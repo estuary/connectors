@@ -48,6 +48,7 @@ type transactor struct {
 
 	objAndArrayAsJson       bool
 	loggedStorageApiMessage bool
+	skipCleanup             bool
 }
 
 func prepareNewTransactor(
@@ -85,6 +86,7 @@ func prepareNewTransactor(
 			dialect:           ep.Dialect,
 			templates:         templates,
 			objAndArrayAsJson: featureFlags["objects_and_arrays_as_json"],
+			skipCleanup:       featureFlags["skip_cleanup"],
 			client:            client,
 			be:                be,
 			loadFiles:         boilerplate.NewStagedFiles(stagedFileClient{}, bucket, writer.DefaultJsonFileSizeLimit, cfg.effectiveBucketPath(), false, false),
@@ -223,12 +225,15 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return it.Err()
 	}
 
-	defer t.loadFiles.CleanupCurrentTransaction(ctx)
+	if !t.skipCleanup {
+		defer t.loadFiles.CleanupCurrentTransaction(ctx)
+	}
 
 	// Build the queries of all documents across all bindings that were requested.
 	var subqueries []string
 	// This is the map of external table references we will populate.
 	var edcTableDefs = make(map[string]bigquery.ExternalData)
+	var externalData = make(map[string][]string)
 
 	for idx, b := range t.bindings {
 		if !t.loadFiles.Started(idx) {
@@ -247,6 +252,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			} else {
 				subqueries = append(subqueries, loadQuery)
 				edcTableDefs[b.tempTableName] = edc(uris, b.loadSchema)
+				externalData[b.tempTableName] = uris
 			}
 		}
 	}
@@ -259,7 +265,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	queryStr := strings.Join(subqueries, "\nUNION ALL\n") + ";"
 	query := t.client.newQuery(queryStr)
 	query.TableDefinitions = edcTableDefs // Tell bigquery where to get the external references in gcs.
-	ll := log.WithField("query", queryStr)
+	ll := log.WithFields(log.Fields{"query": queryStr, "external_data": externalData})
 
 	t.be.StartedEvaluatingLoads()
 	job, err := t.client.runQuery(ctx, query)
@@ -273,6 +279,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		ll.WithError(err).Error("job read failed")
 		return fmt.Errorf("load job read: %w", err)
 	}
+
+	ll.Debug("load query executed")
 	t.be.FinishedEvaluatingLoads()
 
 	if !bqit.IsAccelerated() && !t.loggedStorageApiMessage {
@@ -292,7 +300,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	if err := t.loadFiles.CleanupCurrentTransaction(ctx); err != nil {
+	if t.skipCleanup {
+		log.Warn("cleanup disabled; load files retained")
+	} else if err := t.loadFiles.CleanupCurrentTransaction(ctx); err != nil {
 		return fmt.Errorf("cleaning up load files: %w", err)
 	}
 
@@ -392,6 +402,14 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			t.be.StartedResourceCommit(b.target.Path)
 			if err := t.client.queryIdempotent(groupCtx, b.storeSchema, item.Query, item.JobPrefix, item.SourceURIs, item.TempTableName); err != nil {
 				return fmt.Errorf("acknowledge query for %q: %w", b.target.Path, err)
+			}
+			log.WithFields(log.Fields{
+				"query":         item.Query,
+				"external_data": map[string][]string{item.TempTableName: item.SourceURIs},
+			}).Debug("acknowledge query executed")
+
+			if t.skipCleanup {
+				log.Warn("cleanup disabled; staged files retained")
 			} else if err := t.storeFiles.CleanupCheckpoint(ctx, item.SourceURIs); err != nil {
 				// Queries will fail if the source files have been deleted, but
 				// if queryIdempotent has returned without error then a job for

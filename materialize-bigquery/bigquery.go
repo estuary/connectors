@@ -27,6 +27,7 @@ var featureFlagDefaults = map[string]bool{
 	"objects_and_arrays_as_json":       true,
 	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
+	"skip_cleanup":                     false,
 }
 
 type AuthType string
