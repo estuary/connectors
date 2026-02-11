@@ -206,6 +206,7 @@ class CampaignPreLaunchStates(StrEnum):
     DRAFT = "Draft"
     RECURRING = "Recurring"
     SCHEDULED = "Scheduled"
+    STARTING = "Starting"
 
 
 class CampaignInProgressStates(StrEnum):
