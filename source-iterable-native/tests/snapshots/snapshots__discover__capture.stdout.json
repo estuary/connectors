@@ -84,7 +84,8 @@
           "enum": [
             "Draft",
             "Recurring",
-            "Scheduled"
+            "Scheduled",
+            "Starting"
           ],
           "title": "CampaignPreLaunchStates",
           "type": "string"
