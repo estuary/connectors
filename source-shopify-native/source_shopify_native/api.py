@@ -1,6 +1,6 @@
-from datetime import datetime, timedelta, UTC
-from logging import Logger
 import time
+from datetime import UTC, datetime, timedelta
+from logging import Logger
 from typing import AsyncGenerator
 
 from estuary_cdk.capture.common import (
@@ -9,22 +9,28 @@ from estuary_cdk.capture.common import (
 )
 from estuary_cdk.http import HTTPMixin
 
-from .graphql.client import ShopifyGraphQLClient
-from .graphql.common import dt_to_str, str_to_dt
-import source_shopify_native.graphql as gql
-from source_shopify_native.models import BaseResponseData, ShopifyGraphQLResource, TShopifyGraphQLResource
+from source_shopify_native.graphql.bulk_job_manager import BulkJobManager
+from source_shopify_native.models import (
+    BaseResponseData,
+    ShopifyGraphQLResource,
+    StoreValidationContext,
+    TShopifyGraphQLResource,
+)
 
+from .graphql.client import ShopifyGraphQLClient
+from .utils import dt_to_str, str_to_dt
 
 CHECKPOINT_INTERVAL = 1_000
 PAGE_SIZE = 250
-TARGET_FETCH_PAGE_INVOCATION_RUN_TIME = 60 * 5 # 5 minutes
+TARGET_FETCH_PAGE_INVOCATION_RUN_TIME = 60 * 5  # 5 minutes
 
 
 async def bulk_fetch_incremental(
     http: HTTPMixin,
     window_size: timedelta,
-    bulk_job_manager: gql.bulk_job_manager.BulkJobManager,
+    bulk_job_manager: BulkJobManager,
     model: type[ShopifyGraphQLResource],
+    store: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[ShopifyGraphQLResource | LogCursor, None]:
@@ -37,14 +43,15 @@ async def bulk_fetch_incremental(
 
     if url is None:
         log.info(
-            f"Bulk query job found no results between {log_cursor} and {end} for this query."
+            f"[{store}] Bulk query job found no results between {log_cursor} and {end}."
         )
         yield end
         return
 
     _, lines = await http.request_lines(log, url)
+    ctx = StoreValidationContext(store=store)
     async for record in model.process_result(log, lines()):
-        resource = model.model_validate(record)
+        resource = model.model_validate(record, context=ctx)
         yield resource
 
     yield end
@@ -53,8 +60,9 @@ async def bulk_fetch_incremental(
 async def bulk_fetch_full_refresh(
     http: HTTPMixin,
     start_date: datetime,
-    bulk_job_manager: gql.bulk_job_manager.BulkJobManager,
+    bulk_job_manager: BulkJobManager,
     model: type[ShopifyGraphQLResource],
+    store: str,
     log: Logger,
 ) -> AsyncGenerator[ShopifyGraphQLResource, None]:
     end = datetime.now(tz=UTC)
@@ -64,13 +72,14 @@ async def bulk_fetch_full_refresh(
 
     if url is None:
         log.info(
-            f"Bulk query job found no results between {start_date} and {end} for {model.__name__}."
+            f"[{store}] Bulk query job found no results between {start_date} and {end} for {model.__name__}."
         )
         return
 
     _, lines = await http.request_lines(log, url)
+    ctx = StoreValidationContext(store=store)
     async for record in model.process_result(log, lines()):
-        resource = model.model_validate(record)
+        resource = model.model_validate(record, context=ctx)
         yield resource
 
 
@@ -80,9 +89,11 @@ async def _paginate_through_resources(
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
     start: datetime,
     end: datetime,
+    store: str,
     log: Logger,
 ) -> AsyncGenerator[TShopifyGraphQLResource, None]:
     after: str | None = None
+    ctx = StoreValidationContext(store=store)
 
     while True:
         query = model.build_query(
@@ -92,7 +103,7 @@ async def _paginate_through_resources(
             after=after,
         )
 
-        data = await client.request(query, data_model,log)
+        data = await client.request(query, data_model, log, context=ctx)
 
         for doc in data.nodes:
             yield doc
@@ -108,6 +119,7 @@ async def fetch_incremental_unsorted(
     client: ShopifyGraphQLClient,
     model: type[TShopifyGraphQLResource],
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    store: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TShopifyGraphQLResource | LogCursor, None]:
@@ -122,6 +134,7 @@ async def fetch_incremental_unsorted(
         data_model=data_model,
         start=log_cursor,
         end=end,
+        store=store,
         log=log,
     ):
         cursor_value = doc.get_cursor_value()
@@ -139,6 +152,7 @@ async def fetch_incremental(
     client: ShopifyGraphQLClient,
     model: type[TShopifyGraphQLResource],
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    store: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TShopifyGraphQLResource | LogCursor, None]:
@@ -154,6 +168,7 @@ async def fetch_incremental(
         data_model=data_model,
         start=log_cursor,
         end=end,
+        store=store,
         log=log,
     ):
         cursor_value = doc.get_cursor_value()
@@ -161,10 +176,7 @@ async def fetch_incremental(
         if cursor_value <= log_cursor:
             continue
 
-        if (
-            count >= CHECKPOINT_INTERVAL and
-            cursor_value > last_dt
-        ):
+        if count >= CHECKPOINT_INTERVAL and cursor_value > last_dt:
             yield last_dt
             count = 0
 
@@ -180,6 +192,7 @@ async def backfill_incremental(
     client: ShopifyGraphQLClient,
     model: type[TShopifyGraphQLResource],
     data_model: type[BaseResponseData[TShopifyGraphQLResource]],
+    store: str,
     log: Logger,
     page: PageCursor | None,
     cutoff: LogCursor,
@@ -199,6 +212,7 @@ async def backfill_incremental(
         data_model=data_model,
         start=start,
         end=cutoff,
+        store=store,
         log=log,
     ):
         cursor_value = doc.get_cursor_value()
@@ -209,10 +223,7 @@ async def backfill_incremental(
         if cursor_value > cutoff:
             return
 
-        if (
-            count >= CHECKPOINT_INTERVAL and
-            cursor_value > last_seen_dt
-        ):
+        if count >= CHECKPOINT_INTERVAL and cursor_value > last_seen_dt:
             yield dt_to_str(last_seen_dt)
             count = 0
 
