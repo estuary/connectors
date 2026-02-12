@@ -91,12 +91,12 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key1", "hello1", "world1"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key2", "hello2", "world2"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key3", "hello3", "world3"}))
-		blobs, err := sm.flush("the-token-1")
+		blobs, encKeys, err := sm.flush("the-token-1")
 		require.NoError(t, err)
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
 
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
 		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
 			{"key1", "hello1", "world1"},
@@ -105,7 +105,7 @@ func TestStreamManager(t *testing.T) {
 		})
 
 		// Write the same token again, it is not added to the table.
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
 		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
 			{"key1", "hello1", "world1"},
@@ -121,13 +121,13 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key4", "hello4", "world4"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key5", "hello5", "world5"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key6", "hello6", "world6"}))
-		blobs, err = sm.flush("the-token-2")
+		blobs, encKeys, err = sm.flush("the-token-2")
 		require.NoError(t, err)
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
 
 		// The original invocation will error and not write any data.
-		require.Error(t, sm.write(ctx, blobs[0], false))
+		require.Error(t, sm.write(ctx, blobs[0], encKeys[0], false))
 		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
 			{"key1", "hello1", "world1"},
 			{"key2", "hello2", "world2"},
@@ -138,12 +138,12 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key4", "hello4", "world4"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key5", "hello5", "world5"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key6", "hello6", "world6"}))
-		blobs, err = sm.flush("the-token-2")
+		blobs, encKeys, err = sm.flush("the-token-2")
 		require.NoError(t, err)
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
 
-		require.NoError(t, ssm.write(ctx, blobs[0], false))
+		require.NoError(t, ssm.write(ctx, blobs[0], encKeys[0], false))
 
 		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
 			{"key1", "hello1", "world1"},
@@ -184,13 +184,13 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key1", "hello1", "world1"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key2", "hello2", "world2"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key3", "hello3", "world3"}))
-		blobs, err := sm.flush("the-token-1")
+		blobs, encKeys, err := sm.flush("the-token-1")
 		require.NoError(t, err)
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
 
 		// Write blob normally.
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
 		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
 			{"key1", "hello1", "world1"},
@@ -205,7 +205,7 @@ func TestStreamManager(t *testing.T) {
 		// cause a Snowflake error / table corruption), this will re-name the
 		// blob and register it with the exact same data.
 		blobs[0][0].Chunks[0].Channels[0].OffsetToken = "a-new-token:0"
-		require.NoError(t, sm.write(ctx, blobs[0], true))
+		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], true))
 
 		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
 			{"key1", "hello1", "world1"},
@@ -250,12 +250,12 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key4", "hello4", "world4"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key5", "hello5", "world5"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key6", "hello6", "world6"}))
-		blobs, err := sm.flush("the-token-1")
+		blobs, encKeys, err := sm.flush("the-token-1")
 		require.NoError(t, err)
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 2, len(blobs[0]))
 
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
 		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
 			{"key1", "hello1", "world1"},
@@ -319,11 +319,11 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key1", "hello1", "world1"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key2", "hello2", "world2"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key3", "hello3", "world3"}))
-		blobs, err := sm.flush("the-token-1")
+		blobs, encKeys, err := sm.flush("the-token-1")
 		require.NoError(t, err)
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key4", "hello4", "world4"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key5", "hello5", "world5"}))
@@ -334,16 +334,16 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, sm.writeRow(ctx, 2, []any{"key4", "hello4", "world4"}))
 		require.NoError(t, sm.writeRow(ctx, 2, []any{"key5", "hello5", "world5"}))
 		require.NoError(t, sm.writeRow(ctx, 2, []any{"key6", "hello6", "world6"}))
-		blobs, err = sm.flush("the-token-2")
+		blobs, encKeys, err = sm.flush("the-token-2")
 		require.NoError(t, err)
 		require.Equal(t, 3, len(blobs))
-		for _, blob := range blobs {
+		for idx, blob := range blobs {
 			require.Equal(t, 1, len(blob))
-			require.NoError(t, sm.write(ctx, blob, false))
+			require.NoError(t, sm.write(ctx, blob, encKeys[idx], false))
 		}
 
 		// Noop commit.
-		blobs, err = sm.flush("the-token-3")
+		blobs, encKeys, err = sm.flush("the-token-3")
 		require.NoError(t, err)
 		require.Equal(t, 0, len(blobs))
 
@@ -353,12 +353,12 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, sm.writeRow(ctx, 2, []any{"key7", "hello7", "world7"}))
 		require.NoError(t, sm.writeRow(ctx, 2, []any{"key8", "hello8", "world8"}))
 		require.NoError(t, sm.writeRow(ctx, 2, []any{"key9", "hello9", "world9"}))
-		blobs, err = sm.flush("the-token-3")
+		blobs, encKeys, err = sm.flush("the-token-3")
 		require.NoError(t, err)
 		require.Equal(t, 2, len(blobs))
-		for _, blob := range blobs {
+		for idx, blob := range blobs {
 			require.Equal(t, 1, len(blob))
-			require.NoError(t, sm.write(ctx, blob, false))
+			require.NoError(t, sm.write(ctx, blob, encKeys[idx], false))
 		}
 
 		verify(t, "SELECT * FROM "+tables[0].Identifier+" ORDER BY key", [][]any{
@@ -435,11 +435,11 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key1", "hello1", "goodbye1", "aloha1"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key2", "hello2", "goodbye2", "aloha2"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key3", "hello3", "goodbye3", "aloha3"}))
-		blobs, err := sm.flush("token")
+		blobs, encKeys, err := sm.flush("token")
 		require.NoError(t, err)
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
 		verify(t, "SELECT * FROM "+tbl.Identifier+" ORDER BY key", [][]any{
 			{nil, "key1", "hello1", nil, "goodbye1", "aloha1", nil},
@@ -482,12 +482,12 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table.Identifier, table))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key1", json.RawMessage(data)}))
-		blobs, err := sm.flush("the-token-1")
+		blobs, encKeys, err := sm.flush("the-token-1")
 		require.NoError(t, err)
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
 
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
 		var gotData string
 		require.NoError(t, db.QueryRowContext(ctx, "SELECT firstcol FROM STREAM_TEST").Scan(&gotData))
@@ -603,11 +603,11 @@ func TestStreamDatatypes(t *testing.T) {
 				require.NoError(t, sm.writeRow(ctx, 0, []any{i, val}))
 			}
 
-			blobs, err := sm.flush("token")
+			blobs, encKeys, err := sm.flush("token")
 			require.NoError(t, err)
 			require.Equal(t, 1, len(blobs))
 			require.Equal(t, 1, len(blobs[0]))
-			require.NoError(t, sm.write(ctx, blobs[0], false))
+			require.NoError(t, sm.write(ctx, blobs[0], encKeys[0], false))
 
 			var snap strings.Builder
 			eps, err := json.Marshal(blobs[0][0].Chunks[0].EPS)

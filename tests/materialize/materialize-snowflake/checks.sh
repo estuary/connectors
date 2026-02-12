@@ -6,6 +6,7 @@ fi
 $SED_CMD -i'' 's/@flow_v1\/.\{36\}/<uuid>/g' ${SNAPSHOT}
 $SED_CMD -i'' 's/"Path": ".*"/"Path": "<uuid>"/g' ${SNAPSHOT}
 $SED_CMD -i'' 's/"PipeStartTime": ".\{1,\}"/"PipeStartTime": "<timestamp>"/g' ${SNAPSHOT}
+$SED_CMD -i'' 's/"EncryptionKey": ".*"/"EncryptionKey": "<encryption_key>"/g' ${SNAPSHOT}
 $SED_CMD -i'' 's/"path": ".*"/"path": "<path>"/g' ${SNAPSHOT}
 $SED_CMD -i'' 's/"md5": ".*"/"md5": "<md5>"/g' ${SNAPSHOT}
 $SED_CMD -i'' 's/"chunk_length": [0-9]\+/"chunk_length": "<chunk_length>"/g' ${SNAPSHOT}
