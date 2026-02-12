@@ -232,7 +232,10 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, recov
 	// This can happen if a table is dropped after blobs have already been
 	// written.
 	if blobs[0].Chunks[0].EncryptionKeyID != thisChannel.EncryptionKeyId {
-		return fmt.Errorf("channel encryption key has changed; backfill required")
+		log.WithFields(log.Fields{
+			"schema": schema,
+			"table":  table,
+		}).Warn("channel encryption key has changed; backfill may be required")
 	}
 
 	for _, blob := range blobs {
