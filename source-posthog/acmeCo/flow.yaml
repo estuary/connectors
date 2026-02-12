@@ -1,0 +1,29 @@
+collections:
+  acmeCo/Annotations:
+    schema: Annotations.schema.yaml
+    key:
+    - /id
+  acmeCo/Cohorts:
+    schema: Cohorts.schema.yaml
+    key:
+    - /id
+  acmeCo/Events:
+    schema: Events.schema.yaml
+    key:
+    - /id
+  acmeCo/FeatureFlags:
+    schema: FeatureFlags.schema.yaml
+    key:
+    - /id
+  acmeCo/Organizations:
+    schema: Organizations.schema.yaml
+    key:
+    - /id
+  acmeCo/Persons:
+    schema: Persons.schema.yaml
+    key:
+    - /id
+  acmeCo/Projects:
+    schema: Projects.schema.yaml
+    key:
+    - /id
