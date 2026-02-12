@@ -169,10 +169,13 @@ def braintree_object_to_dict(braintree_object):
     return data
 
 
-def reduce_window_end(
+def bisect_window(
     start: datetime,
     end: datetime,
 ) -> datetime:
+    """
+    Returns the datetime at the midpoint between start and end.
+    """
     window_size = (end - start) / 2
 
     # Braintree's datetimes have a resolution of seconds, so we remove microseconds from the window size.
