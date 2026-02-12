@@ -12,7 +12,7 @@ from .common import (
     HEADERS,
     TRANSACTION_SEARCH_LIMIT,
     braintree_xml_to_dict,
-    reduce_window_end,
+    bisect_window,
 )
 from ..models import (
     IncrementalResource,
@@ -205,7 +205,7 @@ async def _fetch_transaction_ids_with_created_at_windowing(
             if min_created_at is None:
                 min_created_at = max_created_at - timedelta(days=1)
             else:
-                min_created_at = reduce_window_end(min_created_at, max_created_at)
+                min_created_at = bisect_window(min_created_at, max_created_at)
 
         yield (ids, min_created_at, max_created_at)
 
