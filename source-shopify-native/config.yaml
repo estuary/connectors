@@ -1,21 +1,17 @@
-credentials:
-    credentials_title: Private App Credentials
-    access_token_sops: ENC[AES256_GCM,data:Mcq58scGHGj8jW7Lsv9gI7GQ+kbnnGe40nwOY+60W173vqNklHo=,iv:9XLi7MOmucqmyesaSxEhj4GQKd74JbyR1w20TdG7YcM=,tag:U2M6LgJeHn3Xj4ysnQYLag==,type:str]
-store: estuary-alex-testing
+stores:
+    - store: estuary-alex-testing
+      credentials:
+        credentials_title: Private App Credentials
+        access_token_sops: ENC[AES256_GCM,data:U4H9/+mC+YbmCzSeQOs77ikDHAFAl8flLkohlfLvIG4oR6O444s=,iv:RpboQbPOJnctlQeH2EEnns+xtBydFpD6TecqLiilFD4=,tag:zWOk5wMGZObyaLemX0bZ7w==,type:str]
 start_date: "2025-01-10T00:00:00Z"
 advanced:
     window_size: P50000D
 sops:
-    kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
-          created_at: "2023-12-19T13:25:05Z"
-          enc: CiQAdmEdwmjDSn1NNdMUXMUGzrNlxb+PmRnwO3SlDl7ECE2TEj8SSQCVvC1zgeSluXBB2sK8SHPxU5VLUcCcAoMUAYjww/YYhqowBhINH4xi+cC9zJaOZxU8Oq/jrGCzO0o1Kxr1HMKv4C3tyc6/4ck=
-    azure_kv: []
-    hc_vault: []
-    age: []
-    lastmodified: "2025-09-05T13:06:45Z"
-    mac: ENC[AES256_GCM,data:I4FWGsOWyKxrI4ud+Ul5b8MR2qCOGeK0HyOtRnxpdC6cc2g7qa9o0ZNi70Uz+1LtigCfFgRKyJkU1lry7AFyPJsT9IEDo4mt/4+taSkoo7T1aFakwnN5GLDeD3j0ktKvlFXPt5/RoWGczTfgZ0U+q8IsjBF1gPPA2BgJ5+kP1S4=,iv:flzhyYQLxi/5vFPXywtE0ENHM67oWehJglMWHnvIclE=,tag:JXkLiXB8p/NHbj/UBqW69A==,type:str]
-    pgp: []
+          created_at: "2026-02-10T14:31:14Z"
+          enc: CiQAdmEdwsIlJneQ2fXL155ChSwlJWjSsbXJPov0rLvZ67BYKaISSQDNZIk6KsWXDUNAXjyc2C/5rNbt67SyOZRv+8m0bkmtWcHAkq7Qe2CdsqquG2FG5Mc0XPVvt7wmhb1N51XpxaGykrD79QbhWR4=
+    lastmodified: "2026-02-10T14:31:14Z"
+    mac: ENC[AES256_GCM,data:/pYcG5z75ME8I68UVj1whiJAHRTp/VOAoAa0elRQiPJCP93LvAFeNhekN4T23pdyiscL88prwVNjzS8dMvAPSTSxF0T/H2di7BYqDawAEKV4C42cup74wB1Gxl8QeUpTwmYIlOSq/13kuSF+mEruPrTvvnSddiwkYrGyUciEPJo=,iv:R2u0T3Nrsqbuin5HE9xkk9mlOXCOJEo6NVmvuftv2o0=,tag:IeX6GSZ+hF7n36fEilmFfw==,type:str]
     encrypted_suffix: _sops
-    version: 3.9.0
+    version: 3.10.2
