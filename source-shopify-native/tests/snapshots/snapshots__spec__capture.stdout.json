@@ -68,6 +68,33 @@
           "title": "OAuth",
           "type": "object",
           "x-oauth2-provider": "shopify"
+        },
+        "ShopifyClientCredentials": {
+          "description": "Credentials for the Shopify client_credentials grant flow.\n\nUsed by Dev Dashboard custom apps (post-Jan 2026) where the app developer\nand store owner are the same organization. The CDK's TokenSource exchanges\nclient_id + client_secret for a short-lived access token (~24 hours)\nat runtime, with automatic refresh at 75% of the token lifetime.\n\nInherits client_id, client_secret, and grant_type=\"client_credentials\"\nfrom ClientCredentialsOAuth2Credentials / _BaseOAuth2CredentialsData.\n\nReferences:\n    https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/client-credentials-grant",
+          "properties": {
+            "credentials_title": {
+              "const": "Client Credentials",
+              "default": "Client Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "client_id": {
+              "secret": true,
+              "title": "Client Id",
+              "type": "string"
+            },
+            "client_secret": {
+              "secret": true,
+              "title": "Client Secret",
+              "type": "string"
+            }
+          },
+          "required": [
+            "client_id",
+            "client_secret"
+          ],
+          "title": "Client Credentials",
+          "type": "object"
         }
       },
       "properties": {
@@ -79,6 +106,7 @@
         "credentials": {
           "discriminator": {
             "mapping": {
+              "Client Credentials": "#/$defs/ShopifyClientCredentials",
               "OAuth Credentials": "#/$defs/LongLivedClientCredentialsOAuth2Credentials",
               "Private App Credentials": "#/$defs/AccessToken"
             },
@@ -87,6 +115,9 @@
           "oneOf": [
             {
               "$ref": "#/$defs/AccessToken"
+            },
+            {
+              "$ref": "#/$defs/ShopifyClientCredentials"
             },
             {
               "$ref": "#/$defs/LongLivedClientCredentialsOAuth2Credentials"

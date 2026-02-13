@@ -1,37 +1,41 @@
 import functools
-from datetime import datetime, timedelta, UTC
+from datetime import UTC, datetime, timedelta
 from logging import Logger
 
 from estuary_cdk.capture import Task
 from estuary_cdk.capture.common import (
-    CaptureBinding,
     Resource,
     ResourceConfig,
     ResourceState,
     open_binding,
 )
-from estuary_cdk.flow import ValidationError
+from estuary_cdk.flow import (
+    CaptureBinding,
+    OAuth2TokenFlowSpec,
+    ValidationError,
+)
 from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
 import source_shopify_native.graphql as gql
 
+from .api import (
+    backfill_incremental,
+    bulk_fetch_incremental,
+    fetch_incremental,
+    fetch_incremental_unsorted,
+)
+from .graphql.common import dt_to_str
 from .models import (
     OAUTH2_SPEC,
     AccessScopes,
     AccessToken,
     EndpointConfig,
-    ShopifyGraphQLResource,
-    ShopDetails,
     PlanName,
+    ShopDetails,
+    ShopifyClientCredentials,
+    ShopifyGraphQLResource,
     create_response_data_model,
 )
-from .api import (
-    bulk_fetch_incremental,
-    fetch_incremental_unsorted,
-    fetch_incremental,
-    backfill_incremental,
-)
-from.graphql.common import dt_to_str
 
 AUTHORIZATION_HEADER = "X-Shopify-Access-Token"
 
@@ -69,6 +73,38 @@ PII_RESOURCES: list[type[ShopifyGraphQLResource]] = [
     gql.Orders,
     gql.FulfillmentOrders,
 ]
+
+
+def _build_token_source(config: EndpointConfig) -> TokenSource:
+    """Construct the appropriate TokenSource based on the credential type.
+
+    - AccessToken (legacy shpat_* tokens): Uses the CDK's default TokenSource
+      with the static token and X-Shopify-Access-Token header.
+    - ShopifyClientCredentials: Uses the CDK's built-in client_credentials
+      OAuth2 flow with a store-specific token endpoint URL. The CDK handles
+      token exchange, caching, and refresh automatically.
+    - OAuth2Credentials: Uses the CDK's default TokenSource with the OAuth2 spec
+      and the long-lived access token obtained during the OAuth2 flow.
+    """
+    if isinstance(config.credentials, ShopifyClientCredentials):
+        # Build a store-specific OAuth2TokenFlowSpec at runtime since
+        # the token endpoint URL depends on the store name and the CDK
+        # uses this URL as a literal string (not a Mustache template).
+        spec = OAuth2TokenFlowSpec(
+            accessTokenUrlTemplate=f"https://{config.store}.myshopify.com/admin/oauth/access_token",
+            accessTokenResponseMap={"access_token": "/access_token"},
+        )
+        return TokenSource(
+            oauth_spec=spec,
+            credentials=config.credentials,
+            authorization_header=AUTHORIZATION_HEADER,
+        )
+    else:
+        return TokenSource(
+            oauth_spec=OAUTH2_SPEC,
+            credentials=config.credentials,
+            authorization_header=AUTHORIZATION_HEADER,
+        )
 
 
 async def _can_access_pii(
@@ -136,7 +172,9 @@ def _incremental_resources(
         # Warn if FulfillmentOrders has partial scope coverage (data may be incomplete).
         if model == gql.FulfillmentOrders:
             fo_scopes = gql.FulfillmentOrders.QUALIFYING_SCOPES
-            has_partial_coverage = fo_scopes.intersection(granted_scopes) and not fo_scopes.issubset(granted_scopes)
+            has_partial_coverage = fo_scopes.intersection(
+                granted_scopes
+            ) and not fo_scopes.issubset(granted_scopes)
             if has_partial_coverage:
                 missing = fo_scopes.difference(granted_scopes)
                 task.log.warning(
@@ -197,7 +235,7 @@ def _incremental_resources(
                         client,
                         model,
                         data_model,
-                    )
+                    ),
                 )
 
     cutoff = datetime.now(tz=UTC)
@@ -231,11 +269,7 @@ def _incremental_resources(
 
 
 async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointConfig):
-    http.token_source = TokenSource(
-        oauth_spec=OAUTH2_SPEC,
-        credentials=config.credentials,
-        authorization_header=AUTHORIZATION_HEADER,
-    )
+    http.token_source = _build_token_source(config)
     client = gql.ShopifyGraphQLClient(http, config.store)
     bulk_job_manager = gql.bulk_job_manager.BulkJobManager(client, log)
 
@@ -252,16 +286,12 @@ async def validate_credentials(log: Logger, http: HTTPMixin, config: EndpointCon
 
 
 async def all_resources(
-        log: Logger,
-        http: HTTPMixin,
-        config: EndpointConfig,
-        should_cancel_ongoing_job: bool = False
+    log: Logger,
+    http: HTTPMixin,
+    config: EndpointConfig,
+    should_cancel_ongoing_job: bool = False,
 ) -> list[Resource]:
-    http.token_source = TokenSource(
-        oauth_spec=OAUTH2_SPEC,
-        credentials=config.credentials,
-        authorization_header=AUTHORIZATION_HEADER,
-    )
+    http.token_source = _build_token_source(config)
     client = gql.ShopifyGraphQLClient(http, config.store)
     bulk_job_manager = gql.bulk_job_manager.BulkJobManager(client, log)
 
@@ -297,10 +327,10 @@ async def all_resources(
     # they may not be able to access certain PII data.
     # https://help.shopify.com/en/manual/apps/app-types/custom-apps
     # https://community.shopify.com/c/shopify-discussions/no-more-customer-pii-in-custom-app-integrations-for-shopify/td-p/2496209
-    if isinstance(config.credentials, AccessToken) and not await _can_access_pii(http, client.url, log):
+    if isinstance(
+        config.credentials, (AccessToken, ShopifyClientCredentials)
+    ) and not await _can_access_pii(http, client.url, log):
         for model in PII_RESOURCES:
-            resources = [
-                r for r in resources if r.name != model.NAME
-            ]
+            resources = [r for r in resources if r.name != model.NAME]
 
     return resources
