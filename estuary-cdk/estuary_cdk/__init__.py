@@ -10,6 +10,7 @@ import traceback
 
 from .logger import init_logger, FlowLogger
 from .flow import ValidationError
+from .utils import get_running_tasks_info
 
 # Request type served by this connector.
 Request = TypeVar("Request", bound=BaseModel)
@@ -89,33 +90,32 @@ class BaseConnector(Generic[Request], abc.ABC):
         original_sigquit = signal.getsignal(signal.SIGQUIT)
 
         def dump_all_tasks(signum, frame):
-            tasks = asyncio.all_tasks(loop)
+            task_infos = get_running_tasks_info(exclude_tasks={this_task} if this_task else None)
 
-            for task in tasks:
-                if task is this_task:
-                    continue
-
+            for info in task_infos:
                 log.info("Attempting to inject SIGQUIT exception into task.", {
-                    "task.get_name()": task.get_name(),
-                    "task.get_coro().__name__": task.get_coro().__name__,
+                    "task_name": info.task_name,
+                    "coro_name": info.coro_name,
                 })
 
                 # Reach inside the task coroutine to inject an exception, which
                 # will unwind the task stack and lets us print a precise stack trace.
-                try:
-                    task.get_coro().throw(RuntimeError("injected SIGQUIT exception"))
-                except Exception as exc:
-                    msg, args = type(exc).__name__, exc.args
-                    if len(args) != 0:
-                        msg = f"{msg}: {args[0]}"
-                    log.exception(msg, args)
+                coro = info.task.get_coro()
+                if coro:
+                    try:
+                        coro.throw(RuntimeError("injected SIGQUIT exception"))
+                    except Exception as exc:
+                        msg, args = type(exc).__name__, exc.args
+                        if len(args) != 0:
+                            msg = f"{msg}: {args[0]}"
+                        log.exception(msg, args)
 
                 # We manually injected an exception into the coroutine,
                 # so the asyncio event loop will attempt to await it again
                 # and get a new "cannot reuse already awaited coroutine".
                 # Cancel the task now and add a callback to clear the exception.
-                task.cancel()
-                task.add_done_callback(lambda task: task.exception())
+                info.task.cancel()
+                info.task.add_done_callback(lambda task: task.exception())
 
             # Wake event loop.
             loop.call_soon_threadsafe(lambda: None)
