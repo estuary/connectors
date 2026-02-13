@@ -20,7 +20,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "all_key_types_part_three": {
         "Table": "all_key_types_part_three",
@@ -29,7 +30,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "all_key_types_part_two": {
         "Table": "all_key_types_part_two",
@@ -38,7 +40,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "deletions": {
         "Table": "deletions",
@@ -47,7 +50,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "duplicate%20keys%20%40%20with%20spaces": {
         "Table": "",
@@ -154,7 +158,8 @@
         ],
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "duplicate_keys_delta": {
         "Table": "",
@@ -261,7 +266,8 @@
         ],
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "duplicate_keys_delta_exclude_flow_doc": {
         "Table": "",
@@ -368,7 +374,8 @@
         ],
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "duplicate_keys_standard": {
         "Table": "duplicate_keys_standard",
@@ -377,7 +384,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "fields_with_projections": {
         "Table": "fields_with_projections",
@@ -386,7 +394,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "formatted_strings": {
         "Table": "formatted_strings",
@@ -395,7 +404,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "many_columns": {
         "Table": "many_columns",
@@ -404,7 +414,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "multiple_types": {
         "Table": "multiple_types",
@@ -413,7 +424,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "simple": {
         "Table": "simple",
@@ -422,7 +434,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "string_escaped_key": {
         "Table": "string_escaped_key",
@@ -431,7 +444,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "symbols": {
         "Table": "symbols",
@@ -440,7 +454,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "timezone_datetimes_delta": {
         "Table": "",
@@ -547,7 +562,8 @@
         ],
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "timezone_datetimes_standard": {
         "Table": "timezone_datetimes_standard",
@@ -556,7 +572,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "unsigned_bigint": {
         "Table": "unsigned_bigint",
@@ -565,7 +582,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       }
     },
     "mergePatch": true
@@ -582,7 +600,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": "ffffffffffffffff"
+        "Version": "ffffffffffffffff",
+        "EncryptionKey": "<encryption_key>"
       },
       "all_key_types_part_three": {
         "Table": "all_key_types_part_three",
@@ -591,7 +610,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": "ffffffffffffffff"
+        "Version": "ffffffffffffffff",
+        "EncryptionKey": "<encryption_key>"
       },
       "all_key_types_part_two": {
         "Table": "all_key_types_part_two",
@@ -600,7 +620,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": "ffffffffffffffff"
+        "Version": "ffffffffffffffff",
+        "EncryptionKey": "<encryption_key>"
       },
       "deletions": {
         "Table": "deletions",
@@ -609,7 +630,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": "ffffffffffffffff"
+        "Version": "ffffffffffffffff",
+        "EncryptionKey": "<encryption_key>"
       },
       "duplicate%20keys%20%40%20with%20spaces": {
         "Table": "",
@@ -716,7 +738,8 @@
         ],
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "duplicate_keys_delta": {
         "Table": "",
@@ -823,7 +846,8 @@
         ],
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "duplicate_keys_delta_exclude_flow_doc": {
         "Table": "",
@@ -930,7 +954,8 @@
         ],
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "duplicate_keys_standard": {
         "Table": "duplicate_keys_standard",
@@ -939,7 +964,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": "ffffffffffffffff"
+        "Version": "ffffffffffffffff",
+        "EncryptionKey": "<encryption_key>"
       },
       "fields_with_projections": {
         "Table": "fields_with_projections",
@@ -948,7 +974,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": "ffffffffffffffff"
+        "Version": "ffffffffffffffff",
+        "EncryptionKey": "<encryption_key>"
       },
       "formatted_strings": {
         "Table": "formatted_strings",
@@ -957,7 +984,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "many_columns": {
         "Table": "many_columns",
@@ -966,7 +994,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": "ffffffffffffffff"
+        "Version": "ffffffffffffffff",
+        "EncryptionKey": "<encryption_key>"
       },
       "multiple_types": {
         "Table": "multiple_types",
@@ -975,7 +1004,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": "ffffffffffffffff"
+        "Version": "ffffffffffffffff",
+        "EncryptionKey": "<encryption_key>"
       },
       "simple": {
         "Table": "simple",
@@ -984,7 +1014,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "string_escaped_key": {
         "Table": "string_escaped_key",
@@ -993,7 +1024,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": "ffffffffffffffff"
+        "Version": "ffffffffffffffff",
+        "EncryptionKey": "<encryption_key>"
       }
     },
     "mergePatch": true
@@ -1108,7 +1140,8 @@
         ],
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "duplicate_keys_delta": {
         "Table": "",
@@ -1215,7 +1248,8 @@
         ],
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "duplicate_keys_delta_exclude_flow_doc": {
         "Table": "",
@@ -1322,7 +1356,8 @@
         ],
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       },
       "duplicate_keys_standard": {
         "Table": "duplicate_keys_standard",
@@ -1331,7 +1366,8 @@
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "",
+        "EncryptionKey": "<encryption_key>"
       }
     },
     "mergePatch": true
@@ -1342,6 +1378,7 @@
   {
     "updated": {
       "duplicate%20keys%20%40%20with%20spaces": {
+        "EncryptionKey": "<encryption_key>",
         "PipeName": "",
         "Query": "",
         "StagedDir": "",
@@ -1448,6 +1485,7 @@
         "Version": ""
       },
       "duplicate_keys_delta": {
+        "EncryptionKey": "<encryption_key>",
         "PipeName": "",
         "Query": "",
         "StagedDir": "",
@@ -1554,6 +1592,7 @@
         "Version": ""
       },
       "duplicate_keys_delta_exclude_flow_doc": {
+        "EncryptionKey": "<encryption_key>",
         "PipeName": "",
         "Query": "",
         "StagedDir": "",
@@ -1660,6 +1699,7 @@
         "Version": ""
       },
       "duplicate_keys_standard": {
+        "EncryptionKey": "<encryption_key>",
         "PipeName": "",
         "Query": "\nCOPY INTO duplicate_keys_standard (\n\tid, flow_published_at, int, str\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str\n\tFROM <uuid>\n);\n",
         "StagedDir": "<uuid>",
