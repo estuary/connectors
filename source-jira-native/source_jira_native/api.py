@@ -3,6 +3,8 @@ from logging import Logger
 from typing import Any, AsyncGenerator
 from zoneinfo import ZoneInfo
 
+import aiohttp
+
 from estuary_cdk.capture.common import LogCursor, PageCursor
 import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.http import HTTPError, HTTPSession
@@ -73,6 +75,15 @@ NEXT_GEN_ISSUE = r"The request contains a next-gen issue"
 ALL_ISSUE_FIELDS = "*all"
 MINIMAL_ISSUE_FIELDS = "id,updated"
 
+# HTTP timeout configuration with sock_read to prevent requests from hanging
+# indefinitely during body reading. Without sock_read, a stalled connection
+# that stops receiving data can hang forever.
+HTTP_TIMEOUT = aiohttp.ClientTimeout(
+    total=300,       # 5 min
+    sock_connect=30, # 30 sec to establish connection
+    sock_read=240,   # 4 min
+)
+
 
 def dt_to_str(dt: datetime) -> str:
     return dt.isoformat()
@@ -115,7 +126,7 @@ async def fetch_timezone(
     url = f"{url_base(domain, JiraAPI.PLATFORM)}/myself"
 
     response = MyselfResponse.model_validate_json(
-        await http.request(log, url)
+        await http.request(log, url, timeout=HTTP_TIMEOUT)
     )
 
     timezone = ZoneInfo(response.timeZone)
@@ -134,7 +145,7 @@ async def snapshot_nested_arrayed_resources(
     url = f"{url_base(domain, stream.api)}/{stream.path}"
     headers = stream.extra_headers or {}
 
-    _, body = await http.request_stream(log, url, params=stream.extra_params, headers=headers)
+    _, body = await http.request_stream(log, url, params=stream.extra_params, headers=headers, timeout=HTTP_TIMEOUT)
     processor = IncrementalJsonProcessor(
         body(),
         f"{stream.response_field}.item",
@@ -156,7 +167,7 @@ async def _fetch_non_paginated_arrayed_resources(
 ) -> AsyncGenerator[APIRecord, None]:
     url = f"{url_base(domain, api)}/{path}"
     headers = extra_headers or {}
-    records = TypeAdapter(list[APIRecord]).validate_json(await http.request(log, url, params=extra_params, headers=headers))
+    records = TypeAdapter(list[APIRecord]).validate_json(await http.request(log, url, params=extra_params, headers=headers, timeout=HTTP_TIMEOUT))
 
     for record in records:
         yield record
@@ -195,7 +206,7 @@ async def snapshot_paginated_arrayed_resources(
         params.update(stream.extra_params)
 
     while True:
-        resources = TypeAdapter(list[FullRefreshResource]).validate_json(await http.request(log, url, params=params, headers=headers))
+        resources = TypeAdapter(list[FullRefreshResource]).validate_json(await http.request(log, url, params=params, headers=headers, timeout=HTTP_TIMEOUT))
 
         if len(resources) == 0:
             break
@@ -244,7 +255,7 @@ async def _paginate_through_resources(
 
     while True:
         response = response_model.model_validate_json(
-            await http.request(log, url, params=params, headers=headers)
+            await http.request(log, url, params=params, headers=headers, timeout=HTTP_TIMEOUT)
         )
 
         if not response.values:
@@ -297,7 +308,7 @@ async def snapshot_labels(
 
     while True:
         response = LabelsResponse.model_validate_json(
-            await http.request(log, url, params=params)
+            await http.request(log, url, params=params, timeout=HTTP_TIMEOUT)
         )
 
         for label in response.values:
@@ -330,7 +341,7 @@ async def snapshot_system_avatars(
         url = f"{url_base(domain, stream.api)}/avatar/{avatar_type}/system"
 
         response = SystemAvatarsResponse.model_validate_json(
-            await http.request(log, url)
+            await http.request(log, url, timeout=HTTP_TIMEOUT)
         )
 
         for avatar in response.system:
@@ -346,7 +357,7 @@ async def snapshot_permissions(
     url = f"{url_base(domain, stream.api)}/{stream.path}"
 
     response = PermissionsResponse.model_validate_json(
-        await http.request(log, url)
+        await http.request(log, url, timeout=HTTP_TIMEOUT)
     )
 
     for permission in response.permissions.values():
@@ -588,7 +599,7 @@ async def _fetch_project_avatars(
     url = f"{url_base(domain, ProjectAvatars.api)}/project/{project_id}/avatars"
 
     response = ProjectAvatarsResponse.model_validate_json(
-        await http.request(log, url)
+        await http.request(log, url, timeout=HTTP_TIMEOUT)
     )
 
     for avatar in response.system:
@@ -612,7 +623,7 @@ async def _fetch_project_email(
     url = f"{url_base(domain, ProjectEmails.api)}/project/{project.id}/email"
 
     yield FullRefreshResource.model_validate_json(
-        await http.request(log, url)
+        await http.request(log, url, timeout=HTTP_TIMEOUT)
     )
 
 
@@ -792,7 +803,7 @@ async def snapshot_epics(
         url = f"{base_url}/{stream.path}/{id}"
         try:
             yield JiraResource.model_validate_json(
-                await http.request(log, url)
+                await http.request(log, url, timeout=HTTP_TIMEOUT)
             )
         except HTTPError as err:
             if err.code == 400 and NEXT_GEN_ISSUE in err.message:
@@ -973,7 +984,8 @@ async def _fetch_issues_between(
             # enormous number of projects. If we encounter that, we
             # can add support to use the POST endpoint instead.
             method="GET",
-            params=params
+            params=params,
+            timeout=HTTP_TIMEOUT,
         )
         processor = IncrementalJsonProcessor(
             body(),
