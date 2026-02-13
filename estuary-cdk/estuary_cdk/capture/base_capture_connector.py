@@ -23,7 +23,7 @@ from ..flow import (
 )
 from ..http import HTTPMixin, TokenSource
 from ..logger import FlowLogger
-from ..utils import format_error_message, sort_dict
+from ..utils import format_error_message, get_running_tasks_info, sort_dict
 from . import Request, Response, Task, request, response
 from ._emit import emit_bytes
 from .common import _ConnectorState
@@ -109,7 +109,26 @@ class BaseCaptureConnector(
                 stopping.event.set()
 
                 await asyncio.sleep(60 * 60)  # 1 hour
-                log.warning("Graceful exit has not finished in one hour")
+
+                current_task = asyncio.current_task()
+                task_infos = get_running_tasks_info(
+                    exclude_tasks={current_task} if current_task else None
+                )
+
+                log.warning(
+                    "Graceful exit has not finished in one hour",
+                    {
+                        "running_task_count": len(task_infos),
+                        "running_tasks": [
+                            {
+                                "task_name": info.task_name,
+                                "coro_name": info.coro_name,
+                                "stack_trace": info.stack_trace,
+                            }
+                            for info in task_infos
+                        ]
+                    },
+                )
 
             # Rotate OAuth2 tokens for credentials with periodically expiring tokens.
             if isinstance(self.token_source, TokenSource) and isinstance(
