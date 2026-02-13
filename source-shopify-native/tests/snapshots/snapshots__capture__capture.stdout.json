@@ -14,7 +14,7 @@
         "marketingUpdatedAt": null
       },
       "defaultPhoneNumber": {
-        "marketingCollectedFrom": "OTHER",
+        "marketingCollectedFrom": null,
         "marketingOptInLevel": "SINGLE_OPT_IN",
         "marketingState": "NOT_SUBSCRIBED",
         "marketingUpdatedAt": null

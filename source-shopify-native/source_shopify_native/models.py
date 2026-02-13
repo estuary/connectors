@@ -1,31 +1,32 @@
 import json
-from datetime import datetime, UTC, timedelta
+from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from logging import Logger
 from typing import (
-    Annotated,
-    AsyncGenerator,
     TYPE_CHECKING,
-    ClassVar,
-    Literal,
+    Annotated,
     Any,
-    TypeVar,
+    AsyncGenerator,
+    ClassVar,
     Generic,
+    TypeVar,
+    Literal,
 )
-from pydantic import AwareDatetime, BaseModel, Field
 
-from estuary_cdk.capture.common import (
+from estuary_cdk.flow import (
     AccessToken,
-    BaseDocument,
+    ClientCredentialsOAuth2Credentials,
     LongLivedClientCredentialsOAuth2Credentials,
     OAuth2Spec,
-    ResourceState,
 )
 from estuary_cdk.capture.common import (
+    BaseDocument,
+    ResourceState,
     ConnectorState as GenericConnectorState,
 )
-from .graphql.common import dt_to_str, str_to_dt
+from pydantic import AwareDatetime, BaseModel, Field, ConfigDict
 
+from .graphql.common import dt_to_str, str_to_dt
 
 # OAuth scopes requested during authorization.
 # These are verified against Shopify's GraphQL Admin API 2025-04 documentation.
@@ -81,6 +82,31 @@ else:
         OAUTH2_SPEC.provider
     )
 
+class ShopifyClientCredentials(ClientCredentialsOAuth2Credentials):
+    """Credentials for the Shopify client_credentials grant flow.
+
+    Used by Dev Dashboard custom apps (post-Jan 2026) where the app developer
+    and store owner are the same organization. The CDK's TokenSource exchanges
+    client_id + client_secret for a short-lived access token (~24 hours)
+    at runtime, with automatic refresh at 75% of the token lifetime.
+
+    Inherits client_id, client_secret, and grant_type="client_credentials"
+    from ClientCredentialsOAuth2Credentials / _BaseOAuth2CredentialsData.
+
+    References:
+        https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/client-credentials-grant
+    """
+    # This configuration provides a "title" annotation for the UI to display
+    # instead of the class name.
+    model_config = ConfigDict(
+        title="Client Credentials",
+    )
+
+    credentials_title: Literal["Client Credentials"] = Field(  # type: ignore[assignment]
+        default="Client Credentials",
+        json_schema_extra={"type": "string"},
+    )
+
 
 def default_start_date():
     dt = datetime.now(tz=UTC) - timedelta(days=30)
@@ -92,7 +118,7 @@ class EndpointConfig(BaseModel):
         title="Shopify Store",
         description="Shopify store ID. Use the prefix of your admin URL e.g. https://{YOUR_STORE}.myshopify.com/admin",
     )
-    credentials: AccessToken | OAuth2Credentials = Field(
+    credentials: AccessToken | ShopifyClientCredentials | OAuth2Credentials = Field(
         discriminator="credentials_title",
         title="Authentication",
     )
@@ -464,7 +490,7 @@ class BaseResponseData(BaseModel, Generic[TShopifyGraphQLResource]):
     def edges(self) -> list[Edge[TShopifyGraphQLResource]]:
         raise NotImplementedError("edges property must be implemented by subclass")
 
-    @property 
+    @property
     def page_info(self) -> PageInfo:
         raise NotImplementedError("page_info property must be implemented by subclass")
 
@@ -476,7 +502,9 @@ class BaseResponseData(BaseModel, Generic[TShopifyGraphQLResource]):
 # create_response_data_model dynamically creates a model for the data field of
 # each response. Models are created dynamically since the query root/field name
 # under the "data" field is different for each query.
-def create_response_data_model(resource_type: type[TShopifyGraphQLResource]) -> type[BaseResponseData[TShopifyGraphQLResource]]:
+def create_response_data_model(
+    resource_type: type[TShopifyGraphQLResource],
+) -> type[BaseResponseData[TShopifyGraphQLResource]]:
     """Factory function to create typed GraphQL data field models."""
     query_root = resource_type.QUERY_ROOT
 
