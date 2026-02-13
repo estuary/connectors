@@ -1,5 +1,56 @@
+import asyncio
+import traceback
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
+
+
+@dataclass
+class TaskInfo:
+    """Information about an asyncio task."""
+    task: asyncio.Task[Any]
+    task_name: str
+    coro_name: str
+    stack_trace: str
+
+
+def get_running_tasks_info(
+    exclude_tasks: set[asyncio.Task[Any]] | None = None,
+) -> list[TaskInfo]:
+    """
+    Returns information about all currently running asyncio tasks,
+    excluding any tasks in exclude_tasks and any completed tasks.
+    """
+    loop = asyncio.get_running_loop()
+    all_tasks = asyncio.all_tasks(loop)
+    exclude = exclude_tasks or set()
+
+    result = []
+    for task in all_tasks:
+        if task in exclude or task.done():
+            continue
+
+        task_name = task.get_name()
+        coro = task.get_coro()
+        coro_name = coro.__name__ if coro else "unknown"
+
+        frames = task.get_stack()
+        if frames:
+            summary = traceback.StackSummary.extract(
+                (frame, frame.f_lineno) for frame in frames
+            )
+            stack_trace = "".join(summary.format()).rstrip()
+        else:
+            stack_trace = "No stack available"
+
+        result.append(TaskInfo(
+            task=task,
+            task_name=task_name,
+            coro_name=coro_name,
+            stack_trace=stack_trace,
+        ))
+
+    return result
 
 
 def format_error_message(err: BaseException):
