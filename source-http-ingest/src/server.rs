@@ -1,4 +1,8 @@
-use crate::{transactor::Transactor, Binding, EndpointConfig};
+use crate::{
+    signature::{WebhookSignatureConfig, WebhookSignatureVerifier},
+    transactor::Transactor,
+    Binding, EndpointConfig,
+};
 
 use anyhow::Context;
 use axum::{
@@ -337,6 +341,7 @@ struct Handler {
     /// If an Authorization header is required, this will be the full expected value of that header,
     /// including the "Bearer " prefix.
     require_auth_header: Option<String>,
+    signature_verifier: Box<dyn WebhookSignatureVerifier>,
     /// Map of http url path (without the leading slash) to the handler for that collection.
     handlers_by_path: Mutex<HashMap<String, CollectionHandler>>,
     io: Transactor,
@@ -374,6 +379,15 @@ impl Handler {
             );
         }
 
+        if matches!(
+            &endpoint_config.signature_config,
+            WebhookSignatureConfig::None {}
+        ) {
+            tracing::info!("signature verification is disabled, allowing unsigned writes");
+        }
+        let signature_verifier: Box<dyn WebhookSignatureVerifier> =
+            endpoint_config.signature_config.try_into()?;
+
         // Pre-format the expected auth header, to make checking requests easier.
         let require_auth_header = endpoint_config
             .require_auth_token
@@ -386,6 +400,7 @@ impl Handler {
 
         Ok(Handler {
             handlers_by_path: Mutex::new(collections_by_path),
+            signature_verifier,
             io,
             require_auth_header,
         })
@@ -414,6 +429,13 @@ impl Handler {
                 }
             }
         }
+
+        let body = match self.signature_verifier.verify(&request_headers, body) {
+            Ok(b) => b,
+            Err(err) => {
+                return Ok(err_response(StatusCode::UNAUTHORIZED, err, matched_path));
+            }
+        };
 
         let parse_result = if body.trim_ascii_start().starts_with(b"[") {
             serde_json::from_slice::<Vec<JsonObj>>(&body).map(JsonBody::Array)
@@ -745,6 +767,7 @@ mod test {
             require_auth_token: Some("testToken".to_string()),
             paths: Vec::new(),
             allowed_cors_origins: Vec::new(),
+            signature_config: WebhookSignatureConfig::default(),
         };
         let binding0 = Binding {
             collection: serde_json::from_value(serde_json::json!({

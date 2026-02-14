@@ -9,9 +9,9 @@ expression: schema
   "properties": {
     "allowedCorsOrigins": {
       "title": "CORS Allowed Origins",
-      "description": "List of allowed CORS origins. If empty, then CORS will be disabled. Otherwise, each item in the list will be interpreted as a specific request origin that will be permitted by the `Access-Control-Allow-Origin` header for preflight requests coming from that origin. As a special case, the value `*` is permitted in order to allow all origins. The `*` should be used with extreme caution, however. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin",
-      "default": [],
+      "description": "List of allowed CORS origins. If empty, then CORS will be disabled. Otherwise, each item\nin the list will be interpreted as a specific request origin that will be permitted by the\n`Access-Control-Allow-Origin` header for preflight requests coming from that origin. As a special\ncase, the value `*` is permitted in order to allow all origins. The `*` should be used with extreme\ncaution, however. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin",
       "type": "array",
+      "default": [],
       "items": {
         "type": "string"
       },
@@ -19,11 +19,11 @@ expression: schema
     },
     "paths": {
       "title": "URL paths",
-      "description": "List of URL paths to accept requests at.\n\nDiscovery will return a separate collection for each given path. Paths must be provided without any percent encoding, and should not include any query parameters or fragment.\n\nPaths can include path parameters, following the syntax of OpenAPI path templating. For example, `/vendors/{vendorId}/products/{productId}`, which would accept a request to `/vendors/abc/products/123`. This would result in captured data with `\"_meta\": { \"pathParams\": { \"vendorId\": \"abc\", \"productId\": \"123\"}, ...}`",
+      "description": "List of URL paths to accept requests at.\n\nDiscovery will return a separate collection for each given path. Paths\nmust be provided without any percent encoding, and should not include\nany query parameters or fragment.\n\nPaths can include path parameters, following the syntax of OpenAPI path\ntemplating. For example, `/vendors/{vendorId}/products/{productId}`,\nwhich would accept a request to `/vendors/abc/products/123`. This would\nresult in captured data with\n`\"_meta\": { \"pathParams\": { \"vendorId\": \"abc\", \"productId\": \"123\"}, ...}`",
+      "type": "array",
       "default": [
         "/webhook-data"
       ],
-      "type": "array",
       "items": {
         "type": "string",
         "pattern": "/.+"
@@ -32,14 +32,129 @@ expression: schema
     },
     "requireAuthToken": {
       "title": "Authentication token",
-      "description": "Optional bearer token to authenticate webhook requests.\n\nWARNING: If this is empty or unset, then anyone who knows the URL of the connector will be able to write data to your collections.",
-      "default": null,
+      "description": "Optional bearer token to authenticate webhook requests.\n\nWARNING: If this is empty or unset, then anyone who knows the URL of the connector\nwill be able to write data to your collections.",
       "type": [
         "string",
         "null"
       ],
+      "default": null,
       "order": 2,
       "secret": true
+    },
+    "signatureConfig": {
+      "title": "Signature Verification",
+      "description": "Configuration for verifying webhook signatures.\nIf set, incoming requests must include valid signature headers.",
+      "type": "object",
+      "default": {
+        "provider": "none"
+      },
+      "discriminator": {
+        "propertyName": "provider"
+      },
+      "oneOf": [
+        {
+          "title": "None",
+          "properties": {
+            "provider": {
+              "type": "string",
+              "const": "none",
+              "default": "none",
+              "order": 0
+            }
+          },
+          "required": [
+            "provider"
+          ]
+        },
+        {
+          "title": "Twilio SendGrid",
+          "properties": {
+            "maxSignatureAge": {
+              "title": "Max Signature Age",
+              "description": "Maximum age of a signed request in seconds before it is rejected. Defaults to 300 (5 minutes).",
+              "type": "integer",
+              "default": 300,
+              "maximum": 259200,
+              "minimum": 1,
+              "order": 2
+            },
+            "provider": {
+              "type": "string",
+              "const": "twilio",
+              "default": "twilio",
+              "order": 0
+            },
+            "publicKey": {
+              "title": "Public Key",
+              "description": "PEM-encoded ECDSA public key from Twilio SendGrid Event Webhook settings.",
+              "type": "string",
+              "multiline": true,
+              "order": 1,
+              "secret": true
+            }
+          },
+          "required": [
+            "provider",
+            "publicKey"
+          ]
+        },
+        {
+          "title": "Custom",
+          "properties": {
+            "algorithm": {
+              "title": "Algorithm",
+              "type": "string",
+              "default": "ecdsa",
+              "enum": [
+                "ecdsa"
+              ],
+              "order": 1
+            },
+            "maxSignatureAge": {
+              "title": "Max Signature Age",
+              "description": "Maximum age of a signed request in seconds before it is rejected. Only applies when a Timestamp Header is configured. Defaults to 300 (5 minutes).",
+              "type": "integer",
+              "default": 300,
+              "maximum": 259200,
+              "minimum": 1,
+              "order": 5
+            },
+            "provider": {
+              "type": "string",
+              "const": "custom",
+              "default": "custom",
+              "order": 0
+            },
+            "publicKey": {
+              "title": "Public Key",
+              "description": "PEM-encoded public key.",
+              "type": "string",
+              "multiline": true,
+              "order": 2,
+              "secret": true
+            },
+            "signatureHeader": {
+              "title": "Signature Header",
+              "description": "HTTP header containing the base64-encoded signature.",
+              "type": "string",
+              "order": 3
+            },
+            "timestampHeader": {
+              "title": "Timestamp Header",
+              "description": "Optional HTTP header containing the timestamp.",
+              "type": "string",
+              "order": 4
+            }
+          },
+          "required": [
+            "provider",
+            "algorithm",
+            "publicKey",
+            "signatureHeader"
+          ]
+        }
+      ],
+      "order": 4
     }
   }
 }
