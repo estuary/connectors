@@ -229,12 +229,6 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, recov
 		return fmt.Errorf("unknown channel %s", channelName)
 	}
 
-	// This can happen if a table is dropped after blobs have already been
-	// written.
-	if blobs[0].Chunks[0].EncryptionKeyID != thisChannel.EncryptionKeyId {
-		return fmt.Errorf("channel encryption key has changed; backfill required")
-	}
-
 	for _, blob := range blobs {
 		blobToken := blob.Chunks[0].Channels[0].OffsetToken
 		currentChannelToken := thisChannel.OffsetToken
