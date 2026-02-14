@@ -17,7 +17,7 @@ from .common import (
     braintree_xml_to_dict,
     process_completed_fetches,
     search_limit_error_message,
-    reduce_window_end,
+    bisect_window,
 )
 from ..models import (
     IncrementalResource,
@@ -99,7 +99,7 @@ async def determine_next_searchable_resource_window_end_by_field(
         if len(ids) < search_limit:
             break
 
-        end = reduce_window_end(start, end)
+        end = bisect_window(start, end)
 
     return end
 
