@@ -229,10 +229,6 @@ type transactor struct {
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
 	version string
-
-	// If this is still the recovery (first after startup) commit, where special
-	// handling may be needed for registering streaming files.
-	didRecovery bool
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -560,14 +556,13 @@ func (d *transactor) pipeExists(ctx context.Context, pipeName string) (bool, err
 }
 
 type checkpointItem struct {
-	Table         string
-	Query         string
-	StagedDir     string
-	StreamBlobs   []*blobMetadata
-	PipeName      string
-	PipeFiles     []fileRecord
-	Version       string
-	EncryptionKey string
+	Table       string
+	Query       string
+	StagedDir   string
+	StreamBlobs []*blobMetadata
+	PipeName    string
+	PipeFiles   []fileRecord
+	Version     string
 }
 
 type checkpoint = map[string]*checkpointItem
@@ -621,7 +616,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (json.RawMessage, error) {
 	streamBlobs := make(map[int][]*blobMetadata)
-	keys := make(map[int]string)
 	if d.streamManager != nil {
 		// The "base token" only really needs to be sufficiently random that it
 		// doesn't collide with the prior or next transaction's value. Deriving
@@ -629,7 +623,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 		// convenient to make testing outputs consistent.
 		if mcp, err := runtimeCheckpoint.Marshal(); err != nil {
 			return nil, fmt.Errorf("marshalling checkpoint: %w", err)
-		} else if streamBlobs, keys, err = d.streamManager.flush(fmt.Sprintf("%016x", xxhash.Sum64(mcp))); err != nil {
+		} else if streamBlobs, err = d.streamManager.flush(fmt.Sprintf("%016x", xxhash.Sum64(mcp))); err != nil {
 			return nil, fmt.Errorf("flushing stream manager: %w", err)
 		}
 	}
@@ -638,8 +632,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 		if b.streaming {
 			if blobs, ok := streamBlobs[idx]; ok {
 				d.cp[b.target.StateKey] = &checkpointItem{
-					StreamBlobs:   blobs,
-					EncryptionKey: keys[idx],
+					StreamBlobs: blobs,
 				}
 			}
 			continue
@@ -802,10 +795,6 @@ func (d *transactor) copyHistory(ctx context.Context, tableName string, fileName
 
 // Acknowledge merges data from temporary table to main table
 func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	defer func() {
-		d.didRecovery = true
-	}()
-
 	// Run store queries concurrently, as each independently operates on a separate table.
 	group, groupCtx := errgroup.WithContext(ctx)
 	group.SetLimit(MaxConcurrentQueries)
@@ -840,7 +829,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		} else if len(item.StreamBlobs) > 0 {
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
-				if err := d.streamManager.write(groupCtx, item.StreamBlobs, item.EncryptionKey, !d.didRecovery); err != nil {
+				if err := d.streamManager.write(groupCtx, item.StreamBlobs); err != nil {
 					return fmt.Errorf("writing streaming blobs for %s: %w", path, err)
 				}
 				d.be.FinishedResourceCommit(path)
