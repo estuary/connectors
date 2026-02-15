@@ -17,3 +17,6 @@ $SED_CMD -i'' 's/"last_insert_time_in_ms": [0-9]\+/"last_insert_time_in_ms": "<l
 $SED_CMD -i'' 's/"flush_start_ms": [0-9]\+/"flush_start_ms": "<flush_start_ms>"/g' ${SNAPSHOT}
 $SED_CMD -i'' 's/"build_duration_ms": [0-9]\+/"build_duration_ms": "<build_duration_ms>"/g' ${SNAPSHOT}
 $SED_CMD -i'' 's/"upload_duration_ms": [0-9]\+/"upload_duration_ms": "<upload_duration_ms>"/g' ${SNAPSHOT}
+# Replace transient staging table names (FLOW_STAGING_INSERT_<idx>_<uuid> and FLOW_STAGING_MERGE_<idx>_<uuid>)
+$SED_CMD -i'' 's/FLOW_STAGING_INSERT_[0-9]\+_[a-f0-9_]\{36\}/FLOW_STAGING_INSERT_<binding>_<uuid>/g' ${SNAPSHOT}
+$SED_CMD -i'' 's/FLOW_STAGING_MERGE_[0-9]\+_[a-f0-9_]\{36\}/FLOW_STAGING_MERGE_<binding>_<uuid>/g' ${SNAPSHOT}

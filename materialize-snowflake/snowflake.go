@@ -326,11 +326,16 @@ type binding struct {
 	}
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
-		stage       *stagedFile
-		mergeInto   string
-		copyInto    string
-		mustMerge   bool
-		mergeBounds *sql.MergeBoundsBuilder
+		insertStage             *stagedFile // For rows where !it.Exists (new rows)
+		mergeStage              *stagedFile // For rows where it.Exists (existing rows)
+		hasInserts              bool        // Track if we have insert operations
+		hasMerges               bool        // Track if we have merge operations
+		mergeInto               string
+		copyInto                string
+		mustMerge               bool   // Deprecated: use hasMerges instead
+		mergeBounds             *sql.MergeBoundsBuilder
+		mergeStagingTable       string // Persistent staging table for merges (created in Store)
+		mergeStagingTableExists bool   // Track if persistent merge table exists
 	}
 }
 
@@ -365,7 +370,8 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	}
 
 	b.load.stage = newStagedFile(os.TempDir())
-	b.store.stage = newStagedFile(os.TempDir())
+	b.store.insertStage = newStagedFile(os.TempDir())
+	b.store.mergeStage = newStagedFile(os.TempDir())
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT {
 		var keyBegin = fmt.Sprintf("%08x", d._range.KeyBegin)
@@ -557,8 +563,14 @@ func (d *transactor) pipeExists(ctx context.Context, pipeName string) (bool, err
 
 type checkpointItem struct {
 	Table       string
-	Query       string
-	StagedDir   string
+	Query       string // Deprecated: use InsertQuery/MergeQuery for new code
+	InsertQuery string // Query for insert operations (from insertStage)
+	MergeQuery  string // Query for merge operations (from mergeStage)
+	StagedDir   string // Deprecated: use InsertStagedDir/MergeStagedDir
+	InsertStagedDir string // Staged directory for inserts
+	MergeStagedDir  string // Staged directory for merges
+	MergeStagingTablePersistent string // Persistent staging table name for merges (reused across transactions)
+	MergeStagingTableExists     bool   // Track if persistent staging table is created
 	StreamBlobs []*blobMetadata
 	PipeName    string
 	PipeFiles   []fileRecord
@@ -579,12 +591,21 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			continue
 		}
 
+		// Route to appropriate stage based on whether key was loaded
+		var targetStage *stagedFile
 		if it.Exists {
-			b.store.mustMerge = true
+			// Key was loaded, so it exists - this is an UPDATE or DELETE
+			targetStage = b.store.mergeStage
+			b.store.hasMerges = true
+			b.store.mustMerge = true // Keep for backward compatibility
+		} else {
+			// Key was not loaded, so it doesn't exist - this is an INSERT
+			targetStage = b.store.insertStage
+			b.store.hasInserts = true
 		}
 
 		if !b.streaming {
-			if err := b.store.stage.start(ctx, d.db); err != nil {
+			if err := targetStage.start(ctx, d.db); err != nil {
 				return nil, err
 			}
 		}
@@ -594,14 +615,102 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			if err := d.streamManager.writeRow(ctx, it.Binding, converted); err != nil {
 				return nil, fmt.Errorf("encoding Store to stream for resource %s: %w", b.target.Path, err)
 			}
-		} else if err = b.store.stage.writeRow(append(converted, flowDelete)); err != nil {
+		} else if err = targetStage.writeRow(append(converted, flowDelete)); err != nil {
 			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
 		} else {
-			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
+			// Only track merge bounds for rows that will be merged
+			if it.Exists {
+				b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
+			}
 		}
 	}
 	if it.Err() != nil {
 		return nil, it.Err()
+	}
+
+	// Create/prepare staging tables for bindings that need them
+	for idx, b := range d.bindings {
+		if b.streaming {
+			continue
+		}
+
+		// Handle MERGE staging tables (persistent, reusable)
+		if b.store.hasMerges {
+			tableName := b.target.Path[len(b.target.Path)-1]
+			mergeStagingTable := fmt.Sprintf("%s.FLOW_STAGING_MERGE_%d_%s",
+				d.cfg.Schema, idx, sanitizeAndAppendHash(tableName))
+
+			prevItem, hasPrev := d.cp[b.target.StateKey]
+			var needsCreation bool
+
+			if !hasPrev || !prevItem.MergeStagingTableExists {
+				// First time: need to CREATE
+				needsCreation = true
+			} else if prevItem.Version != d.version {
+				// Schema changed: DROP old + CREATE new
+				needsCreation = true
+				log.WithFields(log.Fields{
+					"table":        b.target.Identifier,
+					"oldVersion":   prevItem.Version,
+					"newVersion":   d.version,
+					"stagingTable": prevItem.MergeStagingTablePersistent,
+				}).Info("schema version changed, recreating merge staging table")
+				dropSQL := fmt.Sprintf("DROP TABLE IF EXISTS %s", prevItem.MergeStagingTablePersistent)
+				if _, err := d.db.ExecContext(ctx, dropSQL); err != nil {
+					return nil, fmt.Errorf("dropping old merge staging table: %w", err)
+				}
+			}
+
+			if needsCreation {
+				// CREATE path: Create table if it doesn't exist, then truncate to ensure it's empty
+				createSQL, err := renderCreateTransientTable(b.target, mergeStagingTable, d.templates.createTransientTable)
+				if err != nil {
+					return nil, fmt.Errorf("renderCreateTransientTable for merges: %w", err)
+				}
+				if _, err := d.db.ExecContext(ctx, createSQL); err != nil {
+					return nil, fmt.Errorf("creating merge staging table: %w", err)
+				}
+
+				// Always truncate after create to handle migration case where table already existed
+				truncateSQL, err := renderTruncateTransient(mergeStagingTable, d.templates.truncateTransient)
+				if err != nil {
+					return nil, fmt.Errorf("renderTruncateTransient: %w", err)
+				}
+				if _, err := d.db.ExecContext(ctx, truncateSQL); err != nil {
+					return nil, fmt.Errorf("truncating merge staging table after create: %w", err)
+				}
+
+				b.store.mergeStagingTableExists = true
+			} else {
+				// TRUNCATE path (table exists and version matches)
+				truncateSQL, err := renderTruncateTransient(mergeStagingTable, d.templates.truncateTransient)
+				if err != nil {
+					return nil, fmt.Errorf("renderTruncateTransient: %w", err)
+				}
+				if _, err := d.db.ExecContext(ctx, truncateSQL); err != nil {
+					// Check if table was manually deleted
+					if isTableNotFoundError(err) {
+						log.WithFields(log.Fields{
+							"table": mergeStagingTable,
+						}).Warn("merge staging table was manually deleted, recreating")
+						// Recreate the table
+						createSQL, err := renderCreateTransientTable(b.target, mergeStagingTable, d.templates.createTransientTable)
+						if err != nil {
+							return nil, fmt.Errorf("renderCreateTransientTable for merges: %w", err)
+						}
+						if _, err := d.db.ExecContext(ctx, createSQL); err != nil {
+							return nil, fmt.Errorf("creating merge staging table after manual deletion: %w", err)
+						}
+						// No need to truncate a freshly created table
+					} else {
+						return nil, fmt.Errorf("truncating merge staging table: %w", err)
+					}
+				}
+				b.store.mergeStagingTableExists = true
+			}
+
+			b.store.mergeStagingTable = mergeStagingTable
+		}
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
@@ -638,37 +747,84 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 			continue
 		}
 
-		if !b.store.stage.started {
+		// Skip if neither stage has data
+		if !b.store.insertStage.started && !b.store.mergeStage.started {
 			continue
 		}
 
-		dir, err := b.store.stage.flush()
-		if err != nil {
-			return nil, err
+		var cpItem = &checkpointItem{
+			Table:   b.target.Identifier,
+			Version: d.version,
 		}
 
-		if b.store.mustMerge {
-			mergeIntoQuery, err := renderBoundedQueryTemplate(d.templates.mergeInto, b.target, dir, b.store.mergeBounds.Build())
+		// Handle INSERT operations (new rows)
+		if b.store.hasInserts && b.store.insertStage.started {
+			insertDir, err := b.store.insertStage.flush()
 			if err != nil {
-				return nil, fmt.Errorf("mergeInto template: %w", err)
+				return nil, fmt.Errorf("flushing insert stage: %w", err)
 			}
-			d.cp[b.target.StateKey] = &checkpointItem{
-				Table:     b.target.Identifier,
-				Query:     mergeIntoQuery,
-				StagedDir: dir,
-				Version:   d.version,
+
+			if b.pipeName != "" {
+				// Snowpipe for inserts
+				cpItem.InsertStagedDir = insertDir
+				cpItem.PipeFiles = b.store.insertStage.uploaded
+				cpItem.PipeName = b.pipeName
+			} else {
+				// Direct COPY INTO target table (no staging table needed for inserts)
+				copySQL, err := renderTableAndFileTemplate(b.target, insertDir, d.templates.copyInto)
+				if err != nil {
+					return nil, fmt.Errorf("copyInto template for inserts: %w", err)
+				}
+
+				cpItem.InsertQuery = copySQL
+				cpItem.InsertStagedDir = insertDir
 			}
-			// Reset for next round.
-			b.store.mustMerge = false
-		} else if b.pipeName != "" {
+		}
+
+		// Handle MERGE operations (existing rows - updates/deletes)
+		if b.store.hasMerges && b.store.mergeStage.started {
+			mergeDir, err := b.store.mergeStage.flush()
+			if err != nil {
+				return nil, fmt.Errorf("flushing merge stage: %w", err)
+			}
+
+			// Use staging table created/truncated during Store
+			copySQL, err := renderCopyIntoTransient(
+				b.target,
+				b.store.mergeStagingTable,
+				mergeDir,
+				d.templates.copyIntoTransient,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("copyIntoTransient template for merges: %w", err)
+			}
+
+			mergeSQL, err := renderMergeFromTransient(
+				b.target,
+				b.store.mergeStagingTable,
+				b.store.mergeBounds.Build(),
+				d.templates.mergeFromTransient,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("mergeFromTransient template: %w", err)
+			}
+
+			// Build query: COPY + MERGE
+			cpItem.MergeQuery = fmt.Sprintf("%s\n%s", copySQL, mergeSQL)
+			cpItem.MergeStagedDir = mergeDir
+			cpItem.MergeStagingTablePersistent = b.store.mergeStagingTable
+			cpItem.MergeStagingTableExists = b.store.mergeStagingTableExists
+		}
+
+		// Handle Snowpipe creation if needed
+		if b.pipeName != "" && (b.store.hasInserts || b.store.hasMerges) {
 			// Check to see if a pipe for this version already exists
 			exists, err := d.pipeExists(ctx, b.pipeName)
 			if err != nil {
 				return nil, err
 			}
 
-			// Only create the pipe if it doesn't exist. Since the pipe name is versioned by the spec
-			// it means if the spec has been updated, we will end up creating a new pipe
+			// Only create the pipe if it doesn't exist
 			if !exists {
 				log.WithField("name", b.pipeName).Info("store: creating pipe")
 				if createPipe, err := renderTablePipeTemplate(b.target, b.pipeName, d.templates.createPipe); err != nil {
@@ -678,8 +834,7 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 				}
 			}
 
-			// Our understanding is that CREATE PIPE is _eventually consistent_, and so we
-			// wait until we can make sure the pipe exists before continuing
+			// Wait for pipe to be eventually consistent
 			for !exists {
 				exists, err = d.pipeExists(ctx, b.pipeName)
 				if err != nil {
@@ -689,25 +844,15 @@ func (d *transactor) buildDriverCheckpoint(ctx context.Context, runtimeCheckpoin
 					time.Sleep(5 * time.Second)
 				}
 			}
+		}
 
-			d.cp[b.target.StateKey] = &checkpointItem{
-				Table:     b.target.Identifier,
-				StagedDir: dir,
-				PipeFiles: b.store.stage.uploaded,
-				PipeName:  b.pipeName,
-				Version:   d.version,
-			}
-
-		} else {
-			if copyIntoQuery, err := renderTableAndFileTemplate(b.target, dir, d.templates.copyInto); err != nil {
-				return nil, fmt.Errorf("copyInto template: %w", err)
-			} else {
-				d.cp[b.target.StateKey] = &checkpointItem{
-					Table:     b.target.Identifier,
-					Query:     copyIntoQuery,
-					StagedDir: dir,
-				}
-			}
+		// Store checkpoint item if we have any operations
+		if cpItem.InsertQuery != "" || cpItem.MergeQuery != "" || cpItem.PipeName != "" {
+			d.cp[b.target.StateKey] = cpItem
+			// Reset flags for next transaction
+			b.store.hasInserts = false
+			b.store.hasMerges = false
+			b.store.mustMerge = false
 		}
 	}
 
@@ -808,15 +953,106 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 			continue
 		}
 
+		// Execute INSERT query if present
+		if len(item.InsertQuery) > 0 {
+			item := item
+			group.Go(func() error {
+				d.be.StartedResourceCommit(path)
+
+				queryStart := time.Now()
+				result, err := d.db.ExecContext(ctx, item.InsertQuery)
+				queryDuration := time.Since(queryStart)
+
+				if err != nil {
+					return fmt.Errorf("insert query failed: %w", err)
+				}
+
+				// Log performance metrics for performance test tables
+				if strings.HasPrefix(item.Table, "perf_") {
+					rowsAffected, _ := result.RowsAffected()
+					log.WithFields(log.Fields{
+						"perf_query_duration_ms": queryDuration.Milliseconds(),
+						"perf_rows_affected":     rowsAffected,
+						"perf_table":             item.Table,
+						"perf_query_type":        "INSERT",
+					}).Info("SNOWFLAKE_PERF_METRIC")
+				}
+
+				d.be.FinishedResourceCommit(path)
+				if err := d.deleteFiles(groupCtx, []string{item.InsertStagedDir}); err != nil {
+					return fmt.Errorf("cleaning up insert files: %w", err)
+				}
+
+				return nil
+			})
+		}
+
+		// Execute MERGE query if present
+		if len(item.MergeQuery) > 0 {
+			item := item
+			group.Go(func() error {
+				d.be.StartedResourceCommit(path)
+
+				queryStart := time.Now()
+				result, err := d.db.ExecContext(ctx, item.MergeQuery)
+				queryDuration := time.Since(queryStart)
+
+				if err != nil {
+					// Check if error is "table doesn't exist" (indicates manual deletion)
+					if isTableNotFoundError(err) && item.MergeStagingTableExists {
+						log.WithFields(log.Fields{
+							"table":        item.MergeStagingTablePersistent,
+							"error":        err,
+							"stateKey":     stateKey,
+						}).Warn("merge staging table was manually deleted; will recreate on next schema change or connector restart")
+					}
+					// DO NOT cleanup persistent staging table on failure
+					// It will be cleaned up on next success via TRUNCATE
+					return fmt.Errorf("merge query failed: %w", err)
+				}
+
+				// Log performance metrics for performance test tables
+				if strings.HasPrefix(item.Table, "perf_") {
+					rowsAffected, _ := result.RowsAffected()
+					log.WithFields(log.Fields{
+						"perf_query_duration_ms": queryDuration.Milliseconds(),
+						"perf_rows_affected":     rowsAffected,
+						"perf_table":             item.Table,
+						"perf_query_type":        "MERGE",
+					}).Info("SNOWFLAKE_PERF_METRIC")
+				}
+
+				d.be.FinishedResourceCommit(path)
+				if err := d.deleteFiles(groupCtx, []string{item.MergeStagedDir}); err != nil {
+					return fmt.Errorf("cleaning up merge files: %w", err)
+				}
+
+				return nil
+			})
+		}
+
+		// Legacy: Handle old Query field for backward compatibility
 		if len(item.Query) > 0 {
 			item := item
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
-				// NB: Not using groupTx here since the Go Snowflake driver
-				// retains contexts internally, and groupCtx is cancelled after
-				// group.Wait() returns.
-				if _, err := d.db.ExecContext(ctx, item.Query); err != nil {
+
+				queryStart := time.Now()
+				result, err := d.db.ExecContext(ctx, item.Query)
+				queryDuration := time.Since(queryStart)
+
+				if err != nil {
 					return fmt.Errorf("query %q failed: %w", item.Query, err)
+				}
+
+				// Log performance metrics for performance test tables
+				if strings.HasPrefix(item.Table, "perf_") {
+					rowsAffected, _ := result.RowsAffected()
+					log.WithFields(log.Fields{
+						"perf_query_duration_ms": queryDuration.Milliseconds(),
+						"perf_rows_affected":     rowsAffected,
+						"perf_table":             item.Table,
+					}).Info("SNOWFLAKE_PERF_METRIC")
 				}
 
 				d.be.FinishedResourceCommit(path)
@@ -826,7 +1062,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 				return nil
 			})
-		} else if len(item.StreamBlobs) > 0 {
+		}
+
+		if len(item.StreamBlobs) > 0 {
 			group.Go(func() error {
 				d.be.StartedResourceCommit(path)
 				if err := d.streamManager.write(groupCtx, item.StreamBlobs); err != nil {
@@ -1046,6 +1284,30 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	}
 
 	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON), MergePatch: true}, nil
+}
+
+// Check if error indicates table doesn't exist
+func isTableNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	// Snowflake error codes for table not found
+	return strings.Contains(errStr, "002003") || // SQL compilation error: object does not exist
+		strings.Contains(errStr, "does not exist or not authorized")
+}
+
+// Best-effort cleanup of transient staging tables on error
+func (d *transactor) cleanupTransientTable(ctx context.Context, tableName string) {
+	if tableName == "" {
+		return
+	}
+	dropSQL := fmt.Sprintf("DROP TABLE IF EXISTS %s", tableName)
+	if _, err := d.db.ExecContext(ctx, dropSQL); err != nil {
+		log.WithError(err).WithField("table", tableName).Warn("failed to cleanup transient staging table")
+	} else {
+		log.WithField("table", tableName).Debug("cleaned up transient staging table")
+	}
 }
 
 func (d *transactor) pathForStateKey(stateKey string) []string {

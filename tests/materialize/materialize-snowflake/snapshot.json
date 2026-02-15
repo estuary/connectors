@@ -15,44 +15,74 @@
     "updated": {
       "all_key_types_part_one": {
         "Table": "all_key_types_part_one",
-        "Query": "\nCOPY INTO all_key_types_part_one (\n\tid, strintkey, strnumkey, counter, flow_published_at, strint, strnum\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS strintkey, $1[2] AS strnumkey, $1[3] AS counter, $1[4] AS flow_published_at, $1[5] AS strint, $1[6] AS strnum\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO all_key_types_part_one (\n\tid, strintkey, strnumkey, counter, flow_published_at, strint, strnum\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS strintkey, $1[2] AS strnumkey, $1[3] AS counter, $1[4] AS flow_published_at, $1[5] AS strint, $1[6] AS strnum\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "all_key_types_part_three": {
         "Table": "all_key_types_part_three",
-        "Query": "\nCOPY INTO all_key_types_part_three (\n\tid, datetimekey, uuidkey, counter, datetime, flow_published_at, uuid\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS datetimekey, $1[2] AS uuidkey, $1[3] AS counter, $1[4] AS datetime, $1[5] AS flow_published_at, $1[6] AS uuid\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO all_key_types_part_three (\n\tid, datetimekey, uuidkey, counter, datetime, flow_published_at, uuid\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS datetimekey, $1[2] AS uuidkey, $1[3] AS counter, $1[4] AS datetime, $1[5] AS flow_published_at, $1[6] AS uuid\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "all_key_types_part_two": {
         "Table": "all_key_types_part_two",
-        "Query": "\nCOPY INTO all_key_types_part_two (\n\tid, datekey, timekey, counter, date, flow_published_at, time\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS datekey, $1[2] AS timekey, $1[3] AS counter, $1[4] AS date, $1[5] AS flow_published_at, $1[6] AS time\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO all_key_types_part_two (\n\tid, datekey, timekey, counter, date, flow_published_at, time\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS datekey, $1[2] AS timekey, $1[3] AS counter, $1[4] AS date, $1[5] AS flow_published_at, $1[6] AS time\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "deletions": {
         "Table": "deletions",
-        "Query": "\nCOPY INTO deletions (\n\tid, \"_meta/op\", flow_published_at\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS \"_meta/op\", $1[2] AS flow_published_at\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO deletions (\n\tid, \"_meta/op\", flow_published_at\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS \"_meta/op\", $1[2] AS flow_published_at\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "duplicate%20keys%20%40%20with%20spaces": {
         "Table": "",
         "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "",
         "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": [
           {
             "path": "<path>",
@@ -159,7 +189,13 @@
       "duplicate_keys_delta": {
         "Table": "",
         "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "",
         "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": [
           {
             "path": "<path>",
@@ -266,7 +302,13 @@
       "duplicate_keys_delta_exclude_flow_doc": {
         "Table": "",
         "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "",
         "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": [
           {
             "path": "<path>",
@@ -372,80 +414,134 @@
       },
       "duplicate_keys_standard": {
         "Table": "duplicate_keys_standard",
-        "Query": "\nCOPY INTO duplicate_keys_standard (\n\tid, flow_published_at, int, str\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO duplicate_keys_standard (\n\tid, flow_published_at, int, str\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "fields_with_projections": {
         "Table": "fields_with_projections",
-        "Query": "\nCOPY INTO fields_with_projections (\n\tid, another_field, flow_published_at, projected_another, projected_field\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS another_field, $1[2] AS flow_published_at, $1[3] AS projected_another, $1[4] AS projected_field\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO fields_with_projections (\n\tid, another_field, flow_published_at, projected_another, projected_field\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS another_field, $1[2] AS flow_published_at, $1[3] AS projected_another, $1[4] AS projected_field\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "formatted_strings": {
         "Table": "formatted_strings",
-        "Query": "\nCOPY INTO formatted_strings (\n\tid, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS date, $1[2] AS datetime, $1[3] AS flow_published_at, $1[4] AS int_and_str, $1[5] AS int_str, $1[6] AS num_and_str, $1[7] AS num_str, $1[8] AS time\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO formatted_strings (\n\tid, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS date, $1[2] AS datetime, $1[3] AS flow_published_at, $1[4] AS int_and_str, $1[5] AS int_str, $1[6] AS num_and_str, $1[7] AS num_str, $1[8] AS time\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "many_columns": {
         "Table": "many_columns",
-        "Query": "\nCOPY INTO many_columns (\n\tid, a0, a1, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a2, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a3, a30, a31, a32, a33, a34, a35, a36, a37, a38, a39, a4, a40, a41, a42, a43, a44, a45, a46, a47, a48, a49, a5, a50, a51, a52, a53, a54, a55, a56, a57, a58, a59, a6, a60, a61, a62, a63, a64, a65, a66, a67, a68, a69, a7, a70, a71, a72, a73, a74, a75, a76, a77, a78, a79, a8, a80, a81, a82, a83, a84, a85, a86, a87, a88, a89, a9, a90, a91, a92, a93, a94, a95, a96, a97, a98, a99, flow_published_at\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS a0, $1[2] AS a1, $1[3] AS a10, $1[4] AS a11, $1[5] AS a12, $1[6] AS a13, $1[7] AS a14, $1[8] AS a15, $1[9] AS a16, $1[10] AS a17, $1[11] AS a18, $1[12] AS a19, $1[13] AS a2, $1[14] AS a20, $1[15] AS a21, $1[16] AS a22, $1[17] AS a23, $1[18] AS a24, $1[19] AS a25, $1[20] AS a26, $1[21] AS a27, $1[22] AS a28, $1[23] AS a29, $1[24] AS a3, $1[25] AS a30, $1[26] AS a31, $1[27] AS a32, $1[28] AS a33, $1[29] AS a34, $1[30] AS a35, $1[31] AS a36, $1[32] AS a37, $1[33] AS a38, $1[34] AS a39, $1[35] AS a4, $1[36] AS a40, $1[37] AS a41, $1[38] AS a42, $1[39] AS a43, $1[40] AS a44, $1[41] AS a45, $1[42] AS a46, $1[43] AS a47, $1[44] AS a48, $1[45] AS a49, $1[46] AS a5, $1[47] AS a50, $1[48] AS a51, $1[49] AS a52, $1[50] AS a53, $1[51] AS a54, $1[52] AS a55, $1[53] AS a56, $1[54] AS a57, $1[55] AS a58, $1[56] AS a59, $1[57] AS a6, $1[58] AS a60, $1[59] AS a61, $1[60] AS a62, $1[61] AS a63, $1[62] AS a64, $1[63] AS a65, $1[64] AS a66, $1[65] AS a67, $1[66] AS a68, $1[67] AS a69, $1[68] AS a7, $1[69] AS a70, $1[70] AS a71, $1[71] AS a72, $1[72] AS a73, $1[73] AS a74, $1[74] AS a75, $1[75] AS a76, $1[76] AS a77, $1[77] AS a78, $1[78] AS a79, $1[79] AS a8, $1[80] AS a80, $1[81] AS a81, $1[82] AS a82, $1[83] AS a83, $1[84] AS a84, $1[85] AS a85, $1[86] AS a86, $1[87] AS a87, $1[88] AS a88, $1[89] AS a89, $1[90] AS a9, $1[91] AS a90, $1[92] AS a91, $1[93] AS a92, $1[94] AS a93, $1[95] AS a94, $1[96] AS a95, $1[97] AS a96, $1[98] AS a97, $1[99] AS a98, $1[100] AS a99, $1[101] AS flow_published_at\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO many_columns (\n\tid, a0, a1, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a2, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a3, a30, a31, a32, a33, a34, a35, a36, a37, a38, a39, a4, a40, a41, a42, a43, a44, a45, a46, a47, a48, a49, a5, a50, a51, a52, a53, a54, a55, a56, a57, a58, a59, a6, a60, a61, a62, a63, a64, a65, a66, a67, a68, a69, a7, a70, a71, a72, a73, a74, a75, a76, a77, a78, a79, a8, a80, a81, a82, a83, a84, a85, a86, a87, a88, a89, a9, a90, a91, a92, a93, a94, a95, a96, a97, a98, a99, flow_published_at\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS a0, $1[2] AS a1, $1[3] AS a10, $1[4] AS a11, $1[5] AS a12, $1[6] AS a13, $1[7] AS a14, $1[8] AS a15, $1[9] AS a16, $1[10] AS a17, $1[11] AS a18, $1[12] AS a19, $1[13] AS a2, $1[14] AS a20, $1[15] AS a21, $1[16] AS a22, $1[17] AS a23, $1[18] AS a24, $1[19] AS a25, $1[20] AS a26, $1[21] AS a27, $1[22] AS a28, $1[23] AS a29, $1[24] AS a3, $1[25] AS a30, $1[26] AS a31, $1[27] AS a32, $1[28] AS a33, $1[29] AS a34, $1[30] AS a35, $1[31] AS a36, $1[32] AS a37, $1[33] AS a38, $1[34] AS a39, $1[35] AS a4, $1[36] AS a40, $1[37] AS a41, $1[38] AS a42, $1[39] AS a43, $1[40] AS a44, $1[41] AS a45, $1[42] AS a46, $1[43] AS a47, $1[44] AS a48, $1[45] AS a49, $1[46] AS a5, $1[47] AS a50, $1[48] AS a51, $1[49] AS a52, $1[50] AS a53, $1[51] AS a54, $1[52] AS a55, $1[53] AS a56, $1[54] AS a57, $1[55] AS a58, $1[56] AS a59, $1[57] AS a6, $1[58] AS a60, $1[59] AS a61, $1[60] AS a62, $1[61] AS a63, $1[62] AS a64, $1[63] AS a65, $1[64] AS a66, $1[65] AS a67, $1[66] AS a68, $1[67] AS a69, $1[68] AS a7, $1[69] AS a70, $1[70] AS a71, $1[71] AS a72, $1[72] AS a73, $1[73] AS a74, $1[74] AS a75, $1[75] AS a76, $1[76] AS a77, $1[77] AS a78, $1[78] AS a79, $1[79] AS a8, $1[80] AS a80, $1[81] AS a81, $1[82] AS a82, $1[83] AS a83, $1[84] AS a84, $1[85] AS a85, $1[86] AS a86, $1[87] AS a87, $1[88] AS a88, $1[89] AS a89, $1[90] AS a9, $1[91] AS a90, $1[92] AS a91, $1[93] AS a92, $1[94] AS a93, $1[95] AS a94, $1[96] AS a95, $1[97] AS a96, $1[98] AS a97, $1[99] AS a98, $1[100] AS a99, $1[101] AS flow_published_at\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "multiple_types": {
         "Table": "multiple_types",
-        "Query": "\nCOPY INTO multiple_types (\n\tid, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field\n) FROM (\n\tSELECT $1[0] AS id, NULLIF($1[1], PARSE_JSON('null')) AS array_int, $1[2] AS binary_field, $1[3] AS bool_field, $1[4] AS float_field, $1[5] AS flow_published_at, NULLIF($1[6], PARSE_JSON('null')) AS multiple, NULLIF($1[7], PARSE_JSON('null')) AS nested, $1[8] AS nullable_int, $1[9] AS str_field\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO multiple_types (\n\tid, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field\n) FROM (\n\tSELECT $1[0] AS id, NULLIF($1[1], PARSE_JSON('null')) AS array_int, $1[2] AS binary_field, $1[3] AS bool_field, $1[4] AS float_field, $1[5] AS flow_published_at, NULLIF($1[6], PARSE_JSON('null')) AS multiple, NULLIF($1[7], PARSE_JSON('null')) AS nested, $1[8] AS nullable_int, $1[9] AS str_field\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "simple": {
         "Table": "simple",
-        "Query": "\nCOPY INTO simple (\n\tid, canary, flow_published_at\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS canary, $1[2] AS flow_published_at\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO simple (\n\tid, canary, flow_published_at\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS canary, $1[2] AS flow_published_at\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "string_escaped_key": {
         "Table": "string_escaped_key",
-        "Query": "\nCOPY INTO string_escaped_key (\n\tid, counter, flow_published_at\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS counter, $1[2] AS flow_published_at\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO string_escaped_key (\n\tid, counter, flow_published_at\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS counter, $1[2] AS flow_published_at\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "symbols": {
         "Table": "symbols",
-        "Query": "\nCOPY INTO symbols (\n\t\"testing (%s)\", flow_published_at, id\n) FROM (\n\tSELECT $1[0] AS \"testing (%s)\", $1[1] AS flow_published_at, $1[2] AS id\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO symbols (\n\t\"testing (%s)\", flow_published_at, id\n) FROM (\n\tSELECT $1[0] AS \"testing (%s)\", $1[1] AS flow_published_at, $1[2] AS id\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "timezone_datetimes_delta": {
         "Table": "",
         "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "",
         "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": [
           {
             "path": "<path>",
@@ -551,21 +647,33 @@
       },
       "timezone_datetimes_standard": {
         "Table": "timezone_datetimes_standard",
-        "Query": "\nCOPY INTO timezone_datetimes_standard (\n\tid, flow_published_at, offset_datetime, utc_datetime\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS offset_datetime, $1[3] AS utc_datetime\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO timezone_datetimes_standard (\n\tid, flow_published_at, offset_datetime, utc_datetime\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS offset_datetime, $1[3] AS utc_datetime\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "unsigned_bigint": {
         "Table": "unsigned_bigint",
-        "Query": "\nCOPY INTO unsigned_bigint (\n\tid, flow_published_at, unsigned_bigint\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS unsigned_bigint\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO unsigned_bigint (\n\tid, flow_published_at, unsigned_bigint\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS unsigned_bigint\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       }
     },
     "mergePatch": true
@@ -577,8 +685,14 @@
     "updated": {
       "all_key_types_part_one": {
         "Table": "all_key_types_part_one",
-        "Query": "\nMERGE INTO all_key_types_part_one AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS strintkey, $1[2] AS strnumkey, $1[3] AS counter, $1[4] AS flow_published_at, $1[5] AS strint, $1[6] AS strnum, $1[7] AS _flow_delete\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 1\n\tAND l.strintkey = r.strintkey AND l.strintkey >= '1' AND l.strintkey <= '1'\n\tAND l.strnumkey = r.strnumkey AND l.strnumkey >= '10.1' AND l.strnumkey <= '10.1'\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.counter, l.flow_published_at = r.flow_published_at, l.strint = r.strint, l.strnum = r.strnum\nWHEN NOT MATCHED AND r._flow_delete=false THEN\n\tINSERT (id, strintkey, strnumkey, counter, flow_published_at, strint, strnum)\n\tVALUES (r.id, r.strintkey, r.strnumkey, r.counter, r.flow_published_at, r.strint, r.strnum);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "\nCOPY INTO ESTUARY_SCHEMA.FLOW_STAGING_MERGE_11_all_key_types_part_one_F6833CBA0FEF5EC4 (\n\tid, strintkey, strnumkey, counter, flow_published_at, strint, strnum, _flow_delete\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS strintkey, $1[2] AS strnumkey, $1[3] AS counter, $1[4] AS flow_published_at, $1[5] AS strint, $1[6] AS strnum, $1[7] AS _flow_delete\n\tFROM <uuid>\n);\n\n\nMERGE INTO all_key_types_part_one AS l\nUSING ESTUARY_SCHEMA.FLOW_STAGING_MERGE_11_all_key_types_part_one_F6833CBA0FEF5EC4 AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 1\n\tAND l.strintkey = r.strintkey AND l.strintkey >= '1' AND l.strintkey <= '1'\n\tAND l.strnumkey = r.strnumkey AND l.strnumkey >= '10.1' AND l.strnumkey <= '10.1'\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.counter, l.flow_published_at = r.flow_published_at, l.strint = r.strint, l.strnum = r.strnum;\n",
+        "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "<uuid>",
+        "MergeStagingTablePersistent": "ESTUARY_SCHEMA.FLOW_STAGING_MERGE_11_all_key_types_part_one_F6833CBA0FEF5EC4",
+        "MergeStagingTableExists": true,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
@@ -586,8 +700,14 @@
       },
       "all_key_types_part_three": {
         "Table": "all_key_types_part_three",
-        "Query": "\nMERGE INTO all_key_types_part_three AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS datetimekey, $1[2] AS uuidkey, $1[3] AS counter, $1[4] AS datetime, $1[5] AS flow_published_at, $1[6] AS uuid, $1[7] AS _flow_delete\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 1\n\tAND l.datetimekey = r.datetimekey\n\tAND l.uuidkey = r.uuidkey AND l.uuidkey >= '550e8400-e29b-41d4-a716-446655440000' AND l.uuidkey <= '550e8400-e29b-41d4-a716-446655440000'\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.counter, l.datetime = r.datetime, l.flow_published_at = r.flow_published_at, l.uuid = r.uuid\nWHEN NOT MATCHED AND r._flow_delete=false THEN\n\tINSERT (id, datetimekey, uuidkey, counter, datetime, flow_published_at, uuid)\n\tVALUES (r.id, r.datetimekey, r.uuidkey, r.counter, r.datetime, r.flow_published_at, r.uuid);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "\nCOPY INTO ESTUARY_SCHEMA.FLOW_STAGING_MERGE_13_all_key_types_part_three_1C4A3D2A1FD367AF (\n\tid, datetimekey, uuidkey, counter, datetime, flow_published_at, uuid, _flow_delete\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS datetimekey, $1[2] AS uuidkey, $1[3] AS counter, $1[4] AS datetime, $1[5] AS flow_published_at, $1[6] AS uuid, $1[7] AS _flow_delete\n\tFROM <uuid>\n);\n\n\nMERGE INTO all_key_types_part_three AS l\nUSING ESTUARY_SCHEMA.FLOW_STAGING_MERGE_13_all_key_types_part_three_1C4A3D2A1FD367AF AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 1\n\tAND l.datetimekey = r.datetimekey\n\tAND l.uuidkey = r.uuidkey AND l.uuidkey >= '550e8400-e29b-41d4-a716-446655440000' AND l.uuidkey <= '550e8400-e29b-41d4-a716-446655440000'\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.counter, l.datetime = r.datetime, l.flow_published_at = r.flow_published_at, l.uuid = r.uuid;\n",
+        "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "<uuid>",
+        "MergeStagingTablePersistent": "ESTUARY_SCHEMA.FLOW_STAGING_MERGE_13_all_key_types_part_three_1C4A3D2A1FD367AF",
+        "MergeStagingTableExists": true,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
@@ -595,8 +715,14 @@
       },
       "all_key_types_part_two": {
         "Table": "all_key_types_part_two",
-        "Query": "\nMERGE INTO all_key_types_part_two AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS datekey, $1[2] AS timekey, $1[3] AS counter, $1[4] AS date, $1[5] AS flow_published_at, $1[6] AS time, $1[7] AS _flow_delete\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 1\n\tAND l.datekey = r.datekey AND l.datekey >= '0000-01-01' AND l.datekey <= '0000-01-01'\n\tAND l.timekey = r.timekey AND l.timekey >= '12:34:56Z' AND l.timekey <= '12:34:56Z'\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.counter, l.date = r.date, l.flow_published_at = r.flow_published_at, l.time = r.time\nWHEN NOT MATCHED AND r._flow_delete=false THEN\n\tINSERT (id, datekey, timekey, counter, date, flow_published_at, time)\n\tVALUES (r.id, r.datekey, r.timekey, r.counter, r.date, r.flow_published_at, r.time);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "\nCOPY INTO ESTUARY_SCHEMA.FLOW_STAGING_MERGE_12_all_key_types_part_two_2F891BE6C34AAA9B (\n\tid, datekey, timekey, counter, date, flow_published_at, time, _flow_delete\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS datekey, $1[2] AS timekey, $1[3] AS counter, $1[4] AS date, $1[5] AS flow_published_at, $1[6] AS time, $1[7] AS _flow_delete\n\tFROM <uuid>\n);\n\n\nMERGE INTO all_key_types_part_two AS l\nUSING ESTUARY_SCHEMA.FLOW_STAGING_MERGE_12_all_key_types_part_two_2F891BE6C34AAA9B AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 1\n\tAND l.datekey = r.datekey AND l.datekey >= '0000-01-01' AND l.datekey <= '0000-01-01'\n\tAND l.timekey = r.timekey AND l.timekey >= '12:34:56Z' AND l.timekey <= '12:34:56Z'\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.counter, l.date = r.date, l.flow_published_at = r.flow_published_at, l.time = r.time;\n",
+        "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "<uuid>",
+        "MergeStagingTablePersistent": "ESTUARY_SCHEMA.FLOW_STAGING_MERGE_12_all_key_types_part_two_2F891BE6C34AAA9B",
+        "MergeStagingTableExists": true,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
@@ -604,8 +730,14 @@
       },
       "deletions": {
         "Table": "deletions",
-        "Query": "\nMERGE INTO deletions AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS \"_meta/op\", $1[2] AS flow_published_at, $1[3] AS _flow_delete\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 3\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.\"_meta/op\" = r.\"_meta/op\", l.flow_published_at = r.flow_published_at\nWHEN NOT MATCHED AND r._flow_delete=false THEN\n\tINSERT (id, \"_meta/op\", flow_published_at)\n\tVALUES (r.id, r.\"_meta/op\", r.flow_published_at);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO deletions (\n\tid, \"_meta/op\", flow_published_at\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS \"_meta/op\", $1[2] AS flow_published_at\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "\nCOPY INTO ESTUARY_SCHEMA.FLOW_STAGING_MERGE_9_deletions_394E507E0E8932D8 (\n\tid, \"_meta/op\", flow_published_at, _flow_delete\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS \"_meta/op\", $1[2] AS flow_published_at, $1[3] AS _flow_delete\n\tFROM <uuid>\n);\n\n\nMERGE INTO deletions AS l\nUSING ESTUARY_SCHEMA.FLOW_STAGING_MERGE_9_deletions_394E507E0E8932D8 AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 2\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.\"_meta/op\" = r.\"_meta/op\", l.flow_published_at = r.flow_published_at;\n",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "<uuid>",
+        "MergeStagingTablePersistent": "ESTUARY_SCHEMA.FLOW_STAGING_MERGE_9_deletions_394E507E0E8932D8",
+        "MergeStagingTableExists": true,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
@@ -614,7 +746,13 @@
       "duplicate%20keys%20%40%20with%20spaces": {
         "Table": "",
         "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "",
         "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": [
           {
             "path": "<path>",
@@ -721,7 +859,13 @@
       "duplicate_keys_delta": {
         "Table": "",
         "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "",
         "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": [
           {
             "path": "<path>",
@@ -828,7 +972,13 @@
       "duplicate_keys_delta_exclude_flow_doc": {
         "Table": "",
         "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "",
         "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": [
           {
             "path": "<path>",
@@ -934,8 +1084,14 @@
       },
       "duplicate_keys_standard": {
         "Table": "duplicate_keys_standard",
-        "Query": "\nMERGE INTO duplicate_keys_standard AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str, $1[4] AS _flow_delete\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 5\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.flow_published_at = r.flow_published_at, l.int = r.int, l.str = r.str\nWHEN NOT MATCHED AND r._flow_delete=false THEN\n\tINSERT (id, flow_published_at, int, str)\n\tVALUES (r.id, r.flow_published_at, r.int, r.str);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "\nCOPY INTO ESTUARY_SCHEMA.FLOW_STAGING_MERGE_1_duplicate_keys_standard_0BAF7A4336F29D4E (\n\tid, flow_published_at, int, str, _flow_delete\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str, $1[4] AS _flow_delete\n\tFROM <uuid>\n);\n\n\nMERGE INTO duplicate_keys_standard AS l\nUSING ESTUARY_SCHEMA.FLOW_STAGING_MERGE_1_duplicate_keys_standard_0BAF7A4336F29D4E AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 5\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.flow_published_at = r.flow_published_at, l.int = r.int, l.str = r.str;\n",
+        "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "<uuid>",
+        "MergeStagingTablePersistent": "ESTUARY_SCHEMA.FLOW_STAGING_MERGE_1_duplicate_keys_standard_0BAF7A4336F29D4E",
+        "MergeStagingTableExists": true,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
@@ -943,8 +1099,14 @@
       },
       "fields_with_projections": {
         "Table": "fields_with_projections",
-        "Query": "\nMERGE INTO fields_with_projections AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS another_field, $1[2] AS flow_published_at, $1[3] AS projected_another, $1[4] AS projected_field, $1[5] AS _flow_delete\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 1\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.another_field = r.another_field, l.flow_published_at = r.flow_published_at, l.projected_another = r.projected_another, l.projected_field = r.projected_field\nWHEN NOT MATCHED AND r._flow_delete=false THEN\n\tINSERT (id, another_field, flow_published_at, projected_another, projected_field)\n\tVALUES (r.id, r.another_field, r.flow_published_at, r.projected_another, r.projected_field);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "\nCOPY INTO ESTUARY_SCHEMA.FLOW_STAGING_MERGE_14_fields_with_projections_9D7AD036C19516DB (\n\tid, another_field, flow_published_at, projected_another, projected_field, _flow_delete\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS another_field, $1[2] AS flow_published_at, $1[3] AS projected_another, $1[4] AS projected_field, $1[5] AS _flow_delete\n\tFROM <uuid>\n);\n\n\nMERGE INTO fields_with_projections AS l\nUSING ESTUARY_SCHEMA.FLOW_STAGING_MERGE_14_fields_with_projections_9D7AD036C19516DB AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 1\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.another_field = r.another_field, l.flow_published_at = r.flow_published_at, l.projected_another = r.projected_another, l.projected_field = r.projected_field;\n",
+        "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "<uuid>",
+        "MergeStagingTablePersistent": "ESTUARY_SCHEMA.FLOW_STAGING_MERGE_14_fields_with_projections_9D7AD036C19516DB",
+        "MergeStagingTableExists": true,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
@@ -952,17 +1114,29 @@
       },
       "formatted_strings": {
         "Table": "formatted_strings",
-        "Query": "\nCOPY INTO formatted_strings (\n\tid, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS date, $1[2] AS datetime, $1[3] AS flow_published_at, $1[4] AS int_and_str, $1[5] AS int_str, $1[6] AS num_and_str, $1[7] AS num_str, $1[8] AS time\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO formatted_strings (\n\tid, date, datetime, flow_published_at, int_and_str, int_str, num_and_str, num_str, time\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS date, $1[2] AS datetime, $1[3] AS flow_published_at, $1[4] AS int_and_str, $1[5] AS int_str, $1[6] AS num_and_str, $1[7] AS num_str, $1[8] AS time\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "many_columns": {
         "Table": "many_columns",
-        "Query": "\nMERGE INTO many_columns AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS a0, $1[2] AS a1, $1[3] AS a10, $1[4] AS a11, $1[5] AS a12, $1[6] AS a13, $1[7] AS a14, $1[8] AS a15, $1[9] AS a16, $1[10] AS a17, $1[11] AS a18, $1[12] AS a19, $1[13] AS a2, $1[14] AS a20, $1[15] AS a21, $1[16] AS a22, $1[17] AS a23, $1[18] AS a24, $1[19] AS a25, $1[20] AS a26, $1[21] AS a27, $1[22] AS a28, $1[23] AS a29, $1[24] AS a3, $1[25] AS a30, $1[26] AS a31, $1[27] AS a32, $1[28] AS a33, $1[29] AS a34, $1[30] AS a35, $1[31] AS a36, $1[32] AS a37, $1[33] AS a38, $1[34] AS a39, $1[35] AS a4, $1[36] AS a40, $1[37] AS a41, $1[38] AS a42, $1[39] AS a43, $1[40] AS a44, $1[41] AS a45, $1[42] AS a46, $1[43] AS a47, $1[44] AS a48, $1[45] AS a49, $1[46] AS a5, $1[47] AS a50, $1[48] AS a51, $1[49] AS a52, $1[50] AS a53, $1[51] AS a54, $1[52] AS a55, $1[53] AS a56, $1[54] AS a57, $1[55] AS a58, $1[56] AS a59, $1[57] AS a6, $1[58] AS a60, $1[59] AS a61, $1[60] AS a62, $1[61] AS a63, $1[62] AS a64, $1[63] AS a65, $1[64] AS a66, $1[65] AS a67, $1[66] AS a68, $1[67] AS a69, $1[68] AS a7, $1[69] AS a70, $1[70] AS a71, $1[71] AS a72, $1[72] AS a73, $1[73] AS a74, $1[74] AS a75, $1[75] AS a76, $1[76] AS a77, $1[77] AS a78, $1[78] AS a79, $1[79] AS a8, $1[80] AS a80, $1[81] AS a81, $1[82] AS a82, $1[83] AS a83, $1[84] AS a84, $1[85] AS a85, $1[86] AS a86, $1[87] AS a87, $1[88] AS a88, $1[89] AS a89, $1[90] AS a9, $1[91] AS a90, $1[92] AS a91, $1[93] AS a92, $1[94] AS a93, $1[95] AS a94, $1[96] AS a95, $1[97] AS a96, $1[98] AS a97, $1[99] AS a98, $1[100] AS a99, $1[101] AS flow_published_at, $1[102] AS _flow_delete\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 1\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.a0 = r.a0, l.a1 = r.a1, l.a10 = r.a10, l.a11 = r.a11, l.a12 = r.a12, l.a13 = r.a13, l.a14 = r.a14, l.a15 = r.a15, l.a16 = r.a16, l.a17 = r.a17, l.a18 = r.a18, l.a19 = r.a19, l.a2 = r.a2, l.a20 = r.a20, l.a21 = r.a21, l.a22 = r.a22, l.a23 = r.a23, l.a24 = r.a24, l.a25 = r.a25, l.a26 = r.a26, l.a27 = r.a27, l.a28 = r.a28, l.a29 = r.a29, l.a3 = r.a3, l.a30 = r.a30, l.a31 = r.a31, l.a32 = r.a32, l.a33 = r.a33, l.a34 = r.a34, l.a35 = r.a35, l.a36 = r.a36, l.a37 = r.a37, l.a38 = r.a38, l.a39 = r.a39, l.a4 = r.a4, l.a40 = r.a40, l.a41 = r.a41, l.a42 = r.a42, l.a43 = r.a43, l.a44 = r.a44, l.a45 = r.a45, l.a46 = r.a46, l.a47 = r.a47, l.a48 = r.a48, l.a49 = r.a49, l.a5 = r.a5, l.a50 = r.a50, l.a51 = r.a51, l.a52 = r.a52, l.a53 = r.a53, l.a54 = r.a54, l.a55 = r.a55, l.a56 = r.a56, l.a57 = r.a57, l.a58 = r.a58, l.a59 = r.a59, l.a6 = r.a6, l.a60 = r.a60, l.a61 = r.a61, l.a62 = r.a62, l.a63 = r.a63, l.a64 = r.a64, l.a65 = r.a65, l.a66 = r.a66, l.a67 = r.a67, l.a68 = r.a68, l.a69 = r.a69, l.a7 = r.a7, l.a70 = r.a70, l.a71 = r.a71, l.a72 = r.a72, l.a73 = r.a73, l.a74 = r.a74, l.a75 = r.a75, l.a76 = r.a76, l.a77 = r.a77, l.a78 = r.a78, l.a79 = r.a79, l.a8 = r.a8, l.a80 = r.a80, l.a81 = r.a81, l.a82 = r.a82, l.a83 = r.a83, l.a84 = r.a84, l.a85 = r.a85, l.a86 = r.a86, l.a87 = r.a87, l.a88 = r.a88, l.a89 = r.a89, l.a9 = r.a9, l.a90 = r.a90, l.a91 = r.a91, l.a92 = r.a92, l.a93 = r.a93, l.a94 = r.a94, l.a95 = r.a95, l.a96 = r.a96, l.a97 = r.a97, l.a98 = r.a98, l.a99 = r.a99, l.flow_published_at = r.flow_published_at\nWHEN NOT MATCHED AND r._flow_delete=false THEN\n\tINSERT (id, a0, a1, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a2, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a3, a30, a31, a32, a33, a34, a35, a36, a37, a38, a39, a4, a40, a41, a42, a43, a44, a45, a46, a47, a48, a49, a5, a50, a51, a52, a53, a54, a55, a56, a57, a58, a59, a6, a60, a61, a62, a63, a64, a65, a66, a67, a68, a69, a7, a70, a71, a72, a73, a74, a75, a76, a77, a78, a79, a8, a80, a81, a82, a83, a84, a85, a86, a87, a88, a89, a9, a90, a91, a92, a93, a94, a95, a96, a97, a98, a99, flow_published_at)\n\tVALUES (r.id, r.a0, r.a1, r.a10, r.a11, r.a12, r.a13, r.a14, r.a15, r.a16, r.a17, r.a18, r.a19, r.a2, r.a20, r.a21, r.a22, r.a23, r.a24, r.a25, r.a26, r.a27, r.a28, r.a29, r.a3, r.a30, r.a31, r.a32, r.a33, r.a34, r.a35, r.a36, r.a37, r.a38, r.a39, r.a4, r.a40, r.a41, r.a42, r.a43, r.a44, r.a45, r.a46, r.a47, r.a48, r.a49, r.a5, r.a50, r.a51, r.a52, r.a53, r.a54, r.a55, r.a56, r.a57, r.a58, r.a59, r.a6, r.a60, r.a61, r.a62, r.a63, r.a64, r.a65, r.a66, r.a67, r.a68, r.a69, r.a7, r.a70, r.a71, r.a72, r.a73, r.a74, r.a75, r.a76, r.a77, r.a78, r.a79, r.a8, r.a80, r.a81, r.a82, r.a83, r.a84, r.a85, r.a86, r.a87, r.a88, r.a89, r.a9, r.a90, r.a91, r.a92, r.a93, r.a94, r.a95, r.a96, r.a97, r.a98, r.a99, r.flow_published_at);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "\nCOPY INTO ESTUARY_SCHEMA.FLOW_STAGING_MERGE_15_many_columns_71E30CAE5873B0FF (\n\tid, a0, a1, a10, a11, a12, a13, a14, a15, a16, a17, a18, a19, a2, a20, a21, a22, a23, a24, a25, a26, a27, a28, a29, a3, a30, a31, a32, a33, a34, a35, a36, a37, a38, a39, a4, a40, a41, a42, a43, a44, a45, a46, a47, a48, a49, a5, a50, a51, a52, a53, a54, a55, a56, a57, a58, a59, a6, a60, a61, a62, a63, a64, a65, a66, a67, a68, a69, a7, a70, a71, a72, a73, a74, a75, a76, a77, a78, a79, a8, a80, a81, a82, a83, a84, a85, a86, a87, a88, a89, a9, a90, a91, a92, a93, a94, a95, a96, a97, a98, a99, flow_published_at, _flow_delete\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS a0, $1[2] AS a1, $1[3] AS a10, $1[4] AS a11, $1[5] AS a12, $1[6] AS a13, $1[7] AS a14, $1[8] AS a15, $1[9] AS a16, $1[10] AS a17, $1[11] AS a18, $1[12] AS a19, $1[13] AS a2, $1[14] AS a20, $1[15] AS a21, $1[16] AS a22, $1[17] AS a23, $1[18] AS a24, $1[19] AS a25, $1[20] AS a26, $1[21] AS a27, $1[22] AS a28, $1[23] AS a29, $1[24] AS a3, $1[25] AS a30, $1[26] AS a31, $1[27] AS a32, $1[28] AS a33, $1[29] AS a34, $1[30] AS a35, $1[31] AS a36, $1[32] AS a37, $1[33] AS a38, $1[34] AS a39, $1[35] AS a4, $1[36] AS a40, $1[37] AS a41, $1[38] AS a42, $1[39] AS a43, $1[40] AS a44, $1[41] AS a45, $1[42] AS a46, $1[43] AS a47, $1[44] AS a48, $1[45] AS a49, $1[46] AS a5, $1[47] AS a50, $1[48] AS a51, $1[49] AS a52, $1[50] AS a53, $1[51] AS a54, $1[52] AS a55, $1[53] AS a56, $1[54] AS a57, $1[55] AS a58, $1[56] AS a59, $1[57] AS a6, $1[58] AS a60, $1[59] AS a61, $1[60] AS a62, $1[61] AS a63, $1[62] AS a64, $1[63] AS a65, $1[64] AS a66, $1[65] AS a67, $1[66] AS a68, $1[67] AS a69, $1[68] AS a7, $1[69] AS a70, $1[70] AS a71, $1[71] AS a72, $1[72] AS a73, $1[73] AS a74, $1[74] AS a75, $1[75] AS a76, $1[76] AS a77, $1[77] AS a78, $1[78] AS a79, $1[79] AS a8, $1[80] AS a80, $1[81] AS a81, $1[82] AS a82, $1[83] AS a83, $1[84] AS a84, $1[85] AS a85, $1[86] AS a86, $1[87] AS a87, $1[88] AS a88, $1[89] AS a89, $1[90] AS a9, $1[91] AS a90, $1[92] AS a91, $1[93] AS a92, $1[94] AS a93, $1[95] AS a94, $1[96] AS a95, $1[97] AS a96, $1[98] AS a97, $1[99] AS a98, $1[100] AS a99, $1[101] AS flow_published_at, $1[102] AS _flow_delete\n\tFROM <uuid>\n);\n\n\nMERGE INTO many_columns AS l\nUSING ESTUARY_SCHEMA.FLOW_STAGING_MERGE_15_many_columns_71E30CAE5873B0FF AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 1\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.a0 = r.a0, l.a1 = r.a1, l.a10 = r.a10, l.a11 = r.a11, l.a12 = r.a12, l.a13 = r.a13, l.a14 = r.a14, l.a15 = r.a15, l.a16 = r.a16, l.a17 = r.a17, l.a18 = r.a18, l.a19 = r.a19, l.a2 = r.a2, l.a20 = r.a20, l.a21 = r.a21, l.a22 = r.a22, l.a23 = r.a23, l.a24 = r.a24, l.a25 = r.a25, l.a26 = r.a26, l.a27 = r.a27, l.a28 = r.a28, l.a29 = r.a29, l.a3 = r.a3, l.a30 = r.a30, l.a31 = r.a31, l.a32 = r.a32, l.a33 = r.a33, l.a34 = r.a34, l.a35 = r.a35, l.a36 = r.a36, l.a37 = r.a37, l.a38 = r.a38, l.a39 = r.a39, l.a4 = r.a4, l.a40 = r.a40, l.a41 = r.a41, l.a42 = r.a42, l.a43 = r.a43, l.a44 = r.a44, l.a45 = r.a45, l.a46 = r.a46, l.a47 = r.a47, l.a48 = r.a48, l.a49 = r.a49, l.a5 = r.a5, l.a50 = r.a50, l.a51 = r.a51, l.a52 = r.a52, l.a53 = r.a53, l.a54 = r.a54, l.a55 = r.a55, l.a56 = r.a56, l.a57 = r.a57, l.a58 = r.a58, l.a59 = r.a59, l.a6 = r.a6, l.a60 = r.a60, l.a61 = r.a61, l.a62 = r.a62, l.a63 = r.a63, l.a64 = r.a64, l.a65 = r.a65, l.a66 = r.a66, l.a67 = r.a67, l.a68 = r.a68, l.a69 = r.a69, l.a7 = r.a7, l.a70 = r.a70, l.a71 = r.a71, l.a72 = r.a72, l.a73 = r.a73, l.a74 = r.a74, l.a75 = r.a75, l.a76 = r.a76, l.a77 = r.a77, l.a78 = r.a78, l.a79 = r.a79, l.a8 = r.a8, l.a80 = r.a80, l.a81 = r.a81, l.a82 = r.a82, l.a83 = r.a83, l.a84 = r.a84, l.a85 = r.a85, l.a86 = r.a86, l.a87 = r.a87, l.a88 = r.a88, l.a89 = r.a89, l.a9 = r.a9, l.a90 = r.a90, l.a91 = r.a91, l.a92 = r.a92, l.a93 = r.a93, l.a94 = r.a94, l.a95 = r.a95, l.a96 = r.a96, l.a97 = r.a97, l.a98 = r.a98, l.a99 = r.a99, l.flow_published_at = r.flow_published_at;\n",
+        "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "<uuid>",
+        "MergeStagingTablePersistent": "ESTUARY_SCHEMA.FLOW_STAGING_MERGE_15_many_columns_71E30CAE5873B0FF",
+        "MergeStagingTableExists": true,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
@@ -970,8 +1144,14 @@
       },
       "multiple_types": {
         "Table": "multiple_types",
-        "Query": "\nMERGE INTO multiple_types AS l\nUSING (\n\tSELECT $1[0] AS id, NULLIF($1[1], PARSE_JSON('null')) AS array_int, $1[2] AS binary_field, $1[3] AS bool_field, $1[4] AS float_field, $1[5] AS flow_published_at, NULLIF($1[6], PARSE_JSON('null')) AS multiple, NULLIF($1[7], PARSE_JSON('null')) AS nested, $1[8] AS nullable_int, $1[9] AS str_field, $1[10] AS _flow_delete\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= 1 AND l.id <= 10\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.array_int, l.binary_field = r.binary_field, l.bool_field = r.bool_field, l.float_field = r.float_field, l.flow_published_at = r.flow_published_at, l.multiple = r.multiple, l.nested = r.nested, l.nullable_int = r.nullable_int, l.str_field = r.str_field\nWHEN NOT MATCHED AND r._flow_delete=false THEN\n\tINSERT (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field)\n\tVALUES (r.id, r.array_int, r.binary_field, r.bool_field, r.float_field, r.flow_published_at, r.multiple, r.nested, r.nullable_int, r.str_field);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "\nCOPY INTO ESTUARY_SCHEMA.FLOW_STAGING_MERGE_5_multiple_types_B0F72CB25BC98617 (\n\tid, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field, _flow_delete\n) FROM (\n\tSELECT $1[0] AS id, NULLIF($1[1], PARSE_JSON('null')) AS array_int, $1[2] AS binary_field, $1[3] AS bool_field, $1[4] AS float_field, $1[5] AS flow_published_at, NULLIF($1[6], PARSE_JSON('null')) AS multiple, NULLIF($1[7], PARSE_JSON('null')) AS nested, $1[8] AS nullable_int, $1[9] AS str_field, $1[10] AS _flow_delete\n\tFROM <uuid>\n);\n\n\nMERGE INTO multiple_types AS l\nUSING ESTUARY_SCHEMA.FLOW_STAGING_MERGE_5_multiple_types_B0F72CB25BC98617 AS r\nON \n\tl.id = r.id AND l.id >= 6 AND l.id <= 10\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.array_int, l.binary_field = r.binary_field, l.bool_field = r.bool_field, l.float_field = r.float_field, l.flow_published_at = r.flow_published_at, l.multiple = r.multiple, l.nested = r.nested, l.nullable_int = r.nullable_int, l.str_field = r.str_field;\n",
+        "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "<uuid>",
+        "MergeStagingTablePersistent": "ESTUARY_SCHEMA.FLOW_STAGING_MERGE_5_multiple_types_B0F72CB25BC98617",
+        "MergeStagingTableExists": true,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
@@ -979,17 +1159,29 @@
       },
       "simple": {
         "Table": "simple",
-        "Query": "\nCOPY INTO simple (\n\tid, canary, flow_published_at\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS canary, $1[2] AS flow_published_at\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO simple (\n\tid, canary, flow_published_at\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS canary, $1[2] AS flow_published_at\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       },
       "string_escaped_key": {
         "Table": "string_escaped_key",
-        "Query": "\nMERGE INTO string_escaped_key AS l\nUSING (\n\tSELECT $1[0] AS id, $1[1] AS counter, $1[2] AS flow_published_at, $1[3] AS _flow_delete\n\tFROM <uuid>\n) AS r\nON \n\tl.id = r.id AND l.id >= '\\\\he \\\\ '' \" `llo`' AND l.id <= '\\\\he \\\\ '' \" `llo`'\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.counter, l.flow_published_at = r.flow_published_at\nWHEN NOT MATCHED AND r._flow_delete=false THEN\n\tINSERT (id, counter, flow_published_at)\n\tVALUES (r.id, r.counter, r.flow_published_at);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "\nCOPY INTO ESTUARY_SCHEMA.FLOW_STAGING_MERGE_10_string_escaped_key_D70F8C2348B9E120 (\n\tid, counter, flow_published_at, _flow_delete\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS counter, $1[2] AS flow_published_at, $1[3] AS _flow_delete\n\tFROM <uuid>\n);\n\n\nMERGE INTO string_escaped_key AS l\nUSING ESTUARY_SCHEMA.FLOW_STAGING_MERGE_10_string_escaped_key_D70F8C2348B9E120 AS r\nON \n\tl.id = r.id AND l.id >= '\\\\he \\\\ '' \" `llo`' AND l.id <= '\\\\he \\\\ '' \" `llo`'\nWHEN MATCHED AND r._flow_delete=true THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.counter = r.counter, l.flow_published_at = r.flow_published_at;\n",
+        "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "<uuid>",
+        "MergeStagingTablePersistent": "ESTUARY_SCHEMA.FLOW_STAGING_MERGE_10_string_escaped_key_D70F8C2348B9E120",
+        "MergeStagingTableExists": true,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
@@ -1006,7 +1198,13 @@
       "duplicate%20keys%20%40%20with%20spaces": {
         "Table": "",
         "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "",
         "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": [
           {
             "path": "<path>",
@@ -1113,7 +1311,13 @@
       "duplicate_keys_delta": {
         "Table": "",
         "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "",
         "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": [
           {
             "path": "<path>",
@@ -1220,7 +1424,13 @@
       "duplicate_keys_delta_exclude_flow_doc": {
         "Table": "",
         "Query": "",
+        "InsertQuery": "",
+        "MergeQuery": "",
         "StagedDir": "",
+        "InsertStagedDir": "",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": [
           {
             "path": "<path>",
@@ -1326,12 +1536,18 @@
       },
       "duplicate_keys_standard": {
         "Table": "duplicate_keys_standard",
-        "Query": "\nCOPY INTO duplicate_keys_standard (\n\tid, flow_published_at, int, str\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "InsertQuery": "\nCOPY INTO duplicate_keys_standard (\n\tid, flow_published_at, int, str\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str\n\tFROM <uuid>\n);\n",
+        "MergeQuery": "",
+        "StagedDir": "",
+        "InsertStagedDir": "<uuid>",
+        "MergeStagedDir": "",
+        "MergeStagingTablePersistent": "",
+        "MergeStagingTableExists": false,
         "StreamBlobs": null,
         "PipeName": "",
         "PipeFiles": null,
-        "Version": ""
+        "Version": "ffffffffffffffff"
       }
     },
     "mergePatch": true
@@ -1342,6 +1558,12 @@
   {
     "updated": {
       "duplicate%20keys%20%40%20with%20spaces": {
+        "InsertQuery": "",
+        "InsertStagedDir": "",
+        "MergeQuery": "",
+        "MergeStagedDir": "",
+        "MergeStagingTableExists": false,
+        "MergeStagingTablePersistent": "",
         "PipeName": "",
         "Query": "",
         "StagedDir": "",
@@ -1448,6 +1670,12 @@
         "Version": ""
       },
       "duplicate_keys_delta": {
+        "InsertQuery": "",
+        "InsertStagedDir": "",
+        "MergeQuery": "",
+        "MergeStagedDir": "",
+        "MergeStagingTableExists": false,
+        "MergeStagingTablePersistent": "",
         "PipeName": "",
         "Query": "",
         "StagedDir": "",
@@ -1554,6 +1782,12 @@
         "Version": ""
       },
       "duplicate_keys_delta_exclude_flow_doc": {
+        "InsertQuery": "",
+        "InsertStagedDir": "",
+        "MergeQuery": "",
+        "MergeStagedDir": "",
+        "MergeStagingTableExists": false,
+        "MergeStagingTablePersistent": "",
         "PipeName": "",
         "Query": "",
         "StagedDir": "",
@@ -1660,11 +1894,17 @@
         "Version": ""
       },
       "duplicate_keys_standard": {
+        "InsertQuery": "\nCOPY INTO duplicate_keys_standard (\n\tid, flow_published_at, int, str\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str\n\tFROM <uuid>\n);\n",
+        "InsertStagedDir": "<uuid>",
+        "MergeQuery": "",
+        "MergeStagedDir": "",
+        "MergeStagingTableExists": false,
+        "MergeStagingTablePersistent": "",
         "PipeName": "",
-        "Query": "\nCOPY INTO duplicate_keys_standard (\n\tid, flow_published_at, int, str\n) FROM (\n\tSELECT $1[0] AS id, $1[1] AS flow_published_at, $1[2] AS int, $1[3] AS str\n\tFROM <uuid>\n);\n",
-        "StagedDir": "<uuid>",
+        "Query": "",
+        "StagedDir": "",
         "Table": "duplicate_keys_standard",
-        "Version": ""
+        "Version": "ffffffffffffffff"
       }
     }
   }
