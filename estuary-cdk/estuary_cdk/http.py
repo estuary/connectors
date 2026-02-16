@@ -255,7 +255,7 @@ class HTTPSession(abc.ABC):
 class TokenSource:
     class AccessTokenResponse(BaseModel):
         access_token: str
-        token_type: str
+        token_type: str = ""
         expires_in: int = 0
         refresh_token: str = ""
         scope: str = ""
@@ -501,12 +501,14 @@ class HTTPMixin(Mixin, HTTPSession):
     ):
         if with_token and self.token_source is not None:
             token_type, token = await self.token_source.fetch_token(log, self)
-            header_value = (
-                f"{token_type} {token}"
-                if self.token_source.authorization_header
-                == DEFAULT_AUTHORIZATION_HEADER
-                else f"{token}"
-            )
+            if self.token_source.authorization_header == DEFAULT_AUTHORIZATION_HEADER:
+                if not token_type:
+                    log.warning(
+                        "using default Authorization header without a token type prefix",
+                    )
+                header_value = f"{token_type} {token}" if token_type else token
+            else:
+                header_value = token
             headers[self.token_source.authorization_header] = header_value
 
         # Only pass timeout if explicitly provided. Otherwise, omit the
