@@ -3,7 +3,7 @@ from logging import Logger
 from typing import Any, AsyncGenerator, TypedDict
 
 from estuary_cdk.http import HTTPSession
-from .shared import build_query, str_to_dt, VERSION
+from .shared import build_query, should_retry, str_to_dt, VERSION
 from .models import (
     CursorFields,
     FieldDetailsDict,
@@ -61,7 +61,7 @@ class Query:
         })
 
         response = QueryResponse.model_validate_json(
-            await self.http.request(self.log, url, params=params)
+            await self.http.request(self.log, url, params=params, should_retry=should_retry)
         )
 
         count = 0

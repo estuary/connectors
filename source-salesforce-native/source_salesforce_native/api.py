@@ -15,7 +15,7 @@ from .bulk_job_manager import (
     MAX_BULK_QUERY_SET_SIZE,
 )
 from .rest_query_manager import RestQueryManager
-from .shared import dt_to_str, str_to_dt, now, VERSION
+from .shared import dt_to_str, str_to_dt, now, should_retry, VERSION
 from .models import (
     FieldDetails,
     FieldDetailsDict,
@@ -64,7 +64,7 @@ async def fetch_object_fields(
     url = f"{instance_url}/services/data/v{VERSION}/sobjects/{name}/describe"
 
     response = SObject.model_validate_json(
-        await http.request(log, url)
+        await http.request(log, url, should_retry=should_retry)
     )
 
     fields = {}

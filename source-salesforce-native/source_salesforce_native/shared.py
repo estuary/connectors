@@ -1,7 +1,17 @@
 from datetime import datetime, UTC
 
+from estuary_cdk.http import Headers
+
 VERSION = "62.0"
 DATETIME_STRING_FORMAT = "%Y-%m-%dT%H:%M:%S"
+
+# Salesforce recommends retrying transient 500 errors with exponential backoff,
+# but limiting retry attempts to avoid burning API credits indefinitely.
+MAX_SERVER_ERROR_RETRY_ATTEMPTS = 5
+
+
+def should_retry(status: int, headers: Headers, body: bytes, attempt: int) -> bool:
+    return attempt < MAX_SERVER_ERROR_RETRY_ATTEMPTS
 
 
 def dt_to_str(dt: datetime) -> str:
@@ -20,7 +30,7 @@ def now() -> datetime:
 
 
 def build_query(
-        object_name: str, 
+        object_name: str,
         fields: list[str],
         cursor_field: str | None = None,
         start: datetime | None = None,
