@@ -477,7 +477,7 @@ fn produce_to_temp_topic(enc: &ProtobufTestDataEncoder, temp_topic: &str, num_me
     // Build input lines in the format: key_json|value_json
     let mut input_lines = String::new();
     for idx in 0..num_messages {
-        let key_json = format!(r#"{{"idx":{},"nested":{{"subId":{}}}}}"#, idx, idx);
+        let key_json = format!(r#"{{"idx":{},"nested":{{"sub_id":{}}}}}"#, idx, idx);
         let value_json = format!(r#"{{"value":"value-{}"}}"#, idx);
         input_lines.push_str(&format!("{}|{}\n", key_json, value_json));
     }
