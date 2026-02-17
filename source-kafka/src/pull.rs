@@ -352,8 +352,16 @@ async fn parse_datum(
                     // Decode to DynamicMessage
                     let message = crate::protobuf::decode_protobuf_message(&descriptor, &datum[5 + payload_offset..])?;
 
-                    // Convert to JSON using prost-reflect's Serialize implementation
-                    let json_value = serde_json::to_value(&message)?;
+                    // Convert to JSON using proto field names (snake_case) to match discovered schemas
+                    let json_value: serde_json::Value = {
+                        let mut buf = Vec::new();
+                        let mut serializer = serde_json::Serializer::new(&mut buf);
+                        message.serialize_with_options(
+                            &mut serializer,
+                            &prost_reflect::SerializeOptions::new().use_proto_field_name(true),
+                        )?;
+                        serde_json::from_slice(&buf)?
+                    };
 
                     // For keys that are not objects, wrap in a synthetic _key field
                     if is_key && !json_value.is_object() {
