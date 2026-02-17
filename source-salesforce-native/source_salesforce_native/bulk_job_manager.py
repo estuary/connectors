@@ -5,7 +5,7 @@ from typing import AsyncGenerator
 
 from estuary_cdk.http import HTTPSession, HTTPError
 from estuary_cdk.incremental_csv_processor import CSVConfig, IncrementalCSVProcessor
-from .shared import build_query, VERSION
+from .shared import build_query, should_retry, VERSION
 from .models import (
     BulkJobError,
     FieldDetailsDict,
@@ -71,7 +71,7 @@ class BulkJobManager:
             })
 
             response = BulkJobSubmitResponse.model_validate_json(
-                await self.http.request(self.log, self.base_url, method="POST", json=body)
+                await self.http.request(self.log, self.base_url, method="POST", json=body, should_retry=should_retry)
             )
         except HTTPError as err:
             if err.code == 400 and CANNOT_FETCH_COMPOUND_DATA in err.message:
@@ -108,7 +108,7 @@ class BulkJobManager:
         })
 
         response = BulkJobCheckStatusResponse.model_validate_json(
-            await self.http.request(self.log, url)
+            await self.http.request(self.log, url, should_retry=should_retry)
         )
 
         self.log.debug("Received bulk job status.", {
@@ -133,7 +133,7 @@ class BulkJobManager:
                 "params": params,
             })
 
-            headers, body = await self.http.request_stream(self.log, url, params=params, headers=request_headers)
+            headers, body = await self.http.request_stream(self.log, url, params=params, headers=request_headers, should_retry=should_retry)
             count: str | None = headers.get(COUNT_HEADER)
 
             if count is None or int(count) == 0:
