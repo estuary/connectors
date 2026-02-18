@@ -302,6 +302,8 @@ async def fetch_incremental_substreams(
     # and we may see the same document multiple times if it has been updated causing us
     # to emit the updated document before the original document.
     seen_ids = set()
+    # Track parent IDs we've already fetched child streams for to avoid redundant API calls.
+    seen_parent_ids: set[str] = set()
     iterating = True
 
     url = f"{API}/events"
@@ -345,6 +347,9 @@ async def fetch_incremental_substreams(
                 parent_data = cls.model_validate(event.data.object)
                 search_name = cls.SEARCH_NAME
                 id = parent_data.id
+                if id in seen_parent_ids:
+                    continue
+                seen_parent_ids.add(id)
                 child_data = _capture_substreams(
                     cls_child, search_name, id, parent_data, account_id, http, log
                 )
@@ -398,6 +403,9 @@ async def fetch_backfill_substreams(
     """
     assert isinstance(cutoff, datetime)
 
+    # Track parent IDs we've already fetched child streams for to avoid redundant API calls.
+    seen_parent_ids: set[str] = set()
+
     search_name = cls.SEARCH_NAME
     url = f"{API}/{search_name}"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
@@ -429,6 +437,9 @@ async def fetch_backfill_substreams(
         if doc_ts == start_date:
             parent_data = doc
             id = parent_data.id
+            if id in seen_parent_ids:
+                continue
+            seen_parent_ids.add(id)
             child_data = _capture_substreams(
                 cls_child, search_name, id, parent_data, account_id, http, log
             )
@@ -448,6 +459,9 @@ async def fetch_backfill_substreams(
         elif doc_ts is None or doc_ts < cutoff:
             parent_data = doc
             id = parent_data.id
+            if id in seen_parent_ids:
+                continue
+            seen_parent_ids.add(id)
             child_data = _capture_substreams(
                 cls_child, search_name, id, parent_data, account_id, http, log
             )
@@ -696,6 +710,8 @@ async def fetch_incremental_usage_records(
     # and we may see the same document multiple times if it has been updated causing us
     # to emit the updated document before the original document.
     seen_ids = set()
+    # Track subscription item IDs we've already fetched to avoid redundant API calls.
+    seen_subscription_item_ids: set[str] = set()
     iterating = True
 
     url = f"{API}/events"
@@ -740,6 +756,9 @@ async def fetch_incremental_usage_records(
                 search_name = cls.SEARCH_NAME
                 for item in parent_data.items.data:
                     id = item.id
+                    if id in seen_subscription_item_ids:
+                        continue
+                    seen_subscription_item_ids.add(id)
                     child_data = _capture_substreams(
                         cls_child, search_name, id, parent_data, account_id, http, log
                     )
@@ -792,6 +811,9 @@ async def fetch_backfill_usage_records(
     """
     assert isinstance(cutoff, datetime)
 
+    # Track subscription item IDs we've already fetched to avoid redundant API calls.
+    seen_subscription_item_ids: set[str] = set()
+
     search_name = cls.SEARCH_NAME
     url = f"{API}/{search_name}"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
@@ -821,6 +843,9 @@ async def fetch_backfill_usage_records(
             parent_data = doc
             for item in parent_data.items.data:
                 id = item.id
+                if id in seen_subscription_item_ids:
+                    continue
+                seen_subscription_item_ids.add(id)
                 child_data = _capture_substreams(
                     cls_child, search_name, id, parent_data, account_id, http, log
                 )
@@ -839,6 +864,9 @@ async def fetch_backfill_usage_records(
             parent_data = doc
             for item in parent_data.items.data:
                 id = item.id
+                if id in seen_subscription_item_ids:
+                    continue
+                seen_subscription_item_ids.add(id)
                 child_data = _capture_substreams(
                     cls_child, search_name, id, parent_data, account_id, http, log
                 )
