@@ -18,10 +18,12 @@ captures:
         name: customers
         interval: PT5M
       target: acmeCo/customers
+      disable: true
     - resource:
         name: customer_metafields
         interval: PT5M
       target: acmeCo/customer_metafields
+      disable: true
     - resource:
         name: products
         interval: PT5M
