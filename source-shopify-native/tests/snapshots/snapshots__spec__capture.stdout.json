@@ -114,10 +114,10 @@
           },
           "oneOf": [
             {
-              "$ref": "#/$defs/AccessToken"
+              "$ref": "#/$defs/ShopifyClientCredentials"
             },
             {
-              "$ref": "#/$defs/ShopifyClientCredentials"
+              "$ref": "#/$defs/AccessToken"
             },
             {
               "$ref": "#/$defs/LongLivedClientCredentialsOAuth2Credentials"
