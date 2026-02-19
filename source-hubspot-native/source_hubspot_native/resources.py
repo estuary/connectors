@@ -422,7 +422,7 @@ def properties(http: HTTPSession, object_names: Iterable[str]) -> Resource:
             state,
             task,
             fetch_snapshot=snapshot,
-            tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d")),
+            tombstone=Properties(_meta=Properties.Meta(op="d"), type=""),
         )
 
     return Resource(
