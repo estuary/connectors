@@ -72,6 +72,7 @@ async def fetch_incremental(
     platform_account_id: str | None,
     connected_account_id: str | None,
     http: HTTPSession,
+    incremental_window_size: timedelta,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[StripeObjectWithEvents | LogCursor, None]:
@@ -97,7 +98,12 @@ async def fetch_incremental(
     url = f"{API}/events"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
     parameters = add_event_types(parameters, cls.EVENT_TYPES)
-    end = datetime.now(tz=UTC) - LAG
+    
+    end = min(
+        datetime.now(tz=UTC) - LAG,
+        # Bound the window to avoid processing too many events at once when catching up.
+        log_cursor + incremental_window_size,
+    )
 
     if end < log_cursor or (end - log_cursor < MIN_INCREMENTAL_INTERVAL):
         # Return early and sleep if the end date is before the log cursor
@@ -283,6 +289,7 @@ async def fetch_incremental_substreams(
     platform_account_id: str | None,
     connected_account_id: str | None,
     http: HTTPSession,
+    incremental_window_size: timedelta,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[StripeChildObject | LogCursor, None]:
@@ -309,7 +316,11 @@ async def fetch_incremental_substreams(
     url = f"{API}/events"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
     parameters = add_event_types(parameters, cls_child.EVENT_TYPES)
-    end = datetime.now(tz=UTC) - LAG
+    end = min(
+        datetime.now(tz=UTC) - LAG,
+        # Bound the window to avoid processing too many events at once when catching up.
+        log_cursor + incremental_window_size,
+    )
 
     if end < log_cursor or (end - log_cursor < MIN_INCREMENTAL_INTERVAL):
         # Return early and sleep if the end date is before the log cursor
@@ -693,6 +704,7 @@ async def fetch_incremental_usage_records(
     platform_account_id: str | None,
     connected_account_id: str | None,
     http: HTTPSession,
+    incremental_window_size: timedelta,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[StripeChildObject | LogCursor, None]:
@@ -717,7 +729,11 @@ async def fetch_incremental_usage_records(
     url = f"{API}/events"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
     parameters = add_event_types(parameters, cls_child.EVENT_TYPES)
-    end = datetime.now(tz=UTC) - LAG
+    end = min(
+        datetime.now(tz=UTC) - LAG,
+        # Bound the window to avoid processing too many events at once when catching up.
+        log_cursor + incremental_window_size,
+    )
 
     if end < log_cursor or (end - log_cursor < MIN_INCREMENTAL_INTERVAL):
         # Return early and sleep if the end date is before the log cursor

@@ -218,6 +218,7 @@ async def all_resources(
                     base_stream,
                     http,
                     config.start_date,
+                    config.advanced.incremental_window_size,
                     platform_account_id,
                     connected_account_ids,
                     all_account_ids,
@@ -254,6 +255,7 @@ async def all_resources(
                                     child_stream,
                                     http,
                                     config.start_date,
+                                    config.advanced.incremental_window_size,
                                     platform_account_id,
                                     connected_account_ids,
                                     all_account_ids,
@@ -267,6 +269,7 @@ async def all_resources(
                                     child_stream,
                                     http,
                                     config.start_date,
+                                    config.advanced.incremental_window_size,
                                     platform_account_id,
                                     connected_account_ids,
                                     all_account_ids,
@@ -280,6 +283,7 @@ async def all_resources(
                                     child_stream,
                                     http,
                                     config.start_date,
+                                    config.advanced.incremental_window_size,
                                     platform_account_id,
                                     connected_account_ids,
                                     all_account_ids,
@@ -296,6 +300,7 @@ async def all_resources(
                 stream,
                 http,
                 config.start_date,
+                config.advanced.incremental_window_size,
                 platform_account_id,
                 connected_account_ids,
                 all_account_ids,
@@ -423,6 +428,7 @@ def base_object(
     cls,
     http: HTTPSession,
     start_date: datetime,
+    incremental_window_size: timedelta,
     platform_account_id: str,
     connected_account_ids: list[str],
     all_account_ids: list[str],
@@ -463,6 +469,7 @@ def base_object(
                 platform_account_id,
                 None,
                 http,
+                incremental_window_size,
             )
             fetch_page_fns = functools.partial(
                 fetch_backfill,
@@ -492,6 +499,7 @@ def base_object(
                     platform_account_id,
                     account_id,
                     http,
+                    incremental_window_size,
                 )
 
             def fetch_page_factory(account_id: str):
@@ -534,6 +542,7 @@ def child_object(
     child_cls,
     http: HTTPSession,
     start_date: datetime,
+    incremental_window_size: timedelta,
     platform_account_id: str,
     connected_account_ids: list[str],
     all_account_ids: list[str],
@@ -573,6 +582,7 @@ def child_object(
                 platform_account_id,
                 None,
                 http,
+                incremental_window_size,
             )
             fetch_page_fns = functools.partial(
                 fetch_backfill_substreams,
@@ -604,6 +614,7 @@ def child_object(
                     platform_account_id,
                     account_id,
                     http,
+                    incremental_window_size,
                 )
 
             def fetch_page_factory(account_id: str):
@@ -647,6 +658,7 @@ def split_child_object(
     child_cls,
     http: HTTPSession,
     start_date: datetime,
+    incremental_window_size: timedelta,
     platform_account_id: str,
     connected_account_ids: list[str],
     all_account_ids: list[str],
@@ -686,6 +698,7 @@ def split_child_object(
                 platform_account_id,
                 None,
                 http,
+                incremental_window_size,
             )
             fetch_page_fns = functools.partial(
                 fetch_backfill_substreams,
@@ -716,6 +729,7 @@ def split_child_object(
                     platform_account_id,
                     account_id,
                     http,
+                    incremental_window_size,
                 )
 
             def fetch_page_factory(account_id: str):
@@ -759,6 +773,7 @@ def usage_records(
     child_cls,
     http: HTTPSession,
     start_date: datetime,
+    incremental_window_size: timedelta,
     platform_account_id: str,
     connected_account_ids: list[str],
     all_account_ids: list[str],
@@ -798,6 +813,7 @@ def usage_records(
                 platform_account_id,
                 None,
                 http,
+                incremental_window_size,
             )
             fetch_page_fns = functools.partial(
                 fetch_backfill_usage_records,
@@ -829,6 +845,7 @@ def usage_records(
                     platform_account_id,
                     account_id,
                     http,
+                    incremental_window_size,
                 )
 
             def fetch_page_factory(account_id: str):
