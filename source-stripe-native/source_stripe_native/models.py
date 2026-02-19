@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from typing import (
+    Annotated,
     ClassVar,
     Dict,
     Generic,
@@ -31,6 +32,22 @@ class EndpointConfig(BaseModel):
     capture_connected_accounts: bool = Field(
         description="Whether to capture data from connected accounts.",
         default=False,
+    )
+
+    class Advanced(BaseModel):
+        incremental_window_size: Annotated[timedelta, Field(
+            description="Maximum time window to process in a single incremental sweep. This bounds how much catch-up work is done at once and helps prevent the connector from falling behind when there are a large number of changes in a short time frame. Uses ISO 8601 duration format (e.g. PT1H for 1 hour, PT30M for 30 minutes).",
+            title="Max Incremental Window Size",
+            default_factory=lambda: timedelta(days=1),
+            ge=timedelta(minutes=1),
+            le=timedelta(days=30),
+        )]
+
+    advanced: Advanced = Field(
+        default_factory=Advanced,  # type: ignore
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
     )
 
 
