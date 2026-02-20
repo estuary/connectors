@@ -245,9 +245,9 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 		l.{{ $bound.Identifier }} = r.c{{$ind}}
 		{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 	{{- end }}
-{{ else }}
-SELECT -1, NULL LIMIT 0
-{{ end }}
+{{- else -}}
+(SELECT -1, CAST(NULL AS {{ $.ObjectType }}) LIMIT 0) as nodoc
+{{- end }}
 {{ end }}
 
 -- Templated query for no_flow_document feature flag - reconstructs JSON from root-level columns
@@ -268,7 +268,7 @@ SELECT -1, NULL LIMIT 0
 {{- end }}
 
 {{ define "loadQueryNoFlowDocument" -}}
-SELECT {{ $.Binding }}, 
+SELECT {{ $.Binding }},
 TO_JSON(STRUCT(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}}, {{end}}
@@ -315,7 +315,7 @@ WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{end -}}
 		l.{{$val.Identifier}} = r.c{{ Add (len $.Keys) $ind}}
-	{{- end}} 
+	{{- end}}
 	{{- if $.Document -}}
 		{{ if $.Values  }}, {{ end }}l.{{$.Document.Identifier}} = r.c{{ Add (len $.Columns) -1 }}
 	{{- end }}
@@ -421,16 +421,21 @@ UPDATE {{ Identifier $.TablePath }}
 
 type queryParams struct {
 	sql.Table
-	Bounds            []sql.MergeBound
-	ObjAndArrayAsJson bool
+	Bounds     []sql.MergeBound
+	ObjectType string
 }
 
 func renderQueryTemplate(table sql.Table, tpl *template.Template, bounds []sql.MergeBound, objAndArrayAsJson bool) (string, error) {
+	objectType := "STRING"
+	if objAndArrayAsJson {
+		objectType = "JSON"
+	}
+
 	var w strings.Builder
 	if err := tpl.Execute(&w, &queryParams{
-		Table:             table,
-		Bounds:            bounds,
-		ObjAndArrayAsJson: objAndArrayAsJson,
+		Table:      table,
+		Bounds:     bounds,
+		ObjectType: objectType,
 	}); err != nil {
 		return "", err
 	}

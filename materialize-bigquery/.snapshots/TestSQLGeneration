@@ -161,11 +161,10 @@ SELECT 0, l.flow_document
 		 ON l.key1 = r.c0 AND l.key1 >= 10 AND l.key1 <= 100
 		 AND l.key2 = r.c1
 		 AND l.key_binary = r.c2 AND l.key_binary >= 'aGVsbG8K' AND l.key_binary <= 'Z29vZGJ5ZQo='
-
 --- End projectID.dataset.key_value loadQuery ---
 
 --- Begin projectID.dataset.key_value loadQueryNoFlowDocument ---
-SELECT 0, 
+SELECT 0,
 TO_JSON(STRUCT(
 	l.key1 AS key1, 
 	l.key2 AS key2, 
