@@ -74,6 +74,10 @@ captures:
         interval: PT3H
       target: acmeCo/contact_list_memberships
     - resource:
+        name: leads
+        schedule: 55 23 * * *
+      target: acmeCo/leads
+    - resource:
         name: orders
         schedule: 55 23 * * *
       target: acmeCo/orders
