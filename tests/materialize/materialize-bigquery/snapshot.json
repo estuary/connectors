@@ -180,7 +180,7 @@
         "TempTableName": "flow_temp_table_11"
       },
       "estuary-theatre%2Ftesting%2Fmultiple_types": {
-        "Query": "MERGE INTO `estuary-theatre`.testing.multiple_types AS l\nUSING flow_temp_table_2 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 10\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.c1, l.binary_field = r.c2, l.bool_field = r.c3, l.float_field = r.c4, l.flow_published_at = r.c5, l.multiple = r.c6, l.nested = r.c7, l.nullable_int = r.c8, l.str_field = r.c9\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9);\n",
+        "Query": "MERGE INTO `estuary-theatre`.testing.multiple_types AS l\nUSING flow_temp_table_2 AS r\nON \n\tl.id = r.c0 AND l.id >= 6 AND l.id <= 10\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.array_int = r.c1, l.binary_field = r.c2, l.bool_field = r.c3, l.float_field = r.c4, l.flow_published_at = r.c5, l.multiple = r.c6, l.nested = r.c7, l.nullable_int = r.c8, l.str_field = r.c9\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, array_int, binary_field, bool_field, float_field, flow_published_at, multiple, nested, nullable_int, str_field)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9);\n",
         "SourceURIs": [
           "gs://[bucket]/<uuid>"
         ],

@@ -351,6 +351,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			query = mergeQuery
 		} else {
 			query = b.storeInsertSQL
+			b.storeMergeBounds.Reset()
 		}
 		b.mustMerge = false
 
