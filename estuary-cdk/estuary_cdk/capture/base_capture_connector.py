@@ -33,6 +33,21 @@ from .common import _ConnectorState
 ENCRYPTION_URL = os.getenv("ENCRYPTION_URL") or "https://config-encryption.estuary.dev/v1/encrypt-config"
 
 
+PERIODIC_RESTART_INTERVAL = 24 * 60 * 60  # 24 hours
+GRACEFUL_SHUTDOWN_TIMEOUT = 30 * 60  # 30 minutes
+TASK_CANCELLATION_TIMEOUT = 5 * 60  # 5 minutes
+
+
+class TerminateTaskGroup(Exception):
+    """Exception raised to terminate a task group."""
+    pass
+
+
+async def force_terminate_task_group():
+    """Used to force termination of a task group."""
+    raise TerminateTaskGroup()
+
+
 class BaseCaptureConnector(
     BaseConnector[Request[EndpointConfig, ResourceConfig, _ConnectorState]],
     HTTPMixin,
@@ -105,18 +120,33 @@ class BaseCaptureConnector(
             stopping = Task.Stopping(asyncio.Event())
 
             async def periodic_stop() -> None:
-                await asyncio.sleep(24 * 60 * 60)  # 24 hours
+                """Trigger graceful shutdown after 24 hours of continuous operation."""
+                await asyncio.sleep(PERIODIC_RESTART_INTERVAL)
                 stopping.event.set()
 
-                await asyncio.sleep(60 * 60)  # 1 hour
+            async def enforce_shutdown(tg: asyncio.TaskGroup) -> None:
+                """
+                Enforce shutdown completion after stopping.event is set.
+
+                This handles shutdown triggered by any source: periodic_stop,
+                stream exceptions, or any other code that sets stopping.event.
+                """
+                await stopping.event.wait()
+
+                log.debug("Waiting for graceful exit.")
+
+                await asyncio.sleep(GRACEFUL_SHUTDOWN_TIMEOUT)
 
                 current_task = asyncio.current_task()
                 task_infos = get_running_tasks_info(
                     exclude_tasks={current_task} if current_task else None
                 )
 
+                if not task_infos:
+                    return
+
                 log.warning(
-                    "Graceful exit has not finished in one hour",
+                    f"Graceful exit has not finished in {GRACEFUL_SHUTDOWN_TIMEOUT // 60} minutes. Cancelling capture tasks.",
                     {
                         "running_task_count": len(task_infos),
                         "running_tasks": [
@@ -126,9 +156,35 @@ class BaseCaptureConnector(
                                 "stack_trace": info.stack_trace,
                             }
                             for info in task_infos
-                        ]
+                        ],
                     },
                 )
+
+                # Terminate the task group, which will cancel all its tasks.
+                tg.create_task(force_terminate_task_group())
+
+                await asyncio.sleep(TASK_CANCELLATION_TIMEOUT)
+
+                task_infos = get_running_tasks_info(
+                    exclude_tasks={current_task} if current_task else None
+                )
+
+                if task_infos:
+                    log.error(
+                        f"Capture tasks did not respond to cancellation after {TASK_CANCELLATION_TIMEOUT // 60} minutes. Forcing exit.",
+                        {
+                            "running_task_count": len(task_infos),
+                            "running_tasks": [
+                                {
+                                    "task_name": info.task_name,
+                                    "coro_name": info.coro_name,
+                                    "stack_trace": info.stack_trace,
+                                }
+                                for info in task_infos
+                            ],
+                        },
+                    )
+                    os._exit(1)
 
             # Rotate OAuth2 tokens for credentials with periodically expiring tokens.
             if isinstance(self.token_source, TokenSource) and isinstance(
@@ -141,22 +197,28 @@ class BaseCaptureConnector(
             # want to block on it.
             periodic_stop_task = asyncio.create_task(periodic_stop())
 
-            async with asyncio.TaskGroup() as tg:
+            try:
+                async with asyncio.TaskGroup() as tg:
+                    # Start enforce_shutdown after tg is available
+                    enforce_shutdown_task = asyncio.create_task(enforce_shutdown(tg))
 
-                task = Task(
-                    log.getChild("capture"),
-                    ConnectorStatus(log, stopping),
-                    "capture",
-                    self.output,
-                    stopping,
-                    tg,
-                )
-                log.event.status("Capture started")
-                await capture(task)
+                    task = Task(
+                        log.getChild("capture"),
+                        ConnectorStatus(log, stopping),
+                        "capture",
+                        self.output,
+                        stopping,
+                        tg,
+                    )
+                    log.event.status("Capture started")
+                    await capture(task)
+            except* TerminateTaskGroup:
+                pass  # Expected when enforce_shutdown terminates the task group
 
-            # Cancel the periodic_stop task if tasks exited gracefully
-            # before the warning timeout.
+            # Cancel the background tasks if capture exited gracefully
+            # before the shutdown timeout.
             _ = periodic_stop_task.cancel()
+            _ = enforce_shutdown_task.cancel()
 
             # When capture() completes, the connector exits.
             if stopping.first_error:
