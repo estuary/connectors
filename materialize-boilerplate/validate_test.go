@@ -460,6 +460,41 @@ func TestValidate(t *testing.T) {
 
 		require.NoError(t, err)
 	})
+
+	t.Run("cannot add new root document without backfill", func(t *testing.T) {
+		existing := loadValidateSpec(t, "base.flow.proto")
+		proposed := loadValidateSpec(t, "base.flow.proto")
+
+		existing.Bindings[0].FieldSelection.Values = append(
+			existing.Bindings[0].FieldSelection.Values,
+			existing.Bindings[0].FieldSelection.Document,
+		)
+		existing.Bindings[0].FieldSelection.Document = ""
+
+		identityTransform := func(s string) string { return s }
+		is := testInfoSchemaFromSpec(t, existing, identityTransform)
+		featureFlags := map[string]bool{"flow_document": true, "retain_existing_data_on_backfill": false}
+		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, nil)
+
+		constraints, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			proposed.Bindings[0].Backfill,
+			proposed.Bindings[0].Collection,
+			proposed.Bindings[0].FieldSelection.FieldConfigJsonMap,
+			existing,
+		)
+		require.NoError(t, err)
+
+		for _, documentField := range []string{"flow_document", "second_root"} {
+			require.Equal(t, constraints[documentField],
+				&pm.Response_Validated_Constraint{
+					Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
+					Reason: "Cannot add a new root document projection to materialization without backfilling",
+				},
+			)
+		}
+	})
 }
 
 type testConstrainter struct {
