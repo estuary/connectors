@@ -1,9 +1,12 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
+	"google.golang.org/api/option"
+	"google.golang.org/api/transport"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -62,6 +65,39 @@ func trimDatabasePath(path string) string {
 //	=> "users/*/messages"
 func documentToResourcePath(documentPath string) resourcePath {
 	return collectionToResourcePath(documentPath)
+}
+
+// parseDatabasePath extracts projectID and databaseID from a database path.
+// Input format: "projects/{projectID}/databases/{databaseID}"
+func parseDatabasePath(path string) (projectID, databaseID string, err error) {
+	var parts = strings.Split(path, "/")
+	if len(parts) != 4 || parts[0] != "projects" || parts[2] != "databases" {
+		return "", "", fmt.Errorf("invalid database path %q: expected projects/{projectID}/databases/{databaseID}", path)
+	}
+	return parts[1], parts[3], nil
+}
+
+// resolveDatabasePath returns the database path from the config, or auto-detects
+// it from the credentials if not specified. Returns the resolved path along with
+// the extracted projectID and databaseID.
+func resolveDatabasePath(ctx context.Context, configPath string, credsOpt option.ClientOption) (databasePath, projectID, databaseID string, err error) {
+	databasePath = configPath
+	if databasePath == "" {
+		creds, credsErr := transport.Creds(ctx, credsOpt)
+		if credsErr != nil {
+			return "", "", "", fmt.Errorf("unable to get credentials: %w", credsErr)
+		}
+		if creds == nil || creds.ProjectID == "" {
+			return "", "", "", fmt.Errorf("unable to determine project ID from credentials (set 'database' config property)")
+		}
+		databasePath = fmt.Sprintf("projects/%s/databases/(default)", creds.ProjectID)
+	}
+
+	projectID, databaseID, err = parseDatabasePath(databasePath)
+	if err != nil {
+		return "", "", "", err
+	}
+	return databasePath, projectID, databaseID, nil
 }
 
 func retryableStatus(err error) bool {
