@@ -12,7 +12,6 @@ import (
 	"time"
 
 	firestore "cloud.google.com/go/firestore"
-	firebase "firebase.google.com/go"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/invopop/jsonschema"
@@ -119,13 +118,14 @@ func (driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Respo
 		return nil, fmt.Errorf("parsing endpoint config: %w", err)
 	}
 
-	sa := option.WithCredentialsJSON([]byte(cfg.CredentialsJSON))
-	app, err := firebase.NewApp(ctx, nil, sa)
+	credsOpt := option.WithCredentialsJSON([]byte(cfg.CredentialsJSON))
+
+	_, projectID, databaseID, err := resolveDatabasePath(ctx, cfg.DatabasePath, credsOpt)
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := app.Firestore(ctx)
+	client, err := firestore.NewClientWithDatabase(ctx, projectID, databaseID, credsOpt)
 	if err != nil {
 		return nil, err
 	}

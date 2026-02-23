@@ -69,7 +69,7 @@ func TestSyntheticData(t *testing.T) {
 	credentialsJSON, err := ioutil.ReadFile(credentialsPath)
 	require.NoError(t, err)
 
-	client, err := firestore.NewClient(ctx, *testProjectID, option.WithCredentialsJSON(credentialsJSON))
+	client, err := firestore.NewClientWithDatabase(ctx, *testProjectID, *testDatabaseName, option.WithCredentialsJSON(credentialsJSON))
 	require.NoError(t, err)
 
 	var batcher = &datasynthBatcher{inner: client}
@@ -153,7 +153,7 @@ func TestSyntheticClutter(t *testing.T) {
 	credentialsJSON, err := ioutil.ReadFile(credentialsPath)
 	require.NoError(t, err)
 
-	client, err := firestore.NewClient(ctx, *testProjectID, option.WithCredentialsJSON(credentialsJSON))
+	client, err := firestore.NewClientWithDatabase(ctx, *testProjectID, *testDatabaseName, option.WithCredentialsJSON(credentialsJSON))
 	require.NoError(t, err)
 
 	var eg = new(errgroup.Group)

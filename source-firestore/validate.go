@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	firebase "firebase.google.com/go"
+	firestore "cloud.google.com/go/firestore"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"google.golang.org/api/option"
@@ -17,13 +17,14 @@ func (driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Respo
 	}
 
 	// Validate connection to Firestore
-	sa := option.WithCredentialsJSON([]byte(cfg.CredentialsJSON))
-	app, err := firebase.NewApp(ctx, nil, sa)
+	credsOpt := option.WithCredentialsJSON([]byte(cfg.CredentialsJSON))
+
+	_, projectID, databaseID, err := resolveDatabasePath(ctx, cfg.DatabasePath, credsOpt)
 	if err != nil {
 		return nil, err
 	}
 
-	client, err := app.Firestore(ctx)
+	client, err := firestore.NewClientWithDatabase(ctx, projectID, databaseID, credsOpt)
 	if err != nil {
 		return nil, err
 	}
