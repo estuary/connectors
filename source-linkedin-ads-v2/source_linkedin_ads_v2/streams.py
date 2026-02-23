@@ -19,7 +19,7 @@ from .utils import get_parent_stream_values, transform_data
 
 logger = logging.getLogger("airbyte")
 
-LINKEDIN_VERSION_API = "202502"
+LINKEDIN_VERSION_API = "202602"
 
 
 class LinkedinAdsStream(HttpStream, ABC):
