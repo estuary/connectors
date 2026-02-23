@@ -421,7 +421,7 @@ func testFirestoreClient(ctx context.Context, t testing.TB) *firestoreClient {
 	credentialsJSON, err := ioutil.ReadFile(credentialsPath)
 	require.NoError(t, err)
 
-	client, err := firestore.NewClient(ctx, *testProjectID, option.WithCredentialsJSON(credentialsJSON))
+	client, err := firestore.NewClientWithDatabase(ctx, *testProjectID, *testDatabaseName, option.WithCredentialsJSON(credentialsJSON))
 	require.NoError(t, err)
 
 	var prefix = fmt.Sprintf("flow_source_tests/%s", strings.ReplaceAll(t.Name(), "/", "_"))

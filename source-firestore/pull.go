@@ -14,7 +14,6 @@ import (
 
 	firestore "cloud.google.com/go/firestore"
 	firestore_v1 "cloud.google.com/go/firestore/apiv1"
-	firebase "firebase.google.com/go"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -22,7 +21,6 @@ import (
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"google.golang.org/api/option"
-	"google.golang.org/api/transport"
 	firestore_pb "google.golang.org/genproto/googleapis/firestore/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -448,32 +446,29 @@ func (c *capture) Run(ctx context.Context) error {
 	}
 	defer rpcClient.Close()
 
+	// If the 'database' config property is unspecified, try to autodetect it from
+	// the provided credentials.
+	databasePath, projectID, databaseID, err := resolveDatabasePath(ctx, c.Config.DatabasePath, credsOpt)
+	if err != nil {
+		return err
+	}
+	if c.Config.DatabasePath == "" {
+		c.Config.DatabasePath = databasePath
+		log.WithField("path", databasePath).Warn("using autodetected database path (set 'database' config property to override)")
+	}
+
+	ctx = metadata.AppendToOutgoingContext(ctx, "google-cloud-resource-prefix", c.Config.DatabasePath)
+
 	// If we're going to perform any async backfills, connect to Firestore via the client library too
 	var libraryClient *firestore.Client
 	if len(backfills) > 0 {
 		log.WithField("backfills", len(backfills)).Debug("opening second firestore client for async backfills")
-		app, err := firebase.NewApp(ctx, nil, credsOpt)
-		if err != nil {
-			return err
-		}
-		libraryClient, err = app.Firestore(ctx)
+		libraryClient, err = firestore.NewClientWithDatabase(ctx, projectID, databaseID, credsOpt)
 		if err != nil {
 			return err
 		}
 		defer libraryClient.Close()
 	}
-
-	// If the 'database' config property is unspecified, try to autodetect it from
-	// the provided credentials.
-	if c.Config.DatabasePath == "" {
-		var creds, _ = transport.Creds(ctx, credsOpt)
-		if creds == nil || creds.ProjectID == "" {
-			return fmt.Errorf("unable to determine project ID (set 'database' config property)")
-		}
-		c.Config.DatabasePath = fmt.Sprintf("projects/%s/databases/(default)", creds.ProjectID)
-		log.WithField("path", c.Config.DatabasePath).Warn("using autodetected database path (set 'database' config property to override)")
-	}
-	ctx = metadata.AppendToOutgoingContext(ctx, "google-cloud-resource-prefix", c.Config.DatabasePath)
 
 	// Notify Flow that we're starting.
 	if err := c.Output.Ready(false); err != nil {
