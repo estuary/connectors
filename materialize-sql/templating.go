@@ -15,7 +15,7 @@ type ColumnWithAlias struct {
 }
 
 func (c ColumnWithAlias) AsFlatType() FlatType {
-    t, _ := c.Column.AsFlatType()
+	t, _ := c.Column.AsFlatType()
 	return t
 }
 
@@ -41,7 +41,7 @@ func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
 		"Last":       func(s []string) string { return s[len(s)-1] },
 		"First":      func(s []string) string { return s[0] },
 		"Backtick":   func() string { return "`" }, // Go string literals don't allow a ` character
-		"ColumnWithAlias": func (c Column, alias string) ColumnWithAlias {
+		"ColumnWithAlias": func(c Column, alias string) ColumnWithAlias {
 			return ColumnWithAlias{Column: c, Alias: alias}
 		},
 		"ChunkColumns": func(cols []*Column, size int) [][]*Column {
@@ -197,8 +197,13 @@ func (b *MergeBoundsBuilder) Build() []MergeBound {
 	}
 
 	// Reset for tracking the next transaction.
-	b.lower = nil
-	b.upper = nil
+	b.Reset()
 
 	return conditions
+}
+
+// Reset clears the current bounds to begin tracking a new range.
+func (b *MergeBoundsBuilder) Reset() {
+	b.lower = nil
+	b.upper = nil
 }
