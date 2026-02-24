@@ -17,7 +17,6 @@ from typing import (
     Iterable,
     Literal,
     TypeVar,
-    Tuple,
 )
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
@@ -40,7 +39,7 @@ from ..flow import (
 from ..pydantic_polyfill import GenericModel
 from . import Task, request, response
 
-LogCursor = Tuple[str | int] | AwareDatetime | NonNegativeInt
+LogCursor = tuple[str | int] | AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
 The two predominant strategies for accessing logs are:
  a) fetching entities which were created / updated / deleted since a given datetime.

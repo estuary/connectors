@@ -60,6 +60,7 @@ on:
       - "source-iterable-native/**"
       - "source-ringcentral/**"
       - "source-posthog/**"
+      - "source-ashby/**"
 
   pull_request:
     branches: [main]
@@ -121,6 +122,7 @@ on:
       - "source-iterable-native/**"
       - "source-ringcentral/**"
       - "source-posthog/**"
+      - "source-ashby/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -353,6 +355,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-posthog
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-ashby
             type: capture
             version: v1
             usage_rate: "1.0"
