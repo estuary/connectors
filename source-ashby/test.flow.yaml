@@ -1,0 +1,10 @@
+captures:
+  acmeCo/source-ashby:
+    endpoint:
+      local:
+        command:
+          - python
+          - -m
+          - source_ashby
+        config: config.yaml
+    bindings: []
