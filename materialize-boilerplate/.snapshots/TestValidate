@@ -178,7 +178,7 @@ cannot add or remove selected key fields for standard updates:
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"keyA","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"keyB","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
-{"Field":"keyC","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot add a new key location to the field selection of an existing non-delta-updates materialization witout backfilling"}
+{"Field":"keyC","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot add a new key location to the field selection of an existing non-delta-updates materialization without backfilling"}
 {"Field":"multiple","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field is able to be materialized"}
 {"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"This field is able to be materialized"}
 {"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize this field"}

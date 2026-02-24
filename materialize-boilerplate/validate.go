@@ -220,6 +220,11 @@ func (v Validator) validateMatchesExistingResource(
 						c = constraintFromExisting
 					}
 				}
+			} else if lastBinding != nil && lastBinding.FieldSelection.Document == "" {
+				c = &pm.Response_Validated_Constraint{
+					Type:   pm.Response_Validated_Constraint_INCOMPATIBLE,
+					Reason: "Cannot add a new root document projection to materialization without backfilling",
+				}
 			} else {
 				c = &pm.Response_Validated_Constraint{
 					Type: pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
@@ -240,7 +245,7 @@ func (v Validator) validateMatchesExistingResource(
 			// Locations that are part of the primary key may not be added without backfilling the binding
 			c = &pm.Response_Validated_Constraint{
 				Type:   pm.Response_Validated_Constraint_FIELD_FORBIDDEN,
-				Reason: "Cannot add a new key location to the field selection of an existing non-delta-updates materialization witout backfilling",
+				Reason: "Cannot add a new key location to the field selection of an existing non-delta-updates materialization without backfilling",
 			}
 			if lastBinding != nil && slices.Contains(lastBinding.FieldSelection.AllFields(), p.Field) {
 				if existingField := existingResource.GetField(p.Field); existingField != nil {
@@ -278,7 +283,7 @@ func (v Validator) validateMatchesExistingResource(
 		constraints[p.Field] = c
 	}
 
-	if lastBinding != nil && !deltaUpdates && !slices.Contains(docFields, lastBinding.FieldSelection.Document) {
+	if lastBinding != nil && !deltaUpdates && lastBinding.FieldSelection.Document != "" && !slices.Contains(docFields, lastBinding.FieldSelection.Document) {
 		// For standard updates, the proposed binding must still have the original document field
 		// from a prior specification, if that's known. If it doesn't, make sure to fail the build
 		// with a constraint on a root document projection that it does have.
