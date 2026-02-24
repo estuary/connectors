@@ -93,6 +93,7 @@ func (c client) queryIdempotent(
 				log.WithFields(log.Fields{
 					"jobID": jobID,
 				}).Info("previously submitted job finished successfully after waiting")
+				return nil
 			}
 
 			// Other errors will crash the connector and automatically be
