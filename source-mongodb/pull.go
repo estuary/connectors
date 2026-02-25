@@ -90,6 +90,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 	}
 
 	var timeseriesCollections = make(map[string]bool)
+	var preAndPostImagesCollections = make(map[string]bool)
 	for db := range databaseNames {
 		collections, err := client.Database(db).ListCollectionSpecifications(ctx, bson.D{})
 		if err != nil {
@@ -101,6 +102,10 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 				return fmt.Errorf("unsupported collection type: %w", err)
 			} else if collectionType == mongoCollectionTypeTimeseries {
 				timeseriesCollections[resourceId(db, coll.Name)] = true
+			}
+
+			if enabled, err := coll.Options.LookupErr("changeStreamPreAndPostImages", "enabled"); err == nil && enabled.Boolean() {
+				preAndPostImagesCollections[resourceId(db, coll.Name)] = true
 			}
 		}
 	}
@@ -135,6 +140,19 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			batchBindings = append(batchBindings, info)
 		}
 	}
+	var fullDocRequired = make(map[string]bool)
+	for _, db := range databasesForBindings(changeStreamBindings) {
+		allEnabled := true
+		for _, b := range changeStreamBindings {
+			if b.resource.Database == db && !preAndPostImagesCollections[resourceId(b.resource.Database, b.resource.Collection)] {
+				allEnabled = false
+				break
+			}
+		}
+		fullDocRequired[db] = allEnabled
+	}
+	log.WithField("fullDocRequired", fullDocRequired).Info("determined fullDocument mode per database")
+
 	allBindings := append(changeStreamBindings, batchBindings...)
 
 	var prevState captureState
@@ -219,6 +237,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 			serverInfo.supportsStartAfter,
 			cfg.Advanced.ExclusiveCollectionFilter,
 			excludeCollections,
+			fullDocRequired,
 		)
 	}
 

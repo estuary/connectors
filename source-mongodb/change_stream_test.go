@@ -52,11 +52,12 @@ func TestPullStream(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		setup          func(t *testing.T)
-		pullTimes      int
-		wantSent       []string
-		wantEventCount int
+		name            string
+		setup           func(t *testing.T)
+		fullDocRequired map[string]bool
+		pullTimes       int
+		wantSent        []string
+		wantEventCount  int
 	}{
 		{
 			name: "one document",
@@ -84,7 +85,7 @@ func TestPullStream(t *testing.T) {
 				insertDoc(t, testColl3, 3) // not a captured collection
 			},
 			pullTimes:      3,
-			wantSent:       []string{cp, "1", "2", cp},
+			wantSent:       []string{cp, "1", cp, "2", cp},
 			wantEventCount: 3,
 		},
 		{
@@ -95,6 +96,19 @@ func TestPullStream(t *testing.T) {
 			pullTimes:      1,
 			wantSent:       []string{cp, "1", "2", "3", "4", "5", cp},
 			wantEventCount: 5,
+		},
+		{
+			name: "fullDocument required mode",
+			setup: func(t *testing.T) {
+				require.NoError(t, client.Database(testDb).CreateCollection(ctx, testColl1, &options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}))
+				insertDoc(t, testColl1, 1)
+				_, err := client.Database(testDb).Collection(testColl1).UpdateOne(ctx, bson.D{{Key: "_id", Value: 1}}, bson.D{{Key: "$set", Value: bson.D{{Key: "updated", Value: true}}}})
+				require.NoError(t, err)
+			},
+			fullDocRequired: map[string]bool{testDb: true},
+			pullTimes:       2,
+			wantSent:        []string{cp, "1", cp, "1", cp},
+			wantEventCount:  2,
 		},
 		{
 			name: "split fragments",
@@ -152,7 +166,11 @@ func TestPullStream(t *testing.T) {
 				lastEventClusterTime: map[string]primitive.Timestamp{},
 			}
 
-			streams, err := c.initializeStreams(ctx, bindings, nil, true, true, false, map[string][]string{})
+			fullDocRequired := tt.fullDocRequired
+			if fullDocRequired == nil {
+				fullDocRequired = map[string]bool{}
+			}
+			streams, err := c.initializeStreams(ctx, bindings, nil, true, true, false, map[string][]string{}, fullDocRequired)
 			require.NoError(t, err)
 			require.Equal(t, 1, len(streams))
 
