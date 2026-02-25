@@ -12,12 +12,12 @@ Binding 0:
       "c__flow_test_batch_float_nans_10511"
     ],
     "collection": {
-      "name": "acmeCo/test/c__flow_test_batch_float_nans_10511",
+      "name": "acmeCo/test/c__flow_test_batch/float_nans_10511",
       "read_schema_json": {
         "type": "object",
         "required": [
-          "_meta",
-          "ID"
+          "ID",
+          "_meta"
         ],
         "properties": {
           "A_DOUBLE": {
@@ -45,12 +45,37 @@ Binding 0:
                 "type": "integer",
                 "title": "Result Index",
                 "description": "The index of this document within the query execution which produced it."
+              },
+              "source": {
+                "properties": {
+                  "resource": {
+                    "type": "string",
+                    "description": "Resource name of the binding from which this document was captured."
+                  },
+                  "owner": {
+                    "type": "string",
+                    "description": "The name of the owner of the table from which the document was read."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table from which the document was read."
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "resource"
+                ]
               }
             },
             "type": "object",
             "required": [
               "polled",
-              "index"
+              "index",
+              "source"
             ]
           }
         },
