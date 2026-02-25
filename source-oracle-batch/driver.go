@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"text/template"
@@ -454,7 +456,14 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	})
 	defer watchdog.Stop()
 
-	rows, err := c.DB.QueryContext(ctx, query, cursorValues...)
+	var queryExpanded string
+	var queryArgs []any
+	queryExpanded, queryArgs, err = expandQueryPlaceholders(query, cursorValues)
+	if err != nil {
+		return fmt.Errorf("error expanding query placeholders: %w", err)
+	}
+
+	rows, err := c.DB.QueryContext(ctx, queryExpanded, queryArgs...)
 	if err != nil {
 		return fmt.Errorf("error executing query: %w", err)
 	}
@@ -618,6 +627,35 @@ func quoteIdentifier(name string) string {
 	//     Quoted identifiers can contain any characters and punctuations marks as well as spaces.
 	//     However, neither quoted nor nonquoted identifiers can contain double quotation marks or the null character (\0)
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+var queryPlaceholderRegexp = regexp.MustCompile(`:[0-9]+`)
+
+// expandQueryPlaceholders rewrites numbered bind-variable placeholders (`:1`, `:2`, …)
+// into unique sequential placeholders, duplicating argument values as needed. This is
+// necessary because the go-ora driver requires each placeholder occurrence to be unique,
+// but multi-column cursor WHERE clauses naturally reuse the same logical placeholder
+// (e.g. `WHERE ("A" > :1) OR ("A" = :1 AND "B" > :2)`).
+func expandQueryPlaceholders(query string, argvals []any) (string, []any, error) {
+	var errReturn error
+	var argseq []any
+	var counter int
+	query = queryPlaceholderRegexp.ReplaceAllStringFunc(query, func(param string) string {
+		var paramIndex, err = strconv.ParseInt(strings.TrimPrefix(param, ":"), 10, 64)
+		if err != nil {
+			errReturn = fmt.Errorf("internal error: failed to parse parameter name %q", param)
+			return param
+		}
+		paramIndex-- // Template uses 1-indexed, argvals is 0-indexed
+		if paramIndex < 0 || int(paramIndex) >= len(argvals) {
+			errReturn = fmt.Errorf("parameter :%d outside of valid range [1,%d]", paramIndex+1, len(argvals))
+			return param
+		}
+		counter++
+		argseq = append(argseq, argvals[paramIndex])
+		return fmt.Sprintf(":%d", counter)
+	})
+	return query, argseq, errReturn
 }
 
 func (drv *BatchSQLDriver) buildQuery(res *Resource, state *streamState) (string, error) {

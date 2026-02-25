@@ -1,0 +1,100 @@
+Binding 0:
+{
+    "resource_config_json": {
+      "name": "c__flow_test_batch_capturewithcustomcursor_932251",
+      "owner": "C##FLOW_TEST_BATCH",
+      "table": "CAPTUREWITHCUSTOMCURSOR_932251",
+      "cursor": [
+        "SEQ_NUM"
+      ]
+    },
+    "resource_path": [
+      "c__flow_test_batch_capturewithcustomcursor_932251"
+    ],
+    "collection": {
+      "name": "acmeCo/test/c__flow_test_batch/capturewithcustomcursor_932251",
+      "read_schema_json": {
+        "type": "object",
+        "required": [
+          "ID",
+          "_meta"
+        ],
+        "properties": {
+          "DATA": {
+            "description": "(source type: non-nullable VARCHAR2)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "ID": {
+            "type": "string",
+            "format": "integer",
+            "description": "(source type: NUMBER)"
+          },
+          "SEQ_NUM": {
+            "format": "integer",
+            "description": "(source type: non-nullable NUMBER)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "_meta": {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/source-oracle-batch/document-metadata",
+            "properties": {
+              "polled": {
+                "type": "string",
+                "format": "date-time",
+                "title": "Polled Timestamp",
+                "description": "The time at which the update query which produced this document as executed."
+              },
+              "index": {
+                "type": "integer",
+                "title": "Result Index",
+                "description": "The index of this document within the query execution which produced it."
+              },
+              "source": {
+                "properties": {
+                  "resource": {
+                    "type": "string",
+                    "description": "Resource name of the binding from which this document was captured."
+                  },
+                  "owner": {
+                    "type": "string",
+                    "description": "The name of the owner of the table from which the document was read."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table from which the document was read."
+                  },
+                  "tag": {
+                    "type": "string",
+                    "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "resource"
+                ]
+              }
+            },
+            "type": "object",
+            "required": [
+              "polled",
+              "index",
+              "source"
+            ]
+          }
+        },
+        "x-infer-schema": true
+      },
+      "key": [
+        "/ID"
+      ],
+      "projections": null
+    },
+    "state_key": "c__flow_test_batch_capturewithcustomcursor_932251"
+  }
+

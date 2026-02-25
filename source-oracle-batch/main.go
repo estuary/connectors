@@ -167,9 +167,9 @@ const tableQueryTemplateCursor = `{{if .CursorFields -}}
 	    {{$k}} > :{{add $i 1}}
 	  {{- end -}}
 	  )
-    {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};
+    {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end}}
 {{- else -}}
-  SELECT * FROM {{quoteTableName .Owner .TableName}};
+  SELECT * FROM {{quoteTableName .Owner .TableName}}
 {{- end}}`
 
 func selectQueryTemplate(res *Resource) (string, error) {

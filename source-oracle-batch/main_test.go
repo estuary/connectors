@@ -485,6 +485,81 @@ func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 	}
 }
 
+func setResourceCursor(t testing.TB, binding *pf.CaptureSpec_Binding, cursor ...string) {
+	t.Helper()
+	var res Resource
+	require.NoError(t, json.Unmarshal(binding.ResourceConfigJson, &res))
+	res.Cursor = cursor
+	var bs, err = json.Marshal(res)
+	require.NoError(t, err)
+	binding.ResourceConfigJson = bs
+}
+
+// TestCaptureWithCustomCursor exercises a capture using a single-column custom cursor.
+func TestCaptureWithCustomCursor(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(ctx, t, control, tableName, `(id INTEGER PRIMARY KEY, data VARCHAR2(200), seq_num INTEGER)`)
+
+	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "SEQ_NUM")
+
+	t.Run("Discovery", func(t *testing.T) { snapshotBindings(t, cs.Bindings) })
+
+	t.Run("Capture", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			executeControlQuery(ctx, t, control, fmt.Sprintf("INSERT INTO %s VALUES (:1, :2, :3)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), i+1)
+		}
+		cs.Capture(ctx, t, nil)
+
+		for i := 10; i < 20; i++ {
+			executeControlQuery(ctx, t, control, fmt.Sprintf("INSERT INTO %s VALUES (:1, :2, :3)", tableName),
+				i, fmt.Sprintf("Value for row %d", i), i+1)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
+// TestCaptureWithTwoColumnCursor exercises a capture using a two-column compound cursor.
+func TestCaptureWithTwoColumnCursor(t *testing.T) {
+	var ctx, cs = context.Background(), testCaptureSpec(t)
+	var control = testControlClient(ctx, t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(ctx, t, control, tableName, `(id INTEGER PRIMARY KEY, major INTEGER, minor INTEGER, data VARCHAR2(200))`)
+
+	cs.Bindings = discoverStreams(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "MAJOR", "MINOR")
+
+	t.Run("Discovery", func(t *testing.T) { snapshotBindings(t, cs.Bindings) })
+
+	t.Run("Capture", func(t *testing.T) {
+		// First batch with lower version numbers
+		for _, row := range [][]any{
+			{0, 1, 1, "v1.1"}, {1, 1, 2, "v1.2"}, {2, 1, 3, "v1.3"},
+			{3, 2, 1, "v2.1"}, {4, 2, 2, "v2.2"}, {5, 2, 3, "v2.3"},
+		} {
+			executeControlQuery(ctx, t, control, fmt.Sprintf("INSERT INTO %s VALUES (:1, :2, :3, :4)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+
+		// Second batch: rows with major=0 or (major=2, minor<=3) should be excluded
+		// because the cursor is at (2, 3) after the first capture.
+		for _, row := range [][]any{
+			{6, 0, 9, "Ignored: major too small"},
+			{7, 2, 0, "Ignored: minor too small"},
+			{8, 3, 1, "v3.1"}, {9, 3, 2, "v3.2"}, {10, 3, 3, "v3.3"},
+			{11, 4, 1, "v4.1"}, {12, 4, 2, "v4.2"}, {13, 4, 3, "v4.3"},
+		} {
+			executeControlQuery(ctx, t, control, fmt.Sprintf("INSERT INTO %s VALUES (:1, :2, :3, :4)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
 // TestQueryTemplates exercises the selection and execution of query templates
 // for various combinations of resource spec and stream state.
 func TestQueryTemplates(t *testing.T) {
