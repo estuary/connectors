@@ -1,6 +1,6 @@
-address: ENC[AES256_GCM,data:aedrYMVNyl/tkWdU2iuff6wLjT/pLuWb2zlIukio3CY9A9DFYfWMxJwJnq7Hg7+Q0powO7j6o/m3janV/aA0/NRIem3D0az3N2BctF4BOeWXmF39,iv:MUh2EryhYeQhzHYsKxfl+WIemBxkNbnruvH7hlrYCKU=,tag:cy5M8UiodKrwv5tEwmIklQ==,type:str]
+address: ENC[AES256_GCM,data:QG2q7ft0NuGDRU0Qez9jE9rhgL73ZQNUvzfsZ0y/M26nF9bTWGvA6X/C8UliO3Wyqpza3hCKIM93sskYRIsmQ63liHSZmd6I8F6ZIyW52JXQGA==,iv:KdxZqHgWeslQoRE1yIp+lpcXDkZKfpyRaVrgj8hEwNk=,tag:9uQGVIXRQLqMK2U4mPMR+A==,type:str]
 user: ENC[AES256_GCM,data:SvUYGI0=,iv:S8xuIJOCHyHVR4ptqa9QrJ/ZICzhKu1N5R8ghmlKH7E=,tag:S+6hpgHitHZOFoCMZ7HD+Q==,type:str]
-password: ENC[AES256_GCM,data:0NzcFnL4f+4SDNWMd5RIA7jOFHsK,iv:LNDDy7rGuXgx/J3JG1vGT7LRjGgArU5epPeY1HxKyi4=,tag:tMf2Cqn8WgHpvlPzPm9bjA==,type:str]
+password: ENC[AES256_GCM,data:UwcnFcX5zHMmLqdEtP/b0ARdlzU=,iv:EnEEOAkeFn8iCjoJ8maFTjgbROcmH2fa7Lam8tFQOFE=,tag:g7A1kV3ooM6mYw7N/MVSVw==,type:str]
 database: ENC[AES256_GCM,data:NL9Bzg==,iv:gXO929hG2GxQjP9d3rHY0P1C87/EEBr2g1jpn5y639A=,tag:WA4gFIt1wQp+js+AiVS9lg==,type:str]
 hardDelete: ENC[AES256_GCM,data:Bz237g==,iv:nw6O72MUXb0oTevc/Hlxquto2gERUPWrO3Bxry27A6Q=,tag:ScQjgkXFbC5L28RFHXk2Tg==,type:bool]
 advanced:
@@ -12,7 +12,7 @@ sops:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2025-10-17T20:22:32Z"
           enc: CiQAdmEdwtM6jODZoH/GtIZoCMHEUG78r+Xs9IlguiJMhM3HZBESSQC7zGi8NzHI4kJTBopr5NJ8xENrd1pHVfftz5XhS7xeL+HU707MLK3cJjn+fxxK2U3S+Un3gh4mp1aBwOCRfun3qYcreypUo6w=
-    lastmodified: "2025-10-17T20:36:46Z"
-    mac: ENC[AES256_GCM,data:KZ0+wIL/A6RlyvcK6z5xR5wsd0sjG27qUzPbmbPcgHFvEgRt+WltzikFxB3FjzR1hhmNnidk7FeRLd9wp1M2feMiYBH4YD73U0g1RWaX88/4etM3HbegsKeNww/vccNXxEgdkFQjpK7p7CG8gfTCXX4t2bRvEXVpnqP4K/yJqU8=,iv:0yd8VnZJYIyrfmyzyNJrPb1sygn24D8RaDV30/0ZkuI=,tag:34GXvAOUmucC5OAAHQSLlQ==,type:str]
+    lastmodified: "2026-02-25T18:13:59Z"
+    mac: ENC[AES256_GCM,data:sdcZO7RKWBcwyQiKUphiMID+KlsLINOBfpD5LS9KUFSJfAoc8/bJtfalgdX9TuwyaG8yJ+ON4c+oU9zGaadMwOEEesXAfuvgOGzytjdoYQrw9MG9cOeQHsdmhwNyNA2bHLof6fPhQpmAKlf7mbRdJNAQvobcABQbIY+bjwDOHB8=,iv:pnrTzpF1rTOdTOJ9jtJ2TkDlBD0LmfZavdODvcT3FYo=,tag:St1LcJcwYL7YMUolUlwL6A==,type:str]
     unencrypted_suffix: _unencrypted
     version: 3.10.2
