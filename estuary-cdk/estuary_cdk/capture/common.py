@@ -1118,8 +1118,11 @@ async def _binding_incremental_task(
                 )
                 return
             else:
-                # Ensure LogCursor types match and that they're strictly increasing.
+                # Ensure LogCursor types match
+                # and that they're strictly increasing when appropriate.
                 is_larger = False
+                should_be_larger = True
+
                 if isinstance(item, int) and isinstance(state.cursor, int):
                     is_larger = item > state.cursor
                 elif isinstance(item, datetime) and isinstance(state.cursor, datetime):
@@ -1130,13 +1133,13 @@ async def _binding_incremental_task(
                     and isinstance(item[0], str)
                     and isinstance(state.cursor[0], str)
                 ):
-                    is_larger = item[0] > state.cursor[0]
+                    should_be_larger = False
                 else:
                     raise RuntimeError(
                         f"Implementation error: FetchChangesFn yielded LogCursor {item} of a different type than the last LogCursor {state.cursor}",
                     )
 
-                if not is_larger:
+                if should_be_larger and not is_larger:
                     raise RuntimeError(
                         f"Implementation error: FetchChangesFn yielded LogCursor {item} which is not greater than the last LogCursor {state.cursor}",
                     )
