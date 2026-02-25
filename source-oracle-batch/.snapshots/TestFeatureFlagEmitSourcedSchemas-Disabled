@@ -1,8 +1,8 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_batch_featureflagemitsourcedschemas_960966": 2 Documents
+# Collection "acmeCo/test/c__flow_test_batch/featureflagemitsourcedschemas_960966": 2 Documents
 # ================================
-{"DATA":"world","ID":"2","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999}}
-{"DATA":"hello","ID":"1","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999}}
+{"DATA":"world","ID":"2","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999,"source":{"resource":"c__flow_test_batch_featureflagemitsourcedschemas_960966","owner":"C##FLOW_TEST_BATCH","table":"FEATUREFLAGEMITSOURCEDSCHEMAS_960966"}}}
+{"DATA":"hello","ID":"1","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999,"source":{"resource":"c__flow_test_batch_featureflagemitsourcedschemas_960966","owner":"C##FLOW_TEST_BATCH","table":"FEATUREFLAGEMITSOURCEDSCHEMAS_960966"}}}
 # ================================
 # Final State Checkpoint
 # ================================

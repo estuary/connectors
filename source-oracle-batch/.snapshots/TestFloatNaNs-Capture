@@ -1,12 +1,9 @@
 # ================================
-# Collection "acmeCo/test/c__flow_test_batch_float_nans_10511": 4 Documents
-# ================================
-{"type":"object","required":["_meta","ID"],"additionalProperties":false,"properties":{"A_DOUBLE":{"description":"using catch-all schema (source type: non-nullable BINARY_DOUBLE)"},"A_FLOAT":{"description":"using catch-all schema (source type: non-nullable BINARY_FLOAT)"},"ID":{"type":"string","format":"integer","description":"(source type: NUMBER)"},"_meta":{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"https://github.com/estuary/connectors/source-oracle-batch/document-metadata","properties":{"polled":{"type":"string","format":"date-time","title":"Polled Timestamp","description":"The time at which the update query which produced this document as executed."},"index":{"type":"integer","title":"Result Index","description":"The index of this document within the query execution which produced it."}},"additionalProperties":false,"type":"object","required":["polled","index"],"additionalProperties":false}},"x-infer-schema":true}
-{"A_DOUBLE":2,"A_FLOAT":"NaN","ID":"0","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999}}
-{"A_DOUBLE":"Infinity","A_FLOAT":"-Infinity","ID":"2","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999}}
-{"A_DOUBLE":"NaN","A_FLOAT":3,"ID":"1","TXID":"999999","_meta":{"polled":"<TIMESTAMP>","index":999}}
-# ================================
 # Final State Checkpoint
 # ================================
-{"bindingStateV1":{"c__flow_test_batch_float_nans_10511":{"CursorNames":["TXID"],"CursorValues":[999999],"LastPolled":"<TIMESTAMP>"}}}
+
+# ================================
+# Captures Terminated With Errors
+# ================================
+capture terminated with error: error polling binding "c__flow_test_batch_float_nans_10511": error serializing document: error encoding field "A_FLOAT": json: unsupported value: NaN
 
