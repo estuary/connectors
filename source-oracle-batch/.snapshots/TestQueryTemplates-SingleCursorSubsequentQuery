@@ -1,0 +1,1 @@
+SELECT * FROM "TEST"."foobar" WHERE ("AUDIT_ID" > :1) ORDER BY "AUDIT_ID";

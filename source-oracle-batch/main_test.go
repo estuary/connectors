@@ -484,3 +484,38 @@ func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 		})
 	}
 }
+
+// TestQueryTemplates exercises the selection and execution of query templates
+// for various combinations of resource spec and stream state.
+func TestQueryTemplates(t *testing.T) {
+	var testCases = []struct {
+		name         string
+		cursor       []string
+		cursorValues []any
+	}{
+		{name: "SCNFirstQuery", cursor: []string{"TXID"}},
+		{name: "SCNSubsequentQuery", cursor: []string{"TXID"}, cursorValues: []any{12345}},
+		{name: "SingleCursorFirstQuery", cursor: []string{"AUDIT_ID"}},
+		{name: "SingleCursorSubsequentQuery", cursor: []string{"AUDIT_ID"}, cursorValues: []any{100}},
+		{name: "MultiCursorFirstQuery", cursor: []string{"AUDIT_ID", "TIMESTAMP"}},
+		{name: "MultiCursorSubsequentQuery", cursor: []string{"AUDIT_ID", "TIMESTAMP"}, cursorValues: []any{100, "2024-01-01"}},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			var resource = &Resource{
+				Name:      "test_foobar",
+				Owner:     "TEST",
+				TableName: "foobar",
+				Cursor:    tc.cursor,
+			}
+			var state = &streamState{
+				CursorNames:  tc.cursor,
+				CursorValues: tc.cursorValues,
+			}
+			var query, err = oracleDriver.buildQuery(resource, state)
+			require.NoError(t, err)
+			cupaloy.SnapshotT(t, query)
+		})
+	}
+}
