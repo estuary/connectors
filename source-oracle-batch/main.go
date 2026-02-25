@@ -145,7 +145,7 @@ func connectOracle(ctx context.Context, cfg *Config) (*sql.DB, error) {
 // having read all rows with the same SCN.
 // It follows that this column cannot be used as a primary key, but it can be used
 // as a cursor.
-const tableQueryTemplate = `{{if .IsFirstQuery -}}
+const tableQueryTemplateSCN = `{{if .IsFirstQuery -}}
   SELECT ORA_ROWSCN AS TXID, {{quoteTableName .Owner .TableName}}.* FROM {{quoteTableName .Owner .TableName}} ORDER BY ORA_ROWSCN
 {{- else -}}
   SELECT ORA_ROWSCN AS TXID, {{quoteTableName .Owner .TableName}}.* FROM {{quoteTableName .Owner .TableName}}
@@ -153,11 +153,32 @@ const tableQueryTemplate = `{{if .IsFirstQuery -}}
     ORDER BY ORA_ROWSCN
 {{- end}}`
 
+const tableQueryTemplateCursor = `{{if .CursorFields -}}
+  {{- if .IsFirstQuery -}}
+    SELECT * FROM {{quoteTableName .Owner .TableName}}
+  {{- else -}}
+    SELECT * FROM {{quoteTableName .Owner .TableName}}
+	  {{- range $i, $k := $.CursorFields -}}
+	    {{- if eq $i 0}} WHERE ({{else}}) OR ({{end -}}
+        {{- range $j, $n := $.CursorFields -}}
+		  {{- if lt $j $i -}}
+		    {{$n}} = :{{add $j 1}} AND {{end -}}
+	    {{- end -}}
+	    {{$k}} > :{{add $i 1}}
+	  {{- end -}}
+	  )
+    {{- end}} ORDER BY {{range $i, $k := $.CursorFields}}{{if gt $i 0}}, {{end}}{{$k}}{{end -}};
+{{- else -}}
+  SELECT * FROM {{quoteTableName .Owner .TableName}};
+{{- end}}`
+
 func selectQueryTemplate(res *Resource) (string, error) {
 	if res.Template != "" {
 		return res.Template, nil
+	} else if len(res.Cursor) == 1 && res.Cursor[0] == "TXID" {
+		return tableQueryTemplateSCN, nil
 	}
-	return tableQueryTemplate, nil
+	return tableQueryTemplateCursor, nil
 }
 
 func quoteTableName(schema, table string) string {
@@ -165,6 +186,7 @@ func quoteTableName(schema, table string) string {
 }
 
 var templateFuncs = template.FuncMap{
+	"add":             func(a, b int) int { return a + b },
 	"quoteTableName":  quoteTableName,
 	"quoteIdentifier": quoteIdentifier,
 }

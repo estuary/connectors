@@ -435,32 +435,10 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	var cursorNames = state.CursorNames
 	var cursorValues = state.CursorValues
 
-	templateString, err := c.Driver.SelectQueryTemplate(res)
+	query, err := c.Driver.buildQuery(res, state)
 	if err != nil {
-		return fmt.Errorf("error selecting query template: %w", err)
+		return fmt.Errorf("error building query: %w", err)
 	}
-	queryTemplate, err := template.New("query").Funcs(templateFuncs).Parse(templateString)
-	if err != nil {
-		return fmt.Errorf("error parsing template: %w", err)
-	}
-
-	var quotedCursorNames []string
-	for _, cursorName := range cursorNames {
-		quotedCursorNames = append(quotedCursorNames, quoteIdentifier(cursorName))
-	}
-
-	var templateArg = map[string]any{
-		"IsFirstQuery": len(cursorValues) == 0,
-		"CursorFields": quotedCursorNames,
-		"Owner":        res.Owner,
-		"TableName":    res.TableName,
-	}
-
-	var queryBuf = new(strings.Builder)
-	if err := queryTemplate.Execute(queryBuf, templateArg); err != nil {
-		return fmt.Errorf("error generating query: %w", err)
-	}
-	var query = queryBuf.String()
 
 	log.WithFields(log.Fields{
 		"query": query,
@@ -640,4 +618,36 @@ func quoteIdentifier(name string) string {
 	//     Quoted identifiers can contain any characters and punctuations marks as well as spaces.
 	//     However, neither quoted nor nonquoted identifiers can contain double quotation marks or the null character (\0)
 	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
+func (drv *BatchSQLDriver) buildQuery(res *Resource, state *streamState) (string, error) {
+	templateString, err := drv.SelectQueryTemplate(res)
+	if err != nil {
+		return "", fmt.Errorf("error selecting query template: %w", err)
+	}
+	queryTemplate, err := template.New("query").Funcs(templateFuncs).Parse(templateString)
+	if err != nil {
+		return "", fmt.Errorf("error parsing template: %w", err)
+	}
+
+	var cursorNames = state.CursorNames
+	var cursorValues = state.CursorValues
+
+	var quotedCursorNames []string
+	for _, cursorName := range cursorNames {
+		quotedCursorNames = append(quotedCursorNames, quoteIdentifier(cursorName))
+	}
+
+	var templateArg = map[string]any{
+		"IsFirstQuery": len(cursorValues) == 0,
+		"CursorFields": quotedCursorNames,
+		"Owner":        res.Owner,
+		"TableName":    res.TableName,
+	}
+
+	var queryBuf = new(strings.Builder)
+	if err := queryTemplate.Execute(queryBuf, templateArg); err != nil {
+		return "", fmt.Errorf("error generating query: %w", err)
+	}
+	return queryBuf.String(), nil
 }
