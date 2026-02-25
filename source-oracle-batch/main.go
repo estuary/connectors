@@ -179,6 +179,16 @@ func generateOracleResource(resourceName, owner, tableName, tableType string) (*
 }
 
 func translateOracleValue(val any, databaseTypeName string) (any, error) {
+	if val, ok := val.(float32); ok {
+		if math.IsNaN(float64(val)) {
+			return "NaN", nil
+		} else if math.IsInf(float64(val), +1) {
+			return "Infinity", nil
+		} else if math.IsInf(float64(val), -1) {
+			return "-Infinity", nil
+		}
+		return val, nil
+	}
 	if val, ok := val.(float64); ok {
 		if math.IsNaN(val) {
 			return "NaN", nil
