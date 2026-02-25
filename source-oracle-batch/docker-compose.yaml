@@ -1,0 +1,23 @@
+services:
+  db:
+    image: 'gvenzl/oracle-free:23.2'
+    platform: 'linux/amd64'
+    ports:
+      - "1521:1521"
+    environment:
+      {
+        "ORACLE_PASSWORD": "adminpassword",
+        "ORACLE_DATABASE": "TEST"
+      }
+    healthcheck:
+      test: "healthcheck.sh"
+      interval: 10s
+    networks:
+      - flow-test
+    volumes:
+      - ./docker-initdb.sql:/container-entrypoint-initdb.d/docker-initdb.sql
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
