@@ -53,6 +53,7 @@ func (c *capture) initializeStreams(
 	useStartAfter bool,
 	exclusiveCollectionFilter bool,
 	excludeCollections map[string][]string,
+	fullDocRequired map[string]bool,
 ) ([]*changeStream, error) {
 	var out []*changeStream
 
@@ -105,7 +106,12 @@ func (c *capture) initializeStreams(
 			}}}})
 		}
 
-		opts := options.ChangeStream().SetFullDocument(options.UpdateLookup)
+		fullDocOpt := options.UpdateLookup
+		if fullDocRequired[db] {
+			logEntry.Info("using fullDocument 'required' mode (changeStreamPreAndPostImages enabled on all collections)")
+			fullDocOpt = options.Required
+		}
+		opts := options.ChangeStream().SetFullDocument(fullDocOpt)
 		if maxAwaitTime != nil {
 			opts = opts.SetMaxAwaitTime(*maxAwaitTime)
 		}
