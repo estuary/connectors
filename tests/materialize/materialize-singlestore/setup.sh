@@ -20,7 +20,7 @@ function query() {
 
 singlestore_api_token="$(decrypt_config $CONNECTOR_TEST_DIR/api-token.yaml | jq -r '.token')"
 
-workspace_id='e3db037e-1201-4e0b-9622-28a3deccafd6'
+workspace_id='e6d3b980-8c6a-4b9f-806e-6502c8b7d30e'
 curl -XPOST \
   "https://api.singlestore.com/v1/workspaces/$workspace_id/resume" \
   -H 'Content-Type: application/json' \
