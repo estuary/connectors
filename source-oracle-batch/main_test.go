@@ -24,6 +24,13 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+)
+
+var (
+	// Config file for tests. Files with ".sops." in the name are decrypted with sops;
+	// others are read as plaintext YAML. Default is testdata/config.local.yaml for local Docker testing.
+	dbConfig = flag.String("db_config", "testdata/config.local.yaml", "Path to database config file (use .sops. in name for encrypted configs)")
 )
 
 func TestMain(m *testing.M) {
@@ -288,16 +295,32 @@ func testConfig(ctx context.Context, t testing.TB) *Config {
 		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
 
-	var configFile = "config.pdb.yaml"
-	var sops = exec.CommandContext(ctx, "sops", "--decrypt", "--output-type", "json", configFile)
-	var configRaw, err = sops.Output()
-	require.NoError(t, err)
-	var jq = exec.CommandContext(ctx, "jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
-	jq.Stdin = bytes.NewReader(configRaw)
-	cleanedConfig, err := jq.Output()
-	require.NoError(t, err)
+	var configJSON []byte
+	var configFile = *dbConfig
+
+	if strings.Contains(configFile, ".sops.") {
+		// Use sops to decrypt config file to JSON
+		var sops = exec.CommandContext(ctx, "sops", "--decrypt", "--output-type", "json", configFile)
+		var configRaw, err = sops.Output()
+		require.NoError(t, err)
+		// Strip _sops suffix from keys
+		var jq = exec.CommandContext(ctx, "jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
+		jq.Stdin = bytes.NewReader(configRaw)
+		configJSON, err = jq.Output()
+		require.NoError(t, err)
+	} else {
+		// Read plaintext YAML config and convert to JSON
+		var configRaw, err = os.ReadFile(configFile)
+		require.NoError(t, err)
+		var generic map[string]any
+		err = yaml.Unmarshal(configRaw, &generic)
+		require.NoError(t, err)
+		configJSON, err = json.Marshal(generic)
+		require.NoError(t, err)
+	}
+
 	var config Config
-	err = json.Unmarshal(cleanedConfig, &config)
+	err := json.Unmarshal(configJSON, &config)
 	require.NoError(t, err)
 
 	if err := config.Validate(); err != nil {

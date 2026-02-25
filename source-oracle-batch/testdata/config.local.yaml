@@ -1,0 +1,9 @@
+# Local testing config for Docker-based Oracle instance
+# Start the database with: docker compose -f ./source-oracle-batch/docker-compose.yaml up -d
+user: C##FLOW_TEST_BATCH
+password: FLOW123
+address: localhost:1521
+database: FREE
+advanced:
+  discover_schemas:
+    - C##FLOW_TEST_BATCH
