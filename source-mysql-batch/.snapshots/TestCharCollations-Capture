@@ -1,0 +1,223 @@
+# ================================
+# Collection "acmeCo/test/test/charcollations_382659": 5 Documents
+# ================================
+{
+  "type": "object",
+  "required": [
+    "_meta",
+    "char_binary",
+    "char_default",
+    "char_utf8mb4_bin",
+    "id",
+    "text_default",
+    "text_utf8mb4_bin",
+    "varchar_default",
+    "varchar_utf8mb4_bin"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-mysql-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document as executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "char_binary": {
+      "maxLength": 16,
+      "description": "(source type: binary)",
+      "type": [
+        "string"
+      ]
+    },
+    "char_default": {
+      "maxLength": 10,
+      "description": "(source type: char)",
+      "type": [
+        "string"
+      ]
+    },
+    "char_utf8mb4_bin": {
+      "maxLength": 10,
+      "description": "(source type: char)",
+      "type": [
+        "string"
+      ]
+    },
+    "id": {
+      "type": "integer",
+      "description": "(source type: non-nullable int)"
+    },
+    "text_default": {
+      "description": "(source type: text)",
+      "type": [
+        "string"
+      ]
+    },
+    "text_utf8mb4_bin": {
+      "description": "(source type: text)",
+      "type": [
+        "string"
+      ]
+    },
+    "varchar_default": {
+      "maxLength": 255,
+      "description": "(source type: varchar)",
+      "type": [
+        "string"
+      ]
+    },
+    "varchar_utf8mb4_bin": {
+      "maxLength": 255,
+      "description": "(source type: varchar)",
+      "type": [
+        "string"
+      ]
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 0,
+    "row_id": 0,
+    "source": {
+      "resource": "test_charcollations_382659",
+      "schema": "test",
+      "table": "charcollations_382659"
+    }
+  },
+  "char_binary": "aGVsbG8AAAAAAA==",
+  "char_default": "hello",
+  "char_utf8mb4_bin": "hello",
+  "id": 0,
+  "text_default": "text_val",
+  "text_utf8mb4_bin": "text_val",
+  "varchar_default": "world",
+  "varchar_utf8mb4_bin": "world"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 1,
+    "row_id": 1,
+    "source": {
+      "resource": "test_charcollations_382659",
+      "schema": "test",
+      "table": "charcollations_382659"
+    }
+  },
+  "char_binary": "c2hvcnQAAAAAAA==",
+  "char_default": "short",
+  "char_utf8mb4_bin": "short",
+  "id": 1,
+  "text_default": "short",
+  "text_utf8mb4_bin": "short",
+  "varchar_default": "short",
+  "varchar_utf8mb4_bin": "short"
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 2,
+    "row_id": 2,
+    "source": {
+      "resource": "test_charcollations_382659",
+      "schema": "test",
+      "table": "charcollations_382659"
+    }
+  },
+  "char_binary": "AAAAAAAAAAAAAA==",
+  "char_default": "",
+  "char_utf8mb4_bin": "",
+  "id": 2,
+  "text_default": "",
+  "text_utf8mb4_bin": "",
+  "varchar_default": "",
+  "varchar_utf8mb4_bin": ""
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 3,
+    "row_id": 3,
+    "source": {
+      "resource": "test_charcollations_382659",
+      "schema": "test",
+      "table": "charcollations_382659"
+    }
+  },
+  "char_binary": null,
+  "char_default": null,
+  "char_utf8mb4_bin": null,
+  "id": 3,
+  "text_default": null,
+  "text_utf8mb4_bin": null,
+  "varchar_default": null,
+  "varchar_utf8mb4_bin": null
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"test_charcollations_382659":{"CursorNames":["id"],"CursorValues":[3],"DocumentCount":4,"LastPolled":"<TIMESTAMP>"}}}
+

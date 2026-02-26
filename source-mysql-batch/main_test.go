@@ -432,6 +432,43 @@ func TestStringTypes(t *testing.T) {
 	})
 }
 
+// TestCharCollations exercises CHAR/VARCHAR/TEXT columns with various CHARACTER SET
+// and COLLATE options. Columns using a '_bin' collation (like utf8mb4_bin) have the
+// BINARY_FLAG set in the MySQL wire protocol even though they contain text data, and
+// this test verifies that we handle that correctly and don't base64-encode their values.
+func TestCharCollations(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testMySQLClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(t, control, tableName, `(
+        id INTEGER PRIMARY KEY,
+        char_default CHAR(10),
+        char_utf8mb4_bin CHAR(10) COLLATE utf8mb4_bin,
+        char_binary CHAR(10) CHARACTER SET binary,
+        varchar_default VARCHAR(255),
+        varchar_utf8mb4_bin VARCHAR(255) COLLATE utf8mb4_bin,
+        text_default TEXT,
+        text_utf8mb4_bin TEXT COLLATE utf8mb4_bin
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setResourceCursor(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+		for _, row := range [][]any{
+			{0, "hello", "hello", []byte("hello"), "world", "world", "text_val", "text_val"},
+			{1, "short", "short", []byte("short"), "short", "short", "short", "short"},
+			{2, "", "", []byte(""), "", "", "", ""},
+			{3, nil, nil, nil, nil, nil, nil, nil},
+		} {
+			executeControlQuery(t, control, fmt.Sprintf("INSERT INTO %s VALUES (?, ?, ?, ?, ?, ?, ?, ?)", tableName), row...)
+		}
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
 // TestBinaryTypes exercises discovery and capture of the binary types
 // BINARY, VARBINARY, TINYBLOB, BLOB, MEDIUMBLOB, and LONGBLOB.
 func TestBinaryTypes(t *testing.T) {
