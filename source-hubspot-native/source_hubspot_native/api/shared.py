@@ -15,6 +15,20 @@ from estuary_cdk.http import HTTPSession
 EPOCH_PLUS_ONE_SECOND = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=1)
 HUB = "https://api.hubapi.com"
 
+# How far back the delayed stream trails behind realtime. This needs to be far
+# back enough that the HubSpot APIs return consistent data.
+DELAYED_LAG = timedelta(hours=1)
+
+# Limit the maximum time window subtasks will fetch in a single call.
+# This prevents huge checkpoints when catching up after the connector falls behind.
+# The HubSpot APIs are flaky and large checkpoints can become impossible to complete.
+MAX_REALTIME_WINDOW = timedelta(hours=1)
+MAX_DELAYED_WINDOW = timedelta(hours=1)
+
+# Minimum time window required before polling the delayed stream.
+# Prevents excessive API calls when Resource.interval is small.
+MIN_DELAYED_WINDOW = timedelta(minutes=5)
+
 
 class MustBackfillBinding(Exception):
     pass
@@ -53,37 +67,6 @@ cursor, which is the first datetime parameter. The second datetime parameter
 represents an "until" value, and documents more recent than this are discarded
 and should usually not even be retrieved if possible.
 """
-
-# In-memory cache of how far along the "delayed" change stream is.
-last_delayed_fetch_end: dict[str, datetime] = {}
-
-# How far back the delayed stream will search up until. This needs to be far
-# back enough that the HubSpot APIs return consistent data.
-delayed_offset = timedelta(hours=1)
-
-# The minimum amount of time must be available for the delay stream to be
-# called. It can't be called every time `process_changes` is invoked since
-# FetchDelayedFn is usually using a slower API than FetchRecentFn, and calling
-# FetchDelayedFn every time would negate the benefit of having a faster
-# FetchRecentFn.
-delayed_fetch_minimum_window = timedelta(minutes=5)
-
-# Limit the maximum time window we will ask FetchRecentFn to get changes for.
-# This is to prevent the time window from becoming excessively large if there
-# are relatively brief outages in the connector (on the order of a day or two),
-# which otherwise would require a checkpoint containing all of the documents
-# from the last log_cursor up until the present time. This allows for a form of
-# incremental progress to be made, which is helpful if there are ~millions of
-# documents to catch up on. The HubSpot APIs are pretty flaky and will
-# occasionally return non-retryable errors for no reason and a successful
-# checkpoint requires that to never happen, so really large checkpoints can
-# become effectively impossible to complete.
-#
-# Generally moving the cursor forward in these fixed windows is a bad idea when
-# trying to cover time windows on the scales of ~years (as in for a backfill),
-# but incremental bindings shouldn't fall more than ~days behind in the worst of
-# cases so requesting an hour at a time won't take too long.
-max_fetch_recent_window = timedelta(hours=1)
 
 
 def ms_to_dt(ms: int) -> datetime:
@@ -124,132 +107,135 @@ def chunk_props(props: list[str], max_bytes: int) -> list[list[str]]:
 
     return result
 
-async def process_changes(
+
+async def fetch_realtime_changes(
     object_name: str,
     fetch_recent: FetchRecentFn,
-    fetch_delayed: FetchDelayedFn,
     http: HTTPSession,
     with_history: bool,
-    # Remainder is common.FetchChangesFn:
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[Any | LogCursor, None]:
     """
-    High-level processing of changes event documents, where there is both a
-    stream of very recent documents that is potentially incomplete, and a
-    trailing stream that is delayed but 100% complete.
-
-    Every time this function is invoked, the FetchRecentFn is called and any
-    recent documents are emitted. If a sufficient amount of time has passed
-    since the last time the delayed stream was polled, the FetchDelayedFn is
-    called and those documents are emitted to ensure all documents are captured.
-    This process will inevitably result in some duplicate documents being
-    emitted, but some duplicates are better than missing data completely.
-
-    The LogCursor is based on the position of the recent stream in time. To keep
-    track of the progress of both the recent and delayed streams with a single
-    LogCursor, there's a few of important details to note:
-
-    - The delayed stream will only ever read documents as recent as
-      `delayed_offset` (1 hour).
-    - The delayed stream will always be polled up to the LogCursor timestamp
-      minus `delayed_offset` if the LogCursor to be emitted would represent a
-      delayed stream "window" of at least `delayed_fetch_minimum_window` (5
-      minutes).
-    - On connector initialization, the delayed stream is assumed to have last
-      polled up to the persisted LogCursor, less `delayed_offset` _and_
-      `delayed_fetch_minimum_window`. This ensures that when the connector
-      restarts the delayed stream does not resume any later than where it last
-      left off, and will in fact always resume from just prior to the oldest
-      point it may have left off.
-    - While the connector is running, the delayed stream progress is kept in
-      memory.
+    This function uses fast but potentially incomplete APIs to capture very
+    recent documents. Each emitted document is added to the cache so the
+    DELAYED subtask can deduplicate.
     """
     assert isinstance(log_cursor, datetime)
 
-    now_time = datetime.now(UTC)
-    fetch_recent_end_time: datetime | None = None
-    if now_time - log_cursor > max_fetch_recent_window:
+    now = datetime.now(UTC)
+    lower_bound = log_cursor
+
+    upper_bound: datetime | None = None
+    if now - lower_bound > MAX_REALTIME_WINDOW:
         # Limit the maximum requested window for FetchRecentFn if it's been a
         # while since the LogCursor was updated.
-        fetch_recent_end_time = log_cursor + max_fetch_recent_window
+        upper_bound = lower_bound + MAX_REALTIME_WINDOW
 
-    max_ts: datetime = log_cursor
+    max_ts = log_cursor
+
     try:
         async for ts, key, obj in fetch_recent(
-            log, http, with_history, log_cursor, fetch_recent_end_time
+            log, http, with_history, lower_bound, upper_bound
         ):
-            if fetch_recent_end_time and ts > fetch_recent_end_time:
+            if upper_bound and ts > upper_bound:
                 continue
-            elif ts > log_cursor:
+            elif ts > lower_bound:
                 max_ts = max(max_ts, ts)
-                cache.add_recent(object_name, key, ts)
-                yield obj
+                if cache.should_yield(object_name, key, ts):
+                    yield obj
             else:
                 break
     except MustBackfillBinding:
         log.info("triggering automatic backfill for %s", object_name)
         yield Triggers.BACKFILL
 
-    if fetch_recent_end_time:
-        # Assume all recent documents up until fetch_recent_end_time were
-        # returned by FetchRecentFn. It's fine if this is not strictly true
-        # since FetchDelayedFn will eventually fill in any missed documents.
-        # This also ensures that the cursor is always kept moving forward even
-        # if there are no new recent documents for a long time, which is
-        # important since it moves the delayed stream forward in that case.
-        max_ts = fetch_recent_end_time
+    # Assume all recent documents up until upper_bound were
+    # returned by FetchRecentFn. It's fine if this is not strictly true
+    # since FetchDelayedFn will eventually fill in any missed documents.
+    # This also ensures that the cursor is always kept moving forward even
+    # if there are no new recent documents for a long time.
+    if upper_bound:
+        max_ts = upper_bound
 
-    delayed_fetch_next_start = last_delayed_fetch_end.setdefault(
-        object_name, log_cursor - delayed_offset - delayed_fetch_minimum_window
-    )
-    delayed_fetch_next_end = max_ts - delayed_offset
+    if max_ts != lower_bound:
+        yield max_ts
 
+
+async def fetch_delayed_changes(
+    object_name: str,
+    fetch_delayed: FetchDelayedFn,
+    http: HTTPSession,
+    with_history: bool,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[Any | LogCursor, None]:
+    """
+    This function uses consistent APIs to ensure all documents are
+    captured. It uses cache.should_yield() to skip documents that were already
+    emitted by the REALTIME subtask with the same or newer timestamp.
+    """
+    assert isinstance(log_cursor, datetime)
+
+    now = datetime.now(UTC)
+    lower_bound = log_cursor
+    horizon = now - DELAYED_LAG
+
+    # Don't poll unless at least MIN_DELAYED_WINDOW of data has accumulated
+    # to prevent excessive API calls.
+    if horizon - lower_bound < MIN_DELAYED_WINDOW:
+        return
+
+    # Limit the window to prevent huge checkpoints when catching up.
+    upper_bound = min(horizon, log_cursor + MAX_DELAYED_WINDOW)
+
+    if lower_bound >= upper_bound:
+        return
+
+    max_ts = lower_bound
     cache_hits = 0
-    delayed_emitted = 0
-    if delayed_fetch_next_end - delayed_fetch_next_start > delayed_fetch_minimum_window:
-        # Poll the delayed stream for documents if we need to.
-        try:
-            async for ts, key, obj in fetch_delayed(
-                log,
-                http,
-                with_history,
-                delayed_fetch_next_start,
-                delayed_fetch_next_end,
-            ):
-                if ts > delayed_fetch_next_end:
-                    # In case the FetchDelayedFn is unable to filter based on
-                    # `delayed_fetch_next_end`.
-                    continue
-                elif ts > delayed_fetch_next_start:
-                    if cache.has_as_recent_as(object_name, key, ts):
-                        cache_hits += 1
-                        continue
+    emitted = 0
 
-                    delayed_emitted += 1
+    try:
+        async for ts, key, obj in fetch_delayed(
+            log,
+            http,
+            with_history,
+            lower_bound,
+            upper_bound,
+        ):
+            if ts > upper_bound:
+                # In case the FetchDelayedFn is unable to filter based on upper_bound.
+                continue
+            elif ts > lower_bound:
+                max_ts = max(max_ts, ts)
+                if cache.should_yield(object_name, key, ts):
+                    emitted += 1
                     yield obj
                 else:
-                    break
-        except MustBackfillBinding:
-            log.info("triggering automatic backfill for %s", object_name)
-            yield Triggers.BACKFILL
+                    cache_hits += 1
+            else:
+                break
+    except MustBackfillBinding:
+        log.info("triggering automatic backfill for %s", object_name)
+        yield Triggers.BACKFILL
 
-        last_delayed_fetch_end[object_name] = delayed_fetch_next_end
-        evicted = cache.cleanup(object_name, delayed_fetch_next_end)
+    # If we limited the window, advance cursor to upper_bound.
+    if upper_bound < horizon:
+        max_ts = upper_bound
 
+    if max_ts != lower_bound:
+        evicted = cache.cleanup(object_name, max_ts)
         log.info(
             "fetched delayed events for stream",
             {
                 "object_name": object_name,
-                "since": delayed_fetch_next_start,
-                "until": delayed_fetch_next_end,
-                "emitted": delayed_emitted,
+                "since": lower_bound,
+                "until": upper_bound,
+                "emitted": emitted,
                 "cache_hits": cache_hits,
                 "evicted": evicted,
                 "new_size": cache.count_for(object_name),
             },
         )
-
-    if max_ts != log_cursor:
         yield max_ts
-
