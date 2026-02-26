@@ -1,0 +1,40 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-calendly:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_calendly
+        config: config.yaml
+    bindings:
+    - resource:
+        name: event_types
+        interval: PT5M
+      target: acmeCo/event_types
+    - resource:
+        name: scheduled_events
+        interval: PT5M
+      target: acmeCo/scheduled_events
+    - resource:
+        name: organization_memberships
+        interval: PT5M
+      target: acmeCo/organization_memberships
+    - resource:
+        name: routing_forms
+        interval: PT5M
+      target: acmeCo/routing_forms
+    - resource:
+        name: groups
+        interval: PT5M
+      target: acmeCo/groups
+    - resource:
+        name: event_invitees
+        interval: PT5M
+      target: acmeCo/event_invitees
+    - resource:
+        name: routing_form_submissions
+        interval: PT5M
+      target: acmeCo/routing_form_submissions
