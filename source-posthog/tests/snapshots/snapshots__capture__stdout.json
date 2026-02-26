@@ -8,7 +8,7 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "content": "Test annotation created via API",
-      "created_at": "2026-02-10T03:46:39.387068Z",
+      "created_at": "redacted",
       "created_by": {
         "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
         "email": "nicolas@estuary.dev",
@@ -31,7 +31,7 @@
       "insight_name": null,
       "insight_short_id": null,
       "scope": "project",
-      "updated_at": "2026-02-10T03:46:39.387255Z"
+      "updated_at": "redacted"
     }
   ],
   [
@@ -44,7 +44,7 @@
       },
       "cohort_type": null,
       "count": 0,
-      "created_at": "2026-02-10T03:46:30.230619Z",
+      "created_at": "redacted",
       "created_by": {
         "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
         "email": "nicolas@estuary.dev",
@@ -1144,6 +1144,16 @@
           "unit": "configuration"
         },
         {
+          "description": "Use our managed proxy service to send events through your own domain. Capture more usage data that might otherwise be intercepted by ad blockers without needing to set up and maintain the proxy yourself.",
+          "entitlement_only": false,
+          "is_plan_default": true,
+          "key": "managed_reverse_proxy",
+          "limit": 2,
+          "name": "Managed reverse proxy",
+          "note": null,
+          "unit": "proxies"
+        },
+        {
           "description": "Instantly send data to hundreds of third-party tools to trigger automations, send emails, enhance ads, and more.",
           "entitlement_only": false,
           "is_plan_default": true,
@@ -1204,7 +1214,7 @@
           "unit": null
         }
       ],
-      "created_at": "2026-02-03T11:44:47.890984Z",
+      "created_at": "redacted",
       "customer_id": null,
       "default_anonymize_ips": false,
       "default_experiment_stats_method": "bayesian",
@@ -1251,7 +1261,7 @@
           "uuid": "019c2351-c720-0000-990d-d080c67e1de8"
         }
       ],
-      "updated_at": "2026-02-09T13:40:22.622469Z"
+      "updated_at": "redacted"
     }
   ],
   [
@@ -1264,7 +1274,7 @@
         "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "created_at": "2026-02-06T11:39:15Z",
+      "created_at": "redacted",
       "id": "66c138ff-6ce2-5223-8006-6f0d0eea9ced",
       "is_identified": 0,
       "last_seen_at": null,
@@ -1281,7 +1291,7 @@
         "row_id": 1,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "created_at": "2026-02-03T16:07:37Z",
+      "created_at": "redacted",
       "id": "602301e5-4074-5bfb-9fec-63d69c928678",
       "is_identified": 0,
       "last_seen_at": null,
@@ -1325,7 +1335,7 @@
         "project_id": 304748,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "created_at": "2026-02-03T16:07:48.544000Z",
+      "created_at": "redacted",
       "distinct_id": "user_123",
       "elements_chain": "",
       "elements_chain_elements": [],
@@ -1357,7 +1367,7 @@
         "project_id": 304748,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "created_at": "2026-02-06T11:39:20.759000Z",
+      "created_at": "redacted",
       "distinct_id": "user_234",
       "elements_chain": "",
       "elements_chain_elements": [],
@@ -1386,7 +1396,7 @@
       "analytics_dashboards": [],
       "bucketing_identifier": "distinct_id",
       "can_edit": true,
-      "created_at": "2026-02-10T02:54:57.187802Z",
+      "created_at": "redacted",
       "created_by": {
         "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
         "email": "nicolas@estuary.dev",
@@ -1416,6 +1426,7 @@
       "has_enriched_analytics": false,
       "id": 581591,
       "is_remote_configuration": false,
+      "is_used_in_replay_settings": false,
       "key": "test-flag-1",
       "last_called_at": null,
       "last_modified_by": {
@@ -1435,7 +1446,7 @@
       "status": "ACTIVE",
       "surveys": [],
       "tags": [],
-      "updated_at": "2026-02-10T02:54:57.528838Z",
+      "updated_at": "redacted",
       "usage_dashboard": 1266175,
       "user_access_level": "manager",
       "version": "redacted"
@@ -1452,7 +1463,7 @@
       "analytics_dashboards": [],
       "bucketing_identifier": "distinct_id",
       "can_edit": true,
-      "created_at": "2026-02-10T02:55:06.884876Z",
+      "created_at": "redacted",
       "created_by": {
         "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
         "email": "nicolas@estuary.dev",
@@ -1482,6 +1493,7 @@
       "has_enriched_analytics": false,
       "id": 581592,
       "is_remote_configuration": false,
+      "is_used_in_replay_settings": false,
       "key": "test-flag-2",
       "last_called_at": null,
       "last_modified_by": {
@@ -1501,7 +1513,7 @@
       "status": "ACTIVE",
       "surveys": [],
       "tags": [],
-      "updated_at": "2026-02-10T02:55:07.324017Z",
+      "updated_at": "redacted",
       "usage_dashboard": 1266176,
       "user_access_level": "manager",
       "version": "redacted"
@@ -1518,7 +1530,7 @@
       "analytics_dashboards": [],
       "bucketing_identifier": "distinct_id",
       "can_edit": true,
-      "created_at": "2026-02-10T02:55:16.873313Z",
+      "created_at": "redacted",
       "created_by": {
         "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
         "email": "nicolas@estuary.dev",
@@ -1548,6 +1560,7 @@
       "has_enriched_analytics": false,
       "id": 581593,
       "is_remote_configuration": false,
+      "is_used_in_replay_settings": false,
       "key": "test-flag-3",
       "last_called_at": null,
       "last_modified_by": {
@@ -1567,7 +1580,7 @@
       "status": "ACTIVE",
       "surveys": [],
       "tags": [],
-      "updated_at": "2026-02-10T02:55:17.776415Z",
+      "updated_at": "redacted",
       "usage_dashboard": 1266177,
       "user_access_level": "manager",
       "version": "redacted"
@@ -1584,7 +1597,7 @@
       "analytics_dashboards": [],
       "bucketing_identifier": "distinct_id",
       "can_edit": true,
-      "created_at": "2026-02-10T02:55:21.201339Z",
+      "created_at": "redacted",
       "created_by": {
         "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
         "email": "nicolas@estuary.dev",
@@ -1614,6 +1627,7 @@
       "has_enriched_analytics": false,
       "id": 581594,
       "is_remote_configuration": false,
+      "is_used_in_replay_settings": false,
       "key": "test-flag-4",
       "last_called_at": null,
       "last_modified_by": {
@@ -1633,7 +1647,7 @@
       "status": "ACTIVE",
       "surveys": [],
       "tags": [],
-      "updated_at": "2026-02-10T02:55:21.445176Z",
+      "updated_at": "redacted",
       "usage_dashboard": 1266179,
       "user_access_level": "manager",
       "version": "redacted"
@@ -1650,7 +1664,7 @@
       "analytics_dashboards": [],
       "bucketing_identifier": "distinct_id",
       "can_edit": true,
-      "created_at": "2026-02-10T02:55:24.836113Z",
+      "created_at": "redacted",
       "created_by": {
         "distinct_id": "cMtFPsfzBfosuC5DV5TVwIjx5BCFA6eM1y6O1d7o7Pz",
         "email": "nicolas@estuary.dev",
@@ -1680,6 +1694,7 @@
       "has_enriched_analytics": false,
       "id": 581595,
       "is_remote_configuration": false,
+      "is_used_in_replay_settings": false,
       "key": "test-flag-5",
       "last_called_at": null,
       "last_modified_by": {
@@ -1699,7 +1714,7 @@
       "status": "ACTIVE",
       "surveys": [],
       "tags": [],
-      "updated_at": "2026-02-10T02:55:25.138306Z",
+      "updated_at": "redacted",
       "usage_dashboard": 1266180,
       "user_access_level": "manager",
       "version": "redacted"

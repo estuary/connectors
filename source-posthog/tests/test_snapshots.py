@@ -12,7 +12,7 @@ def test_capture(request, snapshot):
             "--sessions",
             "1",
             "--delay",
-            "10s",
+            "30s",
         ],
         stdout=subprocess.PIPE,
         text=True,
@@ -24,6 +24,8 @@ def test_capture(request, snapshot):
         "last_calculation",
         "pending_version",
         "version",
+        "updated_at",
+        "created_at",
     ]
 
     for l in lines:
