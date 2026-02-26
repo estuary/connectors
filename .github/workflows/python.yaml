@@ -63,6 +63,7 @@ on:
       - "source-ashby/**"
       - "source-gong/**"
       - "source-greenhouse-native/**"
+      - "source-calendly/**"
 
   pull_request:
     branches: [main]
@@ -127,6 +128,7 @@ on:
       - "source-ashby/**"
       - "source-gong/**"
       - "source-greenhouse-native/**"
+      - "source-calendly/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -371,6 +373,10 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-greenhouse-native
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-calendly
             type: capture
             version: v1
             usage_rate: "1.0"
