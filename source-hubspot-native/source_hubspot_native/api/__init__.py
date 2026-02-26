@@ -1,7 +1,9 @@
 from .shared import (
+    DELAYED_LAG,
     FetchDelayedFn,
     FetchRecentFn,
-    process_changes,
+    fetch_delayed_changes,
+    fetch_realtime_changes,
 )
 from .campaigns import (
     check_campaigns_access,
@@ -86,6 +88,7 @@ from .workflows import (
 )
 
 __all__ = [
+    "DELAYED_LAG",
     "FetchDelayedFn",
     "FetchRecentFn",
     "check_campaigns_access",
@@ -134,6 +137,7 @@ __all__ = [
     "fetch_recent_tickets",
     "fetch_recent_workflows",
     "fetch_workflows_page",
+    "fetch_delayed_changes",
+    "fetch_realtime_changes",
     "list_custom_objects",
-    "process_changes",
 ]
