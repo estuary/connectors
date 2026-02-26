@@ -1,0 +1,29 @@
+collections:
+  acmeCo/event_invitees:
+    schema: event_invitees.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/event_types:
+    schema: event_types.schema.yaml
+    key:
+    - /uri
+  acmeCo/groups:
+    schema: groups.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/organization_memberships:
+    schema: organization_memberships.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/routing_form_submissions:
+    schema: routing_form_submissions.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/routing_forms:
+    schema: routing_forms.schema.yaml
+    key:
+    - /_meta/row_id
+  acmeCo/scheduled_events:
+    schema: scheduled_events.schema.yaml
+    key:
+    - /_meta/row_id

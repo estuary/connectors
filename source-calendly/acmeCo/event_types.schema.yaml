@@ -1,0 +1,37 @@
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+    title: Meta
+    type: object
+additionalProperties: true
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  uri:
+    title: Uri
+    type: string
+  updated_at:
+    format: date-time
+    title: Updated At
+    type: string
+required:
+- uri
+- updated_at
+title: EventTypes
+type: object
+x-infer-schema: true

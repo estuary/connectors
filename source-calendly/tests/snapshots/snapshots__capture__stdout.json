@@ -1,0 +1,318 @@
+[
+  [
+    "acmeCo/event_types",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "admin_managed": false,
+      "booking_method": "instant",
+      "color": "#8247f5",
+      "created_at": "2026-02-25T17:18:23.960160Z",
+      "custom_questions": [
+        {
+          "answer_choices": [],
+          "enabled": true,
+          "include_other": false,
+          "name": "Please share anything that will help prepare for our meeting.",
+          "position": 0,
+          "required": false,
+          "type": "text"
+        }
+      ],
+      "deleted_at": null,
+      "description_html": null,
+      "description_plain": null,
+      "duration": 30,
+      "duration_options": [],
+      "internal_note": null,
+      "is_paid": false,
+      "kind": "group",
+      "locale": "en",
+      "locations": null,
+      "name": "Test Group Meeting",
+      "pooling_type": null,
+      "position": 0,
+      "profile": {
+        "name": "Connector Dev",
+        "owner": "https://api.calendly.com/users/5620ac67-d75d-4f0a-bf60-a0a95856c697",
+        "type": "User"
+      },
+      "scheduling_url": "https://calendly.com/connector-dev-calendly-estuary/test-group-meeting",
+      "secret": false,
+      "slug": "test-group-meeting",
+      "type": "StandardEventType",
+      "updated_at": "2026-02-25T17:18:56.897864Z",
+      "uri": "https://api.calendly.com/event_types/1024a299-80ff-4b02-aa2c-f51800c87077"
+    }
+  ],
+  [
+    "acmeCo/event_types",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "admin_managed": false,
+      "booking_method": "instant",
+      "color": "#8247f5",
+      "created_at": "2026-02-25T14:56:04.793989Z",
+      "custom_questions": [
+        {
+          "answer_choices": [],
+          "enabled": true,
+          "include_other": false,
+          "name": "Please share anything that will help prepare for our meeting.",
+          "position": 0,
+          "required": false,
+          "type": "text"
+        }
+      ],
+      "deleted_at": null,
+      "description_html": null,
+      "description_plain": null,
+      "duration": 30,
+      "duration_options": null,
+      "internal_note": null,
+      "is_paid": false,
+      "kind": "solo",
+      "locale": "en",
+      "locations": null,
+      "name": "30 Minute Meeting",
+      "pooling_type": null,
+      "position": 2,
+      "profile": {
+        "name": "Connector Dev",
+        "owner": "https://api.calendly.com/users/5620ac67-d75d-4f0a-bf60-a0a95856c697",
+        "type": "User"
+      },
+      "scheduling_url": "https://calendly.com/connector-dev-calendly-estuary/30min",
+      "secret": false,
+      "slug": "30min",
+      "type": "StandardEventType",
+      "updated_at": "2026-02-25T17:18:24.062459Z",
+      "uri": "https://api.calendly.com/event_types/314835f0-a1ba-40b3-933a-20fb9360dc03"
+    }
+  ],
+  [
+    "acmeCo/event_types",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "active": true,
+      "admin_managed": false,
+      "booking_method": "instant",
+      "color": "#8247f5",
+      "created_at": "2026-02-25T17:14:00.782117Z",
+      "custom_questions": [
+        {
+          "answer_choices": [],
+          "enabled": true,
+          "include_other": false,
+          "name": "Please share anything that will help prepare for our meeting.",
+          "position": 0,
+          "required": false,
+          "type": "text"
+        }
+      ],
+      "deleted_at": null,
+      "description_html": null,
+      "description_plain": null,
+      "duration": 30,
+      "duration_options": [],
+      "internal_note": null,
+      "is_paid": false,
+      "kind": "solo",
+      "locale": "en",
+      "locations": null,
+      "name": "New Meeting",
+      "pooling_type": null,
+      "position": 1,
+      "profile": {
+        "name": "Connector Dev",
+        "owner": "https://api.calendly.com/users/5620ac67-d75d-4f0a-bf60-a0a95856c697",
+        "type": "User"
+      },
+      "scheduling_url": "https://calendly.com/connector-dev-calendly-estuary/new-meeting",
+      "secret": false,
+      "slug": "new-meeting",
+      "type": "StandardEventType",
+      "updated_at": "2026-02-25T17:18:24.062459Z",
+      "uri": "https://api.calendly.com/event_types/cacd7738-5ccf-4e89-9ae1-778ca0c4fbc8"
+    }
+  ],
+  [
+    "acmeCo/scheduled_events",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "calendar_event": null,
+      "created_at": "2026-02-25T18:13:01.136075Z",
+      "end_time": "2036-01-31T14:30:00.000000Z",
+      "event_guests": [],
+      "event_memberships": [
+        {
+          "buffered_end_time": "2036-01-31T14:30:00.000000Z",
+          "buffered_start_time": "2036-01-31T14:00:00.000000Z",
+          "user": "https://api.calendly.com/users/5620ac67-d75d-4f0a-bf60-a0a95856c697",
+          "user_email": "connector-dev+calendly@estuary.dev",
+          "user_name": "Connector Dev"
+        }
+      ],
+      "event_type": "https://api.calendly.com/event_types/1024a299-80ff-4b02-aa2c-f51800c87077",
+      "invitees_counter": {
+        "active": 1,
+        "limit": 2,
+        "total": 1
+      },
+      "location": {
+        "location": null,
+        "type": "custom"
+      },
+      "meeting_notes_html": null,
+      "meeting_notes_plain": null,
+      "name": "Test Group Meeting",
+      "start_time": "2036-01-31T14:00:00.000000Z",
+      "status": "active",
+      "updated_at": "2026-02-25T18:13:01.136075Z",
+      "uri": "https://api.calendly.com/scheduled_events/ccc1b129-d7a8-4686-8b12-60795512bad1"
+    }
+  ],
+  [
+    "acmeCo/organization_memberships",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2026-02-25T14:55:07.283347Z",
+      "organization": "https://api.calendly.com/organizations/6e3750a5-49c1-4c06-9ac2-a084d599b390",
+      "role": "owner",
+      "updated_at": "2026-02-25T14:55:07.283347Z",
+      "uri": "https://api.calendly.com/organization_memberships/bf5d151e-255d-4f57-9781-e8180326d3de",
+      "user": {
+        "avatar_url": null,
+        "created_at": "2026-02-25T14:55:07.150902Z",
+        "email": "connector-dev+calendly@estuary.dev",
+        "locale": "en",
+        "name": "Connector Dev",
+        "scheduling_url": "https://calendly.com/connector-dev-calendly-estuary",
+        "slug": "connector-dev-calendly-estuary",
+        "time_notation": "24h",
+        "timezone": "America/Argentina/Buenos_Aires",
+        "updated_at": "2026-02-25T17:15:23.991759Z",
+        "uri": "https://api.calendly.com/users/5620ac67-d75d-4f0a-bf60-a0a95856c697"
+      }
+    }
+  ],
+  [
+    "acmeCo/routing_forms",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2026-02-25T17:15:36.506570Z",
+      "name": "Test Form",
+      "organization": "https://api.calendly.com/organizations/6e3750a5-49c1-4c06-9ac2-a084d599b390",
+      "questions": [
+        {
+          "answer_choices": [],
+          "name": "Name",
+          "required": false,
+          "type": "name",
+          "uuid": "506387d3-e2d9-4fe5-8f51-33d97be7a1d5"
+        }
+      ],
+      "status": "published",
+      "updated_at": "2026-02-25T17:15:52.925296Z",
+      "uri": "https://api.calendly.com/routing_forms/01493e84-dcdc-4ff1-befe-d06cf354ed96"
+    }
+  ],
+  [
+    "acmeCo/event_invitees",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "cancel_url": "https://calendly.com/cancellations/391411f0-6f73-4c24-bb89-77354a6b5277",
+      "created_at": "2026-02-25T18:13:01.147261Z",
+      "email": "johndoe@mail.com",
+      "event": "https://api.calendly.com/scheduled_events/ccc1b129-d7a8-4686-8b12-60795512bad1",
+      "first_name": null,
+      "invitee_scheduled_by": "https://api.calendly.com/users/5620ac67-d75d-4f0a-bf60-a0a95856c697",
+      "last_name": null,
+      "name": "John Doe",
+      "new_invitee": null,
+      "no_show": null,
+      "old_invitee": null,
+      "payment": null,
+      "questions_and_answers": [],
+      "reconfirmation": null,
+      "reschedule_url": "https://calendly.com/reschedulings/391411f0-6f73-4c24-bb89-77354a6b5277",
+      "rescheduled": false,
+      "routing_form_submission": null,
+      "scheduling_method": null,
+      "status": "active",
+      "text_reminder_number": null,
+      "timezone": "America/Argentina/Buenos_Aires",
+      "tracking": {
+        "salesforce_uuid": null,
+        "utm_campaign": null,
+        "utm_content": null,
+        "utm_medium": null,
+        "utm_source": null,
+        "utm_term": null
+      },
+      "updated_at": "2026-02-25T18:13:01.147261Z",
+      "uri": "https://api.calendly.com/scheduled_events/ccc1b129-d7a8-4686-8b12-60795512bad1/invitees/391411f0-6f73-4c24-bb89-77354a6b5277"
+    }
+  ],
+  [
+    "acmeCo/routing_form_submissions",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "2026-02-25T18:16:27.284752Z",
+      "questions_and_answers": [
+        {
+          "answer": "John Doe",
+          "question": "Name",
+          "question_uuid": "506387d3-e2d9-4fe5-8f51-33d97be7a1d5"
+        }
+      ],
+      "result": {
+        "type": "custom_message",
+        "value": {
+          "body": "We aren\u2019t able to offer any meetings at this time.",
+          "headline": "Thank you for your interest"
+        }
+      },
+      "routing_form": "https://api.calendly.com/routing_forms/01493e84-dcdc-4ff1-befe-d06cf354ed96",
+      "submitter": null,
+      "submitter_type": null,
+      "tracking": {
+        "salesforce_uuid": null,
+        "utm_campaign": null,
+        "utm_content": null,
+        "utm_medium": null,
+        "utm_source": null,
+        "utm_term": null
+      },
+      "updated_at": "2026-02-25T18:16:27.284752Z",
+      "uri": "https://api.calendly.com/routing_form_submissions/b391b80d-fc17-47df-8ca7-30432302abfb"
+    }
+  ]
+]
