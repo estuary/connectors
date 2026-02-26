@@ -25,7 +25,7 @@ from .contact_lists import request_contact_lists_in_time_range, request_contact_
 from .shared import (
     HUB,
     EPOCH_PLUS_ONE_SECOND,
-    delayed_offset,
+    DELAYED_LAG,
 )
 
 async def _request_contact_list_memberships(
@@ -214,7 +214,7 @@ async def fetch_contact_list_memberships(
     # We are deliberately not implementing the same delayed stream mechanism
     # used in CRM object APIs. We have no way to filter/sort by `hs_lastmodifieddate`
     # and we don't want to paginate through all items twice
-    start_date = log_cursor - delayed_offset
+    start_date = log_cursor - DELAYED_LAG
     now = datetime.now(tz=UTC)
 
     async for item in _request_all_contact_list_memberships(http, log, start_date):

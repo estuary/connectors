@@ -21,7 +21,7 @@ from ..models import (
 from .shared import (
     EPOCH_PLUS_ONE_SECOND,
     HUB,
-    delayed_offset,
+    DELAYED_LAG,
 )
 
 # Allowed readable properties for campaigns. HubSpot's /crm/v3/properties/campaign
@@ -124,9 +124,9 @@ async def fetch_campaigns(
 ) -> AsyncGenerator[Campaign | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    # Look back by delayed_offset to catch any campaigns that may have been
+    # Look back by DELAYED_LAG to catch any campaigns that may have been
     # updated but not yet visible in the API due to eventual consistency.
-    start_date = log_cursor - delayed_offset
+    start_date = log_cursor - DELAYED_LAG
     now = datetime.now(tz=UTC)
 
     async for item in _request_campaigns_in_time_range(http, log, start_date):
