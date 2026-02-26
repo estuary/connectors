@@ -93,17 +93,20 @@ func (c *Config) SetDefaults() {
 	}
 }
 
-func translateMySQLValue(val any, fieldType byte, fieldFlag uint16) (any, error) {
+// mysqlBinaryCharset is the charset number for MySQL's "binary" charset.
+// Checking charset == 63 is the correct way to distinguish binary column
+// types (BINARY, VARBINARY, BLOB) from text column types (CHAR, VARCHAR,
+// TEXT) that happen to use a binary collation like utf8mb4_bin. The
+// BINARY_FLAG in the field flags is set for both truly-binary columns and
+// text columns with any _bin collation, making it unsuitable for this
+// purpose. See https://dev.mysql.com/doc/c-api/8.0/en/c-api-data-structures.html
+const mysqlBinaryCharset = 63
+
+func translateMySQLValue(val any, fieldType byte, fieldCharset uint16) (any, error) {
 	if bs, ok := val.([]byte); ok {
 		// For binary column types (blobs, geometry, and binary/varbinary), keep as
 		// []byte so that JSON encoding will base64-encode the data. For text column
 		// types, convert to string.
-		//
-		// BINARY/VARBINARY columns use MYSQL_TYPE_STRING/MYSQL_TYPE_VAR_STRING with
-		// the BINARY_FLAG set to distinguish them from CHAR/VARCHAR.
-		//
-		// TEXT types (TINYTEXT, TEXT, MEDIUMTEXT, LONGTEXT) are stored internally as
-		// BLOB types but without the BINARY_FLAG. BLOB types have the BINARY_FLAG set.
 		switch fieldType {
 		case mysql.MYSQL_TYPE_GEOMETRY:
 			// Parse MySQL's internal geometry format and return as WKT string
@@ -112,15 +115,9 @@ func translateMySQLValue(val any, fieldType byte, fieldFlag uint16) (any, error)
 				return nil, fmt.Errorf("parsing spatial value: %w", err)
 			}
 			return wkt, nil
-		case mysql.MYSQL_TYPE_TINY_BLOB, mysql.MYSQL_TYPE_MEDIUM_BLOB, mysql.MYSQL_TYPE_LONG_BLOB, mysql.MYSQL_TYPE_BLOB:
-			// TEXT vs BLOB: TEXT types don't have BINARY_FLAG, BLOB types do
-			if fieldFlag&mysql.BINARY_FLAG != 0 {
-				return bs, nil
-			}
-			return string(bs), nil
-		case mysql.MYSQL_TYPE_STRING, mysql.MYSQL_TYPE_VAR_STRING:
-			// CHAR/VARCHAR vs BINARY/VARBINARY: binary types have BINARY_FLAG
-			if fieldFlag&mysql.BINARY_FLAG != 0 {
+		case mysql.MYSQL_TYPE_TINY_BLOB, mysql.MYSQL_TYPE_MEDIUM_BLOB, mysql.MYSQL_TYPE_LONG_BLOB, mysql.MYSQL_TYPE_BLOB,
+			mysql.MYSQL_TYPE_STRING, mysql.MYSQL_TYPE_VAR_STRING:
+			if fieldCharset == mysqlBinaryCharset {
 				return bs, nil
 			}
 			return string(bs), nil

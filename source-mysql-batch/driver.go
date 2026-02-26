@@ -630,7 +630,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 		rowValues[0] = metadata
 		for idx, val := range row {
 			var field = result.Fields[idx]
-			var translatedValue, err = translateMySQLValue(val.Value(), field.Type, field.Flag)
+			var translatedValue, err = translateMySQLValue(val.Value(), field.Type, field.Charset)
 			if err != nil {
 				return fmt.Errorf("error translating column %q value: %w", string(field.Name), err)
 			}
