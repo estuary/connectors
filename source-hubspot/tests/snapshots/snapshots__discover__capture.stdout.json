@@ -577,6 +577,12 @@
                 "string"
               ]
             },
+            "hs_calculated_phone_number": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_count_intent_signals_created_last_14_days": {
               "type": [
                 "null",
@@ -1032,6 +1038,12 @@
                 "boolean"
               ]
             },
+            "hs_recent_intent_signals": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_research_agent_execution_id": {
               "type": [
                 "null",
@@ -1055,6 +1067,24 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_searchable_calculated_international_phone_number": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_searchable_calculated_phone_number": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_source_object_id": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_state_code": {
@@ -2330,6 +2360,18 @@
                 "number"
               ]
             },
+            "hs_email_optimal_send_day_of_week": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_email_optimal_send_time_of_day": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_email_optout": {
               "type": [
                 "null",
@@ -2370,6 +2412,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_email_type": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_emailconfirmationstatus": {
@@ -2650,6 +2698,12 @@
               ]
             },
             "hs_linkedin_ad_clicked": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_linkedin_click_id": {
               "type": [
                 "null",
                 "string"
@@ -2937,6 +2991,18 @@
               "type": [
                 "null",
                 "boolean"
+              ]
+            },
+            "hs_source_object_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_source_portal_id": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_state_code": {
@@ -4038,6 +4104,12 @@
                 "string"
               ]
             },
+            "hs_cross_sell_opportunity": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_days_to_close_raw": {
               "type": [
                 "null",
@@ -4506,6 +4578,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_source_object_id": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_tcv": {
@@ -5016,6 +5094,12 @@
                 "string"
               ]
             },
+            "hs_cross_sell_opportunity": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_days_to_close_raw": {
               "type": [
                 "null",
@@ -5484,6 +5568,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_source_object_id": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_tcv": {
@@ -7027,6 +7117,12 @@
                 "string"
               ]
             },
+            "hs_call_suggested_next_actions": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_call_summary": {
               "type": [
                 "null",
@@ -7256,6 +7352,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_pinned_engagement_id": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_product_name": {
@@ -8077,6 +8179,12 @@
                 "string"
               ]
             },
+            "hs_pinned_engagement_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_product_name": {
               "type": [
                 "null",
@@ -8437,6 +8545,18 @@
                 "string"
               ]
             },
+            "hs_customized_reminder_body_format": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_customized_reminder_subject_format": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_engagement_source": {
               "type": [
                 "null",
@@ -8484,6 +8604,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_has_associated_notetaker_call_transcript": {
+              "type": [
+                "null",
+                "boolean"
               ]
             },
             "hs_has_call_with_transcript": {
@@ -8567,6 +8693,12 @@
               ]
             },
             "hs_meeting_ms_teams_payload": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_meeting_notetaker_id": {
               "type": [
                 "null",
                 "string"
@@ -8727,6 +8859,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_pinned_engagement_id": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_product_name": {
@@ -9168,6 +9306,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_pinned_engagement_id": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_product_name": {
@@ -9688,6 +9832,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_pinned_engagement_id": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_pipeline": {
@@ -10634,6 +10784,12 @@
                 "number"
               ]
             },
+            "hs_pinned_engagement_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_pop_up_cta_views": {
               "type": [
                 "null",
@@ -11160,6 +11316,12 @@
                 "string"
               ]
             },
+            "hs_pinned_engagement_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
             "hs_position_on_quote": {
               "type": [
                 "null",
@@ -11264,6 +11426,12 @@
                 "number"
               ]
             },
+            "hs_tax_assessed": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_tax_label": {
               "type": [
                 "null",
@@ -11322,6 +11490,24 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_unscaled_amount": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_unscaled_pre_discount_amount": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_unscaled_total_discount": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_updated_by_user_id": {
@@ -11746,6 +11932,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_pinned_engagement_id": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_pricing_model": {
@@ -12576,6 +12768,18 @@
                 "number"
               ]
             },
+            "hs_email_optimal_send_day_of_week": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_email_optimal_send_time_of_day": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_email_optout": {
               "type": [
                 "null",
@@ -12616,6 +12820,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_email_type": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_emailconfirmationstatus": {
@@ -12896,6 +13106,12 @@
               ]
             },
             "hs_linkedin_ad_clicked": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_linkedin_click_id": {
               "type": [
                 "null",
                 "string"
@@ -13183,6 +13399,18 @@
               "type": [
                 "null",
                 "boolean"
+              ]
+            },
+            "hs_source_object_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_source_portal_id": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_state_code": {
@@ -14319,6 +14547,12 @@
                 "string"
               ]
             },
+            "hs_last_nps_survey_comment": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_lastactivitydate": {
               "format": "date-time",
               "type": [
@@ -14606,6 +14840,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_source_object_id": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_source_url": {
