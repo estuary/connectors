@@ -24,6 +24,12 @@ import (
 	"github.com/segmentio/encoding/json"
 )
 
+var featureFlagDefaults = map[string]bool{
+	// An alternate naming style for the Iceberg tables:
+	//   <base_location>/<namespace>/<table>_<hash>
+	"nested_dot_hash_location_style": false,
+}
+
 // TODO(whb): It would be nice to have a configuration for making the table use
 // "Merge on Read" when performing DML, but that is broken in the latest version
 // of Spark. The default is "Copy on Write" which may be suboptimal for some
@@ -103,7 +109,7 @@ func (c config) DefaultNamespace() string {
 }
 
 func (c config) FeatureFlags() (raw string, defaults map[string]bool) {
-	return c.Advanced.FeatureFlags, make(map[string]bool)
+	return c.Advanced.FeatureFlags, featureFlagDefaults
 }
 
 // Returns the signing name for a catalog URL.  Only AWS glue and s3tables URLs
@@ -550,6 +556,13 @@ func (r resource) Parameters() (path []string, deltaUpdates bool, err error) {
 	return sanitizePath(r.Namespace, r.Table), false, nil
 }
 
+type LocationStyle int
+
+const (
+	FlatLocationStyle LocationStyle = iota
+	NestedDotHashLocationStyle
+)
+
 // Iceberg catalogs are generally case-insensitive and do not allow dots in
 // namespace or table names. AWS Glue is also very picky about anything other
 // than alphanumerics or underscores in namespace or table names.
@@ -583,4 +596,21 @@ func sanitizeAndAppendHash(in ...any) string {
 	}
 
 	return fmt.Sprintf("%s_%016X", sanitized, xxhash.Sum64String(joined))
+}
+
+func createNestedDotHashLocation(namespace, table string) string {
+	sanitized := pathSanitizeRegex.ReplaceAllString(namespace, "_") +
+		"/" + pathSanitizeRegex.ReplaceAllString(table, "_")
+	return fmt.Sprintf("%s.%016X", sanitized, xxhash.Sum64String(sanitized))
+}
+
+func createLocationSuffix(namespace, table string, style LocationStyle) string {
+	switch style {
+	case FlatLocationStyle:
+		return sanitizeAndAppendHash(namespace + "_" + table)
+	case NestedDotHashLocationStyle:
+		return createNestedDotHashLocation(namespace, table)
+	default:
+		panic("unknown location style")
+	}
 }
