@@ -41,6 +41,10 @@ collections:
     schema: forms.schema.yaml
     key:
     - /_meta/row_id
+  acmeCo/leads:
+    schema: leads.schema.yaml
+    key:
+    - /id
   acmeCo/line_items:
     schema: line_items.schema.yaml
     key:
