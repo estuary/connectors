@@ -157,6 +157,21 @@ resources_json_template='[
   }
 ]'
 
+perf_resources_json_template='[
+  {
+    "resource": {
+      "table": "perf_simple"
+    },
+    "source": "${TEST_COLLECTION_PERF_SIMPLE}"
+  },
+  {
+    "resource": {
+      "table": "perf_uuid_key"
+    },
+    "source": "${TEST_COLLECTION_PERF_UUID_KEY}"
+  }
+]'
+
 export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
 export SNOWFLAKE_HOST="$(echo $CONNECTOR_CONFIG | jq -r .host)"
 export SNOWFLAKE_ACCOUNT="$(echo $CONNECTOR_CONFIG | jq -r .account)"
@@ -174,4 +189,10 @@ else
   export SNOWFLAKE_PASSWORD="$(echo $CONNECTOR_CONFIG | jq -r .credentials.password)"
 fi
 
-export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
+# Use performance bindings if PERF_DOC_COUNT is set, otherwise use standard test bindings
+if [[ -n "${PERF_DOC_COUNT:-}" ]]; then
+  echo "PERF_DOC_COUNT is set (${PERF_DOC_COUNT}), using performance test bindings only"
+  export RESOURCES_CONFIG="$(echo "$perf_resources_json_template" | envsubst | jq -c)"
+else
+  export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
+fi
