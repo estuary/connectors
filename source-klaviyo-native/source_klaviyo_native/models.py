@@ -31,6 +31,53 @@ class ApiKey(AccessToken):
     )
 
 
+class CustomEventStream(BaseModel):
+    name: str = Field(
+        title="Stream Name",
+        description="A unique name for this custom event binding. The binding will be named 'custom_<name>'.",
+    )
+    metric_id: str | None = Field(
+        default=None,
+        title="Metric ID",
+        description="Filter events by metric ID. Adds 'equals(metric_id,\"<value>\")' to the API request's query filter.",
+    )
+    profile_id: str | None = Field(
+        default=None,
+        title="Profile ID",
+        description="Filter events by profile ID. Adds 'equals(profile_id,\"<value>\")' to the API request's query filter.",
+    )
+    profile: str | None = Field(
+        default=None,
+        title="Profile",
+        description="Filter events by profile. Adds 'has(profile,\"<value>\")' to the API request's query filter.",
+    )
+
+    @model_validator(mode="after")
+    def _validate_at_least_one_filter(self):
+        if not any([self.metric_id, self.profile_id, self.profile]):
+            raise ValueError("At least one filter (metric_id, profile_id, or profile) must be provided")
+        return self
+
+    def _build_additional_filters(self) -> list[str]:
+        filters: list[str] = []
+
+        if self.metric_id:
+            filters.append(f'equals(metric_id,"{self.metric_id}")')
+        if self.profile_id:
+            filters.append(f'equals(profile_id,"{self.profile_id}")')
+        if self.profile:
+            filters.append(f'has(profile,"{self.profile}")')
+
+        return filters
+
+    def build_model(self) -> type["Events"]:
+        return type(
+            f"CustomEvents_{self.name}",
+            (Events,),
+            {"additional_filters": self._build_additional_filters()},
+        )
+
+
 
 class EndpointConfig(BaseModel):
     start_date: AwareDatetime = Field(
@@ -51,6 +98,11 @@ class EndpointConfig(BaseModel):
             ge=timedelta(seconds=30),
             le=timedelta(days=365),
         )]
+        custom_event_streams: list[CustomEventStream] = Field(
+            default_factory=list,
+            title="Custom Event Streams",
+            description="Define additional event streams with custom filters. Each stream captures events matching the specified filters.",
+        )
 
     advanced: Advanced = Field(
         default_factory=Advanced, #type: ignore

@@ -323,8 +323,11 @@ def flows(
     )
 
 
-def events(
-        log: Logger, http: HTTPMixin, config: EndpointConfig
+def _build_events_resource(
+    http: HTTPMixin,
+    config: EndpointConfig,
+    stream_name: str,
+    model: type[Events],
 ) -> common.Resource:
 
     def open(
@@ -344,20 +347,20 @@ def events(
                 # the "realtime" subtask will miss change events. The "lookback"
                 # subtask will follow behind to capture those missed changes.
                 "realtime": functools.partial(
-                    fetch_incremental_resources, http, Events, None,
+                    fetch_incremental_resources, http, model, None,
                 ),
                 "lookback": functools.partial(
-                    fetch_incremental_resources, http, Events, EVENTS_EVENTUAL_CONSISTENCY_HORIZON,
+                    fetch_incremental_resources, http, model, EVENTS_EVENTUAL_CONSISTENCY_HORIZON,
                 ),
             },
-            fetch_page=functools.partial(backfill_events, http, config.advanced.window_size)
+            fetch_page=functools.partial(backfill_events, http, config.advanced.window_size, model)
         )
 
     cutoff = datetime.now(tz=UTC)
     start = dt_to_str(config.start_date - timedelta(seconds=1))
 
     return common.Resource(
-        name=Events.name,
+        name=stream_name,
         key=["/id"],
         model=IncrementalStream,
         open=open,
@@ -369,10 +372,30 @@ def events(
             backfill=ResourceState.Backfill(cutoff=cutoff, next_page=start)
         ),
         initial_config=ResourceConfig(
-            name=Events.name, interval=timedelta(minutes=5)
+            name=stream_name, interval=timedelta(minutes=5)
         ),
         schema_inference=True,
     )
+
+
+def events(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+    return _build_events_resource(http, config, Events.name, Events)
+
+
+def custom_events(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[common.Resource]:
+    return [
+        _build_events_resource(
+            http,
+            config,
+            f"custom_{custom_stream.name}",
+            custom_stream.build_model(),
+        )
+        for custom_stream in config.advanced.custom_event_streams
+    ]
 
 
 async def all_resources(
@@ -386,6 +409,7 @@ async def all_resources(
         campaigns(log, http, config),
         flows(log, http, config),
         events(log, http, config),
+        *custom_events(log, http, config),
     ]
 
     return resources
