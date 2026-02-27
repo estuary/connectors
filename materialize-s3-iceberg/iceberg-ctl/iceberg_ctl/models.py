@@ -47,6 +47,12 @@ class GlueCatalogConfig(BaseModel):
         default="AWS Glue",
         json_schema_extra={"type": "string"}
     )
+    glue_id: Optional[str] = Field(
+        default=None,
+        title="Glue Catalog ID",
+        description="Glue Catalog ID to use. If not specified, defaults to the account ID of the configured credentials.",
+        json_schema_extra={"order": 1},
+    )
 
 class AdvancedConfig(BaseModel):
     feature_flags: Optional[str] = Field(
