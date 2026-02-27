@@ -53,6 +53,9 @@ type config struct {
 type catalogConfig struct {
 	CatalogType catalogType `json:"catalog_type"`
 
+	// Glue catalog configuration.
+	GlueID string `json:"glue_id,omitempty"`
+
 	// Rest catalog configuration.
 	URI        string `json:"uri,omitempty"`
 	Credential string `json:"credential,omitempty"`

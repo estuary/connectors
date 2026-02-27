@@ -85,15 +85,16 @@ def run(
                 )
 
             case GlueCatalogConfig():
-                ctx.obj["catalog"] = GlueCatalog(
-                    "default",
-                    **{
-                        "client.region": cfg.region,
-                        "client.access-key-id": cfg.aws_access_key_id,
-                        "client.secret-access-key": cfg.aws_secret_access_key,
-                        PY_IO_IMPL: "pyiceberg.io.fsspec.FsspecFileIO",  # use S3 file IO instead of Arrow
-                    },
-                )
+                glue_props = {
+                    "client.region": cfg.region,
+                    "client.access-key-id": cfg.aws_access_key_id,
+                    "client.secret-access-key": cfg.aws_secret_access_key,
+                    PY_IO_IMPL: "pyiceberg.io.fsspec.FsspecFileIO",  # use S3 file IO instead of Arrow
+                }
+                if cfg.catalog.glue_id:
+                    glue_props["glue.id"] = cfg.catalog.glue_id
+
+                ctx.obj["catalog"] = GlueCatalog("default", **glue_props)
 
             case _:
                 raise Exception(f"unhandled catalog type: {cfg.catalog.catalog_type}")

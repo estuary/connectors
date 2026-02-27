@@ -30,6 +30,20 @@
             ],
             "title": "Catalog Type",
             "type": "string"
+          },
+          "glue_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Glue Catalog ID to use. If not specified, defaults to the account ID of the configured credentials.",
+            "order": 1,
+            "title": "Glue Catalog ID"
           }
         },
         "title": "AWS Glue",
