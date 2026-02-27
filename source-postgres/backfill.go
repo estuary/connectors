@@ -162,7 +162,14 @@ func (db *postgresDatabase) ScanTableChunk(ctx context.Context, info *sqlcapture
 		for idx, colName := range keyColumns {
 			var resultIndex = slices.Index(resultColumnNames, colName)
 			if resultIndex < 0 {
-				return false, nil, fmt.Errorf("key column %q not found in result columns for %q", colName, streamID)
+				return false, nil, fmt.Errorf(
+				"key column %q not found in result columns for %q (got columns: [%s]):"+
+					" the backfill query uses SELECT * which must return all key columns."+
+					" Common causes: (1) the capture user lacks table-level SELECT and only has"+
+					" column-level grants that don't include this column,"+
+					" (2) row-level security (RLS) policies are restricting query results",
+				colName, streamID, strings.Join(resultColumnNames, ", "),
+			)
 			}
 			keyIndices[idx] = resultIndex
 		}
