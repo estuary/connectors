@@ -3,6 +3,7 @@
     "acmeCo/products",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "bodyHtml": "This is a gift card for the store",
@@ -105,6 +106,7 @@
     "acmeCo/product_media",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-01-14T15:10:14Z",
@@ -129,6 +131,7 @@
     "acmeCo/product_metafields",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-01-14T15:10:14Z",
@@ -142,6 +145,7 @@
     "acmeCo/product_variants",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-01-14T15:10:14Z",
@@ -281,6 +285,7 @@
     {
       "__parentId": "gid://shopify/Product/8086707830829",
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-01-14T15:10:14Z",
@@ -316,6 +321,7 @@
     "acmeCo/fulfillment_orders",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-04-10T17:42:58Z",
@@ -420,6 +426,7 @@
     "acmeCo/fulfillments",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-04-10T17:42:58Z",
@@ -433,6 +440,7 @@
     "acmeCo/orders",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "app": {
@@ -861,6 +869,7 @@
     "acmeCo/order_agreements",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "agreements": [
@@ -977,6 +986,7 @@
     "acmeCo/order_metafields",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-04-10T17:42:58Z",
@@ -990,6 +1000,7 @@
     "acmeCo/order_transactions",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-04-10T17:42:58Z",
@@ -1003,6 +1014,7 @@
     "acmeCo/order_refunds",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-04-10T17:42:58Z",
@@ -1018,6 +1030,7 @@
     "acmeCo/order_risks",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-04-10T17:42:58Z",
@@ -1077,6 +1090,7 @@
     "acmeCo/inventory_items",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "countryCodeOfOrigin": null,
@@ -1107,6 +1121,7 @@
     {
       "__parentId": "gid://shopify/InventoryItem/45258934976557",
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "canDeactivate": false,
@@ -1179,6 +1194,7 @@
     "acmeCo/custom_collections",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "",
@@ -1233,6 +1249,7 @@
     "acmeCo/smart_collections",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "description": "",
@@ -1306,6 +1323,7 @@
     "acmeCo/custom_collection_metafields",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "gid://shopify/Collection/295442513965",
@@ -1318,6 +1336,7 @@
     "acmeCo/smart_collection_metafields",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "id": "gid://shopify/Collection/295442612269",
@@ -1330,6 +1349,7 @@
     "acmeCo/locations",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "activatable": true,
@@ -1365,6 +1385,7 @@
     "acmeCo/location_metafields",
     {
       "_meta": {
+        "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "createdAt": "2025-01-14T15:09:43Z",

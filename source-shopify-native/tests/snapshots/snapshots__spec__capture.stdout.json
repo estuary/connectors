@@ -31,43 +31,16 @@
               "format": "duration",
               "title": "Window Size",
               "type": "string"
+            },
+            "should_use_composite_key": {
+              "default": false,
+              "description": "Controls whether collection keys include the store identifier (/_meta/store). Enabled by default for new captures. Automatically set to false for legacy single-store captures during migration. Must be set to true (with a full backfill / dataflow reset of all bindings) before adding additional stores to a legacy capture.",
+              "title": "Use Composite Key",
+              "type": "boolean"
             }
           },
           "title": "Advanced",
           "type": "object"
-        },
-        "LongLivedClientCredentialsOAuth2Credentials": {
-          "properties": {
-            "credentials_title": {
-              "const": "OAuth Credentials",
-              "default": "OAuth Credentials",
-              "title": "Credentials Title",
-              "type": "string"
-            },
-            "client_id": {
-              "secret": true,
-              "title": "Client Id",
-              "type": "string"
-            },
-            "client_secret": {
-              "secret": true,
-              "title": "Client Secret",
-              "type": "string"
-            },
-            "access_token": {
-              "secret": true,
-              "title": "Access Token",
-              "type": "string"
-            }
-          },
-          "required": [
-            "client_id",
-            "client_secret",
-            "access_token"
-          ],
-          "title": "OAuth",
-          "type": "object",
-          "x-oauth2-provider": "shopify"
         },
         "ShopifyClientCredentials": {
           "description": "Credentials for the Shopify client_credentials grant flow.\n\nUsed by Dev Dashboard custom apps (post-Jan 2026) where the app developer\nand store owner are the same organization. The CDK's TokenSource exchanges\nclient_id + client_secret for a short-lived access token (~24 hours)\nat runtime, with automatic refresh at 75% of the token lifetime.\n\nInherits client_id, client_secret, and grant_type=\"client_credentials\"\nfrom ClientCredentialsOAuth2Credentials / _BaseOAuth2CredentialsData.\n\nReferences:\n    https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens/client-credentials-grant",
@@ -95,35 +68,52 @@
           ],
           "title": "Client Credentials",
           "type": "object"
+        },
+        "StoreConfig": {
+          "description": "Configuration for a single Shopify store.",
+          "properties": {
+            "store": {
+              "description": "Shopify store name (the prefix of your admin URL, e.g., 'mystore' for mystore.myshopify.com)",
+              "minLength": 1,
+              "title": "Store Name",
+              "type": "string"
+            },
+            "credentials": {
+              "discriminator": {
+                "mapping": {
+                  "Client Credentials": "#/$defs/ShopifyClientCredentials",
+                  "Private App Credentials": "#/$defs/AccessToken"
+                },
+                "propertyName": "credentials_title"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/ShopifyClientCredentials"
+                },
+                {
+                  "$ref": "#/$defs/AccessToken"
+                }
+              ],
+              "title": "Authentication"
+            }
+          },
+          "required": [
+            "store",
+            "credentials"
+          ],
+          "title": "StoreConfig",
+          "type": "object"
         }
       },
       "properties": {
-        "store": {
-          "description": "Shopify store ID. Use the prefix of your admin URL e.g. https://{YOUR_STORE}.myshopify.com/admin",
-          "title": "Shopify Store",
-          "type": "string"
-        },
-        "credentials": {
-          "discriminator": {
-            "mapping": {
-              "Client Credentials": "#/$defs/ShopifyClientCredentials",
-              "OAuth Credentials": "#/$defs/LongLivedClientCredentialsOAuth2Credentials",
-              "Private App Credentials": "#/$defs/AccessToken"
-            },
-            "propertyName": "credentials_title"
+        "stores": {
+          "description": "One or more Shopify stores to capture. Each store requires its own credentials.",
+          "items": {
+            "$ref": "#/$defs/StoreConfig"
           },
-          "oneOf": [
-            {
-              "$ref": "#/$defs/ShopifyClientCredentials"
-            },
-            {
-              "$ref": "#/$defs/AccessToken"
-            },
-            {
-              "$ref": "#/$defs/LongLivedClientCredentialsOAuth2Credentials"
-            }
-          ],
-          "title": "Authentication"
+          "minItems": 1,
+          "title": "Shopify Stores",
+          "type": "array"
         },
         "start_date": {
           "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data generated before this date will not be replicated. If left blank, the start date will be set to 30 days before the present.",
@@ -139,8 +129,7 @@
         }
       },
       "required": [
-        "store",
-        "credentials"
+        "stores"
       ],
       "title": "EndpointConfig",
       "type": "object"
@@ -182,18 +171,6 @@
       "type": "object"
     },
     "documentationUrl": "https://go.estuary.dev/source-shopify-native",
-    "oauth2": {
-      "provider": "shopify",
-      "authUrlTemplate": "https://{{{ config.store }}}.myshopify.com/admin/oauth/authorize?client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}&scope=read_locales,read_products,read_orders,read_locations,read_inventory,read_customers,read_own_subscription_contracts,read_assigned_fulfillment_orders,read_merchant_managed_fulfillment_orders,read_third_party_fulfillment_orders,read_marketplace_fulfillment_orders&state={{{#urlencode}}}{{{ state }}}{{{/urlencode}}}&redirect_uri={{{#urlencode}}}{{{ redirect_uri }}}{{{/urlencode}}}",
-      "accessTokenUrlTemplate": "https://{{{ config.store }}}.myshopify.com/admin/oauth/access_token?client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}&client_secret={{{#urlencode}}}{{{ client_secret }}}{{{/urlencode}}}&code={{{#urlencode}}}{{{ code }}}{{{/urlencode}}}",
-      "accessTokenBody": "client_id={{{#urlencode}}}{{{ client_id }}}{{{/urlencode}}}&client_secret={{{#urlencode}}}{{{ client_secret }}}{{{/urlencode}}}&code={{{#urlencode}}}{{{ code }}}{{{/urlencode}}}",
-      "accessTokenHeaders": {
-        "content-type": "application/x-www-form-urlencoded"
-      },
-      "accessTokenResponseMap": {
-        "access_token": "/access_token"
-      }
-    },
     "resourcePathPointers": [
       "/name"
     ]
