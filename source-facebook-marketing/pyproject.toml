@@ -6,7 +6,7 @@ authors = ["Jonathan Wihl <jonathan@estuary.dev>"]
 
 [tool.poetry.dependencies]
 airbyte-cdk = "^0.52"
-estuary-cdk = {path="../estuary-cdk", develop = true}
+estuary-cdk = {path="../estuary-cdk", develop = true, extras = ["airbyte-shim"]}
 python = "^3.11"
 types-requests = "^2.31"
 facebook-business = "23.0.0"

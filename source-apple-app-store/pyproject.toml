@@ -10,6 +10,7 @@ authors = [
 estuary-cdk = { path = "../estuary-cdk", develop = true }
 python = "^3.11"
 pydantic = "^2"
+pyjwt = "^2"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"

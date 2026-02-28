@@ -6,7 +6,7 @@ authors = ["Luishfs <luish1980@hotmail.com>"]
 
 [tool.poetry.dependencies]
 airbyte-cdk = "^0.52"
-estuary-cdk = {path="../estuary-cdk", develop = true}
+estuary-cdk = {path="../estuary-cdk", develop = true, extras = ["airbyte-shim"]}
 types-requests = "^2.31"
 python = "^3.12"
 pydantic = "1.10.14"
