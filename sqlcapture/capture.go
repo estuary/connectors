@@ -225,8 +225,18 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	defer cancelAcknowledgeWorkerCtx()
 
 	// Perform an initial "catch-up" stream-to-fence before entering the main capture loop.
+	//
+	// In test mode we suppress intermediate checkpoints so that all catch-up events land
+	// in a single Flow transaction, preventing nondeterministic document ordering and also
+	// making it easier to know exactly how many transactions are expected from a capture.
 	c.statusUpdate("Catching up on CDC history")
-	if err := c.streamToFence(ctx, replStream, 0, true); err != nil {
+	if TestShutdownAfterCaughtUp || os.Getenv("SHUTDOWN_AFTER_POLLING") == "yes" {
+		if err := c.streamToFence(ctx, replStream, 0, false); err != nil {
+			return fmt.Errorf("error streaming until fence: %w", err)
+		} else if err := c.emitState(); err != nil {
+			return fmt.Errorf("error emitting state after catch-up: %w", err)
+		}
+	} else if err := c.streamToFence(ctx, replStream, 0, true); err != nil {
 		return fmt.Errorf("error streaming until fence: %w", err)
 	}
 
