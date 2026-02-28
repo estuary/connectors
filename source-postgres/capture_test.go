@@ -22,18 +22,18 @@ func TestReplicaIdentity(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'A'), (1, 'bbb'), (2, 'CDEFGH'), (3, 'Three'), (4, 'Four')`)
 	tc.Discover("Discover Test Table")
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 
 	// Default REPLICA IDENTITY logs only the old primary key for deletions and updates.
 	db.Exec(t, `DELETE FROM <NAME> WHERE id = 1`)
 	db.Exec(t, `UPDATE <NAME> SET data = 'UPDATED' WHERE id = 2`)
-	tc.Run("Default Replica Identity", -1)
+	tc.Run("Default Replica Identity", transactionCountBaseline)
 
 	// Increase to REPLICA IDENTITY FULL, and repeat. Expect to see complete modified tuples logged.
 	db.Exec(t, `ALTER TABLE <NAME> REPLICA IDENTITY FULL`)
 	db.Exec(t, `DELETE FROM <NAME> WHERE id = 3`)
 	db.Exec(t, `UPDATE <NAME> SET data = 'UPDATED' WHERE id = 4`)
-	tc.Run("Replica Identity Full", -1)
+	tc.Run("Replica Identity Full", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -55,7 +55,7 @@ func TestToastColumns(t *testing.T) {
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 32, 'smol')`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 42, '`+data+`')`)
 	tc.Discover("Discover Test Table")
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 
 	// Insert TOAST value, update TOAST value, and change an unrelated value.
 	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 52, '`+data+`')`)               // Insert TOAST.
@@ -65,14 +65,14 @@ func TestToastColumns(t *testing.T) {
 	db.Exec(t, `UPDATE <NAME> SET data = 'UPDATE smol' WHERE id = 3`)         // Update TOAST => non-TOAST.
 	db.Exec(t, `UPDATE <NAME> SET other = 72 WHERE id = 1`)                   // Update other (TOAST); data _not_ expected.
 	db.Exec(t, `UPDATE <NAME> SET other = 82 WHERE id = 3`)                   // Update other (non-TOAST).
-	tc.Run("Default Replica Identity", -1)
+	tc.Run("Default Replica Identity", transactionCountBaseline)
 
 	db.Exec(t, `ALTER TABLE <NAME> REPLICA IDENTITY FULL`)
 	db.Exec(t, `UPDATE <NAME> SET other = 92 WHERE id = 1`)                   // Update other (TOAST); data *is* expected.
 	db.Exec(t, `UPDATE <NAME> SET other = 102 WHERE id = 3`)                  // Update other (non-TOAST).
 	db.Exec(t, `UPDATE <NAME> SET data = 'smol smol' WHERE id = 1`)           // Update TOAST => non-TOAST.
 	db.Exec(t, `UPDATE <NAME> SET data = 'UPDATE SIX `+data+`' WHERE id = 4`) // Update non-TOAST => TOAST.
-	tc.Run("Replica Identity Full", -1)
+	tc.Run("Replica Identity Full", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -176,13 +176,13 @@ func TestSkipBackfills(t *testing.T) {
 
 	// Skip A and C, only B will be backfilled
 	require.NoError(t, tc.Capture.EditConfig("advanced.skip_backfills", db.Expand(`<NAME>_a,<NAME>_c`)))
-	tc.Run("Initial Backfill (Only B)", -1)
+	tc.Run("Initial Backfill (Only B)", transactionCountBaseline+1)
 
 	// All three tables should see replication events
 	db.Exec(t, `INSERT INTO <NAME>_a VALUES (7, 'seven'), (8, 'eight')`)
 	db.Exec(t, `INSERT INTO <NAME>_b VALUES (9, 'nine'), (10, 'ten')`)
 	db.Exec(t, `INSERT INTO <NAME>_c VALUES (11, 'eleven'), (12, 'twelve')`)
-	tc.Run("Replication (All Tables)", -1)
+	tc.Run("Replication (All Tables)", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -194,14 +194,14 @@ func TestTruncatedTables(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one'), (2, 'two')`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 
 	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three'), (4, 'four')`)
-	tc.Run("Normal Replication", -1)
+	tc.Run("Normal Replication", transactionCountBaseline)
 
 	db.Exec(t, `TRUNCATE TABLE <NAME>`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (5, 'five'), (6, 'six')`)
-	tc.Run("After Truncation", -1)
+	tc.Run("After Truncation", transactionCountBaseline)
 
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
@@ -212,9 +212,9 @@ func TestTrickyColumnNames(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `("Meta/""wtf""~ID" INTEGER PRIMARY KEY, "table" TEXT, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'one', 'aaa'), (2, 'two', 'bbb')`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three', 'eee'), (4, 'four', 'fff')`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -230,7 +230,7 @@ func TestCursorResume(t *testing.T) {
 		('z', 1, 'qmjp'), ('', 0, 'xakg'), ('', -1, 'kvxr'), ('   ', 3, 'gboj')`)
 	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
 	tc.Discover("Discover Tables")
-	tc.Run("Backfill Data", -1) // Run until the connector decides to shut down
+	tc.Run("Backfill Data", transactionCountBaseline+17)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -258,7 +258,7 @@ func TestComplexDataset(t *testing.T) {
 	tc.Discover("Discover Tables")
 
 	// Initial backfill runs to completion
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+9)
 
 	// Rewind checkpoint to simulate restart at cursor position ('B', 4).
 	// This means rows (A,0) through (B,4) have been "scanned" (10 rows).
@@ -287,7 +287,7 @@ func TestComplexDataset(t *testing.T) {
 
 	// Resume capture - should see replication events for "before cursor" changes,
 	// then backfill from ('B',4) onwards picking up the "after cursor" changes
-	tc.Run("Resume After Checkpoint Rewind", -1)
+	tc.Run("Resume After Checkpoint Rewind", transactionCountBaseline+6)
 
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
@@ -303,9 +303,9 @@ func TestUserTypes(t *testing.T) {
 		db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, value UserDomain)`)
 		tc.DiscoverFull("Discover Tables")
 		db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'hello'), (2, 'world')`)
-		tc.Run("Initial Backfill", -1)
+		tc.Run("Initial Backfill", transactionCountBaseline+1)
 		db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'foo'), (4, 'bar'), (5, 'baz')`)
-		tc.Run("Replication", -1)
+		tc.Run("Replication", transactionCountBaseline)
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 
@@ -318,9 +318,9 @@ func TestUserTypes(t *testing.T) {
 		db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, value UserEnum)`)
 		tc.DiscoverFull("Discover Tables")
 		db.Exec(t, `INSERT INTO <NAME> VALUES (1, 'red'), (2, 'green'), (3, 'blue')`)
-		tc.Run("Initial Backfill", -1)
+		tc.Run("Initial Backfill", transactionCountBaseline+1)
 		db.Exec(t, `INSERT INTO <NAME> VALUES (4, 'blue'), (5, 'red'), (6, 'green')`)
-		tc.Run("Replication", -1)
+		tc.Run("Replication", transactionCountBaseline)
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 
@@ -333,9 +333,9 @@ func TestUserTypes(t *testing.T) {
 		db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, value UserTuple)`)
 		tc.DiscoverFull("Discover Tables")
 		db.Exec(t, `INSERT INTO <NAME> VALUES (1, '(1234, 5678, ''hello'')'), (2, '(3456, 9876, ''world'')')`)
-		tc.Run("Initial Backfill", -1)
+		tc.Run("Initial Backfill", transactionCountBaseline+1)
 		db.Exec(t, `INSERT INTO <NAME> VALUES (3, '(34, 64, ''asdf'')'), (4, '(83, 12, ''fdsa'')')`)
-		tc.Run("Replication", -1)
+		tc.Run("Replication", transactionCountBaseline)
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 
@@ -348,9 +348,9 @@ func TestUserTypes(t *testing.T) {
 		db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, value UserRange)`)
 		tc.DiscoverFull("Discover Tables")
 		db.Exec(t, `INSERT INTO <NAME> VALUES (1, '(1, 2]'), (2, '[3,)')`)
-		tc.Run("Initial Backfill", -1)
+		tc.Run("Initial Backfill", transactionCountBaseline+1)
 		db.Exec(t, `INSERT INTO <NAME> VALUES (3, '(,4]'), (4, '[5,6)')`)
-		tc.Run("Replication", -1)
+		tc.Run("Replication", transactionCountBaseline)
 		cupaloy.SnapshotT(t, tc.Transcript.String())
 	})
 }
@@ -372,7 +372,7 @@ func TestCaptureCapitalization(t *testing.T) {
 	db.Exec(t, `INSERT INTO "<SCHEMA>"."tbl_<ID>_bbBBbb" VALUES (2, 'world'), (3, 'fdsa');`)
 
 	tc.Discover("Discover Tables")
-	tc.Run("Backfill Data", -1)
+	tc.Run("Backfill Data", transactionCountBaseline+2)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -388,12 +388,12 @@ func TestCaptureOversizedFields(t *testing.T) {
 	db.QuietExec(t, `INSERT INTO <NAME> (id, v_json)  VALUES (12, '`+largeJSON+`')`)
 	db.QuietExec(t, `INSERT INTO <NAME> (id, v_jsonb) VALUES (13, '`+largeJSON+`')`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 	db.QuietExec(t, `INSERT INTO <NAME> (id, v_text)  VALUES (20, '`+largeText+`')`)
 	db.QuietExec(t, `INSERT INTO <NAME> (id, v_bytea) VALUES (21, '`+largeText+`')`)
 	db.QuietExec(t, `INSERT INTO <NAME> (id, v_json)  VALUES (22, '`+largeJSON+`')`)
 	db.QuietExec(t, `INSERT INTO <NAME> (id, v_jsonb) VALUES (23, '`+largeJSON+`')`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -404,22 +404,22 @@ func TestCaptureAfterSlotDropped(t *testing.T) {
 	// Run a normal capture
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Capture", -1)
+	tc.Run("Initial Capture", transactionCountBaseline+1)
 
 	// Drop the replication slot while the task is offline. At startup it should
 	// fail because it has a non-empty resume cursor but the slot no longer exists.
 	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 'two'), (3, 'three')`)
 	db.Exec(t, `SELECT pg_drop_replication_slot('flow_slot')`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (4, 'four'), (5, 'five')`)
-	tc.Run("Capture After Slot Dropped (Should Fail)", -1)
+	tc.Run("Capture After Slot Dropped (Should Fail)", transactionCountBaseline)
 
 	// A subsequent capture run should still be failing since we haven't fixed it.
 	db.Exec(t, `INSERT INTO <NAME> VALUES (6, 'six'), (7, 'seven')`)
-	tc.Run("Capture Still Failing", -1)
+	tc.Run("Capture Still Failing", transactionCountBaseline)
 
 	// Bump the backfill counter to trigger a fresh backfill with a new replication slot.
 	require.NoError(t, tc.Capture.EditBinding(0, "backfill", 1))
-	tc.Run("Capture After Backfill Counter Bumped", -1)
+	tc.Run("Capture After Backfill Counter Bumped", transactionCountBaseline+1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -434,9 +434,9 @@ func TestCaptureDomainJSONB(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data UserDomain NOT NULL)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, '{}'), (1, '{"foo": "bar"}')`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (2, '{"baz": [1, 2, 3]}'), (3, '{"asdf": {"a": 1, "b": 2}}')`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -445,16 +445,16 @@ func TestDroppedAndRecreatedTable(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	tc.Discover("Discover Tables")
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 'two'), (3, 'three')`)
-	tc.Run("Some Replication", -1)
+	tc.Run("Some Replication", transactionCountBaseline)
 	db.Exec(t, `DROP TABLE <NAME>`)
 	db.Exec(t, `CREATE TABLE <NAME> (id INTEGER PRIMARY KEY, data TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (4, 'four'), (5, 'five')`)
-	tc.Run("Dropped and Recreated", -1)
+	tc.Run("Dropped and Recreated", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (6, 'six'), (7, 'seven')`)
-	tc.Run("More Replication", -1)
+	tc.Run("More Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -463,9 +463,9 @@ func TestCIText(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data CITEXT, arr CITEXT[])`)
 	tc.DiscoverFull("Discover Tables")
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero', '{a,b}'), (1, 'one', '{c,d}')`)
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 'two', '{e,f}'), (3, 'three', '{g,h}')`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -474,12 +474,12 @@ func TestPrimaryKeyUpdate(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
 	tc.Discover("Discover Tables")
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three'), (4, 'four')`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	db.Exec(t, `UPDATE <NAME> SET id = 5 WHERE id = 1`)
 	db.Exec(t, `UPDATE <NAME> SET id = 6 WHERE id = 4`)
-	tc.Run("Primary Key Updates", -1)
+	tc.Run("Primary Key Updates", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -488,14 +488,14 @@ func TestGeneratedColumn(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, a VARCHAR(32), b VARCHAR(32), generated VARCHAR(64) GENERATED ALWAYS AS (COALESCE(a, b)) STORED)`)
 	tc.DiscoverFull("Discover Tables")
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'a0', 'b0'), (1, null, 'b1'), (2, 'a2', null), (3, null, null)`)
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (4, 'a4', 'b4'), (5, null, 'b5'), (6, 'a6', null), (7, null, null)`)
-	tc.Run("Replication Inserts", -1)
+	tc.Run("Replication Inserts", transactionCountBaseline)
 	db.Exec(t, `UPDATE <NAME> SET a = 'a-modified' WHERE id IN (4, 6)`)
 	db.Exec(t, `UPDATE <NAME> SET b = 'b-modified' WHERE id = 5`)
-	tc.Run("Updates", -1)
+	tc.Run("Updates", transactionCountBaseline)
 	db.Exec(t, `DELETE FROM <NAME> WHERE id IN (4, 5, 6, 7)`)
-	tc.Run("Deletes", -1)
+	tc.Run("Deletes", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -521,7 +521,7 @@ func TestFeatureFlagFlattenArrays(t *testing.T) {
 
 			require.NoError(t, tc.Capture.EditConfig("advanced.feature_flags", testCase.flag))
 			tc.DiscoverFull("Discover Tables")
-			tc.Run("Capture", -1)
+			tc.Run("Capture", transactionCountBaseline+1)
 			cupaloy.SnapshotT(t, tc.Transcript.String())
 		})
 	}
@@ -545,7 +545,7 @@ func TestXMINBackfill(t *testing.T) {
 	// Configure the minimum backfill XID and run the capture
 	require.NoError(t, tc.Capture.EditConfig("advanced.min_backfill_xid", fmt.Sprintf("%d", uint32(lowerXID))))
 	tc.Discover("Discover Tables")
-	tc.Run("Backfill With XMIN Filter", -1)
+	tc.Run("Backfill With XMIN Filter", transactionCountBaseline+1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -567,7 +567,7 @@ func TestMultidimensionalArrays(t *testing.T) {
 		(7, '{{a,b},{c,d}}'),
 		(8, '{{{a,b,c,d},{e,f,g,h},{i,j,k,l}},{{m,n,o,p},{q,r,s,t},{u,v,w,x}}}'),
 		(9, '{{{{a,b},{c,d}},{{e,f},{g,h}},{{i,j},{k,l}}},{{{m,n},{o,p}},{{q,r},{s,t}},{{u,v},{w,x}}}}')`)
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 
 	// Replication capture with the same array shapes
 	db.Exec(t, `INSERT INTO <NAME> VALUES
@@ -580,7 +580,7 @@ func TestMultidimensionalArrays(t *testing.T) {
 		(17, '{{a,b},{c,d}}'),
 		(18, '{{{a,b,c,d},{e,f,g,h},{i,j,k,l}},{{m,n,o,p},{q,r,s,t},{u,v,w,x}}}'),
 		(19, '{{{{a,b},{c,d}},{{e,f},{g,h}},{{i,j},{k,l}}},{{{m,n},{o,p}},{{q,r},{s,t}},{{u,v},{w,x}}}}')`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -603,7 +603,7 @@ func TestFeatureFlagEmitSourcedSchemas(t *testing.T) {
 				require.NoError(t, tc.Capture.EditConfig("advanced.feature_flags", testCase.flag))
 			}
 			tc.Discover("Discover Tables")
-			tc.Run("Capture", -1)
+			tc.Run("Capture", transactionCountBaseline+1)
 			cupaloy.SnapshotT(t, tc.Transcript.String())
 		})
 	}
@@ -628,10 +628,9 @@ func TestPartitionedCTIDBackfill(t *testing.T) {
 	db.Exec(t, `INSERT INTO <NAME> SELECT n, 'data value ' || n FROM generate_series(1, 29) AS n`)
 
 	// Configure for CTID-based backfill (without primary key)
-	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 5))
 	tc.Discover("Discover Tables")
 	require.NoError(t, tc.Capture.EditBinding(0, "resource.mode", "Without Primary Key"))
-	tc.Run("CTID Backfill", -1)
+	tc.Run("CTID Backfill", transactionCountBaseline+1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -677,7 +676,7 @@ func TestCaptureAsPartitions(t *testing.T) {
 		('2023-09-25', 'Q3 data 2'),
 		('2023-11-12', 'Q4 data 1'),
 		('2023-12-28', 'Q4 data 2')`)
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+4)
 
 	// Insert more test data into the partitions for replication
 	db.Exec(t, `INSERT INTO <NAME> VALUES
@@ -685,7 +684,7 @@ func TestCaptureAsPartitions(t *testing.T) {
 		('2023-04-01', 'Q2 replication'),
 		('2023-07-01', 'Q3 replication'),
 		('2023-10-01', 'Q4 replication')`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -709,7 +708,7 @@ func TestUnpairedSurrogatesInJSON(t *testing.T) {
 	db.Exec(t, `INSERT INTO <NAME> VALUES (104, '{"text": "foo \uDEAD bar \uDEAD baz"}')`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (105, '[{"type":"text","text":"foo \"bar\\udfs\" /baz"}]')`)
 	tc.Discover("Discover Tables")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 
 	// Replication inserts with the same values
 	db.Exec(t, `INSERT INTO <NAME> VALUES (200, '{"text": "normal"}')`)
@@ -718,7 +717,7 @@ func TestUnpairedSurrogatesInJSON(t *testing.T) {
 	db.Exec(t, `INSERT INTO <NAME> VALUES (203, '{"\uDeAd": "\ud83d\udE14"}')`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (204, '{"text": "foo \uDEAD bar \uDEAD baz"}')`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (205, '[{"type":"text","text":"foo \"bar\\udfs\" /baz"}]')`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -729,9 +728,9 @@ func TestSourceTag(t *testing.T) {
 	require.NoError(t, tc.Capture.EditConfig("advanced.source_tag", "example_source_tag_1234"))
 	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 'two'), (3, 'three')`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -762,8 +761,10 @@ func TestBackfillPriority(t *testing.T) {
 	require.NoError(t, tc.Capture.EditBinding(3, "resource.priority", -10)) // lo1
 	require.NoError(t, tc.Capture.EditBinding(4, "resource.priority", -10)) // lo2
 
-	tc.Run("Backfill 1 (High Priority)", 5) // Run until first two tables are backfilled
-	tc.Run("Backfill 2 (Default)", 4) // Run until third table is backfilled
-	tc.Run("Backfill 3 (Low Priority)", -1) // Run until everything else is backfilled
+	// These transaction counts are 1 lower than usual because we need to interrupt
+	// the process early and so we're not including the usual shutdown commits.
+	tc.Run("Backfill 1 (High Priority)", transactionCountBaseline+1) // Run until first two tables are backfilled
+	tc.Run("Backfill 2 (Default)", transactionCountBaseline)         // Run until third table is backfilled
+	tc.Run("Backfill 3 (Low Priority)", transactionCountBaseline+1)  // Run until everything else is backfilled
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }

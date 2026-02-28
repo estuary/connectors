@@ -50,6 +50,23 @@ var checkpointSanitizers = []blackbox.JSONSanitizer{
 	{Matcher: regexp.MustCompile(`"cursor":"[0-9A-F]+/[0-9A-F]+"`), Replacement: `"cursor":"REDACTED"`},
 }
 
+const (
+	// transactionCountBaseline is the number of transactions output by a typical
+	// test capture with `SHUTDOWN_AFTER_POLLING=yes` and nothing to backfill. These
+	// correspond to State Initialization, Catchup Streaming, Sourced Schemas, and
+	// finally a Shutdown checkpoint.
+	//
+	// Backfills with default 50k chunk-size will add one transaction per table,
+	// since a single backfill query is enough to read out all data from a test
+	// table and also observe that we've reached the end.
+	//
+	// Backfills with a lower chunk size will incur <tableRows>/<chunkSize> more
+	// transactions, plus one more query when <tableRows> is an integer multiple
+	// of <chunkSize> (since we need a zero-result query in that case to know we
+	// are at the end).
+	transactionCountBaseline = 4
+)
+
 func TestMain(m *testing.M) {
 	flag.Parse()
 
@@ -202,9 +219,9 @@ func TestCapitalizedTables(t *testing.T) {
 	tc.Capture.DiscoveryFilter = regexp.MustCompile(`(?i:users)`)
 	tc.Discover("Discover Tables")
 	db.Exec(t, `INSERT INTO "<SCHEMA>"."USERS" VALUES (1, 'Alice'), (2, 'Bob')`)
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO "<SCHEMA>"."USERS" VALUES (3, 'Carol'), (4, 'Dave')`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 

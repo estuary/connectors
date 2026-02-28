@@ -27,7 +27,7 @@ func TestScanKeyTimestamps(t *testing.T) {
 	// Use chunk size 1 to exercise timestamp scan key serialization on every iteration
 	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
 	tc.Discover("Discover Tables")
-	tc.Run("Backfill With Timestamp Scan Key", -1)
+	tc.Run("Backfill With Timestamp Scan Key", transactionCountBaseline+11)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -122,7 +122,7 @@ func TestScanKeyTypes(t *testing.T) {
 
 			require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
 			tc.Discover("Discover Tables")
-			tc.Run("Backfill", -1)
+			tc.Run("Backfill", transactionCountBaseline+len(testCase.Values)+1)
 			cupaloy.SnapshotT(t, tc.Transcript.String())
 		})
 	}
@@ -145,7 +145,7 @@ func TestEnumScanKey(t *testing.T) {
 	// Use chunk size 1 to exercise enum scan key serialization on every iteration
 	require.NoError(t, tc.Capture.EditConfig("advanced.backfill_chunk_size", 1))
 	tc.Discover("Discover Tables")
-	tc.Run("Backfill With Enum Scan Key", -1)
+	tc.Run("Backfill With Enum Scan Key", transactionCountBaseline+16)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -164,7 +164,7 @@ func TestSpecialTemporalValues(t *testing.T) {
 		(2, '-infinity', NULL, '-infinity'),
 		(3, NULL, 'allballs', NULL)`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 
 	// Replication with same special values
 	db.Exec(t, `INSERT INTO <NAME> VALUES
@@ -172,7 +172,7 @@ func TestSpecialTemporalValues(t *testing.T) {
 		(11, 'infinity', NULL, 'infinity'),
 		(12, '-infinity', NULL, '-infinity'),
 		(13, NULL, 'allballs', NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -193,12 +193,12 @@ func TestBinaryTypes(t *testing.T) {
 		(2, false, '\xCAFEBABE', B'0', B'010', B'0010', B'01000'),
 		(3, NULL, NULL, NULL, NULL, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, true, '\xDEADBEEF', B'1', B'101', B'1101', B'10111'),
 		(102, false, '\xCAFEBABE', B'0', B'010', B'0010', B'01000'),
 		(103, NULL, NULL, NULL, NULL, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -209,9 +209,9 @@ func TestLongYearTimestamps(t *testing.T) {
 	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, created_at TIMESTAMPTZ, description TEXT)`)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (1, '2023-01-01 12:30:45+00', 'Recent date'), (2, '12345-06-07 08:09:10+00', 'Far future date')`)
 	tc.Discover("Discover Tables")
-	tc.Run("Initial Backfill", -1)
+	tc.Run("Initial Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES (4, '2024-05-15 09:30:00+00', 'Another recent date'), (5, '54321-10-11 12:13:14+00', 'Even further future')`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -231,13 +231,13 @@ func TestIntegerTypes(t *testing.T) {
 		(3, 2147483647, 32767, 9223372036854775807, 4294967295),
 		(4, NULL, NULL, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, 123, 456, 789012345678, 54321),
 		(102, -2147483648, -32768, -9223372036854775808, 0),
 		(103, 2147483647, 32767, 9223372036854775807, 4294967295),
 		(104, NULL, NULL, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -257,7 +257,7 @@ func TestFloatingPointTypes(t *testing.T) {
 		(5, '-Infinity', '-Infinity'),
 		(6, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, 123.456, 123.456789012345),
 		(102, -123.456, -123.456789012345),
@@ -265,7 +265,7 @@ func TestFloatingPointTypes(t *testing.T) {
 		(104, 'Infinity', 'Infinity'),
 		(105, '-Infinity', '-Infinity'),
 		(106, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -286,7 +286,7 @@ func TestNumericTypes(t *testing.T) {
 		(5, '-Infinity', '-Infinity', NULL),
 		(6, NULL, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, 123.456, 123.456, 123456.7890),
 		(102, -999.999, -999.999, -999999.9999),
@@ -294,7 +294,7 @@ func TestNumericTypes(t *testing.T) {
 		(104, 'Infinity', 'Infinity', NULL),
 		(105, '-Infinity', '-Infinity', NULL),
 		(106, NULL, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -316,14 +316,14 @@ func TestStringTypes(t *testing.T) {
 newlines', 'unicode: ñ', '✓', 'emoji: 🎉'),
 		(4, NULL, NULL, NULL, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, 'hello', 'world', 'fixed', 'X', 'some text here'),
 		(102, '', '', '          ', ' ', ''),
 		(103, 'special: "quotes" and ''apostrophes''', 'tabs	and
 newlines', 'unicode: ñ', '✓', 'emoji: 🎉'),
 		(104, NULL, NULL, NULL, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -347,7 +347,7 @@ func TestTemporalTypes(t *testing.T) {
 		(5, '-infinity', NULL, NULL, '-infinity', '-infinity', NULL),
 		(6, NULL, NULL, NULL, NULL, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, '2024-01-15', '14:30:00', '14:30:00+05:30', '2024-01-15 14:30:00', '2024-01-15 14:30:00+00', '1 year 2 months 3 days'),
 		(102, '1999-12-31', '23:59:59.999999', '23:59:59.999999-08:00', '1999-12-31 23:59:59.999999', '1999-12-31 23:59:59.999999+00', '5 hours 30 minutes'),
@@ -355,7 +355,7 @@ func TestTemporalTypes(t *testing.T) {
 		(104, 'infinity', NULL, NULL, 'infinity', 'infinity', NULL),
 		(105, '-infinity', NULL, NULL, '-infinity', '-infinity', NULL),
 		(106, NULL, NULL, NULL, NULL, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -377,12 +377,12 @@ func TestGeometryTypes(t *testing.T) {
 		(2, '(0,0)', '{1,0,0}', '[(0,0),(1,1)]', '((0,0),(1,1))', '((0,0))', '((0,0),(1,1),(2,0))', '<(0,0),1>'),
 		(3, NULL, NULL, NULL, NULL, NULL, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, '(1,2)', '{1,2,3}', '[(1,2),(3,4)]', '((1,2),(3,4))', '[(1,2),(3,4),(5,6)]', '((0,0),(0,1),(1,0))', '<(1,2),3>'),
 		(102, '(0,0)', '{1,0,0}', '[(0,0),(1,1)]', '((0,0),(1,1))', '((0,0))', '((0,0),(1,1),(2,0))', '<(0,0),1>'),
 		(103, NULL, NULL, NULL, NULL, NULL, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -402,13 +402,13 @@ func TestNetworkTypes(t *testing.T) {
 		(3, '10.0.0.1/8', '10.0.0.0/8', '00:00:00:00:00:00', '00:00:00:00:00:00:00:00'),
 		(4, NULL, NULL, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, '192.168.1.1', '192.168.1.0/24', '08:00:2b:01:02:03', '08:00:2b:01:02:03:04:05'),
 		(102, '2001:4f8:3:ba::1', '2001:4f8:3:ba::/64', 'ff:ff:ff:ff:ff:ff', 'ff:ff:ff:ff:ff:ff:ff:ff'),
 		(103, '10.0.0.1/8', '10.0.0.0/8', '00:00:00:00:00:00', '00:00:00:00:00:00:00:00'),
 		(104, NULL, NULL, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -428,13 +428,13 @@ func TestMiscTypes(t *testing.T) {
 		(3, 'ffffffff-ffff-ffff-ffff-ffffffffffff', '''simple''', 'simple', '-$999.99'),
 		(4, NULL, NULL, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'a fat cat sat', 'fat & cat', '$123.45'),
 		(102, '00000000-0000-0000-0000-000000000000', 'the quick brown fox', 'quick | fox', '$0.00'),
 		(103, 'ffffffff-ffff-ffff-ffff-ffffffffffff', '''simple''', 'simple', '-$999.99'),
 		(104, NULL, NULL, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -454,13 +454,13 @@ func TestJSONTypes(t *testing.T) {
 		(3, 'null', 'null', '$', '<data attr="value">content</data>'),
 		(4, NULL, NULL, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, '{"name": "test", "value": 123}', '{"name": "test", "value": 123}', '$.name', '<root><item>hello</item></root>'),
 		(102, '[1, 2, 3]', '[1, 2, 3]', '$[0]', '<empty/>'),
 		(103, 'null', 'null', '$', '<data attr="value">content</data>'),
 		(104, NULL, NULL, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -482,14 +482,14 @@ func TestArrayTypes(t *testing.T) {
 		(4, '{{1,2},{3,4}}', '{{"a","b"},{"c","d"}}', NULL, NULL, NULL),
 		(5, NULL, NULL, NULL, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, '{1,2,3}', '{"hello","world"}', '{true,false,true}', '{1.1,2.2,3.3}', '{a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11}'),
 		(102, '{}', '{}', '{}', '{}', '{}'),
 		(103, '{1,NULL,3}', '{NULL,"test",NULL}', '{true,NULL,false}', '{NULL,2.2,NULL}', '{NULL}'),
 		(104, '{{1,2},{3,4}}', '{{"a","b"},{"c","d"}}', NULL, NULL, NULL),
 		(105, NULL, NULL, NULL, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -511,13 +511,13 @@ func TestRangeTypes(t *testing.T) {
 		(3, '[5,5]', '[100,100]', '[1.5,1.5]', NULL, NULL, NULL),
 		(4, NULL, NULL, NULL, NULL, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, '[1,10)', '[1,1000000000)', '(0,1]', '[2024-01-01,2024-12-31)', '[2024-01-01 00:00:00+00,2024-12-31 23:59:59+00)', '[2024-01-01,2024-12-31)'),
 		(102, '(,)', '(,)', '(,)', '(,)', '(,)', '(,)'),
 		(103, '[5,5]', '[100,100]', '[1.5,1.5]', NULL, NULL, NULL),
 		(104, NULL, NULL, NULL, NULL, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -535,13 +535,13 @@ func TestExtensionTypes(t *testing.T) {
 		(3, 'lowercase', '{"lower","case"}'),
 		(4, NULL, NULL)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, 'Hello World', '{"Hello","World"}'),
 		(102, 'UPPERCASE', '{"UPPER","CASE"}'),
 		(103, 'lowercase', '{"lower","case"}'),
 		(104, NULL, NULL)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -560,12 +560,12 @@ func TestSerialTypes(t *testing.T) {
 		(2, 101, 201, 301),
 		(3, 102, 202, 302)`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, 1000, 2000, 3000),
 		(102, 1001, 2001, 3001),
 		(103, 1002, 2002, 3002)`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
@@ -586,10 +586,10 @@ func TestNotNullTypes(t *testing.T) {
 		(1, 123, 'hello', true, 123.456, 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '{"key": "value"}', '{1,2,3}'),
 		(2, -456, 'world', false, -789.012, '00000000-0000-0000-0000-000000000000', '[]', '{}')`)
 	tc.Discover("Discover")
-	tc.Run("Backfill", -1)
+	tc.Run("Backfill", transactionCountBaseline+1)
 	db.Exec(t, `INSERT INTO <NAME> VALUES
 		(101, 123, 'hello', true, 123.456, 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', '{"key": "value"}', '{1,2,3}'),
 		(102, -456, 'world', false, -789.012, '00000000-0000-0000-0000-000000000000', '[]', '{}')`)
-	tc.Run("Replication", -1)
+	tc.Run("Replication", transactionCountBaseline)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
