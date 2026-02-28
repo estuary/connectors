@@ -110,6 +110,6 @@ func TestFloatKeyDiscovery(t *testing.T) {
 	tc.DiscoverFull("Discover Tables")
 	db.Exec(t, `INSERT INTO <NAME> VALUES (3.14, 3.14), (123.456, 123.456), (-12.3456789, -12.3456789), (9999999999.99, 9999999999.99)`)
 	tc.Discover("Discover Tables")
-	tc.Run("Capture", -1)
+	tc.Run("Capture", transactionCountBaseline+1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
