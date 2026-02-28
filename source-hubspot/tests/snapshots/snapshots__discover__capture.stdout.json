@@ -2225,6 +2225,12 @@
                 "string"
               ]
             },
+            "hs_cross_account_note": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_cross_sell_opportunity": {
               "type": [
                 "null",
@@ -4104,6 +4110,12 @@
                 "string"
               ]
             },
+            "hs_cross_account_note": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_cross_sell_opportunity": {
               "type": [
                 "null",
@@ -5089,6 +5101,12 @@
             },
             "hs_createdate": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_cross_account_note": {
               "type": [
                 "null",
                 "string"
@@ -12628,6 +12646,12 @@
             },
             "hs_createdate": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_cross_account_note": {
               "type": [
                 "null",
                 "string"

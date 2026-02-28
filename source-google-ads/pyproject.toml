@@ -6,7 +6,7 @@ authors = ["Jonathan Wihl <jonathan@estuary.dev>"]
 
 [tool.poetry.dependencies]
 airbyte-cdk = "^0.52"
-estuary-cdk = {path="../estuary-cdk", develop = true}
+estuary-cdk = {path="../estuary-cdk", develop = true, extras = ["airbyte-shim"]}
 freezegun = "^1.4.0"
 google-ads = "^28.0.0"
 protobuf = ">=5.29.5"
