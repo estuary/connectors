@@ -79,13 +79,14 @@ func (Driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.Bind
 }
 
 type materialization struct {
-	cfg       config
-	catalog   *catalog.Catalog
-	bucket    blob.Bucket
-	ssmClient *ssm.Client
-	emrClient *emrClient
-	templates templates
-	pyFiles   *pyFileURIs // populated in Setup and NewMaterializerTransactor
+	cfg           config
+	catalog       *catalog.Catalog
+	bucket        blob.Bucket
+	ssmClient     *ssm.Client
+	emrClient     *emrClient
+	templates     templates
+	pyFiles       *pyFileURIs // populated in Setup and NewMaterializerTransactor
+	locationStyle LocationStyle
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mapped] = &materialization{}
@@ -116,6 +117,11 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 		return nil, err
 	}
 
+	locationStyle := FlatLocationStyle
+	if featureFlags["nested_dot_hash_location_style"] {
+		locationStyle = NestedDotHashLocationStyle
+	}
+
 	return &materialization{
 		cfg:     cfg,
 		catalog: catalog,
@@ -131,8 +137,9 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 			ssmClient:           ssmClient,
 			tokenURL:            catalog.TokenURL(),
 		},
-		ssmClient: ssmClient,
-		templates: parseTemplates(),
+		ssmClient:     ssmClient,
+		templates:     parseTemplates(),
+		locationStyle: locationStyle,
 	}, nil
 }
 
@@ -329,7 +336,7 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 
 	var location *string
 	if d.cfg.BaseLocation != "" {
-		base := strings.TrimSuffix(d.cfg.BaseLocation, "/") + "/" + sanitizeAndAppendHash(ns+"_"+name)
+		base := strings.TrimSuffix(d.cfg.BaseLocation, "/") + "/" + createLocationSuffix(ns, name, d.locationStyle)
 		location = &base
 	}
 
