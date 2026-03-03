@@ -1,5 +1,10 @@
 import json
 import subprocess
+from pathlib import Path
+
+import pytest
+
+from estuary_cdk.utils import compare_capture_records
 
 COMMON_FIELDS_TO_REDACT = [
     'created_at',
@@ -97,7 +102,18 @@ def test_capture(request, snapshot):
                 else:
                     rec[field] = 'redacted'
 
-    assert snapshot("capture.stdout.json") == unique_stream_lines
+    snapshot_path = Path(request.fspath.dirname) / "snapshots" / "snapshots__capture__capture.stdout.json"
+    insta_mode = request.config.getoption("--insta", default=None)
+
+    if insta_mode == "update" or not snapshot_path.exists():
+        # Update snapshot or create initial baseline.
+        assert snapshot("capture.stdout.json") == unique_stream_lines
+    else:
+        # Compare capture snapshots. New fields are allowed, but missing or changed fields cause a failure.
+        expected = json.loads(snapshot_path.read_text())
+        errors = compare_capture_records(actual=unique_stream_lines, expected=expected)
+        if errors:
+            pytest.fail("Capture snapshots are different:\n" + "\n".join(errors))
 
 
 def test_discover(request, snapshot):
