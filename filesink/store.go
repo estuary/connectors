@@ -20,6 +20,14 @@ const (
 	uploadTimeout = 30 * time.Minute
 )
 
+type SinglePhase struct {
+	Key string
+}
+
+func (u *SinglePhase) FileKey() string {
+	return u.Key
+}
+
 type GCSStore struct {
 	bucket string
 	client *storage.Client
@@ -92,6 +100,19 @@ func (s *GCSStore) PutStream(ctx context.Context, r io.Reader, key string) error
 	return nil
 }
 
+func (s *GCSStore) SupportsPathPatternExpansion() bool {
+	return false
+}
+
+func (s *GCSStore) StageObject(ctx context.Context, r io.Reader, key string) (*SinglePhase, error) {
+	err := s.PutStream(ctx, r, key)
+	return &SinglePhase{Key: key}, err
+}
+
+func (s *GCSStore) CompleteObject(ctx context.Context, _ *SinglePhase) error {
+	return nil
+}
+
 type AzureBlob struct {
 	bucket *blob.AzureBlobBucket
 }
@@ -147,4 +168,17 @@ func (s *AzureBlob) PutStream(ctx context.Context, r io.Reader, key string) erro
 	defer cancel()
 
 	return s.bucket.Upload(uploadCtx, key, r)
+}
+
+func (s *AzureBlob) SupportsPathPatternExpansion() bool {
+	return false
+}
+
+func (s *AzureBlob) StageObject(ctx context.Context, r io.Reader, key string) (*SinglePhase, error) {
+	err := s.PutStream(ctx, r, key)
+	return &SinglePhase{Key: key}, err
+}
+
+func (s *AzureBlob) CompleteObject(ctx context.Context, _ *SinglePhase) error {
+	return nil
 }

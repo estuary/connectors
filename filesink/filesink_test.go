@@ -1,10 +1,28 @@
 package filesink
 
 import (
+	"context"
+	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+type nullStore struct {
+}
+
+func (*nullStore) SupportsPathPatternExpansion() bool {
+	return true
+}
+
+func (*nullStore) StageObject(ctx context.Context, r io.Reader, key string) (*SinglePhase, error) {
+	panic("not implemented")
+}
+
+func (*nullStore) CompleteObject(ctx context.Context, info *SinglePhase) error {
+	panic("not implemented")
+}
 
 func TestNextFilekey(t *testing.T) {
 	sk := "val"
@@ -59,6 +77,27 @@ func TestNextFilekey(t *testing.T) {
 			prevCount: 3,
 			want:      "prefix/path/v0000000002/00000000000000000004.something.gz",
 		},
+		{
+			prefix:    "prefix/%Y/%m/%D",
+			path:      "path",
+			backfill:  0,
+			prevCount: 0,
+			want:      "prefix/2026/02/11/path/v0000000000/00000000000000000000.something.gz",
+		},
+		{
+			prefix:    "prefix/%Y-%m-%DT%H:%M:%S%z",
+			path:      "path",
+			backfill:  0,
+			prevCount: 0,
+			want:      "prefix/2026-02-11T10:02:03+0000/path/v0000000000/00000000000000000000.something.gz",
+		},
+		{
+			prefix:    "prefix/%Y-%m-%DT%H:%M:%S %Z",
+			path:      "path",
+			backfill:  0,
+			prevCount: 0,
+			want:      "prefix/2026-02-11T10:02:03 UTC/path/v0000000000/00000000000000000000.something.gz",
+		},
 	}
 
 	for _, tt := range tests {
@@ -69,10 +108,11 @@ func TestNextFilekey(t *testing.T) {
 				path:     tt.path,
 			}
 
-			ta := transactor{
-				state: connectorState{
+			ta := transactor[*SinglePhase]{
+				state: connectorState[*SinglePhase]{
 					FileCounts: make(map[string]uint64),
 				},
+				store: &nullStore{},
 			}
 			ta.common.Extension = ".something.gz"
 
@@ -84,8 +124,8 @@ func TestNextFilekey(t *testing.T) {
 				ta.common.Prefix = tt.prefix
 			}
 
-			require.Equal(t, tt.want, ta.nextFileKey(b))
+			time := time.Date(2026, time.February, 11, 10, 2, 3, 4, time.UTC)
+			require.Equal(t, tt.want, ta.nextFileKey(b, time))
 		})
 	}
-
 }

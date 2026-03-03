@@ -1,6 +1,7 @@
 package filesink
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -14,9 +15,14 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/feature/s3/manager"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/estuary/connectors/go/auth/iam"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/invopop/jsonschema"
+)
+
+const (
+	PartSize int = 15 * 1024 * 1024 // 15 MiB
 )
 
 type AuthType string
@@ -25,12 +31,6 @@ const (
 	AWSAccessKey AuthType = "AWSAccessKey"
 	AWSIAM       AuthType = "AWSIAM"
 )
-
-type S3Store struct {
-	client   *s3.Client
-	uploader *manager.Uploader
-	bucket   string
-}
 
 type AccessKeyCredentials struct {
 	AWSAccessKeyID     string `json:"awsAccessKeyId" jsonschema:"title=AWS Access Key ID,description=Access Key ID for writing data to the bucket." jsonschema_extras:"order=1"`
@@ -82,10 +82,11 @@ type S3StoreConfig struct {
 	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=4"`
 
 	UploadInterval string `json:"uploadInterval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid Go duration string.,enum=1s,enum=5m,enum=15m,enum=30m,enum=1h,default=5m" jsonschema_extras:"order=5"`
-	Prefix         string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects." jsonschema_extras:"order=6"`
+	Prefix         string `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects. May contain date patterns." jsonschema_extras:"order=6"`
 	FileSizeLimit  int    `json:"fileSizeLimit,omitempty" jsonschema:"title=File Size Limit,description=Approximate maximum size of materialized files in bytes. Defaults to 10737418240 (10 GiB) if blank." jsonschema_extras:"order=7"`
 
-	Endpoint string `json:"endpoint,omitempty" jsonschema:"title=Custom S3 Endpoint,description=The S3 endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS. Should normally be left blank." jsonschema_extras:"order=8"`
+	Endpoint     string `json:"endpoint,omitempty" jsonschema:"title=Custom S3 Endpoint,description=The S3 endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by AWS. Should normally be left blank." jsonschema_extras:"order=8"`
+	UsePathStyle bool   `json:"use_path_style,omitempty" jsonschema:"-"`
 }
 
 func (c S3StoreConfig) Validate() error {
@@ -139,6 +140,12 @@ func (c S3StoreConfig) CredentialsProvider(ctx context.Context) (aws.Credentials
 	return nil, errors.New("unknown 'auth_type'")
 }
 
+type S3Store struct {
+	client   *s3.Client
+	uploader *manager.Uploader
+	bucket   string
+}
+
 func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
 	credProvider, err := cfg.CredentialsProvider(ctx)
 	if err != nil {
@@ -164,7 +171,9 @@ func NewS3Store(ctx context.Context, cfg S3StoreConfig) (*S3Store, error) {
 		return nil, fmt.Errorf("creating aws config: %w", err)
 	}
 
-	s3Client := s3.NewFromConfig(awsCfg)
+	s3Client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.UsePathStyle = cfg.UsePathStyle
+	})
 
 	uploader := manager.NewUploader(s3Client, func(u *manager.Uploader) {
 		u.Concurrency = 1
@@ -192,4 +201,105 @@ func (s *S3Store) PutStream(ctx context.Context, r io.Reader, key string) error 
 
 func (s *S3Store) Client() *s3.Client {
 	return s.client
+}
+
+type Part struct {
+	PartNumber int32
+	ETag       string
+}
+
+// This is also basically the info needed to complete.
+type S3MultipartUpload struct {
+	Key      string
+	Parts    []Part
+	UploadID string
+}
+
+func (u *S3MultipartUpload) FileKey() string {
+	return u.Key
+}
+
+func (s *S3Store) SupportsPathPatternExpansion() bool {
+	return true
+}
+
+// StageObject writes a file as a multipart upload but does not complete the
+// upload.  This prevents it from being visible to normal operations until it
+// is completed.
+func (s *S3Store) StageObject(ctx context.Context, r io.Reader, key string) (*S3MultipartUpload, error) {
+	createResp, err := s.client.CreateMultipartUpload(ctx, &s3.CreateMultipartUploadInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	var uploadID = *createResp.UploadId
+	var parts []Part
+	var buf = make([]byte, PartSize)
+
+	// Each part in a multipart upload must have a Content-Length, unlike with
+	// PutObject which can use Transfer-Encoding: chunked.  To avoid using too
+	// much memory we write multiple parts.
+	for partNumber := int32(1); ; partNumber++ {
+		n, ioErr := io.ReadFull(r, buf)
+		if ioErr != nil && ioErr != io.ErrUnexpectedEOF {
+			return nil, err
+		}
+
+		uploadPartResp, err := s.client.UploadPart(ctx, &s3.UploadPartInput{
+			Bucket:     aws.String(s.bucket),
+			Key:        aws.String(key),
+			Body:       bytes.NewReader(buf[:n]),
+			PartNumber: aws.Int32(partNumber),
+			UploadId:   &uploadID,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		parts = append(parts, Part{
+			ETag:       *uploadPartResp.ETag,
+			PartNumber: partNumber,
+		})
+
+		if ioErr != nil {
+			break
+		}
+	}
+
+	info := S3MultipartUpload{
+		Key:      key,
+		UploadID: uploadID,
+		Parts:    parts,
+	}
+	return &info, nil
+}
+
+// CompleteObject completes a multipart upload making it visible to normal
+// operations.
+func (s *S3Store) CompleteObject(ctx context.Context, info *S3MultipartUpload) error {
+	var parts []types.CompletedPart
+	for _, part := range info.Parts {
+		completed := types.CompletedPart{
+			ETag:       aws.String(part.ETag),
+			PartNumber: aws.Int32(part.PartNumber),
+		}
+		parts = append(parts, completed)
+	}
+
+	_, err := s.client.CompleteMultipartUpload(ctx, &s3.CompleteMultipartUploadInput{
+		Bucket: aws.String(s.bucket),
+		Key:    aws.String(info.Key),
+		MultipartUpload: &types.CompletedMultipartUpload{
+			Parts: parts,
+		},
+		UploadId: &info.UploadID,
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/estuary/connectors/go/common"
 	m "github.com/estuary/connectors/go/materialize"
@@ -36,10 +37,10 @@ type CommonConfig struct {
 	CaseInsensitiveFields bool
 }
 
-// Store represents a file/object storage system capable of put'ing a stream of data to a binary
-// object with a specified key.
-type Store interface {
-	PutStream(ctx context.Context, r io.Reader, key string) error
+type Store[T any] interface {
+	SupportsPathPatternExpansion() bool
+	StageObject(ctx context.Context, r io.Reader, key string) (T, error)
+	CompleteObject(ctx context.Context, info T) error
 }
 
 // StreamWriter serializes rows of data to a particular format, potentially
@@ -70,23 +71,27 @@ func (fc fieldConfig) Validate() error {
 	return nil
 }
 
-var _ boilerplate.Connector = &FileDriver{}
+var _ boilerplate.Connector = &FileDriver[*SinglePhase]{}
+
+type Upload interface {
+	FileKey() string
+}
 
 // FileDriver contains the behaviors particular to a destination system and file format.
-type FileDriver struct {
+type FileDriver[T Upload] struct {
 	NewConfig        func(raw json.RawMessage) (Config, error)
-	NewStore         func(ctx context.Context, config Config, featureFlags map[string]bool) (Store, error)
+	NewStore         func(ctx context.Context, config Config, featureFlags map[string]bool) (Store[T], error)
 	NewWriter        func(config Config, featureFlags map[string]bool, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (StreamWriter, error)
 	NewConstraints   func(p *pf.Projection) *pm.Response_Validated_Constraint
 	DocumentationURL func() string
 	ConfigSchema     func() ([]byte, error)
 }
 
-func (d FileDriver) Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error) {
+func (d FileDriver[T]) Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error) {
 	return &pm.Response_Applied{}, nil
 }
 
-func (d FileDriver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
+func (d FileDriver[T]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
@@ -108,7 +113,7 @@ func (d FileDriver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Respons
 	}, nil
 }
 
-func (d FileDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
+func (d FileDriver[T]) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var out []*pm.Response_Validated_Binding
 
 	var config, err = d.NewConfig(req.ConfigJson)
@@ -138,7 +143,7 @@ func (d FileDriver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm
 	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+func (d FileDriver[T]) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	driverCfg, err := d.NewConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, nil, err
@@ -184,23 +189,24 @@ func (d FileDriver) NewTransactor(ctx context.Context, open pm.Request_Open, _ *
 		},
 	}
 
-	return &transactor{
+	return &transactor[T]{
 		bindings: bindings,
 		store:    store,
 		common:   driverCfg.CommonConfig(),
 	}, &pm.Response_Opened{}, opts, nil
 }
 
-type connectorState struct {
+type connectorState[T Upload] struct {
 	FileCounts map[string]uint64 `json:"fileCounts"`
+	Uploads    map[string][]T    `json:"uploads"`
 }
 
-func (cs connectorState) Validate() error { return nil }
+func (cs connectorState[T]) Validate() error { return nil }
 
-type transactor struct {
+type transactor[T Upload] struct {
 	bindings []binding
-	store    Store
-	state    connectorState
+	store    Store[T]
+	state    connectorState[T]
 	common   CommonConfig
 }
 
@@ -226,7 +232,7 @@ type binding struct {
 // recent files may have some churn. This will become less of a concern when/if Flow transactions
 // are idempotent, since the re-uploaded files will at least have the same data.
 // 5) The file extension from the specific driver implementation.
-func (t *transactor) nextFileKey(b binding) string {
+func (t *transactor[T]) nextFileKey(b binding, tm time.Time) string {
 	sk := b.stateKey
 
 	// If we haven't generated any file keys yet for this state key, start at 0. Otherwise use one
@@ -237,15 +243,32 @@ func (t *transactor) nextFileKey(b binding) string {
 	}
 	t.state.FileCounts[sk] = next
 
+	prefix := t.common.Prefix
+
+	if t.store.SupportsPathPatternExpansion() && strings.ContainsAny(prefix, "%") {
+		zoneName, zoneOffset := tm.Zone()
+		replacer := strings.NewReplacer(
+			"%Y", fmt.Sprintf("%04d", tm.Year()),
+			"%m", fmt.Sprintf("%02d", tm.Month()),
+			"%D", fmt.Sprintf("%02d", tm.Day()),
+			"%H", fmt.Sprintf("%02d", tm.Hour()),
+			"%M", fmt.Sprintf("%02d", tm.Minute()),
+			"%S", fmt.Sprintf("%02d", tm.Second()),
+			"%Z", fmt.Sprintf("%s", zoneName),
+			"%z", fmt.Sprintf("%+05d", zoneOffset),
+		)
+		prefix = replacer.Replace(t.common.Prefix)
+	}
+
 	return filepath.Join(
-		t.common.Prefix,
+		prefix,
 		b.path,
 		fmt.Sprintf("v%010d", b.backfill), // 10 digits to hold the largest possible uint32
 		fmt.Sprintf("%020d%s", next, t.common.Extension), // 20 digits to hold the largest possible uint64
 	)
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error {
+func (t *transactor[T]) UnmarshalState(state json.RawMessage) error {
 	if err := pf.UnmarshalStrict(state, &t.state); err != nil {
 		return err
 	}
@@ -254,20 +277,26 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 		t.state.FileCounts = make(map[string]uint64)
 	}
 
+	if t.state.Uploads == nil {
+		t.state.Uploads = make(map[string][]T)
+	}
+
 	return nil
 }
 
-func (t *transactor) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {
+func (t *transactor[T]) Load(it *m.LoadIterator, _ func(int, json.RawMessage) error) error {
 	for it.Next() {
 		panic("driver only supports delta updates")
 	}
 	return nil
 }
 
-func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
+func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 	var writer StreamWriter
 	var group errgroup.Group
+
+	txnTime := time.Now().UTC()
 
 	startFile := func(b binding) error {
 		// Start a new file upload. This may be called multiple times in a single transaction if
@@ -275,14 +304,15 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		r, w := io.Pipe()
 
 		group.Go(func() error {
-			k := t.nextFileKey(b)
+			k := t.nextFileKey(b, txnTime)
 			log.WithField("key", k).Info("started uploading file")
-			if err := t.store.PutStream(ctx, r, k); err != nil {
+			info, err := t.store.StageObject(ctx, r, k)
+			if err != nil {
 				r.CloseWithError(err)
 				return fmt.Errorf("uploading file: %w", err)
 			}
+			t.state.Uploads[b.stateKey] = append(t.state.Uploads[b.stateKey], info)
 			log.WithField("key", k).Info("finished uploading file")
-
 			return nil
 		})
 
@@ -360,9 +390,24 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 // Acknowledge is a no-op since the files for this transaction were already uploaded to their
 // desired location in Store, and the driver checkpoint contains the last file counts used.
-func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor[T]) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+	for _, b := range t.bindings {
+		uploads, ok := t.state.Uploads[b.stateKey]
+		if !ok {
+			continue
+		}
 
-func (t *transactor) Destroy() {}
+		for _, upload := range uploads {
+			if err := t.store.CompleteObject(ctx, upload); err != nil {
+				return nil, err
+			}
+			log.WithField("key", upload.FileKey()).Info("completed file upload")
+		}
+	}
+	return &pf.ConnectorState{UpdatedJson: json.RawMessage(`{}`)}, nil
+}
+
+func (t *transactor[T]) Destroy() {}
 
 // StdConstraints represents standard constraints for a projection when materializing columns of
 // data to files.
