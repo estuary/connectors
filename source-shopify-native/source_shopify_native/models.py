@@ -128,7 +128,7 @@ class EndpointConfig(BaseModel):
             ),
         ]
         should_use_composite_key: bool = Field(
-            default=False,
+            default=True,
             title="Use Composite Key",
             description=(
                 "Controls whether collection keys include the store identifier (/_meta/store). "

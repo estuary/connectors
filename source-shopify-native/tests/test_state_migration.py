@@ -511,7 +511,7 @@ class TestEndpointConfigMigration:
         })
         assert config._was_migrated is False
         assert config._legacy_store is None
-        assert config.advanced.should_use_composite_key is False
+        assert config.advanced.should_use_composite_key is True
 
     def test_duplicate_stores_rejected(self):
         with pytest.raises(ValueError, match="Duplicate store names"):

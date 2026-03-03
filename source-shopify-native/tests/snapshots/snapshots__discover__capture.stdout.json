@@ -56,6 +56,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -116,6 +117,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -176,6 +178,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -236,6 +239,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -296,6 +300,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -356,6 +361,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -416,6 +422,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -476,6 +483,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -536,6 +544,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -596,6 +605,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -656,6 +666,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -716,6 +727,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -776,6 +788,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -836,6 +849,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -896,6 +910,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -956,6 +971,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -1016,6 +1032,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -1076,6 +1093,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -1136,6 +1154,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -1196,6 +1215,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -1256,6 +1276,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -1316,6 +1337,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -1376,6 +1398,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   },
@@ -1436,6 +1459,7 @@
       "x-infer-schema": true
     },
     "key": [
+      "/_meta/store",
       "/id"
     ]
   }
