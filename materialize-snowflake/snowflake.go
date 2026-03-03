@@ -1088,27 +1088,28 @@ func (d *transactor) cleanupPipes(ctx context.Context, currentPipeNames []string
 	// Find all FLOW_PIPEs with a matching KeyBegin
 	// We use SHOW PIPES to avoid waking up the warehouse. SELECT from INFORMATION_SCHEMA.PIPES wakes up the warehouse.
 	var query = fmt.Sprintf("SHOW PIPES LIKE 'FLOW\\\\_PIPE\\\\_%%\\\\_%s\\\\_%%\\\\_%%';", keyBegin)
-	rows, err := d.db.QueryContext(ctx, query)
-	if err != nil {
+
+	type pipeRow struct {
+		Name   string `db:"name"`
+		DB     string `db:"database_name"`
+		Schema string `db:"schema_name"`
+	}
+
+	// Use sqlx to scan SHOW results by column name via `pipeRow`, since
+	// Snowflake may change the number of columns returned across releases.
+	var pipeRows []pipeRow
+	xdb := sqlx.NewDb(d.db, "snowflake").Unsafe()
+	if err := xdb.SelectContext(ctx, &pipeRows, query); err != nil {
 		return fmt.Errorf("listing pipes: %w", err)
 	}
-	defer rows.Close()
 
 	var toDelete []string
-	for rows.Next() {
-		var db, schema, name string
-		// a string value to discard all the columns we don't want from SHOW PIPES
-		var x stdsql.NullString
-		var created time.Time
-		if err := rows.Scan(&created, &name, &db, &schema, &x, &x, &x, &x, &x, &x, &x, &x, &x, &x); err != nil {
-			return fmt.Errorf("scanning pipe: %w", err)
-		}
-
-		fullName := fmt.Sprintf("%s.%s.%s", db, schema, name)
+	for _, row := range pipeRows {
+		fullName := fmt.Sprintf("%s.%s.%s", row.DB, row.Schema, row.Name)
 		parts := pipeNameToParts(fullName)
 
 		for _, pipe := range currentPipes {
-			if pipe.Catalog == db && pipe.Schema == schema && pipe.TableName == parts.TableName && pipe.Version != parts.Version {
+			if pipe.Catalog == row.DB && pipe.Schema == row.Schema && pipe.TableName == parts.TableName && pipe.Version != parts.Version {
 				log.WithFields(log.Fields{
 					"pipeName":        fullName,
 					"currentVersion":  pipe.Version,
