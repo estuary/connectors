@@ -38,16 +38,17 @@ const (
 // There is an equivalent pydantic model in iceberg-ctl, and the config schema is generated from
 // that. The fields of this struct must be compatible with that model.
 type config struct {
-	Bucket             string         `json:"bucket"`
-	AWSAccessKeyID     string         `json:"aws_access_key_id"`
-	AWSSecretAccessKey string         `json:"aws_secret_access_key"`
-	Namespace          string         `json:"namespace"`
-	Region             string         `json:"region"`
-	UploadInterval     string         `json:"upload_interval"`
-	Prefix             string         `json:"prefix,omitempty"`
-	S3Endpoint         string         `json:"s3_endpoint,omitempty"`
-	Catalog            catalogConfig  `json:"catalog"`
-	Advanced           advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+	Bucket             string                      `json:"bucket"`
+	AWSAccessKeyID     string                      `json:"aws_access_key_id,omitempty"`
+	AWSSecretAccessKey string                      `json:"aws_secret_access_key,omitempty"`
+	Credentials        *filesink.CredentialsConfig `json:"credentials,omitempty"`
+	Namespace          string                      `json:"namespace"`
+	Region             string                      `json:"region"`
+	UploadInterval     string                      `json:"upload_interval"`
+	Prefix             string                      `json:"prefix,omitempty"`
+	S3Endpoint         string                      `json:"s3_endpoint,omitempty"`
+	Catalog            catalogConfig               `json:"catalog"`
+	Advanced           advancedConfig              `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 type catalogConfig struct {
@@ -67,11 +68,26 @@ type advancedConfig struct {
 	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
+func (c config) s3StoreConfig() filesink.S3StoreConfig {
+	cfg := filesink.S3StoreConfig{
+		Bucket:   c.Bucket,
+		Region:   c.Region,
+		Endpoint: c.S3Endpoint,
+	}
+
+	if c.Credentials != nil {
+		cfg.Credentials = c.Credentials
+	} else {
+		cfg.AWSAccessKeyID = c.AWSAccessKeyID
+		cfg.AWSSecretAccessKey = c.AWSSecretAccessKey
+	}
+
+	return cfg
+}
+
 func (c config) Validate() error {
-	var requiredProperties = [][]string{
+	requiredProperties := [][]string{
 		{"bucket", c.Bucket},
-		{"aws_access_key_id", c.AWSAccessKeyID},
-		{"aws_secret_access_key", c.AWSSecretAccessKey},
 		{"namespace", c.Namespace},
 		{"region", c.Region},
 		{"upload_interval", c.UploadInterval},
@@ -80,6 +96,24 @@ func (c config) Validate() error {
 		if req[1] == "" {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
+	}
+
+	hasLegacy := c.AWSAccessKeyID != "" || c.AWSSecretAccessKey != ""
+	hasNew := c.Credentials != nil
+
+	if hasLegacy && hasNew {
+		return fmt.Errorf("cannot specify both top-level aws_access_key_id/aws_secret_access_key and credentials")
+	} else if !hasLegacy && !hasNew {
+		return fmt.Errorf("must provide either credentials or aws_access_key_id/aws_secret_access_key")
+	} else if hasLegacy {
+		if c.AWSAccessKeyID == "" {
+			return fmt.Errorf("missing 'aws_access_key_id'")
+		}
+		if c.AWSSecretAccessKey == "" {
+			return fmt.Errorf("missing 'aws_secret_access_key'")
+		}
+	} else if err := c.Credentials.Validate(); err != nil {
+		return err
 	}
 
 	if c.Catalog.CatalogType == "" {
@@ -269,13 +303,7 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, resourcePaths 
 func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	s3store, err := filesink.NewS3Store(ctx, filesink.S3StoreConfig{
-		Bucket:             d.cfg.Bucket,
-		AWSAccessKeyID:     d.cfg.AWSAccessKeyID,
-		AWSSecretAccessKey: d.cfg.AWSSecretAccessKey,
-		Region:             d.cfg.Region,
-		Endpoint:           d.cfg.S3Endpoint,
-	})
+	s3store, err := filesink.NewS3Store(ctx, d.cfg.s3StoreConfig())
 	if err != nil {
 		errs.Err(fmt.Errorf("creating s3 store: %w", err))
 		return errs
@@ -436,13 +464,7 @@ func (d *materialization) NewMaterializerTransactor(
 		bindings[idx].catalogTablePath = tablePaths[idx]
 	}
 
-	s3store, err := filesink.NewS3Store(ctx, filesink.S3StoreConfig{
-		Bucket:             d.cfg.Bucket,
-		AWSAccessKeyID:     d.cfg.AWSAccessKeyID,
-		AWSSecretAccessKey: d.cfg.AWSSecretAccessKey,
-		Region:             d.cfg.Region,
-		Endpoint:           d.cfg.S3Endpoint,
-	})
+	s3store, err := filesink.NewS3Store(ctx, d.cfg.s3StoreConfig())
 	if err != nil {
 		return nil, fmt.Errorf("creating s3 store: %w", err)
 	}

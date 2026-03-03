@@ -3,18 +3,19 @@ import json
 import sys
 import time
 import traceback
-from typing import Any, Literal
+from typing import Any, Literal, override
 
 import click
 from click import Context
-from iceberg_ctl.models import EndpointConfig, GlueCatalogConfig, RestCatalogConfig
-from pydantic import BaseModel, TypeAdapter
+from pydantic import BaseModel, JsonValue, TypeAdapter
+from pydantic.json_schema import GenerateJsonSchema, JsonSchemaValue
+from pydantic_core.core_schema import NullableSchema
 from pyiceberg.catalog import Catalog
-from pyiceberg.table import TableProperties
 from pyiceberg.catalog.glue import GlueCatalog
 from pyiceberg.catalog.rest import RestCatalog
 from pyiceberg.io import PY_IO_IMPL
 from pyiceberg.schema import Schema
+from pyiceberg.table import TableProperties
 from pyiceberg.types import (
     BinaryType,
     BooleanType,
@@ -28,6 +29,8 @@ from pyiceberg.types import (
     TimeType,
     UUIDType,
 )
+
+from iceberg_ctl.models import EndpointConfig, GlueCatalogConfig, RestCatalogConfig
 
 
 def log(msg: str):
@@ -87,12 +90,43 @@ def run(
             case GlueCatalogConfig():
                 glue_props = {
                     "client.region": cfg.region,
-                    "client.access-key-id": cfg.aws_access_key_id,
-                    "client.secret-access-key": cfg.aws_secret_access_key,
                     PY_IO_IMPL: "pyiceberg.io.fsspec.FsspecFileIO",  # use S3 file IO instead of Arrow
                 }
+
                 if cfg.catalog.glue_id:
                     glue_props["glue.id"] = cfg.catalog.glue_id
+
+                if (
+                    cfg.aws_access_key_id is not None
+                    and cfg.aws_secret_access_key is not None
+                ):  # Legacy creds
+                    creds = {
+                        "client.access-key-id": cfg.aws_access_key_id,
+                        "client.secret-access-key": cfg.aws_secret_access_key,
+                    }
+                elif (
+                    cfg.credentials is not None
+                    and cfg.credentials.auth_type == "AWSAccessKey"
+                ):
+                    creds = {
+                        "client.access-key-id": cfg.credentials.awsAccessKeyId,
+                        "client.secret-access-key": cfg.credentials.awsSecretAccessKey,
+                    }
+                elif (
+                    cfg.credentials is not None
+                    and cfg.credentials.auth_type == "AWSIAM"
+                ):
+                    creds = {
+                        "client.access-key-id": cfg.credentials.aws_access_key_id,
+                        "client.secret-access-key": cfg.credentials.aws_secret_access_key,
+                        "client.session-token": cfg.credentials.aws_session_token,
+                    }
+                else:
+                    raise ValueError(
+                        "credentials setup does not fit any of the supported formats"
+                    )
+
+                glue_props.update(creds)
 
                 ctx.obj["catalog"] = GlueCatalog("default", **glue_props)
 
@@ -100,13 +134,36 @@ def run(
                 raise Exception(f"unhandled catalog type: {cfg.catalog.catalog_type}")
 
 
+class UICompatJsonSchema(GenerateJsonSchema):
+    """Customizes nullable type generation for UI compatibility.
+
+    The UI expects `oneOf` for discriminated unions (not `anyOf` with a null variant)
+    and `union_format='primitive_type_array'` handles nullable scalars. This subclass
+    fixes the discriminated union case by stripping the null wrapper.
+    """
+
+    @override
+    def nullable_schema(self, schema: NullableSchema) -> JsonSchemaValue:
+        inner = self.generate_inner(schema["schema"])
+        null_schema = {"type": "null"}
+
+        if inner == null_schema:
+            return null_schema
+
+        # Discriminated union: keep the oneOf as-is, drop the null wrapper.
+        if "oneOf" in inner:
+            return inner
+
+        return self.get_union_of_schemas([inner, null_schema])
+
+
 @run.command()
 def print_config_schema():
-    print(
-        TypeAdapter(dict[str, Any])
-        .dump_json(EndpointConfig.model_json_schema())
-        .decode()
+    schema = EndpointConfig.model_json_schema(
+        schema_generator=UICompatJsonSchema,
+        union_format="primitive_type_array",
     )
+    print(TypeAdapter(dict[str, JsonValue]).dump_json(schema).decode())
 
 
 class IcebergColumn(BaseModel):

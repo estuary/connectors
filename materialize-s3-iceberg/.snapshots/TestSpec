@@ -1,20 +1,48 @@
 {
   "config_schema_json": {
     "$defs": {
+      "AccessKeyCredentials": {
+        "properties": {
+          "auth_type": {
+            "const": "AWSAccessKey",
+            "default": "AWSAccessKey",
+            "order": 0,
+            "title": "Auth Type",
+            "type": "string"
+          },
+          "awsAccessKeyId": {
+            "description": "Access Key ID for accessing AWS services.",
+            "minLength": 1,
+            "order": 1,
+            "title": "AWS Access Key ID",
+            "type": "string"
+          },
+          "awsSecretAccessKey": {
+            "description": "Secret Access Key for accessing AWS services.",
+            "minLength": 1,
+            "order": 2,
+            "secret": true,
+            "title": "AWS Secret Access Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "awsAccessKeyId",
+          "awsSecretAccessKey"
+        ],
+        "title": "Access Key",
+        "type": "object"
+      },
       "AdvancedConfig": {
         "properties": {
           "feature_flags": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "default": null,
             "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
-            "title": "Feature Flags"
+            "title": "Feature Flags",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "title": "AdvancedConfig",
@@ -25,28 +53,76 @@
           "catalog_type": {
             "const": "AWS Glue",
             "default": "AWS Glue",
-            "enum": [
-              "AWS Glue"
-            ],
             "title": "Catalog Type",
             "type": "string"
           },
           "glue_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "default": null,
             "description": "Glue Catalog ID to use. If not specified, defaults to the account ID of the configured credentials.",
             "order": 1,
-            "title": "Glue Catalog ID"
+            "title": "Glue Catalog ID",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "title": "AWS Glue",
+        "type": "object"
+      },
+      "IAMCredentials": {
+        "properties": {
+          "auth_type": {
+            "const": "AWSIAM",
+            "default": "AWSIAM",
+            "order": 0,
+            "title": "Auth Type",
+            "type": "string"
+          },
+          "aws_region": {
+            "description": "AWS Region of your resource.",
+            "minLength": 1,
+            "order": 1,
+            "title": "AWS Region",
+            "type": "string"
+          },
+          "aws_role_arn": {
+            "description": "AWS Role which has access to the resource which will be assumed by Flow.",
+            "minLength": 1,
+            "order": 2,
+            "title": "AWS Role ARN",
+            "type": "string"
+          },
+          "aws_access_key_id": {
+            "default": "",
+            "description": "AWS Access Key ID for accessing AWS services.",
+            "order": 3,
+            "title": "AWS Access Key ID",
+            "type": "string",
+            "x-hidden-field": true
+          },
+          "aws_secret_access_key": {
+            "default": "",
+            "description": "AWS Secret Access Key for accessing AWS services.",
+            "order": 4,
+            "title": "AWS Secret Access Key",
+            "type": "string",
+            "x-hidden-field": true
+          },
+          "aws_session_token": {
+            "default": "",
+            "description": "AWS Session Token for accessing AWS services.",
+            "order": 5,
+            "title": "AWS Session Token",
+            "type": "string",
+            "x-hidden-field": true
+          }
+        },
+        "required": [
+          "aws_region",
+          "aws_role_arn"
+        ],
+        "title": "AWS IAM",
         "type": "object"
       },
       "RestCatalogConfig": {
@@ -54,9 +130,6 @@
           "catalog_type": {
             "const": "Iceberg REST Server",
             "default": "Iceberg REST Server",
-            "enum": [
-              "Iceberg REST Server"
-            ],
             "order": 0,
             "title": "Catalog Type",
             "type": "string"
@@ -68,34 +141,26 @@
             "type": "string"
           },
           "credential": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "default": null,
             "description": "Credential for connecting to the catalog.",
             "order": 2,
             "secret": true,
-            "title": "Credential"
+            "title": "Credential",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "token": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
             "default": null,
             "description": "Token for connecting to the catalog.",
             "order": 3,
             "secret": true,
-            "title": "Token"
+            "title": "Token",
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "warehouse": {
             "description": "Warehouse to connect to.",
@@ -114,40 +179,73 @@
     },
     "properties": {
       "aws_access_key_id": {
+        "default": null,
         "description": "Access Key ID for accessing AWS services.",
         "order": 0,
         "title": "AWS Access Key ID",
-        "type": "string"
+        "type": [
+          "string",
+          "null"
+        ],
+        "x-hidden-field": true
       },
       "aws_secret_access_key": {
+        "default": null,
         "description": "Secret Access Key for accessing AWS services.",
         "order": 1,
         "secret": true,
         "title": "AWS Secret Access Key",
-        "type": "string"
+        "type": [
+          "string",
+          "null"
+        ],
+        "x-hidden-field": true
+      },
+      "credentials": {
+        "default": {
+          "auth_type": "AWSAccessKey"
+        },
+        "discriminator": {
+          "mapping": {
+            "AWSAccessKey": "#/$defs/AccessKeyCredentials",
+            "AWSIAM": "#/$defs/IAMCredentials"
+          },
+          "propertyName": "auth_type"
+        },
+        "oneOf": [
+          {
+            "$ref": "#/$defs/AccessKeyCredentials"
+          },
+          {
+            "$ref": "#/$defs/IAMCredentials"
+          }
+        ],
+        "order": 2,
+        "title": "Authentication",
+        "x-iam-auth": true
       },
       "bucket": {
         "description": "The S3 bucket to write data files to.",
-        "order": 2,
+        "order": 3,
         "title": "Bucket",
         "type": "string"
       },
       "prefix": {
         "default": "",
         "description": "Optional prefix that will be used to store objects.",
-        "order": 3,
+        "order": 4,
         "title": "Prefix",
         "type": "string"
       },
       "region": {
         "description": "AWS region.",
-        "order": 4,
+        "order": 5,
         "title": "Region",
         "type": "string"
       },
       "namespace": {
         "description": "Namespace for bound collection tables (unless overridden within the binding resource configuration).",
-        "order": 5,
+        "order": 6,
         "pattern": "^[^.]*$",
         "title": "Namespace",
         "type": "string"
@@ -156,14 +254,14 @@
         "default": "PT5M",
         "description": "Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.",
         "format": "duration",
-        "order": 6,
+        "order": 7,
         "title": "Upload Interval",
         "type": "string"
       },
       "s3_endpoint": {
         "default": "",
         "description": "Custom S3 endpoint URL. If not provided, the default AWS S3 endpoint for the specified region will be used.",
-        "order": 7,
+        "order": 8,
         "title": "S3 Endpoint",
         "type": "string"
       },
@@ -183,7 +281,7 @@
             "$ref": "#/$defs/GlueCatalogConfig"
           }
         ],
-        "order": 8,
+        "order": 9,
         "title": "Catalog"
       },
       "advanced": {
@@ -198,13 +296,11 @@
         ],
         "default": null,
         "description": "Options for advanced users. You should not typically need to modify these.",
-        "order": 9,
+        "order": 10,
         "title": "Advanced Options"
       }
     },
     "required": [
-      "aws_access_key_id",
-      "aws_secret_access_key",
       "bucket",
       "region",
       "namespace",
