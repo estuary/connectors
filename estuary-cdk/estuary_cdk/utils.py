@@ -97,3 +97,65 @@ def json_merge_patch(target: dict, patch: dict) -> None:
         else:
             # Replace the value (including arrays)
             target[key] = value
+
+
+def compare_capture_records(actual: list, expected: list) -> list[str]:
+    """
+    Compare captured documents against each other. All keys present in
+    an expected document must be present in the analogous actual document.
+    Extra keys in actual documents are allowed.
+
+    Each element in the actual and expected list arguments is [binding_name, document].
+
+    Returns a list that contains any error messages generated during the comparison validation.
+    """
+    errors: list[str] = []
+
+    if len(actual) != len(expected):
+        errors.append(f"Record count: got {len(actual)}, expected {len(expected)}")
+        return errors
+
+    for i, (actual_record, expected_record) in enumerate(zip(actual, expected)):
+        binding = expected_record[0] if isinstance(expected_record, list) and expected_record else f"record[{i}]"
+        actual_doc = actual_record[1] if isinstance(actual_record, list) and len(actual_record) > 1 else actual_record
+        baseline_doc = expected_record[1] if isinstance(expected_record, list) and len(expected_record) > 1 else expected_record
+
+        errors.extend(compare_values(actual_doc, baseline_doc, binding))
+
+    return errors
+
+
+def compare_values(actual: Any, expected: Any, path: str) -> list[str]:
+    """
+    Recursively find where the actual value fails to validate against the expected value.
+
+    For dicts: all expected keys must exist in actual with matching values. Extra keys are allowed in actual.
+    For lists and primitives: values must match exactly.
+
+    Returns a list that contains any error messages generated during the comparison validation.
+    """
+    errors: list[str] = []
+
+    if isinstance(expected, dict):
+        if not isinstance(actual, dict):
+            return [f"{path}: expected dict, got {type(actual).__name__}"]
+        for k in expected.keys():
+            if k not in actual:
+                errors.append(f"{path}: key '{k}' missing from actual document")
+            else:
+                errors.extend(compare_values(actual[k], expected[k], f"{path}.{k}"))
+    elif isinstance(expected, list):
+        if not isinstance(actual, list):
+            return [f"{path}: expected list, got {type(actual).__name__}"]
+        if len(expected) != len(actual):
+            errors.append(f"{path}: list length {len(actual)}, expected {len(expected)}")
+        elif any(isinstance(e, (dict, list)) for e in expected):
+            for i, (a, e) in enumerate(zip(actual, expected)):
+                errors.extend(compare_values(a, e, f"{path}[{i}]"))
+        elif actual != expected:
+            errors.append(f"{path}: expected {expected!r}, got {actual!r}")
+    else:
+        if actual != expected:
+            errors.append(f"{path}: expected {expected!r}, got {actual!r}")
+
+    return errors
