@@ -310,6 +310,8 @@ async def _reconcile_connector_state(
     1. Migration from flat to dict-based state (legacy single-store captures)
     2. Adding missing store entries for newly configured stores
     """
+    prev_state = deepcopy(state)
+
     # Step 1: Migrate flat state to dict-based if needed.
     migrated = _migrate_flat_to_dict_state(state, legacy_store_id, task.log)
 
@@ -318,22 +320,29 @@ async def _reconcile_connector_state(
     # may be None for both state and initial_state — only reconcile it when both are dicts.
     should_checkpoint = migrated
 
-    if isinstance(state.inc, dict) and isinstance(initial_state.inc, dict):
+    if (
+        isinstance(state.inc, dict)
+        and isinstance(state.backfill, dict)
+        and isinstance(initial_state.inc, dict)
+        and isinstance(initial_state.backfill, dict)
+    ):
         for store_id in store_ids:
-            if store_id not in state.inc:
+            inc_state_exists = store_id in state.inc
+            backfill_state_exists = store_id in state.backfill
+
+            if not inc_state_exists and not backfill_state_exists:
                 task.log.info(f"Initializing new subtask state for store {store_id}.")
                 state.inc[store_id] = deepcopy(initial_state.inc[store_id])
-                should_checkpoint = True
-
-    if isinstance(state.backfill, dict) and isinstance(initial_state.backfill, dict):
-        for store_id in store_ids:
-            if store_id not in state.backfill:
                 state.backfill[store_id] = deepcopy(initial_state.backfill[store_id])
                 should_checkpoint = True
 
     if should_checkpoint:
         task.log.info(
-            f"Checkpointing state to ensure any new state is persisted for {binding.stateKey}."
+            f"Checkpointing state to ensure any new state is persisted for {binding.stateKey}.",
+            {
+                "prevState": prev_state,
+                "newState": state,
+            },
         )
         await task.checkpoint(ConnectorState(bindingStateV1={binding.stateKey: state}))
 
