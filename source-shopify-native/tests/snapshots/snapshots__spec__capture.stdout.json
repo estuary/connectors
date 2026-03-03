@@ -33,7 +33,7 @@
               "type": "string"
             },
             "should_use_composite_key": {
-              "default": false,
+              "default": true,
               "description": "Controls whether collection keys include the store identifier (/_meta/store). Enabled by default for new captures. Automatically set to false for legacy single-store captures during migration. Must be set to true (with a full backfill / dataflow reset of all bindings) before adding additional stores to a legacy capture.",
               "title": "Use Composite Key",
               "type": "boolean"
