@@ -117,22 +117,23 @@
       "companies": {
         "data": [
           {
-            "id": "67570a878b6e26fe4ce6a895",
+            "id": "675c3ce414462dde5a790bb6",
             "type": "company",
-            "url": "/companies/67570a878b6e26fe4ce6a895"
+            "url": "/companies/675c3ce414462dde5a790bb6"
           }
         ],
         "has_more": false,
         "total_count": 1,
         "type": "list",
-        "url": "/contacts/67570a878b6e26fe4ce6a894/companies"
+        "url": "/contacts/67570bc4f8bbaf49f9287fc9/companies"
       },
-      "created_at": 1733757575,
+      "created_at": 1733757892,
       "custom_attributes": {},
-      "email": "example.user@projectmap.com",
-      "external_id": "1cfe8e49-d7c1-426a-a7b7-6a424e7f8148",
+      "email": "alexb@estuary.dev",
+      "enabled_push_messaging": null,
+      "external_id": null,
       "has_hard_bounced": false,
-      "id": "67570a878b6e26fe4ce6a894",
+      "id": "67570bc4f8bbaf49f9287fc9",
       "ios_app_name": null,
       "ios_app_version": null,
       "ios_device": null,
@@ -140,48 +141,48 @@
       "ios_os_version": null,
       "ios_sdk_version": null,
       "language_override": null,
-      "last_contacted_at": 1734097732,
+      "last_contacted_at": null,
       "last_email_clicked_at": null,
       "last_email_opened_at": null,
       "last_replied_at": null,
-      "last_seen_at": 1733757575,
+      "last_seen_at": null,
       "location": {
-        "city": "Dublin",
-        "continent_code": "EU",
-        "country": "Ireland",
-        "country_code": "IRL",
-        "region": "Leinster",
+        "city": null,
+        "continent_code": null,
+        "country": null,
+        "country_code": null,
+        "region": null,
         "type": "location"
       },
       "marked_email_as_spam": false,
-      "name": "Example User",
+      "name": "Alex",
       "notes": {
         "data": [],
         "has_more": false,
         "total_count": 0,
         "type": "list",
-        "url": "/contacts/67570a878b6e26fe4ce6a894/notes"
+        "url": "/contacts/67570bc4f8bbaf49f9287fc9/notes"
       },
       "opted_in_subscription_types": {
         "data": [],
         "has_more": false,
         "total_count": 0,
         "type": "list",
-        "url": "/contacts/67570a878b6e26fe4ce6a894/subscriptions"
+        "url": "/contacts/67570bc4f8bbaf49f9287fc9/subscriptions"
       },
       "opted_out_subscription_types": {
         "data": [],
         "has_more": false,
         "total_count": 0,
         "type": "list",
-        "url": "/contacts/67570a878b6e26fe4ce6a894/subscriptions"
+        "url": "/contacts/67570bc4f8bbaf49f9287fc9/subscriptions"
       },
       "os": null,
       "owner_id": null,
       "phone": null,
       "referrer": null,
       "role": "user",
-      "signed_up_at": 1733757575,
+      "signed_up_at": null,
       "sms_consent": false,
       "social_profiles": {
         "data": [],
@@ -198,21 +199,6 @@
             "id": "10718351",
             "type": "tag",
             "url": "/tags/10718351"
-          },
-          {
-            "id": "10718352",
-            "type": "tag",
-            "url": "/tags/10718352"
-          },
-          {
-            "id": "10718349",
-            "type": "tag",
-            "url": "/tags/10718349"
-          },
-          {
-            "id": "10718354",
-            "type": "tag",
-            "url": "/tags/10718354"
           },
           {
             "id": "10718353",
@@ -263,12 +249,12 @@
         "has_more": false,
         "total_count": 14,
         "type": "list",
-        "url": "/contacts/67570a878b6e26fe4ce6a894/tags"
+        "url": "/contacts/67570bc4f8bbaf49f9287fc9/tags"
       },
       "type": "contact",
       "unsubscribed_from_emails": false,
       "unsubscribed_from_sms": false,
-      "updated_at": 1740758913,
+      "updated_at": 1740758687,
       "utm_campaign": null,
       "utm_content": null,
       "utm_medium": null,
@@ -283,22 +269,30 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "app_package_code": null,
       "assigned_to": null,
       "attachments": [],
       "author": {
         "email": "alexb@estuary.dev",
+        "from_ai_agent": false,
         "id": "7939621",
+        "is_ai_answer": false,
         "name": "Alex Bair",
         "type": "admin"
       },
       "body": "<p class=\"no-margin\">Hello</p>",
       "conversation_id": "1",
       "created_at": 1734097565,
+      "email_message_metadata": null,
+      "event_details": {},
       "external_id": null,
       "id": "1",
+      "metadata": {},
       "notified_at": 1734097565,
       "part_type": "comment",
       "redacted": false,
+      "state": "open",
+      "tags": [],
       "type": "conversation_part",
       "updated_at": 1734097565
     }
@@ -311,6 +305,7 @@
       },
       "admin_assignee_id": "7939621",
       "category": "Tracker",
+      "channel": "messenger",
       "contacts": {
         "contacts": [],
         "type": "contact.list"
@@ -394,9 +389,13 @@
         "total_count": 3,
         "type": "ticket_part.list"
       },
-      "ticket_state": "in_progress",
-      "ticket_state_external_label": "In progress",
-      "ticket_state_internal_label": "In progress",
+      "ticket_state": {
+        "category": "in_progress",
+        "external_label": "In progress",
+        "id": "2",
+        "internal_label": "In progress",
+        "type": "ticket_state"
+      },
       "ticket_type": {
         "archived": false,
         "category": "Tracker",
@@ -552,6 +551,7 @@
       "admin_assignee_id": null,
       "ai_agent": null,
       "ai_agent_participated": false,
+      "company": null,
       "contacts": {
         "contacts": [
           {
@@ -591,6 +591,7 @@
         "body": "",
         "delivered_as": "admin_initiated",
         "id": "1",
+        "recipients": null,
         "redacted": false,
         "subject": "",
         "type": null,
@@ -598,6 +599,8 @@
       },
       "state": "open",
       "statistics": {
+        "assigned_team_first_response_time": [],
+        "assigned_team_first_response_time_in_office_hours": [],
         "count_assignments": 0,
         "count_conversation_parts": 11,
         "count_reopens": 0,
@@ -605,6 +608,7 @@
         "first_assignment_at": null,
         "first_close_at": null,
         "first_contact_reply_at": null,
+        "handling_time": null,
         "last_admin_reply_at": null,
         "last_assignment_admin_reply_at": null,
         "last_assignment_at": null,
