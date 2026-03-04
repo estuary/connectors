@@ -21,11 +21,12 @@ def test_capture(request, snapshot):
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
     FIELDS_TO_REDACT = [
-        "last_calculation",
-        "pending_version",
-        "version",
-        "updated_at",
         "created_at",
+        "last_calculation",
+        "last_seen_at",
+        "pending_version",
+        "updated_at",
+        "version",
     ]
 
     for l in lines:
