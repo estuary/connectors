@@ -99,6 +99,28 @@
     }
   ],
   [
+    "acmeCo/conversation_attributes",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "api_writable": false,
+      "archived": false,
+      "custom": false,
+      "data_type": "integer",
+      "description": "The ID of the conversation",
+      "full_name": "id",
+      "label": "ID",
+      "messenger_writable": false,
+      "model": "conversation",
+      "name": "id",
+      "type": "data_attribute",
+      "ui_writable": false
+    }
+  ],
+  [
     "acmeCo/contacts",
     {
       "_meta": {

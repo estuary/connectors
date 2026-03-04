@@ -31,6 +31,10 @@ captures:
         interval: PT5M
       target: acmeCo/contact_attributes
     - resource:
+        name: conversation_attributes
+        interval: PT5M
+      target: acmeCo/conversation_attributes
+    - resource:
         name: contacts
         interval: PT5M
       target: acmeCo/contacts

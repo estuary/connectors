@@ -39,6 +39,7 @@ FULL_REFRESH_RESOURCES: list[tuple[str, str, str, str | None]] = [
     ("teams", "teams", "teams", None),
     ("company_attributes", "data_attributes", "data", "company"),
     ("contact_attributes", "data_attributes", "data", "contact"),
+    ("conversation_attributes", "data_attributes", "data", "conversation"),
 ]
 
 
