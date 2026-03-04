@@ -10,6 +10,7 @@ use crate::{Error, Result, PAYLOAD_BUFFER};
 // Binary protocol output message type discriminators
 const MSG_TYPE_SKIP: u8 = 0x01;
 const MSG_TYPE_DOCUMENT: u8 = 0x02;
+const MSG_TYPE_SKIP_NO_FULL_DOCUMENT: u8 = 0x03;
 
 // Binary protocol input message type discriminators
 const INPUT_TYPE_CHANGE_EVENT: u8 = 0x01;
@@ -126,6 +127,23 @@ fn write_frame(writer: &mut impl Write, payload: &[u8]) -> io::Result<()> {
 /// Write a skip message (1 byte: type only)
 pub fn write_skip(writer: &mut impl Write) -> io::Result<()> {
     write_frame(writer, &[MSG_TYPE_SKIP])
+}
+
+/// Write a skip message indicating fullDocument was missing for a non-delete event.
+/// Format: [type: 0x03][db_len: u8][db][coll_len: u8][coll]
+pub fn write_skip_no_full_document(
+    writer: &mut impl Write,
+    database: &str,
+    collection: &str,
+) -> io::Result<()> {
+    let payload_size = 1 + 1 + database.len() + 1 + collection.len();
+    let mut payload = Vec::with_capacity(payload_size);
+    payload.push(MSG_TYPE_SKIP_NO_FULL_DOCUMENT);
+    payload.push(database.len() as u8);
+    payload.extend_from_slice(database.as_bytes());
+    payload.push(collection.len() as u8);
+    payload.extend_from_slice(collection.as_bytes());
+    write_frame(writer, &payload)
 }
 
 /// Build a document message payload into the provided buffer.
@@ -387,5 +405,21 @@ mod tests {
         let parsed: serde_json::Value = serde_json::from_slice(json_bytes).unwrap();
         assert_eq!(parsed["_id"], "abc123");
         assert_eq!(parsed["name"], "John Doe");
+    }
+
+    #[test]
+    fn test_write_skip_no_full_document() {
+        let mut buf = Vec::new();
+        write_skip_no_full_document(&mut buf, "mydb", "mycoll").unwrap();
+
+        // Parse frame
+        let frame_len = u32::from_le_bytes([buf[0], buf[1], buf[2], buf[3]]) as usize;
+        let payload = &buf[4..4 + frame_len];
+
+        assert_eq!(payload[0], MSG_TYPE_SKIP_NO_FULL_DOCUMENT);
+        assert_eq!(payload[1], 4); // db length
+        assert_eq!(&payload[2..6], b"mydb");
+        assert_eq!(payload[6], 6); // coll length
+        assert_eq!(&payload[7..13], b"mycoll");
     }
 }

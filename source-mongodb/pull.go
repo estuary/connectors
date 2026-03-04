@@ -170,6 +170,7 @@ func (d *driver) Pull(open *pc.Request_Open, stream *boilerplate.PullOutput) err
 		output:                      stream,
 		state:                       prevState,
 		trackedChangeStreamBindings: trackedChangeStreamBindings,
+		fullDocRequired:             fullDocRequired,
 		lastEventClusterTime:        make(map[string]primitive.Timestamp),
 	}
 
@@ -290,6 +291,7 @@ type capture struct {
 	client                      *mongo.Client
 	output                      *boilerplate.PullOutput
 	trackedChangeStreamBindings map[string]bindingInfo
+	fullDocRequired             map[string]bool
 	transcoder                  *Transcoder
 
 	// mu provides synchronization for values that are accessed by concurrent backfill and change

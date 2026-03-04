@@ -11,7 +11,7 @@ use event::{
     get_split_info, is_document_operation, process_change_event, process_raw_document,
     ChangeEvent, FragmentAccumulator,
 };
-use protocol::{read_input_message, write_document_bytes, write_skip, ReadResult};
+use protocol::{read_input_message, write_document_bytes, write_skip, write_skip_no_full_document, ReadResult};
 
 // Thread-local reusable buffers for JSON serialization and payload building
 thread_local! {
@@ -117,8 +117,10 @@ fn main() -> Result<()> {
                             // events where FullDocument is null. Another change event of type
                             // delete will eventually come and delete the document.
                             if event.operation_type != "delete" && event.full_document.is_none() {
+                                let db = event.database.to_owned();
+                                let coll = event.collection.to_owned();
                                 accumulator = None;
-                                write_skip(&mut stdout)?;
+                                write_skip_no_full_document(&mut stdout, &db, &coll)?;
                                 continue;
                             }
 
@@ -165,7 +167,10 @@ fn main() -> Result<()> {
                     // events where FullDocument is null. Another change event of type
                     // delete will eventually come and delete the document.
                     if op_type != "delete" && raw_doc.get_document("fullDocument").is_err() {
-                        write_skip(&mut stdout)?;
+                        let ns = raw_doc.get_document("ns").map_err(|_| Error::MissingField("ns"))?;
+                        let db = ns.get_str("db").map_err(|_| Error::MissingField("ns.db"))?;
+                        let coll = ns.get_str("coll").map_err(|_| Error::MissingField("ns.coll"))?;
+                        write_skip_no_full_document(&mut stdout, db, coll)?;
                         continue;
                     }
 

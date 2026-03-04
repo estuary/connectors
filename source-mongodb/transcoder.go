@@ -18,8 +18,9 @@ import (
 
 // Binary protocol output message type discriminators
 const (
-	msgTypeSkip     uint8 = 0x01
-	msgTypeDocument uint8 = 0x02
+	msgTypeSkip               uint8 = 0x01
+	msgTypeDocument           uint8 = 0x02
+	msgTypeSkipNoFullDocument uint8 = 0x03
 )
 
 // Binary protocol input message type discriminators
@@ -251,6 +252,8 @@ func (t *Transcoder) TranscodeRawDocuments(docs []RawDocumentInput) ([]*Transcod
 type TranscoderResponse struct {
 	// IsSkip is true if the event was skipped (not a document event).
 	IsSkip bool
+	// FullDocumentMissing is true when the skip was due to a missing fullDocument on a non-delete event.
+	FullDocumentMissing bool
 	// Document is the JSON document (only set if IsSkip is false).
 	Document json.RawMessage
 	// CompletedSplitEvent is true if this document completed a split event (multiple fragments merged).
@@ -364,6 +367,36 @@ func (t *Transcoder) readResponse() (*TranscoderResponse, error) {
 		// Skip message - just 1 byte, no additional data
 		return &TranscoderResponse{
 			IsSkip: true,
+		}, nil
+
+	case msgTypeSkipNoFullDocument:
+		// Skip due to missing fullDocument on a non-delete event.
+		// Payload format: [type: u8][db_len: u8][db][coll_len: u8][coll]
+		offset := 1 // skip type byte
+		if offset >= len(payload) {
+			return nil, fmt.Errorf("skipNoFullDocument message too short for db_len")
+		}
+		dbLen := int(payload[offset])
+		offset++
+		if offset+dbLen > len(payload) {
+			return nil, fmt.Errorf("skipNoFullDocument db length exceeds payload")
+		}
+		database := string(payload[offset : offset+dbLen])
+		offset += dbLen
+		if offset >= len(payload) {
+			return nil, fmt.Errorf("skipNoFullDocument message too short for coll_len")
+		}
+		collLen := int(payload[offset])
+		offset++
+		if offset+collLen > len(payload) {
+			return nil, fmt.Errorf("skipNoFullDocument collection length exceeds payload")
+		}
+		collection := string(payload[offset : offset+collLen])
+		return &TranscoderResponse{
+			IsSkip:              true,
+			FullDocumentMissing: true,
+			Database:            database,
+			Collection:          collection,
 		}, nil
 
 	case msgTypeDocument:
