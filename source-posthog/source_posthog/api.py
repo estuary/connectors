@@ -2,7 +2,6 @@
 PostHog API client functions.
 """
 
-import functools
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
 from logging import Logger
@@ -30,6 +29,7 @@ from .models import (
 )
 
 HOGQL_PAGE_SIZE = 50_000
+BACKFILL_TIMEOUT_PERIOD = timedelta(minutes=5)
 
 
 # Cache for project IDs per organization (avoids re-fetching on retry).
@@ -160,8 +160,20 @@ async def _query_hogql[T: HogQLEntity[str] | HogQLEntity[int]](
     http: HTTPSession,
     log: Logger,
 ) -> AsyncGenerator[T]:
+    log.debug(
+        "Querying HogQL",
+        {
+            "table": model.table_name,
+            "project_id": project_id,
+            "start": start_date,
+            "end": end_date,
+        },
+    )
+
     url = model.get_api_endpoint_url(base_url, project_id)
     column_names = await _get_hogql_columns(model, base_url, project_id, http, log)
+
+    coalesced_cursor_fields = f'COALESCE({",".join(model.cursor_columns)})'
 
     serialized_start_date = start_date.astimezone(UTC).replace(tzinfo=None).isoformat()
     serialized_end_date = (
@@ -171,11 +183,11 @@ async def _query_hogql[T: HogQLEntity[str] | HogQLEntity[int]](
     )
 
     start_date_clause = (
-        f"WHERE {model.cursor_column} > "
+        f"WHERE {coalesced_cursor_fields} > "
         + f"toDateTime64('{serialized_start_date}', 6, 'UTC') "
     )
     end_date_clause = (
-        f"AND {model.cursor_column} <= toDateTime64('{serialized_end_date}', 6, 'UTC') "
+        f"AND {coalesced_cursor_fields} <= toDateTime64('{serialized_end_date}', 6, 'UTC') "
         if end_date is not None
         else ""
     )
@@ -187,7 +199,7 @@ async def _query_hogql[T: HogQLEntity[str] | HogQLEntity[int]](
             + f"FROM {model.table_name} "
             + start_date_clause
             + end_date_clause
-            + f"ORDER BY {model.cursor_column} DESC "
+            + f"ORDER BY {coalesced_cursor_fields} ASC "
             + f"LIMIT {HOGQL_PAGE_SIZE}",
         },
     }
@@ -299,7 +311,6 @@ async def backfill_project_events(
         return
 
     base_url = config.advanced.base_url
-    ctx = ProjectIdValidationContext(project_id=project_id)
     new_cursor = start_date
     doc_count = 0
 
@@ -343,7 +354,6 @@ async def fetch_project_events(
     assert isinstance(cursor, datetime)
 
     base_url = config.advanced.base_url
-    ctx = ProjectIdValidationContext(project_id=project_id)
     now = datetime.now(tz=UTC)
     upper_bound = now - horizon if horizon else None
 
@@ -380,34 +390,98 @@ async def fetch_project_events(
         yield new_cursor
 
 
-async def snapshot_persons(
+async def backfill_persons(
     http: HTTPSession,
     config: EndpointConfig,
+    project_id: int,
     log: Logger,
-) -> AsyncGenerator[Person, None]:
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[Person | PageCursor, None]:
+    assert isinstance(page, str | None)
+    assert isinstance(cutoff, datetime)
+
+    start_date = datetime.fromisoformat(page) if page is not None else config.start_date
+
+    if start_date >= cutoff:
+        return
+
     base_url = config.advanced.base_url
-    project_ids = await fetch_project_ids(http, config, log)
+    new_cursor = start_date
+    doc_count = 0
+    backfill_timeout = datetime.now(tz=UTC) + BACKFILL_TIMEOUT_PERIOD
 
-    total_doc_count = 0
+    while True:
+        batch_count = 0
 
-    for project_id in project_ids:
-        doc_count = 0
-        project_cursor = datetime.min.replace(tzinfo=UTC)
+        async for item in _query_hogql(
+            Person,
+            new_cursor,
+            cutoff,
+            base_url,
+            project_id,
+            http,
+            log,
+        ):
+            batch_count += 1
+            doc_count += 1
+            item_cursor = item.get_cursor()
+            new_cursor = max(new_cursor, item_cursor)
 
-        while True:
-            async for item in _query_hogql(
-                Person, project_cursor, None, base_url, project_id, http, log
-            ):
-                doc_count += 1
-                project_cursor = item.get_cursor()
+            yield item
 
-                yield item
+        if batch_count < HOGQL_PAGE_SIZE:
+            break
 
-            # If we got fewer rows than page_size, we've reached the end
-            if doc_count < HOGQL_PAGE_SIZE:
-                break
+        if datetime.now(tz=UTC) > backfill_timeout:
+            log.info(
+                f"{BACKFILL_TIMEOUT_PERIOD.total_seconds() / 60} "
+                + "minutes have elapsed, emitting a checkpoint"
+            )
+            break
 
-        log.info(f"Fetched {doc_count} persons from project {project_id}")
-        total_doc_count += doc_count
+    log.info(f"Backfilled {doc_count} persons from project {project_id}")
 
-    log.info(f"Fetched {total_doc_count} total persons across all projects")
+    if new_cursor > start_date:
+        yield new_cursor.isoformat()
+
+
+async def fetch_persons(
+    http: HTTPSession,
+    config: EndpointConfig,
+    project_id: int,
+    log: Logger,
+    cursor: LogCursor,
+) -> AsyncGenerator[Person | LogCursor, None]:
+    assert isinstance(cursor, datetime)
+
+    base_url = config.advanced.base_url
+    new_cursor = cursor
+    doc_count = 0
+
+    while True:
+        batch_count = 0
+
+        async for item in _query_hogql(
+            Person,
+            new_cursor,
+            None,
+            base_url,
+            project_id,
+            http,
+            log,
+        ):
+            batch_count += 1
+            doc_count += 1
+            item_cursor = item.get_cursor()
+            new_cursor = max(new_cursor, item_cursor)
+
+            yield item
+
+        if batch_count < HOGQL_PAGE_SIZE:
+            break
+
+    log.info(f"Fetched {doc_count} persons from project {project_id}")
+
+    if new_cursor > cursor:
+        yield new_cursor

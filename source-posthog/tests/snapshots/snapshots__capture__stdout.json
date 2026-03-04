@@ -1265,40 +1265,6 @@
     }
   ],
   [
-    "acmeCo/Persons",
-    {
-      "$virt_initial_channel_type": "Unknown",
-      "$virt_initial_referring_domain_type": null,
-      "_meta": {
-        "op": "c",
-        "row_id": 0,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "created_at": "redacted",
-      "id": "66c138ff-6ce2-5223-8006-6f0d0eea9ced",
-      "is_identified": 0,
-      "last_seen_at": null,
-      "properties": "{\"name\":\"Test User 2\",\"email\":\"user-2@example.com\",\"$current_url\":\"https://example.com\",\"$geoip_latitude\":-36,\"$geoip_city_name\":null,\"$geoip_longitude\":-59.9964,\"$geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_postal_code\":\"1772\",\"$creator_event_uuid\":\"019c32bf-c9d2-74b0-bb21-aa8b536dc198\",\"$geoip_country_code\":\"AR\",\"$geoip_country_name\":\"Argentina\",\"$initial_current_url\":\"https://example.com\",\"$geoip_continent_code\":\"SA\",\"$geoip_continent_name\":\"South America\",\"$geoip_accuracy_radius\":10,\"$geoip_city_confidence\":null,\"$initial_geoip_latitude\":-36,\"$initial_geoip_city_name\":null,\"$initial_geoip_longitude\":-59.9964,\"$initial_geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_subdivision_1_code\":\"B\",\"$geoip_subdivision_1_name\":\"Buenos Aires\",\"$geoip_subdivision_2_code\":null,\"$geoip_subdivision_2_name\":null,\"$initial_geoip_postal_code\":\"1772\",\"$initial_geoip_country_code\":\"AR\",\"$initial_geoip_country_name\":\"Argentina\",\"$initial_geoip_continent_code\":\"SA\",\"$initial_geoip_continent_name\":\"South America\",\"$initial_geoip_accuracy_radius\":10,\"$initial_geoip_city_confidence\":null,\"$initial_geoip_subdivision_1_code\":\"B\",\"$initial_geoip_subdivision_1_name\":\"Buenos Aires\",\"$initial_geoip_subdivision_2_code\":null,\"$initial_geoip_subdivision_2_name\":null}"
-    }
-  ],
-  [
-    "acmeCo/Persons",
-    {
-      "$virt_initial_channel_type": "Unknown",
-      "$virt_initial_referring_domain_type": null,
-      "_meta": {
-        "op": "c",
-        "row_id": 1,
-        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
-      },
-      "created_at": "redacted",
-      "id": "602301e5-4074-5bfb-9fec-63d69c928678",
-      "is_identified": 0,
-      "last_seen_at": null,
-      "properties": "{\"name\":\"Test User\",\"email\":\"user@example.com\",\"$current_url\":\"https://example.com\",\"$geoip_latitude\":-36,\"$geoip_city_name\":null,\"$geoip_longitude\":-59.9964,\"$geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_postal_code\":\"1772\",\"$creator_event_uuid\":\"019c2442-66ff-7fd0-9504-768135539eeb\",\"$geoip_country_code\":\"AR\",\"$geoip_country_name\":\"Argentina\",\"$initial_current_url\":\"https://example.com\",\"$geoip_continent_code\":\"SA\",\"$geoip_continent_name\":\"South America\",\"$geoip_accuracy_radius\":5,\"$geoip_city_confidence\":null,\"$initial_geoip_latitude\":-36,\"$initial_geoip_city_name\":null,\"$initial_geoip_longitude\":-59.9964,\"$initial_geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_subdivision_1_code\":\"B\",\"$geoip_subdivision_1_name\":\"Buenos Aires\",\"$geoip_subdivision_2_code\":null,\"$geoip_subdivision_2_name\":null,\"$initial_geoip_postal_code\":\"1772\",\"$initial_geoip_country_code\":\"AR\",\"$initial_geoip_country_name\":\"Argentina\",\"$initial_geoip_continent_code\":\"SA\",\"$initial_geoip_continent_name\":\"South America\",\"$initial_geoip_accuracy_radius\":5,\"$initial_geoip_city_confidence\":null,\"$initial_geoip_subdivision_1_code\":\"B\",\"$initial_geoip_subdivision_1_name\":\"Buenos Aires\",\"$initial_geoip_subdivision_2_code\":null,\"$initial_geoip_subdivision_2_name\":null}"
-    }
-  ],
-  [
     "acmeCo/Projects",
     {
       "_meta": {
@@ -1718,6 +1684,38 @@
       "usage_dashboard": 1266180,
       "user_access_level": "manager",
       "version": "redacted"
+    }
+  ],
+  [
+    "acmeCo/Persons",
+    {
+      "$virt_initial_channel_type": "Unknown",
+      "$virt_initial_referring_domain_type": null,
+      "_meta": {
+        "project_id": 304748,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "redacted",
+      "id": "602301e5-4074-5bfb-9fec-63d69c928678",
+      "is_identified": 0,
+      "last_seen_at": null,
+      "properties": "{\"name\":\"Test User\",\"email\":\"user@example.com\",\"$current_url\":\"https://example.com\",\"$geoip_latitude\":-36,\"$geoip_city_name\":null,\"$geoip_longitude\":-59.9964,\"$geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_postal_code\":\"1772\",\"$creator_event_uuid\":\"019c2442-66ff-7fd0-9504-768135539eeb\",\"$geoip_country_code\":\"AR\",\"$geoip_country_name\":\"Argentina\",\"$initial_current_url\":\"https://example.com\",\"$geoip_continent_code\":\"SA\",\"$geoip_continent_name\":\"South America\",\"$geoip_accuracy_radius\":5,\"$geoip_city_confidence\":null,\"$initial_geoip_latitude\":-36,\"$initial_geoip_city_name\":null,\"$initial_geoip_longitude\":-59.9964,\"$initial_geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_subdivision_1_code\":\"B\",\"$geoip_subdivision_1_name\":\"Buenos Aires\",\"$geoip_subdivision_2_code\":null,\"$geoip_subdivision_2_name\":null,\"$initial_geoip_postal_code\":\"1772\",\"$initial_geoip_country_code\":\"AR\",\"$initial_geoip_country_name\":\"Argentina\",\"$initial_geoip_continent_code\":\"SA\",\"$initial_geoip_continent_name\":\"South America\",\"$initial_geoip_accuracy_radius\":5,\"$initial_geoip_city_confidence\":null,\"$initial_geoip_subdivision_1_code\":\"B\",\"$initial_geoip_subdivision_1_name\":\"Buenos Aires\",\"$initial_geoip_subdivision_2_code\":null,\"$initial_geoip_subdivision_2_name\":null}"
+    }
+  ],
+  [
+    "acmeCo/Persons",
+    {
+      "$virt_initial_channel_type": "Unknown",
+      "$virt_initial_referring_domain_type": null,
+      "_meta": {
+        "project_id": 304748,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "created_at": "redacted",
+      "id": "66c138ff-6ce2-5223-8006-6f0d0eea9ced",
+      "is_identified": 0,
+      "last_seen_at": null,
+      "properties": "{\"name\":\"Test User 2\",\"email\":\"user-2@example.com\",\"$current_url\":\"https://example.com\",\"$geoip_latitude\":-36,\"$geoip_city_name\":null,\"$geoip_longitude\":-59.9964,\"$geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_postal_code\":\"1772\",\"$creator_event_uuid\":\"019c32bf-c9d2-74b0-bb21-aa8b536dc198\",\"$geoip_country_code\":\"AR\",\"$geoip_country_name\":\"Argentina\",\"$initial_current_url\":\"https://example.com\",\"$geoip_continent_code\":\"SA\",\"$geoip_continent_name\":\"South America\",\"$geoip_accuracy_radius\":10,\"$geoip_city_confidence\":null,\"$initial_geoip_latitude\":-36,\"$initial_geoip_city_name\":null,\"$initial_geoip_longitude\":-59.9964,\"$initial_geoip_time_zone\":\"America/Argentina/Buenos_Aires\",\"$geoip_subdivision_1_code\":\"B\",\"$geoip_subdivision_1_name\":\"Buenos Aires\",\"$geoip_subdivision_2_code\":null,\"$geoip_subdivision_2_name\":null,\"$initial_geoip_postal_code\":\"1772\",\"$initial_geoip_country_code\":\"AR\",\"$initial_geoip_country_name\":\"Argentina\",\"$initial_geoip_continent_code\":\"SA\",\"$initial_geoip_continent_name\":\"South America\",\"$initial_geoip_accuracy_radius\":10,\"$initial_geoip_city_confidence\":null,\"$initial_geoip_subdivision_1_code\":\"B\",\"$initial_geoip_subdivision_1_name\":\"Buenos Aires\",\"$initial_geoip_subdivision_2_code\":null,\"$initial_geoip_subdivision_2_name\":null}"
     }
   ]
 ]

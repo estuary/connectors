@@ -24,7 +24,8 @@ collections:
   acmeCo/Persons:
     schema: Persons.schema.yaml
     key:
-    - /_meta/row_id
+    - /_meta/project_id
+    - /id
   acmeCo/Projects:
     schema: Projects.schema.yaml
     key:
