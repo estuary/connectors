@@ -18,6 +18,7 @@ from typing import (
     Literal,
     TypeVar,
 )
+
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..cron import next_fire
@@ -102,7 +103,7 @@ def pop_cursor_marker(cursor: dict) -> dict:
     return cursor
 
 
-PageCursor = str | int | dict | None
+PageCursor = str | int | dict[str, Any] | None
 """PageCursor is a cursor into a paged result set.
 These cursors are predominantly an opaque string or an internal offset integer.
 When a dict is used, it represents a structured cursor that supports JSON merge patches
