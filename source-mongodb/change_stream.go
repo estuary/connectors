@@ -108,8 +108,8 @@ func (c *capture) initializeStreams(
 
 		fullDocOpt := options.UpdateLookup
 		if fullDocRequired[db] {
-			logEntry.Info("using fullDocument 'required' mode (changeStreamPreAndPostImages enabled on all collections)")
-			fullDocOpt = options.Required
+			logEntry.Info("using fullDocument 'whenAvailable' mode (changeStreamPreAndPostImages enabled on all collections)")
+			fullDocOpt = options.WhenAvailable
 		}
 		opts := options.ChangeStream().SetFullDocument(fullDocOpt)
 		if maxAwaitTime != nil {
@@ -430,6 +430,19 @@ func (c *capture) processBatch(
 			return primitive.Timestamp{}, fmt.Errorf("extracting timestamp from resume token: %w", err)
 		} else {
 			lastOpTime = opTime
+		}
+
+		if resp.IsSkip && resp.FullDocumentMissing {
+			rid := resourceId(resp.Database, resp.Collection)
+			if _, tracked := c.trackedChangeStreamBindings[rid]; tracked && c.fullDocRequired[resp.Database] {
+				return primitive.Timestamp{}, fmt.Errorf(
+					"fullDocument was missing for a change event on %s.%s: the collection must have changeStreamPreAndPostImages enabled",
+					resp.Database, resp.Collection,
+				)
+			}
+			// Untracked binding or UpdateLookup database: null fullDocument is a
+			// known race condition (doc deleted between update and lookup).
+			continue
 		}
 
 		if resp.IsSkip {

@@ -59,6 +59,7 @@ func TestPullStream(t *testing.T) {
 		pullTimes       int
 		wantSent        []string
 		wantEventCount  int
+		wantErr         string // if non-empty, expect processBatch to return an error containing this string
 	}{
 		{
 			name: "one document",
@@ -112,6 +113,43 @@ func TestPullStream(t *testing.T) {
 			wantEventCount:  2,
 		},
 		{
+			name: "fullDocument missing on tracked binding with fullDocRequired errors",
+			setup: func(t *testing.T) {
+				// Collection WITHOUT changeStreamPreAndPostImages but fullDocRequired is set.
+				// With whenAvailable, update events on collections without the flag will have
+				// null fullDocument since there is no stored post-image to return.
+				insertDoc(t, testColl1, 1)
+				_, err := client.Database(testDb).Collection(testColl1).UpdateOne(ctx,
+					bson.D{{Key: "_id", Value: 1}},
+					bson.D{{Key: "$set", Value: bson.D{{Key: "v", Value: true}}}})
+				require.NoError(t, err)
+			},
+			fullDocRequired: map[string]bool{testDb: true},
+			pullTimes:       5,
+			wantErr:         "changeStreamPreAndPostImages",
+		},
+		{
+			name: "fullDocument missing on untracked collection is silently ignored",
+			setup: func(t *testing.T) {
+				// testColl1 is tracked and has changeStreamPreAndPostImages enabled.
+				// testColl3 is NOT tracked and does NOT have the flag. With whenAvailable,
+				// an update on testColl3 produces a null fullDocument event in the
+				// database-level change stream. This should be silently ignored since
+				// testColl3 is not a tracked binding.
+				require.NoError(t, client.Database(testDb).CreateCollection(ctx, testColl1, &options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}))
+				insertDoc(t, testColl3, 1)
+				_, err := client.Database(testDb).Collection(testColl3).UpdateOne(ctx,
+					bson.D{{Key: "_id", Value: 1}},
+					bson.D{{Key: "$set", Value: bson.D{{Key: "v", Value: true}}}})
+				require.NoError(t, err)
+				insertDoc(t, testColl1, 1)
+			},
+			fullDocRequired: map[string]bool{testDb: true},
+			pullTimes:       3,
+			wantSent:        []string{cp, "1", cp},
+			wantEventCount:  3, // insert on coll3 (skipped: untracked) + update on coll3 (skipped: untracked, no fullDoc) + insert on coll1 (emitted)
+		},
+		{
 			name: "split fragments",
 			setup: func(t *testing.T) {
 				require.NoError(t, client.Database(testDb).CreateCollection(ctx, testColl1, &options.CreateCollectionOptions{ChangeStreamPreAndPostImages: bson.D{{Key: "enabled", Value: true}}}))
@@ -155,6 +193,12 @@ func TestPullStream(t *testing.T) {
 			t.Cleanup(func() { transcoder.Stop() })
 
 			srv := &testServer{}
+
+			fullDocRequired := tt.fullDocRequired
+			if fullDocRequired == nil {
+				fullDocRequired = map[string]bool{}
+			}
+
 			c := capture{
 				client:     client,
 				output:     &boilerplate.PullOutput{Connector_CaptureServer: srv},
@@ -163,13 +207,9 @@ func TestPullStream(t *testing.T) {
 					resourceId(testDb, testColl1): bindings[0],
 					resourceId(testDb, testColl2): bindings[1],
 				},
+				fullDocRequired:      fullDocRequired,
 				state:                captureState{DatabaseResumeTokens: map[string]bson.Raw{}},
 				lastEventClusterTime: map[string]primitive.Timestamp{},
-			}
-
-			fullDocRequired := tt.fullDocRequired
-			if fullDocRequired == nil {
-				fullDocRequired = map[string]bool{}
 			}
 			streams, err := c.initializeStreams(ctx, bindings, nil, true, true, false, map[string][]string{}, fullDocRequired)
 			require.NoError(t, err)
@@ -206,12 +246,16 @@ func TestPullStream(t *testing.T) {
 			tt.setup(t)
 
 			// Pull and process batches until we've seen pullTimes batch completions.
+			var processErr error
 			batchesCompleted := 0
 			for batch := range batches {
 				require.NoError(t, batch.err)
 
 				_, err := c.processBatch(ctx, stream, batch)
-				require.NoError(t, err)
+				if err != nil {
+					processErr = err
+					break
+				}
 
 				batchesCompleted++
 				if batchesCompleted >= tt.pullTimes {
@@ -222,6 +266,13 @@ func TestPullStream(t *testing.T) {
 			// Stop producer
 			cancelProducer()
 			<-producerDone
+
+			if tt.wantErr != "" {
+				require.Error(t, processErr)
+				require.Contains(t, processErr.Error(), tt.wantErr)
+				return
+			}
+			require.NoError(t, processErr)
 
 			// MongoDB may non-deterministically batch change events together or
 			// separately, and map iteration order in processBatch can vary the
