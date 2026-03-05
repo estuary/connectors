@@ -53,6 +53,7 @@ else:
     OAuth2Credentials = LongLivedClientCredentialsOAuth2Credentials.for_provider(OAUTH2_SPEC.provider)
 
 MAX_SEARCH_PAGE_SIZE = 150
+DEFAULT_API_VERSION = "2.11"
 
 
 def default_start_date():
@@ -89,6 +90,12 @@ class EndpointConfig(BaseModel):
             gt=0,
             le=MAX_SEARCH_PAGE_SIZE,
         )]
+        api_version: str = Field(
+            description=f"The Intercom API version used for requests. Defaults to '{DEFAULT_API_VERSION}'.",
+            title="API Version",
+            default_factory=lambda: DEFAULT_API_VERSION,
+            pattern=r"^\d+\.\d+$",
+        )
 
     advanced: Advanced = Field(
         default_factory=Advanced, #type: ignore
@@ -222,21 +229,21 @@ class CompanyScrollResponse(BaseModel, extra="allow"):
 
 
 ClientSideFilteringResourceFetchChangesFn = Callable[
-    [HTTPSession, Logger, LogCursor],
+    [HTTPSession, str, Logger, LogCursor],
     AsyncGenerator[TimestampedResource | LogCursor, None],
 ]
 
 IncrementalResourceFetchChangesFn = Callable[
-    [HTTPSession, int, Logger, LogCursor],
+    [HTTPSession, int, str, Logger, LogCursor],
     AsyncGenerator[TimestampedResource | LogCursor, None],
 ]
 
 CompanyResourceFetchChangesFn = Callable[
-    [HTTPSession, bool, Logger, LogCursor],
+    [HTTPSession, bool, str, Logger, LogCursor],
     AsyncGenerator[TimestampedResource | LogCursor, None],
 ]
 
 IncrementalDateWindowResourceFetchChangesFn = Callable[
-    [HTTPSession, int, int, Logger, LogCursor],
+    [HTTPSession, int, int, str, Logger, LogCursor],
     AsyncGenerator[TimestampedResource | LogCursor, None],
 ]

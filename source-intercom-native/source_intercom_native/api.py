@@ -27,6 +27,7 @@ from .models import (
 
 
 API = "https://api.intercom.io"
+API_VERSION_HEADER = "Intercom-Version"
 COMPANIES_LIST_LIMIT = 10_000
 
 COMPANIES_LIST_LIMIT_REACHED_REGEX = r"page limit reached, please use scroll API"
@@ -49,13 +50,14 @@ async def snapshot_resources(
         path: str,
         response_field: str,
         query_param: str | None,
+        api_version: str,
         log: Logger,
 ) -> AsyncGenerator[IntercomResource, None]:
     url = f"{API}/{path}"
     params = None if query_param is None else {"model": query_param}
 
     response = json.loads(
-        await http.request(log, url, params=params)
+        await http.request(log, url, params=params, headers={API_VERSION_HEADER: api_version})
     )
 
     resources = TypeAdapter(list[IntercomResource]).validate_python(response[f'{response_field}'])
@@ -193,12 +195,13 @@ def _is_large_date_window(start: int, end: int) -> bool:
 async def _hydrate_contact(
     http: HTTPSession,
     contact: Contact,
+    api_version: str,
     log: Logger,
 ) -> Contact:
     if contact.tags.has_more:
         url = f"{API}/contacts/{contact.id}/tags"
         response = ContactTagsResponse.model_validate_json(
-            await http.request(log, url)
+            await http.request(log, url, headers={API_VERSION_HEADER: api_version})
         )
 
         # Tags and nested tags have different shapes. We have to transform tags into nested tags
@@ -221,6 +224,7 @@ async def fetch_contacts(
     http: HTTPSession,
     window_size: int,
     page_size: int,
+    api_version: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -239,7 +243,7 @@ async def fetch_contacts(
     pagination_ended_early = False
     while True:
         response = ContactsSearchResponse.model_validate_json(
-                await http.request(log, url, "POST", json=body)
+                await http.request(log, url, "POST", json=body, headers={API_VERSION_HEADER: api_version})
         )
 
         page_num = response.pages.page
@@ -270,7 +274,7 @@ async def fetch_contacts(
             if updated_at > start:
                 # Nested subresources within a contact are capped at 10 elements, even if more exist.
                 # We hydrate the contact with the additional subresources if they aren't all present.
-                yield await _hydrate_contact(http, contact, log)
+                yield await _hydrate_contact(http, contact, api_version, log)
 
         if pagination_ended_early or response.pages.next is None:
             break
@@ -287,6 +291,7 @@ async def fetch_contacts(
 async def fetch_tickets(
     http: HTTPSession,
     page_size: int,
+    api_version: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -302,7 +307,7 @@ async def fetch_tickets(
 
     while True:
         response = TicketsSearchResponse.model_validate_json(
-                await http.request(log, url, "POST", json=body)
+                await http.request(log, url, "POST", json=body, headers={API_VERSION_HEADER: api_version})
         )
 
         page_num = response.pages.page
@@ -340,6 +345,7 @@ async def fetch_tickets(
 async def fetch_conversations(
     http: HTTPSession,
     page_size: int,
+    api_version: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -357,7 +363,7 @@ async def fetch_conversations(
 
     while True:
         response = ConversationsSearchResponse.model_validate_json(
-                await http.request(log, url, "POST", json=body)
+                await http.request(log, url, "POST", json=body, headers={API_VERSION_HEADER: api_version})
         )
 
         page_num = response.pages.page
@@ -396,18 +402,19 @@ async def fetch_conversations(
 async def fetch_conversations_parts(
     http: HTTPSession,
     page_size: int,
+    api_version: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
     conversation_ids: list[str] = []
 
-    async for conversation_or_dt in fetch_conversations(http, page_size, log, log_cursor):
+    async for conversation_or_dt in fetch_conversations(http, page_size, api_version, log, log_cursor):
         if isinstance(conversation_or_dt, TimestampedResource):
             conversation_ids.append(conversation_or_dt.id)
         else:
             for coro in asyncio.as_completed(
                 [
-                    _fetch_parts(http, log, conversation_id)
+                    _fetch_parts(http, conversation_id, api_version, log)
                     for conversation_id in conversation_ids
                 ]
             ):
@@ -422,14 +429,15 @@ async def fetch_conversations_parts(
 
 async def _fetch_parts(
         http: HTTPSession,
+        conversation_id: str,
+        api_version: str,
         log: Logger,
-        conversation_id: str
 ) -> list[TimestampedResource]:
     async with parts_semaphore:
         url = f"{API}/conversations/{conversation_id}"
 
         response = ConversationResponse.model_validate_json(
-            await http.request(log, url)
+            await http.request(log, url, headers={API_VERSION_HEADER: api_version})
         )
 
         for part in response.conversation_parts.conversation_parts:
@@ -441,6 +449,7 @@ async def _fetch_parts(
 
 async def fetch_segments(
     http: HTTPSession,
+    api_version: str,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -453,7 +462,7 @@ async def fetch_segments(
     params={"include_count": 'true'}
 
     response = SegmentsResponse.model_validate_json(
-        await http.request(log, url, params=params)
+        await http.request(log, url, params=params, headers={API_VERSION_HEADER: api_version})
     )
 
     for result in response.data:
@@ -470,6 +479,7 @@ async def fetch_segments(
 
 async def _list_companies(
         http: HTTPSession,
+        api_version: str,
         log: Logger,
 ) -> AsyncGenerator[TimestampedResource, None]:
     url = f"{API}/companies/list"
@@ -484,7 +494,7 @@ async def _list_companies(
     while True:
         try:
             response = CompanyListResponse.model_validate_json(
-                await http.request(log, url, method="POST", params=params)
+                await http.request(log, url, method="POST", params=params, headers={API_VERSION_HEADER: api_version})
             )
         except HTTPError as err:
             # End pagination and checkpoint any documents if we hit the limit for the /companies/list endpoint.
@@ -511,6 +521,7 @@ async def _list_companies(
 
 async def _scroll_companies(
         http: HTTPSession,
+        api_version: str,
         log: Logger,
 ) -> AsyncGenerator[TimestampedResource, None]:
     url = f"{API}/companies/scroll"
@@ -522,7 +533,7 @@ async def _scroll_companies(
         while True:
             try:
                 response = CompanyScrollResponse.model_validate_json(
-                    await http.request(log, url, method="GET", params=params)
+                    await http.request(log, url, method="GET", params=params, headers={API_VERSION_HEADER: api_version})
                 )
             except HTTPError as err:
                 if err.code == 400 and bool(re.search(COMPANIES_SCROLL_IN_USE_BY_OTHER_APPLICATION_REGEX, err.message, re.DOTALL)):
@@ -545,6 +556,7 @@ async def _scroll_companies(
 async def fetch_companies(
         http: HTTPSession,
         use_list_endpoint: bool,
+        api_version: str,
         log: Logger,
         log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -555,7 +567,7 @@ async def fetch_companies(
 
     companies_func = _list_companies if use_list_endpoint else _scroll_companies
 
-    async for company in companies_func(http, log):
+    async for company in companies_func(http, api_version, log):
         if company.updated_at > last_seen_ts:
             last_seen_ts = company.updated_at
         if company.updated_at > log_cursor_ts:
@@ -570,6 +582,7 @@ async def fetch_companies(
 async def fetch_company_segments(
         http: HTTPSession,
         use_list_endpoint: bool,
+        api_version: str,
         log: Logger,
         log_cursor: LogCursor,
 ) -> AsyncGenerator[TimestampedResource | LogCursor, None]:
@@ -584,7 +597,7 @@ async def fetch_company_segments(
 
     # Fetch & buffer company ids to avoid using the /companies/scroll endpoint for longer than necessary and
     # avoid exceeding the one minute timeout for a single "scroll" if we were to fetch segments while scrolling.
-    async for company in companies_func(http, log):
+    async for company in companies_func(http, api_version, log):
         company_ids.append(company.id)
 
     for id in company_ids:
@@ -592,7 +605,7 @@ async def fetch_company_segments(
 
         try:
             company_segments = CompanySegmentsResponse.model_validate_json(
-                await http.request(log, segments_url)
+                await http.request(log, segments_url, headers={API_VERSION_HEADER: api_version})
             )
         except HTTPError as err:
             if err.code == 404 and 'Company Not Found' in err.message:
