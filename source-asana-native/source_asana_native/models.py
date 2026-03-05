@@ -84,6 +84,11 @@ class TopLevelEntity(BaseEntity, metaclass=ABCMeta):
 class WorkspaceScopedEntity(BaseEntity, metaclass=ABCMeta):
     """Entity fetched by iterating over workspaces."""
     api_path: ClassVar[str]
+    # HTTP status codes to silently skip per-parent scope. Asana returns different
+    # errors depending on workspace/project plan tier or type — e.g. 402 for premium
+    # features (portfolios, goals, custom fields) and 403/404 for endpoints that only
+    # work on organization-type workspaces (teams). Rather than failing the entire
+    # capture, we log and skip the inaccessible scope.
     tolerated_errors: ClassVar[frozenset[int]] = frozenset()
     deduplicate: ClassVar[bool] = False
 
@@ -95,7 +100,7 @@ class WorkspaceScopedEntity(BaseEntity, metaclass=ABCMeta):
 class ProjectScopedEntity(BaseEntity, metaclass=ABCMeta):
     """Entity fetched by iterating over projects."""
     api_path: ClassVar[str]
-    tolerated_errors: ClassVar[frozenset[int]] = frozenset()
+    tolerated_errors: ClassVar[frozenset[int]] = frozenset()  # see WorkspaceScopedEntity
 
     @classmethod
     def get_url(cls, base_url: str, project_gid: str) -> str:
