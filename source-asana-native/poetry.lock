@@ -668,7 +668,7 @@ optional = false
 python-versions = "^3.11"
 groups = ["main"]
 files = []
-develop = false
+develop = true
 
 [package.dependencies]
 aiocsv = "^1.3.2"
@@ -687,11 +687,8 @@ xxhash = "^3.4.1"
 airbyte-shim = ["airbyte-cdk (<=6.56.0)"]
 
 [package.source]
-type = "git"
-url = "https://github.com/estuary/connectors"
-reference = "HEAD"
-resolved_reference = "dd28dd4a9da2c19ff71170793f4ea9ddf1ff52d7"
-subdirectory = "estuary-cdk"
+type = "directory"
+url = "../estuary-cdk"
 
 [[package]]
 name = "filelock"
@@ -2966,4 +2963,4 @@ propcache = ">=0.2.1"
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.12"
-content-hash = "05567e38be5df25fc4eef9559422e02ea998d20ed66d65dfc2f2b1e64b7156b5"
+content-hash = "754b1fddf73b039595531d87d4db9d4603d8483a1483c91138d55331617c880f"
