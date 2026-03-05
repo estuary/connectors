@@ -9,12 +9,12 @@ import pytest
 
 from source_asana_native import Connector
 from source_asana_native.api import (
-    fetch_projects,
-    fetch_users,
-    fetch_workspaces,
+    fetch_project_scoped,
+    fetch_top_level,
+    fetch_workspace_scoped,
     validate_credentials,
 )
-from source_asana_native.models import EndpointConfig
+from source_asana_native.models import EndpointConfig, Project, Section, User, Workspace
 
 
 @pytest.fixture
@@ -74,7 +74,7 @@ class TestResourceEndpoints:
         log = logging.getLogger()
 
         results = []
-        async for ws in fetch_workspaces(http_client, endpoint_config, log):
+        async for ws in fetch_top_level(Workspace, http_client, endpoint_config, log):
             results.append(ws)
 
         assert len(results) > 0
@@ -88,7 +88,7 @@ class TestResourceEndpoints:
         log = logging.getLogger()
 
         results = []
-        async for user in fetch_users(http_client, endpoint_config, log):
+        async for user in fetch_workspace_scoped(User, http_client, endpoint_config, log):
             results.append(user)
 
         assert len(results) > 0
@@ -101,7 +101,21 @@ class TestResourceEndpoints:
         log = logging.getLogger()
 
         results = []
-        async for project in fetch_projects(http_client, endpoint_config, log):
+        async for project in fetch_workspace_scoped(Project, http_client, endpoint_config, log):
             results.append(project)
 
         assert isinstance(results, list)
+
+    @pytest.mark.asyncio
+    async def test_fetch_sections(
+        self, http_client: Connector, endpoint_config: EndpointConfig
+    ):
+        _setup_auth(http_client, endpoint_config)
+        log = logging.getLogger()
+
+        results = []
+        async for section in fetch_project_scoped(Section, http_client, endpoint_config, log):
+            results.append(section)
+
+        assert isinstance(results, list)
+        assert all(hasattr(s, "gid") for s in results)

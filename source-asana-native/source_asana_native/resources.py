@@ -10,24 +10,13 @@ from estuary_cdk.http import HTTPSession
 
 from .api import (
     _collect_projects,
-    fetch_attachments,
-    fetch_custom_fields,
-    fetch_goals,
-    fetch_memberships,
-    fetch_portfolios,
-    fetch_project_templates,
+    fetch_project_scoped,
     fetch_project_tasks,
-    fetch_projects,
-    fetch_sections,
-    fetch_status_updates,
     fetch_stories,
-    fetch_tags,
     fetch_task_events,
     fetch_team_memberships,
-    fetch_teams,
-    fetch_time_periods,
-    fetch_users,
-    fetch_workspaces,
+    fetch_top_level,
+    fetch_workspace_scoped,
 )
 from .models import (
     Attachment,
@@ -37,6 +26,7 @@ from .models import (
     Membership,
     Portfolio,
     Project,
+    ProjectScopedEntity,
     ProjectTemplate,
     ResourceConfig,
     ResourceState,
@@ -48,31 +38,49 @@ from .models import (
     Team,
     TeamMembership,
     TimePeriod,
+    TopLevelEntity,
     TOMBSTONE,
     User,
     Workspace,
+    WorkspaceScopedEntity,
 )
 
 
-# (fetch_fn, model_class, key_field, display_name)
-SNAPSHOT_RESOURCES = [
-    (fetch_workspaces, Workspace, "/gid", "Workspaces"),
-    (fetch_users, User, "/gid", "Users"),
-    (fetch_teams, Team, "/gid", "Teams"),
-    (fetch_projects, Project, "/gid", "Projects"),
-    (fetch_sections, Section, "/gid", "Sections"),
-    (fetch_tags, Tag, "/gid", "Tags"),
-    (fetch_portfolios, Portfolio, "/gid", "Portfolios"),
-    (fetch_goals, Goal, "/gid", "Goals"),
-    (fetch_custom_fields, CustomField, "/gid", "CustomFields"),
-    (fetch_time_periods, TimePeriod, "/gid", "TimePeriods"),
-    (fetch_project_templates, ProjectTemplate, "/gid", "ProjectTemplates"),
-    (fetch_status_updates, StatusUpdate, "/gid", "StatusUpdates"),
-    (fetch_attachments, Attachment, "/gid", "Attachments"),
-    (fetch_stories, Story, "/gid", "Stories"),
-    (fetch_memberships, Membership, "/gid", "Memberships"),
-    (fetch_team_memberships, TeamMembership, "/gid", "TeamMemberships"),
+# Models whose snapshots use the standard scope-based generic fetch.
+SNAPSHOT_MODELS = [
+    Workspace,
+    User,
+    Team,
+    Project,
+    Tag,
+    Portfolio,
+    Goal,
+    CustomField,
+    TimePeriod,
+    ProjectTemplate,
+    Section,
+    StatusUpdate,
+    Attachment,
+    Membership,
 ]
+
+# Models with multi-level iteration that need dedicated fetch functions.
+SNAPSHOT_CUSTOM_FETCHERS: dict[str, Any] = {
+    "TeamMemberships": fetch_team_memberships,
+    "Stories": fetch_stories,
+}
+
+
+def _get_snapshot_fetcher(model, http, config):
+    """Return a snapshot fetch partial for a model based on its scope type."""
+    if issubclass(model, TopLevelEntity):
+        return functools.partial(fetch_top_level, model, http, config)
+    elif issubclass(model, WorkspaceScopedEntity):
+        return functools.partial(fetch_workspace_scoped, model, http, config)
+    elif issubclass(model, ProjectScopedEntity):
+        return functools.partial(fetch_project_scoped, model, http, config)
+    else:
+        raise ValueError(f"Unknown entity scope for {model}")
 
 
 async def all_resources(
@@ -82,8 +90,6 @@ async def all_resources(
 ) -> list[common.Resource]:
     """Build list of all available resources."""
     base_url = config.advanced.base_url.rstrip("/")
-
-    # --- Snapshot binding opener ---
 
     def open_snapshot_binding(
         fetch_fn: Any,
@@ -98,12 +104,64 @@ async def all_resources(
             binding_index,
             state,
             task,
-            fetch_snapshot=functools.partial(fetch_fn, http, config),
+            fetch_snapshot=fetch_fn,
             tombstone=TOMBSTONE,
         )
 
-    # --- Tasks: sync-token incremental, one subtask per project ---
-    # Fetch all projects to build per-project dicts for fetch_page and fetch_changes.
+    # --- Build snapshot resources from models ---
+
+    resources: list[common.Resource] = []
+
+    for model in SNAPSHOT_MODELS:
+        fetcher = _get_snapshot_fetcher(model, http, config)
+        resources.append(
+            common.Resource(
+                name=model.resource_name,
+                key=["/gid"],
+                model=model,
+                open=functools.partial(open_snapshot_binding, fetcher),
+                initial_state=ResourceState(
+                    snapshot=ResourceState.Snapshot(
+                        updated_at=datetime.min.replace(tzinfo=UTC),
+                        last_count=0,
+                        last_digest="",
+                    )
+                ),
+                initial_config=ResourceConfig(
+                    name=model.resource_name,
+                    interval=timedelta(minutes=5),
+                ),
+                schema_inference=True,
+            )
+        )
+
+    # --- Custom-fetched snapshot resources ---
+
+    for name, fetch_fn in SNAPSHOT_CUSTOM_FETCHERS.items():
+        model = TeamMembership if name == "TeamMemberships" else Story
+        fetcher = functools.partial(fetch_fn, http, config)
+        resources.append(
+            common.Resource(
+                name=name,
+                key=["/gid"],
+                model=model,
+                open=functools.partial(open_snapshot_binding, fetcher),
+                initial_state=ResourceState(
+                    snapshot=ResourceState.Snapshot(
+                        updated_at=datetime.min.replace(tzinfo=UTC),
+                        last_count=0,
+                        last_digest="",
+                    )
+                ),
+                initial_config=ResourceConfig(
+                    name=name,
+                    interval=timedelta(minutes=5),
+                ),
+                schema_inference=True,
+            )
+        )
+
+    # --- Tasks: per-project incremental via events API ---
 
     projects = await _collect_projects(http, config, log)
 
@@ -141,33 +199,6 @@ async def all_resources(
             tombstone=TOMBSTONE,
         )
 
-    # --- Build resource list ---
-
-    resources: list[common.Resource] = []
-
-    for fetch_fn, model_class, key_field, name in SNAPSHOT_RESOURCES:
-        resources.append(
-            common.Resource(
-                name=name,
-                key=[key_field],
-                model=model_class,
-                open=functools.partial(open_snapshot_binding, fetch_fn),
-                initial_state=ResourceState(
-                    snapshot=ResourceState.Snapshot(
-                        updated_at=datetime.min.replace(tzinfo=UTC),
-                        last_count=0,
-                        last_digest="",
-                    )
-                ),
-                initial_config=ResourceConfig(
-                    name=name,
-                    interval=timedelta(minutes=5),
-                ),
-                schema_inference=True,
-            )
-        )
-
-    # Tasks resource: per-project incremental via events API
     resources.append(
         common.Resource(
             name="Tasks",
@@ -175,9 +206,9 @@ async def all_resources(
             model=AsanaTask,
             open=open_tasks_binding,
             initial_state=ResourceState(
-            inc=task_initial_inc,
-            backfill=task_initial_backfill,
-        ),
+                inc=task_initial_inc,
+                backfill=task_initial_backfill,
+            ),
             initial_config=ResourceConfig(
                 name="Tasks",
                 interval=timedelta(minutes=1),

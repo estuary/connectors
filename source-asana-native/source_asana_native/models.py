@@ -1,7 +1,6 @@
 """Pydantic models for Asana source connector."""
 
-from abc import ABCMeta
-from datetime import UTC, datetime, timedelta
+from abc import ABCMeta, abstractmethod
 from typing import Annotated, ClassVar
 
 from estuary_cdk.capture.common import (
@@ -10,9 +9,11 @@ from estuary_cdk.capture.common import (
     ResourceState,
     ConnectorState as GenericConnectorState,
 )
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import BaseModel, Field
 
 ConnectorState = GenericConnectorState[ResourceState]
+
+API_PAGE_LIMIT = 100
 
 
 class EndpointConfig(BaseModel):
@@ -61,98 +62,193 @@ class AsanaPageMeta(BaseModel, extra="allow"):
     next_page: NextPage | None = None
 
 
-# --- Base entity ---
+# =============================================================================
+# Entity Base Classes
+# =============================================================================
 
 class BaseEntity(BaseDocument, extra="allow", metaclass=ABCMeta):
     """Base for all Asana entities. Uses gid as primary key."""
+    resource_name: ClassVar[str]
     gid: str
 
 
-# --- Workspace-scoped resources ---
-# Fetched by iterating over all workspaces the authenticated user belongs to.
+class TopLevelEntity(BaseEntity, metaclass=ABCMeta):
+    """Entity fetched from a top-level API endpoint (no parent scope)."""
+    api_path: ClassVar[str]
 
-class Workspace(BaseEntity):
-    pass
-
-
-class User(BaseEntity):
-    pass
+    @classmethod
+    def get_url(cls, base_url: str) -> str:
+        return f"{base_url}/{cls.api_path}?limit={API_PAGE_LIMIT}"
 
 
-class Team(BaseEntity):
-    pass
+class WorkspaceScopedEntity(BaseEntity, metaclass=ABCMeta):
+    """Entity fetched by iterating over workspaces."""
+    api_path: ClassVar[str]
+    tolerated_errors: ClassVar[frozenset[int]] = frozenset()
+    deduplicate: ClassVar[bool] = False
+
+    @classmethod
+    def get_url(cls, base_url: str, ws_gid: str) -> str:
+        return f"{base_url}/{cls.api_path}?workspace={ws_gid}&limit={API_PAGE_LIMIT}"
 
 
-class Project(BaseEntity):
-    pass
+class ProjectScopedEntity(BaseEntity, metaclass=ABCMeta):
+    """Entity fetched by iterating over projects."""
+    api_path: ClassVar[str]
+    tolerated_errors: ClassVar[frozenset[int]] = frozenset()
+
+    @classmethod
+    def get_url(cls, base_url: str, project_gid: str) -> str:
+        return f"{base_url}/{cls.api_path}?parent={project_gid}&limit={API_PAGE_LIMIT}"
 
 
-class Tag(BaseEntity):
-    pass
+# =============================================================================
+# Top-Level Entities
+# =============================================================================
+
+class Workspace(TopLevelEntity):
+    resource_name: ClassVar[str] = "Workspaces"
+    api_path: ClassVar[str] = "workspaces"
 
 
-class Portfolio(BaseEntity):
-    pass
+# =============================================================================
+# Workspace-Scoped Entities
+# =============================================================================
+
+class User(WorkspaceScopedEntity):
+    resource_name: ClassVar[str] = "Users"
+    api_path: ClassVar[str] = "users"
+    deduplicate: ClassVar[bool] = True
 
 
-class Goal(BaseEntity):
-    pass
+class Team(WorkspaceScopedEntity):
+    resource_name: ClassVar[str] = "Teams"
+    api_path: ClassVar[str] = "teams"
+    tolerated_errors: ClassVar[frozenset[int]] = frozenset({403, 404})
+
+    @classmethod
+    def get_url(cls, base_url: str, ws_gid: str) -> str:
+        return f"{base_url}/organizations/{ws_gid}/teams?limit={API_PAGE_LIMIT}"
 
 
-class CustomField(BaseEntity):
-    pass
+class Project(WorkspaceScopedEntity):
+    resource_name: ClassVar[str] = "Projects"
+    api_path: ClassVar[str] = "projects"
+
+    @classmethod
+    def get_url(cls, base_url: str, ws_gid: str) -> str:
+        return f"{base_url}/projects?workspace={ws_gid}&limit={API_PAGE_LIMIT}&archived=false"
 
 
-class TimePeriod(BaseEntity):
-    pass
+class Tag(WorkspaceScopedEntity):
+    resource_name: ClassVar[str] = "Tags"
+    api_path: ClassVar[str] = "tags"
 
 
-class ProjectTemplate(BaseEntity):
-    pass
+class Portfolio(WorkspaceScopedEntity):
+    resource_name: ClassVar[str] = "Portfolios"
+    api_path: ClassVar[str] = "portfolios"
+    tolerated_errors: ClassVar[frozenset[int]] = frozenset({402})
+
+    @classmethod
+    def get_url(cls, base_url: str, ws_gid: str) -> str:
+        return f"{base_url}/portfolios?workspace={ws_gid}&owner=me&limit={API_PAGE_LIMIT}"
 
 
-# --- Project-scoped resources ---
-# Fetched by iterating over all projects.
-
-class Task(BaseEntity):
-    pass
-
-
-class Section(BaseEntity):
-    pass
+class Goal(WorkspaceScopedEntity):
+    resource_name: ClassVar[str] = "Goals"
+    api_path: ClassVar[str] = "goals"
+    tolerated_errors: ClassVar[frozenset[int]] = frozenset({402})
 
 
-class StatusUpdate(BaseEntity):
-    pass
+class CustomField(WorkspaceScopedEntity):
+    resource_name: ClassVar[str] = "CustomFields"
+    api_path: ClassVar[str] = "custom_fields"
+    tolerated_errors: ClassVar[frozenset[int]] = frozenset({402})
+
+    @classmethod
+    def get_url(cls, base_url: str, ws_gid: str) -> str:
+        return f"{base_url}/workspaces/{ws_gid}/custom_fields?limit={API_PAGE_LIMIT}"
 
 
-class Attachment(BaseEntity):
-    pass
+class TimePeriod(WorkspaceScopedEntity):
+    resource_name: ClassVar[str] = "TimePeriods"
+    api_path: ClassVar[str] = "time_periods"
 
 
-# --- Task-scoped resources ---
-
-class Story(BaseEntity):
-    pass
-
-
-# --- Membership resources ---
-
-class Membership(BaseEntity):
-    pass
+class ProjectTemplate(WorkspaceScopedEntity):
+    resource_name: ClassVar[str] = "ProjectTemplates"
+    api_path: ClassVar[str] = "project_templates"
+    tolerated_errors: ClassVar[frozenset[int]] = frozenset({400, 402})
 
 
-class TeamMembership(BaseEntity):
-    pass
+# =============================================================================
+# Project-Scoped Entities
+# =============================================================================
+
+class Task(ProjectScopedEntity):
+    resource_name: ClassVar[str] = "Tasks"
+    api_path: ClassVar[str] = "tasks"
+
+    @classmethod
+    def get_url(cls, base_url: str, project_gid: str) -> str:
+        return f"{base_url}/tasks?project={project_gid}&limit={API_PAGE_LIMIT}"
+
+
+class Section(ProjectScopedEntity):
+    resource_name: ClassVar[str] = "Sections"
+    api_path: ClassVar[str] = "sections"
+
+    @classmethod
+    def get_url(cls, base_url: str, project_gid: str) -> str:
+        return f"{base_url}/projects/{project_gid}/sections?limit={API_PAGE_LIMIT}"
+
+
+class StatusUpdate(ProjectScopedEntity):
+    resource_name: ClassVar[str] = "StatusUpdates"
+    api_path: ClassVar[str] = "status_updates"
+    tolerated_errors: ClassVar[frozenset[int]] = frozenset({403, 404})
+
+
+class Attachment(ProjectScopedEntity):
+    resource_name: ClassVar[str] = "Attachments"
+    api_path: ClassVar[str] = "attachments"
+    tolerated_errors: ClassVar[frozenset[int]] = frozenset({403, 404})
+
+
+class Story(ProjectScopedEntity):
+    """Stories are task-scoped but modeled as project-scoped with custom fetch logic."""
+    resource_name: ClassVar[str] = "Stories"
+    api_path: ClassVar[str] = "stories"
+
+    @classmethod
+    def get_url(cls, base_url: str, task_gid: str) -> str:
+        return f"{base_url}/tasks/{task_gid}/stories?limit={API_PAGE_LIMIT}"
+
+
+class Membership(ProjectScopedEntity):
+    resource_name: ClassVar[str] = "Memberships"
+    api_path: ClassVar[str] = "memberships"
+    tolerated_errors: ClassVar[frozenset[int]] = frozenset({403, 404})
+
+
+class TeamMembership(WorkspaceScopedEntity):
+    """Team memberships require iterating workspace → teams → memberships."""
+    resource_name: ClassVar[str] = "TeamMemberships"
+    api_path: ClassVar[str] = "team_memberships"
+    tolerated_errors: ClassVar[frozenset[int]] = frozenset({403, 404})
+
+    @classmethod
+    def get_url(cls, base_url: str, team_gid: str) -> str:
+        return f"{base_url}/team_memberships?team={team_gid}&limit={API_PAGE_LIMIT}"
 
 
 # --- Sync-token models ---
-# For Asana's Events API: change notifications with opaque sync tokens.
 
 class ChangeEvent(BaseModel, extra="allow"):
     """A change notification from GET /events."""
-    resource: dict  # {"gid": str, "resource_type": str}
-    action: str     # "created", "changed", "deleted", "added", "removed"
+    resource: dict
+    action: str
 
 
 class SyncTokenResponse(BaseModel, extra="allow"):
