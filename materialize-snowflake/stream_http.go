@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"path"
@@ -321,7 +322,7 @@ func (s *streamClient) channelStatus(ctx context.Context, clientSeq int, schema,
 	} else if err := getErrorByCode(res.StatusCode); err != nil {
 		return nil, fmt.Errorf("request was not successful: %w", err)
 	} else if res.Message != "Success" {
-		return nil, fmt.Errorf("unexpected response message: %s", res.Message)
+		return nil, fmt.Errorf("unexpected response message: %q", res.Message)
 	}
 
 	for _, channel := range res.Channels {
@@ -339,7 +340,9 @@ func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, 
 	ts := time.Now()
 	for n := 1; ; n++ {
 		if status, err := s.channelStatus(ctx, clientSeq, schema, table, name); err != nil {
-			return err
+			if !errors.Is(err, ErrTemporary) {
+				return err
+			}
 		} else if len(status.Channels) != 1 {
 			return fmt.Errorf("expected 1 channel but got %d", len(status.Channels))
 		} else if status.Channels[0].PersistedOffsetToken == token {
@@ -461,13 +464,28 @@ var streamingIngestResponseCodes = map[int]string{
 	55: "Snowpipe Streaming does not support columns of type AUTOINCREMENT, IDENTITY, GEO, or columns with a default value or collation",
 }
 
+var ErrTemporary = errors.New("temporary error")
+var ErrPermanent = errors.New("permanent error")
+
+func errorCategory(code int) error {
+	if code == 10 {
+		return ErrTemporary
+	}
+	return ErrPermanent
+}
+
 type streamingApiError struct {
-	Code    int    `json:"status_code"`
-	Message string `json:"message"`
+	Code        int    `json:"status_code"`
+	Message     string `json:"message"`
+	ErrCategory error
 }
 
 func (e *streamingApiError) Error() string {
 	return fmt.Sprintf("%s (code %d)", e.Message, e.Code)
+}
+
+func (e *streamingApiError) Unwrap() error {
+	return e.ErrCategory
 }
 
 func getErrorByCode(code int) error {
@@ -476,7 +494,11 @@ func getErrorByCode(code int) error {
 	}
 
 	if msg, ok := streamingIngestResponseCodes[code]; ok {
-		return &streamingApiError{Code: code, Message: msg}
+		return &streamingApiError{
+			Code:        code,
+			Message:     msg,
+			ErrCategory: errorCategory(code),
+		}
 	}
 
 	return fmt.Errorf("unknown status message for code %d", code)
