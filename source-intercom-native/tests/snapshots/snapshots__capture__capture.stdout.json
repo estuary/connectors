@@ -152,7 +152,6 @@
       "created_at": 1733757892,
       "custom_attributes": {},
       "email": "alexb@estuary.dev",
-      "enabled_push_messaging": null,
       "external_id": null,
       "has_hard_bounced": false,
       "id": "67570bc4f8bbaf49f9287fc9",
@@ -291,30 +290,22 @@
       "_meta": {
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "app_package_code": null,
       "assigned_to": null,
       "attachments": [],
       "author": {
         "email": "alexb@estuary.dev",
-        "from_ai_agent": false,
         "id": "7939621",
-        "is_ai_answer": false,
         "name": "Alex Bair",
         "type": "admin"
       },
       "body": "<p class=\"no-margin\">Hello</p>",
       "conversation_id": "1",
       "created_at": 1734097565,
-      "email_message_metadata": null,
-      "event_details": {},
       "external_id": null,
       "id": "1",
-      "metadata": {},
       "notified_at": 1734097565,
       "part_type": "comment",
       "redacted": false,
-      "state": "open",
-      "tags": [],
       "type": "conversation_part",
       "updated_at": 1734097565
     }
@@ -327,7 +318,6 @@
       },
       "admin_assignee_id": "7939621",
       "category": "Tracker",
-      "channel": "messenger",
       "contacts": {
         "contacts": [],
         "type": "contact.list"
@@ -411,13 +401,9 @@
         "total_count": 3,
         "type": "ticket_part.list"
       },
-      "ticket_state": {
-        "category": "in_progress",
-        "external_label": "In progress",
-        "id": "2",
-        "internal_label": "In progress",
-        "type": "ticket_state"
-      },
+      "ticket_state": "in_progress",
+      "ticket_state_external_label": "In progress",
+      "ticket_state_internal_label": "In progress",
       "ticket_type": {
         "archived": false,
         "category": "Tracker",
@@ -573,7 +559,6 @@
       "admin_assignee_id": null,
       "ai_agent": null,
       "ai_agent_participated": false,
-      "company": null,
       "contacts": {
         "contacts": [
           {
@@ -613,7 +598,6 @@
         "body": "",
         "delivered_as": "admin_initiated",
         "id": "1",
-        "recipients": null,
         "redacted": false,
         "subject": "",
         "type": null,
@@ -621,8 +605,6 @@
       },
       "state": "open",
       "statistics": {
-        "assigned_team_first_response_time": [],
-        "assigned_team_first_response_time_in_office_hours": [],
         "count_assignments": 0,
         "count_conversation_parts": 11,
         "count_reopens": 0,
@@ -630,7 +612,6 @@
         "first_assignment_at": null,
         "first_close_at": null,
         "first_contact_reply_at": null,
-        "handling_time": null,
         "last_admin_reply_at": null,
         "last_assignment_admin_reply_at": null,
         "last_assignment_at": null,

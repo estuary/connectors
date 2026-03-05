@@ -28,6 +28,7 @@ from .api import (
     fetch_companies,
     fetch_company_segments,
     API,
+    API_VERSION_HEADER,
 )
 
 
@@ -77,9 +78,10 @@ async def validate_credentials(
     http.token_source = TokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials)
     url = f"{API}/data_attributes"
     params = {"model": "contact"}
+    headers = {API_VERSION_HEADER: config.advanced.api_version}
 
     try:
-        await http.request(log, url, params=params)
+        await http.request(log, url, params=params, headers=headers)
     except HTTPError as err:
         msg = 'Unknown error occurred.'
         if err.code == 401:
@@ -115,6 +117,7 @@ def full_refresh_resources(
                 path,
                 response_field,
                 query_param,
+                config.advanced.api_version,
             ),
             tombstone=IntercomResource(_meta=IntercomResource.Meta(op="d"))
         )
@@ -158,6 +161,7 @@ def incremental_resources(
                 fetch_fn,
                 http,
                 config.advanced.search_page_size,
+                config.advanced.api_version,
             )
         )
 
@@ -203,6 +207,7 @@ def incremental_date_window_resources(
                 http,
                 config.advanced.window_size,
                 config.advanced.search_page_size,
+                config.advanced.api_version,
             )
         )
 
@@ -246,6 +251,7 @@ def client_side_filtered_resources(
             fetch_changes=functools.partial(
                 fetch_fn,
                 http,
+                config.advanced.api_version,
             )
         )
 
@@ -290,6 +296,7 @@ def company_resources(
                 fetch_fn,
                 http,
                 config.advanced.use_companies_list_endpoint,
+                config.advanced.api_version,
             )
         )
 

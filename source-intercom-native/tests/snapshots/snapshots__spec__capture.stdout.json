@@ -45,6 +45,12 @@
               "maximum": 150,
               "title": "Search Streams' Page Size",
               "type": "integer"
+            },
+            "api_version": {
+              "description": "The Intercom API version used for requests. Defaults to '2.11'.",
+              "pattern": "^\\d+\\.\\d+$",
+              "title": "API Version",
+              "type": "string"
             }
           },
           "title": "Advanced",
