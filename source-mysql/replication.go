@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/go/mysql/jsonpath"
@@ -145,6 +146,9 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 		if streamer, err = syncer.StartSync(pos); err == nil {
 			logrus.Info("replication connected without TLS")
 		} else {
+			if userErr := wrapMySQLReplicationError(err); userErr != nil {
+				return nil, userErr
+			}
 			return nil, fmt.Errorf("error starting binlog sync: %w", err)
 		}
 	}
@@ -177,6 +181,29 @@ func parseCursor(cursor string) (mysql.Position, error) {
 		Name: seps[0],
 		Pos:  uint32(offset),
 	}, nil
+}
+
+// wrapMySQLReplicationError checks if an error is a known MySQL replication error and returns
+// a user-friendly error message if so. Returns nil if the error is not a known replication error.
+func wrapMySQLReplicationError(err error) error {
+	var mysqlErr *mysql.MyError
+	if !errors.As(err, &mysqlErr) {
+		return nil
+	}
+	if mysqlErr.Code == 1236 {
+		msg := mysqlErr.Message
+		switch {
+		case strings.Contains(msg, "Could not find first log file name"):
+			return cerrors.NewUserError(err, "the MySQL binary logs that this capture was tracking have been purged and replication cannot resume. This typically happens when binlog retention is too short (we recommend 7 days or more), binary logging was disabled and re-enabled, or the database was restored from a snapshot. To recover, trigger a backfill of all capture bindings.")
+		case strings.Contains(msg, "max_allowed_packet"):
+			return cerrors.NewUserError(err, "a binlog event exceeded the server's max_allowed_packet size limit. Increase the max_allowed_packet setting on the MySQL server, then trigger a backfill of all capture bindings to skip past the problematic event.")
+		case strings.Contains(msg, "position > file size"):
+			return cerrors.NewUserError(err, "the capture's replication cursor points to a position beyond the end of the binlog file. This usually means the MySQL server was replaced, restored from a snapshot, or experienced binlog corruption. To recover, trigger a backfill of all capture bindings.")
+		default:
+			return cerrors.NewUserError(err, fmt.Sprintf("MySQL replication error: %s. To recover, trigger a backfill of all capture bindings.", msg))
+		}
+	}
+	return nil
 }
 
 func unmarshalJSONString(bs json.RawMessage) (string, error) {
@@ -308,6 +335,9 @@ func (rs *mysqlReplicationStream) run(ctx context.Context, startCursor mysql.Pos
 		// Process the next binlog event from the database.
 		var event, err = rs.streamer.GetEvent(ctx)
 		if err != nil {
+			if userErr := wrapMySQLReplicationError(err); userErr != nil {
+				return userErr
+			}
 			return fmt.Errorf("error getting next event: %w", err)
 		}
 
