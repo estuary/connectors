@@ -170,13 +170,6 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 
 	var slot, publication = db.config.Advanced.SlotName, db.config.Advanced.PublicationName
 
-	// Obtain the current WAL flush location on the server. We will need this either to
-	// initialize our cursor or to sanity-check it.
-	serverFlushLSN, err := queryLatestServerLSN(ctx, db.conn)
-	if err != nil {
-		return nil, err
-	}
-
 	var startLSN pglogrepl.LSN
 	if startCursor != "" {
 		// Parse the cursor into an LSN value
@@ -192,6 +185,10 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		// which includes situations like "DB version upgrade")
 		//
 		// TODO(wgd): Upgrade this check to an actual failure once it's been verified to work in prod.
+		serverFlushLSN, err := queryLatestServerLSN(ctx, db.conn)
+		if err != nil {
+			return nil, err
+		}
 		if startLSN > serverFlushLSN {
 			logrus.WithFields(logrus.Fields{
 				"resumeLSN": startLSN.String(),
@@ -219,6 +216,10 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		}
 
 		// Initialize our start LSN to the current server flush LSN.
+		serverFlushLSN, err := queryLatestServerLSN(ctx, db.conn)
+		if err != nil {
+			return nil, err
+		}
 		startLSN = serverFlushLSN
 	}
 
