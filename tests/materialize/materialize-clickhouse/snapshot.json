@@ -1,0 +1,798 @@
+[
+  "applied.actionDescription",
+  "\nCREATE TABLE IF NOT EXISTS simple (\n\t\t`id` Int64,\n\t\tcanary Nullable(String),\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`);\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_standard (\n\t\t`id` Int64,\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\tint Nullable(Int64),\n\t\tstr Nullable(String),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`);\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_delta (\n\t\t`id` Int64,\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\tint Nullable(Int64),\n\t\tstr Nullable(String)\n)\nENGINE = MergeTree()\nORDER BY (`id`);\n\n\nCREATE TABLE IF NOT EXISTS duplicate_keys_delta_exclude_flow_doc (\n\t\t`id` Int64,\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\tint Nullable(Int64),\n\t\tstr Nullable(String)\n)\nENGINE = MergeTree()\nORDER BY (`id`);\n\n\nCREATE TABLE IF NOT EXISTS multiple_types (\n\t\t`id` Int64,\n\t\tarray_int Nullable(String),\n\t\tbinary_field Nullable(String),\n\t\tbool_field Nullable(Bool),\n\t\tfloat_field Nullable(Float64),\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\tmultiple Nullable(String),\n\t\tnested Nullable(String),\n\t\tnullable_int Nullable(Int64),\n\t\tstr_field Nullable(String),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`);\n\n\nCREATE TABLE IF NOT EXISTS formatted_strings (\n\t\t`id` Int64,\n\t\t`date` Nullable(Date32),\n\t\tdatetime Nullable(DateTime64(6, 'UTC')),\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\tint_and_str Nullable(String),\n\t\tint_str Nullable(String),\n\t\tnum_and_str Nullable(Float64),\n\t\tnum_str Nullable(Float64),\n\t\ttime Nullable(String),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`);\n\n\nCREATE TABLE IF NOT EXISTS long_string (\n\t\t`id` String,\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\tstr_field Nullable(String),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`);\n\n\nCREATE TABLE IF NOT EXISTS unsigned_bigint (\n\t\t`id` Int64,\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\tunsigned_bigint Nullable(String),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`);\n\n\nCREATE TABLE IF NOT EXISTS deletions (\n\t\t`id` Int64,\n\t\t`_meta/op` Nullable(String),\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`);\n\n\nCREATE TABLE IF NOT EXISTS all_key_types_part_one (\n\t\t`id` Int64,\n\t\tstrintkey String,\n\t\tstrnumkey String,\n\t\tcounter Nullable(Int64),\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\tstrint Nullable(String),\n\t\tstrnum Nullable(Float64),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`, strintkey, strnumkey);\n\n\nCREATE TABLE IF NOT EXISTS all_key_types_part_two (\n\t\t`id` Int64,\n\t\tdatekey Date32,\n\t\ttimekey String,\n\t\tcounter Nullable(Int64),\n\t\t`date` Nullable(Date32),\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\ttime Nullable(String),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`, datekey, timekey);\n\n\nCREATE TABLE IF NOT EXISTS all_key_types_part_three (\n\t\t`id` Int64,\n\t\tdatetimekey DateTime64(6, 'UTC'),\n\t\tuuidkey String,\n\t\tcounter Nullable(Int64),\n\t\tdatetime Nullable(DateTime64(6, 'UTC')),\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\t`uuid` Nullable(String),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`, datetimekey, uuidkey);\n\n\nCREATE TABLE IF NOT EXISTS fields_with_projections (\n\t\t`id` Int64,\n\t\tanother_field Nullable(String),\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\tprojected_another Nullable(String),\n\t\tprojected_field Nullable(String),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`);\n\n\nCREATE TABLE IF NOT EXISTS many_columns (\n\t\t`id` Int64,\n\t\ta0 Nullable(Int64),\n\t\ta1 Nullable(Int64),\n\t\ta10 Nullable(Int64),\n\t\ta11 Nullable(Int64),\n\t\ta12 Nullable(Int64),\n\t\ta13 Nullable(Int64),\n\t\ta14 Nullable(Int64),\n\t\ta15 Nullable(Int64),\n\t\ta16 Nullable(Int64),\n\t\ta17 Nullable(Int64),\n\t\ta18 Nullable(Int64),\n\t\ta19 Nullable(Int64),\n\t\ta2 Nullable(Int64),\n\t\ta20 Nullable(Int64),\n\t\ta21 Nullable(Int64),\n\t\ta22 Nullable(Int64),\n\t\ta23 Nullable(Int64),\n\t\ta24 Nullable(Int64),\n\t\ta25 Nullable(Int64),\n\t\ta26 Nullable(Int64),\n\t\ta27 Nullable(Int64),\n\t\ta28 Nullable(Int64),\n\t\ta29 Nullable(Int64),\n\t\ta3 Nullable(Int64),\n\t\ta30 Nullable(Int64),\n\t\ta31 Nullable(Int64),\n\t\ta32 Nullable(Int64),\n\t\ta33 Nullable(Int64),\n\t\ta34 Nullable(Int64),\n\t\ta35 Nullable(Int64),\n\t\ta36 Nullable(Int64),\n\t\ta37 Nullable(Int64),\n\t\ta38 Nullable(Int64),\n\t\ta39 Nullable(Int64),\n\t\ta4 Nullable(Int64),\n\t\ta40 Nullable(Int64),\n\t\ta41 Nullable(Int64),\n\t\ta42 Nullable(Int64),\n\t\ta43 Nullable(Int64),\n\t\ta44 Nullable(Int64),\n\t\ta45 Nullable(Int64),\n\t\ta46 Nullable(Int64),\n\t\ta47 Nullable(Int64),\n\t\ta48 Nullable(Int64),\n\t\ta49 Nullable(Int64),\n\t\ta5 Nullable(Int64),\n\t\ta50 Nullable(Int64),\n\t\ta51 Nullable(Int64),\n\t\ta52 Nullable(Int64),\n\t\ta53 Nullable(Int64),\n\t\ta54 Nullable(Int64),\n\t\ta55 Nullable(Int64),\n\t\ta56 Nullable(Int64),\n\t\ta57 Nullable(Int64),\n\t\ta58 Nullable(Int64),\n\t\ta59 Nullable(Int64),\n\t\ta6 Nullable(Int64),\n\t\ta60 Nullable(Int64),\n\t\ta61 Nullable(Int64),\n\t\ta62 Nullable(Int64),\n\t\ta63 Nullable(Int64),\n\t\ta64 Nullable(Int64),\n\t\ta65 Nullable(Int64),\n\t\ta66 Nullable(Int64),\n\t\ta67 Nullable(Int64),\n\t\ta68 Nullable(Int64),\n\t\ta69 Nullable(Int64),\n\t\ta7 Nullable(Int64),\n\t\ta70 Nullable(Int64),\n\t\ta71 Nullable(Int64),\n\t\ta72 Nullable(Int64),\n\t\ta73 Nullable(Int64),\n\t\ta74 Nullable(Int64),\n\t\ta75 Nullable(Int64),\n\t\ta76 Nullable(Int64),\n\t\ta77 Nullable(Int64),\n\t\ta78 Nullable(Int64),\n\t\ta79 Nullable(Int64),\n\t\ta8 Nullable(Int64),\n\t\ta80 Nullable(Int64),\n\t\ta81 Nullable(Int64),\n\t\ta82 Nullable(Int64),\n\t\ta83 Nullable(Int64),\n\t\ta84 Nullable(Int64),\n\t\ta85 Nullable(Int64),\n\t\ta86 Nullable(Int64),\n\t\ta87 Nullable(Int64),\n\t\ta88 Nullable(Int64),\n\t\ta89 Nullable(Int64),\n\t\ta9 Nullable(Int64),\n\t\ta90 Nullable(Int64),\n\t\ta91 Nullable(Int64),\n\t\ta92 Nullable(Int64),\n\t\ta93 Nullable(Int64),\n\t\ta94 Nullable(Int64),\n\t\ta95 Nullable(Int64),\n\t\ta96 Nullable(Int64),\n\t\ta97 Nullable(Int64),\n\t\ta98 Nullable(Int64),\n\t\ta99 Nullable(Int64),\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`);\n\n\nCREATE TABLE IF NOT EXISTS timezone_datetimes_standard (\n\t\t`id` Int64,\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\toffset_datetime Nullable(DateTime64(6, 'UTC')),\n\t\tutc_datetime Nullable(DateTime64(6, 'UTC')),\n\t\tflow_document Nullable(String),\n\t\t`_version` UInt64,\n\t\t`_is_deleted` UInt8 DEFAULT 0\n)\nENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)\nORDER BY (`id`);\n\n\nCREATE TABLE IF NOT EXISTS timezone_datetimes_delta (\n\t\t`id` Int64,\n\t\tflow_published_at Nullable(DateTime64(6, 'UTC')),\n\t\toffset_datetime Nullable(DateTime64(6, 'UTC')),\n\t\tutc_datetime Nullable(DateTime64(6, 'UTC'))\n)\nENGINE = MergeTree()\nORDER BY (`id`);\n"
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {}
+]
+[
+  "connectorState",
+  {
+    "updated": {}
+  }
+]
+{
+  "rows": [
+    {
+      "canary": "roaches",
+      "flow_published_at": "1970-01-01 02:00:01.000000",
+      "id": "8"
+    },
+    {
+      "canary": "devilish",
+      "flow_published_at": "1970-01-01 02:00:02.000000",
+      "id": "9"
+    },
+    {
+      "canary": "glucose's",
+      "flow_published_at": "1970-01-01 02:00:03.000000",
+      "id": "10"
+    },
+    {
+      "canary": "amputation's",
+      "flow_published_at": "1970-01-01 01:00:00.000000",
+      "id": "1"
+    },
+    {
+      "canary": "armament's",
+      "flow_published_at": "1970-01-01 01:00:01.000000",
+      "id": "2"
+    },
+    {
+      "canary": "splatters",
+      "flow_published_at": "1970-01-01 01:00:02.000000",
+      "id": "3"
+    },
+    {
+      "canary": "strengthen",
+      "flow_published_at": "1970-01-01 01:00:03.000000",
+      "id": "4"
+    },
+    {
+      "canary": "Kringle's",
+      "flow_published_at": "1970-01-01 01:00:04.000000",
+      "id": "5"
+    },
+    {
+      "canary": "grosbeak's",
+      "flow_published_at": "1970-01-01 01:00:05.000000",
+      "id": "6"
+    },
+    {
+      "canary": "pieced",
+      "flow_published_at": "1970-01-01 02:00:00.000000",
+      "id": "7"
+    }
+  ],
+  "table": "simple"
+}
+{
+  "rows": [
+    {
+      "flow_published_at": "1970-01-01 03:00:01.000000",
+      "id": "7",
+      "int": "12",
+      "str": "str 12"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:02.000000",
+      "id": "8",
+      "int": "13",
+      "str": "str 13"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:03.000000",
+      "id": "9",
+      "int": "14",
+      "str": "str 14"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:04.000000",
+      "id": "10",
+      "int": "15",
+      "str": "str 15"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:04.000000",
+      "id": "1",
+      "int": "7",
+      "str": "str 6"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:05.000000",
+      "id": "2",
+      "int": "9",
+      "str": "str 7"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:06.000000",
+      "id": "3",
+      "int": "11",
+      "str": "str 8"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:07.000000",
+      "id": "4",
+      "int": "13",
+      "str": "str 9"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:08.000000",
+      "id": "5",
+      "int": "15",
+      "str": "str 10"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:00.000000",
+      "id": "6",
+      "int": "11",
+      "str": "str 11"
+    }
+  ],
+  "table": "duplicate_keys_standard"
+}
+{
+  "rows": [
+    {
+      "flow_published_at": "1970-01-01 02:00:04.000000",
+      "id": "1",
+      "int": "6",
+      "str": "str 6"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:05.000000",
+      "id": "2",
+      "int": "7",
+      "str": "str 7"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:06.000000",
+      "id": "3",
+      "int": "8",
+      "str": "str 8"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:07.000000",
+      "id": "4",
+      "int": "9",
+      "str": "str 9"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:08.000000",
+      "id": "5",
+      "int": "10",
+      "str": "str 10"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:00.000000",
+      "id": "6",
+      "int": "11",
+      "str": "str 11"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:01.000000",
+      "id": "7",
+      "int": "12",
+      "str": "str 12"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:02.000000",
+      "id": "8",
+      "int": "13",
+      "str": "str 13"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:03.000000",
+      "id": "9",
+      "int": "14",
+      "str": "str 14"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:04.000000",
+      "id": "10",
+      "int": "15",
+      "str": "str 15"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:06.000000",
+      "id": "1",
+      "int": "1",
+      "str": "str 1"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:07.000000",
+      "id": "2",
+      "int": "2",
+      "str": "str 2"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:08.000000",
+      "id": "3",
+      "int": "3",
+      "str": "str 3"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:09.000000",
+      "id": "4",
+      "int": "4",
+      "str": "str 4"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:10.000000",
+      "id": "5",
+      "int": "5",
+      "str": "str 5"
+    }
+  ],
+  "table": "duplicate_keys_delta"
+}
+{
+  "rows": [
+    {
+      "flow_published_at": "1970-01-01 03:00:00.000000",
+      "id": "6",
+      "int": "11",
+      "str": "str 11"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:01.000000",
+      "id": "7",
+      "int": "12",
+      "str": "str 12"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:02.000000",
+      "id": "8",
+      "int": "13",
+      "str": "str 13"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:03.000000",
+      "id": "9",
+      "int": "14",
+      "str": "str 14"
+    },
+    {
+      "flow_published_at": "1970-01-01 03:00:04.000000",
+      "id": "10",
+      "int": "15",
+      "str": "str 15"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:06.000000",
+      "id": "1",
+      "int": "1",
+      "str": "str 1"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:07.000000",
+      "id": "2",
+      "int": "2",
+      "str": "str 2"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:08.000000",
+      "id": "3",
+      "int": "3",
+      "str": "str 3"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:09.000000",
+      "id": "4",
+      "int": "4",
+      "str": "str 4"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:10.000000",
+      "id": "5",
+      "int": "5",
+      "str": "str 5"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:04.000000",
+      "id": "1",
+      "int": "6",
+      "str": "str 6"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:05.000000",
+      "id": "2",
+      "int": "7",
+      "str": "str 7"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:06.000000",
+      "id": "3",
+      "int": "8",
+      "str": "str 8"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:07.000000",
+      "id": "4",
+      "int": "9",
+      "str": "str 9"
+    },
+    {
+      "flow_published_at": "1970-01-01 02:00:08.000000",
+      "id": "5",
+      "int": "10",
+      "str": "str 10"
+    }
+  ],
+  "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "rows": [
+    {
+      "array_int": "[11,12]",
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 1.1,
+      "flow_published_at": "1970-01-01 01:00:13.000000",
+      "id": "1",
+      "multiple": "1",
+      "nested": "{\"id\":\"i1\"}",
+      "nullable_int": null,
+      "str_field": "str1"
+    },
+    {
+      "array_int": "[21,22]",
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 2.2,
+      "flow_published_at": "1970-01-01 01:00:14.000000",
+      "id": "2",
+      "multiple": "2.2",
+      "nested": "{\"id\":\"i2\"}",
+      "nullable_int": "2",
+      "str_field": "str2"
+    },
+    {
+      "array_int": "[31,32]",
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 3.3,
+      "flow_published_at": "1970-01-01 01:00:15.000000",
+      "id": "3",
+      "multiple": "true",
+      "nested": "{\"id\":\"i3\"}",
+      "nullable_int": null,
+      "str_field": "str3"
+    },
+    {
+      "array_int": "[41,42]",
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 4.4,
+      "flow_published_at": "1970-01-01 01:00:16.000000",
+      "id": "4",
+      "multiple": "false",
+      "nested": "{\"id\":\"i4\"}",
+      "nullable_int": "4",
+      "str_field": "str4"
+    },
+    {
+      "array_int": "[51,52]",
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 5.5,
+      "flow_published_at": "1970-01-01 01:00:17.000000",
+      "id": "5",
+      "multiple": "\"string five\"",
+      "nested": "{\"id\":\"i5\"}",
+      "nullable_int": null,
+      "str_field": "str5"
+    },
+    {
+      "array_int": "[61,62]",
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 66.66,
+      "flow_published_at": "1970-01-01 02:00:19.000000",
+      "id": "6",
+      "multiple": "[\"one\",2,true]",
+      "nested": "{\"id\":\"i6\"}",
+      "nullable_int": "6",
+      "str_field": "str6 v2"
+    },
+    {
+      "array_int": "[71,72]",
+      "binary_field": null,
+      "bool_field": false,
+      "float_field": 77.77,
+      "flow_published_at": "1970-01-01 02:00:20.000000",
+      "id": "7",
+      "multiple": "{\"object\":\"seven\"}",
+      "nested": "{\"id\":\"i7\"}",
+      "nullable_int": null,
+      "str_field": "str7 v2"
+    },
+    {
+      "array_int": "[81,82]",
+      "binary_field": null,
+      "bool_field": true,
+      "float_field": 88.88,
+      "flow_published_at": "1970-01-01 02:00:21.000000",
+      "id": "8",
+      "multiple": null,
+      "nested": "{\"id\":\"i8\"}",
+      "nullable_int": "8",
+      "str_field": "str8 v2"
+    },
+    {
+      "array_int": "[91,92]",
+      "binary_field": "YWxvaGEK",
+      "bool_field": false,
+      "float_field": 99.99,
+      "flow_published_at": "1970-01-01 02:00:22.000000",
+      "id": "9",
+      "multiple": null,
+      "nested": "{\"id\":\"i9\"}",
+      "nullable_int": null,
+      "str_field": "str9 v2"
+    },
+    {
+      "array_int": "[1,2]",
+      "binary_field": "c2F5xY1uYXJhCg==",
+      "bool_field": true,
+      "float_field": 1010.101,
+      "flow_published_at": "1970-01-01 02:00:23.000000",
+      "id": "10",
+      "multiple": null,
+      "nested": "{\"id\":\"i10\"}",
+      "nullable_int": "10",
+      "str_field": "str10 v2"
+    }
+  ],
+  "table": "multiple_types"
+}
+{
+  "rows": [
+    {
+      "date": "1900-01-01",
+      "datetime": "1925-01-01 00:00:00.000000",
+      "flow_published_at": "1970-01-01 01:00:11.000000",
+      "id": "3",
+      "int_and_str": "3",
+      "int_str": "30",
+      "num_and_str": 3.1,
+      "num_str": 30.1,
+      "time": "23:59:38.10Z"
+    },
+    {
+      "date": "2023-08-29",
+      "datetime": "2023-08-29 23:59:38.000000",
+      "flow_published_at": "1970-01-01 01:00:12.000000",
+      "id": "4",
+      "int_and_str": "4",
+      "int_str": "40",
+      "num_and_str": 4.1,
+      "num_str": 40.1,
+      "time": "23:59:38Z"
+    },
+    {
+      "date": "1900-01-01",
+      "datetime": "1925-01-01 00:00:00.000000",
+      "flow_published_at": "1970-01-01 02:00:13.000000",
+      "id": "1",
+      "int_and_str": "1",
+      "int_str": "10",
+      "num_and_str": 1.1,
+      "num_str": 10.1,
+      "time": "00:00:00Z"
+    },
+    {
+      "date": "1999-02-02",
+      "datetime": "1999-02-02 14:20:12.330000",
+      "flow_published_at": "1970-01-01 02:00:14.000000",
+      "id": "2",
+      "int_and_str": "2",
+      "int_str": "20",
+      "num_and_str": 2.1,
+      "num_str": 20.1,
+      "time": "14:20:12.33Z"
+    },
+    {
+      "date": "2299-12-31",
+      "datetime": "1900-01-01 00:00:00.066278",
+      "flow_published_at": "1970-01-01 02:00:15.000000",
+      "id": "5",
+      "int_and_str": "5",
+      "int_str": "50",
+      "num_and_str": 5.1,
+      "num_str": 50.1,
+      "time": "23:59:59Z"
+    },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_published_at": "1970-01-01 02:00:16.000000",
+      "id": "8",
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": null,
+      "time": null
+    },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_published_at": "1970-01-01 02:00:17.000000",
+      "id": "9",
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": null,
+      "time": null
+    },
+    {
+      "date": null,
+      "datetime": null,
+      "flow_published_at": "1970-01-01 02:00:18.000000",
+      "id": "10",
+      "int_and_str": null,
+      "int_str": null,
+      "num_and_str": null,
+      "num_str": null,
+      "time": null
+    }
+  ],
+  "table": "formatted_strings"
+}
+{
+  "rows": [
+    {
+      "flow_published_at": "1970-01-01 02:00:24.000000",
+      "id": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru.",
+      "str_field": "very long string that exceeds 256 characters to test if dynamic sizing of varchar fields works. Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostru."
+    }
+  ],
+  "table": "long_string"
+}
+{
+  "rows": [
+    {
+      "flow_published_at": "1970-01-01 01:00:28.000000",
+      "id": "1",
+      "unsigned_bigint": "18446744073709551615"
+    }
+  ],
+  "table": "unsigned_bigint"
+}
+{
+  "rows": [
+    {
+      "_meta/op": "u",
+      "flow_published_at": "1970-01-01 02:00:26.000000",
+      "id": "2"
+    },
+    {
+      "_meta/op": "c",
+      "flow_published_at": "1970-01-01 02:00:27.000000",
+      "id": "3"
+    }
+  ],
+  "table": "deletions"
+}
+{
+  "rows": [
+    {
+      "counter": "2",
+      "flow_published_at": "1970-01-01 02:00:32.000000",
+      "id": "1",
+      "strint": "1",
+      "strintkey": "1",
+      "strnum": 10.1,
+      "strnumkey": "10.1"
+    }
+  ],
+  "table": "all_key_types_part_one"
+}
+{
+  "rows": [
+    {
+      "counter": "2",
+      "date": "1900-01-01",
+      "datekey": "1900-01-01",
+      "flow_published_at": "1970-01-01 02:00:33.000000",
+      "id": "1",
+      "time": "12:34:56Z",
+      "timekey": "12:34:56Z"
+    }
+  ],
+  "table": "all_key_types_part_two"
+}
+{
+  "rows": [
+    {
+      "counter": "2",
+      "datetime": "1925-01-01 00:00:00.000000",
+      "datetimekey": "1925-01-01 00:00:00.000000",
+      "flow_published_at": "1970-01-01 02:00:34.000000",
+      "id": "1",
+      "uuid": "550e8400-e29b-41d4-a716-446655440000",
+      "uuidkey": "550e8400-e29b-41d4-a716-446655440000"
+    }
+  ],
+  "table": "all_key_types_part_three"
+}
+{
+  "rows": [
+    {
+      "another_field": "another_updated",
+      "flow_published_at": "1970-01-01 02:00:35.000000",
+      "id": "1",
+      "projected_another": "another_updated",
+      "projected_field": "updated_value"
+    }
+  ],
+  "table": "fields_with_projections"
+}
+{
+  "rows": [
+    {
+      "a0": "100",
+      "a1": "101",
+      "a10": null,
+      "a11": null,
+      "a12": null,
+      "a13": null,
+      "a14": null,
+      "a15": "115",
+      "a16": null,
+      "a17": null,
+      "a18": null,
+      "a19": null,
+      "a2": null,
+      "a20": null,
+      "a21": null,
+      "a22": null,
+      "a23": null,
+      "a24": null,
+      "a25": "125",
+      "a26": null,
+      "a27": null,
+      "a28": null,
+      "a29": null,
+      "a3": null,
+      "a30": null,
+      "a31": null,
+      "a32": null,
+      "a33": null,
+      "a34": null,
+      "a35": "135",
+      "a36": null,
+      "a37": null,
+      "a38": null,
+      "a39": null,
+      "a4": null,
+      "a40": null,
+      "a41": null,
+      "a42": null,
+      "a43": null,
+      "a44": null,
+      "a45": "145",
+      "a46": null,
+      "a47": null,
+      "a48": null,
+      "a49": null,
+      "a5": null,
+      "a50": null,
+      "a51": null,
+      "a52": null,
+      "a53": null,
+      "a54": null,
+      "a55": "155",
+      "a56": null,
+      "a57": null,
+      "a58": null,
+      "a59": null,
+      "a6": null,
+      "a60": null,
+      "a61": null,
+      "a62": null,
+      "a63": null,
+      "a64": null,
+      "a65": "165",
+      "a66": null,
+      "a67": null,
+      "a68": null,
+      "a69": null,
+      "a7": null,
+      "a70": null,
+      "a71": null,
+      "a72": null,
+      "a73": null,
+      "a74": null,
+      "a75": "175",
+      "a76": null,
+      "a77": null,
+      "a78": null,
+      "a79": null,
+      "a8": null,
+      "a80": null,
+      "a81": null,
+      "a82": null,
+      "a83": null,
+      "a84": null,
+      "a85": "185",
+      "a86": null,
+      "a87": null,
+      "a88": null,
+      "a89": null,
+      "a9": null,
+      "a90": null,
+      "a91": null,
+      "a92": null,
+      "a93": null,
+      "a94": null,
+      "a95": "195",
+      "a96": null,
+      "a97": null,
+      "a98": null,
+      "a99": "199",
+      "flow_published_at": "1970-01-01 02:00:36.000000",
+      "id": "1"
+    }
+  ],
+  "table": "many_columns"
+}
+{
+  "rows": [
+    {
+      "flow_published_at": "1970-01-01 01:00:36.000000",
+      "id": "1",
+      "offset_datetime": "2024-01-15 15:30:00.000000",
+      "utc_datetime": "2024-01-15 15:30:00.000000"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:37.000000",
+      "id": "2",
+      "offset_datetime": "1925-01-01 00:00:00.000000",
+      "utc_datetime": "1925-01-01 00:00:00.000000"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:38.000000",
+      "id": "3",
+      "offset_datetime": "2025-01-01 00:00:00.123456",
+      "utc_datetime": "2025-01-01 00:00:00.123456"
+    }
+  ],
+  "table": "timezone_datetimes_standard"
+}
+{
+  "rows": [
+    {
+      "flow_published_at": "1970-01-01 01:00:36.000000",
+      "id": "1",
+      "offset_datetime": "2024-01-15 15:30:00.000000",
+      "utc_datetime": "2024-01-15 15:30:00.000000"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:37.000000",
+      "id": "2",
+      "offset_datetime": "1925-01-01 00:00:00.000000",
+      "utc_datetime": "1925-01-01 00:00:00.000000"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:38.000000",
+      "id": "3",
+      "offset_datetime": "2025-01-01 00:00:00.123456",
+      "utc_datetime": "2025-01-01 00:00:00.123456"
+    }
+  ],
+  "table": "timezone_datetimes_delta"
+}

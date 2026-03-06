@@ -1,0 +1,29 @@
+version: "3.7"
+
+services:
+  clickhouse:
+    image: 'clickhouse/clickhouse-server:24.8'
+    platform: linux/amd64
+    environment:
+      CLICKHOUSE_DB: flow
+      CLICKHOUSE_USER: flow
+      CLICKHOUSE_PASSWORD: flow
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - flow-test
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--host", "127.0.0.1", "--user", "flow", "--password", "flow", "--query", "SELECT 1"]
+      interval: 1s
+      retries: 30
+    ports:
+      - "9000:9000"
+      - "8123:8123"
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true
+
+volumes:
+  clickhouse_data: {}

@@ -1,0 +1,222 @@
+package main
+
+import (
+	"fmt"
+	"math"
+	"slices"
+	"strings"
+	"text/template"
+	"time"
+
+	sql "github.com/estuary/connectors/materialize-sql"
+)
+
+const (
+	clickhouseMinimumDate     = "1900-01-01"
+	clickhouseMinimumDatetime = "1925-01-01T00:00:00Z"
+)
+
+var clickHouseClampDate sql.ElementConverter = sql.StringCastConverter(func(str string) (interface{}, error) {
+	parsed, err := time.Parse(time.DateOnly, str)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse %q as date: %w", str, err)
+	}
+	if parsed.Year() < 1900 {
+		parsed, _ = time.Parse(time.DateOnly, clickhouseMinimumDate)
+	}
+	return parsed, nil
+})
+
+var clickHouseClampDatetime sql.ElementConverter = sql.StringCastConverter(func(str string) (interface{}, error) {
+	if strings.HasSuffix(str, "z") {
+		str = str[:len(str)-1] + "Z"
+	}
+	parsed, err := time.Parse(time.RFC3339Nano, str)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
+	}
+	if parsed.Year() < 1925 {
+		parsed, _ = time.Parse(time.RFC3339Nano, clickhouseMinimumDatetime)
+	}
+	return parsed.UTC(), nil
+})
+
+var clickHouseDialect = func(database string) sql.Dialect {
+	mapper := sql.NewDDLMapper(
+		sql.FlatTypeMappings{
+			sql.INTEGER: sql.MapSignedInt64(
+				sql.MapStatic("Int64"),
+				sql.MapStatic("String", sql.UsingConverter(sql.ToStr)),
+			),
+			sql.NUMBER:  sql.MapStatic("Float64"),
+			sql.BOOLEAN: sql.MapStatic("Bool"),
+			sql.OBJECT:  sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
+			sql.ARRAY:   sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
+			sql.BINARY:  sql.MapStatic("String"),
+			sql.MULTIPLE: sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
+			sql.STRING_INTEGER: sql.MapStatic("String", sql.UsingConverter(sql.ToStr)),
+			sql.STRING_NUMBER:  sql.MapStatic("Float64", sql.UsingConverter(sql.StrToFloat(math.NaN(), math.Inf(1), math.Inf(-1)))),
+			sql.STRING: sql.MapString(sql.StringMappings{
+				Fallback: sql.MapStatic("String"),
+				WithFormat: map[string]sql.MapProjectionFn{
+					"date":      sql.MapStatic("Date32", sql.UsingConverter(clickHouseClampDate)),
+					"date-time": sql.MapStatic("DateTime64(6, 'UTC')", sql.UsingConverter(clickHouseClampDatetime)),
+				},
+				WithContentType: map[string]sql.MapProjectionFn{
+					"application/x-protobuf; proto=flow.MaterializationSpec": sql.MapStatic("String"),
+					"application/x-protobuf; proto=consumer.Checkpoint":      sql.MapStatic("String"),
+				},
+			}),
+		},
+		// ClickHouse columns are NOT NULL by default. We handle Nullable wrapping in templates.
+	)
+
+	return sql.Dialect{
+		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
+			return sql.InfoTableLocation{TableSchema: database, TableName: path[0]}
+		}),
+		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string { return schema }),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
+		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
+			sql.PassThroughTransform(
+				func(s string) bool {
+					return sql.IsSimpleIdentifier(s) && !slices.Contains(CLICKHOUSE_RESERVED_WORDS, strings.ToLower(s))
+				},
+				sql.QuoteTransform("`", "``"),
+			))),
+		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "\\'")),
+		Placeholderer: sql.PlaceholderFn(func(index int) string {
+			return "?"
+		}),
+		TypeMapper:          mapper,
+		MaxColumnCharLength: 256,
+	}
+}
+
+type templates struct {
+	createTargetTable *template.Template
+	createLoadTable   *template.Template
+	loadInsert        *template.Template
+	loadQuery         *template.Template
+	truncateLoadTable *template.Template
+	storeInsert       *template.Template
+	alterTableColumns *template.Template
+}
+
+func renderTemplates(dialect sql.Dialect) templates {
+	var tplAll = sql.MustParseTemplate(dialect, "root", `
+{{ define "temp_load_name" -}}
+flow_temp_load_{{ $.Binding }}
+{{- end }}
+
+-- Templated creation of a materialized table definition.
+
+{{ define "createTargetTable" }}
+CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }},{{ end }}
+		{{$key.Identifier}} {{$key.DDL}}
+	{{- end }}
+	{{- range $val := $.Values }},
+		{{$val.Identifier}} Nullable({{$val.DDL}})
+	{{- end }}
+	{{- if $.Document }},
+		{{$.Document.Identifier}} Nullable({{$.Document.DDL}})
+	{{- end }}
+	{{- if not $.DeltaUpdates }},
+		`+"`_version`"+` UInt64,
+		`+"`_is_deleted`"+` UInt8 DEFAULT 0
+	{{- end }}
+)
+ENGINE = {{- if $.DeltaUpdates }} MergeTree()
+{{- else }} ReplacingMergeTree(`+"`_version`"+`, `+"`_is_deleted`"+`)
+{{- end }}
+ORDER BY (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }}, {{ end -}}
+		{{$key.Identifier}}
+	{{- end -}}
+);
+{{ end }}
+
+-- Templated creation of a temporary load table for staging keys.
+
+{{ define "createLoadTable" }}
+CREATE TEMPORARY TABLE IF NOT EXISTS {{ template "temp_load_name" . }} (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }},{{ end }}
+		{{ $key.Identifier }} {{ $key.DDL }}
+	{{- end }}
+);
+{{ end }}
+
+-- Templated INSERT for loading keys into the temporary load table.
+
+{{ define "loadInsert" }}
+INSERT INTO {{ template "temp_load_name" . }} (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }}, {{ end -}}
+		{{ $key.Identifier }}
+	{{- end -}}
+)
+{{ end }}
+
+-- Templated query which joins keys from the load table with the target table
+-- using FINAL to get deduplicated results from ReplacingMergeTree.
+
+{{ define "loadQuery" }}
+{{ if and $.Document (not $.DeltaUpdates) -}}
+SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
+	FROM (SELECT * FROM {{$.Identifier}} FINAL WHERE ` + "`_is_deleted`" + ` = 0) AS l
+	JOIN {{ template "temp_load_name" . }} AS r
+	{{- range $ind, $key := $.Keys }}
+		{{ if $ind }} AND {{ else }} ON  {{ end -}}
+		r.{{ $key.Identifier }} = l.{{ $key.Identifier }}
+	{{- end }}
+{{ else -}}
+SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
+{{ end }}
+{{ end }}
+
+-- Templated truncation of the temporary load table.
+
+{{ define "truncateLoadTable" }}
+TRUNCATE TABLE {{ template "temp_load_name" . }};
+{{ end }}
+
+-- Templated INSERT for storing documents into the target table.
+
+{{ define "storeInsert" }}
+INSERT INTO {{$.Identifier}} (
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }}, {{ end -}}
+		{{$col.Identifier}}
+	{{- end -}}
+	{{- if not $.DeltaUpdates -}}
+		, ` + "`_version`" + `, ` + "`_is_deleted`" + `
+	{{- end -}}
+)
+{{ end }}
+
+-- Templated ALTER TABLE for adding columns and modifying nullable constraints.
+
+{{ define "alterTableColumns" }}
+{{- range $ind, $col := $.AddColumns }}
+ALTER TABLE {{$.Identifier}} ADD COLUMN IF NOT EXISTS {{$col.Identifier}} Nullable({{$col.NullableDDL}});
+{{ end -}}
+{{- range $ind, $col := $.DropNotNulls }}
+ALTER TABLE {{$.Identifier}} MODIFY COLUMN {{ ColumnIdentifier $col.Name }} Nullable({{$col.Type}});
+{{ end -}}
+{{ end }}
+`)
+
+	return templates{
+		createTargetTable: tplAll.Lookup("createTargetTable"),
+		createLoadTable:   tplAll.Lookup("createLoadTable"),
+		loadInsert:        tplAll.Lookup("loadInsert"),
+		loadQuery:         tplAll.Lookup("loadQuery"),
+		truncateLoadTable: tplAll.Lookup("truncateLoadTable"),
+		storeInsert:       tplAll.Lookup("storeInsert"),
+		alterTableColumns: tplAll.Lookup("alterTableColumns"),
+	}
+}
