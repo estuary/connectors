@@ -203,6 +203,7 @@ class ProjectTemplate(WorkspaceScopedEntity):
 class Task(ProjectScopedEntity):
     resource_name: ClassVar[str] = "Tasks"
     api_path: ClassVar[str] = "tasks"
+    event_type: ClassVar[str] = "task"
 
     @classmethod
     def get_url(cls, base_url: str, project_gid: str) -> str:
@@ -212,6 +213,7 @@ class Task(ProjectScopedEntity):
 class Section(ProjectScopedEntity):
     resource_name: ClassVar[str] = "Sections"
     api_path: ClassVar[str] = "sections"
+    event_type: ClassVar[str] = "section"
 
     @classmethod
     def get_url(cls, base_url: str, project_gid: str) -> str:
@@ -227,6 +229,7 @@ class StatusUpdate(ProjectScopedEntity):
 class Attachment(ProjectScopedEntity):
     resource_name: ClassVar[str] = "Attachments"
     api_path: ClassVar[str] = "attachments"
+    event_type: ClassVar[str] = "attachment"
     tolerated_errors: ClassVar[frozenset[int]] = frozenset({403, 404})
 
 
@@ -234,6 +237,7 @@ class Story(ProjectScopedEntity):
     """Stories are task-scoped but modeled as project-scoped with custom fetch logic."""
     resource_name: ClassVar[str] = "Stories"
     api_path: ClassVar[str] = "stories"
+    event_type: ClassVar[str] = "story"
 
     @classmethod
     def get_url(cls, base_url: str, task_gid: str) -> str:
@@ -265,6 +269,9 @@ class AsanaDetailResponse(BaseModel, extra="allow"):
 
 
 # --- Sync-token models ---
+# Asana Events API: https://developers.asana.com/reference/events
+# Uses opaque sync tokens per project. Tokens expire after 24h (or sooner under load).
+# Expired tokens return 412 with a new token.
 
 class ChangeEvent(BaseModel, extra="allow"):
     """A change notification from GET /events."""

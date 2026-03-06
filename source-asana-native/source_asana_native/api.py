@@ -176,40 +176,60 @@ async def fetch_stories(
 # --- Sync-token incremental: Events API ---
 
 
-async def _fetch_single_task(
+async def _fetch_single[T: BaseEntity](
+    model: type[T],
     http: HTTPSession,
     base_url: str,
     gid: str,
     log: Logger,
-) -> Task:
-    url = Task.get_detail_url(base_url, gid)
+) -> T:
+    """Fetch a single resource by GID using its detail endpoint."""
+    url = model.get_detail_url(base_url, gid)
     response = await http.request(log, url)
     envelope = AsanaDetailResponse.model_validate_json(response)
-    return Task.model_validate(envelope.data)
+    return model.model_validate(envelope.data)
 
 
-async def fetch_project_tasks(
+async def backfill_resources[T: ProjectScopedEntity](
+    model: type[T],
     http: HTTPSession,
     base_url: str,
     project_gid: str,
     log: Logger,
     _log_cursor: object,
     _cutoff: object,
-) -> AsyncGenerator[Task]:
-    """FetchPageFn: backfill all tasks for a single project."""
-    url = Task.get_url(base_url, project_gid)
-    async for task in _fetch_paginated(url, Task, http, log):
-        yield task
+) -> AsyncGenerator[T]:
+    """FetchPageFn: backfill all resources of a type for a single project."""
+    url = model.get_url(base_url, project_gid)
+    async for item in _fetch_paginated(url, model, http, log):
+        yield item
 
 
-async def fetch_task_events(
+async def backfill_stories(
+    http: HTTPSession,
+    base_url: str,
+    project_gid: str,
+    log: Logger,
+    _log_cursor: object,
+    _cutoff: object,
+) -> AsyncGenerator[Story]:
+    """FetchPageFn: backfill stories for a project (requires task iteration)."""
+    tasks_url = Task.get_url(base_url, project_gid)
+    async for task in _fetch_paginated(tasks_url, Task, http, log):
+        url = Story.get_url(base_url, task.gid)
+        async for story in _fetch_paginated(url, Story, http, log):
+            yield story
+
+
+async def fetch_events[T: BaseEntity](
+    model: type[T],
     http: HTTPSession,
     base_url: str,
     project_gid: str,
     log: Logger,
     log_cursor: tuple[str | int],
-) -> AsyncGenerator[Task | _Tombstone | tuple[str], None]:
-    """FetchChangesFn: poll project events, re-fetch changed tasks, yield docs + new cursor."""
+) -> AsyncGenerator[T | _Tombstone | tuple[str], None]:
+    """FetchChangesFn: poll project events for a resource type, re-fetch changed resources."""
     sync_token = str(log_cursor[0])
 
     if not sync_token:
@@ -220,9 +240,7 @@ async def fetch_task_events(
             return
         except HTTPError as e:
             if e.code == 412:
-                sync_token = SyncTokenResponse.model_validate_json(
-                    e.body
-                ).sync
+                sync_token = SyncTokenResponse.model_validate_json(e.body).sync
                 yield (sync_token,)
                 return
             raise
@@ -238,9 +256,7 @@ async def fetch_task_events(
             response = await http.request(log, url)
         except HTTPError as e:
             if e.code == 412:
-                new_token = SyncTokenResponse.model_validate_json(
-                    e.body
-                ).sync
+                new_token = SyncTokenResponse.model_validate_json(e.body).sync
                 yield (new_token,)
                 return
             raise
@@ -250,7 +266,7 @@ async def fetch_task_events(
         for event in data.data:
             gid = event.resource.get("gid")
             resource_type = event.resource.get("resource_type")
-            if not gid or resource_type != "task":
+            if not gid or resource_type != model.event_type:
                 continue
             if event.action == "deleted":
                 deleted_gids.add(gid)
@@ -266,12 +282,12 @@ async def fetch_task_events(
 
     for gid in changed_gids - deleted_gids:
         try:
-            doc = await _fetch_single_task(http, base_url, gid, log)
+            doc = await _fetch_single(model, http, base_url, gid, log)
             doc.meta_ = BaseDocument.Meta(op="c")
             yield doc
         except HTTPError as e:
             if e.code in (403, 404):
-                log.info(f"Skipping task {gid} (not accessible)")
+                log.info(f"Skipping {model.event_type} {gid} (not accessible)")
             else:
                 raise
 

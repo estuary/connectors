@@ -10,10 +10,10 @@ from estuary_cdk.http import HTTPSession
 
 from .api import (
     _collect_projects,
+    backfill_resources,
+    backfill_stories,
+    fetch_events,
     fetch_project_scoped,
-    fetch_project_tasks,
-    fetch_stories,
-    fetch_task_events,
     fetch_team_memberships,
     fetch_top_level,
     fetch_workspace_scoped,
@@ -46,7 +46,7 @@ from .models import (
 )
 
 
-# Models whose snapshots use the standard scope-based generic fetch.
+# Snapshot-only resources (full refresh).
 SNAPSHOT_MODELS = [
     Workspace,
     User,
@@ -58,17 +58,23 @@ SNAPSHOT_MODELS = [
     CustomField,
     TimePeriod,
     ProjectTemplate,
-    Section,
     StatusUpdate,
-    Attachment,
     Membership,
 ]
 
-# Models with multi-level iteration that need dedicated fetch functions.
+# Snapshot resources with multi-level iteration that need dedicated fetch functions.
 SNAPSHOT_CUSTOM_FETCHERS: dict[str, Any] = {
     "TeamMemberships": fetch_team_memberships,
-    "Stories": fetch_stories,
 }
+
+# Incremental resources tracked via the project Events API.
+# Each gets a per-project sync token and polls for changes.
+INCREMENTAL_MODELS = [
+    AsanaTask,
+    Section,
+    Attachment,
+    Story,
+]
 
 
 def _get_snapshot_fetcher(model, http, config):
@@ -81,6 +87,13 @@ def _get_snapshot_fetcher(model, http, config):
         return functools.partial(fetch_project_scoped, model, http, config)
     else:
         raise ValueError(f"Unknown entity scope for {model}")
+
+
+def _get_backfill_fn(model):
+    """Return the appropriate backfill function for an incremental model."""
+    if model is Story:
+        return backfill_stories
+    return functools.partial(backfill_resources, model)
 
 
 async def all_resources(
@@ -108,7 +121,7 @@ async def all_resources(
             tombstone=TOMBSTONE,
         )
 
-    # --- Build snapshot resources from models ---
+    # --- Snapshot resources ---
 
     resources: list[common.Resource] = []
 
@@ -135,10 +148,9 @@ async def all_resources(
             )
         )
 
-    # --- Custom-fetched snapshot resources ---
-
     for name, fetch_fn in SNAPSHOT_CUSTOM_FETCHERS.items():
-        model = TeamMembership if name == "TeamMemberships" else Story
+        model = TeamMembership if name == "TeamMemberships" else None
+        assert model is not None
         fetcher = functools.partial(fetch_fn, http, config)
         resources.append(
             common.Resource(
@@ -161,60 +173,65 @@ async def all_resources(
             )
         )
 
-    # --- Tasks: per-project incremental via events API ---
+    # --- Incremental resources via project Events API ---
 
     projects = await _collect_projects(http, config, log)
 
-    task_fetch_page: dict[str, Any] = {}
-    task_fetch_changes: dict[str, Any] = {}
-    task_initial_inc: dict[str, ResourceState.Incremental] = {}
-    task_initial_backfill: dict[str, ResourceState.Backfill] = {}
+    for model in INCREMENTAL_MODELS:
+        backfill_fn = _get_backfill_fn(model)
 
-    for project in projects:
-        task_fetch_page[project.gid] = functools.partial(
-            fetch_project_tasks, http, base_url, project.gid,
-        )
-        task_fetch_changes[project.gid] = functools.partial(
-            fetch_task_events, http, base_url, project.gid,
-        )
-        task_initial_inc[project.gid] = ResourceState.Incremental(cursor=("",))
-        task_initial_backfill[project.gid] = ResourceState.Backfill(
-            cutoff=("",), next_page=None,
-        )
+        fetch_page: dict[str, Any] = {}
+        fetch_changes: dict[str, Any] = {}
+        initial_inc: dict[str, ResourceState.Incremental] = {}
+        initial_backfill: dict[str, ResourceState.Backfill] = {}
 
-    def open_tasks_binding(
-        binding: Any,
-        binding_index: int,
-        state: ResourceState,
-        task: Task,
-        all_bindings: Any,
-    ):
-        common.open_binding(
-            binding,
-            binding_index,
-            state,
-            task,
-            fetch_page=task_fetch_page,
-            fetch_changes=task_fetch_changes,
-            tombstone=TOMBSTONE,
-        )
+        for project in projects:
+            fetch_page[project.gid] = functools.partial(
+                backfill_fn, http, base_url, project.gid,
+            )
+            fetch_changes[project.gid] = functools.partial(
+                fetch_events, model, http, base_url, project.gid,
+            )
+            initial_inc[project.gid] = ResourceState.Incremental(cursor=("",))
+            initial_backfill[project.gid] = ResourceState.Backfill(
+                cutoff=("",), next_page=None,
+            )
 
-    resources.append(
-        common.Resource(
-            name="Tasks",
-            key=["/gid"],
-            model=AsanaTask,
-            open=open_tasks_binding,
-            initial_state=ResourceState(
-                inc=task_initial_inc,
-                backfill=task_initial_backfill,
-            ),
-            initial_config=ResourceConfig(
-                name="Tasks",
-                interval=timedelta(minutes=1),
-            ),
-            schema_inference=True,
+        def open_incremental_binding(
+            fp: dict,
+            fc: dict,
+            binding: Any,
+            binding_index: int,
+            state: ResourceState,
+            task: Task,
+            all_bindings: Any,
+        ):
+            common.open_binding(
+                binding,
+                binding_index,
+                state,
+                task,
+                fetch_page=fp,
+                fetch_changes=fc,
+                tombstone=TOMBSTONE,
+            )
+
+        resources.append(
+            common.Resource(
+                name=model.resource_name,
+                key=["/gid"],
+                model=model,
+                open=functools.partial(open_incremental_binding, fetch_page, fetch_changes),
+                initial_state=ResourceState(
+                    inc=initial_inc,
+                    backfill=initial_backfill,
+                ),
+                initial_config=ResourceConfig(
+                    name=model.resource_name,
+                    interval=timedelta(minutes=1),
+                ),
+                schema_inference=True,
+            )
         )
-    )
 
     return resources
