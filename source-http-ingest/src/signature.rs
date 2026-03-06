@@ -6,6 +6,7 @@ use base64::prelude::*;
 use bytes::Bytes;
 use chrono::{DateTime, TimeDelta, Utc};
 use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
+use p256::pkcs8::DecodePublicKey;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -76,6 +77,7 @@ impl WebhookSignatureVerifier for NoopVerifier {
     }
 }
 
+#[derive(Debug)]
 struct TimestampParser {
     header: String,
     max_age: TimeDelta,
@@ -130,6 +132,7 @@ impl TimestampParser {
     }
 }
 
+#[derive(Debug)]
 struct EcdsaVerifier {
     verifying_key: VerifyingKey,
     signature_header: String,
@@ -146,9 +149,31 @@ impl EcdsaVerifier {
             anyhow::bail!("Signature header name is required but was empty");
         }
 
-        let verifying_key = public_key
-            .parse::<VerifyingKey>()
-            .context("parsing ECDSA public key from PEM")?;
+        let public_key = public_key.trim();
+        if public_key.is_empty() {
+            anyhow::bail!("Public key is required but was empty");
+        }
+
+        let verifying_key = {
+            if public_key.starts_with("-----BEGIN PUBLIC KEY") {
+                public_key
+                    .parse::<VerifyingKey>()
+                    .context("Failed to parse PEM as a P-256 ECDSA public key in SPKI format")?
+            } else if public_key.starts_with("-----BEGIN") {
+                anyhow::bail!(
+                    "Unsupported PEM type. Only '-----BEGIN PUBLIC KEY-----' (SPKI) format is accepted"
+                );
+            } else {
+                let bytes = BASE64_STANDARD.decode(public_key).context(
+                    "Public key is not in PEM format and could not be decoded as base64. \
+                     Accepted formats: PEM ('-----BEGIN PUBLIC KEY-----') or base64-encoded SPKI DER",
+                )?;
+
+                VerifyingKey::from_public_key_der(&bytes).context(
+                    "Failed to parse base64-decoded bytes as a P-256 ECDSA public key in SPKI DER format",
+                )?
+            }
+        };
 
         Ok(Self {
             verifying_key,
@@ -306,6 +331,24 @@ mod test {
             max_age_seconds.map(|age| TimestampParser::new("X-Timestamp".into(), age).unwrap());
         Box::new(
             EcdsaVerifier::new(&test_verifying_key_pem(), "X-Signature".to_string(), tv).unwrap(),
+        )
+    }
+
+    fn test_verifying_key_b64() -> String {
+        let der = test_verifying_key()
+            .to_public_key_der()
+            .expect("failed to encode public key as DER");
+        BASE64_STANDARD.encode(der.as_bytes())
+    }
+
+    fn make_ecdsa_verifier_b64(with_timestamp: bool) -> Box<dyn WebhookSignatureVerifier> {
+        let tv = if with_timestamp {
+            Some(TimestampParser::new("X-Timestamp".into(), default_max_signature_age()).unwrap())
+        } else {
+            None
+        };
+        Box::new(
+            EcdsaVerifier::new(&test_verifying_key_b64(), "X-Signature".to_string(), tv).unwrap(),
         )
     }
 
@@ -591,5 +634,50 @@ mod test {
             }
             _ => panic!("expected Custom variant"),
         }
+    }
+
+    #[test]
+    fn test_ecdsa_raw_b64_key_parses() {
+        let result = EcdsaVerifier::new(&test_verifying_key_b64(), "X-Signature".to_string(), None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_ecdsa_signature_valid_b64_key() {
+        let body = b"test body content";
+        let signature = sign_payload(body);
+
+        let headers = {
+            let mut val = axum::http::HeaderMap::new();
+            val.insert("X-Signature", signature.parse().unwrap());
+            val
+        };
+
+        let verifier = make_ecdsa_verifier_b64(false);
+        let result = verifier.verify(&headers, Bytes::from_static(body));
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().as_ref(), body);
+    }
+
+    #[test]
+    fn test_ecdsa_raw_b64_key_invalid_base64() {
+        let result = EcdsaVerifier::new("not-valid-base64", "X-Signature".to_string(), None);
+        assert!(result.is_err());
+        assert_snapshot!(
+            result.unwrap_err(),
+            @"Public key is not in PEM format and could not be decoded as base64. Accepted formats: PEM ('-----BEGIN PUBLIC KEY-----') or base64-encoded SPKI DER"
+        );
+    }
+
+    #[test]
+    fn test_ecdsa_raw_b64_key_invalid_der() {
+        let garbage_der = BASE64_STANDARD.encode(b"this is not valid DER");
+        let result = EcdsaVerifier::new(&garbage_der, "X-Signature".to_string(), None);
+        assert!(result.is_err());
+        assert_snapshot!(
+            result.unwrap_err(),
+            @"Failed to parse base64-decoded bytes as a P-256 ECDSA public key in SPKI DER format"
+        );
     }
 }
