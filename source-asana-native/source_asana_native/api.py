@@ -8,7 +8,6 @@ from estuary_cdk.http import HTTPError, HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from .models import (
-    API_PAGE_LIMIT,
     AsanaDetailResponse,
     AsanaPageMeta,
     BaseEntity,
