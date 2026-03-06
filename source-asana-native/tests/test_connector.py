@@ -3,6 +3,7 @@
 import logging
 
 import pytest
+from estuary_cdk.capture import request
 
 from source_asana_native import Connector
 from source_asana_native.models import EndpointConfig, ResourceConfig
@@ -14,7 +15,6 @@ def connector() -> Connector:
 
 
 class TestSpec:
-
     @pytest.mark.asyncio
     async def test_spec_returns_config_schema(self, connector: Connector):
         spec = await connector.spec(logging.getLogger(), None)
@@ -47,8 +47,6 @@ class TestDiscover:
 
     @pytest.mark.asyncio
     async def test_discover_returns_resources(self, endpoint_config: EndpointConfig):
-        from estuary_cdk.capture import request
-
         connector = Connector()
         log = logging.getLogger()
         await connector._mixin_enter(log)
@@ -66,8 +64,6 @@ class TestDiscover:
 
     @pytest.mark.asyncio
     async def test_discover_includes_expected_resources(self, endpoint_config: EndpointConfig):
-        from estuary_cdk.capture import request
-
         connector = Connector()
         log = logging.getLogger()
         await connector._mixin_enter(log)

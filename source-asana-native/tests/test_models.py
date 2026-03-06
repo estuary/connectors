@@ -76,54 +76,77 @@ class TestClassVars:
 class TestEventType:
     """Incremental models must declare event_type."""
 
-    @pytest.mark.parametrize("model,expected", [
-        (Task, "task"),
-        (Section, "section"),
-        (Attachment, "attachment"),
-        (Story, "story"),
-    ])
+    @pytest.mark.parametrize(
+        "model,expected",
+        [
+            (Task, "task"),
+            (Section, "section"),
+            (Attachment, "attachment"),
+            (Story, "story"),
+        ],
+    )
     def test_event_type(self, model, expected):
         assert model.event_type == expected
 
     def test_snapshot_models_have_no_event_type(self):
-        snapshot_only = [Workspace, User, Team, Project, Tag, Portfolio,
-                         Goal, CustomField, TimePeriod, ProjectTemplate,
-                         StatusUpdate, Membership, TeamMembership]
+        snapshot_only = [
+            Workspace,
+            User,
+            Team,
+            Project,
+            Tag,
+            Portfolio,
+            Goal,
+            CustomField,
+            TimePeriod,
+            ProjectTemplate,
+            StatusUpdate,
+            Membership,
+            TeamMembership,
+        ]
         for model in snapshot_only:
-            assert not hasattr(model, "event_type"), (
-                f"{model.__name__} should not have event_type"
-            )
+            assert not hasattr(model, "event_type"), f"{model.__name__} should not have event_type"
 
 
 class TestToleratedErrors:
-
     def test_defaults_to_empty(self):
         for model in [User, Project, Tag, TimePeriod, Task, Section]:
             assert model.tolerated_errors == frozenset(), model.__name__
 
-    @pytest.mark.parametrize("model,expected", [
-        (Team, frozenset({403, 404})),
-        (Portfolio, frozenset({402})),
-        (Goal, frozenset({402})),
-        (CustomField, frozenset({402})),
-        (ProjectTemplate, frozenset({400, 402})),
-        (StatusUpdate, frozenset({403, 404})),
-        (Attachment, frozenset({403, 404})),
-        (Membership, frozenset({403, 404})),
-        (TeamMembership, frozenset({403, 404})),
-    ])
+    @pytest.mark.parametrize(
+        "model,expected",
+        [
+            (Team, frozenset({403, 404})),
+            (Portfolio, frozenset({402})),
+            (Goal, frozenset({402})),
+            (CustomField, frozenset({402})),
+            (ProjectTemplate, frozenset({400, 402})),
+            (StatusUpdate, frozenset({403, 404})),
+            (Attachment, frozenset({403, 404})),
+            (Membership, frozenset({403, 404})),
+            (TeamMembership, frozenset({403, 404})),
+        ],
+    )
     def test_tolerated_errors(self, model, expected):
         assert model.tolerated_errors == expected
 
 
 class TestDeduplicate:
-
     def test_user_deduplicates(self):
         assert User.deduplicate is True
 
     def test_others_do_not_deduplicate(self):
-        for model in [Team, Project, Tag, Portfolio, Goal, CustomField,
-                       TimePeriod, ProjectTemplate, TeamMembership]:
+        for model in [
+            Team,
+            Project,
+            Tag,
+            Portfolio,
+            Goal,
+            CustomField,
+            TimePeriod,
+            ProjectTemplate,
+            TeamMembership,
+        ]:
             assert model.deduplicate is False, model.__name__
 
 
@@ -131,24 +154,27 @@ class TestDeduplicate:
 # URL construction
 # =============================================================================
 
+
 class TestGetDetailUrl:
     """get_detail_url is inherited from BaseEntity and uses api_path."""
 
-    @pytest.mark.parametrize("model,expected_path", [
-        (Task, "tasks"),
-        (Story, "stories"),
-        (Section, "sections"),
-        (Attachment, "attachments"),
-        (User, "users"),
-        (Workspace, "workspaces"),
-    ])
+    @pytest.mark.parametrize(
+        "model,expected_path",
+        [
+            (Task, "tasks"),
+            (Story, "stories"),
+            (Section, "sections"),
+            (Attachment, "attachments"),
+            (User, "users"),
+            (Workspace, "workspaces"),
+        ],
+    )
     def test_detail_url(self, model, expected_path):
         url = model.get_detail_url(BASE, "12345")
         assert url == f"{BASE}/{expected_path}/12345"
 
 
 class TestTopLevelGetUrl:
-
     def test_workspace_url(self):
         url = Workspace.get_url(BASE)
         assert url == f"{BASE}/workspaces?limit={API_PAGE_LIMIT}"
@@ -211,7 +237,6 @@ class TestProjectScopedGetUrl:
 
 
 class TestProjectEventsUrl:
-
     def test_without_sync_token(self):
         url = Project.get_events_url(BASE, "proj123")
         assert url == f"{BASE}/projects/proj123/events"
@@ -229,21 +254,41 @@ class TestProjectEventsUrl:
 # Scope hierarchy
 # =============================================================================
 
+
 class TestScopeHierarchy:
     """Verify each model inherits from the correct scope base class."""
 
     def test_top_level(self):
         assert issubclass(Workspace, TopLevelEntity)
 
-    @pytest.mark.parametrize("model", [
-        User, Team, Project, Tag, Portfolio, Goal,
-        CustomField, TimePeriod, ProjectTemplate, TeamMembership,
-    ])
+    @pytest.mark.parametrize(
+        "model",
+        [
+            User,
+            Team,
+            Project,
+            Tag,
+            Portfolio,
+            Goal,
+            CustomField,
+            TimePeriod,
+            ProjectTemplate,
+            TeamMembership,
+        ],
+    )
     def test_workspace_scoped(self, model):
         assert issubclass(model, WorkspaceScopedEntity)
 
-    @pytest.mark.parametrize("model", [
-        Task, Section, StatusUpdate, Attachment, Story, Membership,
-    ])
+    @pytest.mark.parametrize(
+        "model",
+        [
+            Task,
+            Section,
+            StatusUpdate,
+            Attachment,
+            Story,
+            Membership,
+        ],
+    )
     def test_project_scoped(self, model):
         assert issubclass(model, ProjectScopedEntity)

@@ -188,14 +188,22 @@ async def all_resources(
 
         for project in projects:
             fetch_page[project.gid] = functools.partial(
-                backfill_fn, http, base_url, project.gid,
+                backfill_fn,
+                http,
+                base_url,
+                project.gid,
             )
             fetch_changes[project.gid] = functools.partial(
-                fetch_events, model, http, base_url, project.gid,
+                fetch_events,
+                model,
+                http,
+                base_url,
+                project.gid,
             )
             initial_inc[project.gid] = ResourceState.Incremental(cursor=("",))
             initial_backfill[project.gid] = ResourceState.Backfill(
-                cutoff=("",), next_page=None,
+                cutoff=("",),
+                next_page=None,
             )
 
         def open_incremental_binding(

@@ -36,7 +36,6 @@ def _setup_auth(http_client: Connector, endpoint_config: EndpointConfig):
 
 
 class TestAPIConnectivity:
-
     @pytest.mark.asyncio
     async def test_api_authentication(
         self, http_client: Connector, endpoint_config: EndpointConfig
@@ -61,11 +60,8 @@ class TestAPIConnectivity:
 
 
 class TestResourceEndpoints:
-
     @pytest.mark.asyncio
-    async def test_fetch_workspaces(
-        self, http_client: Connector, endpoint_config: EndpointConfig
-    ):
+    async def test_fetch_workspaces(self, http_client: Connector, endpoint_config: EndpointConfig):
         _setup_auth(http_client, endpoint_config)
         log = logging.getLogger()
 
@@ -77,9 +73,7 @@ class TestResourceEndpoints:
         assert all(hasattr(ws, "gid") for ws in results)
 
     @pytest.mark.asyncio
-    async def test_fetch_users(
-        self, http_client: Connector, endpoint_config: EndpointConfig
-    ):
+    async def test_fetch_users(self, http_client: Connector, endpoint_config: EndpointConfig):
         _setup_auth(http_client, endpoint_config)
         log = logging.getLogger()
 
@@ -90,9 +84,7 @@ class TestResourceEndpoints:
         assert len(results) > 0
 
     @pytest.mark.asyncio
-    async def test_fetch_projects(
-        self, http_client: Connector, endpoint_config: EndpointConfig
-    ):
+    async def test_fetch_projects(self, http_client: Connector, endpoint_config: EndpointConfig):
         _setup_auth(http_client, endpoint_config)
         log = logging.getLogger()
 
@@ -103,9 +95,7 @@ class TestResourceEndpoints:
         assert isinstance(results, list)
 
     @pytest.mark.asyncio
-    async def test_fetch_sections(
-        self, http_client: Connector, endpoint_config: EndpointConfig
-    ):
+    async def test_fetch_sections(self, http_client: Connector, endpoint_config: EndpointConfig):
         _setup_auth(http_client, endpoint_config)
         log = logging.getLogger()
 

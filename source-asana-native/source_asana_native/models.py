@@ -51,8 +51,10 @@ class EndpointConfig(BaseModel):
 
 # --- Response envelope ---
 
+
 class NextPage(BaseModel, extra="allow"):
     """Pagination cursor from Asana API responses."""
+
     offset: str | None = None
     path: str | None = None
     uri: str | None = None
@@ -60,6 +62,7 @@ class NextPage(BaseModel, extra="allow"):
 
 class AsanaPageMeta(BaseModel, extra="allow"):
     """Top-level pagination metadata wrapping next_page."""
+
     next_page: NextPage | None = None
 
 
@@ -67,8 +70,10 @@ class AsanaPageMeta(BaseModel, extra="allow"):
 # Entity Base Classes
 # =============================================================================
 
+
 class BaseEntity(BaseDocument, extra="allow", metaclass=ABCMeta):
     """Base for all Asana entities. Uses gid as primary key."""
+
     resource_name: ClassVar[str]
     api_path: ClassVar[str]
     gid: str
@@ -88,6 +93,7 @@ class TopLevelEntity(BaseEntity, metaclass=ABCMeta):
 
 class WorkspaceScopedEntity(BaseEntity, metaclass=ABCMeta):
     """Entity fetched by iterating over workspaces."""
+
     # HTTP status codes to silently skip per-parent scope. Asana returns different
     # errors depending on workspace/project plan tier or type — e.g. 402 for premium
     # features (portfolios, goals, custom fields) and 403/404 for endpoints that only
@@ -103,6 +109,7 @@ class WorkspaceScopedEntity(BaseEntity, metaclass=ABCMeta):
 
 class ProjectScopedEntity(BaseEntity, metaclass=ABCMeta):
     """Entity fetched by iterating over projects."""
+
     tolerated_errors: ClassVar[frozenset[int]] = frozenset()  # see WorkspaceScopedEntity
 
     @classmethod
@@ -114,6 +121,7 @@ class ProjectScopedEntity(BaseEntity, metaclass=ABCMeta):
 # Top-Level Entities
 # =============================================================================
 
+
 class Workspace(TopLevelEntity):
     resource_name: ClassVar[str] = "Workspaces"
     api_path: ClassVar[str] = "workspaces"
@@ -122,6 +130,7 @@ class Workspace(TopLevelEntity):
 # =============================================================================
 # Workspace-Scoped Entities
 # =============================================================================
+
 
 class User(WorkspaceScopedEntity):
     resource_name: ClassVar[str] = "Users"
@@ -201,6 +210,7 @@ class ProjectTemplate(WorkspaceScopedEntity):
 # Project-Scoped Entities
 # =============================================================================
 
+
 class Task(ProjectScopedEntity):
     resource_name: ClassVar[str] = "Tasks"
     api_path: ClassVar[str] = "tasks"
@@ -236,6 +246,7 @@ class Attachment(ProjectScopedEntity):
 
 class Story(ProjectScopedEntity):
     """Stories are task-scoped but modeled as project-scoped with custom fetch logic."""
+
     resource_name: ClassVar[str] = "Stories"
     api_path: ClassVar[str] = "stories"
     event_type: ClassVar[str] = "story"
@@ -253,6 +264,7 @@ class Membership(ProjectScopedEntity):
 
 class TeamMembership(WorkspaceScopedEntity):
     """Team memberships require iterating workspace → teams → memberships."""
+
     resource_name: ClassVar[str] = "TeamMemberships"
     api_path: ClassVar[str] = "team_memberships"
     tolerated_errors: ClassVar[frozenset[int]] = frozenset({403, 404})
@@ -264,8 +276,10 @@ class TeamMembership(WorkspaceScopedEntity):
 
 # --- API response envelopes ---
 
+
 class AsanaDetailResponse(BaseModel, extra="allow"):
     """Envelope for single-object Asana API responses: {"data": {...}}."""
+
     data: dict
 
 
@@ -274,20 +288,24 @@ class AsanaDetailResponse(BaseModel, extra="allow"):
 # Uses opaque sync tokens per project. Tokens expire after 24h (or sooner under load).
 # Expired tokens return 412 with a new token.
 
+
 class ChangeEvent(BaseModel, extra="allow"):
     """A change notification from GET /events."""
+
     resource: dict
     action: str
 
 
 class SyncTokenResponse(BaseModel, extra="allow"):
     """Response envelope from GET /events."""
+
     data: list[ChangeEvent] = []
     sync: str
     has_more: bool = False
 
 
 # --- Tombstone ---
+
 
 class _Tombstone(BaseDocument, extra="allow"):
     gid: str = ""
