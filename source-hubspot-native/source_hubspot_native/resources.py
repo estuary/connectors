@@ -11,6 +11,7 @@ from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
 from .api import (
+    DELAYED_LAG,
     FetchDelayedFn,
     FetchRecentFn,
     check_campaigns_access,
@@ -23,6 +24,7 @@ from .api import (
     fetch_contact_list_memberships_page,
     fetch_contact_lists,
     fetch_deal_pipelines,
+    fetch_delayed_changes,
     fetch_delayed_companies,
     fetch_delayed_contacts,
     fetch_delayed_custom_objects,
@@ -44,6 +46,7 @@ from .api import (
     fetch_owners,
     fetch_page_with_associations,
     fetch_properties,
+    fetch_realtime_changes,
     fetch_recent_companies,
     fetch_recent_contacts,
     fetch_recent_custom_objects,
@@ -60,7 +63,6 @@ from .api import (
     fetch_recent_workflows,
     fetch_workflows_page,
     list_custom_objects,
-    process_changes,
 )
 from .models import (
     OAUTH2_SPEC,
@@ -93,6 +95,11 @@ from .models import (
     Workflow,
     ConnectorState,
 )
+
+
+# Subtask identifiers for incremental capture.
+REALTIME = "realtime"
+DELAYED = "delayed"
 
 
 MISSING_SCOPE_REGEX = (
@@ -191,6 +198,34 @@ def _resolve_custom_object_resource_name(
     useLegacyNaming: bool,
 ) -> str:
     return name if useLegacyNaming else f"custom_{name}"
+
+
+async def _migrate_to_subtask_state(
+    state: ResourceState,
+    binding: CaptureBinding,
+    task: Task,
+    cursor: datetime,
+) -> None:
+    """
+    Migrate from single-cursor state to REALTIME and DELAYED subtask state format.
+
+    JSON Merge Patch (RFC 7396) interprets null values as "delete this key".
+    By including "cursor": None in the dict, we remove the old cursor field
+    while adding the new realtime/delayed subtasks in a single checkpoint.
+    """
+    migrated_inc_state: dict[str, ResourceState.Incremental | None] = {
+        "cursor": None,  # Remove old cursor key via merge-patch
+        REALTIME: ResourceState.Incremental(cursor=cursor),
+        DELAYED: ResourceState.Incremental(cursor=cursor - DELAYED_LAG),
+    }
+    state.inc = migrated_inc_state
+
+    task.log.info("Migrated incremental state.", {
+        "migrated_inc_state": migrated_inc_state,
+    })
+    await task.checkpoint(
+        ConnectorState(bindingStateV1={binding.stateKey: ResourceState(inc=migrated_inc_state)}),
+    )
 
 
 async def all_resources(
@@ -365,25 +400,37 @@ def crm_object_with_associations(
         task.sourced_schema(binding_index, cls.sourced_schema(properties.results))
         await task.checkpoint(state=ConnectorState())
 
+        # Migrate from single-cursor state to REALTIME and DELAYED subtask state.
+        if isinstance(state.inc, ResourceState.Incremental) and isinstance(state.inc.cursor, datetime):
+            await _migrate_to_subtask_state(state, binding, task, state.inc.cursor)
+
         open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(
-                process_changes,
-                path_component,
-                fetch_recent,
-                fetch_delayed,
-                http,
-                with_history,
-            ),
+            fetch_changes={
+                REALTIME: functools.partial(
+                    fetch_realtime_changes,
+                    path_component,
+                    fetch_recent,
+                    http,
+                    with_history,
+                ),
+                DELAYED: functools.partial(
+                    fetch_delayed_changes,
+                    path_component,
+                    fetch_delayed,
+                    http,
+                    with_history,
+                ),
+            },
             fetch_page=functools.partial(
                 fetch_page_with_associations, cls, http, with_history, path_component
             ),
         )
 
-    started_at = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC)
 
     return Resource(
         name=object_name,
@@ -391,8 +438,11 @@ def crm_object_with_associations(
         model=cls,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+            inc={
+                REALTIME: ResourceState.Incremental(cursor=cutoff),
+                DELAYED: ResourceState.Incremental(cursor=cutoff - DELAYED_LAG),
+            },
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
         ),
         # Default to performing a calculated properties refresh at 23:55 UTC every day for enabled CRM object bindings.
         initial_config=HubspotResourceConfigWithSchedule(name=object_name, schedule="55 23 * * *"),
@@ -506,30 +556,42 @@ def owners(http: HTTPSession) -> Resource:
 
 
 def email_events(http: HTTPSession) -> Resource:
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        # Migrate from single-cursor state to REALTIME and DELAYED subtask state.
+        if isinstance(state.inc, ResourceState.Incremental) and isinstance(state.inc.cursor, datetime):
+            await _migrate_to_subtask_state(state, binding, task, state.inc.cursor)
+
         open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(
-                process_changes,
-                Names.email_events,
-                fetch_recent_email_events,
-                fetch_delayed_email_events,
-                http,
-                True,  # email events do not include property history
-            ),
+            fetch_changes={
+                REALTIME: functools.partial(
+                    fetch_realtime_changes,
+                    Names.email_events,
+                    fetch_recent_email_events,
+                    http,
+                    True,  # email events do not include property history
+                ),
+                DELAYED: functools.partial(
+                    fetch_delayed_changes,
+                    Names.email_events,
+                    fetch_delayed_email_events,
+                    http,
+                    True,
+                ),
+            },
             fetch_page=functools.partial(fetch_email_events_page, http),
         )
 
-    started_at = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC)
 
     return Resource(
         name=Names.email_events,
@@ -537,8 +599,11 @@ def email_events(http: HTTPSession) -> Resource:
         model=EmailEvent,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+            inc={
+                REALTIME: ResourceState.Incremental(cursor=cutoff),
+                DELAYED: ResourceState.Incremental(cursor=cutoff - DELAYED_LAG),
+            },
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
         ),
         initial_config=ResourceConfig(name=Names.email_events),
         schema_inference=True,
@@ -610,30 +675,42 @@ def form_submissions(http: HTTPSession) -> Resource:
 
 
 def marketing_emails(http: HTTPSession) -> Resource:
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        # Migrate from single-cursor state to REALTIME and DELAYED subtask state.
+        if isinstance(state.inc, ResourceState.Incremental) and isinstance(state.inc.cursor, datetime):
+            await _migrate_to_subtask_state(state, binding, task, state.inc.cursor)
+
         open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(
-                process_changes,
-                Names.marketing_emails,
-                fetch_recent_marketing_emails,
-                fetch_delayed_marketing_emails,
-                http,
-                False,  # marketing emails do not include property history
-            ),
+            fetch_changes={
+                REALTIME: functools.partial(
+                    fetch_realtime_changes,
+                    Names.marketing_emails,
+                    fetch_recent_marketing_emails,
+                    http,
+                    False,  # marketing emails do not include property history
+                ),
+                DELAYED: functools.partial(
+                    fetch_delayed_changes,
+                    Names.marketing_emails,
+                    fetch_delayed_marketing_emails,
+                    http,
+                    False,
+                ),
+            },
             fetch_page=functools.partial(fetch_marketing_emails_page, http),
         )
 
-    started_at = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC)
 
     return Resource(
         name=Names.marketing_emails,
@@ -641,8 +718,11 @@ def marketing_emails(http: HTTPSession) -> Resource:
         model=MarketingEmail,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+            inc={
+                REALTIME: ResourceState.Incremental(cursor=cutoff),
+                DELAYED: ResourceState.Incremental(cursor=cutoff - DELAYED_LAG),
+            },
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
         ),
         initial_config=ResourceConfig(name=Names.marketing_emails),
         schema_inference=True,
@@ -732,30 +812,42 @@ def contact_list_memberships(http: HTTPSession) -> Resource:
 
 
 def workflows(http: HTTPSession) -> Resource:
-    def open(
+    async def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
         state: ResourceState,
         task: Task,
         all_bindings,
     ):
+        # Migrate from single-cursor state to REALTIME and DELAYED subtask state.
+        if isinstance(state.inc, ResourceState.Incremental) and isinstance(state.inc.cursor, datetime):
+            await _migrate_to_subtask_state(state, binding, task, state.inc.cursor)
+
         open_binding(
             binding,
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(
-                process_changes,
-                Names.workflows,
-                fetch_recent_workflows,
-                fetch_delayed_workflows,
-                http,
-                False,  # workflows do not include property history
-            ),
+            fetch_changes={
+                REALTIME: functools.partial(
+                    fetch_realtime_changes,
+                    Names.workflows,
+                    fetch_recent_workflows,
+                    http,
+                    False,  # workflows do not include property history
+                ),
+                DELAYED: functools.partial(
+                    fetch_delayed_changes,
+                    Names.workflows,
+                    fetch_delayed_workflows,
+                    http,
+                    False,
+                ),
+            },
             fetch_page=functools.partial(fetch_workflows_page, http),
         )
 
-    started_at = datetime.now(tz=UTC)
+    cutoff = datetime.now(tz=UTC)
 
     return Resource(
         name=Names.workflows,
@@ -763,8 +855,11 @@ def workflows(http: HTTPSession) -> Resource:
         model=Workflow,
         open=open,
         initial_state=ResourceState(
-            inc=ResourceState.Incremental(cursor=started_at),
-            backfill=ResourceState.Backfill(next_page=None, cutoff=started_at),
+            inc={
+                REALTIME: ResourceState.Incremental(cursor=cutoff),
+                DELAYED: ResourceState.Incremental(cursor=cutoff - DELAYED_LAG),
+            },
+            backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff),
         ),
         initial_config=ResourceConfig(name=Names.workflows),
         schema_inference=True,
