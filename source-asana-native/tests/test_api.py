@@ -6,6 +6,8 @@ These tests require valid API credentials in config.yaml.
 import logging
 
 import pytest
+from estuary_cdk.flow import AccessToken
+from estuary_cdk.http import HTTPError, TokenSource
 
 from source_asana_native import Connector
 from source_asana_native.api import (
@@ -27,9 +29,6 @@ async def http_client():
 
 
 def _setup_auth(http_client: Connector, endpoint_config: EndpointConfig):
-    from estuary_cdk.flow import AccessToken
-    from estuary_cdk.http import TokenSource
-
     http_client.token_source = TokenSource(
         oauth_spec=None,
         credentials=AccessToken(access_token=endpoint_config.api_key),
@@ -48,15 +47,12 @@ class TestAPIConnectivity:
 
     @pytest.mark.asyncio
     async def test_invalid_api_key_fails(self, http_client: Connector):
-        from estuary_cdk.flow import AccessToken
-        from estuary_cdk.http import TokenSource
-
         http_client.token_source = TokenSource(
             oauth_spec=None,
             credentials=AccessToken(access_token="invalid_key"),
         )
 
-        with pytest.raises(Exception):
+        with pytest.raises(HTTPError):
             await validate_credentials(
                 http_client,
                 "https://app.asana.com/api/1.0",

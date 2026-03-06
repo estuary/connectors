@@ -1,12 +1,13 @@
 """Pydantic models for Asana source connector."""
 
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 from typing import Annotated, ClassVar
 
 from estuary_cdk.capture.common import (
     BaseDocument,
-    ResourceConfig,
     ResourceState,
+)
+from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
 from pydantic import BaseModel, Field

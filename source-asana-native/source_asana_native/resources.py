@@ -19,6 +19,7 @@ from .api import (
     fetch_workspace_scoped,
 )
 from .models import (
+    TOMBSTONE,
     Attachment,
     CustomField,
     EndpointConfig,
@@ -34,17 +35,17 @@ from .models import (
     StatusUpdate,
     Story,
     Tag,
-    Task as AsanaTask,
     Team,
     TeamMembership,
     TimePeriod,
     TopLevelEntity,
-    TOMBSTONE,
     User,
     Workspace,
     WorkspaceScopedEntity,
 )
-
+from .models import (
+    Task as AsanaTask,
+)
 
 # Snapshot-only resources (full refresh).
 SNAPSHOT_MODELS = [

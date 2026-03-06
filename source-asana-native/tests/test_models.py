@@ -161,7 +161,7 @@ class TestWorkspaceScopedGetUrl:
         """Models using the default get_url: /{api_path}?workspace={gid}"""
         for model in [User, Tag, Goal, TimePeriod]:
             url = model.get_url(BASE, "ws123")
-            assert f"?workspace=ws123" in url, model.__name__
+            assert "?workspace=ws123" in url, model.__name__
             assert f"limit={API_PAGE_LIMIT}" in url, model.__name__
 
     def test_team_uses_organizations_path(self):
@@ -194,7 +194,7 @@ class TestProjectScopedGetUrl:
         """Models using the default get_url: /{api_path}?parent={gid}"""
         for model in [StatusUpdate, Attachment, Membership]:
             url = model.get_url(BASE, "proj123")
-            assert f"?parent=proj123" in url, model.__name__
+            assert "?parent=proj123" in url, model.__name__
             assert f"limit={API_PAGE_LIMIT}" in url, model.__name__
 
     def test_task_uses_project_param(self):
