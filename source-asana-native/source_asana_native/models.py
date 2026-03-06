@@ -69,12 +69,16 @@ class AsanaPageMeta(BaseModel, extra="allow"):
 class BaseEntity(BaseDocument, extra="allow", metaclass=ABCMeta):
     """Base for all Asana entities. Uses gid as primary key."""
     resource_name: ClassVar[str]
+    api_path: ClassVar[str]
     gid: str
+
+    @classmethod
+    def get_detail_url(cls, base_url: str, gid: str) -> str:
+        return f"{base_url}/{cls.api_path}/{gid}"
 
 
 class TopLevelEntity(BaseEntity, metaclass=ABCMeta):
     """Entity fetched from a top-level API endpoint (no parent scope)."""
-    api_path: ClassVar[str]
 
     @classmethod
     def get_url(cls, base_url: str) -> str:
@@ -83,7 +87,6 @@ class TopLevelEntity(BaseEntity, metaclass=ABCMeta):
 
 class WorkspaceScopedEntity(BaseEntity, metaclass=ABCMeta):
     """Entity fetched by iterating over workspaces."""
-    api_path: ClassVar[str]
     # HTTP status codes to silently skip per-parent scope. Asana returns different
     # errors depending on workspace/project plan tier or type — e.g. 402 for premium
     # features (portfolios, goals, custom fields) and 403/404 for endpoints that only
@@ -99,7 +102,6 @@ class WorkspaceScopedEntity(BaseEntity, metaclass=ABCMeta):
 
 class ProjectScopedEntity(BaseEntity, metaclass=ABCMeta):
     """Entity fetched by iterating over projects."""
-    api_path: ClassVar[str]
     tolerated_errors: ClassVar[frozenset[int]] = frozenset()  # see WorkspaceScopedEntity
 
     @classmethod
@@ -143,6 +145,13 @@ class Project(WorkspaceScopedEntity):
     @classmethod
     def get_url(cls, base_url: str, ws_gid: str) -> str:
         return f"{base_url}/projects?workspace={ws_gid}&limit={API_PAGE_LIMIT}&archived=false"
+
+    @classmethod
+    def get_events_url(cls, base_url: str, project_gid: str, sync: str | None = None) -> str:
+        url = f"{base_url}/projects/{project_gid}/events"
+        if sync:
+            url += f"?sync={sync}"
+        return url
 
 
 class Tag(WorkspaceScopedEntity):
@@ -246,6 +255,13 @@ class TeamMembership(WorkspaceScopedEntity):
     @classmethod
     def get_url(cls, base_url: str, team_gid: str) -> str:
         return f"{base_url}/team_memberships?team={team_gid}&limit={API_PAGE_LIMIT}"
+
+
+# --- API response envelopes ---
+
+class AsanaDetailResponse(BaseModel, extra="allow"):
+    """Envelope for single-object Asana API responses: {"data": {...}}."""
+    data: dict
 
 
 # --- Sync-token models ---

@@ -1,6 +1,5 @@
 """Asana API client functions."""
 
-import json
 from collections.abc import AsyncGenerator
 from logging import Logger
 
@@ -10,6 +9,7 @@ from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 
 from .models import (
     API_PAGE_LIMIT,
+    AsanaDetailResponse,
     AsanaPageMeta,
     BaseEntity,
     EndpointConfig,
@@ -25,15 +25,6 @@ from .models import (
     WorkspaceScopedEntity,
     _Tombstone,
 )
-
-
-def _extract_response_body(e: HTTPError) -> str:
-    """Extract the response body from an HTTPError message."""
-    marker = "Response:\n"
-    idx = e.message.find(marker)
-    if idx == -1:
-        return ""
-    return e.message[idx + len(marker) :]
 
 
 async def validate_credentials(
@@ -192,10 +183,10 @@ async def _fetch_single_task(
     gid: str,
     log: Logger,
 ) -> Task:
-    url = f"{base_url}/tasks/{gid}"
+    url = Task.get_detail_url(base_url, gid)
     response = await http.request(log, url)
-    data = json.loads(response)
-    return Task.model_validate(data["data"])
+    envelope = AsanaDetailResponse.model_validate_json(response)
+    return Task.model_validate(envelope.data)
 
 
 async def fetch_project_tasks(
@@ -221,17 +212,18 @@ async def fetch_task_events(
 ) -> AsyncGenerator[Task | _Tombstone | tuple[str], None]:
     """FetchChangesFn: poll project events, re-fetch changed tasks, yield docs + new cursor."""
     sync_token = str(log_cursor[0])
-    events_url = f"{base_url}/projects/{project_gid}/events"
 
     if not sync_token:
+        bootstrap_url = Project.get_events_url(base_url, project_gid)
         try:
-            await http.request(log, events_url)
-            log.warning(f"Expected 412 from {events_url}, got 200 — using empty token")
+            await http.request(log, bootstrap_url)
+            log.warning(f"Expected 412 from {bootstrap_url}, got 200 — using empty token")
             return
         except HTTPError as e:
             if e.code == 412:
-                body = json.loads(_extract_response_body(e))
-                sync_token = body["sync"]
+                sync_token = SyncTokenResponse.model_validate_json(
+                    e.body
+                ).sync
                 yield (sync_token,)
                 return
             raise
@@ -243,11 +235,14 @@ async def fetch_task_events(
     has_more = True
     while has_more:
         try:
-            response = await http.request(log, f"{events_url}?sync={token}")
+            url = Project.get_events_url(base_url, project_gid, sync=token)
+            response = await http.request(log, url)
         except HTTPError as e:
             if e.code == 412:
-                body = json.loads(_extract_response_body(e))
-                yield (body["sync"],)
+                new_token = SyncTokenResponse.model_validate_json(
+                    e.body
+                ).sync
+                yield (new_token,)
                 return
             raise
 
