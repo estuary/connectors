@@ -76,10 +76,11 @@ class HTTPError(RuntimeError):
     as a distinct attribute.
     """
 
-    def __init__(self, message: str, code: int):
+    def __init__(self, message: str, code: int, body: bytes = b""):
         super().__init__(message)
         self.code = code
         self.message = message
+        self.body = body
 
 
 class HTTPSession(abc.ABC):
@@ -632,12 +633,14 @@ class HTTPMixin(Mixin, HTTPSession):
                         raise HTTPError(
                             f"Encountered HTTP error status {resp.status}.\nURL: {url}\nResponse:\n{body.decode('utf-8')}",
                             resp.status,
+                            body,
                         )
                 elif resp.status >= 400 and resp.status < 500:
                     body = await resp.read()
                     raise HTTPError(
                         f"Encountered HTTP error status {resp.status} which cannot be retried.\nURL: {url}\nResponse:\n{body.decode('utf-8')}",
                         resp.status,
+                        body,
                     )
                 else:
                     resp.raise_for_status()
