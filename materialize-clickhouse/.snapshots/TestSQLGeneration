@@ -1,0 +1,98 @@
+--- Begin key_value createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS key_value (
+		key1 Int64,
+		key2 Bool,
+		`key!binary` String,
+		`array` Nullable(String),
+		binary Nullable(String),
+		boolean Nullable(Bool),
+		field_with_projection Nullable(String),
+		flow_published_at DateTime64(6, 'UTC'),
+		integer Nullable(Int64),
+		`integerGt64Bit` Nullable(String),
+		`integerWithUserDDL` Nullable(DECIMAL(20)),
+		multiple Nullable(String),
+		`nonAsciiκόσμε` Nullable(String),
+		number Nullable(Float64),
+		`numberCastToString` Nullable(String),
+		object Nullable(String),
+		string Nullable(String),
+		`stringInteger` Nullable(String),
+		`stringInteger39Chars` Nullable(String),
+		`stringInteger66Chars` Nullable(String),
+		`stringNumber` Nullable(Float64),
+		flow_document String,
+		`_version` UInt64,
+		`_is_deleted` UInt8 DEFAULT 0
+)
+ENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)
+ORDER BY (key1, key2, `key!binary`);
+--- End key_value createTargetTable ---
+
+--- Begin delta_updates createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS delta_updates (
+		`theKey` String,
+		`aValue` Nullable(Int64),
+		flow_published_at DateTime64(6, 'UTC'),
+		`_version` UInt64,
+		`_is_deleted` UInt8 DEFAULT 0
+)
+ENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)
+ORDER BY (`theKey`);
+--- End delta_updates createTargetTable ---
+
+--- Begin key_value loadQuery ---
+
+SELECT flow_document
+	FROM key_value FINAL
+	WHERE `_is_deleted` = 0
+	AND (key1, key2, `key!binary`) IN (?)
+
+--- End key_value loadQuery ---
+
+--- Begin delta_updates loadQuery ---
+
+SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
+
+--- End delta_updates loadQuery ---
+
+--- Begin key_value storeInsert ---
+
+INSERT INTO key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document, `_version`, `_is_deleted`
+)
+--- End key_value storeInsert ---
+
+--- Begin delta_updates storeInsert ---
+
+INSERT INTO delta_updates (`theKey`, `aValue`, flow_published_at, `_version`, `_is_deleted`
+)
+--- End delta_updates storeInsert ---
+
+--- Begin alter table add columns and drop not nulls ---
+
+ALTER TABLE key_value ADD COLUMN IF NOT EXISTS first_new_column Nullable(STRING);
+
+ALTER TABLE key_value ADD COLUMN IF NOT EXISTS second_new_column Nullable(BOOL);
+
+ALTER TABLE key_value MODIFY COLUMN first_required_column Nullable(string);
+
+ALTER TABLE key_value MODIFY COLUMN second_required_column Nullable(bool);
+--- End alter table add columns and drop not nulls ---
+
+--- Begin alter table add columns ---
+
+ALTER TABLE key_value ADD COLUMN IF NOT EXISTS first_new_column Nullable(STRING);
+
+ALTER TABLE key_value ADD COLUMN IF NOT EXISTS second_new_column Nullable(BOOL);
+--- End alter table add columns ---
+
+--- Begin alter table drop not nulls ---
+
+ALTER TABLE key_value MODIFY COLUMN first_required_column Nullable(string);
+
+ALTER TABLE key_value MODIFY COLUMN second_required_column Nullable(bool);
+--- End alter table drop not nulls ---
+
+

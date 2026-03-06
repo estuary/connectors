@@ -1,0 +1,118 @@
+Base Initial Constraints:
+{"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
+{"Field":"boolWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"dateValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"datetimeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"fieldWithProjection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"field_with_projection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"int64","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"int64ToNumber","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"intToNumber","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"intWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The first collection key component is required to be included for standard updates"}
+{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
+{"Field":"nonScalarValue","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
+{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"optional","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
+{"Field":"requiredNumeric","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Only a single root document projection can be materialized for standard updates"}
+{"Field":"stringAddMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringIncreaseMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"stringWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+{"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
+
+Migratable Changes Before Apply Schema:
+{"Name":"_is_deleted","Type":"UInt8"}
+{"Name":"_meta/flow_truncated","Type":"Bool"}
+{"Name":"_version","Type":"UInt64"}
+{"Name":"boolWidenedToJson","Type":"Nullable(Bool)"}
+{"Name":"dateValue","Type":"Nullable(Date32)"}
+{"Name":"datetimeValue","Type":"Nullable(DateTime64(6, 'UTC'))"}
+{"Name":"fieldWithProjection","Type":"Nullable(String)"}
+{"Name":"field_with_projection","Type":"Nullable(String)"}
+{"Name":"flow_document","Type":"String"}
+{"Name":"flow_published_at","Type":"DateTime64(6, 'UTC')"}
+{"Name":"int64","Type":"Nullable(Int64)"}
+{"Name":"int64ToNumber","Type":"Nullable(String)"}
+{"Name":"intToNumber","Type":"Nullable(Int64)"}
+{"Name":"intWidenedToJson","Type":"Nullable(Int64)"}
+{"Name":"key","Type":"String"}
+{"Name":"multiple","Type":"Nullable(String)"}
+{"Name":"nonScalarValue","Type":"Nullable(String)"}
+{"Name":"numericString","Type":"Nullable(String)"}
+{"Name":"optional","Type":"Nullable(String)"}
+{"Name":"requiredNumeric","Type":"String"}
+{"Name":"scalarValue","Type":"String"}
+{"Name":"stringAddMaxLength","Type":"Nullable(String)"}
+{"Name":"stringIncreaseMaxLength","Type":"Nullable(String)"}
+{"Name":"stringWidenedToJson","Type":"Nullable(String)"}
+{"Name":"timeValue","Type":"Nullable(String)"}
+
+
+Migratable Changes Before Apply Data:
+key (String), _meta/flow_truncated (Bool), boolWidenedToJson (Nullable(Bool)), dateValue (Nullable(Date32)), datetimeValue (Nullable(DateTime64(6, 'UTC'))), fieldWithProjection (Nullable(String)), field_with_projection (Nullable(String)), flow_published_at (DateTime64(6, 'UTC')), int64 (Nullable(Int64)), int64ToNumber (Nullable(String)), intToNumber (Nullable(Int64)), intWidenedToJson (Nullable(Int64)), multiple (Nullable(String)), nonScalarValue (Nullable(String)), numericString (Nullable(String)), optional (Nullable(String)), requiredNumeric (String), scalarValue (String), stringAddMaxLength (Nullable(String)), stringIncreaseMaxLength (Nullable(String)), stringWidenedToJson (Nullable(String)), timeValue (Nullable(String)), flow_document (String), _version (UInt64), _is_deleted (UInt8)
+1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T01:01:01.111111Z, <nil>, <nil>, 2024-09-13T01:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, <nil>, <nil>, hello, 01:01:01, {}, 1, 0
+
+Migratable Changes Constraints:
+{"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"boolWidenedToJson","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'boolWidenedToJson' is already being materialized as endpoint type 'BOOL' but endpoint type 'STRING' is required by its schema '{ type: [boolean, string] }'"}
+{"Field":"dateValue","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'dateValue' is already being materialized as endpoint type 'DATE32' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"datetimeValue","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'datetimeValue' is already being materialized as endpoint type 'DATETIME64(6, 'UTC')' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"fieldWithProjection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"field_with_projection","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
+{"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"int64","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'int64' is already being materialized as endpoint type 'INT64' but endpoint type 'STRING' is required by its schema '{ type: [integer] }'"}
+{"Field":"int64ToNumber","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'int64ToNumber' is already being materialized as endpoint type 'STRING' but endpoint type 'FLOAT64' is required by its schema '{ type: [number] }'"}
+{"Field":"intToNumber","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'intToNumber' is already being materialized as endpoint type 'INT64' but endpoint type 'FLOAT64' is required by its schema '{ type: [number] }'"}
+{"Field":"intWidenedToJson","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'intWidenedToJson' is already being materialized as endpoint type 'INT64' but endpoint type 'STRING' is required by its schema '{ type: [boolean, integer, string] }'"}
+{"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
+{"Field":"multiple","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"nonScalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"nullValue","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
+{"Field":"numericString","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"optional","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"requiredNumeric","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"scalarValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"second_root","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize root document projection 'second_root' because field 'flow_document' is already being materialized as the document"}
+{"Field":"stringAddMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIncreaseMaxLength","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringWidenedToJson","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"timeValue","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+
+Migratable Changes Applied Schema:
+{"Name":"_is_deleted","Type":"UInt8"}
+{"Name":"_meta/flow_truncated","Type":"Bool"}
+{"Name":"_version","Type":"UInt64"}
+{"Name":"boolWidenedToJson","Type":"Nullable(Bool)"}
+{"Name":"dateValue","Type":"Nullable(Date32)"}
+{"Name":"datetimeValue","Type":"Nullable(DateTime64(6, 'UTC'))"}
+{"Name":"fieldWithProjection","Type":"Nullable(String)"}
+{"Name":"field_with_projection","Type":"Nullable(String)"}
+{"Name":"flow_document","Type":"String"}
+{"Name":"flow_published_at","Type":"DateTime64(6, 'UTC')"}
+{"Name":"int64","Type":"Nullable(Int64)"}
+{"Name":"int64ToNumber","Type":"Nullable(String)"}
+{"Name":"intToNumber","Type":"Nullable(Int64)"}
+{"Name":"intWidenedToJson","Type":"Nullable(Int64)"}
+{"Name":"key","Type":"String"}
+{"Name":"multiple","Type":"Nullable(String)"}
+{"Name":"nonScalarValue","Type":"Nullable(String)"}
+{"Name":"numericString","Type":"Nullable(String)"}
+{"Name":"optional","Type":"Nullable(String)"}
+{"Name":"requiredNumeric","Type":"String"}
+{"Name":"scalarValue","Type":"String"}
+{"Name":"stringAddMaxLength","Type":"Nullable(String)"}
+{"Name":"stringIncreaseMaxLength","Type":"Nullable(String)"}
+{"Name":"stringWidenedToJson","Type":"Nullable(String)"}
+{"Name":"timeValue","Type":"Nullable(String)"}
+
+
+Migratable Changes Applied Data:
+key (String), _meta/flow_truncated (Bool), boolWidenedToJson (Nullable(Bool)), dateValue (Nullable(Date32)), datetimeValue (Nullable(DateTime64(6, 'UTC'))), fieldWithProjection (Nullable(String)), field_with_projection (Nullable(String)), flow_published_at (DateTime64(6, 'UTC')), int64 (Nullable(Int64)), int64ToNumber (Nullable(String)), intToNumber (Nullable(Int64)), intWidenedToJson (Nullable(Int64)), multiple (Nullable(String)), nonScalarValue (Nullable(String)), numericString (Nullable(String)), optional (Nullable(String)), requiredNumeric (String), scalarValue (String), stringAddMaxLength (Nullable(String)), stringIncreaseMaxLength (Nullable(String)), stringWidenedToJson (Nullable(String)), timeValue (Nullable(String)), flow_document (String), _version (UInt64), _is_deleted (UInt8)
+1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T01:01:01.111111Z, <nil>, <nil>, 2024-09-13T01:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, <nil>, <nil>, hello, 01:01:01, {}, 1, 0
+

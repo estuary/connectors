@@ -132,6 +132,7 @@ jobs:
           - materialize-webhook
           - materialize-sqlserver
           - materialize-slack
+          - materialize-clickhouse
           - materialize-cratedb
         include:
           - connector: source-criteo
@@ -202,7 +203,8 @@ jobs:
             "source-sqlserver",
             "source-sqlserver-batch",
             "source-sqlserver-ct",
-            "source-mongodb"
+            "source-mongodb",
+            "materialize-clickhouse"
             ]'), matrix.connector)
         run: |
           set +e # Show logs even if startup fails
@@ -330,7 +332,8 @@ jobs:
               "materialize-bigquery",
               "materialize-redshift",
               "materialize-s3-iceberg",
-              "materialize-iceberg"
+              "materialize-iceberg",
+              "materialize-clickhouse"
             ]'), matrix.connector)
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
