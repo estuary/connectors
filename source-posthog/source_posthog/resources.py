@@ -11,17 +11,19 @@ from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
 from .api import (
     backfill_feature_flags,
+    backfill_persons,
     backfill_project_events,
     fetch_entity,
     fetch_feature_flags,
+    fetch_persons,
     fetch_project_entity,
     fetch_project_events,
     fetch_project_ids,
     fetch_token_scopes,
-    snapshot_persons,
 )
 from .models import (
     Annotation,
+    BasePostHogEntity,
     Cohort,
     EndpointConfig,
     Event,
@@ -52,12 +54,15 @@ RESOURCE_REQUIRED_SCOPES: dict[str, str] = {
     "Persons": "query:read",
 }
 
+PostHogResource = Resource[
+    BasePostHogEntity[str] | BasePostHogEntity[int], ResourceConfig, ResourceState
+]
+
 
 SNAPSHOT_RESOURCES = [
     Annotation,
     Cohort,
     Organization,
-    Person,
     Project,
 ]
 
@@ -112,14 +117,14 @@ async def filter_resources_by_scopes(
     log: Logger,
     http: HTTPMixin,
     config: EndpointConfig,
-    resources: list[Resource],
-) -> list[Resource]:
+    resources: list[PostHogResource],
+) -> list[PostHogResource]:
     scopes = await fetch_token_scopes(http, config, log)
 
     if "*" in scopes:
         return resources
 
-    def _is_resource_in_scopes(resource):
+    def _is_resource_in_scopes(resource: PostHogResource):
         required_scope = RESOURCE_REQUIRED_SCOPES.get(resource.name)
 
         return required_scope is None or required_scope in scopes
@@ -128,14 +133,13 @@ async def filter_resources_by_scopes(
 
 
 def snapshot_resources(
-    log: Logger, http: HTTPMixin, config: EndpointConfig
-) -> list[Resource]:
+    http: HTTPMixin, config: EndpointConfig
+) -> list[PostHogResource]:
     """Return Resource objects for all snapshot (full-refresh) resources."""
 
     snapshot_fetchers = {
         "Organizations": functools.partial(fetch_entity, Organization, http, config),
         "Projects": functools.partial(fetch_entity, Project, http, config),
-        "Persons": functools.partial(snapshot_persons, http, config),
         "Cohorts": functools.partial(fetch_project_entity, Cohort, http, config),
         "Annotations": functools.partial(
             fetch_project_entity, Annotation, http, config
@@ -160,7 +164,7 @@ def snapshot_resources(
         )
 
     return [
-        Resource(
+        PostHogResource(
             name=model.resource_name,
             key=["/_meta/row_id"],
             model=model,
@@ -176,7 +180,9 @@ def snapshot_resources(
     ]
 
 
-async def events(log: Logger, http: HTTPMixin, config: EndpointConfig) -> Resource:
+async def events(
+    log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> PostHogResource:
     project_ids = await fetch_project_ids(http, config, log)
 
     cutoff = datetime.now(tz=UTC)
@@ -234,7 +240,7 @@ async def events(log: Logger, http: HTTPMixin, config: EndpointConfig) -> Resour
             fetch_page=backfill_fetchers,
         )
 
-    return Resource(
+    return PostHogResource(
         name=Event.resource_name,
         key=["/_meta/project_id", "/uuid"],
         model=Event,
@@ -277,7 +283,7 @@ async def events(log: Logger, http: HTTPMixin, config: EndpointConfig) -> Resour
 
 async def feature_flags(
     log: Logger, http: HTTPMixin, config: EndpointConfig
-) -> Resource:
+) -> PostHogResource:
     """Return Resource for incremental feature flags capture."""
     project_ids = await fetch_project_ids(http, config, log)
     cutoff = datetime.now(tz=UTC)
@@ -314,7 +320,7 @@ async def feature_flags(
             fetch_page=backfill_fetchers,
         )
 
-    return Resource(
+    return PostHogResource(
         name=FeatureFlag.resource_name,
         key=["/_meta/project_id", "/id"],
         model=FeatureFlag,
@@ -337,11 +343,66 @@ async def feature_flags(
     )
 
 
+async def persons(
+    log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> PostHogResource:
+    project_ids = await fetch_project_ids(http, config, log)
+    cutoff = datetime.now(tz=UTC)
+
+    incremental_fetchers = {
+        f"{project_id}": functools.partial(fetch_persons, http, config, project_id)
+        for project_id in project_ids
+    }
+
+    backfill_fetchers = {
+        f"{project_id}": functools.partial(backfill_persons, http, config, project_id)
+        for project_id in project_ids
+    }
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=incremental_fetchers,
+            fetch_page=backfill_fetchers,
+        )
+
+    return PostHogResource(
+        name=Person.resource_name,
+        key=["/_meta/project_id", "/id"],
+        model=Person,
+        open=open,
+        initial_state=ResourceState(
+            inc={
+                f"{project_id}": ResourceState.Incremental(cursor=cutoff)
+                for project_id in project_ids
+            },
+            backfill={
+                f"{project_id}": ResourceState.Backfill(cutoff=cutoff, next_page=None)
+                for project_id in project_ids
+            },
+        ),
+        initial_config=ResourceConfig(
+            name=Person.resource_name,
+            interval=timedelta(minutes=5),
+        ),
+        schema_inference=True,
+    )
+
+
 async def all_resources(
     log: Logger,
     http: HTTPMixin,
     config: EndpointConfig,
-) -> list[Resource]:
+) -> list[PostHogResource]:
     """Return all resources for the PostHog connector."""
 
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
@@ -352,9 +413,10 @@ async def all_resources(
     )
 
     resources = [
-        *snapshot_resources(log, http, config),
+        *snapshot_resources(http, config),
         await events(log, http, config),
         await feature_flags(log, http, config),
+        await persons(log, http, config),
     ]
 
     return await filter_resources_by_scopes(log, http, config, resources)

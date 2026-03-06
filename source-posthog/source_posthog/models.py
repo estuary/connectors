@@ -164,7 +164,7 @@ class HogQLEntity[T: PostHogPrimaryKey](BasePostHogEntity[T], metaclass=ABCMeta)
     """Entity fetched via HogQL Query API."""
 
     table_name: ClassVar[str]
-    cursor_column: ClassVar[str]
+    cursor_columns: ClassVar[list[str]]
 
     @classmethod
     def get_api_endpoint_url(cls, base_url: str, project_id: int) -> str:
@@ -288,7 +288,7 @@ class Event(HogQLEntity[str]):
 
     resource_name: ClassVar[str] = "Events"
     table_name: ClassVar[str] = "events"
-    cursor_column: ClassVar[str] = "timestamp"
+    cursor_columns: ClassVar[list[str]] = ["timestamp"]
 
     class Meta(BaseDocument.Meta):
         model_config = ConfigDict(validate_assignment=True)
@@ -327,13 +327,38 @@ class Person(HogQLEntity[str]):
 
     resource_name: ClassVar[str] = "Persons"
     table_name: ClassVar[str] = "persons"
-    cursor_column: ClassVar[str] = "created_at"
+    cursor_columns: ClassVar[list[str]] = ["last_seen_at", "created_at"]
+
+    class Meta(BaseDocument.Meta):
+        model_config = ConfigDict(validate_assignment=True)
+        project_id: int | None = Field(
+            default=None,
+            description="The PostHog project this document belongs to",
+        )
+
+    meta_: Meta = Field(  # pyright: ignore[reportIncompatibleVariableOverride]
+        default_factory=lambda: Person.Meta(op="u"),
+        alias="_meta",
+        description="Document metadata",
+    )
 
     created_at: AwareDatetime
+    last_seen_at: AwareDatetime | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _inject_project_id_from_context(cls, data: Any, info: ValidationInfo) -> Any:
+        if not isinstance(data, dict):
+            return data
+        if info.context and isinstance(info.context, ProjectIdValidationContext):
+            meta = data.get("_meta") or {}
+            meta["project_id"] = info.context.project_id
+            data["_meta"] = meta
+        return data
 
     @override
     def get_cursor(self) -> AwareDatetime:
-        return self.created_at
+        return self.last_seen_at or self.created_at
 
 
 # =============================================================================
