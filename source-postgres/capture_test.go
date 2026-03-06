@@ -688,6 +688,117 @@ func TestCaptureAsPartitions(t *testing.T) {
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
+// TestCaptureAsPartitionsMixed verifies that when CaptureAsPartitions is enabled,
+// non-partitioned regular tables are still discovered alongside partition leaves.
+// This is a regression test for a bug where the discovery query filtered on
+// `relispartition = true`, which excluded all non-partitioned tables.
+func TestCaptureAsPartitionsMixed(t *testing.T) {
+	var db, tc = blackboxTestSetup(t)
+
+	// Create a regular (non-partitioned) table
+	db.CreateTable(t, `<NAME>_regular`, `(id INTEGER PRIMARY KEY, data TEXT)`)
+
+	// Create a partitioned table with two partitions
+	db.CreateTable(t, `<NAME>_parted`, `(logdate DATE PRIMARY KEY, value TEXT) PARTITION BY RANGE (logdate)`)
+	var cleanup = func() {
+		db.QuietExec(t, `DROP TABLE IF EXISTS <NAME>_parted_h1`)
+		db.QuietExec(t, `DROP TABLE IF EXISTS <NAME>_parted_h2`)
+	}
+	cleanup()
+	db.Exec(t, `CREATE TABLE <NAME>_parted_h1 PARTITION OF <NAME>_parted FOR VALUES FROM ('2023-01-01') TO ('2023-07-01')`)
+	db.Exec(t, `CREATE TABLE <NAME>_parted_h2 PARTITION OF <NAME>_parted FOR VALUES FROM ('2023-07-01') TO ('2024-01-01')`)
+	t.Cleanup(cleanup)
+
+	// Recreate the publication without `publish_via_partition_root` for this test
+	t.Cleanup(func() {
+		db.QuietExec(t, `DROP PUBLICATION IF EXISTS flow_publication`)
+		db.QuietExec(t, `CREATE PUBLICATION flow_publication FOR ALL TABLES`)
+		db.QuietExec(t, `ALTER PUBLICATION flow_publication SET (publish_via_partition_root = true)`)
+	})
+	db.QuietExec(t, `DROP PUBLICATION IF EXISTS flow_publication`)
+	db.QuietExec(t, `CREATE PUBLICATION flow_publication FOR ALL TABLES`)
+
+	// Enable CaptureAsPartitions and discover. We expect to see:
+	//   - <NAME>_regular (non-partitioned table, should still be discovered)
+	//   - <NAME>_parted_h1 (partition leaf)
+	//   - <NAME>_parted_h2 (partition leaf)
+	// We should NOT see:
+	//   - <NAME>_parted (the partitioned root table)
+	require.NoError(t, tc.Capture.EditConfig("advanced.capture_as_partitions", true))
+	tc.DiscoverFull("Discover Mixed")
+
+	// Insert test data
+	db.Exec(t, `INSERT INTO <NAME>_regular VALUES (1, 'regular row 1'), (2, 'regular row 2')`)
+	db.Exec(t, `INSERT INTO <NAME>_parted VALUES
+		('2023-03-15', 'H1 data'),
+		('2023-09-15', 'H2 data')`)
+	tc.Run("Backfill", transactionCountBaseline+3)
+
+	// Replication
+	db.Exec(t, `INSERT INTO <NAME>_regular VALUES (3, 'regular replication')`)
+	db.Exec(t, `INSERT INTO <NAME>_parted VALUES
+		('2023-06-01', 'H1 replication'),
+		('2023-12-01', 'H2 replication')`)
+	tc.Run("Replication", transactionCountBaseline)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
+}
+
+// TestCaptureAsPartitionsSubpartitioned verifies that multi-level partitioning
+// (sub-partitioned tables) correctly discovers only the leaf partitions.
+func TestCaptureAsPartitionsSubpartitioned(t *testing.T) {
+	var db, tc = blackboxTestSetup(t)
+
+	// Create a table partitioned by range, with sub-partitions by list
+	db.CreateTable(t, `<NAME>`, `(region TEXT, logdate DATE, value TEXT, PRIMARY KEY (region, logdate)) PARTITION BY RANGE (logdate)`)
+	var cleanup = func() {
+		db.QuietExec(t, `DROP TABLE IF EXISTS <NAME>_h1_east`)
+		db.QuietExec(t, `DROP TABLE IF EXISTS <NAME>_h1_west`)
+		db.QuietExec(t, `DROP TABLE IF EXISTS <NAME>_h1`)
+		db.QuietExec(t, `DROP TABLE IF EXISTS <NAME>_h2_east`)
+		db.QuietExec(t, `DROP TABLE IF EXISTS <NAME>_h2_west`)
+		db.QuietExec(t, `DROP TABLE IF EXISTS <NAME>_h2`)
+	}
+	cleanup()
+	// Create intermediate partitions (these are both partitions AND partitioned tables, relkind='p')
+	db.Exec(t, `CREATE TABLE <NAME>_h1 PARTITION OF <NAME> FOR VALUES FROM ('2023-01-01') TO ('2023-07-01') PARTITION BY LIST (region)`)
+	db.Exec(t, `CREATE TABLE <NAME>_h2 PARTITION OF <NAME> FOR VALUES FROM ('2023-07-01') TO ('2024-01-01') PARTITION BY LIST (region)`)
+	// Create leaf partitions (relkind='r', relispartition=true)
+	db.Exec(t, `CREATE TABLE <NAME>_h1_east PARTITION OF <NAME>_h1 FOR VALUES IN ('east')`)
+	db.Exec(t, `CREATE TABLE <NAME>_h1_west PARTITION OF <NAME>_h1 FOR VALUES IN ('west')`)
+	db.Exec(t, `CREATE TABLE <NAME>_h2_east PARTITION OF <NAME>_h2 FOR VALUES IN ('east')`)
+	db.Exec(t, `CREATE TABLE <NAME>_h2_west PARTITION OF <NAME>_h2 FOR VALUES IN ('west')`)
+	t.Cleanup(cleanup)
+
+	// Recreate the publication without `publish_via_partition_root` for this test
+	t.Cleanup(func() {
+		db.QuietExec(t, `DROP PUBLICATION IF EXISTS flow_publication`)
+		db.QuietExec(t, `CREATE PUBLICATION flow_publication FOR ALL TABLES`)
+		db.QuietExec(t, `ALTER PUBLICATION flow_publication SET (publish_via_partition_root = true)`)
+	})
+	db.QuietExec(t, `DROP PUBLICATION IF EXISTS flow_publication`)
+	db.QuietExec(t, `CREATE PUBLICATION flow_publication FOR ALL TABLES`)
+
+	// Enable CaptureAsPartitions and discover. We expect to see only the 4 leaf partitions,
+	// NOT the root table or the intermediate partitions (_h1 and _h2).
+	require.NoError(t, tc.Capture.EditConfig("advanced.capture_as_partitions", true))
+	tc.DiscoverFull("Discover Subpartitions")
+
+	// Insert test data
+	db.Exec(t, `INSERT INTO <NAME> VALUES
+		('east', '2023-03-15', 'H1 East data'),
+		('west', '2023-03-15', 'H1 West data'),
+		('east', '2023-09-15', 'H2 East data'),
+		('west', '2023-09-15', 'H2 West data')`)
+	tc.Run("Backfill", transactionCountBaseline+4)
+
+	// Replication
+	db.Exec(t, `INSERT INTO <NAME> VALUES
+		('east', '2023-06-01', 'H1 East replication'),
+		('west', '2023-12-01', 'H2 West replication')`)
+	tc.Run("Replication", transactionCountBaseline)
+	cupaloy.SnapshotT(t, tc.Transcript.String())
+}
+
 // TestUnpairedSurrogatesInJSON tests the handling of unpaired surrogate codepoints
 // inside of JSON values. Because apparently those will be emitted as-is by the Go
 // JSON serializer when present in a json.RawMessage but are considered an error by

@@ -1,0 +1,773 @@
+sql> CREATE TABLE test.captureaspartitionssubpartitioned_416337 (region TEXT, logdate DATE, value TEXT, PRIMARY KEY (region, logdate)) PARTITION BY RANGE (logdate)
+sql> CREATE TABLE test.captureaspartitionssubpartitioned_416337_h1 PARTITION OF test.captureaspartitionssubpartitioned_416337 FOR VALUES FROM ('2023-01-01') TO ('2023-07-01') PARTITION BY LIST (region)
+sql> CREATE TABLE test.captureaspartitionssubpartitioned_416337_h2 PARTITION OF test.captureaspartitionssubpartitioned_416337 FOR VALUES FROM ('2023-07-01') TO ('2024-01-01') PARTITION BY LIST (region)
+sql> CREATE TABLE test.captureaspartitionssubpartitioned_416337_h1_east PARTITION OF test.captureaspartitionssubpartitioned_416337_h1 FOR VALUES IN ('east')
+sql> CREATE TABLE test.captureaspartitionssubpartitioned_416337_h1_west PARTITION OF test.captureaspartitionssubpartitioned_416337_h1 FOR VALUES IN ('west')
+sql> CREATE TABLE test.captureaspartitionssubpartitioned_416337_h2_east PARTITION OF test.captureaspartitionssubpartitioned_416337_h2 FOR VALUES IN ('east')
+sql> CREATE TABLE test.captureaspartitionssubpartitioned_416337_h2_west PARTITION OF test.captureaspartitionssubpartitioned_416337_h2 FOR VALUES IN ('west')
+=== Discover: Discover Subpartitions ===
+{
+  "recommendedName": "test/captureaspartitionssubpartitioned_416337_h1_east",
+  "resourceConfig": {
+    "namespace": "test",
+    "stream": "captureaspartitionssubpartitioned_416337_h1_east"
+  },
+  "documentSchema": {
+    "$defs": {
+      "TestCaptureaspartitionssubpartitioned_416337_h1_east": {
+        "type": "object",
+        "required": [
+          "logdate",
+          "region"
+        ],
+        "$anchor": "TestCaptureaspartitionssubpartitioned_416337_h1_east",
+        "properties": {
+          "logdate": {
+            "type": "string",
+            "format": "date",
+            "description": "(source type: non-nullable date)"
+          },
+          "region": {
+            "type": "string",
+            "description": "(source type: non-nullable text)"
+          },
+          "value": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "_meta": {
+              "properties": {
+                "op": {
+                  "const": "d"
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "merge"
+          }
+        },
+        "else": {
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "op",
+              "source"
+            ],
+            "properties": {
+              "before": {
+                "$ref": "#TestCaptureaspartitionssubpartitioned_416337_h1_east",
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "loc": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array",
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
+                  },
+                  "txid": {
+                    "type": "integer",
+                    "description": "The 32-bit transaction ID assigned by Postgres to the commit which produced this change."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table",
+                  "loc"
+                ]
+              }
+            },
+            "reduce": {
+              "strategy": "merge"
+            }
+          }
+        }
+      },
+      {
+        "$ref": "#TestCaptureaspartitionssubpartitioned_416337_h1_east"
+      }
+    ],
+    "x-infer-schema": true
+  },
+  "key": [
+    "/region",
+    "/logdate"
+  ]
+}
+{
+  "recommendedName": "test/captureaspartitionssubpartitioned_416337_h1_west",
+  "resourceConfig": {
+    "namespace": "test",
+    "stream": "captureaspartitionssubpartitioned_416337_h1_west"
+  },
+  "documentSchema": {
+    "$defs": {
+      "TestCaptureaspartitionssubpartitioned_416337_h1_west": {
+        "type": "object",
+        "required": [
+          "logdate",
+          "region"
+        ],
+        "$anchor": "TestCaptureaspartitionssubpartitioned_416337_h1_west",
+        "properties": {
+          "logdate": {
+            "type": "string",
+            "format": "date",
+            "description": "(source type: non-nullable date)"
+          },
+          "region": {
+            "type": "string",
+            "description": "(source type: non-nullable text)"
+          },
+          "value": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "_meta": {
+              "properties": {
+                "op": {
+                  "const": "d"
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "merge"
+          }
+        },
+        "else": {
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "op",
+              "source"
+            ],
+            "properties": {
+              "before": {
+                "$ref": "#TestCaptureaspartitionssubpartitioned_416337_h1_west",
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "loc": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array",
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
+                  },
+                  "txid": {
+                    "type": "integer",
+                    "description": "The 32-bit transaction ID assigned by Postgres to the commit which produced this change."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table",
+                  "loc"
+                ]
+              }
+            },
+            "reduce": {
+              "strategy": "merge"
+            }
+          }
+        }
+      },
+      {
+        "$ref": "#TestCaptureaspartitionssubpartitioned_416337_h1_west"
+      }
+    ],
+    "x-infer-schema": true
+  },
+  "key": [
+    "/region",
+    "/logdate"
+  ]
+}
+{
+  "recommendedName": "test/captureaspartitionssubpartitioned_416337_h2_east",
+  "resourceConfig": {
+    "namespace": "test",
+    "stream": "captureaspartitionssubpartitioned_416337_h2_east"
+  },
+  "documentSchema": {
+    "$defs": {
+      "TestCaptureaspartitionssubpartitioned_416337_h2_east": {
+        "type": "object",
+        "required": [
+          "logdate",
+          "region"
+        ],
+        "$anchor": "TestCaptureaspartitionssubpartitioned_416337_h2_east",
+        "properties": {
+          "logdate": {
+            "type": "string",
+            "format": "date",
+            "description": "(source type: non-nullable date)"
+          },
+          "region": {
+            "type": "string",
+            "description": "(source type: non-nullable text)"
+          },
+          "value": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "_meta": {
+              "properties": {
+                "op": {
+                  "const": "d"
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "merge"
+          }
+        },
+        "else": {
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "op",
+              "source"
+            ],
+            "properties": {
+              "before": {
+                "$ref": "#TestCaptureaspartitionssubpartitioned_416337_h2_east",
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "loc": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array",
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
+                  },
+                  "txid": {
+                    "type": "integer",
+                    "description": "The 32-bit transaction ID assigned by Postgres to the commit which produced this change."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table",
+                  "loc"
+                ]
+              }
+            },
+            "reduce": {
+              "strategy": "merge"
+            }
+          }
+        }
+      },
+      {
+        "$ref": "#TestCaptureaspartitionssubpartitioned_416337_h2_east"
+      }
+    ],
+    "x-infer-schema": true
+  },
+  "key": [
+    "/region",
+    "/logdate"
+  ]
+}
+{
+  "recommendedName": "test/captureaspartitionssubpartitioned_416337_h2_west",
+  "resourceConfig": {
+    "namespace": "test",
+    "stream": "captureaspartitionssubpartitioned_416337_h2_west"
+  },
+  "documentSchema": {
+    "$defs": {
+      "TestCaptureaspartitionssubpartitioned_416337_h2_west": {
+        "type": "object",
+        "required": [
+          "logdate",
+          "region"
+        ],
+        "$anchor": "TestCaptureaspartitionssubpartitioned_416337_h2_west",
+        "properties": {
+          "logdate": {
+            "type": "string",
+            "format": "date",
+            "description": "(source type: non-nullable date)"
+          },
+          "region": {
+            "type": "string",
+            "description": "(source type: non-nullable text)"
+          },
+          "value": {
+            "description": "(source type: text)",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      }
+    },
+    "allOf": [
+      {
+        "if": {
+          "properties": {
+            "_meta": {
+              "properties": {
+                "op": {
+                  "const": "d"
+                }
+              }
+            }
+          }
+        },
+        "then": {
+          "reduce": {
+            "delete": true,
+            "strategy": "merge"
+          }
+        },
+        "else": {
+          "reduce": {
+            "strategy": "merge"
+          }
+        },
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "type": "object",
+            "required": [
+              "op",
+              "source"
+            ],
+            "properties": {
+              "before": {
+                "$ref": "#TestCaptureaspartitionssubpartitioned_416337_h2_west",
+                "description": "Record state immediately before this change was applied.",
+                "reduce": {
+                  "strategy": "firstWriteWins"
+                }
+              },
+              "op": {
+                "enum": [
+                  "c",
+                  "d",
+                  "u"
+                ],
+                "description": "Change operation type: 'c' Create/Insert, 'u' Update, 'd' Delete."
+              },
+              "source": {
+                "properties": {
+                  "ts_ms": {
+                    "type": "integer",
+                    "description": "Unix timestamp (in millis) at which this event was recorded by the database."
+                  },
+                  "schema": {
+                    "type": "string",
+                    "description": "Database schema (namespace) of the event."
+                  },
+                  "snapshot": {
+                    "type": "boolean",
+                    "description": "Snapshot is true if the record was produced from an initial table backfill and unset if produced from the replication log."
+                  },
+                  "table": {
+                    "type": "string",
+                    "description": "Database table of the event."
+                  },
+                  "loc": {
+                    "items": {
+                      "type": "integer"
+                    },
+                    "type": "array",
+                    "maxItems": 3,
+                    "minItems": 3,
+                    "description": "Location of this WAL event as [last Commit.EndLSN; event LSN; current Begin.FinalLSN]. See https://www.postgresql.org/docs/current/protocol-logicalrep-message-formats.html"
+                  },
+                  "txid": {
+                    "type": "integer",
+                    "description": "The 32-bit transaction ID assigned by Postgres to the commit which produced this change."
+                  }
+                },
+                "type": "object",
+                "required": [
+                  "schema",
+                  "table",
+                  "loc"
+                ]
+              }
+            },
+            "reduce": {
+              "strategy": "merge"
+            }
+          }
+        }
+      },
+      {
+        "$ref": "#TestCaptureaspartitionssubpartitioned_416337_h2_west"
+      }
+    ],
+    "x-infer-schema": true
+  },
+  "key": [
+    "/region",
+    "/logdate"
+  ]
+}
+sql> INSERT INTO test.captureaspartitionssubpartitioned_416337 VALUES
+		('east', '2023-03-15', 'H1 East data'),
+		('west', '2023-03-15', 'H1 West data'),
+		('east', '2023-09-15', 'H2 East data'),
+		('west', '2023-09-15', 'H2 West data')
+=== Run: Backfill ===
+[
+  "acmeCo/test_capture/test/captureaspartitionssubpartitioned_416337_h1_east",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureaspartitionssubpartitioned_416337_h1_east"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "logdate": "2023-03-15",
+    "region": "east",
+    "value": "H1 East data"
+  }
+]
+[
+  "acmeCo/test_capture/test/captureaspartitionssubpartitioned_416337_h1_west",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureaspartitionssubpartitioned_416337_h1_west"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "logdate": "2023-03-15",
+    "region": "west",
+    "value": "H1 West data"
+  }
+]
+[
+  "acmeCo/test_capture/test/captureaspartitionssubpartitioned_416337_h2_east",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureaspartitionssubpartitioned_416337_h2_east"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "logdate": "2023-09-15",
+    "region": "east",
+    "value": "H2 East data"
+  }
+]
+[
+  "acmeCo/test_capture/test/captureaspartitionssubpartitioned_416337_h2_west",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "snapshot": true,
+        "table": "captureaspartitionssubpartitioned_416337_h2_west"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "logdate": "2023-09-15",
+    "region": "west",
+    "value": "H2 West data"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fcaptureaspartitionssubpartitioned_416337_h1_east": {
+      "backfilled": 1,
+      "key_columns": [
+        "region",
+        "logdate"
+      ],
+      "mode": "Active"
+    },
+    "test%2Fcaptureaspartitionssubpartitioned_416337_h1_west": {
+      "backfilled": 1,
+      "key_columns": [
+        "region",
+        "logdate"
+      ],
+      "mode": "Active"
+    },
+    "test%2Fcaptureaspartitionssubpartitioned_416337_h2_east": {
+      "backfilled": 1,
+      "key_columns": [
+        "region",
+        "logdate"
+      ],
+      "mode": "Active"
+    },
+    "test%2Fcaptureaspartitionssubpartitioned_416337_h2_west": {
+      "backfilled": 1,
+      "key_columns": [
+        "region",
+        "logdate"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+sql> INSERT INTO test.captureaspartitionssubpartitioned_416337 VALUES
+		('east', '2023-06-01', 'H1 East replication'),
+		('west', '2023-12-01', 'H2 West replication')
+=== Run: Replication ===
+[
+  "acmeCo/test_capture/test/captureaspartitionssubpartitioned_416337_h1_east",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "captureaspartitionssubpartitioned_416337_h1_east",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "logdate": "2023-06-01",
+    "region": "east",
+    "value": "H1 East replication"
+  }
+]
+[
+  "acmeCo/test_capture/test/captureaspartitionssubpartitioned_416337_h2_west",
+  {
+    "_meta": {
+      "op": "c",
+      "source": {
+        "loc": "REDACTED",
+        "schema": "test",
+        "table": "captureaspartitionssubpartitioned_416337_h2_west",
+        "ts_ms": "REDACTED",
+        "txid": "REDACTED"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "logdate": "2023-12-01",
+    "region": "west",
+    "value": "H2 West replication"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "test%2Fcaptureaspartitionssubpartitioned_416337_h1_east": {
+      "backfilled": 1,
+      "key_columns": [
+        "region",
+        "logdate"
+      ],
+      "mode": "Active"
+    },
+    "test%2Fcaptureaspartitionssubpartitioned_416337_h1_west": {
+      "backfilled": 1,
+      "key_columns": [
+        "region",
+        "logdate"
+      ],
+      "mode": "Active"
+    },
+    "test%2Fcaptureaspartitionssubpartitioned_416337_h2_east": {
+      "backfilled": 1,
+      "key_columns": [
+        "region",
+        "logdate"
+      ],
+      "mode": "Active"
+    },
+    "test%2Fcaptureaspartitionssubpartitioned_416337_h2_west": {
+      "backfilled": 1,
+      "key_columns": [
+        "region",
+        "logdate"
+      ],
+      "mode": "Active"
+    }
+  },
+  "cursor": "REDACTED"
+}
+
