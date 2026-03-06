@@ -5,6 +5,7 @@ from typing import Annotated, ClassVar
 
 from estuary_cdk.capture.common import (
     BaseDocument,
+    ResourceConfig,  # noqa: F401 — re-exported for __init__.py and resources.py
     ResourceState,
 )
 from estuary_cdk.capture.common import (
