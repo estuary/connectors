@@ -380,9 +380,9 @@ func getTables(ctx context.Context, conn *pgxpool.Pool, selectedSchemas []string
 	fmt.Fprintf(query, "  WHERE n.nspname NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron', 'pglogical')")
 	fmt.Fprintf(query, "    AND c.relpersistence = 'p'") // exclude temporary tables ('t') and unlogged tables ('u')
 	if captureAsPartitions {
-		// When capturing as partitions, we want partition leaves only
-		fmt.Fprintf(query, "    AND c.relispartition")
-		fmt.Fprintf(query, "    AND c.relkind = 'r'") // Only ordinary tables (includes partitions but not the root of a partitioned table)
+		// When capturing as partitions, we want partition leaves and regular
+		// non-partitioned tables, but not partitioned root tables.
+		fmt.Fprintf(query, "    AND c.relkind = 'r'")
 	} else {
 		// Default behavior: exclude partitions and include root tables
 		fmt.Fprintf(query, "    AND NOT c.relispartition")
