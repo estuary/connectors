@@ -81,18 +81,27 @@ class TestDiscover:
         resource_names = [b.resourceConfig.name for b in result.bindings]
 
         expected_resources = [
+            # Snapshot: top-level
             "Workspaces",
+            # Snapshot: workspace-scoped
             "Users",
             "Teams",
             "Projects",
-            "Tasks",
-            "Sections",
             "Tags",
             "Portfolios",
             "Goals",
             "CustomFields",
+            "TimePeriods",
+            "ProjectTemplates",
+            "TeamMemberships",
+            # Snapshot: project-scoped
             "StatusUpdates",
             "Memberships",
+            # Incremental via Events API
+            "Tasks",
+            "Sections",
+            "Attachments",
+            "Stories",
         ]
 
         for expected in expected_resources:
