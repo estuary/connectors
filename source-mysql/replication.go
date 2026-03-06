@@ -20,6 +20,7 @@ import (
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/go/mysql/jsonpath"
 	"github.com/estuary/connectors/sqlcapture"
+	"github.com/go-mysql-org/go-mysql/client"
 	"github.com/go-mysql-org/go-mysql/mysql"
 	"github.com/go-mysql-org/go-mysql/replication"
 	"github.com/google/uuid"
@@ -132,6 +133,11 @@ func (db *mysqlDatabase) ReplicationStream(ctx context.Context, startCursorJSON 
 
 		// Allow the binlog syncer to buffer a few events internally for speed, but not too many.
 		EventCacheCount: binlogEventCacheCount,
+
+		Option: func(c *client.Conn) error {
+			c.SetAttributes(map[string]string{"program_name": "Estuary source-mysql"})
+			return nil
+		},
 	}
 
 	logrus.WithFields(logrus.Fields{"pos": pos}).Info("starting replication")
