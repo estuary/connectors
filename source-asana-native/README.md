@@ -10,8 +10,6 @@ An Estuary Flow source connector for Asana.
 | Users            | Snapshot    | Per-workspace | Deduplicated across workspaces         |
 | Teams            | Snapshot    | Per-workspace | Organization workspaces only           |
 | Projects         | Snapshot    | Per-workspace | Active (non-archived) projects         |
-| Tasks            | Incremental | Per-project   | Sync-token events + backfill           |
-| Sections         | Snapshot    | Per-project   | Project sections                       |
 | Tags             | Snapshot    | Per-workspace | All tags                               |
 | Portfolios       | Snapshot    | Per-workspace | Portfolios owned by authenticated user |
 | Goals            | Snapshot    | Per-workspace | All goals                              |
@@ -19,10 +17,25 @@ An Estuary Flow source connector for Asana.
 | TimePeriods      | Snapshot    | Per-workspace | Time period definitions                |
 | ProjectTemplates | Snapshot    | Per-workspace | Project templates                      |
 | StatusUpdates    | Snapshot    | Per-project   | Project status updates                 |
-| Attachments      | Snapshot    | Per-project   | Project attachments                    |
-| Stories          | Snapshot    | Per-task      | Task comments and activity             |
 | Memberships      | Snapshot    | Per-project   | Project memberships                    |
 | TeamMemberships  | Snapshot    | Per-team      | Team memberships                       |
+| Tasks            | Incremental | Per-project   | Sync-token events + backfill           |
+| Sections         | Incremental | Per-project   | Sync-token events + backfill           |
+| Attachments      | Incremental | Per-project   | Sync-token events + backfill           |
+| Stories          | Incremental | Per-project   | Sync-token events + backfill           |
+
+### Not captured (potentially useful)
+
+- **Time Tracking Entries** — logged time on tasks
+- **Project Memberships** — user-to-project membership details
+- **Portfolio Memberships** — user-to-portfolio membership details
+- **Workspace Memberships** — user-to-workspace membership details
+- **Goal Relationships** — links between goals
+- **Task Templates** — reusable task templates
+- **User Task Lists** — per-user "My Tasks" lists
+- **Custom Field Settings** — how custom fields are applied to projects
+- **Reactions** — emoji reactions on stories
+- **Project Briefs** — summary documents on projects
 
 ## Setup
 
