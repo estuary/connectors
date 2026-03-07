@@ -107,6 +107,12 @@ class RestCatalogConfig(BaseModel):
         description="Warehouse to connect to.",
         json_schema_extra={"order": 4},
     )
+    scope: str | None = Field(
+        default=None,
+        title="Scope",
+        description="Desired scope of the requested security token.",
+        json_schema_extra={"order": 5},
+    )
 
 
 class GlueCatalogConfig(BaseModel):

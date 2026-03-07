@@ -15,8 +15,10 @@ ENV VIRTUAL_ENV=/opt/venv
 
 WORKDIR /opt/iceberg-ctl
 
-COPY materialize-s3-iceberg/iceberg-ctl /opt/iceberg-ctl
-
+COPY materialize-s3-iceberg/iceberg-ctl/poetry.lock /opt/iceberg-ctl/poetry.lock
+COPY materialize-s3-iceberg/iceberg-ctl/pyproject.toml /opt/iceberg-ctl/pyproject.toml
+RUN poetry install --no-root
+COPY materialize-s3-iceberg/iceberg-ctl/iceberg_ctl /opt/iceberg-ctl/iceberg_ctl
 RUN poetry install
 
 # Go build stage
@@ -26,6 +28,8 @@ FROM --platform=linux/amd64 golang:1.25-bookworm AS gobuilder
 WORKDIR /builder
 
 COPY go.*                       ./
+RUN go mod download
+
 COPY go                         ./go
 COPY filesink                   ./filesink
 COPY materialize-boilerplate    ./materialize-boilerplate

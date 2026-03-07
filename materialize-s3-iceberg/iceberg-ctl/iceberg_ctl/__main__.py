@@ -76,15 +76,17 @@ def run(
 
         match cfg.catalog:
             case RestCatalogConfig():
+                properties = {
+                    "uri": cfg.catalog.uri,
+                    "credential": cfg.catalog.credential,
+                    "token": cfg.catalog.token,
+                    "warehouse": cfg.catalog.warehouse,
+                    "scope": cfg.catalog.scope,
+                    PY_IO_IMPL: "pyiceberg.io.fsspec.FsspecFileIO",  # use S3 file IO instead of Arrow
+                }
                 ctx.obj["catalog"] = RestCatalog(
                     "default",
-                    **{
-                        "uri": cfg.catalog.uri,
-                        "credential": cfg.catalog.credential,
-                        "token": cfg.catalog.token,
-                        "warehouse": cfg.catalog.warehouse,
-                        PY_IO_IMPL: "pyiceberg.io.fsspec.FsspecFileIO",  # use S3 file IO instead of Arrow
-                    },
+                    **{k:v for k, v in properties.items() if v is not None},
                 )
 
             case GlueCatalogConfig():
