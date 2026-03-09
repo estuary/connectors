@@ -3,9 +3,10 @@ import asyncio
 import base64
 import json
 import time
+from collections.abc import AsyncGenerator, Awaitable
 from dataclasses import dataclass
 from logging import Logger
-from typing import Any, AsyncGenerator, Awaitable, Callable, Protocol, TypeVar
+from typing import Any, Callable, Protocol, TypeVar
 
 import aiohttp
 from google.auth.credentials import TokenState as GoogleTokenState
@@ -513,7 +514,9 @@ class HTTPMixin(Mixin, HTTPSession):
 
         # Only pass timeout if explicitly provided. Otherwise, omit the
         # timeout argument and rely on the session's default timeout.
-        optional_kwargs: dict[str, Any] = {"timeout": timeout} if timeout is not None else {}
+        optional_kwargs: dict[str, Any] = (
+            {"timeout": timeout} if timeout is not None else {}
+        )
 
         resp = await self.inner.request(
             headers=headers,

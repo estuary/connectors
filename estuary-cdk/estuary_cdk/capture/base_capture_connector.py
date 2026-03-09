@@ -3,8 +3,9 @@ import asyncio
 import json
 import os
 import sys
+from collections.abc import Awaitable
 from datetime import UTC, datetime, timedelta
-from typing import Any, Awaitable, BinaryIO, Callable, Generic
+from typing import Any, BinaryIO, Callable, Generic
 
 from pydantic import BaseModel
 
@@ -30,7 +31,10 @@ from .common import _ConnectorState
 
 # Default encryption service URL, can be overridden via ENCRYPTION_URL environment variable
 # for local testing with docker gateway addresses like http://172.18.0.1:port
-ENCRYPTION_URL = os.getenv("ENCRYPTION_URL") or "https://config-encryption.estuary.dev/v1/encrypt-config"
+ENCRYPTION_URL = (
+    os.getenv("ENCRYPTION_URL")
+    or "https://config-encryption.estuary.dev/v1/encrypt-config"
+)
 
 
 PERIODIC_RESTART_INTERVAL = 24 * 60 * 60  # 24 hours
@@ -40,6 +44,7 @@ TASK_CANCELLATION_TIMEOUT = 5 * 60  # 5 minutes
 
 class TerminateTaskGroup(Exception):
     """Exception raised to terminate a task group."""
+
     pass
 
 
@@ -52,6 +57,7 @@ class BaseCaptureConnector(
     BaseConnector[Request[EndpointConfig, ResourceConfig, _ConnectorState]],
     HTTPMixin,
     Generic[EndpointConfig, ResourceConfig, _ConnectorState],
+    metaclass=abc.ABCMeta,
 ):
     output: BinaryIO = sys.stdout.buffer
 

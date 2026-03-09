@@ -51,7 +51,7 @@ the tuple type allows for str or integer values to be used
 """
 
 # Cursor marker for dict-based cursors.
-# This marker is necessary to distinguish between regular dictionaries (documents) 
+# This marker is necessary to distinguish between regular dictionaries (documents)
 # and cursor dictionaries when yielded by fetch functions. Without this marker,
 # the runtime cannot determine whether a dict should be treated as a document to
 # capture or as a PageCursor for checkpointing progress.
@@ -65,17 +65,17 @@ def is_cursor_dict(item: dict) -> bool:
 
 def make_cursor_dict(data: dict) -> dict:
     """Convert a regular dict to a cursor dict by adding the marker.
-    
+
     The intended way of using this is to first call `make_cursor_dict` on a dictionary that
     represents the full state of a resource's `PageCursor` and then subsequent calls representing changes
     to that state. This allows JSON merge patches to be used for efficient incremental updates.
-    
+
     IMPORTANT: When checkpointing, connectors should yield only the changes/patches that need to be
     merged into the backfill state's next_page, not the entire dictionary. This approach:
-    - Keeps checkpoints relatively small 
+    - Keeps checkpoints relatively small
     - Reduces the impact checkpoints have on the recovery log size
     - Enables efficient incremental state updates via JSON merge patches
-    
+
     Example:
     ```python
     # Initial full state - use make_cursor_dict for the complete state
@@ -88,7 +88,7 @@ def make_cursor_dict(data: dict) -> dict:
     completed_boards = {"board1": None}  # marks board1 as completed
     yield completed_boards
     ```
-    
+
     Args:
         data: The dictionary data to mark as a cursor. For initial state, this should be
               the complete cursor state. For subsequent calls, this should contain only
@@ -117,6 +117,7 @@ and "no pages remain" in a response context.
 class Triggers(Enum):
     BACKFILL = "BACKFILL"
 
+
 @dataclass
 class SourcedSchema:
     """
@@ -126,6 +127,7 @@ class SourcedSchema:
     widens inferred schemas to accommodate the current inferred schema along
     with any SourcedSchemas.
     """
+
     value: dict[str, Any]
 
 
@@ -158,7 +160,9 @@ class BaseResourceConfig(abc.ABC, BaseModel, extra="forbid"):
     PATH_POINTERS: ClassVar[list[str]]
 
     meta_: dict | None = Field(
-        default=None, alias="_meta", title="Meta",
+        default=None,
+        alias="_meta",
+        title="Meta",
     )
 
     @abc.abstractmethod
@@ -279,7 +283,8 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
     )
 
     is_connector_initiated: bool = Field(
-        default=False, description="Indicates if this backfill was initiated by the connector.",
+        default=False,
+        description="Indicates if this backfill was initiated by the connector.",
     )
 
 
@@ -413,7 +418,13 @@ Implementations SHOULD NOT sleep or implement their own coarse rate limit
 """
 
 
-def is_recurring_fetch_page_fn(fn: FetchPageFn | RecurringFetchPageFn, log: Logger, page: PageCursor, cutoff: LogCursor, is_connector_initiated: bool) -> bool:
+def is_recurring_fetch_page_fn(
+    fn: FetchPageFn | RecurringFetchPageFn,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+    is_connector_initiated: bool,
+) -> bool:
     """Check if the function signature accepts the arguments of a RecurringFetchPageFn."""
     try:
         inspect.signature(fn).bind(log, page, cutoff, is_connector_initiated)
@@ -570,7 +581,9 @@ def _get_min_incremental_cursor(state: ResourceState) -> datetime | None:
     elif isinstance(state.inc, dict):
         min_cursor: datetime | None = None
         for inc_state in state.inc.values():
-            if isinstance(inc_state, ResourceState.Incremental) and isinstance(inc_state.cursor, datetime):
+            if isinstance(inc_state, ResourceState.Incremental) and isinstance(
+                inc_state.cursor, datetime
+            ):
                 if min_cursor is None or inc_state.cursor < min_cursor:
                     min_cursor = inc_state.cursor
         return min_cursor
@@ -620,13 +633,16 @@ def open(
                         ConnectorState(bindingStateV1={binding.stateKey: state})
                     )
 
-                if not state.backfill and isinstance(binding.resourceConfig, ResourceConfigWithSchedule):
+                if not state.backfill and isinstance(
+                    binding.resourceConfig, ResourceConfigWithSchedule
+                ):
                     cron_schedule = binding.resourceConfig.schedule
                     missed_scheduled_initialization = next_fire(
                         cron_schedule, state.last_initialized, NOW
                     )
                     future_scheduled_initialization = next_fire(
-                        cron_schedule, NOW,
+                        cron_schedule,
+                        NOW,
                     )
 
                     if missed_scheduled_initialization:
@@ -635,9 +651,14 @@ def open(
 
                     if future_scheduled_initialization:
                         if not soonest_future_scheduled_initialization:
-                            soonest_future_scheduled_initialization = future_scheduled_initialization
+                            soonest_future_scheduled_initialization = (
+                                future_scheduled_initialization
+                            )
                         else:
-                            soonest_future_scheduled_initialization = min(soonest_future_scheduled_initialization, future_scheduled_initialization)
+                            soonest_future_scheduled_initialization = min(
+                                soonest_future_scheduled_initialization,
+                                future_scheduled_initialization,
+                            )
 
             if should_initialize:
                 if is_connector_initiated:
@@ -649,10 +670,10 @@ def open(
                     # Check if we can coordinate the backfill cutoff with the incremental cursor.
                     # We currently only perform this coordination when there's a single backfill task.
                     if (
-                        state and
-                        min_cursor is not None and
-                        isinstance(initial_backfill_state, ResourceState.Backfill) and
-                        isinstance(initial_backfill_state.cutoff, datetime)
+                        state
+                        and min_cursor is not None
+                        and isinstance(initial_backfill_state, ResourceState.Backfill)
+                        and isinstance(initial_backfill_state.cutoff, datetime)
                     ):
                         state.backfill = initial_backfill_state.model_copy(deep=True)
                         state.backfill.cutoff = min_cursor
@@ -684,11 +705,12 @@ def open(
             if inspect.iscoroutine(result):
                 await result
 
-
         if soonest_future_scheduled_initialization:
             # Gracefully exit to ensure relatively close adherence to any bindings'
             # re-initialization schedules.
-            asyncio.create_task(scheduled_stop(task, soonest_future_scheduled_initialization))
+            asyncio.create_task(
+                scheduled_stop(task, soonest_future_scheduled_initialization)
+            )
 
     return (response.Opened(explicitAcknowledgements=False), _run)
 
@@ -698,13 +720,15 @@ def open_binding(
     binding_index: int,
     resource_state: _ResourceState,
     task: Task,
-    fetch_changes: FetchChangesFn[_BaseDocument]
-    | dict[str, FetchChangesFn[_BaseDocument]]
-    | None = None,
-    fetch_page: FetchPageFn[_BaseDocument]
-    | RecurringFetchPageFn[_BaseDocument]
-    | dict[str, FetchPageFn[_BaseDocument]]
-    | None = None,
+    fetch_changes: (
+        FetchChangesFn[_BaseDocument] | dict[str, FetchChangesFn[_BaseDocument]] | None
+    ) = None,
+    fetch_page: (
+        FetchPageFn[_BaseDocument]
+        | RecurringFetchPageFn[_BaseDocument]
+        | dict[str, FetchPageFn[_BaseDocument]]
+        | None
+    ) = None,
     fetch_snapshot: FetchSnapshotFn[_BaseDocument] | None = None,
     tombstone: _BaseDocument | None = None,
 ):
@@ -807,7 +831,9 @@ def open_binding(
                 )
 
         else:
-            assert resource_state.backfill and not isinstance(resource_state.backfill, dict)
+            assert resource_state.backfill and not isinstance(
+                resource_state.backfill, dict
+            )
             task.spawn_child(
                 f"{prefix}.backfill",
                 functools.partial(
@@ -961,7 +987,9 @@ async def _binding_backfill_task(
         done = True
 
         # Distinguish between FetchPageFn and RecurringFetchPageFn to provide the correct arguments.
-        if is_recurring_fetch_page_fn(fetch_page, task.log, state.next_page, state.cutoff, is_connector_initiated):
+        if is_recurring_fetch_page_fn(
+            fetch_page, task.log, state.next_page, state.cutoff, is_connector_initiated
+        ):
             fn = cast(RecurringFetchPageFn, fetch_page)
             pages = fn(task.log, state.next_page, state.cutoff, is_connector_initiated)
         else:
@@ -1037,10 +1065,14 @@ async def _binding_backfill_task(
         assert isinstance(last_initialized, datetime)
         NOW = datetime.now(tz=UTC)
         cron_schedule = binding.resourceConfig.schedule
-        missed_scheduled_initialization = next_fire(cron_schedule, last_initialized, NOW)
+        missed_scheduled_initialization = next_fire(
+            cron_schedule, last_initialized, NOW
+        )
         future_scheduled_initialization = next_fire(cron_schedule, NOW)
         if missed_scheduled_initialization:
-            task.log.info("Backfill completed after the next backfill was scheduled. Resetting the connector to keep adherence to the schedule.")
+            task.log.info(
+                "Backfill completed after the next backfill was scheduled. Resetting the connector to keep adherence to the schedule."
+            )
             task.stopping.event.set()
         elif future_scheduled_initialization:
             asyncio.create_task(scheduled_stop(task, future_scheduled_initialization))

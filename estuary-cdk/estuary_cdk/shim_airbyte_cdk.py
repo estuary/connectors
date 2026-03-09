@@ -1,14 +1,16 @@
-from dataclasses import dataclass
-import io
-from logging import Logger
-import sys
-from pydantic import Field
-from typing import Any, ClassVar, Annotated, Callable, Awaitable, List, Literal
 import asyncio
 import logging
 import os
+import sys
+from collections.abc import Awaitable
+from dataclasses import dataclass
+from logging import Logger
+from typing import Annotated, Any, Callable, ClassVar, Literal
 
+from airbyte_cdk.sources.source import Source as AirbyteSource
+from pydantic import Field
 
+from . import ValidationError
 from .capture import (
     BaseCaptureConnector,
     Request,
@@ -17,34 +19,43 @@ from .capture import (
     request,
     response,
 )
-from .flow import CaptureBinding, OAuth2Spec, ConnectorSpec
-from . import ValidationError
-
-from airbyte_cdk.sources.source import Source as AirbyteSource
+from .flow import CaptureBinding, ConnectorSpec, OAuth2Spec
 
 try:
     # For older Airbyte CDK versions, models are imported from airbyte_protocol.models.
     from airbyte_protocol.models import (
-        SyncMode as AirbyteSyncMode,
-        ConfiguredAirbyteCatalog,
-        ConfiguredAirbyteStream,
         AirbyteStateMessage,
         AirbyteStateType,
         AirbyteStream,
-        Status as AirbyteStatus,
+        ConfiguredAirbyteCatalog,
+        ConfiguredAirbyteStream,
+    )
+    from airbyte_protocol.models import (
         Level as AirbyteLevel,
+    )
+    from airbyte_protocol.models import (
+        Status as AirbyteStatus,
+    )
+    from airbyte_protocol.models import (
+        SyncMode as AirbyteSyncMode,
     )
 except ImportError:
     # For newer Airbyte CDK versions, models are imported from airbyte_cdk.models.airbyte_protocol.
     from airbyte_cdk.models.airbyte_protocol import (
-        SyncMode as AirbyteSyncMode,
-        ConfiguredAirbyteCatalog,
-        ConfiguredAirbyteStream,
         AirbyteStateMessage,
         AirbyteStateType,
         AirbyteStream,
-        Status as AirbyteStatus,
+        ConfiguredAirbyteCatalog,
+        ConfiguredAirbyteStream,
+    )
+    from airbyte_cdk.models.airbyte_protocol import (
         Level as AirbyteLevel,
+    )
+    from airbyte_cdk.models.airbyte_protocol import (
+        Status as AirbyteStatus,
+    )
+    from airbyte_cdk.models.airbyte_protocol import (
+        SyncMode as AirbyteSyncMode,
     )
 
 
@@ -97,15 +108,13 @@ class ResourceConfig(common.BaseResourceConfig, extra="forbid"):
             sch["properties"]["namespace"] = {
                 "title": "Namespace",
                 "description": "Enclosing schema namespace of this resource",
-                "type": "string"
+                "type": "string",
             }
 
             sch["properties"]["cursorField"] = {
                 "title": "Cursor Field",
                 "type": "array",
-                "items": {
-                    "type": "string"
-                }
+                "items": {"type": "string"},
             }
 
         return sch
@@ -127,7 +136,7 @@ class ResourceState(common.BaseResourceState, extra="forbid"):
 
 class ConnectorState(common.ConnectorState[ResourceState], extra="ignore"):
     """ConnectorState represents a number of ResourceStates, keyed by binding state key.
-    
+
     Top-level fields other than bindingStateV1 are ignored, to allow for a lossy migration from
     states that existed prior to adopting this convection. Connectors transitioning in this way will
     effectively start over from the beginning.
@@ -144,8 +153,8 @@ def escape_field(field: str) -> str:
     return field.replace("~", "~0").replace("/", "~1")
 
 
-def transform_airbyte_key(key: str | List[str] | List[List[str]]) -> List[str]:
-    key_fields: List[str] = []
+def transform_airbyte_key(key: str | list[str] | list[list[str]]) -> list[str]:
+    key_fields: list[str] = []
 
     if isinstance(key, str):
         # key = "piz/za"
@@ -195,13 +204,9 @@ def set_additional_properties_false(schema: dict) -> dict:
             if isinstance(value, dict):
                 _schema[key] = set_additional_properties_false(value)
             elif isinstance(value, list):
-                _schema[key] = [
-                    set_additional_properties_false(item) for item in value
-                ]
+                _schema[key] = [set_additional_properties_false(item) for item in value]
         elif key in ["oneOf", "anyOf", "allOf"] and isinstance(value, list):
-            _schema[key] = [
-                set_additional_properties_false(item) for item in value
-            ]
+            _schema[key] = [set_additional_properties_false(item) for item in value]
 
     return _schema
 
@@ -328,11 +333,13 @@ class CaptureShim(BaseCaptureConnector):
         async def _run(task: Task) -> None:
             async def closure(task: Task):
                 await self._run(
-                    task, resolved, open.capture.config, open.state,
+                    task,
+                    resolved,
+                    open.capture.config,
+                    open.state,
                 )
 
             task.spawn_child("airbyte_shim", closure)
-
 
         return (response.Opened(explicitAcknowledgements=False), _run)
 
