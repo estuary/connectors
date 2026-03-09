@@ -62,6 +62,7 @@ type catalogConfig struct {
 	Credential string `json:"credential,omitempty"`
 	Token      string `json:"token,omitempty"`
 	Warehouse  string `json:"warehouse,omitempty"`
+	Scope      string `json:"scope,omitempty"`
 }
 
 type advancedConfig struct {
