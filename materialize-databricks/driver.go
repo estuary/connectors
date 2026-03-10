@@ -65,6 +65,9 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 }
 
 func newDatabricksDriver() *sql.Driver[config, tableConfig] {
+	// semantic version to match VERSION file
+	databricks.WithProduct("EstuaryFlow-materialize-databricks", "3.0.0")
+
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-databricks",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
@@ -543,6 +546,5 @@ func main() {
 		}
 	}
 
-	databricks.WithProduct("EstuaryFlow materialize-databricks", "0.0.0")
 	boilerplate.RunMain(newDatabricksDriver())
 }
