@@ -1,0 +1,124 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "GongCredentials": {
+          "properties": {
+            "credentials_title": {
+              "const": "API Key",
+              "default": "API Key",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_key": {
+              "description": "The Gong API Access Key.",
+              "secret": true,
+              "title": "Access Key",
+              "type": "string"
+            },
+            "access_key_secret": {
+              "description": "The Gong API Access Key Secret.",
+              "secret": true,
+              "title": "Access Key Secret",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_key",
+            "access_key_secret"
+          ],
+          "title": "GongCredentials",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "credentials": {
+          "discriminator": {
+            "mapping": {
+              "API Key": "#/$defs/GongCredentials"
+            },
+            "propertyName": "credentials_title"
+          },
+          "oneOf": [
+            {
+              "$ref": "#/$defs/GongCredentials"
+            }
+          ],
+          "title": "Authentication"
+        },
+        "region": {
+          "default": "us-55616",
+          "description": "The API region for your Gong account. Check your Gong API settings for the correct region.",
+          "title": "API Region",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any data before this date will not be replicated. If left blank, defaults to 30 days before current time.",
+          "format": "date-time",
+          "title": "Start Date",
+          "type": "string"
+        },
+        "calls_lookback_window": {
+          "default": 7,
+          "description": "Number of days to look back when fetching calls to capture post-call enrichment. Applied once per day.",
+          "maximum": 30,
+          "minimum": 1,
+          "title": "Calls Lookback Window (Days)",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "additionalProperties": false,
+      "properties": {
+        "_meta": {
+          "anyOf": [
+            {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Meta"
+        },
+        "name": {
+          "description": "Name of this resource",
+          "title": "Name",
+          "type": "string"
+        },
+        "interval": {
+          "default": "PT0S",
+          "description": "Interval between updates for this resource",
+          "format": "duration",
+          "title": "Interval",
+          "type": "string"
+        },
+        "schedule": {
+          "default": "",
+          "description": "Schedule to automatically rebackfill this binding. Accepts a cron expression.",
+          "pattern": "^((?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?)(?:,(?:[0-5]?\\d(?:-[0-5]?\\d)?|\\*(?:/[0-5]?\\d)?))*)\\s+((?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?)(?:,(?:[01]?\\d|2[0-3]|(?:[01]?\\d|2[0-3])-(?:[01]?\\d|2[0-3])|\\*(?:/[01]?\\d|/2[0-3])?))*)\\s+((?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?)(?:,(?:0?[1-9]|[12]\\d|3[01]|(?:0?[1-9]|[12]\\d|3[01])-(?:0?[1-9]|[12]\\d|3[01])|\\*(?:/[0-9]|/1[0-9]|/2[0-9]|/3[01])?))*)\\s+((?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?)(?:,(?:[1-9]|1[0-2]|(?:[1-9]|1[0-2])-(?:[1-9]|1[0-2])|\\*(?:/[1-9]|/1[0-2])?))*)\\s+((?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?)(?:,(?:[0-6]|(?:[0-6])-(?:[0-6])|\\*(?:/[0-6])?))*)$|^$",
+          "title": "Schedule",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "ResourceConfigWithSchedule",
+      "type": "object"
+    },
+    "documentationUrl": "https://go.estuary.dev/source-gong",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
