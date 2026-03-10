@@ -543,5 +543,6 @@ func main() {
 		}
 	}
 
+	databricks.WithProduct("EstuaryFlow materialize-databricks", "0.0.0")
 	boilerplate.RunMain(newDatabricksDriver())
 }
