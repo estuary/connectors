@@ -1,0 +1,216 @@
+[
+  {
+    "recommendedName": "calls",
+    "resourceConfig": {
+      "name": "calls",
+      "interval": "PT2M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Gong Call resource.\n\nIncremental by started timestamp with a lookback window to capture\npost-call enrichment.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "Call",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "scorecard_definitions",
+    "resourceConfig": {
+      "name": "scorecard_definitions",
+      "interval": "PT1H"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Gong Scorecard Definition resource - full refresh.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        }
+      },
+      "title": "ScorecardDefinition",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/row_id"
+    ]
+  },
+  {
+    "recommendedName": "scorecards",
+    "resourceConfig": {
+      "name": "scorecards",
+      "interval": "PT2M"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Gong Scorecard resource - incremental by reviewTime timestamp.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "scorecardId": {
+          "title": "Scorecardid",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "scorecardId"
+      ],
+      "title": "Scorecard",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/scorecardId"
+    ]
+  },
+  {
+    "recommendedName": "users",
+    "resourceConfig": {
+      "name": "users",
+      "interval": "PT2M",
+      "schedule": "0 0 * * *"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "description": "Gong User resource.\n\nIncremental by created timestamp via the /v2/users/extensive endpoint,\nwith scheduled backfill to capture updates.",
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "title": "User",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/id"
+    ]
+  }
+]

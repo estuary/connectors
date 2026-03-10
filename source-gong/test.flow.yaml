@@ -1,0 +1,16 @@
+captures:
+  acmeCo/source-gong:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_gong
+        config:
+          credentials:
+            credentials_title: API Key
+            access_key: notanaccesskey
+            access_key_secret: notanaccesskeysecret
+          region: us-55616
+          start_date: 2024-01-01T00:00:00Z
+    bindings: []
