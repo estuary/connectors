@@ -13,6 +13,7 @@ import (
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
+	"github.com/databricks/databricks-sdk-go/useragent"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -65,8 +66,7 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 }
 
 func newDatabricksDriver() *sql.Driver[config, tableConfig] {
-	// semantic version to match VERSION file
-	databricks.WithProduct("EstuaryFlow-materialize-databricks", "3.0.0")
+	useragent.WithProduct(productGlobalDescription.name, productGlobalDescription.version)
 
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-databricks",

@@ -189,7 +189,7 @@ func (c config) ToURI() string {
 	var params = make(url.Values)
 	params.Add("catalog", c.CatalogName)
 	params.Add("schema", c.SchemaName)
-	params.Add("userAgentEntry", "Estuary Technologies Flow")
+	params.Add(productParameterDSN.key, productParameterDSN.value)
 
 	var uri url.URL
 	switch c.Credentials.AuthType {
