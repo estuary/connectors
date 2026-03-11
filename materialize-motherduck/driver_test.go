@@ -172,7 +172,7 @@ func TestFencingCases(t *testing.T) {
 
 	var cfg = mustGetCfg(t)
 
-	c, err := newClient(ctx, &sql.Endpoint[config]{Config: cfg})
+	c, err := newClient(ctx, "", &sql.Endpoint[config]{Config: cfg})
 	require.NoError(t, err)
 	defer c.Close()
 

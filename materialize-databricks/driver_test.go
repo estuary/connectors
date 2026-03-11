@@ -62,7 +62,7 @@ func TestValidateAndApply(t *testing.T) {
 		Schema: cfg.SchemaName,
 	}
 
-	db, err := stdsql.Open("databricks", cfg.ToURI())
+	db, err := stdsql.Open("databricks", cfg.ToURI(""))
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -96,7 +96,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		Schema: cfg.SchemaName,
 	}
 
-	db, err := stdsql.Open("databricks", cfg.ToURI())
+	db, err := stdsql.Open("databricks", cfg.ToURI(""))
 	require.NoError(t, err)
 	defer db.Close()
 

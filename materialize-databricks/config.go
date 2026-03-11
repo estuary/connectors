@@ -12,7 +12,7 @@ import (
 )
 
 var featureFlagDefaults = map[string]bool{
-	"datetime_keys_as_string": true,
+	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
 }
 
@@ -36,7 +36,7 @@ type advancedConfig struct {
 }
 
 const (
-	PAT_AUTH_TYPE       = "PAT"         // personal access token
+	PAT_AUTH_TYPE       = "PAT"        // personal access token
 	OAUTH_M2M_AUTH_TYPE = "OAuth2 M2M" // OAuth2 machine-to-machine
 )
 
@@ -180,7 +180,7 @@ func (c config) FeatureFlags() (string, map[string]bool) {
 }
 
 // ToURI puts together address and http_path to form the full workspace URL
-func (c config) ToURI() string {
+func (c config) ToURI(materializationName string) string {
 	var address = c.Address
 	if !strings.Contains(address, ":") {
 		address = address + ":" + defaultPort
@@ -189,7 +189,13 @@ func (c config) ToURI() string {
 	var params = make(url.Values)
 	params.Add("catalog", c.CatalogName)
 	params.Add("schema", c.SchemaName)
+	// Connection attribute for Estuary application reporting.
 	params.Add(productParameterDSN.key, productParameterDSN.value)
+	if materializationName != "" {
+		// Query tag for Estuary task reporting.
+		// https://docs.databricks.com/aws/en/dev-tools/go-sql-driver#optional-parameters
+		params.Add("query_tags", "materialization-name:"+materializationName)
+	}
 
 	var uri url.URL
 	switch c.Credentials.AuthType {

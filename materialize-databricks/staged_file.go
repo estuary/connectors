@@ -107,7 +107,7 @@ func newStagedFile(cfg config, root string, fields []string) *stagedFile {
 	}
 }
 
-func (f *stagedFile) start(ctx context.Context) error {
+func (f *stagedFile) start(ctx context.Context, db *stdsql.DB) error {
 	if f.started {
 		return nil
 	}
@@ -130,7 +130,7 @@ func (f *stagedFile) start(ctx context.Context) error {
 	for i := 0; i < uploadConcurrency; i++ {
 		// Start the putWorker for this transaction.
 		f.group.Go(func() error {
-			return f.putWorker(f.groupCtx, f.putFiles)
+			return f.putWorker(f.groupCtx, db, f.putFiles)
 		})
 	}
 
@@ -177,7 +177,7 @@ func (f *stagedFile) remoteFilePath(file string) string {
 	return filepath.Join(f.root, file)
 }
 
-func (f *stagedFile) putWorker(ctx context.Context, filePaths <-chan string) error {
+func (f *stagedFile) putWorker(ctx context.Context, db *stdsql.DB, filePaths <-chan string) error {
 	for {
 		var file string
 
@@ -193,12 +193,6 @@ func (f *stagedFile) putWorker(ctx context.Context, filePaths <-chan string) err
 
 		var fName = filepath.Base(file)
 		log.WithField("filepath", f.remoteFilePath(fName)).Debug("staged file: uploading")
-
-		db, err := stdsql.Open("databricks", f.cfg.ToURI())
-		if err != nil {
-			return fmt.Errorf("sql.Open: %w", err)
-		}
-		defer db.Close()
 
 		ctx = driverctx.NewContextWithStagingInfo(ctx, []string{f.dir})
 

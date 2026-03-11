@@ -289,7 +289,7 @@ func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 	var dialect = testDialect
 
-	c, err := prepareNewClient(time.UTC)(ctx, &sql.Endpoint[config]{Config: testConfig()})
+	c, err := prepareNewClient(time.UTC)(ctx, "", &sql.Endpoint[config]{Config: testConfig()})
 	require.NoError(t, err)
 	defer c.Close()
 

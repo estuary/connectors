@@ -366,6 +366,7 @@ type transactor struct {
 
 func newTransactor(
 	ctx context.Context,
+	_ string,
 	featureFlags map[string]bool,
 	ep *sql.Endpoint[config],
 	fence sql.Fence,

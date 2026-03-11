@@ -96,7 +96,7 @@ func (d *Driver[EC, RC]) newMaterialization(ctx context.Context, materialization
 		return nil, fmt.Errorf("creating endpoint: %w", err)
 	}
 
-	client, err := endpoint.NewClient(ctx, endpoint)
+	client, err := endpoint.NewClient(ctx, materializationName, endpoint)
 	if err != nil {
 		return nil, fmt.Errorf("creating client: %w", err)
 	}
@@ -398,7 +398,7 @@ func (s *sqlMaterialization[EC, RC]) NewMaterializerTransactor(
 		}
 	}
 
-	transactor, err := s.endpoint.NewTransactor(ctx, s.featureFlags, s.endpoint, fence, tables, open, &is, be)
+	transactor, err := s.endpoint.NewTransactor(ctx, s.materializationName, s.featureFlags, s.endpoint, fence, tables, open, &is, be)
 	if err != nil {
 		return nil, fmt.Errorf("building transactor: %w", err)
 	}

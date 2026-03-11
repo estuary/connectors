@@ -36,10 +36,10 @@ type client struct {
 	templates templates
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
 	cfg := ep.Config
 
-	db, err := stdsql.Open("databricks", cfg.ToURI())
+	db, err := stdsql.Open("databricks", cfg.ToURI(materializationName))
 	if err != nil {
 		return nil, fmt.Errorf("opening database: %w", err)
 	}
@@ -261,11 +261,12 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 		return errs
 	}
 
-	db, err := stdsql.Open("databricks", cfg.ToURI())
+	db, err := stdsql.Open("databricks", cfg.ToURI("n/a"))
 	if err != nil {
 		errs.Err(fmt.Errorf("opening database: %w", err))
 		return errs
 	}
+	defer db.Close()
 
 	var httpPathSplit = strings.Split(cfg.HTTPPath, "/")
 	var warehouseId = httpPathSplit[len(httpPathSplit)-1]

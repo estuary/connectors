@@ -28,7 +28,7 @@ type client struct {
 	templates templates
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+func newClient(ctx context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
 	uri, err := ep.Config.ToURI(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("building connection URI: %w", err)

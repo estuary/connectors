@@ -24,7 +24,7 @@ type client struct {
 	ep *sql.Endpoint[config]
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+func newClient(ctx context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
 	db, err := ep.Config.db(ctx)
 	if err != nil {
 		return nil, err

@@ -234,7 +234,7 @@ func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 	var dialect = testDialect
 
-	c, err := newClient(ctx, &sql.Endpoint[config]{Config: testConfig(), Dialect: dialect})
+	c, err := newClient(ctx, "", &sql.Endpoint[config]{Config: testConfig(), Dialect: dialect})
 	require.NoError(t, err)
 	defer c.Close()
 

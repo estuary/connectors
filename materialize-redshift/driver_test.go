@@ -159,7 +159,7 @@ func TestFencingCases(t *testing.T) {
 
 	ctx := context.Background()
 
-	c, err := newClient(ctx, &sql.Endpoint[config]{Config: cfg})
+	c, err := newClient(ctx, "", &sql.Endpoint[config]{Config: cfg})
 	require.NoError(t, err)
 	defer c.Close()
 

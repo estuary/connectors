@@ -100,7 +100,7 @@ type client struct {
 	db *stdsql.DB
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+func newClient(ctx context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
 	db, err := stdsql.Open("sqlite3", databasePath)
 	if err != nil {
 		return nil, err
@@ -150,6 +150,7 @@ func (c *client) Close() {
 
 func newTransactor(
 	ctx context.Context,
+	_ string,
 	featureFlags map[string]bool,
 	ep *sql.Endpoint[config],
 	fence sql.Fence,

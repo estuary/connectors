@@ -24,7 +24,7 @@ type client struct {
 	cfg config
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+func newClient(ctx context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
 	db, err := stdsql.Open("pgx", ep.Config.ToURI())
 	if err != nil {
 		return nil, err
