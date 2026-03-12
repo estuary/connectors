@@ -1,3 +1,5 @@
+import asyncio
+import traceback
 from collections.abc import AsyncGenerator, Mapping
 from datetime import datetime
 from enum import Enum
@@ -126,8 +128,12 @@ async def _run_webhook_server(
     # collection routing. So, we need an universal handler for all requests,
     # then it gets routed to the collection handler.
 
+    _rejecting = False
+
     # TODO: Make URL paths configurable, with the default being the resource name
     async def webhook_handler(req: web.Request) -> web.Response:
+        if _rejecting:
+            return web.Response(status=503, text="Server shutting down")
         return web.Response(text="{published: 1}")
 
     listener = web.Application()
@@ -139,8 +145,9 @@ async def _run_webhook_server(
     await site.start()
 
     try:
-        await task.stopping.event.wait()
+        await task.stopping.webhook_event.wait()
         task.log.debug("webhook server is yielding to stop")
+        _rejecting = True
     finally:
         await runner.cleanup()
 
@@ -152,13 +159,31 @@ def start_webhook_server(
     """Start the webhook listener for the given bindings.
 
     Called from common.open() after resolving webhook bindings.
+    Runs outside the main TaskGroup so the webhook server survives
+    until all non-webhook tasks complete their graceful shutdown.
     """
     task.log.info("Starting webhook server")
 
     # TODO: We want to reject bad messages as fast as possible.
     # 1. Verify IP ranges, signatures, auth, everything
     # 2. Only then, route to the appropriate collection handling fn
-    async def run(child_task: Task):
-        await _run_webhook_server(child_task, bindings)
+    async def run():
+        async with asyncio.TaskGroup() as webhook_tg:
+            try:
+                webhook_task = Task(
+                    task.log.getChild("webhook-server"),
+                    task.connector_status,
+                    "capture.webhook-server",
+                    task._output,
+                    task.stopping,
+                    webhook_tg,
+                )
+                await _run_webhook_server(webhook_task, bindings)
+            except Exception as exc:
+                task.log.error("".join(traceback.format_exception(exc)))
+                if task.stopping.first_error is None:
+                    task.stopping.first_error = exc
+                    task.stopping.first_error_task = "webhook-server"
+                task.stopping.pull_api_event.set()
 
-    task.spawn_child("webhook-server", run)
+    task.stopping.webhook_task = asyncio.create_task(run())

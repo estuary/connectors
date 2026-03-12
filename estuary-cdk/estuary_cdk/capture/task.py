@@ -85,9 +85,15 @@ class Task:
         The Task's coroutine should monitor this event and exit when it's set AND
         it has no more immediate work to do (for example, no further documents are
         currently ready to be captured).
+
+        `webhook_event` is a separate event for the webhook server. It is set
+        after all non-webhook tasks have completed, signaling the webhook server
+        to reject new requests with 503 and clean up.
         """
 
-        event: asyncio.Event
+        pull_api_event: asyncio.Event = asyncio.Event()
+        webhook_event: asyncio.Event = asyncio.Event()
+        webhook_task: asyncio.Task[None] | None = None
         first_error: Exception | None = None
         first_error_task: str | None = None
 
@@ -216,7 +222,7 @@ class Task:
                         parent.stopping.first_error = exc
                         parent.stopping.first_error_task = child_name
 
-                    parent.stopping.event.set()
+                    parent.stopping.pull_api_event.set()
 
         task = self._tg.create_task(run_task(self))
         task.set_name(child_name)

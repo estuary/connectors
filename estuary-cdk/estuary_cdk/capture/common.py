@@ -16,7 +16,6 @@ from typing import (
     Literal,
     TypeVar,
     cast,
-    override,
 )
 from uuid import uuid4
 
@@ -24,7 +23,6 @@ from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 if TYPE_CHECKING:
     from estuary_cdk.capture.webhook import (
-        ReceiveWebhookFn,
         WebhookCursor,
     )
 
@@ -233,7 +231,7 @@ class ResourceConfigWithSchedule(ResourceConfig):
 async def scheduled_stop(task: Task, future_dt: datetime) -> None:
     sleep_duration = future_dt - datetime.now(tz=UTC)
     await asyncio.sleep(sleep_duration.total_seconds())
-    task.stopping.event.set()
+    task.stopping.pull_api_event.set()
 
 
 class BaseResourceState(abc.ABC, BaseModel, extra="forbid"):
@@ -284,7 +282,8 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
     class Webhook(BaseModel, extra="forbid"):
         """Partial state of a resource which listens for webhook messages"""
 
-        cursor: "WebhookCursor" = Field(description="ASDF")  # TODO: Add description
+        # TODO: Add description and maybe remove quotes
+        cursor: "WebhookCursor" = Field(description="ASDF")
 
     inc: Incremental | dict[str, Incremental | None] | None = Field(
         default=None, description="Incremental capture progress"
@@ -746,6 +745,11 @@ def open(
 
             start_webhook_server(resolved_webhook_bindings, task)
 
+            # The webhook server runs outside the TaskGroup so it can outlive
+            # non-webhook tasks during two-phase shutdown. Block here so the
+            # TaskGroup stays alive until graceful shutdown begins.
+            await task.stopping.pull_api_event.wait()
+
     return (response.Opened(explicitAcknowledgements=False), _run)
 
 
@@ -929,9 +933,10 @@ async def _binding_snapshot_task(
         )
 
         try:
-            if not task.stopping.event.is_set():
+            if not task.stopping.pull_api_event.is_set():
                 await asyncio.wait_for(
-                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
+                    task.stopping.pull_api_event.wait(),
+                    timeout=sleep_for.total_seconds(),
                 )
 
             task.log.debug(f"periodic snapshot is idle and is yielding to stop")
@@ -1014,7 +1019,7 @@ async def _binding_backfill_task(
         # Yield to the event loop to prevent starvation.
         await asyncio.sleep(0)
 
-        if task.stopping.event.is_set():
+        if task.stopping.pull_api_event.is_set():
             task.log.debug("backfill is yielding to stop", {"subtask_id": subtask_id})
             return
 
@@ -1108,7 +1113,7 @@ async def _binding_backfill_task(
             task.log.info(
                 "Backfill completed after the next backfill was scheduled. Resetting the connector to keep adherence to the schedule."
             )
-            task.stopping.event.set()
+            task.stopping.pull_api_event.set()
         elif future_scheduled_initialization:
             asyncio.create_task(scheduled_stop(task, future_scheduled_initialization))
 
@@ -1152,9 +1157,10 @@ async def _binding_incremental_task(
 
     while True:
         try:
-            if not task.stopping.event.is_set():
+            if not task.stopping.pull_api_event.is_set():
                 await asyncio.wait_for(
-                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
+                    task.stopping.pull_api_event.wait(),
+                    timeout=sleep_for.total_seconds(),
                 )
 
             task.log.debug(
@@ -1179,7 +1185,7 @@ async def _binding_incremental_task(
                 task.log.info(
                     "incremental task triggered backfill", {"subtask_id": subtask_id}
                 )
-                task.stopping.event.set()
+                task.stopping.pull_api_event.set()
                 await task.checkpoint(
                     ConnectorState(backfillRequests={binding.stateKey: True})
                 )

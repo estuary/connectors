@@ -26,7 +26,7 @@ class ConnectorStatus:
             # Allow some initial setup time for bindings to be registered before
             # starting to poll for status changes every second.
             await asyncio.sleep(5)
-            while not stopping.event.is_set():
+            while not stopping.pull_api_event.is_set():
                 self._log_status()
                 await asyncio.sleep(1)
 

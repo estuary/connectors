@@ -418,14 +418,14 @@ class CaptureShim(BaseCaptureConnector):
         # because the `task` output has already captured a reference to the
         # original stdout.
         sys.stdout = sys.stderr
-        
+
         for message in self.delegate.read(
             task.log, config, airbyte_catalog, airbyte_states
         ):
             # Yield to the event loop to allow SIGQUIT signals to stop shimmed captures.
             await asyncio.sleep(0)
 
-            if task.stopping.event.is_set():
+            if task.stopping.pull_api_event.is_set():
                 task.log.info(f"Airbyte shim is yielding to stop.")
                 return
 
