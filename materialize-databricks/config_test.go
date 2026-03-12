@@ -23,7 +23,7 @@ func TestDatabricksConfig(t *testing.T) {
 	}
 	require.NoError(t, validConfig.Validate())
 	var uri = validConfig.ToURI("my-materialization")
-	require.Equal(t, "token:secret@db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?catalog=mycatalog&query_tags=materialization-name%3Amy-materialization&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", uri)
+	require.Equal(t, "token:secret@db-something.cloud.databricks.com:400/sql/1.0/warehouses/someid?catalog=mycatalog&query_tags=materialization_name%3Amy-materialization&schema=default&userAgentEntry=Estuary+Technologies+Flow%2F3.0.0+materialize-databricks", uri)
 
 	var noPort = validConfig
 	noPort.Address = "db-something.cloud.databricks.com"

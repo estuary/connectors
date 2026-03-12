@@ -194,7 +194,9 @@ func (c config) ToURI(materializationName string) string {
 	if materializationName != "" {
 		// Query tag for Estuary task reporting.
 		// https://docs.databricks.com/aws/en/dev-tools/go-sql-driver#optional-parameters
-		params.Add("query_tags", "materialization-name:"+materializationName)
+		// Underscores are allowed in tag keys.
+		// https://docs.databricks.com/aws/en/sql/user/queries/query-tags#limitations
+		params.Add("query_tags", "materialization_name:"+materializationName)
 	}
 
 	var uri url.URL
