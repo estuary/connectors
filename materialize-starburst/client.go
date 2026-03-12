@@ -34,7 +34,7 @@ func connectToDb(ctx context.Context, uri string) (*stdsql.Conn, error) {
 	return db.Conn(ctx)
 }
 
-func newClient(_ context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
+func newClient(_ context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
 	db, err := openDB(ep.Config.ToURI())
 	if err != nil {
 		return nil, err

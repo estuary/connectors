@@ -410,7 +410,7 @@ func queryNodeCount(ctx context.Context, projectID, instanceID string, opts []op
 
 func newTransactor(
 	ctx context.Context,
-	_ string,
+	materializationName string,
 	featureFlags map[string]bool,
 	ep *sql.Endpoint[config],
 	fence sql.Fence,

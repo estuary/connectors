@@ -56,7 +56,7 @@ func prepareNewTransactor(
 ) func(context.Context, string, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *m.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
-		_ string,
+		materializationName string,
 		featureFlags map[string]bool,
 		ep *sql.Endpoint[config],
 		fence sql.Fence,

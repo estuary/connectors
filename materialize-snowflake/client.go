@@ -40,7 +40,7 @@ type client struct {
 	ep         *sql.Endpoint[config]
 }
 
-func newClient(ctx context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
+func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
 	dsnWithSchema, err := ep.Config.toURI(true)
 	if err != nil {
 		return nil, err
