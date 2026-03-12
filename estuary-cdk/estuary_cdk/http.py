@@ -83,6 +83,11 @@ class HTTPError(RuntimeError):
         self.message = message
 
 
+# TODO: Should it become an HTTP client+server?
+# Would that be too much bloat, should they be broken apart?
+# So far I'm leaning on the option of keeping everything together.
+# It's the one piece of state we move around for session management,
+# idk what we'd be getting from having to do two instead.
 class HTTPSession(abc.ABC):
     """
     HTTPSession is an abstract base class for an HTTP client implementation.
@@ -659,3 +664,4 @@ class HTTPMixin(Mixin, HTTPSession):
             finally:
                 if should_release_response:
                     await resp.release()
+

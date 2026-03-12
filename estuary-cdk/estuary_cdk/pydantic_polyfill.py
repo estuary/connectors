@@ -20,7 +20,10 @@ try:
     VERSION = "v2"
 
     # GenericModel was removed. It's just BaseModel now.
-    GenericModel : TypeAlias = pydantic.BaseModel
+    GenericModel: TypeAlias = pydantic.BaseModel
+
+    # Re-export pydantic v2's JsonValue which handles recursive schema generation.
+    from pydantic import JsonValue as JsonValue
 
 except ImportError:
     VERSION = "v1"
@@ -52,4 +55,8 @@ except ImportError:
 
     setattr(pydantic.BaseModel, "model_json_schema", model_json_schema)
 
-__all__ = ["VERSION", "GenericModel"]
+    JsonValue = (
+        list["JsonValue"] | dict[str, "JsonValue"] | str | bool | int | float | None
+    )
+
+__all__ = ["VERSION", "GenericModel", "JsonValue"]

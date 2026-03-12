@@ -1,43 +1,40 @@
 import abc
 import asyncio
 import functools
-from enum import Enum, StrEnum
+import inspect
+from collections.abc import AsyncGenerator, Awaitable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-import inspect
+from enum import Enum, StrEnum
 from logging import Logger
 from typing import (
+    TYPE_CHECKING,
     Any,
-    AsyncGenerator,
-    Awaitable,
     Callable,
-    cast,
     ClassVar,
     Generic,
-    Iterable,
     Literal,
     TypeVar,
+    cast,
+    override,
 )
+from uuid import uuid4
 
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
+if TYPE_CHECKING:
+    from estuary_cdk.capture.webhook import (
+        ReceiveWebhookFn,
+        WebhookCursor,
+    )
+
 from ..cron import next_fire
-from ..utils import json_merge_patch
 from ..flow import (
-    AccessToken,
-    BaseOAuth2Credentials,
     CaptureBinding,
-    ClientCredentialsOAuth2Credentials,
-    OAuth2TokenFlowSpec,
-    AuthorizationCodeFlowOAuth2Credentials,
-    LongLivedClientCredentialsOAuth2Credentials,
-    ResourceOwnerPasswordOAuth2Credentials,
-    RotatingOAuth2Credentials,
-    OAuth2Spec,
     ValidationError,
-    BasicAuth,
 )
-from ..pydantic_polyfill import GenericModel
+from ..pydantic_polyfill import GenericModel, JsonValue
+from ..utils import json_merge_patch
 from . import Task, request, response
 
 LogCursor = tuple[str | int] | AwareDatetime | NonNegativeInt
@@ -103,7 +100,7 @@ def pop_cursor_marker(cursor: dict) -> dict:
     return cursor
 
 
-PageCursor = str | int | dict[str, Any] | None
+PageCursor = str | int | dict[str, JsonValue] | None
 """PageCursor is a cursor into a paged result set.
 These cursors are predominantly an opaque string or an internal offset integer.
 When a dict is used, it represents a structured cursor that supports JSON merge patches
@@ -150,6 +147,23 @@ class BaseDocument(BaseModel):
 
 
 _BaseDocument = TypeVar("_BaseDocument", bound=BaseDocument)
+
+
+class WebhookDocument(BaseDocument):
+    class Meta(BaseDocument.Meta):
+        webhookId: str = Field(default_factory=lambda: str(uuid4()))
+        receivedAt: str = Field(
+            default_factory=lambda: datetime.now(tz=UTC).isoformat()
+        )
+        headers: dict[str, JsonValue]
+        reqPath: str
+        # TODO: Conditionally include path params and query params like s-h-i
+
+    meta_: Meta = Field(
+        default_factory=lambda: WebhookDocument.Meta(op="u"),
+        alias="_meta",
+        description="Document metadata",
+    )
 
 
 class BaseResourceConfig(abc.ABC, BaseModel, extra="forbid"):
@@ -266,6 +280,11 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
         last_digest: str = Field(
             description="The xxh3_128 hex digest of documents of this resource in the last snapshot"
         )
+
+    class Webhook(BaseModel, extra="forbid"):
+        """Partial state of a resource which listens for webhook messages"""
+
+        cursor: "WebhookCursor" = Field(description="ASDF")  # TODO: Add description
 
     inc: Incremental | dict[str, Incremental | None] | None = Field(
         default=None, description="Incremental capture progress"
@@ -484,6 +503,10 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     schema_inference: bool
     reduction_strategy: ReductionStrategy | None = None
     disable: bool = False
+
+    @property
+    def is_webhook_resource(self) -> bool:
+        return issubclass(self.model, WebhookDocument)
 
 
 def discovered(
@@ -712,6 +735,17 @@ def open(
                 scheduled_stop(task, soonest_future_scheduled_initialization)
             )
 
+        resolved_webhook_bindings = [
+            binding
+            for _, binding in resolved_bindings
+            if binding.is_webhook_resource and not binding.disable
+        ]
+        if resolved_webhook_bindings:
+            # TODO: I think there's a circular dependency issue, but try moving it to the top
+            from estuary_cdk.capture.webhook import start_webhook_server
+
+            start_webhook_server(resolved_webhook_bindings)
+
     return (response.Opened(explicitAcknowledgements=False), _run)
 
 
@@ -730,6 +764,7 @@ def open_binding(
         | None
     ) = None,
     fetch_snapshot: FetchSnapshotFn[_BaseDocument] | None = None,
+    # receive_webhook: ReceiveWebhookFn | None = None,
     tombstone: _BaseDocument | None = None,
 ):
     """
