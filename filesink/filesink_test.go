@@ -33,6 +33,7 @@ func TestNextFilekey(t *testing.T) {
 		path      string
 		backfill  uint32
 		prevCount uint64
+		locString string
 		want      string
 	}{
 		{
@@ -78,25 +79,33 @@ func TestNextFilekey(t *testing.T) {
 			want:      "prefix/path/v0000000002/00000000000000000004.something.gz",
 		},
 		{
-			prefix:    "prefix/%Y/%m/%D",
+			prefix:    "prefix/%Y/%m/%d",
 			path:      "path",
 			backfill:  0,
 			prevCount: 0,
 			want:      "prefix/2026/02/11/path/v0000000000/00000000000000000000.something.gz",
 		},
 		{
-			prefix:    "prefix/%Y-%m-%DT%H:%M:%S%z",
+			prefix:    "prefix/%Y-%m-%dT%H:%M:%S%z",
 			path:      "path",
 			backfill:  0,
 			prevCount: 0,
 			want:      "prefix/2026-02-11T10:02:03+0000/path/v0000000000/00000000000000000000.something.gz",
 		},
 		{
-			prefix:    "prefix/%Y-%m-%DT%H:%M:%S %Z",
+			prefix:    "prefix/%Y-%m-%dT%H:%M:%S %Z",
 			path:      "path",
 			backfill:  0,
 			prevCount: 0,
 			want:      "prefix/2026-02-11T10:02:03 UTC/path/v0000000000/00000000000000000000.something.gz",
+		},
+		{
+			prefix:    "prefix/%Y-%m-%dT%H:%M:%S %Z",
+			path:      "path",
+			backfill:  0,
+			prevCount: 0,
+			locString: "Asia/Kathmandu",
+			want:      "prefix/2026-02-11T15:47:03 +0545/path/v0000000000/00000000000000000000.something.gz",
 		},
 	}
 
@@ -124,8 +133,13 @@ func TestNextFilekey(t *testing.T) {
 				ta.common.Prefix = tt.prefix
 			}
 
-			time := time.Date(2026, time.February, 11, 10, 2, 3, 4, time.UTC)
-			require.Equal(t, tt.want, ta.nextFileKey(b, time))
+			tm := time.Date(2026, time.February, 11, 10, 2, 3, 4, time.UTC)
+			if tt.locString != "" {
+				loc, err := time.LoadLocation(tt.locString)
+				require.NoError(t, err)
+				tm = tm.In(loc)
+			}
+			require.Equal(t, tt.want, ta.nextFileKey(b, tm))
 		})
 	}
 }

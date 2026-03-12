@@ -245,7 +245,7 @@ func (s *S3Store) StageObject(ctx context.Context, r io.Reader, key string) (*S3
 	for partNumber := int32(1); ; partNumber++ {
 		n, ioErr := io.ReadFull(r, buf)
 		if ioErr != nil && ioErr != io.ErrUnexpectedEOF {
-			return nil, err
+			return nil, ioErr
 		}
 
 		uploadPartResp, err := s.client.UploadPart(ctx, &s3.UploadPartInput{

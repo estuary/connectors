@@ -247,15 +247,18 @@ func (t *transactor[T]) nextFileKey(b binding, tm time.Time) string {
 
 	if t.store.SupportsPathPatternExpansion() && strings.ContainsAny(prefix, "%") {
 		zoneName, zoneOffset := tm.Zone()
+		zoneHour := zoneOffset / 3600
+		zoneMin := zoneOffset % 3600 / 60
+
 		replacer := strings.NewReplacer(
 			"%Y", fmt.Sprintf("%04d", tm.Year()),
 			"%m", fmt.Sprintf("%02d", tm.Month()),
-			"%D", fmt.Sprintf("%02d", tm.Day()),
+			"%d", fmt.Sprintf("%02d", tm.Day()),
 			"%H", fmt.Sprintf("%02d", tm.Hour()),
 			"%M", fmt.Sprintf("%02d", tm.Minute()),
 			"%S", fmt.Sprintf("%02d", tm.Second()),
 			"%Z", fmt.Sprintf("%s", zoneName),
-			"%z", fmt.Sprintf("%+05d", zoneOffset),
+			"%z", fmt.Sprintf("%+03d%02d", zoneHour, zoneMin),
 		)
 		prefix = replacer.Replace(t.common.Prefix)
 	}
