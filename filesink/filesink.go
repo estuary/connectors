@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/estuary/connectors/go/common"
@@ -206,8 +208,10 @@ func (cs connectorState[T]) Validate() error { return nil }
 type transactor[T Upload] struct {
 	bindings []binding
 	store    Store[T]
-	state    connectorState[T]
 	common   CommonConfig
+
+	stateLock sync.Mutex
+	state     connectorState[T]
 }
 
 type binding struct {
@@ -248,7 +252,7 @@ func (t *transactor[T]) nextFileKey(b binding, tm time.Time) string {
 	if t.store.SupportsPathPatternExpansion() && strings.ContainsAny(prefix, "%") {
 		zoneName, zoneOffset := tm.Zone()
 		zoneHour := zoneOffset / 3600
-		zoneMin := zoneOffset % 3600 / 60
+		zoneMin := int(math.Abs(float64(zoneOffset % 3600 / 60)))
 
 		replacer := strings.NewReplacer(
 			"%Y", fmt.Sprintf("%04d", tm.Year()),
@@ -307,14 +311,21 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		r, w := io.Pipe()
 
 		group.Go(func() error {
+			t.stateLock.Lock()
 			k := t.nextFileKey(b, txnTime)
+			t.stateLock.Unlock()
+
 			log.WithField("key", k).Info("started uploading file")
 			info, err := t.store.StageObject(ctx, r, k)
 			if err != nil {
 				r.CloseWithError(err)
 				return fmt.Errorf("uploading file: %w", err)
 			}
+
+			t.stateLock.Lock()
 			t.state.Uploads[b.stateKey] = append(t.state.Uploads[b.stateKey], info)
+			t.stateLock.Unlock()
+
 			log.WithField("key", k).Info("finished uploading file")
 			return nil
 		})

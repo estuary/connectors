@@ -100,12 +100,20 @@ func TestNextFilekey(t *testing.T) {
 			want:      "prefix/2026-02-11T10:02:03 UTC/path/v0000000000/00000000000000000000.something.gz",
 		},
 		{
-			prefix:    "prefix/%Y-%m-%dT%H:%M:%S %Z",
+			prefix:    "prefix/%Y-%m-%dT%H:%M:%S%z",
+			path:      "path",
+			backfill:  0,
+			prevCount: 0,
+			locString: "America/Los_Angeles",
+			want:      "prefix/2026-02-11T02:02:03-0800/path/v0000000000/00000000000000000000.something.gz",
+		},
+		{
+			prefix:    "prefix/%Y-%m-%dT%H:%M:%S%z",
 			path:      "path",
 			backfill:  0,
 			prevCount: 0,
 			locString: "Asia/Kathmandu",
-			want:      "prefix/2026-02-11T15:47:03 +0545/path/v0000000000/00000000000000000000.something.gz",
+			want:      "prefix/2026-02-11T15:47:03+0545/path/v0000000000/00000000000000000000.something.gz",
 		},
 	}
 
