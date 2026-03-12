@@ -744,7 +744,7 @@ def open(
             # TODO: I think there's a circular dependency issue, but try moving it to the top
             from estuary_cdk.capture.webhook import start_webhook_server
 
-            start_webhook_server(resolved_webhook_bindings)
+            start_webhook_server(resolved_webhook_bindings, task)
 
     return (response.Opened(explicitAcknowledgements=False), _run)
 

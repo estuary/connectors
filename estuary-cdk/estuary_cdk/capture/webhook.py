@@ -1,5 +1,3 @@
-import asyncio
-import sys
 from collections.abc import AsyncGenerator, Mapping
 from datetime import datetime
 from enum import Enum
@@ -121,6 +119,7 @@ class WebhookCaptureSpec(BaseModel):
 
 
 async def _run_webhook_server(
+    task: Task,
     bindings: list[Resource[_BaseDocument, _ResourceConfig, _ResourceState]],
 ):
     # TODO: We need to classify webhook processing features as pre- and post-
@@ -139,16 +138,27 @@ async def _run_webhook_server(
     site = web.TCPSite(runner, port=8080)
     await site.start()
 
+    try:
+        await task.stopping.event.wait()
+        task.log.debug("webhook server is yielding to stop")
+    finally:
+        await runner.cleanup()
+
 
 def start_webhook_server(
     bindings: list[Resource[_BaseDocument, _ResourceConfig, _ResourceState]],
+    task: Task,
 ):
     """Start the webhook listener for the given bindings.
 
     Called from common.open() after resolving webhook bindings.
     """
-    print("Running server", file=sys.stderr)
+    task.log.info("Starting webhook server")
+
     # TODO: We want to reject bad messages as fast as possible.
     # 1. Verify IP ranges, signatures, auth, everything
     # 2. Only then, route to the appropriate collection handling fn
-    _ = asyncio.create_task(_run_webhook_server(bindings))
+    async def run(child_task: Task):
+        await _run_webhook_server(child_task, bindings)
+
+    task.spawn_child("webhook-server", run)
