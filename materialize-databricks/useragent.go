@@ -1,13 +1,21 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
+	"regexp"
 	"strings"
 )
 
 const productName = "Estuary Technologies Flow"
 const productFeature = "materialize-databricks"
-const productVersion = "3.0.0" // this should match VERSION file
+
+//go:embed VERSION
+var rawVersion string
+
+func productVersion() string {
+	return regexp.MustCompile(`^v(\d+)\s*$`).FindStringSubmatch(rawVersion)[1] + ".0.0"
+}
 
 // DSN parameter for "partner identification".
 var productParameterDSN = struct {
@@ -19,7 +27,7 @@ var productParameterDSN = struct {
 	// The format for this value is found in the JDBC driver docs.
 	// https://docs.databricks.com/aws/en/integrations/jdbc-oss/properties#-other-feature-properties
 	// "This value is in the following format: [ProductName]/[ProductVersion] [Comment]"
-	value: fmt.Sprintf("%s/%s %s", productName, productVersion, productFeature),
+	value: fmt.Sprintf("%s/%s %s", productName, productVersion(), productFeature),
 }
 
 // Values for global product identification.
@@ -28,5 +36,5 @@ var productGlobalDescription = struct {
 	name, version string
 }{
 	name:    strings.ReplaceAll(fmt.Sprintf("%s_%s", productName, productFeature), " ", "-"),
-	version: productVersion,
+	version: productVersion(),
 }
