@@ -80,7 +80,7 @@ func NewFakeS3() *FakeS3 {
 }
 
 func (s *FakeS3) GenerateUploadId() string {
-	buf := make([]byte, 0, 24)
+	buf := make([]byte, 24)
 	rand.Read(buf)
 	return base64.StdEncoding.EncodeToString(buf)
 }

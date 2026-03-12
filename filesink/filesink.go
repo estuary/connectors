@@ -406,8 +406,16 @@ func (t *transactor[T]) Acknowledge(ctx context.Context) (*pf.ConnectorState, er
 			}
 			log.WithField("key", upload.FileKey()).Info("completed file upload")
 		}
+
 	}
-	return &pf.ConnectorState{UpdatedJson: json.RawMessage(`{}`)}, nil
+
+	t.state.Uploads = make(map[string][]T)
+
+	checkpointJSON, err := json.Marshal(t.state)
+	if err != nil {
+		return nil, fmt.Errorf("creating checkpoint clearing json: %w", err)
+	}
+	return &pf.ConnectorState{UpdatedJson: json.RawMessage(checkpointJSON)}, nil
 }
 
 func (t *transactor[T]) Destroy() {}
