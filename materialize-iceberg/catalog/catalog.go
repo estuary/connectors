@@ -391,30 +391,20 @@ func (c *Catalog) CreateTable(ctx context.Context, ns string, name string, sch *
 		Fields  []sortField `json:"fields"`
 	}
 
-	// Two separate request types so that the `properties` field is never
-	// present in the JSON body when no properties are specified. Some catalog
-	// implementations (e.g. Snowflake Polaris) do not handle unexpected or
-	// empty fields gracefully.
 	type createTableRequest struct {
-		Name        string          `json:"name"`
-		Schema      *iceberg.Schema `json:"schema"`
-		Location    *string         `json:"location,omitempty"`
-		WriteOrder  *sortOrder      `json:"write-order,omitempty"`
-		StageCreate bool            `json:"stage-create"` // always false, required to exist & be false for s3tables catalogs
-	}
-	type createTableRequestWithProperties struct {
 		Name        string            `json:"name"`
 		Schema      *iceberg.Schema   `json:"schema"`
 		Location    *string           `json:"location,omitempty"`
 		WriteOrder  *sortOrder        `json:"write-order,omitempty"`
 		Properties  map[string]string `json:"properties,omitempty"`
-		StageCreate bool              `json:"stage-create"`
+		StageCreate bool              `json:"stage-create"` // always false, required to exist & be false for s3tables catalogs
 	}
 
-	base := createTableRequest{
+	req := createTableRequest{
 		Name:        name,
 		Schema:      sch,
 		Location:    location,
+		Properties:  properties,
 		StageCreate: false,
 	}
 
@@ -429,25 +419,13 @@ func (c *Catalog) CreateTable(ctx context.Context, ns string, name string, sch *
 			})
 		}
 
-		base.WriteOrder = &sortOrder{
+		req.WriteOrder = &sortOrder{
 			OrderID: 1,
 			Fields:  fields,
 		}
 	}
 
-	var body any = base
-	if len(properties) > 0 {
-		body = createTableRequestWithProperties{
-			Name:        base.Name,
-			Schema:      base.Schema,
-			Location:    base.Location,
-			WriteOrder:  base.WriteOrder,
-			Properties:  properties,
-			StageCreate: base.StageCreate,
-		}
-	}
-
-	if err := doPost(ctx, c, fmt.Sprintf("/namespaces/%s/tables", ns), body); err != nil {
+	if err := doPost(ctx, c, fmt.Sprintf("/namespaces/%s/tables", ns), req); err != nil {
 		return err
 	}
 
@@ -544,7 +522,7 @@ func doPost(ctx context.Context, client *Catalog, path string, body any) error {
 	if got, err := client.baseReq(ctx).SetBody(body).Post(path); err != nil {
 		return fmt.Errorf("failed to post %s: %w", path, err)
 	} else if !got.IsSuccess() {
-		return fmt.Errorf("failed to POST %s: %s %s (raw: %s)", got.Request.URL, got.Status(), got.Error().(*errorResponse), got.String())
+		return fmt.Errorf("failed to POST %s: %s %s", got.Request.URL, got.Status(), got.Error().(*errorResponse))
 	}
 
 	return nil
