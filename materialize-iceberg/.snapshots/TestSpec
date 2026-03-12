@@ -394,6 +394,11 @@
             "title": "Lowercase Column Names",
             "description": "Create all columns with lowercase names. This is necessary for compatibility with some systems such as querying S3 Table Buckets with Athena."
           },
+          "iceberg_v3": {
+            "type": "boolean",
+            "title": "Use Iceberg V3",
+            "description": "Enable Iceberg spec version 3 for newly created tables. V3 is set at table creation time and cannot be changed afterwards."
+          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
@@ -405,6 +410,44 @@
         "title": "Advanced Options",
         "description": "Options for advanced users. You should not typically need to modify these.",
         "advanced": true
+      },
+      "glue_optimizers": {
+        "properties": {
+          "enable_compaction": {
+            "type": "boolean",
+            "title": "Enable Compaction",
+            "description": "Enable automatic compaction of small Iceberg data files to improve query performance."
+          },
+          "enable_retention": {
+            "type": "boolean",
+            "title": "Enable Snapshot Retention",
+            "description": "Enable automatic removal of old Iceberg table snapshots to reduce storage costs."
+          },
+          "snapshot_retention_days": {
+            "type": "integer",
+            "title": "Snapshot Retention Days",
+            "description": "Number of days to retain Iceberg snapshots. Uses the Glue default of 5 if unset."
+          },
+          "number_of_snapshots_to_retain": {
+            "type": "integer",
+            "title": "Number of Snapshots to Retain",
+            "description": "Minimum number of Iceberg snapshots to retain regardless of the retention period. Uses the Glue default of 1 if unset."
+          },
+          "enable_orphan_file_deletion": {
+            "type": "boolean",
+            "title": "Enable Orphan File Deletion",
+            "description": "Enable automatic deletion of files that are no longer referenced by any table snapshot."
+          },
+          "orphan_file_retention_days": {
+            "type": "integer",
+            "title": "Orphan File Retention Days",
+            "description": "Number of days to retain orphan files before deletion. Uses the Glue default of 3 if unset."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Glue Table Optimizers",
+        "description": "Configure AWS Glue managed table optimizers for compaction"
       }
     },
     "type": "object",
@@ -432,6 +475,14 @@
         "title": "Alternative Namespace",
         "description": "Alternative Namespace for this table (optional).",
         "x-schema-name": true
+      },
+      "additional_table_properties": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object",
+        "title": "Additional Table Properties",
+        "description": "Additional Iceberg table properties to set when the table is created. These are set only at creation time and cannot be changed afterwards. Example: {'write.parquet.compression-codec': 'zstd'}"
       }
     },
     "type": "object",
