@@ -815,11 +815,17 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// NB: Not using groupTx here since the Go Snowflake driver
 				// retains contexts internally, and groupCtx is cancelled after
 				// group.Wait() returns.
-				if _, err := d.db.ExecContext(ctx, item.Query); err != nil {
+				result, err := d.db.ExecContext(ctx, item.Query)
+				if err != nil {
 					return fmt.Errorf("query %q failed: %w", item.Query, err)
 				}
 
 				d.be.FinishedResourceCommit(path)
+
+				// Log partition scan stats for merge observability.
+				if sfResult, ok := result.(sf.SnowflakeResult); ok {
+					logMergePartitionStats(ctx, d.db, sfResult.GetQueryID(), path)
+				}
 				if err := d.deleteFiles(groupCtx, []string{item.StagedDir}); err != nil {
 					return fmt.Errorf("cleaning up files: %w", err)
 				}
@@ -1134,6 +1140,26 @@ func (d *transactor) Destroy() {
 	d.load.conn.Close()
 	d.store.conn.Close()
 	d.db.Close()
+}
+
+func logMergePartitionStats(ctx context.Context, db *stdsql.DB, queryID string, path []string) {
+	var scanned, total stdsql.NullInt64
+	row := db.QueryRowContext(ctx,
+		`SELECT PARTITIONS_SCANNED, PARTITIONS_TOTAL
+         FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION(RESULT_LIMIT => 20))
+         WHERE QUERY_ID = ?`,
+		queryID,
+	)
+	if err := row.Scan(&scanned, &total); err != nil {
+		log.WithField("query_id", queryID).WithError(err).Debug("could not fetch merge partition stats")
+		return
+	}
+	log.WithFields(log.Fields{
+		"table":              path,
+		"query_id":           queryID,
+		"partitions_scanned": scanned.Int64,
+		"partitions_total":   total.Int64,
+	}).Info("merge partition stats")
 }
 
 func main() {
