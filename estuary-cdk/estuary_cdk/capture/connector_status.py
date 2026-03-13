@@ -6,6 +6,7 @@ from estuary_cdk.logger import FlowLogger
 
 if typing.TYPE_CHECKING:
     from estuary_cdk.capture.task import Task
+
     StoppingType = Task.Stopping
 else:
     StoppingType = typing.Any
@@ -25,7 +26,7 @@ class ConnectorStatus:
             # Allow some initial setup time for bindings to be registered before
             # starting to poll for status changes every second.
             await asyncio.sleep(5)
-            while not stopping.event.is_set():
+            while not stopping.pull_api_event.is_set():
                 self._log_status()
                 await asyncio.sleep(1)
 
@@ -64,8 +65,12 @@ class ConnectorStatus:
             return
 
         if (backfill_count := len(self.binding_backfill_counts)) > 0:
-            self.log.event.status(f"Backfilling {backfill_count} out of {self.binding_count} bindings")
+            self.log.event.status(
+                f"Backfilling {backfill_count} out of {self.binding_count} bindings"
+            )
         else:
-            self.log.event.status(f"Streaming change events (all {self.binding_count} bindings are backfilled)")
+            self.log.event.status(
+                f"Streaming change events (all {self.binding_count} bindings are backfilled)"
+            )
 
         self.should_log = False

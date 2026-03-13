@@ -52,7 +52,7 @@ def orjson_default(obj):
     if isinstance(obj, decimal.Decimal):
         return str(obj)
     if isinstance(obj, (bytes, bytearray)):
-        return base64.b64encode(obj).decode('utf-8')
+        return base64.b64encode(obj).decode("utf-8")
     raise TypeError
 
 
@@ -85,9 +85,15 @@ class Task:
         The Task's coroutine should monitor this event and exit when it's set AND
         it has no more immediate work to do (for example, no further documents are
         currently ready to be captured).
+
+        `webhook_event` is a separate event for the webhook server. It is set
+        after all non-webhook tasks have completed, signaling the webhook server
+        to reject new requests with 503 and clean up.
         """
 
-        event: asyncio.Event
+        pull_api_event: asyncio.Event = asyncio.Event()
+        webhook_event: asyncio.Event = asyncio.Event()
+        webhook_task: asyncio.Task[None] | None = None
         first_error: Exception | None = None
         first_error_task: str | None = None
 
@@ -127,16 +133,21 @@ class Task:
         Or, reset() will discard any queued documents."""
 
         if isinstance(document, dict):
-            b = orjson.dumps({
-                "captured": {
-                    "binding": binding,
-                    "doc": document,
-                }
-            }, default=orjson_default)
+            b = orjson.dumps(
+                {
+                    "captured": {
+                        "binding": binding,
+                        "doc": document,
+                    }
+                },
+                default=orjson_default,
+            )
         else:
-            b = Response(
-                captured=response.Captured(binding=binding, doc=document)
-            ).model_dump_json(by_alias=True, exclude_unset=True).encode()
+            b = (
+                Response(captured=response.Captured(binding=binding, doc=document))
+                .model_dump_json(by_alias=True, exclude_unset=True)
+                .encode()
+            )
 
         self._buffer.write(b)
         self._buffer.write(b"\n")
@@ -152,9 +163,15 @@ class Task:
         """Write a SourcedSchema message for the given binding to the buffer.
         SourcedSchema messages won't be emitted until checkpoint() is called."""
 
-        b = Response(
-            sourcedSchema=response.SourcedSchema(binding=binding_index, schema_json=schema)
-        ).model_dump_json(by_alias=True, exclude_unset=True).encode()
+        b = (
+            Response(
+                sourcedSchema=response.SourcedSchema(
+                    binding=binding_index, schema_json=schema
+                )
+            )
+            .model_dump_json(by_alias=True, exclude_unset=True)
+            .encode()
+        )
 
         self._buffer.write(b)
         self._buffer.write(b"\n")
@@ -205,13 +222,15 @@ class Task:
                         parent.stopping.first_error = exc
                         parent.stopping.first_error_task = child_name
 
-                    parent.stopping.event.set()
+                    parent.stopping.pull_api_event.set()
 
         task = self._tg.create_task(run_task(self))
         task.set_name(child_name)
         return task
 
-    async def _emit(self, response: Response[EndpointConfig, ResourceConfig, ConnectorState]):
+    async def _emit(
+        self, response: Response[EndpointConfig, ResourceConfig, ConnectorState]
+    ):
         self._buffer.write(
             response.model_dump_json(by_alias=True, exclude_unset=True).encode()
         )

@@ -3,9 +3,10 @@ import asyncio
 import base64
 import json
 import time
+from collections.abc import AsyncGenerator, Awaitable
 from dataclasses import dataclass
 from logging import Logger
-from typing import Any, AsyncGenerator, Awaitable, Callable, Protocol, TypeVar
+from typing import Any, Callable, Protocol, TypeVar
 
 import aiohttp
 from google.auth.credentials import TokenState as GoogleTokenState
@@ -82,6 +83,11 @@ class HTTPError(RuntimeError):
         self.message = message
 
 
+# TODO: Should it become an HTTP client+server?
+# Would that be too much bloat, should they be broken apart?
+# So far I'm leaning on the option of keeping everything together.
+# It's the one piece of state we move around for session management,
+# idk what we'd be getting from having to do two instead.
 class HTTPSession(abc.ABC):
     """
     HTTPSession is an abstract base class for an HTTP client implementation.
@@ -513,7 +519,9 @@ class HTTPMixin(Mixin, HTTPSession):
 
         # Only pass timeout if explicitly provided. Otherwise, omit the
         # timeout argument and rely on the session's default timeout.
-        optional_kwargs: dict[str, Any] = {"timeout": timeout} if timeout is not None else {}
+        optional_kwargs: dict[str, Any] = (
+            {"timeout": timeout} if timeout is not None else {}
+        )
 
         resp = await self.inner.request(
             headers=headers,
@@ -656,3 +664,4 @@ class HTTPMixin(Mixin, HTTPSession):
             finally:
                 if should_release_response:
                     await resp.release()
+

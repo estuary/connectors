@@ -1,43 +1,32 @@
 import abc
 import asyncio
 import functools
-from enum import Enum, StrEnum
+import inspect
+from collections.abc import AsyncGenerator, Awaitable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-import inspect
+from enum import Enum, StrEnum
 from logging import Logger
 from typing import (
     Any,
-    AsyncGenerator,
-    Awaitable,
     Callable,
-    cast,
     ClassVar,
     Generic,
-    Iterable,
     Literal,
     TypeVar,
+    cast,
 )
+from uuid import uuid4
 
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..cron import next_fire
-from ..utils import json_merge_patch
 from ..flow import (
-    AccessToken,
-    BaseOAuth2Credentials,
     CaptureBinding,
-    ClientCredentialsOAuth2Credentials,
-    OAuth2TokenFlowSpec,
-    AuthorizationCodeFlowOAuth2Credentials,
-    LongLivedClientCredentialsOAuth2Credentials,
-    ResourceOwnerPasswordOAuth2Credentials,
-    RotatingOAuth2Credentials,
-    OAuth2Spec,
     ValidationError,
-    BasicAuth,
 )
-from ..pydantic_polyfill import GenericModel
+from ..pydantic_polyfill import GenericModel, JsonValue
+from ..utils import json_merge_patch
 from . import Task, request, response
 
 LogCursor = tuple[str | int] | AwareDatetime | NonNegativeInt
@@ -51,7 +40,7 @@ the tuple type allows for str or integer values to be used
 """
 
 # Cursor marker for dict-based cursors.
-# This marker is necessary to distinguish between regular dictionaries (documents) 
+# This marker is necessary to distinguish between regular dictionaries (documents)
 # and cursor dictionaries when yielded by fetch functions. Without this marker,
 # the runtime cannot determine whether a dict should be treated as a document to
 # capture or as a PageCursor for checkpointing progress.
@@ -65,17 +54,17 @@ def is_cursor_dict(item: dict) -> bool:
 
 def make_cursor_dict(data: dict) -> dict:
     """Convert a regular dict to a cursor dict by adding the marker.
-    
+
     The intended way of using this is to first call `make_cursor_dict` on a dictionary that
     represents the full state of a resource's `PageCursor` and then subsequent calls representing changes
     to that state. This allows JSON merge patches to be used for efficient incremental updates.
-    
+
     IMPORTANT: When checkpointing, connectors should yield only the changes/patches that need to be
     merged into the backfill state's next_page, not the entire dictionary. This approach:
-    - Keeps checkpoints relatively small 
+    - Keeps checkpoints relatively small
     - Reduces the impact checkpoints have on the recovery log size
     - Enables efficient incremental state updates via JSON merge patches
-    
+
     Example:
     ```python
     # Initial full state - use make_cursor_dict for the complete state
@@ -88,7 +77,7 @@ def make_cursor_dict(data: dict) -> dict:
     completed_boards = {"board1": None}  # marks board1 as completed
     yield completed_boards
     ```
-    
+
     Args:
         data: The dictionary data to mark as a cursor. For initial state, this should be
               the complete cursor state. For subsequent calls, this should contain only
@@ -103,7 +92,7 @@ def pop_cursor_marker(cursor: dict) -> dict:
     return cursor
 
 
-PageCursor = str | int | dict[str, Any] | None
+PageCursor = str | int | dict[str, JsonValue] | None
 """PageCursor is a cursor into a paged result set.
 These cursors are predominantly an opaque string or an internal offset integer.
 When a dict is used, it represents a structured cursor that supports JSON merge patches
@@ -113,9 +102,13 @@ None means "begin a new iteration" in a request context,
 and "no pages remain" in a response context.
 """
 
+# TODO: explain that I don't really have any use for this yet, I just want to be permissive for future purposes
+WebhookCursor = str | int | datetime | dict[str, JsonValue] | None
+
 
 class Triggers(Enum):
     BACKFILL = "BACKFILL"
+
 
 @dataclass
 class SourcedSchema:
@@ -126,6 +119,7 @@ class SourcedSchema:
     widens inferred schemas to accommodate the current inferred schema along
     with any SourcedSchemas.
     """
+
     value: dict[str, Any]
 
 
@@ -147,7 +141,26 @@ class BaseDocument(BaseModel):
     )
 
 
+# TODO: I may need to have WebhookDocument inherit from AssociatedDocument
+class WebhookDocument(BaseDocument):
+    class Meta(BaseDocument.Meta):
+        webhookId: str = Field(default_factory=lambda: str(uuid4()))
+        receivedAt: str = Field(
+            default_factory=lambda: datetime.now(tz=UTC).isoformat()
+        )
+        headers: dict[str, JsonValue]
+        reqPath: str
+        # TODO: Conditionally include path params and query params like s-h-i
+
+    meta_: Meta = Field(
+        default_factory=lambda: WebhookDocument.Meta(op="u"),
+        alias="_meta",
+        description="Document metadata",
+    )
+
+
 _BaseDocument = TypeVar("_BaseDocument", bound=BaseDocument)
+_WebhookDocument = TypeVar("_WebhookDocument", bound=WebhookDocument)
 
 
 class BaseResourceConfig(abc.ABC, BaseModel, extra="forbid"):
@@ -158,7 +171,9 @@ class BaseResourceConfig(abc.ABC, BaseModel, extra="forbid"):
     PATH_POINTERS: ClassVar[list[str]]
 
     meta_: dict | None = Field(
-        default=None, alias="_meta", title="Meta",
+        default=None,
+        alias="_meta",
+        title="Meta",
     )
 
     @abc.abstractmethod
@@ -215,7 +230,7 @@ class ResourceConfigWithSchedule(ResourceConfig):
 async def scheduled_stop(task: Task, future_dt: datetime) -> None:
     sleep_duration = future_dt - datetime.now(tz=UTC)
     await asyncio.sleep(sleep_duration.total_seconds())
-    task.stopping.event.set()
+    task.stopping.pull_api_event.set()
 
 
 class BaseResourceState(abc.ABC, BaseModel, extra="forbid"):
@@ -263,6 +278,12 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
             description="The xxh3_128 hex digest of documents of this resource in the last snapshot"
         )
 
+    class Webhook(BaseModel, extra="forbid"):
+        """Partial state of a resource which listens for webhook messages"""
+
+        # TODO: Add description
+        cursor: WebhookCursor = Field(default=None, description="ASDF")
+
     inc: Incremental | dict[str, Incremental | None] | None = Field(
         default=None, description="Incremental capture progress"
     )
@@ -274,12 +295,18 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
 
     snapshot: Snapshot | None = Field(default=None, description="Snapshot progress")
 
+    webhook: Webhook | None = Field(
+        default=None,
+        description="Webhook progress, or None if no state tracking is required",
+    )
+
     last_initialized: datetime | None = Field(
         default=None, description="The last time this state was initialized."
     )
 
     is_connector_initiated: bool = Field(
-        default=False, description="Indicates if this backfill was initiated by the connector.",
+        default=False,
+        description="Indicates if this backfill was initiated by the connector.",
     )
 
 
@@ -412,8 +439,38 @@ Implementations SHOULD NOT sleep or implement their own coarse rate limit
 (use `ResourceConfig.interval`).
 """
 
+# TODO: Should these fns receive an async generator of messages, as produced by the webhook listener?
+# How would they inform the server that the data's been checkpointed so it can ACK the HTTP request?
+# I need to provide a "heavy lifting" ReceiveWebhookFn type function that performs all the heavy lifting.
+# Any fns that extend it should call it so we perform all the usual data validation and transformation,
+# and only then would it do its own thing. The same way in existing connectors we define an `open` fn
+# to decorate `open_binding`'s behaviour.
+# I mean, kind of. Some checks we want to perform before collection routing, like signature verifications.
+# Some messages will come encrypted and we can't even read the discriminator until we verify.
+ProcessWebhookFn = Callable[
+    [
+        Logger,
+        WebhookCursor,
+    ],
+    AsyncGenerator[_WebhookDocument | dict[str, JsonValue], None],
+]
+"""
+TODO: Add high-level description. 
 
-def is_recurring_fetch_page_fn(fn: FetchPageFn | RecurringFetchPageFn, log: Logger, page: PageCursor, cutoff: LogCursor, is_connector_initiated: bool) -> bool:
+This fn should execute after all usual verifications (auth, signatures) happen
+and should be responsible for publishing documents
+
+We need to mention this fn needs to run as fast as possible, we don't want HTTP reqs to time out
+"""
+
+
+def is_recurring_fetch_page_fn(
+    fn: FetchPageFn | RecurringFetchPageFn,
+    log: Logger,
+    page: PageCursor,
+    cutoff: LogCursor,
+    is_connector_initiated: bool,
+) -> bool:
     """Check if the function signature accepts the arguments of a RecurringFetchPageFn."""
     try:
         inspect.signature(fn).bind(log, page, cutoff, is_connector_initiated)
@@ -473,6 +530,10 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     schema_inference: bool
     reduction_strategy: ReductionStrategy | None = None
     disable: bool = False
+
+    @property
+    def is_webhook_resource(self) -> bool:
+        return issubclass(self.model, WebhookDocument)
 
 
 def discovered(
@@ -570,7 +631,9 @@ def _get_min_incremental_cursor(state: ResourceState) -> datetime | None:
     elif isinstance(state.inc, dict):
         min_cursor: datetime | None = None
         for inc_state in state.inc.values():
-            if isinstance(inc_state, ResourceState.Incremental) and isinstance(inc_state.cursor, datetime):
+            if isinstance(inc_state, ResourceState.Incremental) and isinstance(
+                inc_state.cursor, datetime
+            ):
                 if min_cursor is None or inc_state.cursor < min_cursor:
                     min_cursor = inc_state.cursor
         return min_cursor
@@ -620,13 +683,16 @@ def open(
                         ConnectorState(bindingStateV1={binding.stateKey: state})
                     )
 
-                if not state.backfill and isinstance(binding.resourceConfig, ResourceConfigWithSchedule):
+                if not state.backfill and isinstance(
+                    binding.resourceConfig, ResourceConfigWithSchedule
+                ):
                     cron_schedule = binding.resourceConfig.schedule
                     missed_scheduled_initialization = next_fire(
                         cron_schedule, state.last_initialized, NOW
                     )
                     future_scheduled_initialization = next_fire(
-                        cron_schedule, NOW,
+                        cron_schedule,
+                        NOW,
                     )
 
                     if missed_scheduled_initialization:
@@ -635,9 +701,14 @@ def open(
 
                     if future_scheduled_initialization:
                         if not soonest_future_scheduled_initialization:
-                            soonest_future_scheduled_initialization = future_scheduled_initialization
+                            soonest_future_scheduled_initialization = (
+                                future_scheduled_initialization
+                            )
                         else:
-                            soonest_future_scheduled_initialization = min(soonest_future_scheduled_initialization, future_scheduled_initialization)
+                            soonest_future_scheduled_initialization = min(
+                                soonest_future_scheduled_initialization,
+                                future_scheduled_initialization,
+                            )
 
             if should_initialize:
                 if is_connector_initiated:
@@ -649,10 +720,10 @@ def open(
                     # Check if we can coordinate the backfill cutoff with the incremental cursor.
                     # We currently only perform this coordination when there's a single backfill task.
                     if (
-                        state and
-                        min_cursor is not None and
-                        isinstance(initial_backfill_state, ResourceState.Backfill) and
-                        isinstance(initial_backfill_state.cutoff, datetime)
+                        state
+                        and min_cursor is not None
+                        and isinstance(initial_backfill_state, ResourceState.Backfill)
+                        and isinstance(initial_backfill_state.cutoff, datetime)
                     ):
                         state.backfill = initial_backfill_state.model_copy(deep=True)
                         state.backfill.cutoff = min_cursor
@@ -684,11 +755,28 @@ def open(
             if inspect.iscoroutine(result):
                 await result
 
-
         if soonest_future_scheduled_initialization:
             # Gracefully exit to ensure relatively close adherence to any bindings'
             # re-initialization schedules.
-            asyncio.create_task(scheduled_stop(task, soonest_future_scheduled_initialization))
+            asyncio.create_task(
+                scheduled_stop(task, soonest_future_scheduled_initialization)
+            )
+
+        resolved_webhook_bindings = [
+            binding
+            for _, binding in resolved_bindings
+            if binding.is_webhook_resource and not binding.disable
+        ]
+        if resolved_webhook_bindings:
+            # TODO: I think there's a circular dependency issue, but try moving it to the top
+            from estuary_cdk.capture.webhook import start_webhook_server
+
+            start_webhook_server(resolved_webhook_bindings, task)
+
+            # The webhook server runs outside the TaskGroup so it can outlive
+            # non-webhook tasks during two-phase shutdown. Block here so the
+            # TaskGroup stays alive until graceful shutdown begins.
+            await task.stopping.pull_api_event.wait()
 
     return (response.Opened(explicitAcknowledgements=False), _run)
 
@@ -698,14 +786,17 @@ def open_binding(
     binding_index: int,
     resource_state: _ResourceState,
     task: Task,
-    fetch_changes: FetchChangesFn[_BaseDocument]
-    | dict[str, FetchChangesFn[_BaseDocument]]
-    | None = None,
-    fetch_page: FetchPageFn[_BaseDocument]
-    | RecurringFetchPageFn[_BaseDocument]
-    | dict[str, FetchPageFn[_BaseDocument]]
-    | None = None,
+    fetch_changes: (
+        FetchChangesFn[_BaseDocument] | dict[str, FetchChangesFn[_BaseDocument]] | None
+    ) = None,
+    fetch_page: (
+        FetchPageFn[_BaseDocument]
+        | RecurringFetchPageFn[_BaseDocument]
+        | dict[str, FetchPageFn[_BaseDocument]]
+        | None
+    ) = None,
     fetch_snapshot: FetchSnapshotFn[_BaseDocument] | None = None,
+    process_webhook: ProcessWebhookFn[_WebhookDocument] | None = None,
     tombstone: _BaseDocument | None = None,
 ):
     """
@@ -807,7 +898,9 @@ def open_binding(
                 )
 
         else:
-            assert resource_state.backfill and not isinstance(resource_state.backfill, dict)
+            assert resource_state.backfill and not isinstance(
+                resource_state.backfill, dict
+            )
             task.spawn_child(
                 f"{prefix}.backfill",
                 functools.partial(
@@ -831,6 +924,29 @@ def open_binding(
             )
 
         task.spawn_child(f"{prefix}.snapshot", closure)
+
+    # TODO: How about feeding discriminated processing fns as a dict? Something to keep in mind
+    if process_webhook:
+
+        async def webhook_closure(
+            task: Task,
+            process_webhook: ProcessWebhookFn[_WebhookDocument],
+            state: ResourceState.Webhook,
+        ):
+            assert state and not isinstance(state, dict)
+            await _binding_webhook_task(
+                binding, binding_index, process_webhook, state, task
+            )
+
+        assert resource_state.webhook and isinstance(resource_state.webhook, dict)
+        _ = task.spawn_child(
+            f"{prefix}.webhook",
+            functools.partial(
+                webhook_closure,
+                process_webhook=process_webhook,
+                state=resource_state.webhook,
+            ),
+        )
 
 
 async def _binding_snapshot_task(
@@ -868,9 +984,10 @@ async def _binding_snapshot_task(
         )
 
         try:
-            if not task.stopping.event.is_set():
+            if not task.stopping.pull_api_event.is_set():
                 await asyncio.wait_for(
-                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
+                    task.stopping.pull_api_event.wait(),
+                    timeout=sleep_for.total_seconds(),
                 )
 
             task.log.debug(f"periodic snapshot is idle and is yielding to stop")
@@ -953,7 +1070,7 @@ async def _binding_backfill_task(
         # Yield to the event loop to prevent starvation.
         await asyncio.sleep(0)
 
-        if task.stopping.event.is_set():
+        if task.stopping.pull_api_event.is_set():
             task.log.debug("backfill is yielding to stop", {"subtask_id": subtask_id})
             return
 
@@ -961,7 +1078,9 @@ async def _binding_backfill_task(
         done = True
 
         # Distinguish between FetchPageFn and RecurringFetchPageFn to provide the correct arguments.
-        if is_recurring_fetch_page_fn(fetch_page, task.log, state.next_page, state.cutoff, is_connector_initiated):
+        if is_recurring_fetch_page_fn(
+            fetch_page, task.log, state.next_page, state.cutoff, is_connector_initiated
+        ):
             fn = cast(RecurringFetchPageFn, fetch_page)
             pages = fn(task.log, state.next_page, state.cutoff, is_connector_initiated)
         else:
@@ -1037,11 +1156,15 @@ async def _binding_backfill_task(
         assert isinstance(last_initialized, datetime)
         NOW = datetime.now(tz=UTC)
         cron_schedule = binding.resourceConfig.schedule
-        missed_scheduled_initialization = next_fire(cron_schedule, last_initialized, NOW)
+        missed_scheduled_initialization = next_fire(
+            cron_schedule, last_initialized, NOW
+        )
         future_scheduled_initialization = next_fire(cron_schedule, NOW)
         if missed_scheduled_initialization:
-            task.log.info("Backfill completed after the next backfill was scheduled. Resetting the connector to keep adherence to the schedule.")
-            task.stopping.event.set()
+            task.log.info(
+                "Backfill completed after the next backfill was scheduled. Resetting the connector to keep adherence to the schedule."
+            )
+            task.stopping.pull_api_event.set()
         elif future_scheduled_initialization:
             asyncio.create_task(scheduled_stop(task, future_scheduled_initialization))
 
@@ -1085,9 +1208,10 @@ async def _binding_incremental_task(
 
     while True:
         try:
-            if not task.stopping.event.is_set():
+            if not task.stopping.pull_api_event.is_set():
                 await asyncio.wait_for(
-                    task.stopping.event.wait(), timeout=sleep_for.total_seconds()
+                    task.stopping.pull_api_event.wait(),
+                    timeout=sleep_for.total_seconds(),
                 )
 
             task.log.debug(
@@ -1112,7 +1236,7 @@ async def _binding_incremental_task(
                 task.log.info(
                     "incremental task triggered backfill", {"subtask_id": subtask_id}
                 )
-                task.stopping.event.set()
+                task.stopping.pull_api_event.set()
                 await task.checkpoint(
                     ConnectorState(backfillRequests={binding.stateKey: True})
                 )
@@ -1177,3 +1301,33 @@ async def _binding_incremental_task(
             "incremental task is idle",
             {"sleep_for": sleep_for, "cursor": state.cursor, "subtask_id": subtask_id},
         )
+
+
+async def _binding_webhook_task(
+    binding: CaptureBinding[_ResourceConfig],
+    binding_index: int,
+    process_webhook: ProcessWebhookFn[_WebhookDocument],
+    state: ResourceState.Webhook | None,
+    task: Task,
+):
+    """Process incoming webhook data for a resource"""
+
+    if not state:
+        state = ResourceState.Webhook()
+
+    connector_state = ConnectorState(
+        bindingStateV1={binding.stateKey: ResourceState(webhook=state)}
+    )
+
+    while True:
+        # Yield to the event loop to prevent starvation.
+        await asyncio.sleep(0)
+
+        async for item in process_webhook(task.log, state.cursor):
+            if isinstance(item, WebhookDocument) or isinstance(item, dict):
+                task.captured(binding_index, item)
+                await task.checkpoint(connector_state)
+            else:
+                # TODO: Do I want to push this to prod?
+                # Aren't there any other doc types to handle?
+                raise ValueError("Unexpected webhook yield received")
