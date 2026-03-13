@@ -72,7 +72,6 @@ func (c glueOptimizersConfig) anyEnabled() bool {
 
 type advancedConfig struct {
 	LowercaseColumnNames bool   `json:"lowercase_column_names,omitempty" jsonschema:"title=Lowercase Column Names,description=Create all columns with lowercase names. This is necessary for compatibility with some systems such as querying S3 Table Buckets with Athena."`
-	IcebergV3            bool   `json:"iceberg_v3,omitempty" jsonschema:"title=Use Iceberg V3,description=Enable Iceberg spec version 3 for newly created tables. V3 is set at table creation time and cannot be changed afterwards."`
 	FeatureFlags         string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
@@ -113,6 +112,16 @@ func (c config) Validate() error {
 	if c.Compute.ComputeType == computeTypeEmrServerless && catalogAuth.AuthType == catalogAuthTypeClientCredential {
 		if c.Compute.emrConfig.SystemsManagerPrefix == "" {
 			return fmt.Errorf("must specify Systems Manager Prefix for AWS EMR Serverless compute with Client Credentials catalog authentication")
+		}
+	}
+
+	if c.GlueOptimizers.anyEnabled() {
+		if c.GlueOptimizers.ExecutionRoleArn == "" {
+			return fmt.Errorf("glue_optimizers.execution_role_arn is required when any Glue table optimizer is enabled")
+		}
+		signingName, _ := SigningName(c.URL)
+		if signingName != "glue" {
+			return fmt.Errorf("Glue table optimizers are only supported when using AWS Glue as the catalog")
 		}
 	}
 

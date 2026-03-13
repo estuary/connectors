@@ -394,11 +394,6 @@
             "title": "Lowercase Column Names",
             "description": "Create all columns with lowercase names. This is necessary for compatibility with some systems such as querying S3 Table Buckets with Athena."
           },
-          "iceberg_v3": {
-            "type": "boolean",
-            "title": "Use Iceberg V3",
-            "description": "Enable Iceberg spec version 3 for newly created tables. V3 is set at table creation time and cannot be changed afterwards."
-          },
           "feature_flags": {
             "type": "string",
             "title": "Feature Flags",
