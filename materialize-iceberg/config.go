@@ -57,12 +57,13 @@ type config struct {
 // table creation time and keep it up to date when the connector configuration
 // is applied.
 type glueOptimizersConfig struct {
-	EnableCompaction          bool `json:"enable_compaction,omitempty" jsonschema:"title=Enable Compaction,description=Enable automatic compaction of small Iceberg data files to improve query performance."`
-	EnableRetention           bool `json:"enable_retention,omitempty" jsonschema:"title=Enable Snapshot Retention,description=Enable automatic removal of old Iceberg table snapshots to reduce storage costs."`
-	SnapshotRetentionDays     int  `json:"snapshot_retention_days,omitempty" jsonschema:"title=Snapshot Retention Days,description=Number of days to retain Iceberg snapshots. Uses the Glue default of 5 if unset."`
-	NumberOfSnapshotsToRetain int  `json:"number_of_snapshots_to_retain,omitempty" jsonschema:"title=Number of Snapshots to Retain,description=Minimum number of Iceberg snapshots to retain regardless of the retention period. Uses the Glue default of 1 if unset."`
-	EnableOrphanFileDeletion  bool `json:"enable_orphan_file_deletion,omitempty" jsonschema:"title=Enable Orphan File Deletion,description=Enable automatic deletion of files that are no longer referenced by any table snapshot."`
-	OrphanFileRetentionDays   int  `json:"orphan_file_retention_days,omitempty" jsonschema:"title=Orphan File Retention Days,description=Number of days to retain orphan files before deletion. Uses the Glue default of 3 if unset."`
+	ExecutionRoleArn          string `json:"execution_role_arn,omitempty" jsonschema:"title=Execution Role ARN,description=IAM role ARN that Glue assumes to perform table optimization. The role must have permissions to read/write table data in S3 and access the Glue catalog." jsonschema_extras:"order=0"`
+	EnableCompaction          bool   `json:"enable_compaction,omitempty" jsonschema:"title=Enable Compaction,description=Enable automatic compaction of small Iceberg data files to improve query performance." jsonschema_extras:"order=1"`
+	EnableRetention           bool   `json:"enable_retention,omitempty" jsonschema:"title=Enable Snapshot Retention,description=Enable automatic removal of old Iceberg table snapshots to reduce storage costs." jsonschema_extras:"order=2"`
+	SnapshotRetentionDays     int    `json:"snapshot_retention_days,omitempty" jsonschema:"title=Snapshot Retention Days,description=Number of days to retain Iceberg snapshots. Uses the Glue default of 5 if unset." jsonschema_extras:"order=3"`
+	NumberOfSnapshotsToRetain int    `json:"number_of_snapshots_to_retain,omitempty" jsonschema:"title=Number of Snapshots to Retain,description=Minimum number of Iceberg snapshots to retain regardless of the retention period. Uses the Glue default of 1 if unset." jsonschema_extras:"order=4"`
+	EnableOrphanFileDeletion  bool   `json:"enable_orphan_file_deletion,omitempty" jsonschema:"title=Enable Orphan File Deletion,description=Enable automatic deletion of files that are no longer referenced by any table snapshot." jsonschema_extras:"order=5"`
+	OrphanFileRetentionDays   int    `json:"orphan_file_retention_days,omitempty" jsonschema:"title=Orphan File Retention Days,description=Number of days to retain orphan files before deletion. Uses the Glue default of 3 if unset." jsonschema_extras:"order=6"`
 }
 
 func (c glueOptimizersConfig) anyEnabled() bool {
