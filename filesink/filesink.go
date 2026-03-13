@@ -413,8 +413,8 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}, nil
 }
 
-// Acknowledge is a no-op since the files for this transaction were already uploaded to their
-// desired location in Store, and the driver checkpoint contains the last file counts used.
+// Acknowledge completes all staged uploads and removes them from the
+// checkpoint, so that the checkpoint contains only the list of file counts.
 func (t *transactor[T]) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
 	for _, b := range t.bindings {
 		uploads, ok := t.state.Uploads[b.stateKey]
