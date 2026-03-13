@@ -222,6 +222,24 @@ type binding struct {
 	newWriter  func(w io.WriteCloser) (StreamWriter, error)
 }
 
+func (t *transactor[T]) keyReplacer(tm time.Time) *strings.Replacer {
+	zoneName, zoneOffset := tm.Zone()
+	zoneHour := zoneOffset / 3600
+	zoneMin := int(math.Abs(float64(zoneOffset % 3600 / 60)))
+
+	replacer := strings.NewReplacer(
+		"%Y", fmt.Sprintf("%04d", tm.Year()),
+		"%m", fmt.Sprintf("%02d", tm.Month()),
+		"%d", fmt.Sprintf("%02d", tm.Day()),
+		"%H", fmt.Sprintf("%02d", tm.Hour()),
+		"%M", fmt.Sprintf("%02d", tm.Minute()),
+		"%S", fmt.Sprintf("%02d", tm.Second()),
+		"%Z", fmt.Sprintf("%s", zoneName),
+		"%z", fmt.Sprintf("%+03d%02d", zoneHour, zoneMin),
+	)
+	return replacer
+}
+
 // File keys are the full "path" to a file, usually applied as a key for an object in an object
 // store. They consist of:
 // 1) The optional prefix supplied from the connector config.
@@ -248,28 +266,21 @@ func (t *transactor[T]) nextFileKey(b binding, tm time.Time) string {
 	t.state.FileCounts[sk] = next
 
 	prefix := t.common.Prefix
+	path := b.path
 
-	if t.store.SupportsPathPatternExpansion() && strings.ContainsAny(prefix, "%") {
-		zoneName, zoneOffset := tm.Zone()
-		zoneHour := zoneOffset / 3600
-		zoneMin := int(math.Abs(float64(zoneOffset % 3600 / 60)))
-
-		replacer := strings.NewReplacer(
-			"%Y", fmt.Sprintf("%04d", tm.Year()),
-			"%m", fmt.Sprintf("%02d", tm.Month()),
-			"%d", fmt.Sprintf("%02d", tm.Day()),
-			"%H", fmt.Sprintf("%02d", tm.Hour()),
-			"%M", fmt.Sprintf("%02d", tm.Minute()),
-			"%S", fmt.Sprintf("%02d", tm.Second()),
-			"%Z", fmt.Sprintf("%s", zoneName),
-			"%z", fmt.Sprintf("%+03d%02d", zoneHour, zoneMin),
-		)
-		prefix = replacer.Replace(t.common.Prefix)
+	if t.store.SupportsPathPatternExpansion() {
+		replacer := t.keyReplacer(tm)
+		if strings.ContainsAny(prefix, "%") {
+			prefix = replacer.Replace(prefix)
+		}
+		if strings.ContainsAny(path, "%") {
+			path = replacer.Replace(path)
+		}
 	}
 
 	return filepath.Join(
 		prefix,
-		b.path,
+		path,
 		fmt.Sprintf("v%010d", b.backfill), // 10 digits to hold the largest possible uint32
 		fmt.Sprintf("%020d%s", next, t.common.Extension), // 20 digits to hold the largest possible uint64
 	)
