@@ -3,17 +3,9 @@ name: govulncheck
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 on:
   schedule:
     - cron: "0 12 * * 1"
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
 
 jobs:
   govulncheck:
