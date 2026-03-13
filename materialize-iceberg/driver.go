@@ -340,14 +340,9 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 		location = &base
 	}
 
-	// Merge table properties: user-specified properties take precedence over
-	// the IcebergV3 convenience flag.
 	var properties map[string]string
-	if d.cfg.Advanced.IcebergV3 || len(res.Config.AdditionalTableProperties) > 0 {
+	if len(res.Config.AdditionalTableProperties) > 0 {
 		properties = make(map[string]string)
-		if d.cfg.Advanced.IcebergV3 {
-			properties["format-version"] = "3"
-		}
 		for k, v := range res.Config.AdditionalTableProperties {
 			properties[k] = v
 		}
