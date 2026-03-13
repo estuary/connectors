@@ -187,6 +187,11 @@ type templates struct {
 	pipeName                *template.Template
 	createPipe              *template.Template
 	copyHistory             *template.Template
+	createTransientTable    *template.Template
+	copyIntoTransient       *template.Template
+	insertFromTransient     *template.Template
+	mergeFromTransient      *template.Template
+	truncateTransient       *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -391,6 +396,81 @@ SELECT FILE_NAME, STATUS, FIRST_ERROR_MESSAGE FROM TABLE(INFORMATION_SCHEMA.COPY
 )) WHERE
 FILE_NAME IN ('{{ Join $.Files "','" }}')
 {{ end }}
+
+-- Templated creation of a transient staging table
+
+{{ define "createTransientTable" }}
+CREATE TRANSIENT TABLE IF NOT EXISTS {{$.StagingIdentifier}} (
+{{- range $ind, $col := $.Columns }}
+{{- if $ind }},{{ end }}
+	{{$col.Identifier}} {{$col.DDL}}
+{{- end }},
+	_flow_delete BOOLEAN
+)
+DEFAULT_DDL_COLLATION = '';
+{{ end }}
+
+-- Templated COPY INTO transient staging table from JSON stage
+
+{{ define "copyIntoTransient" }}
+COPY INTO {{ $.StagingIdentifier }} (
+	{{ range $ind, $key := $.Table.Columns }}
+		{{- if $ind }}, {{ end -}}
+		{{$key.Identifier -}}
+	{{- end }}, _flow_delete
+) FROM (
+	SELECT {{ range $ind, $key := $.Table.Columns }}
+	{{- if $ind }}, {{ end -}}
+	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
+	{{- end }}, $1[{{ len $.Table.Columns }}] AS _flow_delete
+	FROM {{ $.File }}
+);
+{{ end }}
+
+-- Templated INSERT from transient staging table into target table
+
+{{ define "insertFromTransient" }}
+INSERT INTO {{ $.Table.Identifier }} (
+	{{- range $ind, $key := $.Table.Columns }}
+		{{- if $ind }}, {{ end -}}
+		{{$key.Identifier -}}
+	{{- end }}
+)
+SELECT {{ range $ind, $key := $.Table.Columns }}
+	{{- if $ind }}, {{ end -}}
+	{{$key.Identifier -}}
+{{- end }}
+FROM {{ $.StagingIdentifier }}
+WHERE _flow_delete = false;
+{{ end }}
+
+-- Templated MERGE from transient staging table into target table (no WHEN NOT MATCHED)
+
+{{ define "mergeFromTransient" }}
+MERGE INTO {{ $.Table.Identifier }} AS l
+USING {{ $.StagingIdentifier }} AS r
+ON {{ range $ind, $bound := $.Bounds }}
+	{{ if $ind -}} AND {{ end -}}
+	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- end }}
+WHEN MATCHED AND r._flow_delete=true THEN
+	DELETE
+WHEN MATCHED THEN
+	UPDATE SET {{ range $ind, $key := $.Table.Values }}
+	{{- if $ind }}, {{ end -}}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+{{- end -}}
+{{- if $.Table.Document -}}
+{{ if $.Table.Values }}, {{ end }}l.{{ $.Table.Document.Identifier}} = r.{{ $.Table.Document.Identifier }}
+{{- end }};
+{{ end }}
+
+-- Templated TRUNCATE of persistent transient staging table
+
+{{ define "truncateTransient" }}
+TRUNCATE TABLE {{$.StagingIdentifier}};
+{{ end }}
   `)
 
 	return templates{
@@ -403,6 +483,11 @@ FILE_NAME IN ('{{ Join $.Files "','" }}')
 		pipeName:                tplAll.Lookup("pipe_name"),
 		createPipe:              tplAll.Lookup("createPipe"),
 		copyHistory:             tplAll.Lookup("copyHistory"),
+		createTransientTable:    tplAll.Lookup("createTransientTable"),
+		copyIntoTransient:       tplAll.Lookup("copyIntoTransient"),
+		insertFromTransient:     tplAll.Lookup("insertFromTransient"),
+		mergeFromTransient:      tplAll.Lookup("mergeFromTransient"),
+		truncateTransient:       tplAll.Lookup("truncateTransient"),
 	}
 }
 
@@ -489,5 +574,75 @@ func renderBoundedQueryTemplate(tpl *template.Template, table sql.Table, file st
 		return "", err
 	}
 
+	return w.String(), nil
+}
+
+// Template input for transient table operations
+type transientTableInput struct {
+	Table             sql.Table
+	File              string
+	StagingIdentifier string
+	Columns           []*sql.Column
+	Bounds            []sql.MergeBound
+}
+
+// Render CREATE TRANSIENT TABLE statement
+func renderCreateTransientTable(table sql.Table, stagingIdentifier string, tpl *template.Template) (string, error) {
+	var w strings.Builder
+	if err := tpl.Execute(&w, &transientTableInput{
+		StagingIdentifier: stagingIdentifier,
+		Columns:           table.Columns(),
+	}); err != nil {
+		return "", err
+	}
+	return w.String(), nil
+}
+
+// Render COPY INTO transient table statement
+func renderCopyIntoTransient(table sql.Table, stagingIdentifier string, file string, tpl *template.Template) (string, error) {
+	var w strings.Builder
+	if err := tpl.Execute(&w, &transientTableInput{
+		Table:             table,
+		StagingIdentifier: stagingIdentifier,
+		File:              file,
+	}); err != nil {
+		return "", err
+	}
+	return w.String(), nil
+}
+
+// Render INSERT FROM transient table statement
+func renderInsertFromTransient(table sql.Table, stagingIdentifier string, tpl *template.Template) (string, error) {
+	var w strings.Builder
+	if err := tpl.Execute(&w, &transientTableInput{
+		Table:             table,
+		StagingIdentifier: stagingIdentifier,
+	}); err != nil {
+		return "", err
+	}
+	return w.String(), nil
+}
+
+// Render MERGE FROM transient table statement
+func renderMergeFromTransient(table sql.Table, stagingIdentifier string, bounds []sql.MergeBound, tpl *template.Template) (string, error) {
+	var w strings.Builder
+	if err := tpl.Execute(&w, &transientTableInput{
+		Table:             table,
+		StagingIdentifier: stagingIdentifier,
+		Bounds:            bounds,
+	}); err != nil {
+		return "", err
+	}
+	return w.String(), nil
+}
+
+// Render TRUNCATE persistent transient table statement
+func renderTruncateTransient(stagingIdentifier string, tpl *template.Template) (string, error) {
+	var w strings.Builder
+	if err := tpl.Execute(&w, &transientTableInput{
+		StagingIdentifier: stagingIdentifier,
+	}); err != nil {
+		return "", err
+	}
 	return w.String(), nil
 }
