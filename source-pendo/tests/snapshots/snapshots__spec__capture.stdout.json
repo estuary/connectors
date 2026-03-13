@@ -22,9 +22,26 @@
           ],
           "title": "AccessToken",
           "type": "object"
+        },
+        "PendoHost": {
+          "enum": [
+            "app.pendo.io",
+            "us1.app.pendo.io",
+            "app.eu.pendo.io",
+            "app.jpn.pendo.io",
+            "app.au.pendo.io"
+          ],
+          "title": "PendoHost",
+          "type": "string"
         }
       },
       "properties": {
+        "host": {
+          "$ref": "#/$defs/PendoHost",
+          "default": "app.pendo.io",
+          "description": "The Pendo host to connect to. Select the host that matches the region of your Pendo subscription.",
+          "title": "Pendo Host"
+        },
         "startDate": {
           "description": "UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any event data generated before this date will not be replicated. If left blank, the start date will be set to one hour before the present date.",
           "examples": [
