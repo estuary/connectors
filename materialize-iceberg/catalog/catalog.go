@@ -378,7 +378,7 @@ func (c *Catalog) GetTable(ctx context.Context, ns string, name string) (*Table,
 	}, nil
 }
 
-func (c *Catalog) CreateTable(ctx context.Context, ns string, name string, sch *iceberg.Schema, sortFieldIDs []int, location *string) error {
+func (c *Catalog) CreateTable(ctx context.Context, ns string, name string, sch *iceberg.Schema, sortFieldIDs []int, location *string, properties map[string]string) error {
 	type sortField struct {
 		SourceID  int    `json:"source-id"`
 		Transform string `json:"transform"`  // always "identity"
@@ -392,17 +392,19 @@ func (c *Catalog) CreateTable(ctx context.Context, ns string, name string, sch *
 	}
 
 	type createTableRequest struct {
-		Name        string          `json:"name"`
-		Schema      *iceberg.Schema `json:"schema"`
-		Location    *string         `json:"location,omitempty"`
-		WriteOrder  *sortOrder      `json:"write-order,omitempty"`
-		StageCreate bool            `json:"stage-create"` // always false, required to exist & be false for s3tables catalogs
+		Name        string            `json:"name"`
+		Schema      *iceberg.Schema   `json:"schema"`
+		Location    *string           `json:"location,omitempty"`
+		WriteOrder  *sortOrder        `json:"write-order,omitempty"`
+		Properties  map[string]string `json:"properties,omitempty"`
+		StageCreate bool              `json:"stage-create"` // always false, required to exist & be false for s3tables catalogs
 	}
 
 	req := createTableRequest{
 		Name:        name,
 		Schema:      sch,
 		Location:    location,
+		Properties:  properties,
 		StageCreate: false,
 	}
 
