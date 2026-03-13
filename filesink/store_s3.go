@@ -278,7 +278,7 @@ func (s *S3Store) StageObject(ctx context.Context, r io.Reader, key string) (*S3
 }
 
 // CompleteObject completes a multipart upload making it visible to normal
-// operations.
+// operations.  It is not an error to call more than once with a given key.
 func (s *S3Store) CompleteObject(ctx context.Context, info *S3MultipartUpload) error {
 	var parts []types.CompletedPart
 	for _, part := range info.Parts {

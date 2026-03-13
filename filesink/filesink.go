@@ -40,8 +40,22 @@ type CommonConfig struct {
 }
 
 type Store[T any] interface {
+	// SupportsPathPatternExpansion returns true if the Store supports
+	// expanding patterns in the path or prefix.
+	//
+	// For this to be safe it must be possible for a transaction to be retried
+	// with objects being written to different keys than the first attempt, and
+	// without orphaning files from the previous attempt in a way that they
+	// appear to be part of the set of successfully written files.
 	SupportsPathPatternExpansion() bool
+
+	// StageObject adds files to the object store as the first step of a
+	// 2-phase commit.
 	StageObject(ctx context.Context, r io.Reader, key string) (T, error)
+
+	// CompleteObject moves the file into its final position as the second step
+	// of a 2-phase commit.  This step must be idempotent in case the recovery
+	// is retried.
 	CompleteObject(ctx context.Context, info T) error
 }
 
