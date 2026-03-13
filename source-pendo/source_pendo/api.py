@@ -14,9 +14,10 @@ from .models import (
     Metadata,
     FullRefreshResource,
     IncrementalResource,
+    PendoHost,
 )
 
-API = "https://app.pendo.io/api/v1"
+
 RESPONSE_LIMIT = 50000
 # Event data for a given hour isn't available via the API until ~4-6 hours afterwards.
 # This isn't mentioned in Pendo's docs but has been observed empirically. We shift the
@@ -35,6 +36,9 @@ def _dt_to_ms(dt: datetime) -> int:
 
 def _ms_to_dt(ms: int) -> datetime:
     return datetime.fromtimestamp(ms / 1000.0, tz=UTC)
+
+def base_url(host: PendoHost) -> str:
+    return f"https://{host}/api/v1"
 
 def generate_events_body(
         entity: str,
@@ -247,10 +251,11 @@ def generate_resources_body(
 
 async def snapshot_resources(
         http: HTTPSession,
+        host: PendoHost,
         entity: str,
         log: Logger,
 ) -> AsyncGenerator[FullRefreshResource, None]:
-    url = f"{API}/{entity}"
+    url = f"{base_url(host)}/{entity}"
 
     params = {
         # The expand query parameter tells Pendo to return data for all
@@ -266,10 +271,11 @@ async def snapshot_resources(
 
 async def snapshot_metadata(
         http: HTTPSession,
+        host: PendoHost,
         entity: str,
         log: Logger,
 ) -> AsyncGenerator[Metadata, None]:
-    url = f"{API}/metadata/schema/{entity}"
+    url = f"{base_url(host)}/metadata/schema/{entity}"
 
     metadata = Metadata.model_validate_json(
         await http.request(log, url)
@@ -280,6 +286,7 @@ async def snapshot_metadata(
 
 async def _fetch_events_between(
     http: HTTPSession,
+    host: PendoHost,
     entity: str,
     model: type[Event],
     identifying_field: str,
@@ -287,7 +294,7 @@ async def _fetch_events_between(
     upper_bound: datetime,
     log: Logger,
 ) -> AsyncGenerator[Event, None]:
-    url = f"{API}/aggregation"
+    url = f"{base_url(host)}/aggregation"
     last_dt = lower_bound
     lower_bound_ts = _dt_to_ms(lower_bound)
     upper_bound_ts = _dt_to_ms(upper_bound)
@@ -355,6 +362,7 @@ async def _fetch_events_between(
 
 async def fetch_events(
         http: HTTPSession,
+        host: PendoHost,
         entity: str,
         model: type[Event],
         identifying_field: str,
@@ -375,6 +383,7 @@ async def fetch_events(
     count = 0
     async for event in _fetch_events_between(
         http=http,
+        host=host,
         entity=entity,
         model=model,
         identifying_field=identifying_field,
@@ -401,6 +410,7 @@ async def fetch_events(
 
 async def backfill_events(
         http: HTTPSession,
+        host: PendoHost,
         entity: str,
         model: type[Event],
         identifying_field: str,
@@ -420,6 +430,7 @@ async def backfill_events(
     count = 0
     async for event in _fetch_events_between(
         http=http,
+        host=host,
         entity=entity,
         model=model,
         identifying_field=identifying_field,
@@ -446,6 +457,7 @@ async def backfill_events(
 
 async def _fetch_aggregated_events_between(
     http: HTTPSession,
+    host: PendoHost,
     entity: str,
     model: type[EventAggregate],
     identifying_field: str,
@@ -453,7 +465,7 @@ async def _fetch_aggregated_events_between(
     upper_bound: datetime,
     log: Logger,
 ) -> AsyncGenerator[EventAggregate, None]:
-    url = f"{API}/aggregation"
+    url = f"{base_url(host)}/aggregation"
     last_dt = lower_bound
     lower_bound_ts = _dt_to_ms(lower_bound)
     upper_bound_ts = _dt_to_ms(upper_bound)
@@ -521,6 +533,7 @@ async def _fetch_aggregated_events_between(
 
 async def fetch_aggregated_events(
         http: HTTPSession,
+        host: PendoHost,
         entity: str,
         model: type[EventAggregate],
         identifying_field: str,
@@ -541,6 +554,7 @@ async def fetch_aggregated_events(
     count = 0
     async for aggregate in _fetch_aggregated_events_between(
         http=http,
+        host=host,
         entity=entity,
         model=model,
         identifying_field=identifying_field,
@@ -567,6 +581,7 @@ async def fetch_aggregated_events(
 
 async def backfill_aggregated_events(
         http: HTTPSession,
+        host: PendoHost,
         entity: str,
         model: type[EventAggregate],
         identifying_field: str,
@@ -586,6 +601,7 @@ async def backfill_aggregated_events(
     count = 0
     async for aggregate in _fetch_aggregated_events_between(
         http=http,
+        host=host,
         entity=entity,
         model=model,
         identifying_field=identifying_field,
@@ -631,6 +647,7 @@ def _extract_updated_at(doc: BaseDocument, updated_at_field: str, log: Logger) -
 
 async def _fetch_resources_between(
     http: HTTPSession,
+    host: PendoHost,
     entity: str,
     model: type[IncrementalResource],
     updated_at_field: str,
@@ -639,7 +656,7 @@ async def _fetch_resources_between(
     upper_bound: datetime,
     log: Logger,
 ) -> AsyncGenerator[IncrementalResource, None]:
-    url = f"{API}/aggregation"
+    url = f"{base_url(host)}/aggregation"
     last_dt = lower_bound
     lower_bound_ts = _dt_to_ms(lower_bound)
     upper_bound_ts = _dt_to_ms(upper_bound)
@@ -707,6 +724,7 @@ async def _fetch_resources_between(
 
 async def fetch_resources(
         http: HTTPSession,
+        host: PendoHost,
         entity: str,
         model: type[IncrementalResource],
         updated_at_field: str,
@@ -721,6 +739,7 @@ async def fetch_resources(
     count = 0
     async for resource in _fetch_resources_between(
         http=http,
+        host=host,
         entity=entity,
         model=model,
         updated_at_field=updated_at_field,
@@ -750,6 +769,7 @@ async def fetch_resources(
 
 async def backfill_resources(
         http: HTTPSession,
+        host: PendoHost,
         entity: str,
         model: type[IncrementalResource],
         updated_at_field: str,
@@ -770,6 +790,7 @@ async def backfill_resources(
     count = 0
     async for resource in _fetch_resources_between(
         http=http,
+        host=host,
         entity=entity,
         model=model,
         updated_at_field=updated_at_field,

@@ -32,7 +32,7 @@ from .api import (
     fetch_aggregated_events,
     snapshot_metadata,
     _dt_to_ms,
-    API,
+    base_url,
     API_EVENT_LAG,
 )
 
@@ -44,7 +44,7 @@ async def validate_api_key(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ):
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials, authorization_header=AUTHORIZATION_HEADER)
-    url = f"{API}/metadata/schema/AccountMetadata"
+    url = f"{base_url(config.host)}/metadata/schema/AccountMetadata"
 
     try:
         await http.request(log, url)
@@ -76,6 +76,7 @@ def full_refresh_resources(
             fetch_snapshot=functools.partial(
                 snapshot_resources,
                 http,
+                config.host,
                 entity,
             ),
             tombstone=FullRefreshResource(_meta=FullRefreshResource.Meta(op="d"))
@@ -121,6 +122,7 @@ def incremental_resources(
             fetch_changes=functools.partial(
                 fetch_resources,
                 http,
+                config.host,
                 entity,
                 model,
                 updated_at_field,
@@ -129,6 +131,7 @@ def incremental_resources(
             fetch_page=functools.partial(
                 backfill_resources,
                 http,
+                config.host,
                 entity,
                 model,
                 updated_at_field,
@@ -180,6 +183,7 @@ def metadata(
             fetch_snapshot=functools.partial(
                 snapshot_metadata,
                 http,
+                config.host,
                 entity,
             ),
             tombstone=Metadata(_meta=Metadata.Meta(op="d"))
@@ -224,6 +228,7 @@ def events(
             fetch_changes=functools.partial(
                 fetch_events,
                 http,
+                config.host,
                 entity,
                 model,
                 identifying_field,
@@ -231,6 +236,7 @@ def events(
             fetch_page=functools.partial(
                 backfill_events,
                 http,
+                config.host,
                 entity,
                 model,
                 identifying_field,
@@ -292,6 +298,7 @@ def aggregated_events(
             fetch_changes=functools.partial(
                 fetch_aggregated_events,
                 http,
+                config.host,
                 entity,
                 model,
                 identifying_field,
@@ -299,6 +306,7 @@ def aggregated_events(
             fetch_page=functools.partial(
                 backfill_aggregated_events,
                 http,
+                config.host,
                 entity,
                 model,
                 identifying_field,

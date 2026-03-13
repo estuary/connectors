@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import ClassVar, Generic, TypeVar
 import pendulum
 from pydantic import AwareDatetime, BaseModel, Field
@@ -13,11 +14,24 @@ from estuary_cdk.capture.common import (
 from estuary_cdk.flow import AccessToken
 
 
+class PendoHost(StrEnum):
+    US = "app.pendo.io"
+    US1 = "us1.app.pendo.io"
+    EU = "app.eu.pendo.io"
+    JPN = "app.jpn.pendo.io"
+    AU = "app.au.pendo.io"
+
+
 def default_start_date():
     return pendulum.now().subtract(hours=1).in_timezone("UTC").format("YYYY-MM-DDTHH:mm:ssZ")
 
 
 class EndpointConfig(BaseModel):
+    host: PendoHost = Field(
+        description="The Pendo host to connect to. Select the host that matches the region of your Pendo subscription.",
+        title="Pendo Host",
+        default=PendoHost.US,
+    )
     startDate: str = Field(
         description="UTC date and time in the format YYYY-MM-DDTHH:MM:SSZ. Any event data generated before this date will not be replicated. If left blank, the start date will be set to one hour before the present date.",
         title="Start Date",
