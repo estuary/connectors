@@ -21,12 +21,14 @@ func configureTableOptimizers(ctx context.Context, client *glue.Client, catalogI
 	}
 
 	var specs []optimizerSpec
+	roleArn := aws.String(cfg.ExecutionRoleArn)
 
 	if cfg.EnableCompaction {
 		specs = append(specs, optimizerSpec{
 			optType: glueTypes.TableOptimizerTypeCompaction,
 			config: &glueTypes.TableOptimizerConfiguration{
 				Enabled: aws.Bool(true),
+				RoleArn: roleArn,
 			},
 		})
 	}
@@ -45,6 +47,7 @@ func configureTableOptimizers(ctx context.Context, client *glue.Client, catalogI
 			optType: glueTypes.TableOptimizerTypeRetention,
 			config: &glueTypes.TableOptimizerConfiguration{
 				Enabled: aws.Bool(true),
+				RoleArn: roleArn,
 				RetentionConfiguration: &glueTypes.RetentionConfiguration{
 					IcebergConfiguration: icebergRetention,
 				},
@@ -62,6 +65,7 @@ func configureTableOptimizers(ctx context.Context, client *glue.Client, catalogI
 			optType: glueTypes.TableOptimizerTypeOrphanFileDeletion,
 			config: &glueTypes.TableOptimizerConfiguration{
 				Enabled: aws.Bool(true),
+				RoleArn: roleArn,
 				OrphanFileDeletionConfiguration: &glueTypes.OrphanFileDeletionConfiguration{
 					IcebergConfiguration: icebergOrphan,
 				},

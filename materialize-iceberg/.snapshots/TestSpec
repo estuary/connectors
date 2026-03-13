@@ -413,35 +413,47 @@
       },
       "glue_optimizers": {
         "properties": {
+          "execution_role_arn": {
+            "type": "string",
+            "title": "Execution Role ARN",
+            "description": "IAM role ARN that Glue assumes to perform table optimization. The role must have permissions to read/write table data in S3 and access the Glue catalog.",
+            "order": 0
+          },
           "enable_compaction": {
             "type": "boolean",
             "title": "Enable Compaction",
-            "description": "Enable automatic compaction of small Iceberg data files to improve query performance."
+            "description": "Enable automatic compaction of small Iceberg data files to improve query performance.",
+            "order": 1
           },
           "enable_retention": {
             "type": "boolean",
             "title": "Enable Snapshot Retention",
-            "description": "Enable automatic removal of old Iceberg table snapshots to reduce storage costs."
+            "description": "Enable automatic removal of old Iceberg table snapshots to reduce storage costs.",
+            "order": 2
           },
           "snapshot_retention_days": {
             "type": "integer",
             "title": "Snapshot Retention Days",
-            "description": "Number of days to retain Iceberg snapshots. Uses the Glue default of 5 if unset."
+            "description": "Number of days to retain Iceberg snapshots. Uses the Glue default of 5 if unset.",
+            "order": 3
           },
           "number_of_snapshots_to_retain": {
             "type": "integer",
             "title": "Number of Snapshots to Retain",
-            "description": "Minimum number of Iceberg snapshots to retain regardless of the retention period. Uses the Glue default of 1 if unset."
+            "description": "Minimum number of Iceberg snapshots to retain regardless of the retention period. Uses the Glue default of 1 if unset.",
+            "order": 4
           },
           "enable_orphan_file_deletion": {
             "type": "boolean",
             "title": "Enable Orphan File Deletion",
-            "description": "Enable automatic deletion of files that are no longer referenced by any table snapshot."
+            "description": "Enable automatic deletion of files that are no longer referenced by any table snapshot.",
+            "order": 5
           },
           "orphan_file_retention_days": {
             "type": "integer",
             "title": "Orphan File Retention Days",
-            "description": "Number of days to retain orphan files before deletion. Uses the Glue default of 3 if unset."
+            "description": "Number of days to retain orphan files before deletion. Uses the Glue default of 3 if unset.",
+            "order": 6
           }
         },
         "additionalProperties": false,
