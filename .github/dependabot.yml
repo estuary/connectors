@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Go modules are intentionally excluded — govulncheck handles
+  # vulnerability scanning with reachability analysis instead.
+
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

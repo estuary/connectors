@@ -1,0 +1,56 @@
+name: govulncheck
+
+permissions:
+  contents: read
+  issues: write
+
+on:
+  schedule:
+    - cron: "0 12 * * 1"
+
+jobs:
+  govulncheck:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Run govulncheck
+        uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: "1.25"
+          go-package: ./...
+        env:
+          GIT_LFS_SKIP_SMUDGE: 1
+
+      - name: Create issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = `govulncheck: reachable vulnerability detected`;
+            const body = `The weekly govulncheck scan found reachable vulnerabilities.\n\n` +
+              `[View workflow run](${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId})\n`;
+
+            // Don't create duplicates — check for an existing open issue.
+            const { data: existing } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'govulncheck',
+            });
+            if (existing.length > 0) {
+              console.log(`Issue #${existing[0].number} already open, skipping.`);
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['govulncheck'],
+            });
