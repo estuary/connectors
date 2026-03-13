@@ -13,6 +13,7 @@ import (
 	"github.com/databricks/databricks-sdk-go"
 	dbConfig "github.com/databricks/databricks-sdk-go/config"
 	"github.com/databricks/databricks-sdk-go/logger"
+	"github.com/databricks/databricks-sdk-go/useragent"
 	dbsqllog "github.com/databricks/databricks-sql-go/logger"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -65,6 +66,8 @@ func (c tableConfig) Parameters() ([]string, bool, error) {
 }
 
 func newDatabricksDriver() *sql.Driver[config, tableConfig] {
+	useragent.WithProduct(productGlobalDescription.name, productGlobalDescription.version)
+
 	return &sql.Driver[config, tableConfig]{
 		DocumentationURL: "https://go.estuary.dev/materialize-databricks",
 		StartTunnel:      func(ctx context.Context, cfg config) error { return nil },
@@ -104,15 +107,16 @@ func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 }
 
 type transactor struct {
-	cfg              config
-	cp               checkpoint
-	cpRecovery       bool // is this checkpoint a recovered checkpoint?
-	wsClient         *databricks.WorkspaceClient
-	localStagingPath string
-	bindings         []*binding
-	be               *m.BindingEvents
-	ep               *sql.Endpoint[config]
-	templates        templates
+	cfg                 config
+	cp                  checkpoint
+	cpRecovery          bool // is this checkpoint a recovered checkpoint?
+	wsClient            *databricks.WorkspaceClient
+	localStagingPath    string
+	bindings            []*binding
+	be                  *m.BindingEvents
+	ep                  *sql.Endpoint[config]
+	templates           templates
+	materializationName string
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -126,6 +130,7 @@ func (d *transactor) UnmarshalState(state json.RawMessage) error {
 
 func newTransactor(
 	ctx context.Context,
+	materializationName string,
 	featureFlags map[string]bool,
 	ep *sql.Endpoint[config],
 	fence sql.Fence,
@@ -148,9 +153,9 @@ func newTransactor(
 
 	var d = &transactor{cfg: cfg, wsClient: wsClient, be: be, ep: ep, templates: renderTemplates(ep.Dialect)}
 
-	db, err := stdsql.Open("databricks", d.cfg.ToURI())
+	db, err := d.openDB()
 	if err != nil {
-		return nil, fmt.Errorf("sql.Open: %w", err)
+		return nil, err
 	}
 	defer db.Close()
 
@@ -181,6 +186,14 @@ func newTransactor(
 	}
 
 	return d, nil
+}
+
+func (t *transactor) openDB() (*stdsql.DB, error) {
+	if db, err := stdsql.Open("databricks", t.cfg.ToURI(t.materializationName)); err != nil {
+		return nil, fmt.Errorf("sql.Open: %w", err)
+	} else {
+		return db, nil
+	}
 }
 
 type binding struct {
@@ -227,11 +240,16 @@ func (t *transactor) addBinding(target sql.Table) error {
 
 func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	var ctx = it.Context()
+	db, err := d.openDB()
+	if err != nil {
+		return err
+	}
+	defer db.Close()
 
 	for it.Next() {
 		var b = d.bindings[it.Binding]
 
-		if err := b.loadFile.start(ctx); err != nil {
+		if err := b.loadFile.start(ctx, db); err != nil {
 			return fmt.Errorf("starting load file: %w", err)
 		}
 
@@ -277,12 +295,6 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	if len(queries) > 0 {
-		db, err := stdsql.Open("databricks", d.cfg.ToURI())
-		if err != nil {
-			return fmt.Errorf("sql.Open: %w", err)
-		}
-		defer db.Close()
-
 		// Issue a union join of the target tables and their (now staged) load keys,
 		// and send results to the |loaded| callback.
 		d.be.StartedEvaluatingLoads()
@@ -342,6 +354,11 @@ const queryBatchSize = 128
 
 func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
+	db, err := d.openDB()
+	if err != nil {
+		return nil, err
+	}
+	defer db.Close()
 
 	for it.Next() {
 		var b = d.bindings[it.Binding]
@@ -352,7 +369,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			continue
 		}
 
-		if err := b.storeFile.start(ctx); err != nil {
+		if err := b.storeFile.start(ctx, db); err != nil {
 			return nil, err
 		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
@@ -449,9 +466,9 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	var db *stdsql.DB
 	if len(d.cp) > 0 {
 		var err error
-		db, err = stdsql.Open("databricks", d.cfg.ToURI())
+		db, err = d.openDB()
 		if err != nil {
-			return nil, fmt.Errorf("sql.Open: %w", err)
+			return nil, err
 		}
 		defer db.Close()
 	}

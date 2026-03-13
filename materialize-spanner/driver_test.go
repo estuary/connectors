@@ -173,7 +173,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 func TestFencingCases(t *testing.T) {
 	ctx := context.Background()
 
-	c, err := newClient(ctx, &sql.Endpoint[config]{Config: testConfig(t), Dialect: testDialect})
+	c, err := newClient(ctx, "", &sql.Endpoint[config]{Config: testConfig(t), Dialect: testDialect})
 	require.NoError(t, err)
 	defer c.Close()
 
@@ -383,7 +383,7 @@ func dumpSpannerTableWithKeys(ctx context.Context, client *spanner.Client, table
 
 // dropTableIfExists drops a table if it exists
 func dropTableIfExists(ctx context.Context, t *testing.T, cfg config, tableName string) {
-	c, err := newClient(ctx, &sql.Endpoint[config]{Config: cfg, Dialect: testDialect})
+	c, err := newClient(ctx, "", &sql.Endpoint[config]{Config: cfg, Dialect: testDialect})
 	if err != nil {
 		return
 	}

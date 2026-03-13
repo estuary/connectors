@@ -132,7 +132,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 
-	c, err := newClient(ctx, &sql.Endpoint[config]{Config: testConfig()})
+	c, err := newClient(ctx, "", &sql.Endpoint[config]{Config: testConfig()})
 	require.NoError(t, err)
 	defer c.Close()
 

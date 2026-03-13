@@ -71,7 +71,7 @@ func (c *spannerClients) Close() {
 	c.adminClient.Close()
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
 	clients, err := newSpannerClients(ctx, ep.Config)
 	if err != nil {
 		return nil, err

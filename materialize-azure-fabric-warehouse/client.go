@@ -31,7 +31,7 @@ type client struct {
 	templates *templates
 }
 
-func newClient(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
 	db, err := ep.Config.db()
 	if err != nil {
 		return nil, err

@@ -429,9 +429,10 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 func prepareNewTransactor(
 	templates templates,
 	product string,
-) func(context.Context, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *m.BindingEvents) (m.Transactor, error) {
+) func(context.Context, string, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *m.BindingEvents) (m.Transactor, error) {
 	return func(
 		ctx context.Context,
+		materializationName string,
 		featureFlags map[string]bool,
 		ep *sql.Endpoint[config],
 		fence sql.Fence,

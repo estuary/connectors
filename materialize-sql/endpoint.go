@@ -115,12 +115,17 @@ type Endpoint[EC boilerplate.EndpointConfiger] struct {
 	SerPolicy *flow.SerPolicy
 	// NewClient creates a client, which provides Endpoint-specific methods for performing
 	// operations with the Endpoint store.
-	NewClient func(context.Context, *Endpoint[EC]) (Client, error)
+	NewClient func(
+		ctx context.Context,
+		materializationName string,
+		endpoint *Endpoint[EC],
+	) (Client, error)
 	// CreateTableTemplate evaluates a Table into an endpoint statement which creates it.
 	CreateTableTemplate *template.Template
 	// NewTransactor returns a Transactor ready for pm.RunTransactions.
 	NewTransactor func(
 		ctx context.Context,
+		materializationName string,
 		featureFlags map[string]bool,
 		_ *Endpoint[EC],
 		_ Fence,

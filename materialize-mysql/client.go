@@ -23,8 +23,8 @@ type client struct {
 	tzLocation *time.Location
 }
 
-func prepareNewClient(tzLocation *time.Location) func(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
-	return func(ctx context.Context, ep *sql.Endpoint[config]) (sql.Client, error) {
+func prepareNewClient(tzLocation *time.Location) func(ctx context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
+	return func(ctx context.Context, _ string, ep *sql.Endpoint[config]) (sql.Client, error) {
 		db, err := stdsql.Open("mysql", ep.Config.ToURI())
 		if err != nil {
 			return nil, err
