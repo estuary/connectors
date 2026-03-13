@@ -15,7 +15,7 @@ import (
 var featureFlagDefaults = map[string]bool{
 	// Starting on 18-Aug-2025 newly created parquet materializations will use
 	// STRING logical type for UUID fields, rather than a UUID logical type.
-	"uuid_logical_type": false,
+	"uuid_logical_type":                false,
 	"retain_existing_data_on_backfill": false,
 }
 
@@ -53,7 +53,7 @@ func (c config) CommonConfig() filesink.CommonConfig {
 	}
 }
 
-var driver = filesink.FileDriver{
+var driver = filesink.FileDriver[*filesink.S3MultipartUpload]{
 	NewConfig: func(raw json.RawMessage) (filesink.Config, error) {
 		var cfg config
 		if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
@@ -61,7 +61,7 @@ var driver = filesink.FileDriver{
 		}
 		return cfg, nil
 	},
-	NewStore: func(ctx context.Context, c filesink.Config, featureFlags map[string]bool) (filesink.Store, error) {
+	NewStore: func(ctx context.Context, c filesink.Config, featureFlags map[string]bool) (filesink.Store[*filesink.S3MultipartUpload], error) {
 		return filesink.NewS3Store(ctx, c.(config).S3StoreConfig)
 	},
 	NewWriter: func(c filesink.Config, featureFlags map[string]bool, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (filesink.StreamWriter, error) {
