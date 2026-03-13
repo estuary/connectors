@@ -8,7 +8,6 @@ from datetime import UTC, datetime, timedelta
 from enum import Enum, StrEnum
 from logging import Logger
 from typing import (
-    TYPE_CHECKING,
     Any,
     Callable,
     ClassVar,
@@ -20,11 +19,6 @@ from typing import (
 from uuid import uuid4
 
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
-
-if TYPE_CHECKING:
-    from estuary_cdk.capture.webhook import (
-        WebhookCursor,
-    )
 
 from ..cron import next_fire
 from ..flow import (
@@ -108,6 +102,9 @@ None means "begin a new iteration" in a request context,
 and "no pages remain" in a response context.
 """
 
+# TODO: explain that I don't really have any use for this yet, I just want to be permissive for future purposes
+WebhookCursor = str | int | datetime | dict[str, JsonValue] | None
+
 
 class Triggers(Enum):
     BACKFILL = "BACKFILL"
@@ -144,9 +141,7 @@ class BaseDocument(BaseModel):
     )
 
 
-_BaseDocument = TypeVar("_BaseDocument", bound=BaseDocument)
-
-
+# TODO: I may need to have WebhookDocument inherit from AssociatedDocument
 class WebhookDocument(BaseDocument):
     class Meta(BaseDocument.Meta):
         webhookId: str = Field(default_factory=lambda: str(uuid4()))
@@ -162,6 +157,10 @@ class WebhookDocument(BaseDocument):
         alias="_meta",
         description="Document metadata",
     )
+
+
+_BaseDocument = TypeVar("_BaseDocument", bound=BaseDocument)
+_WebhookDocument = TypeVar("_WebhookDocument", bound=WebhookDocument)
 
 
 class BaseResourceConfig(abc.ABC, BaseModel, extra="forbid"):
@@ -282,8 +281,8 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
     class Webhook(BaseModel, extra="forbid"):
         """Partial state of a resource which listens for webhook messages"""
 
-        # TODO: Add description and maybe remove quotes
-        cursor: "WebhookCursor" = Field(description="ASDF")
+        # TODO: Add description
+        cursor: WebhookCursor = Field(default=None, description="ASDF")
 
     inc: Incremental | dict[str, Incremental | None] | None = Field(
         default=None, description="Incremental capture progress"
@@ -295,6 +294,11 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
     )
 
     snapshot: Snapshot | None = Field(default=None, description="Snapshot progress")
+
+    webhook: Webhook | None = Field(
+        default=None,
+        description="Webhook progress, or None if no state tracking is required",
+    )
 
     last_initialized: datetime | None = Field(
         default=None, description="The last time this state was initialized."
@@ -433,6 +437,30 @@ Otherwise if it returns without yielding a checkpoint, then
 `ResourceConfig.interval` is respected between invocations.
 Implementations SHOULD NOT sleep or implement their own coarse rate limit
 (use `ResourceConfig.interval`).
+"""
+
+# TODO: Should these fns receive an async generator of messages, as produced by the webhook listener?
+# How would they inform the server that the data's been checkpointed so it can ACK the HTTP request?
+# I need to provide a "heavy lifting" ReceiveWebhookFn type function that performs all the heavy lifting.
+# Any fns that extend it should call it so we perform all the usual data validation and transformation,
+# and only then would it do its own thing. The same way in existing connectors we define an `open` fn
+# to decorate `open_binding`'s behaviour.
+# I mean, kind of. Some checks we want to perform before collection routing, like signature verifications.
+# Some messages will come encrypted and we can't even read the discriminator until we verify.
+ProcessWebhookFn = Callable[
+    [
+        Logger,
+        WebhookCursor,
+    ],
+    AsyncGenerator[_WebhookDocument | dict[str, JsonValue], None],
+]
+"""
+TODO: Add high-level description. 
+
+This fn should execute after all usual verifications (auth, signatures) happen
+and should be responsible for publishing documents
+
+We need to mention this fn needs to run as fast as possible, we don't want HTTP reqs to time out
 """
 
 
@@ -768,7 +796,7 @@ def open_binding(
         | None
     ) = None,
     fetch_snapshot: FetchSnapshotFn[_BaseDocument] | None = None,
-    # receive_webhook: ReceiveWebhookFn | None = None,
+    process_webhook: ProcessWebhookFn[_WebhookDocument] | None = None,
     tombstone: _BaseDocument | None = None,
 ):
     """
@@ -896,6 +924,29 @@ def open_binding(
             )
 
         task.spawn_child(f"{prefix}.snapshot", closure)
+
+    # TODO: How about feeding discriminated processing fns as a dict? Something to keep in mind
+    if process_webhook:
+
+        async def webhook_closure(
+            task: Task,
+            process_webhook: ProcessWebhookFn[_WebhookDocument],
+            state: ResourceState.Webhook,
+        ):
+            assert state and not isinstance(state, dict)
+            await _binding_webhook_task(
+                binding, binding_index, process_webhook, state, task
+            )
+
+        assert resource_state.webhook and isinstance(resource_state.webhook, dict)
+        _ = task.spawn_child(
+            f"{prefix}.webhook",
+            functools.partial(
+                webhook_closure,
+                process_webhook=process_webhook,
+                state=resource_state.webhook,
+            ),
+        )
 
 
 async def _binding_snapshot_task(
@@ -1250,3 +1301,33 @@ async def _binding_incremental_task(
             "incremental task is idle",
             {"sleep_for": sleep_for, "cursor": state.cursor, "subtask_id": subtask_id},
         )
+
+
+async def _binding_webhook_task(
+    binding: CaptureBinding[_ResourceConfig],
+    binding_index: int,
+    process_webhook: ProcessWebhookFn[_WebhookDocument],
+    state: ResourceState.Webhook | None,
+    task: Task,
+):
+    """Process incoming webhook data for a resource"""
+
+    if not state:
+        state = ResourceState.Webhook()
+
+    connector_state = ConnectorState(
+        bindingStateV1={binding.stateKey: ResourceState(webhook=state)}
+    )
+
+    while True:
+        # Yield to the event loop to prevent starvation.
+        await asyncio.sleep(0)
+
+        async for item in process_webhook(task.log, state.cursor):
+            if isinstance(item, WebhookDocument) or isinstance(item, dict):
+                task.captured(binding_index, item)
+                await task.checkpoint(connector_state)
+            else:
+                # TODO: Do I want to push this to prod?
+                # Aren't there any other doc types to handle?
+                raise ValueError("Unexpected webhook yield received")

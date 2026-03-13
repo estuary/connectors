@@ -1,16 +1,14 @@
 import asyncio
 import traceback
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import Mapping
 from datetime import datetime
 from enum import Enum
-from logging import Logger
-from typing import Callable, TypeVar
+from typing import TypeVar
 
 from aiohttp import web
 from pydantic import BaseModel
 
 from estuary_cdk.capture.common import (
-    AssociatedDocument,
     BaseDocument,
     CaptureBinding,
     Resource,
@@ -25,35 +23,6 @@ from estuary_cdk.pydantic_polyfill import JsonValue
 _BaseDocument = TypeVar("_BaseDocument", bound=BaseDocument)
 _ResourceConfig = TypeVar("_ResourceConfig", bound=ResourceConfig)
 _ResourceState = TypeVar("_ResourceState", bound=ResourceState)
-
-WebhookCursor = str | int | datetime | dict[str, JsonValue] | None
-"""
-TODO: explain that I don't really have any use for this yet, I just want to be permissive for future uses
-"""
-
-# TODO: Should these fns receive an async generator of messages, as produced by the webhook listener?
-# How would they inform the server that the data's been checkpointed so it can ACK the HTTP request?
-# I need to provide a "heavy lifting" ReceiveWebhookFn type function that performs all the heavy lifting.
-# Any fns that extend it should call it so we perform all the usual data validation and transformation,
-# and only then would it do its own thing. The same way in existing connectors we define an `open` fn
-# to decorate `open_binding`'s behaviour.
-# I mean, kind of. Some checks we want to perform before collection routing, like signature verifications.
-# Some messages will come encrypted and we can't even read the discriminator until we verify.
-ReceiveWebhookFn = Callable[
-    [
-        Logger,
-        WebhookCursor,
-    ],
-    AsyncGenerator[_BaseDocument | dict | AssociatedDocument | WebhookCursor, None],
-]
-"""
-TODO: Add high-level description. 
-
-This fn should execute after all usual verifications (auth, signatures) happen
-and should be responsible for publishing documents
-
-We need to mention this fn needs to run as fast as possible, we don't want HTTP reqs to time out
-"""
 
 
 def _open_webhook_binding(
