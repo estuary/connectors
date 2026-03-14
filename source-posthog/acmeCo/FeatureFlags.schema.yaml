@@ -16,12 +16,10 @@ $defs:
         title: Row Id
         type: integer
       project_id:
-        anyOf:
-        - type: integer
-        - type: 'null'
-        default: null
+        default: -1
         description: The PostHog project this document belongs to
         title: Project Id
+        type: integer
     title: Meta
     type: object
 additionalProperties: true

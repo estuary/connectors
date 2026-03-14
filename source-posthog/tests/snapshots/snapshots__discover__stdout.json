@@ -137,17 +137,10 @@
               "type": "integer"
             },
             "project_id": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
+              "default": -1,
               "description": "The PostHog project this document belongs to",
-              "title": "Project Id"
+              "title": "Project Id",
+              "type": "integer"
             }
           },
           "title": "Meta",
@@ -212,17 +205,10 @@
               "type": "integer"
             },
             "project_id": {
-              "anyOf": [
-                {
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
+              "default": -1,
               "description": "The PostHog project this document belongs to",
-              "title": "Project Id"
+              "title": "Project Id",
+              "type": "integer"
             }
           },
           "title": "Meta",
@@ -345,6 +331,12 @@
               "description": "Row ID of the Document, counting up from zero, or -1 if not known",
               "title": "Row Id",
               "type": "integer"
+            },
+            "project_id": {
+              "default": -1,
+              "description": "The PostHog project this document belongs to",
+              "title": "Project Id",
+              "type": "integer"
             }
           },
           "title": "Meta",
@@ -366,18 +358,32 @@
           "format": "date-time",
           "title": "Created At",
           "type": "string"
+        },
+        "last_seen_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Last Seen At"
         }
       },
       "required": [
         "id",
-        "created_at"
+        "created_at",
+        "last_seen_at"
       ],
       "title": "Person",
       "type": "object",
       "x-infer-schema": true
     },
     "key": [
-      "/_meta/row_id"
+      "/_meta/project_id",
+      "/id"
     ]
   },
   {
