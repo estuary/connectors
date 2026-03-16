@@ -9,7 +9,8 @@ export TABLE_SUFFIX=$(head -c 12 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | he
 resources_json_template='[
   {
     "resource": {
-      "table": "simple_${TABLE_SUFFIX}"
+      "table": "simple_${TABLE_SUFFIX}",
+      "additional_table_properties": {"write.parquet.compression-codec": "gzip"}
     },
     "source": "${TEST_COLLECTION_SIMPLE}"
   },
