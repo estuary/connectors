@@ -72,7 +72,7 @@ func TestValidateAndApply(t *testing.T) {
 		Schema: "PUBLIC",
 	}
 
-	dsn, err := cfg.toURI(true)
+	dsn, err := cfg.toURI(true, "n/a")
 	require.NoError(t, err)
 
 	db, err := stdsql.Open("snowflake", dsn)
@@ -109,7 +109,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		Schema: "PUBLIC",
 	}
 
-	dsn, err := cfg.toURI(true)
+	dsn, err := cfg.toURI(true, "n/a")
 	require.NoError(t, err)
 
 	db, err := stdsql.Open("snowflake", dsn)

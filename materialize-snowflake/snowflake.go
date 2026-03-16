@@ -91,7 +91,7 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 				"schema":   cfg.Schema,
 			}).Info("opening Snowflake")
 
-			dsn, err := cfg.toURI(false)
+			dsn, err := cfg.toURI(false, "n/a")
 			if err != nil {
 				return nil, fmt.Errorf("building snowflake dsn: %w", err)
 			}
@@ -252,7 +252,7 @@ func newTransactor(
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 
-	dsn, err := cfg.toURI(true)
+	dsn, err := cfg.toURI(true, materializationName)
 	if err != nil {
 		return nil, fmt.Errorf("building snowflake dsn: %w", err)
 	}
@@ -270,7 +270,7 @@ func newTransactor(
 			return nil, fmt.Errorf("fetching current account name: %w", err)
 		} else if sm, err = newStreamManager(&cfg, open.Materialization.TaskName(), accountName, open.Range.KeyBegin); err != nil {
 			return nil, fmt.Errorf("newStreamManager: %w", err)
-		} else if pipeClient, err = NewPipeClient(&cfg, accountName); err != nil {
+		} else if pipeClient, err = NewPipeClient(&cfg, accountName, materializationName); err != nil {
 			return nil, fmt.Errorf("NewPipeClient: %w", err)
 		}
 
