@@ -357,14 +357,19 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 			return err
 		}
 
-		signingName, _ := SigningName(d.cfg.URL)
-		if signingName == "glue" && d.cfg.GlueOptimizers.anyEnabled() {
-			glueClient, err := d.cfg.toGlueClient(ctx)
+		if d.cfg.GlueOptimizers.anyEnabled() {
+			signingName, err := SigningName(d.cfg.URL)
 			if err != nil {
-				return fmt.Errorf("creating Glue client: %w", err)
+				return fmt.Errorf("determining signing name: %w", err)
 			}
-			if err := configureTableOptimizers(ctx, glueClient, d.cfg.Warehouse, ns, name, d.cfg.GlueOptimizers); err != nil {
-				return fmt.Errorf("configuring Glue table optimizers for %s.%s: %w", ns, name, err)
+			if signingName == "glue" {
+				glueClient, err := d.cfg.toGlueClient(ctx)
+				if err != nil {
+					return fmt.Errorf("creating Glue client: %w", err)
+				}
+				if err := configureTableOptimizers(ctx, glueClient, d.cfg.Warehouse, ns, name, d.cfg.GlueOptimizers); err != nil {
+					return fmt.Errorf("configuring Glue table optimizers for %s.%s: %w", ns, name, err)
+				}
 			}
 		}
 
@@ -398,8 +403,14 @@ func (d *materialization) UpdateResource(
 	ns := resourcePath[0]
 	name := resourcePath[1]
 
-	signingName, _ := SigningName(d.cfg.URL)
-	needsGlueOptimizers := signingName == "glue" && d.cfg.GlueOptimizers.anyEnabled()
+	needsGlueOptimizers := false
+	if d.cfg.GlueOptimizers.anyEnabled() {
+		signingName, err := SigningName(d.cfg.URL)
+		if err != nil {
+			return "", nil, fmt.Errorf("determining signing name: %w", err)
+		}
+		needsGlueOptimizers = signingName == "glue"
+	}
 
 	if len(update.NewProjections) == 0 && len(update.NewlyNullableFields) == 0 && len(update.FieldsToMigrate) == 0 {
 		if !needsGlueOptimizers {

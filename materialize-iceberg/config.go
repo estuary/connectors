@@ -119,7 +119,10 @@ func (c config) Validate() error {
 		if c.GlueOptimizers.ExecutionRoleArn == "" {
 			return fmt.Errorf("glue_optimizers.execution_role_arn is required when any Glue table optimizer is enabled")
 		}
-		signingName, _ := SigningName(c.URL)
+		signingName, err := SigningName(c.URL)
+		if err != nil {
+			return fmt.Errorf("Glue table optimizers are only supported when using AWS Glue as the catalog: %w", err)
+		}
 		if signingName != "glue" {
 			return fmt.Errorf("Glue table optimizers are only supported when using AWS Glue as the catalog")
 		}
