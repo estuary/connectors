@@ -28,7 +28,7 @@ func TestStreamManager(t *testing.T) {
 
 	cfg := mustGetCfg(t)
 
-	dsn, err := cfg.toURI(true, "n/a")
+	dsn, err := cfg.toURI(true, "")
 	require.NoError(t, err)
 
 	db, err := stdsql.Open("snowflake", dsn)
@@ -441,7 +441,7 @@ func TestStreamDatatypes(t *testing.T) {
 
 	cfg := mustGetCfg(t)
 
-	dsn, err := cfg.toURI(true, "n/a")
+	dsn, err := cfg.toURI(true, "")
 	require.NoError(t, err)
 
 	db, err := stdsql.Open("snowflake", dsn)

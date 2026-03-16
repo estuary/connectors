@@ -260,7 +260,7 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	dsn, err := cfg.toURI(false, "n/a")
+	dsn, err := cfg.toURI(false, "")
 	if err != nil {
 		errs.Err(err)
 		return errs
