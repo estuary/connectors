@@ -228,6 +228,11 @@ def generate_resources_body(
                         entity: {
                             # Capture resources for all applications within this Pendo subscription.
                             "appId": "expandAppIds(\"*\")",
+                            "timeSeries": {
+                                "period": "hourRange",
+                                "first": f"{lower_bound}",
+                                "last": f"{upper_bound or 'now()'}"
+                            }
                         },
                     }
                 },
