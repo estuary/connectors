@@ -91,7 +91,7 @@ func newSnowflakeDriver() *sql.Driver[config, tableConfig] {
 				"schema":   cfg.Schema,
 			}).Info("opening Snowflake")
 
-			dsn, err := cfg.toURI(false, "n/a")
+			dsn, err := cfg.toURI(false, "")
 			if err != nil {
 				return nil, fmt.Errorf("building snowflake dsn: %w", err)
 			}
