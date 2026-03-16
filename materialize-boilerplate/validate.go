@@ -118,7 +118,7 @@ func (v Validator) ValidateBinding(
 			// We allow a binding to switch from standard => delta updates but not the other
 			// way. This is because a standard materialization is trivially a valid
 			// delta-updates materialization.
-			return nil, fmt.Errorf("changing from delta updates to standard updates is not allowed")
+			return nil, fmt.Errorf("Changing from delta updates to standard updates is not allowed. Please click the backfill button first before disabling delta updates.")
 		} else if constraints, err = v.validateMatchesExistingResource(*existingResource, lastBinding, boundCollection, deltaUpdates, fieldConfigJsonMap); err != nil {
 			return nil, err
 		}
