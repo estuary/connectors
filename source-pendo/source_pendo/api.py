@@ -39,6 +39,30 @@ def _ms_to_dt(ms: int) -> datetime:
 def base_url(host: PendoHost) -> str:
     return f"https://{host}/api/v1"
 
+def _generate_time_series(
+        period: str,
+        lower_bound: int,
+        upper_bound: int | None = None,
+        last_seen_id: str | None = None,
+) -> dict[str, str]:
+    """Builds a timeSeries block for Pendo aggregation queries.
+
+    When paginating within a single timestamp (last_seen_id is set), the scan
+    is scoped to just that timestamp. Otherwise it spans the full range.
+    """
+    # When paginating within a single timestamp (last_seen_id is set), we only
+    # need the hour bucket containing lower_bound. Using the full range would
+    # cause Pendo to scan all buckets just to filter down to one timestamp. Instead
+    # we filter down to just the timestamp we care about (lower_bound).
+    #
+    # If an upper bound isn't specified, retrieve all data up to the present.
+    return {
+        "period": period,
+        "first": f"{lower_bound}",
+        "last": f"{lower_bound}" if last_seen_id else f"{upper_bound or 'now()'}",
+    }
+
+
 def generate_events_body(
         entity: str,
         identifying_field:str,
@@ -83,12 +107,7 @@ def generate_events_body(
                             # Capture events for all applications within this Pendo subscription.
                             "appId": "expandAppIds(\"*\")",
                         },
-                        "timeSeries": {
-                            "period": "hourRange",
-                            "first": f"{lower_bound}",
-                            # If an upper bound isn't specified, retrieve all events up to the present.
-                            "last": f"{upper_bound or 'now()'}"
-                        }
+                        "timeSeries": _generate_time_series("hourRange", lower_bound, upper_bound, last_seen_id),
                     }
                 },
                 {
@@ -160,12 +179,7 @@ def generate_event_aggregates_body(
                             # Capture events for all applications within this Pendo subscription.
                             "appId": "expandAppIds(\"*\")",
                         },
-                        "timeSeries": {
-                            "period": "hourRange",
-                            "first": f"{lower_bound}",
-                            # If an upper bound isn't specified, retrieve all events up to the present.
-                            "last": f"{upper_bound or 'now()'}"
-                        }
+                        "timeSeries": _generate_time_series("hourRange", lower_bound, upper_bound, last_seen_id),
                     }
                 },
                 {
@@ -230,11 +244,7 @@ def generate_resources_body(
                         entity: {
                             # Capture resources for all applications within this Pendo subscription.
                             "appId": "expandAppIds(\"*\")",
-                            "timeSeries": {
-                                "period": "hourRange",
-                                "first": f"{lower_bound}",
-                                "last": f"{upper_bound or 'now()'}"
-                            }
+                            "timeSeries": _generate_time_series("hourRange", lower_bound, upper_bound, last_seen_id),
                         },
                     }
                 },
