@@ -259,28 +259,27 @@ func (t *transactor) addBinding(target sql.Table) error {
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	var ctx = it.Context()
+	const batchSize = 1000
 
-	for it.Next() {
-		var b = t.bindings[it.Binding]
-		converted, err := b.target.ConvertKey(it.Key)
-		if err != nil {
-			return fmt.Errorf("converting Load key: %w", err)
+	keysByBinding := make(map[int][]clickhouse.GroupSet)
+	flushBinding := func(binding int) error {
+		groupSets := keysByBinding[binding]
+		delete(keysByBinding, binding)
+		if len(groupSets) == 0 {
+			return nil
 		}
 
-		var groupSets = []clickhouse.GroupSet{{Value: converted}}
-
-		rows, err := t.store.conn.Query(ctx, b.loadQuerySQL, groupSets)
+		b := t.bindings[binding]
+		rows, err := t.store.conn.Query(it.Context(), b.loadQuerySQL, groupSets)
 		if err != nil {
 			return fmt.Errorf("querying Load documents: %w", err)
 		}
-
 		for rows.Next() {
 			var document json.RawMessage
 			if err := rows.Scan(&document); err != nil {
 				_ = rows.Close()
 				return fmt.Errorf("scanning Load document: %w", err)
-			} else if err := loaded(it.Binding, document); err != nil {
+			} else if err := loaded(binding, document); err != nil {
 				_ = rows.Close()
 				return err
 			}
@@ -289,21 +288,44 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err := rows.Err(); err != nil {
 			return fmt.Errorf("querying Loads: %w", err)
 		}
+		return nil
+	}
+
+	for it.Next() {
+		b := t.bindings[it.Binding]
+		converted, err := b.target.ConvertKey(it.Key)
+		if err != nil {
+			return fmt.Errorf("converting Load key: %w", err)
+		}
+
+		keysByBinding[it.Binding] = append(keysByBinding[it.Binding], clickhouse.GroupSet{Value: converted})
+
+		if len(keysByBinding[it.Binding]) >= batchSize {
+			if err := flushBinding(it.Binding); err != nil {
+				return err
+			}
+		}
 	}
 	if it.Err() != nil {
 		return it.Err()
 	}
 
+	for bindingIndex := range keysByBinding {
+		if err := flushBinding(bindingIndex); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
-const (
-	deleteFalse uint8  = 0
-	deleteTrue  uint8  = 1
-	versionZero uint64 = 0
-)
-
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
+	const (
+		deleteFalse uint8  = 0
+		deleteTrue  uint8  = 1
+		versionZero uint64 = 0
+	)
+
 	batchByBinding := make(map[int]chdriver.Batch, 2)
 	abortAllBatches := func() {
 		for _, batch := range batchByBinding {
