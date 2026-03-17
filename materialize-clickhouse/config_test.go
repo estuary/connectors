@@ -65,42 +65,12 @@ func TestResolvedAddress(t *testing.T) {
 	require.Equal(t, "host:9000", cfg.resolvedAddress())
 }
 
-func TestUnmarshalState(t *testing.T) {
-	var tr transactor
-
-	// nil state is a no-op.
-	require.NoError(t, tr.UnmarshalState(nil))
-	require.Equal(t, uint64(0), tr.version)
-
-	// "null" state is a no-op.
-	require.NoError(t, tr.UnmarshalState(json.RawMessage("null")))
-	require.Equal(t, uint64(0), tr.version)
-
-	// Valid JSON sets version.
-	require.NoError(t, tr.UnmarshalState(json.RawMessage(`{"version":42}`)))
-	require.Equal(t, uint64(42), tr.version)
-
-	// Invalid JSON returns an error.
-	require.Error(t, tr.UnmarshalState(json.RawMessage("not-json")))
-}
-
 func TestAcknowledge(t *testing.T) {
 	var tr transactor
 	state, err := tr.Acknowledge(t.Context())
 	require.NoError(t, err)
 	require.Nil(t, state)
 }
-
-func TestConnectorStateRoundTrip(t *testing.T) {
-	var cs = connectorState{Version: 42}
-	data, err := json.Marshal(cs)
-	require.NoError(t, err)
-
-	var cs2 connectorState
-	require.NoError(t, json.Unmarshal(data, &cs2))
-	require.Equal(t, cs, cs2)
-}
-
 
 func TestSpecification(t *testing.T) {
 	resp, err := newClickHouseDriver().

@@ -422,7 +422,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	// Store: insert a row via native batch.
 	batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "v1", `{"id":"k1"}`, uint64(1), uint8(0)))
+	require.NoError(t, batch.Append("k1", "v1", `{"id":"k1"}`, uint64(0), uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Load: query back the document via GroupSet IN parameter.
@@ -434,14 +434,14 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"id":"k1"}`, docs[0])
 
-	// Store a delete row (higher version, _is_deleted=1) with full record.
+	// Store a delete row (_is_deleted=1) with full record.
 	batch, err = conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
 	require.NoError(t, batch.Append(
 		"k1",
 		nil,
 		`{"id":"k1"}`,
-		uint64(2), uint8(1),
+		uint64(0), uint8(1),
 	))
 	require.NoError(t, batch.Send())
 
@@ -598,7 +598,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	// Insert a live row.
 	batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "hello", "opt", true, int64(42), `{"id":"k1"}`, uint64(1), uint8(0)))
+	require.NoError(t, batch.Append("k1", "hello", "opt", true, int64(42), `{"id":"k1"}`, uint64(0), uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Verify it loads.
@@ -610,7 +610,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	// Store a delete row with full record values, exactly as Store does.
 	var converted []any
 	converted = append(converted, "k1", "hello", "opt", true, int64(42), `{"id":"k1"}`)
-	converted = append(converted, uint64(2), uint8(1))
+	converted = append(converted, uint64(0), uint8(1))
 
 	batch, err = conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
@@ -741,9 +741,9 @@ func TestLoadMultipleKeys(t *testing.T) {
 	// Store 3 rows.
 	batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "v1", `{"id":"k1"}`, uint64(1), uint8(0)))
-	require.NoError(t, batch.Append("k2", "v2", `{"id":"k2"}`, uint64(1), uint8(0)))
-	require.NoError(t, batch.Append("k3", "v3", `{"id":"k3"}`, uint64(1), uint8(0)))
+	require.NoError(t, batch.Append("k1", "v1", `{"id":"k1"}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("k2", "v2", `{"id":"k2"}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("k3", "v3", `{"id":"k3"}`, uint64(0), uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Load all 3 keys.
@@ -799,9 +799,9 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 	// Store 3 rows with composite keys: (tenant, id).
 	batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("acme", int64(1), "v1", `{"tenant":"acme","id":1}`, uint64(1), uint8(0)))
-	require.NoError(t, batch.Append("acme", int64(2), "v2", `{"tenant":"acme","id":2}`, uint64(1), uint8(0)))
-	require.NoError(t, batch.Append("beta", int64(1), "v3", `{"tenant":"beta","id":1}`, uint64(1), uint8(0)))
+	require.NoError(t, batch.Append("acme", int64(1), "v1", `{"tenant":"acme","id":1}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("acme", int64(2), "v2", `{"tenant":"acme","id":2}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("beta", int64(1), "v3", `{"tenant":"beta","id":1}`, uint64(0), uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Load (acme,1) → doc1.
@@ -840,6 +840,11 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 	require.JSONEq(t, `{"tenant":"beta","id":1}`, docs[1])
 }
 
+// TestVersionDeduplication verifies that when multiple inserts for the same key
+// all use _version=0 (as Store does), querying with FINAL returns the most
+// recently inserted row. Per the ReplacingMergeTree docs: "if ver is the same
+// for several rows, then it will use 'if ver is not specified' rule for them,
+// i.e. the most recent inserted row will remain."
 func TestVersionDeduplication(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -850,22 +855,28 @@ func TestVersionDeduplication(t *testing.T) {
 
 	b, conn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
-	// Store the same key at versions 1, 2, 3 with distinct documents.
-	for v := uint64(1); v <= 3; v++ {
+	// Simulate 3 successive Store commits for the same key, each in a separate
+	// batch (separate insert/part) so that insertion order is well-defined.
+	for seq := 1; seq <= 3; seq++ {
 		batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 		require.NoError(t, err)
-		doc := fmt.Sprintf(`{"id":"k1","version":%d}`, v)
-		require.NoError(t, batch.Append("k1", fmt.Sprintf("v%d", v), doc, v, uint8(0)))
+		doc := fmt.Sprintf(`{"id":"k1","seq":%d}`, seq)
+		require.NoError(t, batch.Append("k1", fmt.Sprintf("v%d", seq), doc, uint64(0), uint8(0)))
 		require.NoError(t, batch.Send())
 	}
 
-	// Load → exactly 1 doc, matching the highest version.
-	var groupSets = []clickhouse.GroupSet{{Value: []any{"k1"}}}
-	rows, err := conn.Query(ctx, b.loadQuerySQL, groupSets)
+	// Query ClickHouse directly with FINAL to verify deduplication picks the
+	// most recently inserted row.
+	db := cfg.openDB()
+	defer db.Close()
+
+	var doc string
+	err := db.QueryRowContext(ctx, fmt.Sprintf(
+		"SELECT flow_document FROM %s FINAL WHERE _is_deleted = 0 AND id = 'k1'",
+		dialect.Identifier(tableName),
+	)).Scan(&doc)
 	require.NoError(t, err)
-	docs := scanDocuments(t, rows)
-	require.Len(t, docs, 1)
-	require.JSONEq(t, `{"id":"k1","version":3}`, docs[0])
+	require.JSONEq(t, `{"id":"k1","seq":3}`, doc)
 }
 
 func TestStoreBatchMultipleRows(t *testing.T) {
@@ -881,9 +892,9 @@ func TestStoreBatchMultipleRows(t *testing.T) {
 	// Single PrepareBatch, append 3 rows, then Send.
 	batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "v1", `{"id":"k1"}`, uint64(1), uint8(0)))
-	require.NoError(t, batch.Append("k2", "v2", `{"id":"k2"}`, uint64(1), uint8(0)))
-	require.NoError(t, batch.Append("k3", "v3", `{"id":"k3"}`, uint64(1), uint8(0)))
+	require.NoError(t, batch.Append("k1", "v1", `{"id":"k1"}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("k2", "v2", `{"id":"k2"}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("k3", "v3", `{"id":"k3"}`, uint64(0), uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Load all 3 → all present.
@@ -946,13 +957,13 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	// Store a row into table A.
 	batch, err := conn.PrepareBatch(ctx, bA.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("keyA", "valA", `{"id":"keyA"}`, uint64(1), uint8(0)))
+	require.NoError(t, batch.Append("keyA", "valA", `{"id":"keyA"}`, uint64(0), uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Store a row into table B.
 	batch, err = conn.PrepareBatch(ctx, bB.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("keyB", "valB", `{"id":"keyB"}`, uint64(1), uint8(0)))
+	require.NoError(t, batch.Append("keyB", "valB", `{"id":"keyB"}`, uint64(0), uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Load from table A → correct doc.
@@ -991,7 +1002,7 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	// Store a live row (acme, 1).
 	batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("acme", int64(1), "val", `{"tenant":"acme","id":1}`, uint64(1), uint8(0)))
+	require.NoError(t, batch.Append("acme", int64(1), "val", `{"tenant":"acme","id":1}`, uint64(0), uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Load → present.
@@ -1002,11 +1013,11 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"tenant":"acme","id":1}`, docs[0])
 
-	// Store delete row at higher version with _is_deleted=1, using full record.
+	// Store delete row with _is_deleted=1, using full record.
 	var converted []any
 	converted = append(converted, "acme", int64(1)) // keys
 	converted = append(converted, "val", `{"tenant":"acme","id":1}`)
-	converted = append(converted, uint64(2), uint8(1))
+	converted = append(converted, uint64(0), uint8(1))
 
 	batch, err = conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)

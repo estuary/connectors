@@ -187,14 +187,6 @@ func newClickHouseDriver() *sql.Driver[config, tableConfig] {
 	}
 }
 
-// connectorState is persisted in the Flow recovery log and used to generate
-// deterministic _version values for ReplacingMergeTree. On crash recovery the
-// runtime re-delivers the same transaction; using the same version ensures
-// ReplacingMergeTree deduplicates the duplicate rows.
-type connectorState struct {
-	Version uint64 `json:"version"`
-}
-
 type transactor struct {
 	cfg       config
 	templates templates
@@ -206,20 +198,9 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
-	version  uint64
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error {
-	if len(state) == 0 || string(state) == "null" {
-		return nil
-	}
-	var cs connectorState
-	if err := json.Unmarshal(state, &cs); err != nil {
-		return err
-	}
-	t.version = cs.Version
-	return nil
-}
+func (t *transactor) UnmarshalState(state json.RawMessage) error                { return nil }
 func (t *transactor) Acknowledge(_ context.Context) (*pf.ConnectorState, error) { return nil, nil }
 
 func prepareNewTransactor(
@@ -317,19 +298,12 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 }
 
 const (
-	deleteFalse uint8 = 0
-	deleteTrue  uint8 = 1
+	deleteFalse uint8  = 0
+	deleteTrue  uint8  = 1
+	versionZero uint64 = 0
 )
 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
-	var ctx = it.Context()
-	// Increment version before any stores. The version is persisted in the Flow
-	// recovery log via connectorState so that on crash recovery the runtime
-	// re-delivers the same transaction with the same version, enabling
-	// ReplacingMergeTree to deduplicate duplicate rows deterministically.
-	t.version++
-	var version = t.version
-
 	batchByBinding := make(map[int]chdriver.Batch, 2)
 	abortAllBatches := func() {
 		for _, batch := range batchByBinding {
@@ -345,7 +319,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		b := t.bindings[it.Binding]
 		batch, found := batchByBinding[it.Binding]
 		if !found {
-			batch, err = t.store.conn.PrepareBatch(ctx, b.storeInsertSQL)
+			batch, err = t.store.conn.PrepareBatch(it.Context(), b.storeInsertSQL)
 			if err != nil {
 				abortAllBatches()
 				return nil, fmt.Errorf("prepare store batch: %w", err)
@@ -360,11 +334,11 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
 
+		var deleteState = deleteFalse
 		if it.Delete && t.cfg.HardDelete {
-			converted = append(converted, version, deleteTrue)
-		} else {
-			converted = append(converted, version, deleteFalse)
+			deleteState = deleteTrue
 		}
+		converted = append(converted, versionZero, deleteState)
 
 		if err = batch.Append(converted...); err != nil {
 			abortAllBatches()
@@ -377,11 +351,6 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		var checkpointJSON, err = json.Marshal(connectorState{Version: version})
-		if err != nil {
-			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
-		}
-
 		future := m.RunAsyncOperation(func() error {
 			var errs []error
 			for _, batch := range batchByBinding {
@@ -392,7 +361,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			return errors.Join(errs...)
 		})
 
-		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, future
+		return nil, future
 	}, nil
 }
 
