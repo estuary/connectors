@@ -124,11 +124,11 @@ This time that `b` record in Part 1 is removed, and that in Part 2 is retained.
 | c   | charlie | 30      | 0        | 0           |
 
 If we queried all records in the table (`SELECT * FROM t`), the results would change after merge.
-Before merge, `SELECT * FROM t` yields 5 records, including both `b` records.
-After merge, the same query yields just 4 records; the old `b` version is now gone.
+Before merge, `SELECT * FROM t` yields 4 records, including both `b` records.
+After merge, the same query yields just 3 records; the old `b` version is now gone.
 
 We can't determine when merge operations occur, but we can improve our SQL queries to mitigate.
-Adding the `FINAL` SQL qualifier, this query yields just four records *before and after merge*:
+Adding the `FINAL` SQL qualifier, this query yields just three records *before and after merge*:
 `SELECT * FROM t FINAL`.
 
 ### Merge after Delete
@@ -162,11 +162,11 @@ The result of this merge operation is that both `c` records are removed.
 | d   | delta   | 40      | 0        | 0           |
 
 As before, we queried all records in the table (`SELECT * FROM t`), the results would change after merge.
-Before merge, `SELECT * FROM t` yields 6 records, including both `c` records.
-After merge, the same query yields just 4 records; both `c` versions are gone.
+Before merge, `SELECT * FROM t` yields 5 records, including both `c` records.
+After merge, the same query yields just 3 records; both `c` versions are gone.
 
 Adding the `FINAL` SQL qualifier isn't quite enough this time.
-This query yields *5* records before merge, and *4* records after merge:
+This query yields *4* records before merge, and *3* records after merge:
 `SELECT * FROM t FINAL`.
 The `FINAL` qualifier does not skip deleted records, it only deduplicates based on the table `ORDER BY` key.
 We can omit deleted records with a familiar predicate:
