@@ -121,15 +121,19 @@ func renderTemplates(dialect sql.Dialect) templates {
 --   allow_experimental_replacing_merge_with_cleanup: enables the CLEANUP merge
 --     feature (experimental). Required for the other settings to have any effect,
 --     and also enables manual: OPTIMIZE TABLE ... FINAL CLEANUP.
+--     Added in ClickHouse 23.12 and 24.1.
 --   min_age_to_force_merge_seconds: minimum age (in seconds) of all parts in a
 --     partition before forcing a merge. Only partitions where every part is older
 --     than this threshold are eligible. 604800 = 1 week.
+--     Added in ClickHouse 22.10.
 --   min_age_to_force_merge_on_partition_only: restricts forced merges to only run
 --     when merging an entire partition into one part. Required for CLEANUP to safely
 --     remove deleted rows (ensures no older versions remain).
+--     Added in ClickHouse 22.10.
 --   enable_replacing_merge_with_cleanup_for_min_age_to_force_merge: actually enables
 --     automatic background CLEANUP merges when the age threshold is met. Without this,
 --     cleanup only happens via OPTIMIZE ... FINAL CLEANUP.
+--     Added in ClickHouse 25.3.
 
 {{ define "createTargetTable" }}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
