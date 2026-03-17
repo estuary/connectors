@@ -116,6 +116,20 @@ func renderTemplates(dialect sql.Dialect) templates {
 -- must use the FINAL qualifier, which (1) deduplicates the order by key,
 -- selecting the highest _version row per key but (2) does NOT exclude rows
 -- where _is_deleted != 0.
+--
+-- The SETTINGS block enables automatic background CLEANUP merges:
+--   allow_experimental_replacing_merge_with_cleanup: enables the CLEANUP merge
+--     feature (experimental). Required for the other settings to have any effect,
+--     and also enables manual: OPTIMIZE TABLE ... FINAL CLEANUP.
+--   min_age_to_force_merge_seconds: minimum age (in seconds) of all parts in a
+--     partition before forcing a merge. Only partitions where every part is older
+--     than this threshold are eligible. 604800 = 1 week.
+--   min_age_to_force_merge_on_partition_only: restricts forced merges to only run
+--     when merging an entire partition into one part. Required for CLEANUP to safely
+--     remove deleted rows (ensures no older versions remain).
+--   enable_replacing_merge_with_cleanup_for_min_age_to_force_merge: actually enables
+--     automatic background CLEANUP merges when the age threshold is met. Without this,
+--     cleanup only happens via OPTIMIZE ... FINAL CLEANUP.
 
 {{ define "createTargetTable" }}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
@@ -131,7 +145,12 @@ ORDER BY (
 		{{- if $ind }}, {{ end -}}
 		{{$key.Identifier}}
 	{{- end -}}
-);
+)
+SETTINGS
+	allow_experimental_replacing_merge_with_cleanup = 1,
+	min_age_to_force_merge_seconds = 604800,
+	min_age_to_force_merge_on_partition_only = 1,
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
 {{ end }}
 
 -- Templated query which looks up existing documents by primary key using a native
