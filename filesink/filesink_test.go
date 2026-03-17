@@ -1,10 +1,28 @@
 package filesink
 
 import (
+	"context"
+	"io"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+type nullStore struct {
+}
+
+func (*nullStore) SupportsPathPatternExpansion() bool {
+	return true
+}
+
+func (*nullStore) StageObject(ctx context.Context, r io.Reader, key string) (*SinglePhase, error) {
+	panic("not implemented")
+}
+
+func (*nullStore) CompleteObject(ctx context.Context, info *SinglePhase) error {
+	panic("not implemented")
+}
 
 func TestNextFilekey(t *testing.T) {
 	sk := "val"
@@ -15,6 +33,7 @@ func TestNextFilekey(t *testing.T) {
 		path      string
 		backfill  uint32
 		prevCount uint64
+		locString string
 		want      string
 	}{
 		{
@@ -59,6 +78,50 @@ func TestNextFilekey(t *testing.T) {
 			prevCount: 3,
 			want:      "prefix/path/v0000000002/00000000000000000004.something.gz",
 		},
+		{
+			prefix:    "prefix/%Y/%m/%d",
+			path:      "path",
+			backfill:  0,
+			prevCount: 0,
+			want:      "prefix/2026/02/11/path/v0000000000/00000000000000000000.something.gz",
+		},
+		{
+			prefix:    "prefix/%Y-%m-%dT%H:%M:%S%z",
+			path:      "path",
+			backfill:  0,
+			prevCount: 0,
+			want:      "prefix/2026-02-11T10:02:03+0000/path/v0000000000/00000000000000000000.something.gz",
+		},
+		{
+			prefix:    "prefix/%Y-%m-%dT%H:%M:%S %Z",
+			path:      "path",
+			backfill:  0,
+			prevCount: 0,
+			want:      "prefix/2026-02-11T10:02:03 UTC/path/v0000000000/00000000000000000000.something.gz",
+		},
+		{
+			prefix:    "prefix/%Y-%m-%dT%H:%M:%S%z",
+			path:      "path",
+			backfill:  0,
+			prevCount: 0,
+			locString: "America/Los_Angeles",
+			want:      "prefix/2026-02-11T02:02:03-0800/path/v0000000000/00000000000000000000.something.gz",
+		},
+		{
+			prefix:    "prefix/%Y-%m-%dT%H:%M:%S%z",
+			path:      "path",
+			backfill:  0,
+			prevCount: 0,
+			locString: "Asia/Kathmandu",
+			want:      "prefix/2026-02-11T15:47:03+0545/path/v0000000000/00000000000000000000.something.gz",
+		},
+		{
+			prefix:    "prefix/",
+			path:      "path/%Y/%m/%d",
+			backfill:  0,
+			prevCount: 0,
+			want:      "prefix/path/2026/02/11/v0000000000/00000000000000000000.something.gz",
+		},
 	}
 
 	for _, tt := range tests {
@@ -69,10 +132,11 @@ func TestNextFilekey(t *testing.T) {
 				path:     tt.path,
 			}
 
-			ta := transactor{
-				state: connectorState{
+			ta := transactor[*SinglePhase]{
+				state: connectorState[*SinglePhase]{
 					FileCounts: make(map[string]uint64),
 				},
+				store: &nullStore{},
 			}
 			ta.common.Extension = ".something.gz"
 
@@ -84,8 +148,13 @@ func TestNextFilekey(t *testing.T) {
 				ta.common.Prefix = tt.prefix
 			}
 
-			require.Equal(t, tt.want, ta.nextFileKey(b))
+			tm := time.Date(2026, time.February, 11, 10, 2, 3, 4, time.UTC)
+			if tt.locString != "" {
+				loc, err := time.LoadLocation(tt.locString)
+				require.NoError(t, err)
+				tm = tm.In(loc)
+			}
+			require.Equal(t, tt.want, ta.nextFileKey(b, tm))
 		})
 	}
-
 }
