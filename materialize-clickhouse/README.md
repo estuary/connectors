@@ -27,12 +27,13 @@ Therefore, batching is critical; they recommend batches of 10,000 to 100,000 rec
 
 ClickHouse tables are append-only; clients can semantically INSERT, but not UPDATE or DELETE.
 In the Estuary data model, updating and deleting records are core features.
-To reconcile this, we utilize the ClickHouse ReplacingMergeTree engine.
 
-ReplacingMergeTree augments the merge process in two ways:
+To reconcile updates, we utilize the ClickHouse ReplacingMergeTree engine.
+ReplacingMergeTree augments the merge process by dropping duplicate rows (according to the `ORDER BY` key),
+retaining only the most recent version.
 
-1) Records with duplicate `ORDER BY` keys are reconciled by dropping all but the most recent version.
-2) Records with marked for deletion are omitted from merge operations; they are effectively dropped.
+To reconcile deletes, we enable automatic background CLEANUP merges.
+This means that records marked for deletion are omitted from merge operations; they are dropped.
 
 ## Querying ClickHouse
 
