@@ -98,7 +98,7 @@ async def fetch_incremental(
     url = f"{API}/events"
     parameters: dict[str, str | int] = {"limit": MAX_PAGE_LIMIT}
     parameters = add_event_types(parameters, cls.EVENT_TYPES)
-    
+
     end = min(
         datetime.now(tz=UTC) - LAG,
         # Bound the window to avoid processing too many events at once when catching up.
@@ -659,6 +659,8 @@ async def fetch_incremental_no_events(
         last_resource: StripeObjectNoEvents | None = None
         async for resource in processor:
             last_resource = resource
+            if not resource.created or not isinstance(resource.created, int):
+                log.warning("Resource has invalid 'created' field", resource)
             resource_ts = _s_to_dt(resource.created)
 
             # Update the most recent timestamp seen.
