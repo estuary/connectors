@@ -434,15 +434,13 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"id":"k1"}`, docs[0])
 
-	// Store a tombstone row (higher version, _is_deleted=1).
-	// Use tombstoneValue for non-nullable columns: "value" is nullable (nil),
-	// "flow_document" is non-nullable (empty string).
+	// Store a delete row (higher version, _is_deleted=1) with full record.
 	batch, err = conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
 	require.NoError(t, batch.Append(
 		"k1",
-		tombstoneValue(table.Values[0]),
-		tombstoneValue(*table.Document),
+		nil,
+		`{"id":"k1"}`,
 		uint64(2), uint8(1),
 	))
 	require.NoError(t, batch.Send())
@@ -495,9 +493,8 @@ func TestPrepareNewTransactor(t *testing.T) {
 	txn.Destroy()
 }
 
-// TestHardDeleteTombstone verifies that tombstone rows with typed zero values
-// (from tombstoneValue) can be batch-inserted into a table with non-nullable
-// columns and are correctly hidden by FINAL + _is_deleted=0.
+// TestHardDeleteTombstone verifies that delete rows with _is_deleted=1
+// are correctly hidden by FINAL + _is_deleted=0.
 func TestHardDeleteTombstone(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -610,14 +607,9 @@ func TestHardDeleteTombstone(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, scanDocuments(t, rows), 1)
 
-	// Build a tombstone row using tombstoneValue for each value + document column,
-	// exactly as Store does.
+	// Store a delete row with full record values, exactly as Store does.
 	var converted []any
-	converted = append(converted, "k1") // key
-	for i := range table.Values {
-		converted = append(converted, tombstoneValue(table.Values[i]))
-	}
-	converted = append(converted, tombstoneValue(*table.Document))
+	converted = append(converted, "k1", "hello", "opt", true, int64(42), `{"id":"k1"}`)
 	converted = append(converted, uint64(2), uint8(1))
 
 	batch, err = conn.PrepareBatch(ctx, b.storeInsertSQL)
@@ -1010,13 +1002,10 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"tenant":"acme","id":1}`, docs[0])
 
-	// Store tombstone at higher version with _is_deleted=1.
+	// Store delete row at higher version with _is_deleted=1, using full record.
 	var converted []any
 	converted = append(converted, "acme", int64(1)) // keys
-	for i := range table.Values {
-		converted = append(converted, tombstoneValue(table.Values[i]))
-	}
-	converted = append(converted, tombstoneValue(*table.Document))
+	converted = append(converted, "val", `{"tenant":"acme","id":1}`)
 	converted = append(converted, uint64(2), uint8(1))
 
 	batch, err = conn.PrepareBatch(ctx, b.storeInsertSQL)

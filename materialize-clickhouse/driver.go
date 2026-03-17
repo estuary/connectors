@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -262,35 +261,6 @@ type binding struct {
 	storeInsertSQL string
 }
 
-// tombstoneZeroValues maps ClickHouse DDL types to their typed Go zero values.
-// The native batch driver is type-strict, so nil cannot be used for non-nullable
-// columns. Date/time types use the ClickHouse-minimum clamped values rather than
-// Go's time.Time{} which falls outside the valid ClickHouse range.
-var tombstoneZeroValues = map[string]any{
-	"Bool":    false,
-	"Int64":   int64(0),
-	"Float64": float64(0),
-	"Date32":  func() time.Time { t, _ := time.Parse(time.DateOnly, clickhouseMinimumDate); return t }(),
-}
-
-// tombstoneValue returns the value to insert for col in a hard-delete tombstone row.
-// Nullable columns get nil; non-nullable columns get a typed zero so the native
-// batch insert doesn't reject the row.
-func tombstoneValue(col sql.Column) any {
-	if !col.MustExist {
-		return nil
-	}
-	if v, ok := tombstoneZeroValues[col.DDL]; ok {
-		return v
-	}
-	if strings.HasPrefix(col.DDL, "DateTime64") {
-		t, _ := time.Parse(time.RFC3339Nano, clickhouseMinimumDatetime)
-		return t.UTC()
-	}
-	// String and all other DDL types.
-	return ""
-}
-
 func (t *transactor) addBinding(target sql.Table) error {
 	var b = &binding{target: target}
 
@@ -384,33 +354,19 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			lastBinding = it.Binding
 		}
 
+		if it.Delete && t.cfg.HardDelete && !it.Exists {
+			continue // nothing to delete if it was never stored
+		}
+
 		var converted []any
+		converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+		if err != nil {
+			return nil, fmt.Errorf("converting store parameters: %w", err)
+		}
 
 		if it.Delete && t.cfg.HardDelete {
-			// Hard delete: document existed, so insert a tombstone row with
-			// zero values and _is_deleted=1. ReplacingMergeTree will select
-			// this row as the latest version and hide it from FINAL queries.
-			// Non-nullable columns require typed zeros rather than nil.
-			if !it.Exists {
-				continue // nothing to delete if it was never stored
-			}
-			converted, err = b.target.ConvertKey(it.Key)
-			if err != nil {
-				return nil, fmt.Errorf("converting delete key: %w", err)
-			}
-			for i := range b.target.Values {
-				converted = append(converted, tombstoneValue(b.target.Values[i]))
-			}
-			if b.target.Document != nil {
-				converted = append(converted, tombstoneValue(*b.target.Document))
-			}
 			converted = append(converted, version, deleteTrue)
 		} else {
-			converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
-			if err != nil {
-				return nil, fmt.Errorf("converting store parameters: %w", err)
-			}
-			// _version and _is_deleted are always present
 			converted = append(converted, version, deleteFalse)
 		}
 
