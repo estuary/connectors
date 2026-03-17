@@ -345,6 +345,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	return nil
 }
 
+const (
+	deleteFalse uint8 = 0
+	deleteTrue  uint8 = 1
+)
+
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	var ctx = it.Context()
 	// Increment version before any stores. The version is persisted in the Flow
@@ -399,14 +404,14 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			if b.target.Document != nil {
 				converted = append(converted, tombstoneValue(*b.target.Document))
 			}
-			converted = append(converted, version, uint8(1))
+			converted = append(converted, version, deleteTrue)
 		} else {
 			converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 			if err != nil {
 				return nil, fmt.Errorf("converting store parameters: %w", err)
 			}
 			// _version and _is_deleted are always present
-			converted = append(converted, version, uint8(0))
+			converted = append(converted, version, deleteFalse)
 		}
 
 		if err := currentBatch.Append(converted...); err != nil {
