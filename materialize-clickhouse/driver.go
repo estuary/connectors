@@ -4,6 +4,7 @@ import (
 	"context"
 	stdsql "database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -329,38 +330,33 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	t.version++
 	var version = t.version
 
-	var lastBinding = -1
-	var currentBatch chdriver.Batch // nil until first binding is seen
+	batchByBinding := make(map[int]chdriver.Batch, 2)
+	abortAllBatches := func() {
+		for _, batch := range batchByBinding {
+			_ = batch.Abort()
+		}
+	}
 
 	for it.Next() {
-		var b = t.bindings[it.Binding]
-
-		if lastBinding != it.Binding {
-			// Binding changed: flush the previous batch and start a new one.
-			if currentBatch != nil {
-				if err := currentBatch.Send(); err != nil {
-					return nil, fmt.Errorf("flushing store batch: %w", err)
-				}
-				currentBatch = nil
-			}
-			// PrepareBatch parses the INSERT statement, appends "FORMAT Native",
-			// and holds a connection until Send() is called. The storeInsertSQL
-			// template emits only the column list (no VALUES clause), which is
-			// exactly what PrepareBatch expects.
-			currentBatch, err = t.store.conn.PrepareBatch(ctx, b.storeInsertSQL)
-			if err != nil {
-				return nil, fmt.Errorf("prepare store batch: %w", err)
-			}
-			lastBinding = it.Binding
-		}
-
 		if it.Delete && t.cfg.HardDelete && !it.Exists {
 			continue // nothing to delete if it was never stored
+		}
+
+		b := t.bindings[it.Binding]
+		batch, found := batchByBinding[it.Binding]
+		if !found {
+			batch, err = t.store.conn.PrepareBatch(ctx, b.storeInsertSQL)
+			if err != nil {
+				abortAllBatches()
+				return nil, fmt.Errorf("prepare store batch: %w", err)
+			}
+			batchByBinding[it.Binding] = batch
 		}
 
 		var converted []any
 		converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
+			abortAllBatches()
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
 
@@ -370,26 +366,14 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			converted = append(converted, version, deleteFalse)
 		}
 
-		if err := currentBatch.Append(converted...); err != nil {
-			// Append internally releases the connection on error; Abort is a
-			// belt-and-suspenders cleanup that marks the batch as sent.
-			_ = currentBatch.Abort()
-			currentBatch = nil
+		if err = batch.Append(converted...); err != nil {
+			abortAllBatches()
 			return nil, fmt.Errorf("store batch append: %w", err)
 		}
 	}
 	if it.Err() != nil {
-		if currentBatch != nil {
-			_ = currentBatch.Abort()
-		}
+		abortAllBatches()
 		return nil, it.Err()
-	}
-
-	if currentBatch != nil {
-		if err := currentBatch.Send(); err != nil {
-			return nil, fmt.Errorf("flushing final store batch: %w", err)
-		}
-		currentBatch = nil
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
@@ -397,9 +381,18 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		if err != nil {
 			return nil, m.FinishedOperation(fmt.Errorf("creating checkpoint json: %w", err))
 		}
-		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, m.RunAsyncOperation(func() error {
-			return nil
+
+		future := m.RunAsyncOperation(func() error {
+			var errs []error
+			for _, batch := range batchByBinding {
+				if err := batch.Send(); err != nil {
+					errs = append(errs, err)
+				}
+			}
+			return errors.Join(errs...)
 		})
+
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON}, future
 	}, nil
 }
 
