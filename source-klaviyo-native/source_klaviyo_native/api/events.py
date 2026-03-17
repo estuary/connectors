@@ -53,28 +53,29 @@ DEFAULT_BACKFILL_CONFIG = BackfillConfig()
 async def _fetch_events_updated_between(
     http: HTTPSession,
     log: Logger,
+    model: type[Events],
     start: datetime,
     end: datetime,
 ) -> AsyncGenerator[IncrementalStream, None]:
-    url = f"{BASE_URL}/{Events.path}"
+    url = f"{BASE_URL}/{model.path}"
 
     params: dict[str, str | int] = {
-        "sort": Events.cursor_field,
+        "sort": model.cursor_field,
         "filter": _construct_filter_param(
-            cursor_field=Events.cursor_field,
+            cursor_field=model.cursor_field,
             lower_bound_operator=LowerBoundOperator.GREATER_THAN,
             lower_bound=start,
             upper_bound_operator=UpperBoundOperator.LESS_OR_EQUAL,
             upper_bound=end,
-            additional_filters=Events.additional_filters,
+            additional_filters=model.additional_filters,
         )
     }
 
-    if Events.extra_params:
-        params.update(Events.extra_params)
+    if model.extra_params:
+        params.update(model.extra_params)
 
     async for doc in _paginate_through_resources(
-        http, url, params, Events, log,
+        http, url, params, model, log,
     ):
         yield doc
 
@@ -115,9 +116,11 @@ class WorkManager:
         self,
         http: HTTPSession,
         log: Logger,
+        model: type[Events],
     ):
         self.http = http
         self.log = log
+        self.model = model
 
         self.queue_manager = QueueManager(
             work_queue_size=DEFAULT_BACKFILL_CONFIG.work_queue_size,
@@ -193,6 +196,7 @@ class WorkManager:
                         log=self.log,
                         shutdown_event=self.shutdown_event,
                         document_queue=external_queue,
+                        model=self.model,
                     ),
                     name=task_name
                 )
@@ -252,6 +256,7 @@ async def chunk_worker(
     log: Logger,
     shutdown_event: asyncio.Event,
     document_queue: asyncio.Queue,
+    model: type[Events],
 ) -> None:
     try:
         log.debug(f"Event worker {worker_id} started.")
@@ -278,7 +283,7 @@ async def chunk_worker(
             is_divisible = chunk.end - chunk.start >= (SMALLEST_KLAVIYO_DATETIME_GRAIN * 3)
             is_dense_date_window = False
 
-            events_gen = _fetch_events_updated_between(http, log, chunk.start, chunk.end)
+            events_gen = _fetch_events_updated_between(http, log, model, chunk.start, chunk.end)
 
             async for event in events_gen:
                 event_cursor = event.get_cursor_value()
@@ -383,6 +388,7 @@ async def subdivision_worker(
 async def backfill_events(
     http: HTTPSession,
     window_size: timedelta,
+    model: type[Events],
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
@@ -401,6 +407,7 @@ async def backfill_events(
     work_manager = WorkManager(
         http=http,
         log=log,
+        model=model,
     )
 
     async def populate_queue() -> None:
