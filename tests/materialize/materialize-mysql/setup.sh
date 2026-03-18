@@ -167,6 +167,21 @@ resources_json_template='[
     "fields": {
       "recommended": true
     }
+  },
+  {
+    "resource": {
+      "table": "optional_non_nullable"
+    },
+    "source": "${TEST_COLLECTION_OPTIONAL_NON_NULLABLE}",
+    "fields": {
+      "recommended": true,
+      "include": {
+        "opt_str": {},
+        "opt_int": {},
+        "opt_nullable_str": {},
+        "opt_nullable_int": {}
+      }
+    }
   }
 ]'
 

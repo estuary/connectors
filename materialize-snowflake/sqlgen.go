@@ -290,7 +290,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 
 {{ define "loadQueryNoFlowDocument" }}
 SELECT {{ $.Table.Binding }}, 
-OBJECT_CONSTRUCT(
+OBJECT_CONSTRUCT_KEEP_NULL(
 {{- range $i, $col := $.Table.RootLevelColumns}}
 	{{- if $i}},{{end}}
 	{{Literal $col.Field}}, {{ template "uncast" (ColumnWithAlias $col $.Table.Identifier) }}

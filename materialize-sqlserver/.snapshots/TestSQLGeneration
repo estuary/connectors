@@ -228,7 +228,7 @@ SELECT 0,
 		'stringInteger39Chars' = CAST(r."stringInteger39Chars" AS NVARCHAR(MAX)),
 		'stringInteger66Chars' = CAST(r."stringInteger66Chars" AS NVARCHAR(MAX)),
 		'stringNumber' = CAST(r."stringNumber" AS NVARCHAR(MAX))
-	FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+	FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
 ) as flow_document
 FROM key_value AS r
 JOIN #flow_temp_load_0 AS l

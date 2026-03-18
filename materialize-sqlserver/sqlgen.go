@@ -345,7 +345,7 @@ SELECT {{ $.Binding }},
 			{{- if $i}},{{end}}
 		{{Literal $col.Field}} = {{ template "uncast" (ColumnWithAlias $col "r") }}
 		{{- end}}
-	FOR JSON PATH, WITHOUT_ARRAY_WRAPPER
+	FOR JSON PATH, INCLUDE_NULL_VALUES, WITHOUT_ARRAY_WRAPPER
 ) as flow_document
 FROM {{ $.Identifier}} AS r
 JOIN {{ template "temp_load_name" . }} AS l

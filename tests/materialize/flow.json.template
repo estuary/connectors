@@ -357,6 +357,21 @@
       },
       "key": ["/id"]
     },
+    "tests/optional-non-nullable": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "id": {"type": "integer"},
+          "required_val": {"type": "string"},
+          "opt_str": {"type": "string"},
+          "opt_int": {"type": "integer"},
+          "opt_nullable_str": {"type": ["string", "null"]},
+          "opt_nullable_int": {"type": ["integer", "null"]}
+        },
+        "required": ["id", "required_val"]
+      },
+      "key": ["/id"]
+    },
     "tests/perf-simple": {
       "schema": {
         "properties": {
