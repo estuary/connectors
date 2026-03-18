@@ -23,10 +23,9 @@ CREATE TABLE IF NOT EXISTS key_value (
 		`stringInteger66Chars` Nullable(String),
 		`stringNumber` Nullable(Float64),
 		flow_document String,
-		`_version` UInt64,
 		`_is_deleted` UInt8 DEFAULT 0
 )
-ENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)
+ENGINE = ReplacingMergeTree(`flow_published_at`, `_is_deleted`)
 ORDER BY (key1, key2, `key!binary`)
 SETTINGS
 	allow_experimental_replacing_merge_with_cleanup = 1,
@@ -41,10 +40,9 @@ CREATE TABLE IF NOT EXISTS delta_updates (
 		`theKey` String,
 		`aValue` Nullable(Int64),
 		flow_published_at DateTime64(6, 'UTC'),
-		`_version` UInt64,
 		`_is_deleted` UInt8 DEFAULT 0
 )
-ENGINE = ReplacingMergeTree(`_version`, `_is_deleted`)
+ENGINE = ReplacingMergeTree(`flow_published_at`, `_is_deleted`)
 ORDER BY (`theKey`)
 SETTINGS
 	allow_experimental_replacing_merge_with_cleanup = 1,
@@ -57,8 +55,7 @@ SETTINGS
 
 SELECT flow_document
 	FROM key_value FINAL
-	WHERE `_is_deleted` = 0
-	AND (key1, key2, `key!binary`) IN (?)
+	WHERE (key1, key2, `key!binary`) IN (?)
 
 --- End key_value loadQuery ---
 
@@ -70,13 +67,13 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 
 --- Begin key_value storeInsert ---
 
-INSERT INTO key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document, `_version`, `_is_deleted`
+INSERT INTO key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document, `_is_deleted`
 )
 --- End key_value storeInsert ---
 
 --- Begin delta_updates storeInsert ---
 
-INSERT INTO delta_updates (`theKey`, `aValue`, flow_published_at, `_version`, `_is_deleted`
+INSERT INTO delta_updates (`theKey`, `aValue`, flow_published_at, `_is_deleted`
 )
 --- End delta_updates storeInsert ---
 

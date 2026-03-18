@@ -28,7 +28,6 @@ Base Initial Constraints:
 Migratable Changes Before Apply Schema:
 {"Name":"_is_deleted","Type":"UInt8"}
 {"Name":"_meta/flow_truncated","Type":"Bool"}
-{"Name":"_version","Type":"UInt64"}
 {"Name":"boolWidenedToJson","Type":"Nullable(Bool)"}
 {"Name":"dateValue","Type":"Nullable(Date32)"}
 {"Name":"datetimeValue","Type":"Nullable(DateTime64(6, 'UTC'))"}
@@ -54,8 +53,8 @@ Migratable Changes Before Apply Schema:
 
 
 Migratable Changes Before Apply Data:
-key (String), _meta/flow_truncated (Bool), boolWidenedToJson (Nullable(Bool)), dateValue (Nullable(Date32)), datetimeValue (Nullable(DateTime64(6, 'UTC'))), fieldWithProjection (Nullable(String)), field_with_projection (Nullable(String)), flow_published_at (DateTime64(6, 'UTC')), int64 (Nullable(Int64)), int64ToNumber (Nullable(String)), intToNumber (Nullable(Int64)), intWidenedToJson (Nullable(Int64)), multiple (Nullable(String)), nonScalarValue (Nullable(String)), numericString (Nullable(String)), optional (Nullable(String)), requiredNumeric (String), scalarValue (String), stringAddMaxLength (Nullable(String)), stringIncreaseMaxLength (Nullable(String)), stringWidenedToJson (Nullable(String)), timeValue (Nullable(String)), flow_document (String), _version (UInt64), _is_deleted (UInt8)
-1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T01:01:01.111111Z, <nil>, <nil>, 2024-09-13T01:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, <nil>, <nil>, hello, 01:01:01, {}, 1, 0
+key (String), _meta/flow_truncated (Bool), boolWidenedToJson (Nullable(Bool)), dateValue (Nullable(Date32)), datetimeValue (Nullable(DateTime64(6, 'UTC'))), fieldWithProjection (Nullable(String)), field_with_projection (Nullable(String)), flow_published_at (DateTime64(6, 'UTC')), int64 (Nullable(Int64)), int64ToNumber (Nullable(String)), intToNumber (Nullable(Int64)), intWidenedToJson (Nullable(Int64)), multiple (Nullable(String)), nonScalarValue (Nullable(String)), numericString (Nullable(String)), optional (Nullable(String)), requiredNumeric (String), scalarValue (String), stringAddMaxLength (Nullable(String)), stringIncreaseMaxLength (Nullable(String)), stringWidenedToJson (Nullable(String)), timeValue (Nullable(String)), flow_document (String), _is_deleted (UInt8)
+1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T01:01:01.111111Z, <nil>, <nil>, 2024-09-13T01:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, <nil>, <nil>, hello, 01:01:01, {}, 0
 
 Migratable Changes Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -87,7 +86,6 @@ Migratable Changes Constraints:
 Migratable Changes Applied Schema:
 {"Name":"_is_deleted","Type":"UInt8"}
 {"Name":"_meta/flow_truncated","Type":"Bool"}
-{"Name":"_version","Type":"UInt64"}
 {"Name":"boolWidenedToJson","Type":"Nullable(Bool)"}
 {"Name":"dateValue","Type":"Nullable(Date32)"}
 {"Name":"datetimeValue","Type":"Nullable(DateTime64(6, 'UTC'))"}
@@ -113,6 +111,6 @@ Migratable Changes Applied Schema:
 
 
 Migratable Changes Applied Data:
-key (String), _meta/flow_truncated (Bool), boolWidenedToJson (Nullable(Bool)), dateValue (Nullable(Date32)), datetimeValue (Nullable(DateTime64(6, 'UTC'))), fieldWithProjection (Nullable(String)), field_with_projection (Nullable(String)), flow_published_at (DateTime64(6, 'UTC')), int64 (Nullable(Int64)), int64ToNumber (Nullable(String)), intToNumber (Nullable(Int64)), intWidenedToJson (Nullable(Int64)), multiple (Nullable(String)), nonScalarValue (Nullable(String)), numericString (Nullable(String)), optional (Nullable(String)), requiredNumeric (String), scalarValue (String), stringAddMaxLength (Nullable(String)), stringIncreaseMaxLength (Nullable(String)), stringWidenedToJson (Nullable(String)), timeValue (Nullable(String)), flow_document (String), _version (UInt64), _is_deleted (UInt8)
-1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T01:01:01.111111Z, <nil>, <nil>, 2024-09-13T01:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, <nil>, <nil>, hello, 01:01:01, {}, 1, 0
+key (String), _meta/flow_truncated (Bool), boolWidenedToJson (Nullable(Bool)), dateValue (Nullable(Date32)), datetimeValue (Nullable(DateTime64(6, 'UTC'))), fieldWithProjection (Nullable(String)), field_with_projection (Nullable(String)), flow_published_at (DateTime64(6, 'UTC')), int64 (Nullable(Int64)), int64ToNumber (Nullable(String)), intToNumber (Nullable(Int64)), intWidenedToJson (Nullable(Int64)), multiple (Nullable(String)), nonScalarValue (Nullable(String)), numericString (Nullable(String)), optional (Nullable(String)), requiredNumeric (String), scalarValue (String), stringAddMaxLength (Nullable(String)), stringIncreaseMaxLength (Nullable(String)), stringWidenedToJson (Nullable(String)), timeValue (Nullable(String)), flow_document (String), _is_deleted (UInt8)
+1, false, true, 2024-01-01T00:00:00Z, 2024-01-01T01:01:01.111111Z, <nil>, <nil>, 2024-09-13T01:01:01Z, 1, 10000000000000000000, 9223372036854775807, 999, <nil>, <nil>, 123, <nil>, 456, test, <nil>, <nil>, hello, 01:01:01, {}, 0
 

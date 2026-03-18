@@ -86,8 +86,8 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 			return fmt.Errorf("scanning column row: %w", err)
 		}
 
-		// Skip internal columns managed by the connector.
-		if colName == "_version" || colName == "_is_deleted" {
+		// Skip the internal column managed by the connector.
+		if colName == "_is_deleted" {
 			continue
 		}
 

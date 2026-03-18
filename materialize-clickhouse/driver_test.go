@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -143,8 +144,6 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 			values = append(values, "'2024-09-13 01:01:01'")
 			keys = append(keys, dialect.Identifier("flow_document"))
 			values = append(values, "'{}'")
-			keys = append(keys, "`_version`")
-			values = append(values, "1")
 			keys = append(keys, "`_is_deleted`")
 			values = append(values, "0")
 			q := fmt.Sprintf("INSERT INTO %s (%s) VALUES (%s)", dialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
@@ -219,8 +218,23 @@ func TestPrereqs(t *testing.T) {
 	}
 }
 
+var testTime = time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+
+// flowPublishedAtProjection is the standard Estuary metadata timestamp used as
+// the ReplacingMergeTree version column.
+var flowPublishedAtProjection = sql.Projection{
+	Projection: pf.Projection{
+		Field: "flow_published_at",
+		Inference: pf.Inference{
+			Types:   []string{"string"},
+			Exists:  pf.Inference_MUST,
+			String_: &pf.Inference_String{Format: "date-time"},
+		},
+	},
+}
+
 // buildTestTable constructs a resolved sql.Table with one string key ("id"),
-// one nullable string value ("value"), and a document column ("flow_document").
+// one nullable string value ("value"), flow_published_at, and a document column ("flow_document").
 func buildTestTable(t *testing.T, dialect sql.Dialect, tableName string) sql.Table {
 	t.Helper()
 
@@ -250,6 +264,7 @@ func buildTestTable(t *testing.T, dialect sql.Dialect, tableName string) sql.Tab
 					},
 				},
 			},
+			flowPublishedAtProjection,
 		},
 		Document: &sql.Projection{
 			Projection: pf.Projection{
@@ -303,8 +318,9 @@ func TestTruncateTable(t *testing.T) {
 	defer db.Close()
 
 	// Create a table and insert a row.
+	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	_, err := db.ExecContext(ctx, fmt.Sprintf(
-		"CREATE TABLE IF NOT EXISTS %s (id String, _version UInt64, _is_deleted UInt8 DEFAULT 0) ENGINE = ReplacingMergeTree(_version, _is_deleted) ORDER BY (id)",
+		"CREATE TABLE IF NOT EXISTS %s (id String, flow_published_at DateTime64(6, 'UTC'), _is_deleted UInt8 DEFAULT 0) ENGINE = ReplacingMergeTree(flow_published_at, _is_deleted) ORDER BY (id)",
 		dialect.Identifier(tableName),
 	))
 	require.NoError(t, err)
@@ -312,7 +328,7 @@ func TestTruncateTable(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	_, err = db.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s (id, _version) VALUES ('row1', 1)", dialect.Identifier(tableName)))
+	_, err = db.ExecContext(ctx, fmt.Sprintf("INSERT INTO %s (id, flow_published_at) VALUES ('row1', '2024-01-01 00:00:00')", dialect.Identifier(tableName)))
 	require.NoError(t, err)
 
 	c, err := newClient(ctx, "test", ep)
@@ -422,7 +438,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	// Store: insert a row via native batch.
 	batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "v1", `{"id":"k1"}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("k1", "v1", testTime, `{"id":"k1"}`, uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Load: query back the document via GroupSet IN parameter.
@@ -440,8 +456,9 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	require.NoError(t, batch.Append(
 		"k1",
 		nil,
+		testTime.Add(time.Second),
 		`{"id":"k1"}`,
-		uint64(0), uint8(1),
+		uint8(1),
 	))
 	require.NoError(t, batch.Send())
 
@@ -561,6 +578,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 					},
 				},
 			},
+			flowPublishedAtProjection,
 		},
 		Document: &sql.Projection{
 			Projection: pf.Projection{
@@ -598,7 +616,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	// Insert a live row.
 	batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "hello", "opt", true, int64(42), `{"id":"k1"}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("k1", "hello", "opt", true, int64(42), testTime, `{"id":"k1"}`, uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Verify it loads.
@@ -609,8 +627,8 @@ func TestHardDeleteTombstone(t *testing.T) {
 
 	// Store a delete row with full record values, exactly as Store does.
 	var converted []any
-	converted = append(converted, "k1", "hello", "opt", true, int64(42), `{"id":"k1"}`)
-	converted = append(converted, uint64(0), uint8(1))
+	converted = append(converted, "k1", "hello", "opt", true, int64(42), testTime.Add(time.Second), `{"id":"k1"}`)
+	converted = append(converted, uint8(1))
 
 	batch, err = conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
@@ -694,6 +712,7 @@ func buildCompositeKeyTable(t *testing.T, dialect sql.Dialect, tableName string)
 					},
 				},
 			},
+			flowPublishedAtProjection,
 		},
 		Document: &sql.Projection{
 			Projection: pf.Projection{
@@ -741,9 +760,9 @@ func TestLoadMultipleKeys(t *testing.T) {
 	// Store 3 rows.
 	batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "v1", `{"id":"k1"}`, uint64(0), uint8(0)))
-	require.NoError(t, batch.Append("k2", "v2", `{"id":"k2"}`, uint64(0), uint8(0)))
-	require.NoError(t, batch.Append("k3", "v3", `{"id":"k3"}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("k1", "v1", testTime, `{"id":"k1"}`, uint8(0)))
+	require.NoError(t, batch.Append("k2", "v2", testTime, `{"id":"k2"}`, uint8(0)))
+	require.NoError(t, batch.Append("k3", "v3", testTime, `{"id":"k3"}`, uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Load all 3 keys.
@@ -799,9 +818,9 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 	// Store 3 rows with composite keys: (tenant, id).
 	batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("acme", int64(1), "v1", `{"tenant":"acme","id":1}`, uint64(0), uint8(0)))
-	require.NoError(t, batch.Append("acme", int64(2), "v2", `{"tenant":"acme","id":2}`, uint64(0), uint8(0)))
-	require.NoError(t, batch.Append("beta", int64(1), "v3", `{"tenant":"beta","id":1}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("acme", int64(1), "v1", testTime, `{"tenant":"acme","id":1}`, uint8(0)))
+	require.NoError(t, batch.Append("acme", int64(2), "v2", testTime, `{"tenant":"acme","id":2}`, uint8(0)))
+	require.NoError(t, batch.Append("beta", int64(1), "v3", testTime, `{"tenant":"beta","id":1}`, uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Load (acme,1) → doc1.
@@ -841,10 +860,9 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 }
 
 // TestVersionDeduplication verifies that when multiple inserts for the same key
-// all use _version=0 (as Store does), querying with FINAL returns the most
-// recently inserted row. Per the ReplacingMergeTree docs: "if ver is the same
-// for several rows, then it will use 'if ver is not specified' rule for them,
-// i.e. the most recent inserted row will remain."
+// have increasing flow_published_at timestamps, querying with FINAL returns the
+// row with the highest timestamp. Per the ReplacingMergeTree docs: the row with
+// the maximum version value is retained at merge time.
 func TestVersionDeduplication(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -856,12 +874,13 @@ func TestVersionDeduplication(t *testing.T) {
 	b, conn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Simulate 3 successive Store commits for the same key, each in a separate
-	// batch (separate insert/part) so that insertion order is well-defined.
+	// batch (separate insert/part) with increasing flow_published_at timestamps.
 	for seq := 1; seq <= 3; seq++ {
 		batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 		require.NoError(t, err)
 		doc := fmt.Sprintf(`{"id":"k1","seq":%d}`, seq)
-		require.NoError(t, batch.Append("k1", fmt.Sprintf("v%d", seq), doc, uint64(0), uint8(0)))
+		ts := testTime.Add(time.Duration(seq) * time.Second)
+		require.NoError(t, batch.Append("k1", fmt.Sprintf("v%d", seq), ts, doc, uint8(0)))
 		require.NoError(t, batch.Send())
 	}
 
@@ -892,9 +911,9 @@ func TestStoreBatchMultipleRows(t *testing.T) {
 	// Single PrepareBatch, append 3 rows, then Send.
 	batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "v1", `{"id":"k1"}`, uint64(0), uint8(0)))
-	require.NoError(t, batch.Append("k2", "v2", `{"id":"k2"}`, uint64(0), uint8(0)))
-	require.NoError(t, batch.Append("k3", "v3", `{"id":"k3"}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("k1", "v1", testTime, `{"id":"k1"}`, uint8(0)))
+	require.NoError(t, batch.Append("k2", "v2", testTime, `{"id":"k2"}`, uint8(0)))
+	require.NoError(t, batch.Append("k3", "v3", testTime, `{"id":"k3"}`, uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Load all 3 → all present.
@@ -957,13 +976,13 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	// Store a row into table A.
 	batch, err := conn.PrepareBatch(ctx, bA.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("keyA", "valA", `{"id":"keyA"}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("keyA", "valA", testTime, `{"id":"keyA"}`, uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Store a row into table B.
 	batch, err = conn.PrepareBatch(ctx, bB.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("keyB", "valB", `{"id":"keyB"}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("keyB", "valB", testTime, `{"id":"keyB"}`, uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Load from table A → correct doc.
@@ -1002,7 +1021,7 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	// Store a live row (acme, 1).
 	batch, err := conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)
-	require.NoError(t, batch.Append("acme", int64(1), "val", `{"tenant":"acme","id":1}`, uint64(0), uint8(0)))
+	require.NoError(t, batch.Append("acme", int64(1), "val", testTime, `{"tenant":"acme","id":1}`, uint8(0)))
 	require.NoError(t, batch.Send())
 
 	// Load → present.
@@ -1016,8 +1035,8 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	// Store delete row with _is_deleted=1, using full record.
 	var converted []any
 	converted = append(converted, "acme", int64(1)) // keys
-	converted = append(converted, "val", `{"tenant":"acme","id":1}`)
-	converted = append(converted, uint64(0), uint8(1))
+	converted = append(converted, "val", testTime.Add(time.Second), `{"tenant":"acme","id":1}`)
+	converted = append(converted, uint8(1))
 
 	batch, err = conn.PrepareBatch(ctx, b.storeInsertSQL)
 	require.NoError(t, err)

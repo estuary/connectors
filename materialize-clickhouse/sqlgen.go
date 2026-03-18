@@ -111,11 +111,10 @@ func renderTemplates(dialect sql.Dialect) templates {
 -- Templated creation of a materialized table definition.
 -- ClickHouse is an "append-only" database. We use ReplacingMergeTree so that
 -- multiple versions of an Estuary key (as ClickHouse ORDER BY key) can exist
--- concurrently, with monotonically increasing values in the _version column.
+-- concurrently, with monotonically increasing flow_published_at timestamps.
 -- Primary keys are deduplicated in a background ClickHouse process, but queries
--- must use the FINAL qualifier, which (1) deduplicates the order by key,
--- selecting the highest _version row per key but (2) does NOT exclude rows
--- where _is_deleted != 0.
+-- must use the FINAL qualifier, which deduplicates per ORDER BY key (selecting
+-- the highest flow_published_at record) and excludes rows where _is_deleted = 1.
 --
 -- The SETTINGS block enables automatic background CLEANUP merges:
 --   allow_experimental_replacing_merge_with_cleanup: enables the CLEANUP merge
@@ -140,10 +139,9 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{- range $ind, $col := $.Columns }}
 		{{$col.Identifier}} {{ if not $col.MustExist }}Nullable({{ end }}{{$col.DDL}}{{ if not $col.MustExist }}){{ end }},
 	{{- end }}
-		`+"`_version`"+` UInt64,
 		`+"`_is_deleted`"+` UInt8 DEFAULT 0
 )
-ENGINE = ReplacingMergeTree(`+"`_version`"+`, `+"`_is_deleted`"+`)
+ENGINE = ReplacingMergeTree(`+"`flow_published_at`"+`, `+"`_is_deleted`"+`)
 ORDER BY (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{ end -}}
@@ -159,14 +157,13 @@ SETTINGS
 
 -- Templated query which looks up existing documents by primary key using a native
 -- IN (?) parameter. The caller passes a []clickhouse.GroupSet of key tuples.
--- FINAL deduplicates per-key at query time; WHERE _is_deleted=0 excludes tombstones.
+-- FINAL deduplicates per-key and omits deleted records at query time.
 
 {{ define "loadQuery" }}
 {{ if $.Document -}}
 SELECT {{$.Document.Identifier}}
 	FROM {{$.Identifier}} FINAL
-	WHERE `+"`_is_deleted`"+` = 0
-	AND (
+	WHERE (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{ end -}}
 		{{$key.Identifier}}
@@ -178,7 +175,7 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 {{ end }}
 
 -- Templated INSERT for storing documents into the target table.
--- Always includes _version and _is_deleted for ReplacingMergeTree deduplication.
+-- Always includes _is_deleted for ReplacingMergeTree deduplication.
 
 {{ define "storeInsert" }}
 INSERT INTO {{$.Identifier}} (
@@ -186,7 +183,7 @@ INSERT INTO {{$.Identifier}} (
 		{{- if $ind }}, {{ end -}}
 		{{$col.Identifier}}
 	{{- end -}}
-	, `+"`_version`"+`, `+"`_is_deleted`"+`
+	, `+"`_is_deleted`"+`
 )
 {{ end }}
 

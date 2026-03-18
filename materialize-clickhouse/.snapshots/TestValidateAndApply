@@ -118,7 +118,6 @@ Big Schema Changed Types Constraints:
 Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"_is_deleted","Type":"UInt8"}
 {"Name":"_meta/flow_truncated","Type":"Bool"}
-{"Name":"_version","Type":"UInt64"}
 {"Name":"arrayField","Type":"String"}
 {"Name":"boolField","Type":"Bool"}
 {"Name":"flow_document","Type":"String"}
@@ -158,7 +157,6 @@ Big Schema Materialized Resource Schema With All Fields Required:
 Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"_is_deleted","Type":"UInt8"}
 {"Name":"_meta/flow_truncated","Type":"Bool"}
-{"Name":"_version","Type":"UInt64"}
 {"Name":"arrayField","Type":"Nullable(String)"}
 {"Name":"boolField","Type":"Nullable(Bool)"}
 {"Name":"flow_document","Type":"String"}
@@ -237,7 +235,6 @@ Big Schema Changed Types With Table Replacement Constraints:
 Big Schema Materialized Resource Schema Changed Types With Table Replacement:
 {"Name":"_is_deleted","Type":"UInt8"}
 {"Name":"_meta/flow_truncated","Type":"Bool"}
-{"Name":"_version","Type":"UInt64"}
 {"Name":"arrayField","Type":"String"}
 {"Name":"boolField","Type":"Int64"}
 {"Name":"flow_document","Type":"String"}
@@ -278,7 +275,6 @@ Big Schema Materialized Resource Schema Changed Types With Table Replacement:
 add a single field:
 {"Name":"_is_deleted","Type":"UInt8"}
 {"Name":"_meta/flow_truncated","Type":"Bool"}
-{"Name":"_version","Type":"UInt64"}
 {"Name":"addedOptionalString","Type":"Nullable(String)"}
 {"Name":"flow_document","Type":"String"}
 {"Name":"flow_published_at","Type":"DateTime64(6, 'UTC')"}
@@ -295,7 +291,6 @@ add a single field:
 remove a single optional field:
 {"Name":"_is_deleted","Type":"UInt8"}
 {"Name":"_meta/flow_truncated","Type":"Bool"}
-{"Name":"_version","Type":"UInt64"}
 {"Name":"flow_document","Type":"String"}
 {"Name":"flow_published_at","Type":"DateTime64(6, 'UTC')"}
 {"Name":"key","Type":"String"}
@@ -311,7 +306,6 @@ remove a single optional field:
 remove a single required field:
 {"Name":"_is_deleted","Type":"UInt8"}
 {"Name":"_meta/flow_truncated","Type":"Bool"}
-{"Name":"_version","Type":"UInt64"}
 {"Name":"flow_document","Type":"String"}
 {"Name":"flow_published_at","Type":"DateTime64(6, 'UTC')"}
 {"Name":"key","Type":"String"}
@@ -327,7 +321,6 @@ remove a single required field:
 add and remove many fields:
 {"Name":"_is_deleted","Type":"UInt8"}
 {"Name":"_meta/flow_truncated","Type":"Bool"}
-{"Name":"_version","Type":"UInt64"}
 {"Name":"addedOptionalString","Type":"Nullable(String)"}
 {"Name":"addedRequiredString","Type":"Nullable(String)"}
 {"Name":"flow_document","Type":"String"}
@@ -350,7 +343,6 @@ Challenging Field Names Materialized Columns:
 {"Name":"123startsWithDigits","Type":"Nullable(String)"}
 {"Name":"_id","Type":"String"}
 {"Name":"_is_deleted","Type":"UInt8"}
-{"Name":"_version","Type":"UInt64"}
 {"Name":"a\"string`with`quote'characters","Type":"Nullable(String)"}
 {"Name":"flow_document","Type":"String"}
 {"Name":"flow_published_at","Type":"DateTime64(6, 'UTC')"}

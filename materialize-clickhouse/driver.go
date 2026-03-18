@@ -321,9 +321,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	const (
-		deleteFalse uint8  = 0
-		deleteTrue  uint8  = 1
-		versionZero uint64 = 0
+		deleteFalse uint8 = 0
+		deleteTrue  uint8 = 1
 	)
 
 	batchByBinding := make(map[int]chdriver.Batch, 2)
@@ -360,7 +359,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		if it.Delete && t.cfg.HardDelete {
 			deleteState = deleteTrue
 		}
-		converted = append(converted, versionZero, deleteState)
+		converted = append(converted, deleteState)
 
 		if err = batch.Append(converted...); err != nil {
 			abortAllBatches()
