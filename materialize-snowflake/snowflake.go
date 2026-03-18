@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"slices"
 	"strings"
@@ -21,7 +20,7 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
-	sf "github.com/snowflakedb/gosnowflake"
+	sf "github.com/snowflakedb/gosnowflake/v2"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
 )
@@ -480,7 +479,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// NB: Not using groupCtx here since the Go Snowflake driver
 			// retains contexts internally, and the group context is cancelled
 			// after group.Wait() returns.
-			rows, err := d.db.QueryContext(sf.WithStreamDownloader(ctx), query)
+			rows, err := d.db.QueryContext(ctx, query)
 			if err != nil {
 				return fmt.Errorf("querying Load documents: %w", err)
 			}
@@ -1176,6 +1175,6 @@ func main() {
 	// gosnowflake also uses logrus for logging and the logs it produces may be confusing when
 	// intermixed with our connector logs. We disable the gosnowflake logger here and log as needed
 	// when handling errors from the sql driver.
-	sf.GetLogger().SetOutput(io.Discard)
+	sf.GetLogger().SetLogLevel("OFF")
 	boilerplate.RunMain(newSnowflakeDriver())
 }
