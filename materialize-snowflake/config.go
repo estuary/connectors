@@ -12,7 +12,7 @@ import (
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	log "github.com/sirupsen/logrus"
-	sf "github.com/snowflakedb/gosnowflake"
+	sf "github.com/snowflakedb/gosnowflake/v2"
 )
 
 var featureFlagDefaults = map[string]bool{

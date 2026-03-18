@@ -5,12 +5,11 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"fmt"
-	"io"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
-	"github.com/snowflakedb/gosnowflake"
+	"github.com/snowflakedb/gosnowflake/v2"
 )
 
 func connectSnowflake(ctx context.Context, cfg *config) (*sql.DB, error) {
@@ -24,7 +23,7 @@ func connectSnowflake(ctx context.Context, cfg *config) (*sql.DB, error) {
 	// we don't actually want in our task logs. A Snowflake query failing is
 	// not necessarily an error that the user needs to be told about, and when
 	// it is our normal error propagation will handle it.
-	gosnowflake.GetLogger().SetOutput(io.Discard)
+	gosnowflake.GetLogger().SetLogLevel("OFF")
 
 	dsn, err := cfg.ToURI()
 	if err != nil {
