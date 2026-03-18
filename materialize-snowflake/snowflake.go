@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -824,17 +825,39 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// NB: Not using groupTx here since the Go Snowflake driver
 				// retains contexts internally, and groupCtx is cancelled after
 				// group.Wait() returns.
-				result, err := d.db.ExecContext(ctx, item.Query)
-				if err != nil {
-					return fmt.Errorf("query %q failed: %w", item.Query, err)
+				if strings.HasPrefix(item.Query, "\nMERGE INTO") {
+					conn, err := d.db.Conn(ctx)
+					if err != nil {
+						return fmt.Errorf("getting connection for MERGE INTO: %w", err)
+					}
+					defer conn.Close()
+
+					var queryID string
+					err = conn.Raw(func(x any) error {
+						stmt, err := x.(driver.ConnPrepareContext).PrepareContext(ctx, item.Query)
+						if err != nil {
+							return err
+						}
+						result, err := stmt.(driver.StmtExecContext).ExecContext(ctx, nil)
+						if err != nil {
+							return err
+						}
+						queryID = result.(sf.SnowflakeResult).GetQueryID()
+						return nil
+					})
+					if err != nil {
+						return fmt.Errorf("running ack query: %w", err)
+					}
+
+					logMergePartitionStats(ctx, d.db, queryID, item.Table)
+				} else {
+					if _, err := d.db.ExecContext(ctx, item.Query); err != nil {
+						return fmt.Errorf("running ack query: %w", err)
+					}
 				}
 
 				d.be.FinishedResourceCommit(path)
 
-				// Log partition scan stats for merge observability.
-				if sfResult, ok := result.(sf.SnowflakeResult); ok {
-					logMergePartitionStats(ctx, d.db, sfResult.GetQueryID(), path)
-				}
 				if err := d.deleteFiles(groupCtx, []string{item.StagedDir}); err != nil {
 					return fmt.Errorf("cleaning up files: %w", err)
 				}
@@ -1151,20 +1174,22 @@ func (d *transactor) Destroy() {
 	d.db.Close()
 }
 
-func logMergePartitionStats(ctx context.Context, db *stdsql.DB, queryID string, path []string) {
+func logMergePartitionStats(ctx context.Context, db *stdsql.DB, queryID string, table string) {
 	var scanned, total stdsql.NullInt64
 	row := db.QueryRowContext(ctx,
-		`SELECT PARTITIONS_SCANNED, PARTITIONS_TOTAL
-         FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION(RESULT_LIMIT => 20))
-         WHERE QUERY_ID = ?`,
+		`SELECT SUM(VALUE:"partitions_scanned"::INT), SUM(VALUE:"partitions_total"::INT)
+         FROM TABLE(GET_QUERY_OPERATOR_STATS(?)),
+         LATERAL FLATTEN(INPUT => operator_statistics)
+         WHERE VALUE:"partitions_scanned" IS NOT NULL`,
 		queryID,
 	)
 	if err := row.Scan(&scanned, &total); err != nil {
-		log.WithField("query_id", queryID).WithError(err).Debug("could not fetch merge partition stats")
+		log.WithField("query_id", queryID).WithError(err).Warn("could not fetch merge partition stats")
 		return
 	}
+
 	log.WithFields(log.Fields{
-		"table":              path,
+		"table":              table,
 		"query_id":           queryID,
 		"partitions_scanned": scanned.Int64,
 		"partitions_total":   total.Int64,
