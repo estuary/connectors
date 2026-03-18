@@ -197,7 +197,8 @@ func (t *transactor) openDB() (*stdsql.DB, error) {
 }
 
 type binding struct {
-	target sql.Table
+	target            sql.Table
+	nullFieldsToStrip []string
 
 	// path to where we store staging files
 	rootStagingPath string
@@ -217,6 +218,10 @@ type binding struct {
 
 func (t *transactor) addBinding(target sql.Table) error {
 	var b = &binding{target: target}
+
+	if t.cfg.Advanced.NoFlowDocument {
+		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+	}
 
 	b.rootStagingPath = fmt.Sprintf("/Volumes/%s/%s/%s/flow_temp_tables", t.cfg.CatalogName, target.Path[0], volumeName)
 
@@ -313,7 +318,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			if err = rows.Scan(&binding, &document); err != nil {
 				return fmt.Errorf("scanning Load document: %w", err)
 			} else if binding > -1 {
-				if err = loaded(binding, json.RawMessage([]byte(document))); err != nil {
+				doc := json.RawMessage([]byte(document))
+				if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
+					doc = sql.StripNullFields(doc, b.nullFieldsToStrip)
+				}
+				if err = loaded(binding, doc); err != nil {
 					return err
 				}
 			}

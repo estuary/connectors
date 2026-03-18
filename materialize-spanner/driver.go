@@ -268,6 +268,7 @@ type transactor struct {
 // spannerBinding represents a materialized binding with its configuration
 type spannerBinding struct {
 	target             sql.Table
+	nullFieldsToStrip  []string
 	createLoadTableSQL string
 	loadQuerySQL       string
 	dropLoadTableSQL   string
@@ -491,6 +492,10 @@ func newTransactor(
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
 	b := &spannerBinding{target: target}
+
+	if t.cfg.Advanced.NoFlowDocument {
+		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+	}
 
 	// Render createLoadTable template
 	createLoadTableSQL, err := sql.RenderTableTemplate(target, t.templates.createLoadTable)
@@ -754,6 +759,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 		}
 
+		if b := t.bindings[int(bindingNum)]; len(b.nullFieldsToStrip) > 0 {
+			rawDoc = sql.StripNullFields(rawDoc, b.nullFieldsToStrip)
+		}
 		loadedCount++
 		return loaded(int(bindingNum), rawDoc)
 	})

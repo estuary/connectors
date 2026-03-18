@@ -59,6 +59,7 @@ export TEST_COLLECTION_ALL_KEY_TYPES_PART_THREE="tests/all-key-types-part-three"
 export TEST_COLLECTION_TIMEZONE_DATETIMES="tests/timezone-datetimes"
 export TEST_COLLECTION_FIELDS_WITH_PROJECTIONS="tests/fields-with-projections"
 export TEST_COLLECTION_MANY_COLUMNS="tests/many-columns"
+export TEST_COLLECTION_OPTIONAL_NON_NULLABLE="tests/optional-non-nullable"
 export TEST_COLLECTION_PERF_SIMPLE="tests/perf-simple"
 export TEST_COLLECTION_PERF_UUID_KEY="tests/perf-uuid-key"
 

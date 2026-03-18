@@ -424,6 +424,8 @@ type binding struct {
 	tempLoadTableName  string
 	tempLoadTruncate   string
 
+	nullFieldsToStrip []string
+
 	createStoreTableSQL string
 	tempStoreTableName  string
 	tempStoreTruncate   string
@@ -432,7 +434,7 @@ type binding struct {
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, featureFlags map[string]bool) error {
-	var b = &binding{target: target}
+	var b = &binding{target: target, nullFieldsToStrip: target.NullableFieldsToStrip()}
 
 	// Choose the appropriate load query template based on configuration
 	var loadQueryTemplate *template.Template
@@ -559,7 +561,12 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		if err = rows.Scan(&binding, &document); err != nil {
 			return fmt.Errorf("scanning Load document: %w", err)
-		} else if err = loaded(binding, json.RawMessage([]byte(document))); err != nil {
+		}
+		doc := json.RawMessage([]byte(document))
+		if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
+			doc = sql.StripNullFields(doc, b.nullFieldsToStrip)
+		}
+		if err = loaded(binding, doc); err != nil {
 			return err
 		}
 	}

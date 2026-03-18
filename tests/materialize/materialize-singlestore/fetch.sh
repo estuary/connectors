@@ -24,4 +24,5 @@ exportToJsonl "fields_with_projections"
 exportToJsonl "many_columns"
 exportToJsonl "timezone_datetimes_standard"
 exportToJsonl "timezone_datetimes_delta"
+exportToJsonl "optional_non_nullable"
 

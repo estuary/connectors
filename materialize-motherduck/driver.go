@@ -119,21 +119,26 @@ func newTransactor(
 	for idx, target := range bindings {
 		t.loadFiles.AddBinding(idx, target.KeyNames())
 		t.storeFiles.AddBinding(idx, append(target.ColumnNames(), "_flow_delete"))
-		t.bindings = append(t.bindings, &binding{
+		b := &binding{
 			target:           target,
 			loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal),
 			storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal),
-		})
+		}
+		if cfg.Advanced.NoFlowDocument {
+			b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		}
+		t.bindings = append(t.bindings, b)
 	}
 
 	return t, nil
 }
 
 type binding struct {
-	target           sql.Table
-	mustMerge        bool
-	loadMergeBounds  *sql.MergeBoundsBuilder
-	storeMergeBounds *sql.MergeBoundsBuilder
+	target            sql.Table
+	nullFieldsToStrip []string
+	mustMerge         bool
+	loadMergeBounds   *sql.MergeBoundsBuilder
+	storeMergeBounds  *sql.MergeBoundsBuilder
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
@@ -264,7 +269,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 			return fmt.Errorf("scanning loaded document from file: %w", err)
 		}
-		if err = loaded(doc.Binding, doc.Doc); err != nil {
+		loadDoc := doc.Doc
+		if b := d.bindings[doc.Binding]; len(b.nullFieldsToStrip) > 0 {
+			loadDoc = sql.StripNullFields(loadDoc, b.nullFieldsToStrip)
+		}
+		if err = loaded(doc.Binding, loadDoc); err != nil {
 			return fmt.Errorf("sending loaded document: %w", err)
 		}
 		loadedCount += 1
