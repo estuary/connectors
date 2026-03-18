@@ -14,7 +14,7 @@ import (
 	"os"
 	"strings"
 
-	sf "github.com/snowflakedb/gosnowflake"
+	sf "github.com/snowflakedb/gosnowflake/v2"
 )
 
 func mustDSN() string {
