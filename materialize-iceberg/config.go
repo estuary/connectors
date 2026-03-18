@@ -12,6 +12,7 @@ import (
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	emr "github.com/aws/aws-sdk-go-v2/service/emrserverless"
+	"github.com/aws/aws-sdk-go-v2/service/glue"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/cespare/xxhash/v2"
 	"github.com/estuary/connectors/go/auth/iam"
@@ -47,7 +48,26 @@ type config struct {
 	Schedule              m.ScheduleConfig      `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 	DBTJobTrigger         dbt.JobConfig         `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
-	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+	Advanced       advancedConfig       `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+	GlueOptimizers glueOptimizersConfig `json:"glue_optimizers,omitempty" jsonschema:"title=Glue Table Optimizers,description=Configure AWS Glue managed table optimizers for compaction, snapshot retention, and orphan file deletion. Only applicable when using AWS Glue as the catalog."`
+}
+
+// glueOptimizersConfig controls AWS Glue's native table optimizer service.
+// Enabling any optimizer will cause the connector to register it with Glue at
+// table creation time and keep it up to date when the connector configuration
+// is applied.
+type glueOptimizersConfig struct {
+	ExecutionRoleArn          string `json:"execution_role_arn,omitempty" jsonschema:"title=Execution Role ARN,description=IAM role ARN that Glue assumes to perform table optimization. The role must have permissions to read/write table data in S3 and access the Glue catalog." jsonschema_extras:"order=0"`
+	EnableCompaction          bool   `json:"enable_compaction,omitempty" jsonschema:"title=Enable Compaction,description=Enable automatic compaction of small Iceberg data files to improve query performance." jsonschema_extras:"order=1"`
+	EnableRetention           bool   `json:"enable_retention,omitempty" jsonschema:"title=Enable Snapshot Retention,description=Enable automatic removal of old Iceberg table snapshots to reduce storage costs." jsonschema_extras:"order=2"`
+	SnapshotRetentionDays     int    `json:"snapshot_retention_days,omitempty" jsonschema:"title=Snapshot Retention Days,description=Number of days to retain Iceberg snapshots. Uses the Glue default of 5 if unset." jsonschema_extras:"order=3"`
+	NumberOfSnapshotsToRetain int    `json:"number_of_snapshots_to_retain,omitempty" jsonschema:"title=Number of Snapshots to Retain,description=Minimum number of Iceberg snapshots to retain regardless of the retention period. Uses the Glue default of 1 if unset." jsonschema_extras:"order=4"`
+	EnableOrphanFileDeletion  bool   `json:"enable_orphan_file_deletion,omitempty" jsonschema:"title=Enable Orphan File Deletion,description=Enable automatic deletion of files that are no longer referenced by any table snapshot." jsonschema_extras:"order=5"`
+	OrphanFileRetentionDays   int    `json:"orphan_file_retention_days,omitempty" jsonschema:"title=Orphan File Retention Days,description=Number of days to retain orphan files before deletion. Uses the Glue default of 3 if unset." jsonschema_extras:"order=6"`
+}
+
+func (c glueOptimizersConfig) anyEnabled() bool {
+	return c.EnableCompaction || c.EnableRetention || c.EnableOrphanFileDeletion
 }
 
 type advancedConfig struct {
@@ -92,6 +112,19 @@ func (c config) Validate() error {
 	if c.Compute.ComputeType == computeTypeEmrServerless && catalogAuth.AuthType == catalogAuthTypeClientCredential {
 		if c.Compute.emrConfig.SystemsManagerPrefix == "" {
 			return fmt.Errorf("must specify Systems Manager Prefix for AWS EMR Serverless compute with Client Credentials catalog authentication")
+		}
+	}
+
+	if c.GlueOptimizers.anyEnabled() {
+		if c.GlueOptimizers.ExecutionRoleArn == "" {
+			return fmt.Errorf("glue_optimizers.execution_role_arn is required when any Glue table optimizer is enabled")
+		}
+		signingName, err := SigningName(c.URL)
+		if err != nil {
+			return fmt.Errorf("Glue table optimizers are only supported when using AWS Glue as the catalog: %w", err)
+		}
+		if signingName != "glue" {
+			return fmt.Errorf("Glue table optimizers are only supported when using AWS Glue as the catalog")
 		}
 	}
 
@@ -526,9 +559,46 @@ func (c config) toSsmClient(ctx context.Context) (*ssm.Client, error) {
 	return ssm.NewFromConfig(*awsCfg), nil
 }
 
+func (c config) toGlueClient(ctx context.Context) (*glue.Client, error) {
+	catalogAuth, err := c.CatalogAuthConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	var credProvider aws.CredentialsProvider
+	var region string
+
+	switch catalogAuth.AuthType {
+	case catalogAuthTypeSigV4:
+		cfg := catalogAuth.catalogAuthSigV4Config
+		credProvider = credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, "")
+		region = cfg.AWSRegion
+	case catalogAuthTypeAWSIAM:
+		var err error
+		credProvider, err = catalogAuth.IAMTokens.AWSCredentialsProvider()
+		if err != nil {
+			return nil, err
+		}
+		region = catalogAuth.AWSRegion
+	default:
+		return nil, fmt.Errorf("Glue optimizers require AWS credentials (SigV4 or IAM), not %q", catalogAuth.AuthType)
+	}
+
+	awsCfg, err := awsConfig.LoadDefaultConfig(ctx,
+		awsConfig.WithCredentialsProvider(credProvider),
+		awsConfig.WithRegion(region),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return glue.NewFromConfig(awsCfg), nil
+}
+
 type resource struct {
-	Table     string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
-	Namespace string `json:"namespace,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative Namespace for this table (optional)." jsonschema_extras:"x-schema-name=true"`
+	Table                     string            `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
+	Namespace                 string            `json:"namespace,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative Namespace for this table (optional)." jsonschema_extras:"x-schema-name=true"`
+	AdditionalTableProperties map[string]string `json:"additional_table_properties,omitempty" jsonschema:"title=Additional Table Properties,description=Additional Iceberg table properties to set when the table is created. These are set only at creation time and cannot be changed afterwards. Example: {'write.parquet.compression-codec': 'zstd'}"`
 }
 
 func (r resource) Validate() error {

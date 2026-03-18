@@ -15,6 +15,11 @@ $defs:
         description: Row ID of the Document, counting up from zero, or -1 if not known
         title: Row Id
         type: integer
+      project_id:
+        default: -1
+        description: The PostHog project this document belongs to
+        title: Project Id
+        type: integer
     title: Meta
     type: object
 additionalProperties: true
@@ -30,9 +35,16 @@ properties:
     format: date-time
     title: Created At
     type: string
+  last_seen_at:
+    anyOf:
+    - format: date-time
+      type: string
+    - type: 'null'
+    title: Last Seen At
 required:
 - id
 - created_at
+- last_seen_at
 title: Person
 type: object
 x-infer-schema: true

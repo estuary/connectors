@@ -41,7 +41,7 @@ type client struct {
 }
 
 func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	dsnWithSchema, err := ep.Config.toURI(true)
+	dsnWithSchema, err := ep.Config.toURI(true, materializationName)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +51,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 		return nil, err
 	}
 
-	dsnNoSchema, err := ep.Config.toURI(false)
+	dsnNoSchema, err := ep.Config.toURI(false, materializationName)
 	if err != nil {
 		return nil, err
 	}
@@ -260,7 +260,7 @@ func (c *client) CreateSchema(ctx context.Context, schemaName string) (string, e
 func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	dsn, err := cfg.toURI(false)
+	dsn, err := cfg.toURI(false, "")
 	if err != nil {
 		errs.Err(err)
 		return errs

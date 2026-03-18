@@ -18,7 +18,6 @@ from .models import (
 )
 
 
-RESPONSE_LIMIT = 50000
 # Event data for a given hour isn't available via the API until ~4-6 hours afterwards.
 # This isn't mentioned in Pendo's docs but has been observed empirically. We shift the
 # cutoff between backfills & incremental replication back multiple hours to ensure we're
@@ -40,10 +39,35 @@ def _ms_to_dt(ms: int) -> datetime:
 def base_url(host: PendoHost) -> str:
     return f"https://{host}/api/v1"
 
+def _generate_time_series(
+        period: str,
+        lower_bound: int,
+        upper_bound: int | None = None,
+        last_seen_id: str | None = None,
+) -> dict[str, str]:
+    """Builds a timeSeries block for Pendo aggregation queries.
+
+    When paginating within a single timestamp (last_seen_id is set), the scan
+    is scoped to just that timestamp. Otherwise it spans the full range.
+    """
+    # When paginating within a single timestamp (last_seen_id is set), we only
+    # need the hour bucket containing lower_bound. Using the full range would
+    # cause Pendo to scan all buckets just to filter down to one timestamp. Instead
+    # we filter down to just the timestamp we care about (lower_bound).
+    #
+    # If an upper bound isn't specified, retrieve all data up to the present.
+    return {
+        "period": period,
+        "first": f"{lower_bound}",
+        "last": f"{lower_bound}" if last_seen_id else f"{upper_bound or 'now()'}",
+    }
+
+
 def generate_events_body(
         entity: str,
         identifying_field:str,
         lower_bound: int,
+        limit: int,
         upper_bound: int | None = None,
         last_seen_id: str | None = None,
 ) -> dict[str, Any]:
@@ -83,12 +107,7 @@ def generate_events_body(
                             # Capture events for all applications within this Pendo subscription.
                             "appId": "expandAppIds(\"*\")",
                         },
-                        "timeSeries": {
-                            "period": "hourRange",
-                            "first": f"{lower_bound}",
-                            # If an upper bound isn't specified, retrieve all events up to the present.
-                            "last": f"{upper_bound or 'now()'}"
-                        }
+                        "timeSeries": _generate_time_series("hourRange", lower_bound, upper_bound, last_seen_id),
                     }
                 },
                 {
@@ -100,7 +119,7 @@ def generate_events_body(
                     "sort": ["guideTimestamp", f"{identifying_field}"]
                 },
                 {
-                    "limit": RESPONSE_LIMIT
+                    "limit": limit
                 }
             ]
         }
@@ -113,6 +132,7 @@ def generate_event_aggregates_body(
         entity: str,
         identifying_field: str,
         lower_bound: int,
+        limit: int,
         upper_bound: int | None = None,
         last_seen_id: str | None = None,
 ) -> dict[str, Any]:
@@ -159,12 +179,7 @@ def generate_event_aggregates_body(
                             # Capture events for all applications within this Pendo subscription.
                             "appId": "expandAppIds(\"*\")",
                         },
-                        "timeSeries": {
-                            "period": "hourRange",
-                            "first": f"{lower_bound}",
-                            # If an upper bound isn't specified, retrieve all events up to the present.
-                            "last": f"{upper_bound or 'now()'}"
-                        }
+                        "timeSeries": _generate_time_series("hourRange", lower_bound, upper_bound, last_seen_id),
                     }
                 },
                 {
@@ -176,7 +191,7 @@ def generate_event_aggregates_body(
                     "sort": ["lastTime", f"{identifying_field}"]
                 },
                 {
-                    "limit": RESPONSE_LIMIT
+                    "limit": limit
                 }
             ]
         }
@@ -190,6 +205,7 @@ def generate_resources_body(
         updated_at_field: str,
         identifying_field: str,
         lower_bound: int,
+        limit: int,
         upper_bound: int | None = None,
         last_seen_id: str | None = None,
 ) -> dict[str, Any]:
@@ -228,6 +244,7 @@ def generate_resources_body(
                         entity: {
                             # Capture resources for all applications within this Pendo subscription.
                             "appId": "expandAppIds(\"*\")",
+                            "timeSeries": _generate_time_series("hourRange", lower_bound, upper_bound, last_seen_id),
                         },
                     }
                 },
@@ -240,7 +257,7 @@ def generate_resources_body(
                     "sort": [f"{updated_at_field}", f"{identifying_field}"]
                 },
                 {
-                    "limit": RESPONSE_LIMIT
+                    "limit": limit
                 }
             ]
         }
@@ -292,6 +309,7 @@ async def _fetch_events_between(
     identifying_field: str,
     lower_bound: datetime,
     upper_bound: datetime,
+    limit: int,
     log: Logger,
 ) -> AsyncGenerator[Event, None]:
     url = f"{base_url(host)}/aggregation"
@@ -299,7 +317,7 @@ async def _fetch_events_between(
     lower_bound_ts = _dt_to_ms(lower_bound)
     upper_bound_ts = _dt_to_ms(upper_bound)
 
-    body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, upper_bound=upper_bound_ts)
+    body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, upper_bound=upper_bound_ts)
 
     _, response_body = await http.request_stream(log, url, method="POST", json=body)
     processor = IncrementalJsonProcessor(
@@ -311,7 +329,7 @@ async def _fetch_events_between(
     doc_count = 0
     last_seen_id = ""
     async for event in processor:
-        # Due to how we're querying the API with the "sort" and "filter" operators, 
+        # Due to how we're querying the API with the "sort" and "filter" operators,
         # we don't expect to receive documents out of order.
         if event.guideTimestamp < last_dt:
             raise RuntimeError(
@@ -334,7 +352,7 @@ async def _fetch_events_between(
         # If the last document has the same timestamp as our cursor, there could be more documents
         # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
-            body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, last_seen_id=last_seen_id)
+            body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, last_seen_id=last_seen_id)
 
             _, response_body = await http.request_stream(log, url, method="POST", json=body)
             processor = IncrementalJsonProcessor(
@@ -356,7 +374,7 @@ async def _fetch_events_between(
                 event.meta_ = model.Meta(op="c")
                 yield event
 
-            if doc_count < RESPONSE_LIMIT:
+            if doc_count < limit:
                 break
 
 
@@ -366,6 +384,7 @@ async def fetch_events(
         entity: str,
         model: type[Event],
         identifying_field: str,
+        limit: int,
         log: Logger,
         log_cursor: LogCursor,
 ) -> AsyncGenerator[Event | LogCursor, None]:
@@ -389,6 +408,7 @@ async def fetch_events(
         identifying_field=identifying_field,
         lower_bound=log_cursor,
         upper_bound=horizon,
+        limit=limit,
         log=log,
     ):
         count += 1
@@ -414,6 +434,7 @@ async def backfill_events(
         entity: str,
         model: type[Event],
         identifying_field: str,
+        limit: int,
         log: Logger,
         page_cursor: PageCursor | None,
         cutoff: LogCursor,
@@ -436,6 +457,7 @@ async def backfill_events(
         identifying_field=identifying_field,
         lower_bound=last_dt,
         upper_bound=upper_bound_dt,
+        limit=limit,
         log=log,
     ):
         count += 1
@@ -463,6 +485,7 @@ async def _fetch_aggregated_events_between(
     identifying_field: str,
     lower_bound: datetime,
     upper_bound: datetime,
+    limit: int,
     log: Logger,
 ) -> AsyncGenerator[EventAggregate, None]:
     url = f"{base_url(host)}/aggregation"
@@ -470,7 +493,7 @@ async def _fetch_aggregated_events_between(
     lower_bound_ts = _dt_to_ms(lower_bound)
     upper_bound_ts = _dt_to_ms(upper_bound)
 
-    body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, upper_bound=upper_bound_ts)
+    body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, upper_bound=upper_bound_ts)
 
     _, response_body = await http.request_stream(log, url, method="POST", json=body)
     processor = IncrementalJsonProcessor(
@@ -482,7 +505,7 @@ async def _fetch_aggregated_events_between(
     doc_count = 0
     last_seen_id = ""
     async for aggregate in processor:
-        # Due to how we're querying the API with the "sort" and "filter" operators, 
+        # Due to how we're querying the API with the "sort" and "filter" operators,
         # we don't expect to receive documents out of order.
         if aggregate.lastTime < last_dt:
             raise RuntimeError(
@@ -505,7 +528,7 @@ async def _fetch_aggregated_events_between(
         # If the last document has the same timestamp as our cursor, there could be more documents
         # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
-            body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, last_seen_id=last_seen_id)
+            body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, last_seen_id=last_seen_id)
 
             _, response_body = await http.request_stream(log, url, method="POST", json=body)
             processor = IncrementalJsonProcessor(
@@ -527,7 +550,7 @@ async def _fetch_aggregated_events_between(
                 aggregate.meta_ = model.Meta(op="c")
                 yield aggregate
 
-            if doc_count < RESPONSE_LIMIT:
+            if doc_count < limit:
                 break
 
 
@@ -537,6 +560,7 @@ async def fetch_aggregated_events(
         entity: str,
         model: type[EventAggregate],
         identifying_field: str,
+        limit: int,
         log: Logger,
         log_cursor: LogCursor,
 ) -> AsyncGenerator[EventAggregate | LogCursor, None]:
@@ -560,6 +584,7 @@ async def fetch_aggregated_events(
         identifying_field=identifying_field,
         lower_bound=log_cursor,
         upper_bound=horizon,
+        limit=limit,
         log=log,
     ):
         count += 1
@@ -585,6 +610,7 @@ async def backfill_aggregated_events(
         entity: str,
         model: type[EventAggregate],
         identifying_field: str,
+        limit: int,
         log: Logger,
         page_cursor: PageCursor | None,
         cutoff: LogCursor,
@@ -607,6 +633,7 @@ async def backfill_aggregated_events(
         identifying_field=identifying_field,
         lower_bound=last_dt,
         upper_bound=upper_bound_dt,
+        limit=limit,
         log=log,
     ):
         count += 1
@@ -654,6 +681,7 @@ async def _fetch_resources_between(
     identifying_field: str,
     lower_bound: datetime,
     upper_bound: datetime,
+    limit: int,
     log: Logger,
 ) -> AsyncGenerator[IncrementalResource, None]:
     url = f"{base_url(host)}/aggregation"
@@ -661,7 +689,7 @@ async def _fetch_resources_between(
     lower_bound_ts = _dt_to_ms(lower_bound)
     upper_bound_ts = _dt_to_ms(upper_bound)
 
-    body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, upper_bound=upper_bound_ts)
+    body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, upper_bound=upper_bound_ts)
 
     _, response_body = await http.request_stream(log, url, method="POST", json=body)
     processor = IncrementalJsonProcessor(
@@ -674,7 +702,7 @@ async def _fetch_resources_between(
     last_seen_id = ""
     async for resource in processor:
         updated_at_dt = _extract_updated_at(resource, updated_at_field, log)
-        # Due to how we're querying the API with the "sort" and "filter" operators, 
+        # Due to how we're querying the API with the "sort" and "filter" operators,
         # we don't expect to receive documents out of order.
         if updated_at_dt < last_dt:
             raise RuntimeError(
@@ -696,7 +724,7 @@ async def _fetch_resources_between(
         # If the last document has the same timestamp as our cursor, there could be more documents
         # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
-            body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, last_seen_id=last_seen_id)
+            body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, last_seen_id=last_seen_id)
 
             _, response_body = await http.request_stream(log, url, method="POST", json=body)
             processor = IncrementalJsonProcessor(
@@ -718,7 +746,7 @@ async def _fetch_resources_between(
 
                 yield resource
 
-            if doc_count < RESPONSE_LIMIT:
+            if doc_count < limit:
                 break
 
 
@@ -729,6 +757,7 @@ async def fetch_resources(
         model: type[IncrementalResource],
         updated_at_field: str,
         identifying_field: str,
+        limit: int,
         log: Logger,
         log_cursor: LogCursor,
 ) -> AsyncGenerator[IncrementalResource | LogCursor, None]:
@@ -746,6 +775,7 @@ async def fetch_resources(
         identifying_field=identifying_field,
         lower_bound=log_cursor,
         upper_bound=upper_bound,
+        limit=limit,
         log=log,
     ):
         count += 1
@@ -774,6 +804,7 @@ async def backfill_resources(
         model: type[IncrementalResource],
         updated_at_field: str,
         identifying_field: str,
+        limit: int,
         log: Logger,
         page_cursor: PageCursor | None,
         cutoff: LogCursor,
@@ -797,6 +828,7 @@ async def backfill_resources(
         identifying_field=identifying_field,
         lower_bound=last_dt,
         upper_bound=upper_bound_dt,
+        limit=limit,
         log=log,
     ):
         count += 1

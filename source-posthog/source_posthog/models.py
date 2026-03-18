@@ -58,6 +58,7 @@ __all__ = [
     "PersonalApiKeyInfo",
     "PostHogEntity",
     "Project",
+    "ProjectScopedMixin",
     "ProjectEntity",
     "ProjectIdValidationContext",
     "ResourceConfig",
@@ -160,11 +161,46 @@ class ProjectEntity[T: PostHogPrimaryKey](BasePostHogEntity[T], metaclass=ABCMet
         )
 
 
-class HogQLEntity[T: PostHogPrimaryKey](BasePostHogEntity[T], metaclass=ABCMeta):
+class ProjectScopedMixin(BaseDocument):
+    """Mixin for entities scoped to a PostHog project.
+
+    Extends _meta with project_id and injects it from validation context.
+    """
+
+    class Meta(BaseDocument.Meta):
+        model_config = ConfigDict(  # pyright: ignore[reportUnannotatedClassAttribute]
+            validate_assignment=True
+        )
+        project_id: int = Field(
+            default=-1,
+            description="The PostHog project this document belongs to",
+        )
+
+    meta_: Meta = Field(  # pyright: ignore[reportIncompatibleVariableOverride]
+        default_factory=Meta,
+        alias="_meta",
+        description="Document metadata",
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _inject_project_id_from_context(cls, data: Any, info: ValidationInfo) -> Any:
+        if not isinstance(data, dict):
+            return data
+        if info.context and isinstance(info.context, ProjectIdValidationContext):
+            meta = data.get("_meta") or {}
+            meta["project_id"] = info.context.project_id
+            data["_meta"] = meta
+        return data
+
+
+class HogQLEntity[T: PostHogPrimaryKey](
+    ProjectScopedMixin, BasePostHogEntity[T], metaclass=ABCMeta
+):
     """Entity fetched via HogQL Query API."""
 
     table_name: ClassVar[str]
-    cursor_column: ClassVar[str]
+    cursor_columns: ClassVar[list[str]]
 
     @classmethod
     def get_api_endpoint_url(cls, base_url: str, project_id: int) -> str:
@@ -235,37 +271,13 @@ class Cohort(ProjectEntity[int]):
     api_path: ClassVar[str] = "cohorts"
 
 
-class FeatureFlag(ProjectEntity[int]):
+class FeatureFlag(ProjectScopedMixin, ProjectEntity[int]):
     """PostHog feature flag."""
 
     resource_name: ClassVar[str] = "FeatureFlags"
     api_path: ClassVar[str] = "feature_flags"
 
-    class Meta(BaseDocument.Meta):
-        model_config = ConfigDict(validate_assignment=True)
-        project_id: int | None = Field(
-            default=None,
-            description="The PostHog project this document belongs to",
-        )
-
-    meta_: Meta = Field(  # pyright: ignore[reportIncompatibleVariableOverride]
-        default_factory=lambda: FeatureFlag.Meta(op="u"),
-        alias="_meta",
-        description="Document metadata",
-    )
-
     updated_at: AwareDatetime
-
-    @model_validator(mode="before")
-    @classmethod
-    def _inject_project_id_from_context(cls, data: Any, info: ValidationInfo) -> Any:
-        if not isinstance(data, dict):
-            return data
-        if info.context and isinstance(info.context, ProjectIdValidationContext):
-            meta = data.get("_meta") or {}
-            meta["project_id"] = info.context.project_id
-            data["_meta"] = meta
-        return data
 
     def get_cursor(self) -> AwareDatetime:
         return self.updated_at
@@ -288,34 +300,10 @@ class Event(HogQLEntity[str]):
 
     resource_name: ClassVar[str] = "Events"
     table_name: ClassVar[str] = "events"
-    cursor_column: ClassVar[str] = "timestamp"
-
-    class Meta(BaseDocument.Meta):
-        model_config = ConfigDict(validate_assignment=True)
-        project_id: int | None = Field(
-            default=None,
-            description="The PostHog project this document belongs to",
-        )
-
-    meta_: Meta = Field(
-        default_factory=lambda: Event.Meta(op="u"),
-        alias="_meta",
-        description="Document metadata",
-    )
+    cursor_columns: ClassVar[list[str]] = ["timestamp"]
 
     id: str = Field(alias="uuid")
     timestamp: AwareDatetime
-
-    @model_validator(mode="before")
-    @classmethod
-    def _inject_project_id_from_context(cls, data: Any, info: ValidationInfo) -> Any:
-        if not isinstance(data, dict):
-            return data
-        if info.context and isinstance(info.context, ProjectIdValidationContext):
-            meta = data.get("_meta") or {}
-            meta["project_id"] = info.context.project_id
-            data["_meta"] = meta
-        return data
 
     @override
     def get_cursor(self) -> AwareDatetime:
@@ -327,13 +315,14 @@ class Person(HogQLEntity[str]):
 
     resource_name: ClassVar[str] = "Persons"
     table_name: ClassVar[str] = "persons"
-    cursor_column: ClassVar[str] = "created_at"
+    cursor_columns: ClassVar[list[str]] = ["last_seen_at", "created_at"]
 
     created_at: AwareDatetime
+    last_seen_at: AwareDatetime | None
 
     @override
     def get_cursor(self) -> AwareDatetime:
-        return self.created_at
+        return self.last_seen_at or self.created_at
 
 
 # =============================================================================

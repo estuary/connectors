@@ -23,10 +23,6 @@ captures:
         interval: PT5M
       target: acmeCo/Organizations
     - resource:
-        name: Persons
-        interval: PT5M
-      target: acmeCo/Persons
-    - resource:
         name: Projects
         interval: PT5M
       target: acmeCo/Projects
@@ -38,3 +34,7 @@ captures:
         name: FeatureFlags
         interval: PT5M
       target: acmeCo/FeatureFlags
+    - resource:
+        name: Persons
+        interval: PT5M
+      target: acmeCo/Persons
