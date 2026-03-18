@@ -321,8 +321,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	const (
-		deleteFalse uint8 = 0
-		deleteTrue  uint8 = 1
+		deleteFalse     uint8 = 0
+		deleteTrue      uint8 = 1
+		maxBatchRecords       = 100_000
 	)
 
 	batchByBinding := make(map[int]chdriver.Batch, 2)
@@ -364,6 +365,12 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		if err = batch.Append(converted...); err != nil {
 			abortAllBatches()
 			return nil, fmt.Errorf("store batch append: %w", err)
+		}
+		if batch.Rows() >= maxBatchRecords {
+			if err = batch.Flush(); err != nil {
+				abortAllBatches()
+				return nil, fmt.Errorf("flush batch: %w", err)
+			}
 		}
 	}
 	if it.Err() != nil {
