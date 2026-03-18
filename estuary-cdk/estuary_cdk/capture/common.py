@@ -15,10 +15,17 @@ from typing import (
     Literal,
     TypeVar,
     cast,
+    override,
 )
 from uuid import uuid4
 
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
+
+from estuary_cdk.capture.webhook import (
+    CollectionMatchingSpec,
+    UrlMatch,
+    WebhookCaptureSpec,
+)
 
 from ..cron import next_fire
 from ..flow import (
@@ -185,7 +192,7 @@ _BaseResourceConfig = TypeVar("_BaseResourceConfig", bound=BaseResourceConfig)
 
 
 class ResourceConfig(BaseResourceConfig):
-    """ResourceConfig is a common resource configuration shape."""
+    """ResourceConfig is a common pull API resource configuration shape."""
 
     PATH_POINTERS: ClassVar[list[str]] = ["/name"]
 
@@ -200,6 +207,22 @@ class ResourceConfig(BaseResourceConfig):
     #    default=None, description="Enclosing schema namespace of this resource"
     # )
 
+    @override
+    def path(self) -> list[str]:
+        return [self.name]
+
+
+class WebhookResourceConfig(BaseResourceConfig):
+    # TODO: What does this classvar do exactly?
+    PATH_POINTERS: ClassVar[list[str]] = ["/webhookId"]
+
+    name: str = Field(description="Name of this resource")
+    match_rule: CollectionMatchingSpec = Field(
+        default_factory=lambda: UrlMatch(value="*"),
+        description="Matching spec for routing incoming webhooks to this collection",
+    )
+
+    @override
     def path(self) -> list[str]:
         return [self.name]
 
@@ -572,15 +595,25 @@ _ResolvableBinding = TypeVar(
 """_ResolvableBinding is either a CaptureBinding or a request.ValidateBinding"""
 
 
+# TODO: How should we handle users removing declared webhook resources completely?
+# Do we log an error on newfound undiscovered bindings like it's unexpected behaviour?
+# Do we silently put them back in?
 def resolve_bindings(
     bindings: list[_ResolvableBinding],
     resources: list[Resource[Any, _BaseResourceConfig, Any]],
+    webhook_specs: list[WebhookCaptureSpec],
     resource_term="Resource",
 ) -> list[tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]]:
+    # TODO: How can we ensure that specs are being respected and non-conflicting?
+    # Is this the right place to do it?
+    # We have to check for destination ambiguity, something else?
+
     resolved: list[
         tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]
     ] = []
     errors: list[str] = []
+
+    errors += verify_spec_compatibility(webhook_specs)
 
     for binding in bindings:
         path = binding.resourceConfig.path()
@@ -762,15 +795,17 @@ def open(
                 scheduled_stop(task, soonest_future_scheduled_initialization)
             )
 
-        resolved_webhook_bindings = [
-            binding
-            for _, binding in resolved_bindings
-            if binding.is_webhook_resource and not binding.disable
-        ]
+        resolved_webhook_bindings = {
+            index: binding
+            for index, (binding, resource) in enumerate(resolved_bindings)
+            if resource.is_webhook_resource
+        }
         if resolved_webhook_bindings:
-            # TODO: I think there's a circular dependency issue, but try moving it to the top
+            # TODO: Fix this circular dependency issue
             from estuary_cdk.capture.webhook import start_webhook_server
 
+            # TODO: Maybe rather than calling enumerate() twice in `open()`,
+            # we can find a more stable way to assign indexes.
             start_webhook_server(resolved_webhook_bindings, task)
 
             # The webhook server runs outside the TaskGroup so it can outlive
@@ -1319,6 +1354,7 @@ async def _binding_webhook_task(
         bindingStateV1={binding.stateKey: ResourceState(webhook=state)}
     )
 
+    # TODO: Is this while True doing anything for us?
     while True:
         # Yield to the event loop to prevent starvation.
         await asyncio.sleep(0)
@@ -1326,6 +1362,7 @@ async def _binding_webhook_task(
         async for item in process_webhook(task.log, state.cursor):
             if isinstance(item, WebhookDocument) or isinstance(item, dict):
                 task.captured(binding_index, item)
+                # TODO: s-h-i can checkpoint multiple incoming messages, how is that done?
                 await task.checkpoint(connector_state)
             else:
                 # TODO: Do I want to push this to prod?
