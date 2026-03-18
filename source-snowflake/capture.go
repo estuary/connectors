@@ -17,7 +17,6 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
-	sf "github.com/snowflakedb/gosnowflake"
 )
 
 const (
@@ -454,7 +453,7 @@ func (c *capture) captureStagingTable(ctx context.Context, stateKey boilerplate.
 
 	// Read contents of staging table and output to Flow.
 	logEntry.WithField("query", readStagingTableQuery).Info("querying staging table")
-	rows, err := c.DB.QueryContext(sf.WithStreamDownloader(ctx), readStagingTableQuery)
+	rows, err := c.DB.QueryContext(ctx, readStagingTableQuery)
 	if err != nil {
 		return fmt.Errorf("error querying staging table %q: %w", stagingName.String(), err)
 	}
