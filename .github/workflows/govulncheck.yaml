@@ -5,6 +5,7 @@ permissions:
   issues: write
 
 on:
+  push:
   schedule:
     - cron: "0 12 * * 1"
 
