@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -321,16 +322,31 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	const (
-		deleteFalse     uint8 = 0
-		deleteTrue      uint8 = 1
-		maxBatchRecords       = 100_000
+		deleteFalse      uint8 = 0
+		deleteTrue       uint8 = 1
+		maxBatchRecords        = 100_000
+		maxBatchDuration       = time.Minute
 	)
+	timeout := time.Tick(maxBatchDuration)
 
 	batchByBinding := make(map[int]chdriver.Batch, 2)
 	abortAllBatches := func() {
 		for _, batch := range batchByBinding {
 			_ = batch.Abort()
 		}
+	}
+	flushAllBatches := func() error {
+		var errs []error
+		for _, batch := range batchByBinding {
+			if err := batch.Send(); err != nil {
+				errs = append(errs, err)
+			}
+		}
+		if err := errors.Join(errs...); err != nil {
+			abortAllBatches()
+			return fmt.Errorf("flush all batches: %w", err)
+		}
+		return nil
 	}
 
 	for it.Next() {
@@ -372,6 +388,15 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				return nil, fmt.Errorf("flush batch: %w", err)
 			}
 		}
+
+		select {
+		case <-timeout:
+			if err = flushAllBatches(); err != nil {
+				return nil, err
+			}
+		default:
+		}
+
 	}
 	if it.Err() != nil {
 		abortAllBatches()
@@ -379,17 +404,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		future := m.RunAsyncOperation(func() error {
-			var errs []error
-			for _, batch := range batchByBinding {
-				if err := batch.Send(); err != nil {
-					errs = append(errs, err)
-				}
-			}
-			return errors.Join(errs...)
-		})
-
-		return nil, future
+		return nil, m.RunAsyncOperation(flushAllBatches)
 	}, nil
 }
 
