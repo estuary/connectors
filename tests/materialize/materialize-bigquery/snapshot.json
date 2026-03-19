@@ -1,6 +1,6 @@
 [
   "applied.actionDescription",
-  "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INTEGER NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INTEGER,\n\t\tstr STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INTEGER NOT NULL,\n\t\tarray_int JSON,\n\t\tbinary_field STRING,\n\t\tbool_field BOOLEAN,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested JSON,\n\t\tnullable_int INTEGER,\n\t\tstr_field STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INTEGER NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str BIGNUMERIC(38,0),\n\t\tint_str BIGNUMERIC(38,0),\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.unsigned_bigint (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tunsigned_bigint BIGNUMERIC(38,0)\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.deletions (\n\t\tid INTEGER NOT NULL,\n\t\t_meta_op STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.string_escaped_key (\n\t\tid STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_one (\n\t\tid INTEGER NOT NULL,\n\t\tstrintkey STRING NOT NULL,\n\t\tstrnumkey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tstrint BIGNUMERIC(38,0),\n\t\tstrnum FLOAT64\n)\nCLUSTER BY id, strintkey, strnumkey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_two (\n\t\tid INTEGER NOT NULL,\n\t\tdatekey STRING NOT NULL,\n\t\ttimekey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tdate DATE,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\ttime STRING\n)\nCLUSTER BY id, datekey, timekey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_three (\n\t\tid INTEGER NOT NULL,\n\t\tdatetimekey STRING NOT NULL,\n\t\tuuidkey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tuuid STRING\n)\nCLUSTER BY id, datetimekey, uuidkey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.fields_with_projections (\n\t\tid INTEGER NOT NULL,\n\t\tanother_field STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tprojected_another STRING,\n\t\tprojected_field STRING\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.many_columns (\n\t\tid INTEGER NOT NULL,\n\t\ta0 INTEGER,\n\t\ta1 INTEGER,\n\t\ta10 INTEGER,\n\t\ta11 INTEGER,\n\t\ta12 INTEGER,\n\t\ta13 INTEGER,\n\t\ta14 INTEGER,\n\t\ta15 INTEGER,\n\t\ta16 INTEGER,\n\t\ta17 INTEGER,\n\t\ta18 INTEGER,\n\t\ta19 INTEGER,\n\t\ta2 INTEGER,\n\t\ta20 INTEGER,\n\t\ta21 INTEGER,\n\t\ta22 INTEGER,\n\t\ta23 INTEGER,\n\t\ta24 INTEGER,\n\t\ta25 INTEGER,\n\t\ta26 INTEGER,\n\t\ta27 INTEGER,\n\t\ta28 INTEGER,\n\t\ta29 INTEGER,\n\t\ta3 INTEGER,\n\t\ta30 INTEGER,\n\t\ta31 INTEGER,\n\t\ta32 INTEGER,\n\t\ta33 INTEGER,\n\t\ta34 INTEGER,\n\t\ta35 INTEGER,\n\t\ta36 INTEGER,\n\t\ta37 INTEGER,\n\t\ta38 INTEGER,\n\t\ta39 INTEGER,\n\t\ta4 INTEGER,\n\t\ta40 INTEGER,\n\t\ta41 INTEGER,\n\t\ta42 INTEGER,\n\t\ta43 INTEGER,\n\t\ta44 INTEGER,\n\t\ta45 INTEGER,\n\t\ta46 INTEGER,\n\t\ta47 INTEGER,\n\t\ta48 INTEGER,\n\t\ta49 INTEGER,\n\t\ta5 INTEGER,\n\t\ta50 INTEGER,\n\t\ta51 INTEGER,\n\t\ta52 INTEGER,\n\t\ta53 INTEGER,\n\t\ta54 INTEGER,\n\t\ta55 INTEGER,\n\t\ta56 INTEGER,\n\t\ta57 INTEGER,\n\t\ta58 INTEGER,\n\t\ta59 INTEGER,\n\t\ta6 INTEGER,\n\t\ta60 INTEGER,\n\t\ta61 INTEGER,\n\t\ta62 INTEGER,\n\t\ta63 INTEGER,\n\t\ta64 INTEGER,\n\t\ta65 INTEGER,\n\t\ta66 INTEGER,\n\t\ta67 INTEGER,\n\t\ta68 INTEGER,\n\t\ta69 INTEGER,\n\t\ta7 INTEGER,\n\t\ta70 INTEGER,\n\t\ta71 INTEGER,\n\t\ta72 INTEGER,\n\t\ta73 INTEGER,\n\t\ta74 INTEGER,\n\t\ta75 INTEGER,\n\t\ta76 INTEGER,\n\t\ta77 INTEGER,\n\t\ta78 INTEGER,\n\t\ta79 INTEGER,\n\t\ta8 INTEGER,\n\t\ta80 INTEGER,\n\t\ta81 INTEGER,\n\t\ta82 INTEGER,\n\t\ta83 INTEGER,\n\t\ta84 INTEGER,\n\t\ta85 INTEGER,\n\t\ta86 INTEGER,\n\t\ta87 INTEGER,\n\t\ta88 INTEGER,\n\t\ta89 INTEGER,\n\t\ta9 INTEGER,\n\t\ta90 INTEGER,\n\t\ta91 INTEGER,\n\t\ta92 INTEGER,\n\t\ta93 INTEGER,\n\t\ta94 INTEGER,\n\t\ta95 INTEGER,\n\t\ta96 INTEGER,\n\t\ta97 INTEGER,\n\t\ta98 INTEGER,\n\t\ta99 INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL\n)\nCLUSTER BY id;\n"
+  "CREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.simple (\n\t\tid INTEGER NOT NULL,\n\t\tcanary STRING NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.duplicate_keys (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint INTEGER,\n\t\tstr STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.multiple_types (\n\t\tid INTEGER NOT NULL,\n\t\tarray_int JSON,\n\t\tbinary_field STRING,\n\t\tbool_field BOOLEAN,\n\t\tfloat_field FLOAT64,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tmultiple JSON,\n\t\tnested JSON,\n\t\tnullable_int INTEGER,\n\t\tstr_field STRING NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.formatted_strings (\n\t\tid INTEGER NOT NULL,\n\t\tdate DATE,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tint_and_str BIGNUMERIC(38,0),\n\t\tint_str BIGNUMERIC(38,0),\n\t\tnum_and_str FLOAT64,\n\t\tnum_str FLOAT64,\n\t\ttime STRING\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.unsigned_bigint (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tunsigned_bigint BIGNUMERIC(38,0)\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.deletions (\n\t\tid INTEGER NOT NULL,\n\t\t_meta_op STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.string_escaped_key (\n\t\tid STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_one (\n\t\tid INTEGER NOT NULL,\n\t\tstrintkey STRING NOT NULL,\n\t\tstrnumkey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tstrint BIGNUMERIC(38,0),\n\t\tstrnum FLOAT64\n)\nCLUSTER BY id, strintkey, strnumkey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_two (\n\t\tid INTEGER NOT NULL,\n\t\tdatekey STRING NOT NULL,\n\t\ttimekey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tdate DATE,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\ttime STRING\n)\nCLUSTER BY id, datekey, timekey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.all_key_types_part_three (\n\t\tid INTEGER NOT NULL,\n\t\tdatetimekey STRING NOT NULL,\n\t\tuuidkey STRING NOT NULL,\n\t\tcounter INTEGER,\n\t\tdatetime TIMESTAMP,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tuuid STRING\n)\nCLUSTER BY id, datetimekey, uuidkey;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.fields_with_projections (\n\t\tid INTEGER NOT NULL,\n\t\tanother_field STRING,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tprojected_another STRING,\n\t\tprojected_field STRING\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.many_columns (\n\t\tid INTEGER NOT NULL,\n\t\ta0 INTEGER,\n\t\ta1 INTEGER,\n\t\ta10 INTEGER,\n\t\ta11 INTEGER,\n\t\ta12 INTEGER,\n\t\ta13 INTEGER,\n\t\ta14 INTEGER,\n\t\ta15 INTEGER,\n\t\ta16 INTEGER,\n\t\ta17 INTEGER,\n\t\ta18 INTEGER,\n\t\ta19 INTEGER,\n\t\ta2 INTEGER,\n\t\ta20 INTEGER,\n\t\ta21 INTEGER,\n\t\ta22 INTEGER,\n\t\ta23 INTEGER,\n\t\ta24 INTEGER,\n\t\ta25 INTEGER,\n\t\ta26 INTEGER,\n\t\ta27 INTEGER,\n\t\ta28 INTEGER,\n\t\ta29 INTEGER,\n\t\ta3 INTEGER,\n\t\ta30 INTEGER,\n\t\ta31 INTEGER,\n\t\ta32 INTEGER,\n\t\ta33 INTEGER,\n\t\ta34 INTEGER,\n\t\ta35 INTEGER,\n\t\ta36 INTEGER,\n\t\ta37 INTEGER,\n\t\ta38 INTEGER,\n\t\ta39 INTEGER,\n\t\ta4 INTEGER,\n\t\ta40 INTEGER,\n\t\ta41 INTEGER,\n\t\ta42 INTEGER,\n\t\ta43 INTEGER,\n\t\ta44 INTEGER,\n\t\ta45 INTEGER,\n\t\ta46 INTEGER,\n\t\ta47 INTEGER,\n\t\ta48 INTEGER,\n\t\ta49 INTEGER,\n\t\ta5 INTEGER,\n\t\ta50 INTEGER,\n\t\ta51 INTEGER,\n\t\ta52 INTEGER,\n\t\ta53 INTEGER,\n\t\ta54 INTEGER,\n\t\ta55 INTEGER,\n\t\ta56 INTEGER,\n\t\ta57 INTEGER,\n\t\ta58 INTEGER,\n\t\ta59 INTEGER,\n\t\ta6 INTEGER,\n\t\ta60 INTEGER,\n\t\ta61 INTEGER,\n\t\ta62 INTEGER,\n\t\ta63 INTEGER,\n\t\ta64 INTEGER,\n\t\ta65 INTEGER,\n\t\ta66 INTEGER,\n\t\ta67 INTEGER,\n\t\ta68 INTEGER,\n\t\ta69 INTEGER,\n\t\ta7 INTEGER,\n\t\ta70 INTEGER,\n\t\ta71 INTEGER,\n\t\ta72 INTEGER,\n\t\ta73 INTEGER,\n\t\ta74 INTEGER,\n\t\ta75 INTEGER,\n\t\ta76 INTEGER,\n\t\ta77 INTEGER,\n\t\ta78 INTEGER,\n\t\ta79 INTEGER,\n\t\ta8 INTEGER,\n\t\ta80 INTEGER,\n\t\ta81 INTEGER,\n\t\ta82 INTEGER,\n\t\ta83 INTEGER,\n\t\ta84 INTEGER,\n\t\ta85 INTEGER,\n\t\ta86 INTEGER,\n\t\ta87 INTEGER,\n\t\ta88 INTEGER,\n\t\ta89 INTEGER,\n\t\ta9 INTEGER,\n\t\ta90 INTEGER,\n\t\ta91 INTEGER,\n\t\ta92 INTEGER,\n\t\ta93 INTEGER,\n\t\ta94 INTEGER,\n\t\ta95 INTEGER,\n\t\ta96 INTEGER,\n\t\ta97 INTEGER,\n\t\ta98 INTEGER,\n\t\ta99 INTEGER,\n\t\tflow_published_at TIMESTAMP NOT NULL\n)\nCLUSTER BY id;\n\nCREATE TABLE IF NOT EXISTS `estuary-theatre`.testing.optional_non_nullable (\n\t\tid INTEGER NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\topt_int INTEGER,\n\t\topt_nullable_int INTEGER,\n\t\topt_nullable_str STRING,\n\t\topt_str STRING,\n\t\trequired_val STRING NOT NULL\n)\nCLUSTER BY id;\n"
 ]
 [
   "connectorState",
@@ -83,6 +83,14 @@
         ],
         "JobPrefix": "<uuid>",
         "TempTableName": "flow_temp_table_2"
+      },
+      "estuary-theatre%2Ftesting%2Foptional_non_nullable": {
+        "Query": "INSERT INTO `estuary-theatre`.testing.optional_non_nullable (id, flow_published_at, opt_int, opt_nullable_int, opt_nullable_str, opt_str, required_val)\nSELECT c0, c1, c2, c3, c4, c5, c6 FROM flow_temp_table_12;\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_12"
       },
       "estuary-theatre%2Ftesting%2Fsimple": {
         "Query": "INSERT INTO `estuary-theatre`.testing.simple (id, canary, flow_published_at)\nSELECT c0, c1, c2 FROM flow_temp_table_0;\n",
@@ -186,6 +194,14 @@
         ],
         "JobPrefix": "<uuid>",
         "TempTableName": "flow_temp_table_2"
+      },
+      "estuary-theatre%2Ftesting%2Foptional_non_nullable": {
+        "Query": "MERGE INTO `estuary-theatre`.testing.optional_non_nullable AS l\nUSING flow_temp_table_12 AS r\nON \n\tl.id = r.c0 AND l.id >= 1 AND l.id <= 3\nWHEN MATCHED AND r._flow_delete THEN\n\tDELETE\nWHEN MATCHED THEN\n\tUPDATE SET l.flow_published_at = r.c1, l.opt_int = r.c2, l.opt_nullable_int = r.c3, l.opt_nullable_str = r.c4, l.opt_str = r.c5, l.required_val = r.c6\nWHEN NOT MATCHED AND NOT r._flow_delete THEN\n\tINSERT (id, flow_published_at, opt_int, opt_nullable_int, opt_nullable_str, opt_str, required_val)\n\tVALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6);\n",
+        "SourceURIs": [
+          "gs://[bucket]/<uuid>"
+        ],
+        "JobPrefix": "<uuid>",
+        "TempTableName": "flow_temp_table_12"
       },
       "estuary-theatre%2Ftesting%2Fsimple": {
         "Query": "INSERT INTO `estuary-theatre`.testing.simple (id, canary, flow_published_at)\nSELECT c0, c1, c2 FROM flow_temp_table_0;\n",
@@ -738,6 +754,38 @@
     }
   ],
   "table": "many_columns"
+}
+{
+  "rows": [
+    {
+      "flow_published_at": "1970-01-01T02:00:37Z",
+      "id": 1,
+      "opt_int": 10,
+      "opt_nullable_int": 50,
+      "opt_nullable_str": "also present",
+      "opt_str": "now present",
+      "required_val": "first updated"
+    },
+    {
+      "flow_published_at": "1970-01-01T02:00:38Z",
+      "id": 2,
+      "opt_int": 42,
+      "opt_nullable_int": null,
+      "opt_nullable_str": null,
+      "opt_str": "hello",
+      "required_val": "second updated"
+    },
+    {
+      "flow_published_at": "1970-01-01T02:00:39Z",
+      "id": 3,
+      "opt_int": null,
+      "opt_nullable_int": null,
+      "opt_nullable_str": null,
+      "opt_str": null,
+      "required_val": "third updated"
+    }
+  ],
+  "table": "optional_non_nullable"
 }
 [
   "applied.actionDescription",
