@@ -131,6 +131,8 @@ func (c config) openNativeConn() (chdriver.Conn, error) {
 		Compression: &clickhouse.Compression{
 			Method: clickhouse.CompressionLZ4,
 		},
+		MaxOpenConns: 50,
+		MaxIdleConns: 10,
 	})
 }
 

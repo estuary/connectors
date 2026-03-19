@@ -1,5 +1,5 @@
 services:
-  db:
+  clickhouse:
     image: 'clickhouse/clickhouse-server:25.8'
     platform: linux/amd64
     environment:
