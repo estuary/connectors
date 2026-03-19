@@ -663,7 +663,7 @@ async def fetch_incremental_no_events(
             # records incrementally since we don't know when they were created, so
             # we skip them here and rely on periodic backfills to pick them up.
             if not resource.created or not isinstance(resource.created, int):
-                log.warning("Resource has invalid 'created' field and can't be incrementally replicated. Scheduled backfills must be configured to capture updates to this resource.", {"id": resource.id, "created": resource.created})
+                log.debug("Resource has invalid 'created' field and can't be incrementally replicated. Scheduled backfills must be configured to capture updates to this resource.", {"id": resource.id, "created": resource.created})
                 continue
             resource_ts = _s_to_dt(resource.created)
 
