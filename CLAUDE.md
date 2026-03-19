@@ -25,10 +25,11 @@ tests/                 # Integration tests for captures and materializations (Go
 
 ### Go Connectors
 
-The quickest way to build a docker image of a connector is to edit its Dockerfile, comment out the `go test` and `go mod` lines in Dockerfile, and replace `go build` with `COPY ./connector ./`, and use the following set of commands to build the local image:
+The quickest way to build a docker image of a connector is to edit its Dockerfile, comment out the `go test` and `go mod` lines in Dockerfile, in their place add `COPY vendor ./vendor`, and add `-mod=vendor` to `go build` and use the following set of commands to build the local image:
 
 ```bash
-cd $connector; GOARCH=amd64 GOOS=linux go build -tags nozstd -v -o ../connector && cd .. && ./build-local.sh $connector
+go mod vendor
+./build-local.sh $connector
 ```
 
 ## Testing (Go)

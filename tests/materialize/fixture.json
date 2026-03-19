@@ -56,6 +56,7 @@
 
 ["tests/optional-non-nullable", {"id": 1, "required_val": "first", "opt_nullable_str": null, "opt_nullable_int": null}]
 ["tests/optional-non-nullable", {"id": 2, "required_val": "second", "opt_str": "hello", "opt_int": 42, "opt_nullable_str": "world", "opt_nullable_int": 99}]
+["tests/optional-non-nullable", {"id": 3, "required_val": "third", "opt_nullable_str": null, "opt_nullable_int": null}]
 {"commit":true}
 ["tests/simple", { "id": 7, "canary": "pieced"}]
 ["tests/simple", { "id": 8, "canary": "roaches"}]
@@ -109,6 +110,7 @@
 
 ["tests/optional-non-nullable", {"id": 1, "required_val": "first updated", "opt_str": "now present", "opt_int": 10, "opt_nullable_str": "also present", "opt_nullable_int": 50}]
 ["tests/optional-non-nullable", {"id": 2, "required_val": "second updated", "opt_nullable_str": null, "opt_nullable_int": null}]
+["tests/optional-non-nullable", {"id": 3, "required_val": "third updated", "opt_nullable_str": null, "opt_nullable_int": null}]
 {"commit":true}
 ["tests/duplicated-keys", { "id": 6, "int": 11, "str": "str 11"}]
 ["tests/duplicated-keys", { "id": 7, "int": 12, "str": "str 12"}]

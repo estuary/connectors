@@ -360,6 +360,7 @@
     "tests/optional-non-nullable": {
       "schema": {
         "type": "object",
+        "reduce": {"strategy": "merge"},
         "properties": {
           "id": {"type": "integer"},
           "required_val": {"type": "string"},
@@ -368,7 +369,7 @@
           "opt_nullable_str": {"type": ["string", "null"]},
           "opt_nullable_int": {"type": ["integer", "null"]}
         },
-        "required": ["id", "required_val"]
+        "required": ["id", "required_val", "opt_nullable_str", "opt_nullable_int"]
       },
       "key": ["/id"]
     },

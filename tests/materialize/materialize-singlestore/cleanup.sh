@@ -26,5 +26,6 @@ dropTable "fields_with_projections"
 dropTable "many_columns"
 dropTable "timezone_datetimes_standard"
 dropTable "timezone_datetimes_delta"
+dropTable "optional_non_nullable"
 
 query "DELETE FROM flow_checkpoints_v1 WHERE materialization='tests/materialize-singlestore/materialize';"
