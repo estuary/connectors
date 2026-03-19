@@ -232,9 +232,14 @@ func (c config) ToURI(ctx context.Context) (string, error) {
 		// Enable SSL for cloud provider IAM connections by default when not explicitly set
 		params.Set("sslmode", "require")
 	}
-	if len(params) > 0 {
-		uri.RawQuery = params.Encode()
-	}
+
+	// Set a short keepalive interval to detect half-open connections more
+	// quickly.  The default is OS specific, but is over 2 hours on many
+	// systems.  This will detect within 120 + (30 * 6) = 5 minutes
+	params.Set("tcp_keepalives_idle", "120")
+	params.Set("tcp_keepalives_interval", "30")
+	params.Set("tcp_keepalives_count", "6")
+	uri.RawQuery = params.Encode()
 
 	return uri.String(), nil
 }
