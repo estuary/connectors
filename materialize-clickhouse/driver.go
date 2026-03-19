@@ -262,6 +262,9 @@ func (t *transactor) addBinding(target sql.Table) error {
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
 	const batchSize = 1000
 
+	// We are evaluating loads as they come, so we must wait for the runtime's ack of the previous commit.
+	it.WaitForAcknowledged()
+
 	keysByBinding := make(map[int][]clickhouse.GroupSet)
 	flushBinding := func(binding int) error {
 		groupSets := keysByBinding[binding]
@@ -335,14 +338,16 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			_ = batch.Abort()
 		}
 	}
-	flushAllBatches := func() error {
-		var errs []error
+	flushAllBatches := func(doSend bool) error {
+		var err error
 		for _, batch := range batchByBinding {
-			if err := batch.Send(); err != nil {
-				errs = append(errs, err)
+			if doSend {
+				err = errors.Join(err, batch.Send())
+			} else {
+				err = errors.Join(err, batch.Flush())
 			}
 		}
-		if err := errors.Join(errs...); err != nil {
+		if err != nil {
 			abortAllBatches()
 			return fmt.Errorf("flush all batches: %w", err)
 		}
@@ -391,7 +396,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		select {
 		case <-timeout:
-			if err = flushAllBatches(); err != nil {
+			if err = flushAllBatches(false); err != nil {
 				return nil, err
 			}
 		default:
@@ -404,7 +409,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(flushAllBatches)
+		return nil, m.RunAsyncOperation(func() error { return flushAllBatches(true) })
 	}, nil
 }
 

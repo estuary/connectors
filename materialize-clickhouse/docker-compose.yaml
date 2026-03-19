@@ -21,7 +21,7 @@ services:
 networks:
   flow-test:
     name: flow-test
-    external: true
+      #    external: true
 
 volumes:
   clickhouse_data: {}
