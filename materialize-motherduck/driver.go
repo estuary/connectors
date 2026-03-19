@@ -271,7 +271,10 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 		loadDoc := doc.Doc
 		if b := d.bindings[doc.Binding]; len(b.nullFieldsToStrip) > 0 {
-			loadDoc = sql.StripNullFields(loadDoc, b.nullFieldsToStrip)
+			var err error
+			if loadDoc, err = sql.StripNullFields(loadDoc, b.nullFieldsToStrip); err != nil {
+				return fmt.Errorf("stripping null fields: %w", err)
+			}
 		}
 		if err = loaded(doc.Binding, loadDoc); err != nil {
 			return fmt.Errorf("sending loaded document: %w", err)

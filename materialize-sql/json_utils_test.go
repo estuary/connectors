@@ -51,24 +51,6 @@ func TestStripNullFields(t *testing.T) {
 			expected: `{}`,
 		},
 		{
-			name:     "returns non-object JSON unchanged",
-			input:    `[1,2,3]`,
-			fields:   []string{"a"},
-			expected: `[1,2,3]`,
-		},
-		{
-			name:     "returns scalar JSON unchanged",
-			input:    `"hello"`,
-			fields:   []string{"a"},
-			expected: `"hello"`,
-		},
-		{
-			name:     "handles malformed JSON gracefully",
-			input:    `{not valid json`,
-			fields:   []string{"a"},
-			expected: `{not valid json`,
-		},
-		{
 			name:     "strips all specified nulls leaving empty object",
 			input:    `{"a":null,"b":null}`,
 			fields:   []string{"a", "b"},
@@ -90,13 +72,45 @@ func TestStripNullFields(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := StripNullFields(json.RawMessage(tt.input), tt.fields)
+			result, err := StripNullFields(json.RawMessage(tt.input), tt.fields)
+			require.NoError(t, err)
 			var expectedMap, resultMap map[string]json.RawMessage
 			if json.Unmarshal([]byte(tt.expected), &expectedMap) == nil && json.Unmarshal(result, &resultMap) == nil {
 				require.Equal(t, expectedMap, resultMap)
 			} else {
 				require.Equal(t, tt.expected, string(result))
 			}
+		})
+	}
+}
+
+func TestStripNullFieldsErrors(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  string
+		fields []string
+	}{
+		{
+			name:   "returns error for non-object JSON array",
+			input:  `[1,2,3]`,
+			fields: []string{"a"},
+		},
+		{
+			name:   "returns error for scalar JSON",
+			input:  `"hello"`,
+			fields: []string{"a"},
+		},
+		{
+			name:   "returns error for malformed JSON",
+			input:  `{not valid json`,
+			fields: []string{"a"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := StripNullFields(json.RawMessage(tt.input), tt.fields)
+			require.Error(t, err)
 		})
 	}
 }

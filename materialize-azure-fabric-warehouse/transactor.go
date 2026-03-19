@@ -211,7 +211,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		doc := json.RawMessage(document)
 		if b := t.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
-			doc = sql.StripNullFields(doc, b.nullFieldsToStrip)
+			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
+				return fmt.Errorf("stripping null fields: %w", err)
+			}
 		}
 		if err = loaded(binding, doc); err != nil {
 			return err
