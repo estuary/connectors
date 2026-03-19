@@ -304,7 +304,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		doc := bd.Document
 		if b := t.bindings[bd.Binding]; len(b.nullFieldsToStrip) > 0 {
-			doc = sql.StripNullFields(doc, b.nullFieldsToStrip)
+			var err error
+			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
+				return fmt.Errorf("stripping null fields: %w", err)
+			}
 		}
 		if err = loaded(bd.Binding, doc); err != nil {
 			return fmt.Errorf("load row loaded: %w", err)

@@ -541,7 +541,10 @@ func (d *transactor) loadDocuments(ctx context.Context, ch chan *loadDoc, loaded
 			}
 			loadDoc := doc.document
 			if b := d.bindings[doc.binding]; len(b.nullFieldsToStrip) > 0 {
-				loadDoc = sql.StripNullFields(loadDoc, b.nullFieldsToStrip)
+				var err error
+				if loadDoc, err = sql.StripNullFields(loadDoc, b.nullFieldsToStrip); err != nil {
+					return fmt.Errorf("stripping null fields: %w", err)
+				}
 			}
 			if err := loaded(doc.binding, loadDoc); err != nil {
 				return fmt.Errorf("sending loaded document for table %q: %w", d.bindings[doc.binding].target.Identifier, err)
