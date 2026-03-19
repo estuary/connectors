@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from enum import Enum, StrEnum
 from logging import Logger
+from itertools import combinations
 from typing import (
     Any,
     Callable,
@@ -21,12 +22,6 @@ from uuid import uuid4
 
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
-from estuary_cdk.capture.webhook import (
-    CollectionMatchingSpec,
-    UrlMatch,
-    WebhookCaptureSpec,
-)
-
 from ..cron import next_fire
 from ..flow import (
     CaptureBinding,
@@ -35,6 +30,7 @@ from ..flow import (
 from ..pydantic_polyfill import GenericModel, JsonValue
 from ..utils import json_merge_patch
 from . import Task, request, response
+
 
 LogCursor = tuple[str | int] | AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
@@ -206,21 +202,6 @@ class ResourceConfig(BaseResourceConfig):
     # namespace: str | None = Field(
     #    default=None, description="Enclosing schema namespace of this resource"
     # )
-
-    @override
-    def path(self) -> list[str]:
-        return [self.name]
-
-
-class WebhookResourceConfig(BaseResourceConfig):
-    # TODO: What does this classvar do exactly?
-    PATH_POINTERS: ClassVar[list[str]] = ["/webhookId"]
-
-    name: str = Field(description="Name of this resource")
-    match_rule: CollectionMatchingSpec = Field(
-        default_factory=lambda: UrlMatch(value="*"),
-        description="Matching spec for routing incoming webhooks to this collection",
-    )
 
     @override
     def path(self) -> list[str]:
@@ -601,19 +582,29 @@ _ResolvableBinding = TypeVar(
 def resolve_bindings(
     bindings: list[_ResolvableBinding],
     resources: list[Resource[Any, _BaseResourceConfig, Any]],
-    webhook_specs: list[WebhookCaptureSpec],
     resource_term="Resource",
 ) -> list[tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]]:
-    # TODO: How can we ensure that specs are being respected and non-conflicting?
-    # Is this the right place to do it?
-    # We have to check for destination ambiguity, something else?
 
     resolved: list[
         tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]
     ] = []
     errors: list[str] = []
 
-    errors += verify_spec_compatibility(webhook_specs)
+    # Check for routing conflicts between webhook match rules.
+    webhook_match_rules = [
+        resource.initial_config.match_rule
+        for resource in resources
+        if resource.is_webhook_resource
+    ]
+    errors.extend(
+        filter(
+            bool,
+            (
+                rule.list_compatibility_errors(other)
+                for rule, other in combinations(webhook_match_rules, 2)
+            ),
+        )
+    )
 
     for binding in bindings:
         path = binding.resourceConfig.path()
@@ -795,19 +786,7 @@ def open(
                 scheduled_stop(task, soonest_future_scheduled_initialization)
             )
 
-        resolved_webhook_bindings = {
-            index: binding
-            for index, (binding, resource) in enumerate(resolved_bindings)
-            if resource.is_webhook_resource
-        }
-        if resolved_webhook_bindings:
-            # TODO: Fix this circular dependency issue
-            from estuary_cdk.capture.webhook import start_webhook_server
-
-            # TODO: Maybe rather than calling enumerate() twice in `open()`,
-            # we can find a more stable way to assign indexes.
-            start_webhook_server(resolved_webhook_bindings, task)
-
+        if task.stopping.webhook_task is not None:
             # The webhook server runs outside the TaskGroup so it can outlive
             # non-webhook tasks during two-phase shutdown. Block here so the
             # TaskGroup stays alive until graceful shutdown begins.
