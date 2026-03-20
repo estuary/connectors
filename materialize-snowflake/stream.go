@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"path"
 	"strconv"
@@ -170,14 +169,15 @@ func (sm *streamManager) objMetadata() blob.WriterOption {
 	})
 }
 
-func (sm *streamManager) flush(baseToken string) (map[int][]*blobMetadata, error) {
+func (sm *streamManager) flush(baseToken string) (map[int][]*blobMetadata, map[int]string, error) {
 	if sm.bdecWriter != nil {
 		if err := sm.finishBlob(); err != nil {
-			return nil, fmt.Errorf("finishBlob: %w", err)
+			return nil, nil, fmt.Errorf("finishBlob: %w", err)
 		}
 	}
 
 	out := make(map[int][]*blobMetadata)
+	keys := make(map[int]string)
 	for binding, trackedBlobs := range sm.blobStats {
 		for idx, trackedBlob := range trackedBlobs {
 			out[binding] = append(out[binding], generateBlobMetadata(
@@ -185,11 +185,12 @@ func (sm *streamManager) flush(baseToken string) (map[int][]*blobMetadata, error
 				sm.tableStreams[binding].channel,
 				blobToken(baseToken, idx)),
 			)
+			keys[binding] = sm.tableStreams[binding].channel.EncryptionKey
 		}
 	}
 	maps.Clear(sm.blobStats)
 
-	return out, nil
+	return out, keys, nil
 }
 
 // write registers a series of blobs to the table. All the blobs must be for the
@@ -208,7 +209,7 @@ func (sm *streamManager) flush(baseToken string) (map[int][]*blobMetadata, error
 // channel itself persists the last registered token, and this allows us to
 // filter out blobs that had previously been registered and don't need
 // registered again on a re-attempt of an Acknowledge.
-func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata) error {
+func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, decryptKey string, recovery bool) error {
 	if err := validWriteBlobs(blobs); err != nil {
 		return fmt.Errorf("validWriteBlobs: %w", err)
 	}
@@ -247,48 +248,42 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata) error
 		blob.Chunks[0].Channels[0].ClientSequencer = thisChannel.ClientSequencer
 		blob.Chunks[0].Channels[0].RowSequencer = thisChannel.RowSequencer + 1
 
-		if err := sm.c.write(ctx, blob); err != nil {
-			var apiError *streamingApiError
-			if errors.As(err, &apiError) && apiError.Code == 38 {
-				// The "blob has wrong format or extension" error occurs if the
-				// blob was written not-so-recently; apparently anything older
-				// than an hour or so is rejected by what seems to be a
-				// server-side check the examines the name of the file, which
-				// contains the timestamp it was written.
-				//
-				// In these cases, which may arise from re-enabling a disabled
-				// binding / materialization, or extended outages, we have to
-				// download the file and re-upload it with an up-to-date name.
-				//
-				// This should be quite rare, even more rare than one may think,
-				// since blob registration tokens are persisted in Snowflake
-				// rather than exclusively managed by our Acknowledge
-				// checkpoints. But it is still technically possible and so it
-				// is handled with this.
-				if err := sm.maybeInitializeBucket(ctx); err != nil {
-					return fmt.Errorf("initializing bucket to rename: %w", err)
-				}
-				nextName := sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
-
-				ll := log.WithFields(log.Fields{
-					"oldName": blob.Path,
-					"newName": nextName,
-					"token":   blobToken,
-				})
-				ll.Info("attempting to register blob with malformed name by renaming")
-
-				if err := sm.renameBlob(ctx, blob, thisChannel.EncryptionKey, nextName); err != nil {
-					return fmt.Errorf("renameBlob: %w", err)
-				}
-
-				if err := sm.c.write(ctx, blob); err != nil {
-					log.WithField("blob", blob).Warn("blob metadata")
-					return fmt.Errorf("failed to write renamed blob: %w", err)
-				}
-				ll.Info("successfully registered renamed blob")
-			} else {
-				return fmt.Errorf("write: %w", err)
+		if recovery {
+			// Handle the case where decryptKey was not in the checkpoint because
+			// the checkpoint was created before it was added.  We will guess that
+			// its the same as the current key, if its not then the decrypted
+			// data will not have the parquet magic header.
+			//
+			// This check can be removed once all tasks have written a checkpoint.
+			if decryptKey == "" {
+				decryptKey = thisChannel.EncryptionKey
 			}
+
+			// Always use the rename and re-upload strategy during recovery
+			// commits. This prevents issues where blobs could be re-registered
+			// if the underlying channel has changed somehow, perhaps by being
+			// dropped out-of-band, or its last persisted token changed in some
+			// other way.
+			//
+			// It is also possible the channel encryption key has changed and
+			// the blob will need to be rewritten with the new encryption key.
+			//
+			// This also address the "blob has wrong format or extension" error
+			// which occurs if the blob was written not-so-recently; apparently
+			// anything older than an hour or so is rejected by what seems to
+			// be a server-side check the examines the name of the file, which
+			// contains the timestamp it was written.  In this case, which
+			// may arise from re-enabling a disabled binding / materialization,
+			// or extended outages, we have to download the file and re-upload
+			// it with an up-to-date name.
+			//
+			// This should be a relatively infrequent occurrence, so the
+			// performance impact + increased data transfer should be tolerable.
+			if err := sm.writeRenamed(ctx, decryptKey, thisChannel, blob); err != nil {
+				return fmt.Errorf("writeRenamed: %w", err)
+			}
+		} else if err := sm.c.write(ctx, blob); err != nil {
+			return fmt.Errorf("write: %w", err)
 		}
 
 		thisChannel.RowSequencer++
@@ -312,14 +307,48 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata) error
 	return nil
 }
 
-func (sm *streamManager) renameBlob(ctx context.Context, blob *blobMetadata, encryptionKey string, newName blobFileName) error {
+func (sm *streamManager) writeRenamed(ctx context.Context, decryptKey string, channel *channel, blob *blobMetadata) error {
+	if err := sm.maybeInitializeBucket(ctx); err != nil {
+		return fmt.Errorf("initializing bucket to rename: %w", err)
+	}
+	nextName := sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
+
+	ll := log.WithFields(log.Fields{
+		"oldName": blob.Path,
+		"newName": nextName,
+		"token":   blob.Chunks[0].Channels[0].OffsetToken,
+		"schema":  blob.Chunks[0].Schema,
+		"table":   blob.Chunks[0].Table,
+	})
+	ll.Info("attempting to register blob by renaming")
+
+	if err := sm.renameBlob(ctx, blob, decryptKey, channel, nextName); err != nil {
+		return fmt.Errorf("renameBlob: %w", err)
+	}
+
+	if err := sm.c.write(ctx, blob); err != nil {
+		ll.WithField("blob", blob).Warn("blob metadata")
+		return fmt.Errorf("failed to write renamed blob: %w", err)
+	}
+	ll.Info("successfully registered renamed blob")
+
+	return nil
+}
+
+func (sm *streamManager) renameBlob(
+	ctx context.Context,
+	blob *blobMetadata,
+	decryptKey string,
+	channel *channel,
+	newName blobFileName,
+) error {
 	r, err := sm.bucket.NewReader(ctx, path.Join(sm.bucketPath, blob.Path))
 	if err != nil {
 		return fmt.Errorf("NewReader: %w", err)
 	}
 	w := sm.bucket.NewWriter(ctx, path.Join(sm.bucketPath, string(newName)), sm.objMetadata())
 
-	if err := reencrypt(r, w, blob, encryptionKey, newName); err != nil {
+	if err := reencrypt(r, w, blob, decryptKey, channel, newName); err != nil {
 		return fmt.Errorf("reencrypt: %w", err)
 	} else if err := r.Close(); err != nil {
 		return fmt.Errorf("closing r: %w", err)
