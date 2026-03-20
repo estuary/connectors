@@ -832,9 +832,14 @@ def open_binding(
             )
 
     if fetch_snapshot:
+        if tombstone is None:
+            # Default tombstone for snapshot bindings so callers don't need to
+            # provide one. The cast satisfies the _BaseDocument TypeVar since
+            # BaseDocument is its bound.
+            tombstone = cast(_BaseDocument, BaseDocument(_meta=BaseDocument.Meta(op="d")))
 
         async def closure(task: Task):
-            assert tombstone
+            assert tombstone is not None
             await _binding_snapshot_task(
                 binding,
                 binding_index,
