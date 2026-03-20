@@ -4,10 +4,10 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-# All tables use ReplacingMergeTree with _version and _is_deleted columns.
-# FINAL deduplicates at query time, and we filter out soft-deleted rows.
+# All tables use ReplacingMergeTree to deduplicate and hard-delete delete rows asynchronously.
+# FINAL filters duplicate and deleted rows at query time.
 function exportTable() {
-  query "SELECT * EXCEPT (_version, _is_deleted) FROM \`$1\` FINAL WHERE _is_deleted = 0 ORDER BY flow_published_at, id FORMAT JSON;" \
+  query "SELECT * EXCEPT (_is_deleted) FROM \`$1\` FINAL ORDER BY flow_published_at, id FORMAT JSON;" \
     | jq -c "{ table: \"$1\", rows: .data | map(del(.flow_document)) }"
 }
 
