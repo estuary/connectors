@@ -4,7 +4,7 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-export CLICKHOUSE_HOST="${CLICKHOUSE_HOST:=materialize-clickhouse-clickhouse-1.flow-test}"
+export CLICKHOUSE_HOST="${CLICKHOUSE_HOST:=materialize-clickhouse-db-1.flow-test}"
 export CLICKHOUSE_PORT="${CLICKHOUSE_PORT:=9000}"
 export CLICKHOUSE_DATABASE="${CLICKHOUSE_DATABASE:=flow}"
 export CLICKHOUSE_USER="${CLICKHOUSE_USER:=flow}"
@@ -15,7 +15,7 @@ docker compose -f materialize-clickhouse/docker-compose.yaml up --wait
 sleep 5
 
 function query() {
-  docker exec materialize-clickhouse-clickhouse-1 clickhouse-client \
+  docker exec materialize-clickhouse-db-1 clickhouse-client \
     --host=127.0.0.1 --port=$CLICKHOUSE_PORT --user=$CLICKHOUSE_USER --password=$CLICKHOUSE_PASSWORD \
     --database=$CLICKHOUSE_DATABASE --query="$1"
 }
