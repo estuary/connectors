@@ -49,13 +49,14 @@ pub struct EndpointConfig {
     #[schemars(default = "paths_schema_default", schema_with = "paths_schema")]
     paths: Vec<String>,
 
-    /// List of allowed CORS origins. If empty, then CORS will be disabled. Otherwise, each item
-    /// in the list will be interpreted as a specific request origin that will be permitted by the
-    /// `Access-Control-Allow-Origin` header for preflight requests coming from that origin. As a special
-    /// case, the value `*` is permitted in order to allow all origins. The `*` should be used with extreme
-    /// caution, however. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin
-    #[serde(default)]
-    #[schemars(default, schema_with = "cors_schema")]
+    /// List of allowed CORS origins.
+    /// Each item will be interpreted as a specific request origin permitted by the Access-Control-Allow-Origin header.
+    /// Defaults to ["*"], which allows all origins.
+    /// Set to an empty array to disable CORS.
+    /// Must not include "*" when an authentication token is configured.
+    /// See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin
+    #[serde(default = "cors_schema_default")]
+    #[schemars(default = "cors_schema_default", schema_with = "cors_schema")]
     allowed_cors_origins: Vec<String>,
 
     /// Configuration for verifying webhook signatures.
@@ -92,12 +93,17 @@ fn paths_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
     .unwrap()
 }
 
+fn cors_schema_default() -> Vec<String> {
+    vec!["*".to_string()]
+}
+
 fn cors_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
     // This schema is a little more permissive than would otherwise be ideal.
     // We'd like to use something like `oneOf: [{format: hostname}, {const: '*'}]`,
     // but the UI does not handle that construct well.
     serde_json::from_value(serde_json::json!({
         "title": "CORS Allowed Origins",
+        "description": "List of allowed CORS origins. Each item will be interpreted as a specific request origin permitted by the Access-Control-Allow-Origin header. Defaults to [\"*\"], which allows all origins. Set to an empty array to disable CORS. Must not include \"*\" when an authentication token is configured.",
         "type": "array",
         "items": {
             "type": "string"
@@ -494,6 +500,10 @@ async fn do_validate(
     let _ = server::parse_cors_allowed_origins(&config.allowed_cors_origins)
         .context("invalid allowedCorsOrigins value")?;
 
+    if config.require_auth_token.is_some() && config.allowed_cors_origins.iter().any(|o| o.trim() == "*") {
+        anyhow::bail!("allowedCorsOrigins must not be \"*\" when requireAuthToken is set");
+    }
+
     // Ensure that signature verification keys are valid
     let _: Box<dyn WebhookSignatureVerifier> = config.signature_config.try_into()?;
 
@@ -649,7 +659,7 @@ mod test {
         let config = EndpointConfig {
             require_auth_token: None,
             paths: vec!["/foo".to_string(), "/bar/baz".to_string()],
-            allowed_cors_origins: Vec::new(),
+            allowed_cors_origins: vec!["*".to_string()],
             signature_config: WebhookSignatureConfig::default(),
         };
         let result = generate_discover_response(config).unwrap();
