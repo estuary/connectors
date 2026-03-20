@@ -176,7 +176,7 @@ func RunTransactions(
 	// started commit, and then writes Acknowledged to the runtime.
 	// It has an exclusive ability to write to `stream` until it returns.
 	var await = func(
-		ourCommitOp OpFuture, // Resolves when the prior commit completes.
+		lastCommitOp OpFuture, // Resolves when the prior commit completes.
 		awaitDoneCh chan<- struct{}, // To be closed upon return.
 		loadDoneCh <-chan struct{}, // Signaled when load() has completed.
 	) (__out error) {
@@ -188,8 +188,8 @@ func RunTransactions(
 
 		// Wait for commit to complete, with cancellation checks.
 		select {
-		case <-ourCommitOp.Done():
-			if err := ourCommitOp.Err(); err != nil {
+		case <-lastCommitOp.Done():
+			if err := lastCommitOp.Err(); err != nil {
 				return err
 			}
 		case <-loadDoneCh:
@@ -244,8 +244,8 @@ func RunTransactions(
 		return err
 	}
 
-	// ourCommitOp is a future for the last async startCommit().
-	var ourCommitOp OpFuture = FinishedOperation(nil)
+	// lastCommitOp is a future for the last async startCommit().
+	var lastCommitOp OpFuture = FinishedOperation(nil)
 	var loadCtx, loadCancel = context.WithCancel(ctx)
 	defer loadCancel()
 
@@ -264,7 +264,7 @@ func RunTransactions(
 		// On completion, Acknowledged has been written to the stream,
 		// and a concurrent load() phase may now begin to close.
 		// At exit, `awaitDoneCh` is closed and `awaitErr` is its status.
-		go await(ourCommitOp, awaitDoneCh, loadDoneCh)
+		go await(lastCommitOp, awaitDoneCh, loadDoneCh)
 
 		// Begin an async load of the current transaction.
 		// At exit, `loadDoneCh` is closed and `loadErr` is its status.
@@ -317,19 +317,19 @@ func RunTransactions(
 		// `startCommit` may be nil to indicate a no-op commit.
 		var stateUpdate *pf.ConnectorState = nil
 		if startCommit != nil {
-			stateUpdate, ourCommitOp = startCommit(ctx, runtimeCheckpoint)
+			stateUpdate, lastCommitOp = startCommit(ctx, runtimeCheckpoint)
 		}
 		// As a convenience, map a nil OpFuture to a pre-resolved one so the
 		// rest of our handling can ignore the nil case.
-		if ourCommitOp == nil {
-			ourCommitOp = FinishedOperation(nil)
+		if lastCommitOp == nil {
+			lastCommitOp = FinishedOperation(nil)
 		}
 
 		// If startCommit returned a pre-resolved error, fail-fast and don't
 		// send StartedCommit to the runtime, as `stateUpdate` may be invalid.
 		select {
-		case <-ourCommitOp.Done():
-			if err = ourCommitOp.Err(); err != nil {
+		case <-lastCommitOp.Done():
+			if err = lastCommitOp.Err(); err != nil {
 				return fmt.Errorf("transactor.StartCommit: %w", err)
 			}
 		default:
