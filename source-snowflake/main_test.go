@@ -18,7 +18,7 @@ import (
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
-	"github.com/snowflakedb/gosnowflake/v2"
+	"github.com/snowflakedb/gosnowflake"
 	"github.com/stretchr/testify/require"
 )
 
@@ -217,9 +217,7 @@ func (tb *testBackend) Insert(ctx context.Context, t testing.TB, table string, r
 
 	var arrs []any
 	for idx := range cols {
-		arr, err := gosnowflake.Array(&cols[idx])
-		require.NoError(t, err, "creating array binding")
-		arrs = append(arrs, arr)
+		arrs = append(arrs, gosnowflake.Array(&cols[idx]))
 	}
 
 	var tx, err = tb.control.BeginTx(ctx, nil)

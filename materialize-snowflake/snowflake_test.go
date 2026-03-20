@@ -16,7 +16,7 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/snowflakedb/gosnowflake/v2"
+	_ "github.com/snowflakedb/gosnowflake"
 )
 
 var testDialect = snowflakeDialect("PUBLIC", timestampTypeLTZ, featureFlagDefaults)
