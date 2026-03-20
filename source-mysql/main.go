@@ -270,6 +270,10 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 		c.SetTLSConfig(&tls.Config{InsecureSkipVerify: true})
 		return nil
 	}
+	var withAttrs = func(c *client.Conn) error {
+		c.SetAttributes(map[string]string{"program_name": "Estuary source-mysql"})
+		return nil
+	}
 
 	// The following if-else chain looks somewhat complicated but it's really very simple.
 	// * We'd prefer to use TLS, so we first try to connect with TLS, and then if that fails
@@ -278,12 +282,12 @@ func (db *mysqlDatabase) connect(_ context.Context) error {
 	// * Otherwise we report both errors because it's better to be clear what failed and how.
 	// * Except if the non-TLS connection specifically failed because TLS is required then
 	//   we don't need to mention that and just return the with-TLS error.
-	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS); errWithTLS == nil {
+	if connWithTLS, errWithTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withTLS, withAttrs); errWithTLS == nil {
 		logrus.WithField("addr", address).Info("connected with TLS")
 		db.conn = &mysqlConnection{inner: connWithTLS, queryTimeout: DefaultQueryTimeout}
 	} else if errors.As(errWithTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
 		return cerrors.NewUserError(mysqlErr, "incorrect username or password")
-	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName); errWithoutTLS == nil {
+	} else if connWithoutTLS, errWithoutTLS := client.Connect(address, db.config.User, db.config.Password, db.config.Advanced.DBName, withAttrs); errWithoutTLS == nil {
 		logrus.WithField("addr", address).Info("connected without TLS")
 		db.conn = &mysqlConnection{inner: connWithoutTLS, queryTimeout: DefaultQueryTimeout}
 	} else if errors.As(errWithoutTLS, &mysqlErr) && mysqlErr.Code == mysql.ER_ACCESS_DENIED_ERROR {
