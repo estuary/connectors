@@ -2,7 +2,7 @@ import abc
 import asyncio
 import functools
 from enum import Enum, StrEnum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 import inspect
 from logging import Logger
@@ -473,6 +473,20 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     schema_inference: bool
     reduction_strategy: ReductionStrategy | None = None
     disable: bool = False
+
+
+@dataclass(kw_only=True)
+class SnapshotResource(Resource[_BaseDocument, _BaseResourceConfig, ResourceState]):
+    """A Resource for snapshot bindings with standard defaults that
+    work well with the rest of the CDK and Estuary Flow platform.
+
+    Sets key to /_meta/row_id (required for CDK deletion inference),
+    initial_state to an empty ResourceState, and reduction_strategy to
+    lastWriteWins — the invariant choices for all snapshot bindings.
+    """
+
+    key: list[str] = field(default_factory=lambda: ["/_meta/row_id"])
+    initial_state: ResourceState = field(default_factory=ResourceState)
 
 
 def discovered(
