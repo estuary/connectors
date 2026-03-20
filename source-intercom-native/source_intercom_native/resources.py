@@ -94,7 +94,7 @@ async def validate_credentials(
 
 def full_refresh_resources(
         log: Logger, http: HTTPMixin, config: EndpointConfig
-) -> list[common.Resource]:
+) -> list[common.SnapshotResource]:
 
     def open(
             path: str,
@@ -119,16 +119,13 @@ def full_refresh_resources(
                 query_param,
                 config.advanced.api_version,
             ),
-            tombstone=IntercomResource(_meta=IntercomResource.Meta(op="d"))
         )
 
     resources = [
-        common.Resource(
+        common.SnapshotResource(
             name=name,
-            key=["/_meta/row_id"],
-            model=IntercomResource,
+            model=common.BaseDocument,
             open=functools.partial(open, path, response_field, query_param),
-            initial_state=ResourceState(),
             initial_config=ResourceConfig(
                 name=name, interval=timedelta(minutes=5)
             ),
