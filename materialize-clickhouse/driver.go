@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	stdsql "database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -102,8 +101,8 @@ func (c config) resolvedAddress() string {
 	return address
 }
 
-func (c config) openDB() *stdsql.DB {
-	return clickhouse.OpenDB(&clickhouse.Options{
+func (c config) newClickhouseOptions() *clickhouse.Options {
+	return &clickhouse.Options{
 		Addr: []string{c.resolvedAddress()},
 		Auth: clickhouse.Auth{
 			Database: c.Database,
@@ -113,46 +112,7 @@ func (c config) openDB() *stdsql.DB {
 		Compression: &clickhouse.Compression{
 			Method: clickhouse.CompressionLZ4,
 		},
-	})
-}
-
-// openNativeConn returns a clickhouse-go/v2 native connection pool used for
-// Store inserts (PrepareBatch). Unlike openDB() which returns a database/sql
-// wrapper, the native conn supports PrepareBatch() and structured parameter binding.
-func (c config) openNativeConn() (chdriver.Conn, error) {
-	return clickhouse.Open(&clickhouse.Options{
-		Addr: []string{c.resolvedAddress()},
-		Auth: clickhouse.Auth{
-			Database: c.Database,
-			Username: c.Credentials.Username,
-			Password: c.Credentials.Password,
-		},
-		Compression: &clickhouse.Compression{
-			Method: clickhouse.CompressionLZ4,
-		},
-		MaxOpenConns: 50,
-		MaxIdleConns: 10,
-	})
-}
-
-// openNativeConnSingle returns a native connection pool pinned to a single TCP
-// connection (MaxOpenConns=1, MaxIdleConns=1). This guarantees all operations
-// are serialized through the same connection, which is required for ClickHouse
-// session-scoped temporary tables.
-func (c config) openNativeConnSingle() (chdriver.Conn, error) {
-	return clickhouse.Open(&clickhouse.Options{
-		Addr: []string{c.resolvedAddress()},
-		Auth: clickhouse.Auth{
-			Database: c.Database,
-			Username: c.Credentials.Username,
-			Password: c.Credentials.Password,
-		},
-		Compression: &clickhouse.Compression{
-			Method: clickhouse.CompressionLZ4,
-		},
-		MaxOpenConns: 1,
-		MaxIdleConns: 1,
-	})
+	}
 }
 
 // tableConfig defines per-binding resource configuration.
@@ -241,7 +201,9 @@ func prepareNewTransactor(
 		var d = &transactor{dialect: ep.Dialect, templates: tpls, cfg: cfg, be: be}
 
 		var err error
-		if d.store.conn, err = cfg.openNativeConn(); err != nil {
+		opts := cfg.newClickhouseOptions()
+		opts.MaxIdleConns = 40
+		if d.store.conn, err = clickhouse.Open(opts); err != nil {
 			return nil, fmt.Errorf("openNativeConn (store): %w", err)
 		}
 
@@ -287,7 +249,13 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		return fmt.Errorf("rendering storeInsert template: %w", err)
 	}
 
-	if b.load.conn, err = t.cfg.openNativeConnSingle(); err != nil {
+	// Bindings use a temporary tables to store load keys.
+	// The lifetime of a temporary table is tied to its TCP connections, so we must limit
+	// the connection pool to just one.
+	opts := t.cfg.newClickhouseOptions()
+	opts.MaxOpenConns = 1
+	opts.MaxIdleConns = 1
+	if b.load.conn, err = clickhouse.Open(opts); err != nil {
 		return fmt.Errorf("openNativeConnSingle (load): %w", err)
 	}
 

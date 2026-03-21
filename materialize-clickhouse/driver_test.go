@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
 	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -85,7 +86,7 @@ func TestValidateAndApply(t *testing.T) {
 		Table: "target",
 	}
 
-	db := cfg.openDB()
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	boilerplate.RunValidateAndApplyTestCases(
@@ -115,7 +116,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		Table: "target",
 	}
 
-	db := cfg.openDB()
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	sql.RunValidateAndApplyMigrationsTests(
@@ -313,7 +314,7 @@ func TestTruncateTable(t *testing.T) {
 	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: dialect}
 	var tableName = "test_truncate"
 
-	db := cfg.openDB()
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	// Create a table and insert a row.
@@ -347,7 +348,7 @@ func TestTruncateTable(t *testing.T) {
 
 func TestOpenNativeConn(t *testing.T) {
 	var cfg = testConfig()
-	conn, err := cfg.openNativeConn()
+	conn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	defer conn.Close()
 
@@ -358,7 +359,7 @@ func TestDestroy(t *testing.T) {
 	var cfg = testConfig()
 	var tr = &transactor{}
 	var err error
-	tr.store.conn, err = cfg.openNativeConn()
+	tr.store.conn, err = clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 
 	tr.Destroy()
@@ -425,7 +426,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	var tableName = "test_data_path"
 	var table = buildTestTable(t, dialect, tableName)
 
-	db := cfg.openDB()
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	// Drop any stale table from a previous run, then create fresh.
@@ -445,7 +446,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	defer b.load.conn.Close()
 
 	// Open a native connection for store batch inserts.
-	storeConn, err := cfg.openNativeConn()
+	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	defer storeConn.Close()
 
@@ -498,7 +499,7 @@ func TestPrepareNewTransactor(t *testing.T) {
 
 	// One binding — transactor has one binding.
 	var table = buildTestTable(t, dialect, "test_prepare_txn")
-	db := cfg.openDB()
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
@@ -601,7 +602,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	table, err := sql.ResolveTable(shape, dialect)
 	require.NoError(t, err)
 
-	db := cfg.openDB()
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
@@ -618,7 +619,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	var b = tr.bindings[0]
 	defer b.load.conn.Close()
 
-	storeConn, err := cfg.openNativeConn()
+	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	defer storeConn.Close()
 
@@ -651,7 +652,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Dialect, tpls templates, table sql.Table, tableName string) (*binding, chdriver.Conn) {
 	t.Helper()
 
-	db := cfg.openDB()
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
@@ -660,7 +661,7 @@ func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Diale
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
 	t.Cleanup(func() {
-		cleanDB := cfg.openDB()
+		cleanDB := clickhouse.OpenDB(cfg.newClickhouseOptions())
 		defer cleanDB.Close()
 		_, _ = cleanDB.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
@@ -669,7 +670,7 @@ func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Diale
 	require.NoError(t, tr.addBinding(ctx, table))
 	t.Cleanup(func() { _ = tr.bindings[0].load.conn.Close() })
 
-	storeConn, err := cfg.openNativeConn()
+	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = storeConn.Close() })
 
@@ -854,7 +855,7 @@ func TestVersionDeduplication(t *testing.T) {
 
 	// Query ClickHouse directly with FINAL to verify deduplication picks the
 	// most recently inserted row.
-	db := cfg.openDB()
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	var doc string
@@ -902,7 +903,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	tableB.Binding = 1
 
 	// Set up both tables manually since setupTable builds a single-binding transactor.
-	db := cfg.openDB()
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	for _, tn := range []string{tableNameA, tableNameB} {
@@ -915,7 +916,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 		require.NoError(t, err)
 	}
 	t.Cleanup(func() {
-		cleanDB := cfg.openDB()
+		cleanDB := clickhouse.OpenDB(cfg.newClickhouseOptions())
 		defer cleanDB.Close()
 		for _, tn := range []string{tableNameA, tableNameB} {
 			_, _ = cleanDB.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tn)))
@@ -932,7 +933,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 		_ = tr.bindings[1].load.conn.Close()
 	})
 
-	storeConn, err := cfg.openNativeConn()
+	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	defer storeConn.Close()
 

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -20,14 +21,14 @@ type client struct {
 }
 
 func newClient(_ context.Context, materializationName string, ep *sql.Endpoint[config]) (sql.Client, error) {
-	var db = ep.Config.openDB()
+	var db = clickhouse.OpenDB(ep.Config.newClickhouseOptions())
 	return &client{db: db, ep: ep}, nil
 }
 
 func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	var errs = &cerrors.PrereqErr{}
 
-	var db = cfg.openDB()
+	var db = clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
 	var cancel context.CancelFunc
