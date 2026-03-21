@@ -101,6 +101,9 @@ var clickHouseDialect = func(database string) sql.Dialect {
 
 type templates struct {
 	createTargetTable *template.Template
+	loadCreateTable   *template.Template
+	loadTruncateTable *template.Template
+	loadInsert        *template.Template
 	loadQuery         *template.Template
 	storeInsert       *template.Template
 	alterTableColumns *template.Template
@@ -155,20 +158,43 @@ SETTINGS
 	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
 {{ end }}
 
--- Templated query which looks up existing documents by primary key using a native
--- IN (?) parameter. The caller passes a []clickhouse.GroupSet of key tuples.
--- FINAL deduplicates per-key and omits deleted records at query time.
+{{ define "loadCreateTable" }}
+CREATE TEMPORARY TABLE flow_temp_load (
+	{{- range $ind, $key := $.Keys }}
+		{{- if $ind }},{{ end }}
+		{{ $key.Identifier }} {{ $key.DDL }}
+	{{- end }}
+);
+{{ end }}
 
-{{ define "loadQuery" }}
-{{ if $.Document -}}
-SELECT {{$.Document.Identifier}}
-	FROM {{$.Identifier}} FINAL
-	WHERE (
+{{ define "loadTruncateTable" }}
+TRUNCATE TABLE flow_temp_load;
+{{ end }}
+
+-- Templated INSERT for staging load keys into the temp table via PrepareBatch.
+
+{{ define "loadInsert" }}
+INSERT INTO flow_temp_load (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{ end -}}
 		{{$key.Identifier}}
 	{{- end -}}
-	) IN (?)
+)
+{{ end }}
+
+-- Templated query which joins the temp table with the target table to look up
+-- existing documents. Returns binding index and document JSON for UNION ALL.
+-- FINAL deduplicates per-key and omits deleted records at query time.
+
+{{ define "loadQuery" }}
+{{ if $.Document -}}
+SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
+	FROM {{$.Identifier}} AS r FINAL
+	JOIN flow_temp_load AS l
+	{{- range $ind, $key := $.Keys }}
+		{{ if $ind }} AND {{ else }} ON  {{ end -}}
+		l.{{$key.Identifier}} = r.{{$key.Identifier}}
+	{{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 {{ end }}
@@ -201,6 +227,9 @@ ALTER TABLE {{$.Identifier}} MODIFY COLUMN {{ ColumnIdentifier $col.Name }} Null
 
 	return templates{
 		createTargetTable: tplAll.Lookup("createTargetTable"),
+		loadCreateTable:   tplAll.Lookup("loadCreateTable"),
+		loadTruncateTable: tplAll.Lookup("loadTruncateTable"),
+		loadInsert:        tplAll.Lookup("loadInsert"),
 		loadQuery:         tplAll.Lookup("loadQuery"),
 		storeInsert:       tplAll.Lookup("storeInsert"),
 		alterTableColumns: tplAll.Lookup("alterTableColumns"),

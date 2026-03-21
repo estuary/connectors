@@ -21,7 +21,10 @@ func TestSQLGeneration(t *testing.T) {
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
 				testTemplates.createTargetTable,
+				testTemplates.loadCreateTable,
 				testTemplates.loadQuery,
+				testTemplates.loadInsert,
+				testTemplates.loadTruncateTable,
 				testTemplates.storeInsert,
 			},
 			TplAddColumns:    testTemplates.alterTableColumns,

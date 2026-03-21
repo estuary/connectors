@@ -51,11 +51,30 @@ SETTINGS
 	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
 --- End delta_updates createTargetTable ---
 
+--- Begin key_value loadCreateTable ---
+
+CREATE TEMPORARY TABLE flow_temp_load (
+		key1 Int64,
+		key2 Bool,
+		`key!binary` String
+);
+--- End key_value loadCreateTable ---
+
+--- Begin delta_updates loadCreateTable ---
+
+CREATE TEMPORARY TABLE flow_temp_load (
+		`theKey` String
+);
+--- End delta_updates loadCreateTable ---
+
 --- Begin key_value loadQuery ---
 
-SELECT flow_document
-	FROM key_value FINAL
-	WHERE (key1, key2, `key!binary`) IN (?)
+SELECT 0::Int32, r.flow_document
+	FROM key_value AS r FINAL
+	JOIN flow_temp_load AS l
+		 ON  l.key1 = r.key1
+		 AND l.key2 = r.key2
+		 AND l.`key!binary` = r.`key!binary`
 
 --- End key_value loadQuery ---
 
@@ -64,6 +83,26 @@ SELECT flow_document
 SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 
 --- End delta_updates loadQuery ---
+
+--- Begin key_value loadInsert ---
+
+INSERT INTO flow_temp_load (key1, key2, `key!binary`)
+--- End key_value loadInsert ---
+
+--- Begin delta_updates loadInsert ---
+
+INSERT INTO flow_temp_load (`theKey`)
+--- End delta_updates loadInsert ---
+
+--- Begin key_value loadTruncateTable ---
+
+TRUNCATE TABLE flow_temp_load;
+--- End key_value loadTruncateTable ---
+
+--- Begin delta_updates loadTruncateTable ---
+
+TRUNCATE TABLE flow_temp_load;
+--- End delta_updates loadTruncateTable ---
 
 --- Begin key_value storeInsert ---
 

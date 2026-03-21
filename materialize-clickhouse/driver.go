@@ -116,10 +116,9 @@ func (c config) openDB() *stdsql.DB {
 	})
 }
 
-// openNativeConn returns a clickhouse-go/v2 native connection pool used for both
-// Load queries (Query with GroupSet IN parameters) and Store inserts (PrepareBatch).
-// Unlike openDB() which returns a database/sql wrapper, the native conn supports
-// PrepareBatch() and structured parameter binding via clickhouse.GroupSet.
+// openNativeConn returns a clickhouse-go/v2 native connection pool used for
+// Store inserts (PrepareBatch). Unlike openDB() which returns a database/sql
+// wrapper, the native conn supports PrepareBatch() and structured parameter binding.
 func (c config) openNativeConn() (chdriver.Conn, error) {
 	return clickhouse.Open(&clickhouse.Options{
 		Addr: []string{c.resolvedAddress()},
@@ -133,6 +132,26 @@ func (c config) openNativeConn() (chdriver.Conn, error) {
 		},
 		MaxOpenConns: 50,
 		MaxIdleConns: 10,
+	})
+}
+
+// openNativeConnSingle returns a native connection pool pinned to a single TCP
+// connection (MaxOpenConns=1, MaxIdleConns=1). This guarantees all operations
+// are serialized through the same connection, which is required for ClickHouse
+// session-scoped temporary tables.
+func (c config) openNativeConnSingle() (chdriver.Conn, error) {
+	return clickhouse.Open(&clickhouse.Options{
+		Addr: []string{c.resolvedAddress()},
+		Auth: clickhouse.Auth{
+			Database: c.Database,
+			Username: c.Credentials.Username,
+			Password: c.Credentials.Password,
+		},
+		Compression: &clickhouse.Compression{
+			Method: clickhouse.CompressionLZ4,
+		},
+		MaxOpenConns: 1,
+		MaxIdleConns: 1,
 	})
 }
 
@@ -195,8 +214,6 @@ type transactor struct {
 	templates templates
 	dialect   sql.Dialect
 	store     struct {
-		// Native conn pool for both Load queries and Store PrepareBatch inserts.
-		// No session state is needed — each operation acquires a conn and releases.
 		conn chdriver.Conn
 	}
 	bindings []*binding
@@ -223,16 +240,14 @@ func prepareNewTransactor(
 		var cfg = ep.Config
 		var d = &transactor{dialect: ep.Dialect, templates: tpls, cfg: cfg, be: be}
 
-		// The native conn pool is used for both Load queries (Query) and Store
-		// batch inserts (PrepareBatch). No session state is required.
 		var err error
 		if d.store.conn, err = cfg.openNativeConn(); err != nil {
-			return nil, fmt.Errorf("openNativeConn: %w", err)
+			return nil, fmt.Errorf("openNativeConn (store): %w", err)
 		}
 
-		for _, b := range bindings {
-			if err := d.addBinding(b); err != nil {
-				return nil, fmt.Errorf("addBinding of %s: %w", b.Path, err)
+		for _, target := range bindings {
+			if err := d.addBinding(ctx, target); err != nil {
+				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 			}
 		}
 
@@ -241,20 +256,43 @@ func prepareNewTransactor(
 }
 
 type binding struct {
-	target         sql.Table
-	loadQuerySQL   string
-	storeInsertSQL string
+	target               sql.Table
+	loadCreateTableSQL   string
+	loadTruncateTableSQL string
+	loadInsertSQL        string
+	loadQuerySQL         string
+	storeInsertSQL       string
+	load                 struct {
+		conn chdriver.Conn
+	}
 }
 
-func (t *transactor) addBinding(target sql.Table) error {
-	var b = &binding{target: target}
+func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
+	b := &binding{target: target}
 
 	var err error
+	if b.loadCreateTableSQL, err = sql.RenderTableTemplate(target, t.templates.loadCreateTable); err != nil {
+		return fmt.Errorf("rendering loadCreateTable template: %w", err)
+	}
+	if b.loadTruncateTableSQL, err = sql.RenderTableTemplate(target, t.templates.loadTruncateTable); err != nil {
+		return fmt.Errorf("rendering loadTruncateTable template: %w", err)
+	}
+	if b.loadInsertSQL, err = sql.RenderTableTemplate(target, t.templates.loadInsert); err != nil {
+		return fmt.Errorf("rendering loadInsert template: %w", err)
+	}
 	if b.loadQuerySQL, err = sql.RenderTableTemplate(target, t.templates.loadQuery); err != nil {
-		return fmt.Errorf("rendering load query template: %w", err)
+		return fmt.Errorf("rendering loadQuery template: %w", err)
 	}
 	if b.storeInsertSQL, err = sql.RenderTableTemplate(target, t.templates.storeInsert); err != nil {
-		return fmt.Errorf("rendering store insert template: %w", err)
+		return fmt.Errorf("rendering storeInsert template: %w", err)
+	}
+
+	if b.load.conn, err = t.cfg.openNativeConnSingle(); err != nil {
+		return fmt.Errorf("openNativeConnSingle (load): %w", err)
+	}
+
+	if err = b.load.conn.Exec(ctx, b.loadCreateTableSQL); err != nil {
+		return fmt.Errorf("creating load temp table: %w", err)
 	}
 
 	t.bindings = append(t.bindings, b)
@@ -262,63 +300,92 @@ func (t *transactor) addBinding(target sql.Table) error {
 }
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) error {
-	const batchSize = 1000
+	const batchSize = 100_000
 
-	// We are evaluating loads as they come, so we must wait for the runtime's ack of the previous commit.
-	it.WaitForAcknowledged()
+	var ctx = it.Context()
 
-	keysByBinding := make(map[int][]clickhouse.GroupSet)
-	flushBinding := func(binding int) error {
-		groupSets := keysByBinding[binding]
-		delete(keysByBinding, binding)
-		if len(groupSets) == 0 {
-			return nil
+	// Truncate all temp tables to clear keys from prior transactions.
+	for _, b := range t.bindings {
+		if err := b.load.conn.Exec(ctx, b.loadTruncateTableSQL); err != nil {
+			return fmt.Errorf("truncating load table: %w", err)
 		}
-
-		b := t.bindings[binding]
-		rows, err := t.store.conn.Query(it.Context(), b.loadQuerySQL, groupSets)
-		if err != nil {
-			return fmt.Errorf("querying Load documents: %w", err)
-		}
-		for rows.Next() {
-			var document json.RawMessage
-			if err := rows.Scan(&document); err != nil {
-				_ = rows.Close()
-				return fmt.Errorf("scanning Load document: %w", err)
-			} else if err := loaded(binding, document); err != nil {
-				_ = rows.Close()
-				return err
-			}
-		}
-		_ = rows.Close()
-		if err := rows.Err(); err != nil {
-			return fmt.Errorf("querying Loads: %w", err)
-		}
-		return nil
 	}
 
+	batchByBinding := make(map[int]chdriver.Batch)
+	abortAllBatches := func() {
+		for _, batch := range batchByBinding {
+			_ = batch.Abort()
+		}
+	}
+
+	var hasKeys bool
 	for it.Next() {
+		hasKeys = true
 		b := t.bindings[it.Binding]
-		converted, err := b.target.ConvertKey(it.Key)
-		if err != nil {
-			return fmt.Errorf("converting Load key: %w", err)
+
+		batch, found := batchByBinding[it.Binding]
+		if !found {
+			var err error
+			batch, err = b.load.conn.PrepareBatch(ctx, b.loadInsertSQL)
+			if err != nil {
+				abortAllBatches()
+				return fmt.Errorf("preparing load batch: %w", err)
+			}
+			batchByBinding[it.Binding] = batch
 		}
 
-		keysByBinding[it.Binding] = append(keysByBinding[it.Binding], clickhouse.GroupSet{Value: converted})
+		converted, err := b.target.ConvertKey(it.Key)
+		if err != nil {
+			abortAllBatches()
+			return fmt.Errorf("converting Load key: %w", err)
+		}
+		if err = batch.Append(converted...); err != nil {
+			abortAllBatches()
+			return fmt.Errorf("appending to load batch: %w", err)
+		}
 
-		if len(keysByBinding[it.Binding]) >= batchSize {
-			if err := flushBinding(it.Binding); err != nil {
-				return err
+		if batch.Rows() >= batchSize {
+			if err = batch.Send(); err != nil {
+				abortAllBatches()
+				return fmt.Errorf("sending load batch: %w", err)
 			}
+			delete(batchByBinding, it.Binding)
 		}
 	}
 	if it.Err() != nil {
+		abortAllBatches()
 		return it.Err()
 	}
+	if !hasKeys {
+		return nil
+	}
 
-	for bindingIndex := range keysByBinding {
-		if err := flushBinding(bindingIndex); err != nil {
-			return err
+	// Send all remaining batches.
+	for _, batch := range batchByBinding {
+		if err := batch.Send(); err != nil {
+			abortAllBatches()
+			return fmt.Errorf("sending load batch: %w", err)
+		}
+	}
+
+	for _, b := range t.bindings {
+		rows, err := b.load.conn.Query(ctx, b.loadQuerySQL)
+		if err != nil {
+			return fmt.Errorf("querying Load documents: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var bindingIdx int32
+			var doc json.RawMessage
+			if err = rows.Scan(&bindingIdx, &doc); err != nil {
+				return fmt.Errorf("scanning Load document: %w", err)
+			}
+			if err = loaded(int(bindingIdx), doc); err != nil {
+				return err
+			}
+		}
+		if err = rows.Err(); err != nil {
+			return fmt.Errorf("querying Load documents: %w", err)
 		}
 	}
 
@@ -417,6 +484,9 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 func (t *transactor) Destroy() {
 	_ = t.store.conn.Close()
+	for _, b := range t.bindings {
+		_ = b.load.conn.Close()
+	}
 }
 
 func main() {
