@@ -168,6 +168,11 @@ CREATE TEMPORARY TABLE flow_temp_load_{{ $.Binding }} (
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
 	{{- end }}
+)
+ENGINE = Join(ALL, INNER
+	{{- range $ind, $key := $.Keys -}}
+		, {{ $key.Identifier }}
+	{{- end -}}
 );
 {{ end }}
 

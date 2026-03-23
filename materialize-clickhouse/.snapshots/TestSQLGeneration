@@ -57,14 +57,16 @@ CREATE TEMPORARY TABLE flow_temp_load_0 (
 		key1 Int64,
 		key2 Bool,
 		`key!binary` String
-);
+)
+ENGINE = Join(ALL, INNER, key1, key2, `key!binary`);
 --- End key_value loadCreateTable ---
 
 --- Begin delta_updates loadCreateTable ---
 
 CREATE TEMPORARY TABLE flow_temp_load_1 (
 		`theKey` String
-);
+)
+ENGINE = Join(ALL, INNER, `theKey`);
 --- End delta_updates loadCreateTable ---
 
 --- Begin key_value loadQuery ---
