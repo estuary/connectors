@@ -6,8 +6,6 @@ services:
       CLICKHOUSE_DB: flow
       CLICKHOUSE_USER: flow
       CLICKHOUSE_PASSWORD: flow
-    volumes:
-      - clickhouse_data:/var/lib/clickhouse
     networks:
       - flow-test
     healthcheck:
@@ -21,7 +19,4 @@ services:
 networks:
   flow-test:
     name: flow-test
-      #    external: true
-
-volumes:
-  clickhouse_data: {}
+    external: true
