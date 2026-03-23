@@ -34,7 +34,7 @@ var clickHouseClampDate = sql.StringCastConverter(func(str string) (interface{},
 // year 0, since ClickHouse's DateTime type has a minimum value of 1925-01-01. It also returns a
 // time.Time rather than a string, as required by the ClickHouse driver.
 var clickHouseClampDatetime = sql.StringCastConverter(func(str string) (interface{}, error) {
-    str = strings.ToUpper(str)
+	str = strings.ToUpper(str)
 	parsed, err := time.Parse(time.RFC3339Nano, str)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
@@ -140,7 +140,13 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{- range $ind, $col := $.Columns }}
 		{{$col.Identifier}} {{ if not $col.MustExist }}Nullable({{ end }}{{$col.DDL}}{{ if not $col.MustExist }}){{ end }},
 	{{- end }}
+	{{- $hasMetaOp := false -}}
+	{{- range $.Columns }}{{ if eq .Field "_meta/op" }}{{ $hasMetaOp = true }}{{ end }}{{ end }}
+	{{- if $hasMetaOp }}
+		`+"`_is_deleted`"+` UInt8 MATERIALIZED if(`+"`_meta/op`"+` = 'd', 1, 0)
+	{{- else }}
 		`+"`_is_deleted`"+` UInt8 DEFAULT 0
+	{{- end }}
 )
 ENGINE = ReplacingMergeTree(`+"`flow_published_at`"+`, `+"`_is_deleted`"+`)
 ORDER BY (
@@ -199,7 +205,6 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 {{ end }}
 
 -- Templated INSERT for storing documents into the target table.
--- Always includes _is_deleted for ReplacingMergeTree deduplication.
 
 {{ define "storeInsert" }}
 INSERT INTO {{$.Identifier}} (
@@ -207,7 +212,6 @@ INSERT INTO {{$.Identifier}} (
 		{{- if $ind }}, {{ end -}}
 		{{$col.Identifier}}
 	{{- end -}}
-	, `+"`_is_deleted`"+`
 )
 {{ end }}
 

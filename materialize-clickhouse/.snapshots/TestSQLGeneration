@@ -106,14 +106,12 @@ TRUNCATE TABLE flow_temp_load_1;
 
 --- Begin key_value storeInsert ---
 
-INSERT INTO key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document, `_is_deleted`
-)
+INSERT INTO key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document)
 --- End key_value storeInsert ---
 
 --- Begin delta_updates storeInsert ---
 
-INSERT INTO delta_updates (`theKey`, `aValue`, flow_published_at, `_is_deleted`
-)
+INSERT INTO delta_updates (`theKey`, `aValue`, flow_published_at)
 --- End delta_updates storeInsert ---
 
 --- Begin alter table add columns and drop not nulls ---

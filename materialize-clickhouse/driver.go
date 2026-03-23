@@ -364,10 +364,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	const (
-		deleteFalse      uint8 = 0
-		deleteTrue       uint8 = 1
-		maxBatchRecords        = 100_000
-		maxBatchDuration       = time.Minute
+		maxBatchRecords  = 100_000
+		maxBatchDuration = time.Minute
 	)
 	timeout := time.Tick(maxBatchDuration)
 
@@ -393,7 +391,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	for it.Next() {
-		if it.Delete && t.cfg.HardDelete && !it.Exists {
+		if it.Delete && !it.Exists {
 			continue // nothing to delete if it was never stored
 		}
 
@@ -412,13 +410,6 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
-
-		var deleteState = deleteFalse
-		if it.Delete && t.cfg.HardDelete {
-			deleteState = deleteTrue
-		}
-		converted = append(converted, deleteState)
-
 		if err = batch.Append(converted...); err != nil {
 			return nil, fmt.Errorf("store batch append: %w", err)
 		}
