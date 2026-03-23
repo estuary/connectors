@@ -94,6 +94,7 @@ class BaseStream(BaseDocument, extra="allow"):
 
 class IncrementalStream(BaseStream):
     supports_less_than_filter: ClassVar[bool] = True
+    assume_sorted: ClassVar[bool] = True
     cursor_field: ClassVar[CursorField]
     additional_filters: ClassVar[list[str] | None] = None
 
@@ -161,6 +162,9 @@ class EmailCampaigns(Campaigns):
     ]
 
 class EmailCampaignsArchived(Campaigns):
+    # The Klaviyo API occasionally returns archived email campaigns in
+    # slightly unsorted order despite the sort query parameter.
+    assume_sorted: ClassVar[bool] = False
     additional_filters: ClassVar[list[str] | None] = [
         f"equals(messages.channel,'{CampaignType.EMAIL}')",
         "equals(archived,true)"
