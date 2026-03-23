@@ -50,8 +50,8 @@ The ReplacingMergeTree engine is configured with `flow_published_at` as the
 [version column](https://clickhouse.com/docs/engines/table-engines/mergetree-family/replacingmergetree#ver)
 and `_is_deleted` as the deletion marker.
 
-To delete a record, we clone the previous version of the record, set `_is_deleted = 1`, and insert the clone.
-Soft deletes are not implemented; this behavior only applies when hard deletes are enabled.
+To delete a record, we insert a record with `_meta/op = 'd'`.
+The `_is_deleted` column is automatically inferred by ClickHouse via a MATERIALIZED expression: `if(_meta/op = 'd', 1, 0)`.
 
 To update a record, we clone the previous version of the record, update the fields so specified, and insert the clone.
 `flow_published_at` is a standard Estuary metadata timestamp that naturally increases with each transaction,
@@ -162,7 +162,7 @@ As before, we queried all records in the table (`SELECT * FROM t`), the results 
 Before merge, `SELECT * FROM t` yields 5 records, including both `c` records.
 After merge, the same query yields just 3 records; both `c` versions are gone.
 
-Because Estuary destination tables configure `is_deleted` in the `ReplacingMergeTree` engine,
+Because Estuary destination tables configure `_is_deleted` in the `ReplacingMergeTree` engine,
 the `FINAL` qualifier both deduplicates by `ORDER BY` key and
 [skips deleted records](https://clickhouse.com/docs/guides/replacing-merge-tree#querying-replacingmergetree) at query time.
 This query yields *3* records both before and after merge:

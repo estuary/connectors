@@ -497,7 +497,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	))
 	require.NoError(t, batch.Send())
 
-	// Load again: FINAL + _is_deleted=0 filter should exclude the tombstone.
+	// Load again: FINAL should exclude the tombstone (_is_deleted is inferred by the MATERIALIZED expression).
 	require.Empty(t, loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"}))
 }
 
@@ -543,8 +543,8 @@ func TestPrepareNewTransactor(t *testing.T) {
 	txn.Destroy()
 }
 
-// TestHardDeleteTombstone verifies that delete rows with _is_deleted=1
-// are correctly hidden by FINAL + _is_deleted=0.
+// TestHardDeleteTombstone verifies that delete rows with _meta/op="d"
+// (which infer _is_deleted=1 via the MATERIALIZED expression) are hidden by FINAL.
 func TestHardDeleteTombstone(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()

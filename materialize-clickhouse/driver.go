@@ -212,7 +212,7 @@ func prepareNewTransactor(
 		loadOptions.MaxOpenConns = 1
 		loadOptions.MaxIdleConns = 1
 		if d.load.conn, err = clickhouse.Open(loadOptions); err != nil {
-			return nil, fmt.Errorf("openNativeConn (store): %w", err)
+			return nil, fmt.Errorf("openNativeConn (load): %w", err)
 		}
 
 		storeOptions := cfg.newClickhouseOptions()
