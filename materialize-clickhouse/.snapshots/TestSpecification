@@ -9,6 +9,12 @@
         "description": "Host and port of the database (in the form of host[:port]). Port 9000 is used as the default if no specific port is provided.",
         "order": 0
       },
+      "database": {
+        "type": "string",
+        "title": "Database",
+        "description": "Name of the ClickHouse database to materialize to.",
+        "order": 2
+      },
       "credentials": {
         "oneOf": [
           {
@@ -42,12 +48,6 @@
         },
         "order": 1
       },
-      "database": {
-        "type": "string",
-        "title": "Database",
-        "description": "Name of the ClickHouse database to materialize to.",
-        "order": 2
-      },
       "hardDelete": {
         "type": "boolean",
         "title": "Hard Delete",
@@ -73,8 +73,8 @@
     "type": "object",
     "required": [
       "address",
-      "credentials",
-      "database"
+      "database",
+      "credentials"
     ],
     "title": "SQL Connection"
   },
