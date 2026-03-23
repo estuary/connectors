@@ -34,9 +34,7 @@ var clickHouseClampDate = sql.StringCastConverter(func(str string) (interface{},
 // year 0, since ClickHouse's DateTime type has a minimum value of 1925-01-01. It also returns a
 // time.Time rather than a string, as required by the ClickHouse driver.
 var clickHouseClampDatetime = sql.StringCastConverter(func(str string) (interface{}, error) {
-	if strings.HasSuffix(str, "z") {
-		str = str[:len(str)-1] + "Z"
-	}
+    str = strings.ToUpper(str)
 	parsed, err := time.Parse(time.RFC3339Nano, str)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
