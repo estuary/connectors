@@ -188,7 +188,7 @@ jobs:
       - name: Start Dockerized test infrastructure
         if: |
           contains(fromJson('[
-            "materialize-clickhouse"
+            "materialize-clickhouse",
             "materialize-dynamodb",
             "materialize-elasticsearch",
             "materialize-kafka",
@@ -204,7 +204,7 @@ jobs:
             "source-sqlserver",
             "source-sqlserver-batch",
             "source-sqlserver-ct",
-            "source-mongodb",
+            "source-mongodb"
             ]'), matrix.connector)
         run: |
           set +e # Show logs even if startup fails
