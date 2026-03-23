@@ -281,11 +281,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	batchByBinding := make(map[int]chdriver.Batch)
-	abortAllBatches := func() {
+	defer func() {
 		for _, batch := range batchByBinding {
 			_ = batch.Abort()
 		}
-	}
+	}()
 
 	var hasKeys bool
 	for it.Next() {
@@ -300,7 +300,6 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// 2) We can write to multiple temporary tables, each with its own batch.
 			batch, err = t.load.conn.PrepareBatch(ctx, b.loadInsertSQL, chdriver.WithReleaseConnection())
 			if err != nil {
-				abortAllBatches()
 				return fmt.Errorf("preparing load batch: %w", err)
 			}
 			batchByBinding[it.Binding] = batch
@@ -308,24 +307,20 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		converted, err := b.target.ConvertKey(it.Key)
 		if err != nil {
-			abortAllBatches()
 			return fmt.Errorf("converting Load key: %w", err)
 		}
 		if err = batch.Append(converted...); err != nil {
-			abortAllBatches()
 			return fmt.Errorf("appending to load batch: %w", err)
 		}
 
 		if batch.Rows() >= batchSize {
 			if err = batch.Send(); err != nil {
-				abortAllBatches()
 				return fmt.Errorf("sending load batch: %w", err)
 			}
 			delete(batchByBinding, it.Binding)
 		}
 	}
 	if it.Err() != nil {
-		abortAllBatches()
 		return it.Err()
 	}
 	if !hasKeys {
@@ -335,7 +330,6 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	// Send all remaining batches.
 	for _, batch := range batchByBinding {
 		if err := batch.Send(); err != nil {
-			abortAllBatches()
 			return fmt.Errorf("sending load batch: %w", err)
 		}
 	}
@@ -377,11 +371,11 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	timeout := time.Tick(maxBatchDuration)
 
 	batchByBinding := make(map[int]chdriver.Batch, 2)
-	abortAllBatches := func() {
+	defer func() {
 		for _, batch := range batchByBinding {
 			_ = batch.Abort()
 		}
-	}
+	}()
 	flushAllBatches := func(doSend bool) error {
 		var err error
 		for _, batch := range batchByBinding {
@@ -392,7 +386,6 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 		}
 		if err != nil {
-			abortAllBatches()
 			return fmt.Errorf("flush all batches: %w", err)
 		}
 		return nil
@@ -408,7 +401,6 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		if !found {
 			batch, err = t.store.conn.PrepareBatch(it.Context(), b.storeInsertSQL)
 			if err != nil {
-				abortAllBatches()
 				return nil, fmt.Errorf("prepare store batch: %w", err)
 			}
 			batchByBinding[it.Binding] = batch
@@ -417,7 +409,6 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		var converted []any
 		converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
-			abortAllBatches()
 			return nil, fmt.Errorf("converting store parameters: %w", err)
 		}
 
@@ -428,12 +419,10 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		converted = append(converted, deleteState)
 
 		if err = batch.Append(converted...); err != nil {
-			abortAllBatches()
 			return nil, fmt.Errorf("store batch append: %w", err)
 		}
 		if batch.Rows() >= maxBatchRecords {
 			if err = batch.Flush(); err != nil {
-				abortAllBatches()
 				return nil, fmt.Errorf("flush batch: %w", err)
 			}
 		}
@@ -448,7 +437,6 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	}
 	if it.Err() != nil {
-		abortAllBatches()
 		return nil, it.Err()
 	}
 
