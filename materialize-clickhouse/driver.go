@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -364,10 +363,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	const (
-		maxBatchRecords  = 100_000
-		maxBatchDuration = time.Minute
+		maxBatchRecords = 100_000
 	)
-	timeout := time.Tick(maxBatchDuration)
 
 	batchByBinding := make(map[int]chdriver.Batch, 2)
 	defer func() {
@@ -418,15 +415,6 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 				return nil, fmt.Errorf("flush batch: %w", err)
 			}
 		}
-
-		select {
-		case <-timeout:
-			if err = flushAllBatches(false); err != nil {
-				return nil, err
-			}
-		default:
-		}
-
 	}
 	if it.Err() != nil {
 		return nil, it.Err()
