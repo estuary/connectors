@@ -163,6 +163,7 @@ func newClickHouseDriver() *sql.Driver[config, tableConfig] {
 				CreateTableTemplate: tpls.createTargetTable,
 				NewTransactor:       prepareNewTransactor(tpls),
 				ConcurrentApply:     false,
+				RequireMetaOp:       true,
 			}, nil
 		},
 		PreReqs: preReqs,
