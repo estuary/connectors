@@ -361,11 +361,14 @@ func TestDestroy(t *testing.T) {
 	var err error
 	tr.store.conn, err = clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
+	tr.load.conn, err = clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
 
 	tr.Destroy()
 
-	// After Destroy the connection should be closed; Ping should fail.
+	// After Destroy the connections should be closed; Ping should fail.
 	require.Error(t, tr.store.conn.Ping(t.Context()))
+	require.Error(t, tr.load.conn.Ping(t.Context()))
 }
 
 func TestAddBinding(t *testing.T) {
@@ -376,6 +379,10 @@ func TestAddBinding(t *testing.T) {
 	var table = buildTestTable(t, dialect, "test_add_binding")
 
 	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg}
+	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.load.conn = loadConn
+	defer tr.load.conn.Close()
 	require.NoError(t, tr.addBinding(ctx, table))
 
 	require.Len(t, tr.bindings, 1)
@@ -390,17 +397,17 @@ func TestAddBinding(t *testing.T) {
 // loadDocuments inserts keys into the binding's temp table, runs the load query
 // (which JOINs the temp table with the target table), collects documents, then
 // truncates the temp table for the next load cycle.
-func loadDocuments(t *testing.T, ctx context.Context, b *binding, keys ...[]any) []string {
+func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b *binding, keys ...[]any) []string {
 	t.Helper()
 
-	batch, err := b.load.conn.PrepareBatch(ctx, b.loadInsertSQL)
+	batch, err := loadConn.PrepareBatch(ctx, b.loadInsertSQL)
 	require.NoError(t, err)
 	for _, key := range keys {
 		require.NoError(t, batch.Append(key...))
 	}
 	require.NoError(t, batch.Send())
 
-	rows, err := b.load.conn.Query(ctx, b.loadQuerySQL)
+	rows, err := loadConn.Query(ctx, b.loadQuerySQL)
 	require.NoError(t, err)
 
 	var docs []string
@@ -413,7 +420,7 @@ func loadDocuments(t *testing.T, ctx context.Context, b *binding, keys ...[]any)
 	_ = rows.Close()
 	require.NoError(t, rows.Err())
 
-	require.NoError(t, b.load.conn.Exec(ctx, b.loadTruncateTableSQL))
+	require.NoError(t, loadConn.Exec(ctx, b.loadTruncateTableSQL))
 
 	return docs
 }
@@ -441,9 +448,12 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 
 	// Build the binding to get rendered SQL.
 	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg}
+	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.load.conn = loadConn
+	defer tr.load.conn.Close()
 	require.NoError(t, tr.addBinding(ctx, table))
 	var b = tr.bindings[0]
-	defer b.load.conn.Close()
 
 	// Open a native connection for store batch inserts.
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
@@ -457,7 +467,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	require.NoError(t, batch.Send())
 
 	// Load: query back the document via temp table JOIN.
-	docs := loadDocuments(t, ctx, b, []any{"k1"})
+	docs := loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"id":"k1"}`, docs[0])
 
@@ -474,7 +484,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	require.NoError(t, batch.Send())
 
 	// Load again: FINAL + _is_deleted=0 filter should exclude the tombstone.
-	require.Empty(t, loadDocuments(t, ctx, b, []any{"k1"}))
+	require.Empty(t, loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"}))
 }
 
 func TestPrepareNewTransactor(t *testing.T) {
@@ -615,9 +625,12 @@ func TestHardDeleteTombstone(t *testing.T) {
 	})
 
 	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg}
+	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.load.conn = loadConn
+	defer tr.load.conn.Close()
 	require.NoError(t, tr.addBinding(ctx, table))
 	var b = tr.bindings[0]
-	defer b.load.conn.Close()
 
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
@@ -630,7 +643,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	require.NoError(t, batch.Send())
 
 	// Verify it loads.
-	require.Len(t, loadDocuments(t, ctx, b, []any{"k1"}), 1)
+	require.Len(t, loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"}), 1)
 
 	// Store a delete row with full record values, exactly as Store does.
 	var converted []any
@@ -643,13 +656,13 @@ func TestHardDeleteTombstone(t *testing.T) {
 	require.NoError(t, batch.Send())
 
 	// Load again: tombstone should hide the row.
-	require.Empty(t, loadDocuments(t, ctx, b, []any{"k1"}))
+	require.Empty(t, loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"}))
 }
 
 // setupTable drops any stale table, creates it from the template, builds a
 // transactor + binding, opens native conns, and registers cleanup. It returns
 // the first binding, a store connection, and a load connection (with temp tables).
-func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Dialect, tpls templates, table sql.Table, tableName string) (*binding, chdriver.Conn) {
+func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Dialect, tpls templates, table sql.Table, tableName string) (*binding, chdriver.Conn, chdriver.Conn) {
 	t.Helper()
 
 	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
@@ -667,14 +680,17 @@ func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Diale
 	})
 
 	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg}
+	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.load.conn = loadConn
 	require.NoError(t, tr.addBinding(ctx, table))
-	t.Cleanup(func() { _ = tr.bindings[0].load.conn.Close() })
+	t.Cleanup(func() { _ = tr.load.conn.Close() })
 
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = storeConn.Close() })
 
-	return tr.bindings[0], storeConn
+	return tr.bindings[0], storeConn, tr.load.conn
 }
 
 // buildCompositeKeyTable constructs a resolved sql.Table with a two-column
@@ -744,10 +760,10 @@ func TestLoadNonExistentKey(t *testing.T) {
 	var tableName = "test_load_nonexistent"
 	var table = buildTestTable(t, dialect, tableName)
 
-	b, _ := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	b, _, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Query for a key that doesn't exist in the empty table.
-	require.Empty(t, loadDocuments(t, ctx, b, []any{"nonexistent"}))
+	require.Empty(t, loadDocuments(t, ctx, loadConn, b, []any{"nonexistent"}))
 }
 
 func TestLoadMultipleKeys(t *testing.T) {
@@ -758,7 +774,7 @@ func TestLoadMultipleKeys(t *testing.T) {
 	var tableName = "test_load_multi"
 	var table = buildTestTable(t, dialect, tableName)
 
-	b, storeConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Store 3 rows.
 	batch, err := storeConn.PrepareBatch(ctx, b.storeInsertSQL)
@@ -769,7 +785,7 @@ func TestLoadMultipleKeys(t *testing.T) {
 	require.NoError(t, batch.Send())
 
 	// Load all 3 keys.
-	docs := loadDocuments(t, ctx, b, []any{"k1"}, []any{"k2"}, []any{"k3"})
+	docs := loadDocuments(t, ctx, loadConn, b, []any{"k1"}, []any{"k2"}, []any{"k3"})
 	require.Len(t, docs, 3)
 	sort.Strings(docs)
 	require.JSONEq(t, `{"id":"k1"}`, docs[0])
@@ -777,14 +793,14 @@ func TestLoadMultipleKeys(t *testing.T) {
 	require.JSONEq(t, `{"id":"k3"}`, docs[2])
 
 	// Load subset (k1, k3).
-	docs = loadDocuments(t, ctx, b, []any{"k1"}, []any{"k3"})
+	docs = loadDocuments(t, ctx, loadConn, b, []any{"k1"}, []any{"k3"})
 	require.Len(t, docs, 2)
 	sort.Strings(docs)
 	require.JSONEq(t, `{"id":"k1"}`, docs[0])
 	require.JSONEq(t, `{"id":"k3"}`, docs[1])
 
 	// Load mix of existing + non-existing (k1, k99).
-	docs = loadDocuments(t, ctx, b, []any{"k1"}, []any{"k99"})
+	docs = loadDocuments(t, ctx, loadConn, b, []any{"k1"}, []any{"k99"})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"id":"k1"}`, docs[0])
 }
@@ -797,7 +813,7 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 	var tableName = "test_composite_key"
 	var table = buildCompositeKeyTable(t, dialect, tableName)
 
-	b, storeConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Store 3 rows with composite keys: (tenant, id).
 	batch, err := storeConn.PrepareBatch(ctx, b.storeInsertSQL)
@@ -808,20 +824,20 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 	require.NoError(t, batch.Send())
 
 	// Load (acme,1) → doc1.
-	docs := loadDocuments(t, ctx, b, []any{"acme", int64(1)})
+	docs := loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"tenant":"acme","id":1}`, docs[0])
 
 	// Load (beta,1) → doc3.
-	docs = loadDocuments(t, ctx, b, []any{"beta", int64(1)})
+	docs = loadDocuments(t, ctx, loadConn, b, []any{"beta", int64(1)})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"tenant":"beta","id":1}`, docs[0])
 
 	// Load (acme,99) → empty.
-	require.Empty(t, loadDocuments(t, ctx, b, []any{"acme", int64(99)}))
+	require.Empty(t, loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(99)}))
 
 	// Multi-key load: (acme,1) + (beta,1) → 2 docs.
-	docs = loadDocuments(t, ctx, b, []any{"acme", int64(1)}, []any{"beta", int64(1)})
+	docs = loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)}, []any{"beta", int64(1)})
 	require.Len(t, docs, 2)
 	sort.Strings(docs)
 	require.JSONEq(t, `{"tenant":"acme","id":1}`, docs[0])
@@ -840,7 +856,7 @@ func TestVersionDeduplication(t *testing.T) {
 	var tableName = "test_version_dedup"
 	var table = buildTestTable(t, dialect, tableName)
 
-	b, storeConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	b, storeConn, _ := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Simulate 3 successive Store commits for the same key, each in a separate
 	// batch (separate insert/part) with increasing flow_published_at timestamps.
@@ -875,7 +891,7 @@ func TestStoreBatchMultipleRows(t *testing.T) {
 	var tableName = "test_store_batch"
 	var table = buildTestTable(t, dialect, tableName)
 
-	b, storeConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Single PrepareBatch, append 3 rows, then Send.
 	batch, err := storeConn.PrepareBatch(ctx, b.storeInsertSQL)
@@ -886,7 +902,7 @@ func TestStoreBatchMultipleRows(t *testing.T) {
 	require.NoError(t, batch.Send())
 
 	// Load all 3 → all present.
-	docs := loadDocuments(t, ctx, b, []any{"k1"}, []any{"k2"}, []any{"k3"})
+	docs := loadDocuments(t, ctx, loadConn, b, []any{"k1"}, []any{"k2"}, []any{"k3"})
 	require.Len(t, docs, 3)
 }
 
@@ -925,12 +941,14 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 
 	// Build transactor with 2 bindings.
 	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg}
+	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.load.conn = loadConn
 	require.NoError(t, tr.addBinding(ctx, tableA))
 	require.NoError(t, tr.addBinding(ctx, tableB))
 	require.Len(t, tr.bindings, 2)
 	t.Cleanup(func() {
-		_ = tr.bindings[0].load.conn.Close()
-		_ = tr.bindings[1].load.conn.Close()
+		_ = tr.load.conn.Close()
 	})
 
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
@@ -953,17 +971,17 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	require.NoError(t, batch.Send())
 
 	// Load from table A → correct doc.
-	docs := loadDocuments(t, ctx, bA, []any{"keyA"})
+	docs := loadDocuments(t, ctx, tr.load.conn, bA, []any{"keyA"})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"id":"keyA"}`, docs[0])
 
 	// Load from table B → correct doc.
-	docs = loadDocuments(t, ctx, bB, []any{"keyB"})
+	docs = loadDocuments(t, ctx, tr.load.conn, bB, []any{"keyB"})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"id":"keyB"}`, docs[0])
 
 	// Cross-table: key from table A queried against table B → empty.
-	require.Empty(t, loadDocuments(t, ctx, bB, []any{"keyA"}))
+	require.Empty(t, loadDocuments(t, ctx, tr.load.conn, bB, []any{"keyA"}))
 }
 
 func TestCompositeKeyTombstone(t *testing.T) {
@@ -974,7 +992,7 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	var tableName = "test_composite_tombstone"
 	var table = buildCompositeKeyTable(t, dialect, tableName)
 
-	b, storeConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Store a live row (acme, 1).
 	batch, err := storeConn.PrepareBatch(ctx, b.storeInsertSQL)
@@ -983,7 +1001,7 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	require.NoError(t, batch.Send())
 
 	// Load → present.
-	docs := loadDocuments(t, ctx, b, []any{"acme", int64(1)})
+	docs := loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)})
 	require.Len(t, docs, 1)
 	require.JSONEq(t, `{"tenant":"acme","id":1}`, docs[0])
 
@@ -999,5 +1017,5 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	require.NoError(t, batch.Send())
 
 	// Load → empty (tombstone hides the row).
-	require.Empty(t, loadDocuments(t, ctx, b, []any{"acme", int64(1)}))
+	require.Empty(t, loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)}))
 }

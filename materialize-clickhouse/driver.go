@@ -173,7 +173,10 @@ type transactor struct {
 	cfg       config
 	templates templates
 	dialect   sql.Dialect
-	store     struct {
+	load      struct {
+		conn chdriver.Conn
+	}
+	store struct {
 		conn chdriver.Conn
 	}
 	bindings []*binding
@@ -201,9 +204,20 @@ func prepareNewTransactor(
 		var d = &transactor{dialect: ep.Dialect, templates: tpls, cfg: cfg, be: be}
 
 		var err error
-		opts := cfg.newClickhouseOptions()
-		opts.MaxIdleConns = 40
-		if d.store.conn, err = clickhouse.Open(opts); err != nil {
+
+		// We use temporary tables to store load keys.
+		// The lifetime of a temporary table is tied to its TCP connections, so we must limit
+		// the connection pool to just one.
+		loadOptions := cfg.newClickhouseOptions()
+		loadOptions.MaxOpenConns = 1
+		loadOptions.MaxIdleConns = 1
+		if d.load.conn, err = clickhouse.Open(loadOptions); err != nil {
+			return nil, fmt.Errorf("openNativeConn (store): %w", err)
+		}
+
+		storeOptions := cfg.newClickhouseOptions()
+		storeOptions.MaxIdleConns = 40
+		if d.store.conn, err = clickhouse.Open(storeOptions); err != nil {
 			return nil, fmt.Errorf("openNativeConn (store): %w", err)
 		}
 
@@ -224,9 +238,6 @@ type binding struct {
 	loadInsertSQL        string
 	loadQuerySQL         string
 	storeInsertSQL       string
-	load                 struct {
-		conn chdriver.Conn
-	}
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
@@ -249,17 +260,7 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 		return fmt.Errorf("rendering storeInsert template: %w", err)
 	}
 
-	// Bindings use a temporary tables to store load keys.
-	// The lifetime of a temporary table is tied to its TCP connections, so we must limit
-	// the connection pool to just one.
-	opts := t.cfg.newClickhouseOptions()
-	opts.MaxOpenConns = 1
-	opts.MaxIdleConns = 1
-	if b.load.conn, err = clickhouse.Open(opts); err != nil {
-		return fmt.Errorf("openNativeConnSingle (load): %w", err)
-	}
-
-	if err = b.load.conn.Exec(ctx, b.loadCreateTableSQL); err != nil {
+	if err = t.load.conn.Exec(ctx, b.loadCreateTableSQL); err != nil {
 		return fmt.Errorf("creating load temp table: %w", err)
 	}
 
@@ -274,7 +275,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	// Truncate all temp tables to clear keys from prior transactions.
 	for _, b := range t.bindings {
-		if err := b.load.conn.Exec(ctx, b.loadTruncateTableSQL); err != nil {
+		if err := t.load.conn.Exec(ctx, b.loadTruncateTableSQL); err != nil {
 			return fmt.Errorf("truncating load table: %w", err)
 		}
 	}
@@ -294,7 +295,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		batch, found := batchByBinding[it.Binding]
 		if !found {
 			var err error
-			batch, err = b.load.conn.PrepareBatch(ctx, b.loadInsertSQL)
+			// WithReleaseConnection because a single TCP connection is shared by all bindings:
+			// 1) This batch can trust us to reuse the connection, and not pick up another one from the pool.
+			// 2) We can write to multiple temporary tables, each with its own batch.
+			batch, err = t.load.conn.PrepareBatch(ctx, b.loadInsertSQL, chdriver.WithReleaseConnection())
 			if err != nil {
 				abortAllBatches()
 				return fmt.Errorf("preparing load batch: %w", err)
@@ -336,25 +340,28 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		}
 	}
 
-	for _, b := range t.bindings {
-		rows, err := b.load.conn.Query(ctx, b.loadQuerySQL)
-		if err != nil {
-			return fmt.Errorf("querying Load documents: %w", err)
+	loadQueries := make([]string, len(t.bindings))
+	for i, b := range t.bindings {
+		loadQueries[i] = b.loadQuerySQL
+	}
+	loadQueryUnionSQL := strings.Join(loadQueries, "\nUNION ALL\n") + ";"
+	rows, err := t.load.conn.Query(ctx, loadQueryUnionSQL)
+	if err != nil {
+		return fmt.Errorf("querying Load documents: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var bindingId int32
+		var doc json.RawMessage
+		if err = rows.Scan(&bindingId, &doc); err != nil {
+			return fmt.Errorf("scanning Load document: %w", err)
 		}
-		defer rows.Close()
-		for rows.Next() {
-			var bindingIdx int32
-			var doc json.RawMessage
-			if err = rows.Scan(&bindingIdx, &doc); err != nil {
-				return fmt.Errorf("scanning Load document: %w", err)
-			}
-			if err = loaded(int(bindingIdx), doc); err != nil {
-				return err
-			}
+		if err = loaded(int(bindingId), doc); err != nil {
+			return err
 		}
-		if err = rows.Err(); err != nil {
-			return fmt.Errorf("querying Load documents: %w", err)
-		}
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("querying Load documents: %w", err)
 	}
 
 	return nil
@@ -452,9 +459,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 func (t *transactor) Destroy() {
 	_ = t.store.conn.Close()
-	for _, b := range t.bindings {
-		_ = b.load.conn.Close()
-	}
+	_ = t.load.conn.Close()
 }
 
 func main() {

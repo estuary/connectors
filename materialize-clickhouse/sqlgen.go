@@ -159,7 +159,7 @@ SETTINGS
 {{ end }}
 
 {{ define "loadCreateTable" }}
-CREATE TEMPORARY TABLE flow_temp_load (
+CREATE TEMPORARY TABLE flow_temp_load_{{ $.Binding }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
@@ -168,13 +168,13 @@ CREATE TEMPORARY TABLE flow_temp_load (
 {{ end }}
 
 {{ define "loadTruncateTable" }}
-TRUNCATE TABLE flow_temp_load;
+TRUNCATE TABLE flow_temp_load_{{ $.Binding }};
 {{ end }}
 
 -- Templated INSERT for staging load keys into the temp table via PrepareBatch.
 
 {{ define "loadInsert" }}
-INSERT INTO flow_temp_load (
+INSERT INTO flow_temp_load_{{ $.Binding }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{ end -}}
 		{{$key.Identifier}}
@@ -190,7 +190,7 @@ INSERT INTO flow_temp_load (
 {{ if $.Document -}}
 SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
 	FROM {{$.Identifier}} AS r FINAL
-	JOIN flow_temp_load AS l
+	JOIN flow_temp_load_{{ $.Binding }} AS l
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON  {{ end -}}
 		l.{{$key.Identifier}} = r.{{$key.Identifier}}
