@@ -600,7 +600,7 @@
         "id": "1",
         "redacted": false,
         "subject": "",
-        "type": null,
+        "type": "admin_initiated",
         "url": null
       },
       "state": "open",

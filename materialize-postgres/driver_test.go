@@ -6,6 +6,7 @@ import (
 	"context"
 	stdsql "database/sql"
 	"fmt"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -18,7 +19,7 @@ import (
 
 func testConfig() config {
 	return config{
-		Address:  "localhost:5432",
+		Address:  *dbAddress,
 		User:     "flow",
 		Password: "flow",
 		Database: "flow",
@@ -78,7 +79,14 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 
 	uri, err := cfg.ToURI(ctx)
 	require.NoError(t, err)
-	db, err := stdsql.Open("pgx", uri+"?default_query_exec_mode=exec")
+
+	u, err := url.Parse(uri)
+	require.NoError(t, err)
+	params := u.Query()
+	params.Set("default_query_exec_mode", "exec")
+	u.RawQuery = params.Encode()
+
+	db, err := stdsql.Open("pgx", u.String())
 	require.NoError(t, err)
 	defer db.Close()
 
@@ -132,7 +140,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 func TestFencingCases(t *testing.T) {
 	var ctx = context.Background()
 
-	c, err := newClient(ctx, "", &sql.Endpoint[config]{Config: testConfig()})
+	c, err := newClient(ctx, "", &sql.Endpoint[config]{Config: testConfig(), Dialect: testDialect})
 	require.NoError(t, err)
 	defer c.Close()
 

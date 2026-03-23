@@ -17,8 +17,9 @@ import (
 )
 
 type binding struct {
-	target           sql.Table
-	hasBinaryColumns bool
+	target            sql.Table
+	nullFieldsToStrip []string
+	hasBinaryColumns  bool
 
 	load struct {
 		mergeBounds *sql.MergeBoundsBuilder
@@ -89,6 +90,9 @@ func newTransactor(
 		b := &binding{
 			target:           target,
 			hasBinaryColumns: hasBinaryColumns,
+		}
+		if ep.Config.Advanced.NoFlowDocument {
+			b.nullFieldsToStrip = target.NullableFieldsToStrip()
 		}
 		b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal)
 		b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, ep.Dialect.Literal)
@@ -203,7 +207,15 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		if err = rows.Scan(&binding, &document); err != nil {
 			return fmt.Errorf("scanning load document: %w", err)
-		} else if err = loaded(binding, json.RawMessage(document)); err != nil {
+		}
+
+		doc := json.RawMessage(document)
+		if b := t.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
+			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
+				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if err = loaded(binding, doc); err != nil {
 			return err
 		}
 	}

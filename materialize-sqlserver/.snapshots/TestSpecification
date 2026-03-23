@@ -87,6 +87,34 @@
               "aws_role_arn"
             ],
             "title": "AWS IAM"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/azure-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "AzureIAM",
+                "default": "AzureIAM",
+                "order": 0
+              },
+              "azure_client_id": {
+                "type": "string",
+                "title": "Azure Client ID",
+                "description": "Azure App Registration Client ID for Azure Active Directory authentication"
+              },
+              "azure_tenant_id": {
+                "type": "string",
+                "title": "Azure Tenant ID",
+                "description": "Azure Tenant ID for Azure Active Directory authentication"
+              }
+            },
+            "type": "object",
+            "required": [
+              "azure_client_id",
+              "azure_tenant_id"
+            ],
+            "title": "Azure IAM"
           }
         ],
         "type": "object",
@@ -98,7 +126,8 @@
           "propertyName": "auth_type"
         },
         "order": 6,
-        "x-iam-auth": true
+        "x-iam-auth": true,
+        "x-iam-azure-scope": "https://database.windows.net/.default"
       },
       "dbt_job_trigger": {
         "properties": {

@@ -3,6 +3,7 @@ package sql
 import (
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/estuary/flow/go/protocols/fdb/tuple"
@@ -63,6 +64,22 @@ type Column struct {
 	Placeholder string
 	// If this column can be null or not.
 	MustExist bool
+}
+
+// NullableFieldsToStrip returns the list of field names that are optional (may be absent)
+// and non-nullable (schema doesn't allow null). When these fields are SQL NULL (because
+// the document didn't include them), they should be stripped from the reconstructed JSON
+// to avoid schema validation errors.
+func (t *Table) NullableFieldsToStrip() []string {
+	var fields []string
+	for _, cols := range [][]Column{t.Keys, t.Values} {
+		for _, col := range cols {
+			if !col.MustExist && !slices.Contains(col.Inference.Types, "null") {
+				fields = append(fields, col.Field)
+			}
+		}
+	}
+	return fields
 }
 
 // ConvertKey converts a key Tuple to database parameters.

@@ -9,8 +9,9 @@ import (
 )
 
 type binding struct {
-	target         sql.Table
-	storeInsertSQL string
+	target            sql.Table
+	nullFieldsToStrip []string
+	storeInsertSQL    string
 
 	loadSchema       bigquery.Schema
 	storeSchema      bigquery.Schema

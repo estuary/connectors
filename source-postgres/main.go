@@ -365,6 +365,13 @@ func (c *Config) ToURI(ctx context.Context) (string, error) {
 	var params = make(url.Values)
 	params.Set("application_name", "estuary_flow")
 
+	// Lower TCP keepalive settings so that half-open connections are detected more
+	// quickly. With these settings a dead connection will be noticed within ~5 minutes
+	// rather than the OS default of 2+ hours.
+	params.Set("tcp_keepalives_idle", "120")
+	params.Set("tcp_keepalives_interval", "30")
+	params.Set("tcp_keepalives_count", "6")
+
 	// Set SSL mode - user configuration takes precedence, then cloud IAM defaults
 	if c.Advanced.SSLMode != "" {
 		params.Set("sslmode", c.Advanced.SSLMode)

@@ -151,6 +151,10 @@ func (t *transactor) addBinding(target sql.Table, fieldSchemas map[string]*bigqu
 		storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, dialect.Literal),
 	}
 
+	if t.cfg.Advanced.NoFlowDocument {
+		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+	}
+
 	for _, m := range []struct {
 		sql *string
 		tpl *template.Template
@@ -296,7 +300,16 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		} else if err != nil {
 			ll.WithError(err).Error("query results iterator failed")
 			return fmt.Errorf("load row read: %w", err)
-		} else if err = loaded(bd.Binding, bd.Document); err != nil {
+		}
+
+		doc := bd.Document
+		if b := t.bindings[bd.Binding]; len(b.nullFieldsToStrip) > 0 {
+			var err error
+			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
+				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if err = loaded(bd.Binding, doc); err != nil {
 			return fmt.Errorf("load row loaded: %w", err)
 		}
 	}

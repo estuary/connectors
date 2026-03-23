@@ -64,6 +64,9 @@ async def list_entity(
             break
 
         url = header_link.next_url
+        # next_url already contains the query params necessary to continue paginating through
+        # our query, so we don't need to continue passing any parameters in the params dict.
+        params = {}
 
 
 async def list_time_ranged_entity(

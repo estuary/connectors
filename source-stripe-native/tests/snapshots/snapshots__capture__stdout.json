@@ -165,7 +165,6 @@
           },
           "statement_descriptor": null
         },
-        "paypay_payments": {},
         "sepa_debit_payments": {}
       },
       "tos_acceptance": {

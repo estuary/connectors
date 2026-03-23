@@ -21,21 +21,21 @@ func TestPostgresConfig(t *testing.T) {
 	require.NoError(t, validConfig.Validate())
 	uri, err := validConfig.ToURI(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, "postgres://youser:shmassword@post.toast:1234/namegame", uri)
+	require.Equal(t, "postgres://youser:shmassword@post.toast:1234/namegame?tcp_keepalives_count=6&tcp_keepalives_idle=120&tcp_keepalives_interval=30", uri)
 
 	var minimal = validConfig
 	minimal.Database = ""
 	require.NoError(t, minimal.Validate())
 	uri, err = minimal.ToURI(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, "postgres://youser:shmassword@post.toast:1234", uri)
+	require.Equal(t, "postgres://youser:shmassword@post.toast:1234?tcp_keepalives_count=6&tcp_keepalives_idle=120&tcp_keepalives_interval=30", uri)
 
 	var noPort = validConfig
 	noPort.Address = "post.toast"
 	require.NoError(t, noPort.Validate())
 	uri, err = noPort.ToURI(context.Background())
 	require.NoError(t, err)
-	require.Equal(t, "postgres://youser:shmassword@post.toast:5432/namegame", uri)
+	require.Equal(t, "postgres://youser:shmassword@post.toast:5432/namegame?tcp_keepalives_count=6&tcp_keepalives_idle=120&tcp_keepalives_interval=30", uri)
 
 	var noAddress = validConfig
 	noAddress.Address = ""

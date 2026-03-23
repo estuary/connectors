@@ -2,7 +2,7 @@ import abc
 import asyncio
 import functools
 from enum import Enum, StrEnum
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 import inspect
 from logging import Logger
@@ -475,6 +475,20 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     disable: bool = False
 
 
+@dataclass(kw_only=True)
+class SnapshotResource(Resource[_BaseDocument, _BaseResourceConfig, ResourceState]):
+    """A Resource for snapshot bindings with standard defaults that
+    work well with the rest of the CDK and Estuary Flow platform.
+
+    Sets key to /_meta/row_id (required for CDK deletion inference),
+    initial_state to an empty ResourceState, and reduction_strategy to
+    lastWriteWins — the invariant choices for all snapshot bindings.
+    """
+
+    key: list[str] = field(default_factory=lambda: ["/_meta/row_id"])
+    initial_state: ResourceState = field(default_factory=ResourceState)
+
+
 def discovered(
     resources: list["Resource[_BaseDocument, _BaseResourceConfig, _BaseResourceState]"],
 ) -> response.Discovered[_BaseResourceConfig]:
@@ -818,9 +832,14 @@ def open_binding(
             )
 
     if fetch_snapshot:
+        if tombstone is None:
+            # Default tombstone for snapshot bindings so callers don't need to
+            # provide one. The cast satisfies the _BaseDocument TypeVar since
+            # BaseDocument is its bound.
+            tombstone = cast(_BaseDocument, BaseDocument(_meta=BaseDocument.Meta(op="d")))
 
         async def closure(task: Task):
-            assert tombstone
+            assert tombstone is not None
             await _binding_snapshot_task(
                 binding,
                 binding_index,

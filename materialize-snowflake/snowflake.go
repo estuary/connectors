@@ -325,6 +325,7 @@ type binding struct {
 		stage       *stagedFile
 		mergeBounds *sql.MergeBoundsBuilder
 	}
+	nullFieldsToStrip []string
 	// Variables accessed by Prepare, Store, and Commit.
 	store struct {
 		stage       *stagedFile
@@ -338,6 +339,7 @@ type binding struct {
 func (d *transactor) addBinding(ctx context.Context, target sql.Table, streamingEnabled bool) error {
 	var b = new(binding)
 	b.target = target
+	b.nullFieldsToStrip = target.NullableFieldsToStrip()
 	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
 
@@ -537,7 +539,14 @@ func (d *transactor) loadDocuments(ctx context.Context, ch chan *loadDoc, loaded
 			if !ok {
 				return nil
 			}
-			if err := loaded(doc.binding, doc.document); err != nil {
+			loadDoc := doc.document
+			if b := d.bindings[doc.binding]; len(b.nullFieldsToStrip) > 0 {
+				var err error
+				if loadDoc, err = sql.StripNullFields(loadDoc, b.nullFieldsToStrip); err != nil {
+					return fmt.Errorf("stripping null fields: %w", err)
+				}
+			}
+			if err := loaded(doc.binding, loadDoc); err != nil {
 				return fmt.Errorf("sending loaded document for table %q: %w", d.bindings[doc.binding].target.Identifier, err)
 			}
 		}
