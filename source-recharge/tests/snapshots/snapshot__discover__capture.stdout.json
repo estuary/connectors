@@ -1272,7 +1272,6 @@
           ]
         },
         "next_charge_scheduled_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
