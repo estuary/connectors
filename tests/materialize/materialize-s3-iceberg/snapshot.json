@@ -28,19 +28,19 @@
         "iceberg-test%2Fduplicate_keys_delta": {
           "currentCheckpoint": "7a60ee931eb4057c",
           "fileKeys": [
-            "s3://estuary-connector-test-bucket/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
+            "s3://test-bucket/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
           ]
         },
         "iceberg-test%2Fmultiple_types_delta": {
           "currentCheckpoint": "7a60ee931eb4057c",
           "fileKeys": [
-            "s3://estuary-connector-test-bucket/test-data/iceberg-test/multiple_types_delta_7B3833E83A07ECFB/data/<UUID>.parquet"
+            "s3://test-bucket/test-data/iceberg-test/multiple_types_delta_7B3833E83A07ECFB/data/<UUID>.parquet"
           ]
         },
         "iceberg-test%2Fsimple_delta": {
           "currentCheckpoint": "7a60ee931eb4057c",
           "fileKeys": [
-            "s3://estuary-connector-test-bucket/test-data/iceberg-test/simple_delta_4F406620F3D86730/data/<UUID>.parquet"
+            "s3://test-bucket/test-data/iceberg-test/simple_delta_4F406620F3D86730/data/<UUID>.parquet"
           ]
         }
       }
@@ -56,21 +56,21 @@
           "previousCheckpoint": "7a60ee931eb4057c",
           "currentCheckpoint": "0c1aa08d9f287c74",
           "fileKeys": [
-            "s3://estuary-connector-test-bucket/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
+            "s3://test-bucket/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
           ]
         },
         "iceberg-test%2Fmultiple_types_delta": {
           "previousCheckpoint": "7a60ee931eb4057c",
           "currentCheckpoint": "0c1aa08d9f287c74",
           "fileKeys": [
-            "s3://estuary-connector-test-bucket/test-data/iceberg-test/multiple_types_delta_7B3833E83A07ECFB/data/<UUID>.parquet"
+            "s3://test-bucket/test-data/iceberg-test/multiple_types_delta_7B3833E83A07ECFB/data/<UUID>.parquet"
           ]
         },
         "iceberg-test%2Fsimple_delta": {
           "previousCheckpoint": "7a60ee931eb4057c",
           "currentCheckpoint": "0c1aa08d9f287c74",
           "fileKeys": [
-            "s3://estuary-connector-test-bucket/test-data/iceberg-test/simple_delta_4F406620F3D86730/data/<UUID>.parquet"
+            "s3://test-bucket/test-data/iceberg-test/simple_delta_4F406620F3D86730/data/<UUID>.parquet"
           ]
         }
       }
@@ -86,7 +86,7 @@
           "previousCheckpoint": "0c1aa08d9f287c74",
           "currentCheckpoint": "d075ceace3972e7f",
           "fileKeys": [
-            "s3://estuary-connector-test-bucket/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
+            "s3://test-bucket/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
           ]
         },
         "iceberg-test%2Fmultiple_types_delta": {
@@ -112,7 +112,7 @@
           "previousCheckpoint": "0c1aa08d9f287c74",
           "currentCheckpoint": "d075ceace3972e7f",
           "fileKeys": [
-            "s3://estuary-connector-test-bucket/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
+            "s3://test-bucket/test-data/iceberg-test/duplicate_keys_delta_004B23684AF8F596/data/<UUID>.parquet"
           ]
         },
         "iceberg-test%2Fmultiple_types_delta": {
@@ -289,7 +289,7 @@
       {
         "array_int": "[11,12]",
         "binary_field": null,
-        "bool_field": false,
+        "bool_field": "false",
         "float_field": 1.1,
         "flow_published_at": "1970-01-01 01:00:13+00",
         "id": 1,
@@ -301,7 +301,7 @@
       {
         "array_int": "[21,22]",
         "binary_field": null,
-        "bool_field": true,
+        "bool_field": "true",
         "float_field": 2.2,
         "flow_published_at": "1970-01-01 01:00:14+00",
         "id": 2,
@@ -313,7 +313,7 @@
       {
         "array_int": "[31,32]",
         "binary_field": null,
-        "bool_field": false,
+        "bool_field": "false",
         "float_field": 3.3,
         "flow_published_at": "1970-01-01 01:00:15+00",
         "id": 3,
@@ -325,7 +325,7 @@
       {
         "array_int": "[41,42]",
         "binary_field": null,
-        "bool_field": true,
+        "bool_field": "true",
         "float_field": 4.4,
         "flow_published_at": "1970-01-01 01:00:16+00",
         "id": 4,
@@ -337,7 +337,7 @@
       {
         "array_int": "[51,52]",
         "binary_field": null,
-        "bool_field": false,
+        "bool_field": "false",
         "float_field": 5.5,
         "flow_published_at": "1970-01-01 01:00:17+00",
         "id": 5,
@@ -349,7 +349,7 @@
       {
         "array_int": "[61,62]",
         "binary_field": null,
-        "bool_field": true,
+        "bool_field": "true",
         "float_field": 6.6,
         "flow_published_at": "1970-01-01 01:00:18+00",
         "id": 6,
@@ -361,7 +361,7 @@
       {
         "array_int": "[71,72]",
         "binary_field": null,
-        "bool_field": false,
+        "bool_field": "false",
         "float_field": 7.7,
         "flow_published_at": "1970-01-01 01:00:19+00",
         "id": 7,
@@ -373,7 +373,7 @@
       {
         "array_int": "[81,82]",
         "binary_field": null,
-        "bool_field": true,
+        "bool_field": "true",
         "float_field": 8.8,
         "flow_published_at": "1970-01-01 01:00:20+00",
         "id": 8,
@@ -385,7 +385,7 @@
       {
         "array_int": "[91,92]",
         "binary_field": "hello\\x0A",
-        "bool_field": false,
+        "bool_field": "false",
         "float_field": 9.9,
         "flow_published_at": "1970-01-01 01:00:21+00",
         "id": 9,
@@ -397,7 +397,7 @@
       {
         "array_int": "[1,2]",
         "binary_field": "goodbye\\x0A",
-        "bool_field": true,
+        "bool_field": "true",
         "float_field": 10.1,
         "flow_published_at": "1970-01-01 01:00:22+00",
         "id": 10,
@@ -409,7 +409,7 @@
       {
         "array_int": "[61,62]",
         "binary_field": null,
-        "bool_field": true,
+        "bool_field": "true",
         "float_field": 66.66,
         "flow_published_at": "1970-01-01 02:00:19+00",
         "id": 6,
@@ -421,7 +421,7 @@
       {
         "array_int": "[71,72]",
         "binary_field": null,
-        "bool_field": false,
+        "bool_field": "false",
         "float_field": 77.77,
         "flow_published_at": "1970-01-01 02:00:20+00",
         "id": 7,
@@ -433,7 +433,7 @@
       {
         "array_int": "[81,82]",
         "binary_field": null,
-        "bool_field": true,
+        "bool_field": "true",
         "float_field": 88.88,
         "flow_published_at": "1970-01-01 02:00:21+00",
         "id": 8,
@@ -445,7 +445,7 @@
       {
         "array_int": "[91,92]",
         "binary_field": "aloha\\x0A",
-        "bool_field": false,
+        "bool_field": "false",
         "float_field": 99.99,
         "flow_published_at": "1970-01-01 02:00:22+00",
         "id": 9,
@@ -457,7 +457,7 @@
       {
         "array_int": "[1,2]",
         "binary_field": "say\\xC5\\x8Dnara\\x0A",
-        "bool_field": true,
+        "bool_field": "true",
         "float_field": 1010.101,
         "flow_published_at": "1970-01-01 02:00:23+00",
         "id": 10,

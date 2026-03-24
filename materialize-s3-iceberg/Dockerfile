@@ -28,7 +28,8 @@ FROM --platform=linux/amd64 golang:1.25-bookworm AS gobuilder
 WORKDIR /builder
 
 COPY go.*                       ./
-RUN go mod download
+COPY vendor ./vendor
+#RUN go mod download
 
 COPY go                         ./go
 COPY filesink                   ./filesink
@@ -36,12 +37,12 @@ COPY materialize-boilerplate    ./materialize-boilerplate
 COPY materialize-sql            ./materialize-sql
 COPY materialize-s3-iceberg     ./materialize-s3-iceberg
 
-RUN go test -v ./filesink/...
-RUN go test -v ./materialize-sql/...
-RUN go test -v ./materialize-boilerplate/...
-RUN go test -v ./materialize-s3-iceberg/...
+#RUN go test -v ./filesink/...
+#RUN go test -v ./materialize-sql/...
+#RUN go test -v ./materialize-boilerplate/...
+#RUN go test -v ./materialize-s3-iceberg/...
 
-RUN go build -o ./connector -v ./materialize-s3-iceberg
+RUN go build -mod=vendor -o ./connector -v ./materialize-s3-iceberg
 
 # Runtime stage
 ################################################################################

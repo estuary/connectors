@@ -15,6 +15,9 @@ function exportToJsonl() {
         SET s3_access_key_id='${AWS_ACCESS_KEY_ID}'; \
         SET s3_secret_access_key='${AWS_SECRET_ACCESS_KEY}'; \
         SET s3_region='${AWS_REGION}'; \
+        SET s3_endpoint='localhost:9001'; \
+        SET s3_url_style = 'path'; \
+        SET s3_use_ssl = false; \
         SELECT * from '${data_dir}/data/*.parquet' order by flow_published_at;" | jq -sc "{ \"table\": \"$1\", rows: . }"
 }
 

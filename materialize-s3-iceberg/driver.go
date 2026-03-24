@@ -71,9 +71,10 @@ type advancedConfig struct {
 
 func (c config) s3StoreConfig() filesink.S3StoreConfig {
 	cfg := filesink.S3StoreConfig{
-		Bucket:   c.Bucket,
-		Region:   c.Region,
-		Endpoint: c.S3Endpoint,
+		Bucket:       c.Bucket,
+		Region:       c.Region,
+		Endpoint:     c.S3Endpoint,
+		UsePathStyle: c.S3Endpoint != "",
 	}
 
 	if c.Credentials != nil {

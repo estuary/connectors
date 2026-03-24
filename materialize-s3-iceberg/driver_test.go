@@ -42,6 +42,7 @@ func testConfig(t *testing.T) config {
 		Region:             os.Getenv("ICEBERG_REGION_NAME"),
 		UploadInterval:     "PT5M",
 		Prefix:             os.Getenv("ICEBERG_PREFIX"),
+		S3Endpoint:         os.Getenv("ICEBERG_S3_ENDPOINT"),
 		Catalog: catalogConfig{
 			CatalogType: catalogTypeRest,
 			URI:         "http://localhost:8090/catalog",

@@ -44,25 +44,45 @@ resources_json_template='[
   }
 ]'
 
-function decrypt_config {
-  sops --output-type json --decrypt $1 | jq 'walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)' 
-}
-
-export CONNECTOR_CONFIG="$(decrypt_config $CONNECTOR_TEST_DIR/config.yaml)"
-export AWS_ACCESS_KEY_ID="$(echo $CONNECTOR_CONFIG | jq -r .aws_access_key_id)"
-export AWS_SECRET_ACCESS_KEY="$(echo $CONNECTOR_CONFIG | jq -r .aws_secret_access_key)"
-export AWS_REGION="$(echo $CONNECTOR_CONFIG | jq -r .region)"
-export AWS_BUCKET="$(echo $CONNECTOR_CONFIG | jq -r .bucket)"
-export PREFIX="$(echo $CONNECTOR_CONFIG | jq -r .prefix)"
-export NAMESPACE=$(echo $CONNECTOR_CONFIG | jq -r .namespace)
-export WAREHOUSE=$(echo $CONNECTOR_CONFIG | jq -r .catalog.warehouse)
-
 export RESOURCES_CONFIG="$(echo "$resources_json_template" | envsubst | jq -c)"
 
-export S3_DATA_URI="s3://${AWS_BUCKET}/${PREFIX}"
+export AWS_BUCKET=test-bucket
+export AWS_ACCESS_KEY_ID=flow
+export AWS_SECRET_ACCESS_KEY=flow
+export WAREHOUSE=test_warehouse
+export NAMESPACE=iceberg-test
+export AWS_REGION=us-east-1
+export PREFIX=test-data
+export S3_ENDPOINT=http://storage:9001
+export S3_PATH_STYLE_ACCESS=true
+
+config_json_template='{
+  "bucket": "${AWS_BUCKET}",
+  "aws_access_key_id": "${AWS_ACCESS_KEY_ID}",
+  "aws_secret_access_key": "${AWS_SECRET_ACCESS_KEY}",
+  "namespace": "${NAMESPACE}",
+  "region": "${AWS_REGION}",
+  "upload_interval": "PT5M",
+  "prefix": "${PREFIX}",
+  "s3_endpoint": "${S3_ENDPOINT}",
+  "catalog": {
+    "catalog_type": "Iceberg REST Server",
+    "uri": "http://server:8080/catalog",
+    "token": "TODO",
+    "warehouse": "${WAREHOUSE}"
+  }
+}'
+export CONNECTOR_CONFIG="$(echo "$config_json_template" | envsubst | jq -c)"
+echo $CONNECTOR_CONFIG
+
 
 # Start the rest catalog.
 docker compose -f materialize-s3-iceberg/docker-compose.yaml up --wait
+# Give extra time to be ready for external connections.
+sleep 5
+
+# Create the bucket
+curl -s -X PUT http://localhost:9000/${AWS_BUCKET} --aws-sigv4 "aws:amz:us-east-1:s3" --user ${AWS_ACCESS_KEY_ID}:${AWS_SECRET_ACCESS_KEY}
 
 # Create the test warehouse.
 create_warehouse_json_template='{
@@ -72,6 +92,8 @@ create_warehouse_json_template='{
     "type": "s3",
     "bucket": "${AWS_BUCKET}",
     "region": "${AWS_REGION}",
+    "endpoint": "${S3_ENDPOINT}",
+    "path-style-access": ${S3_PATH_STYLE_ACCESS},
     "sts-enabled": false
   },
   "storage-credential": {

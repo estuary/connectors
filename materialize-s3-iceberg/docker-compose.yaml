@@ -1,6 +1,6 @@
 services:
   server:
-    image: quay.io/hansetag/tip-catalog:v0.3
+    image: quay.io/lakekeeper/catalog:v0.3
     pull_policy: always
     environment:
       - ICEBERG_REST__BASE_URI=http://server:8080
@@ -14,9 +14,6 @@ services:
     healthcheck:
       test: [ "CMD", "/home/nonroot/iceberg-catalog", "healthcheck" ]
       interval: 1s
-      timeout: 10s
-      retries: 3
-      start_period: 3s
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -28,7 +25,7 @@ services:
       - "8090:8080" # expose as port 8090 since gazette uses 8080 in a local stack
 
   migrate:
-    image: quay.io/hansetag/tip-catalog:v0.3
+    image: quay.io/lakekeeper/catalog:v0.3
     pull_policy: always
     environment:
       - ICEBERG_REST__PG_ENCRYPTION_KEY=something
@@ -43,7 +40,6 @@ services:
     networks:
       flow-test:
 
-
   db:
     image: postgres:16
     environment:
@@ -53,12 +49,49 @@ services:
       - PGUSER=postgres
     healthcheck:
       test: [ "CMD-SHELL", "pg_isready -U postgres -p 5432 -d postgres" ]
-      interval: 2s
-      timeout: 10s
-      retries: 2
-      start_period: 10s
+      interval: 1s
     networks:
       flow-test:
+
+  storage:
+    image: rustfs/rustfs:latest
+    pull_policy: always
+    ports:
+      - "9000:9000" # S3 API port
+      - "9001:9001" # Console port
+    environment:
+      - RUSTFS_ADDRESS=0.0.0.0:9000
+      - RUSTFS_CONSOLE_ADDRESS=0.0.0.0:9001
+      - RUSTFS_CONSOLE_ENABLE=true
+      - RUSTFS_CORS_ALLOWED_ORIGINS=*
+      - RUSTFS_CONSOLE_CORS_ALLOWED_ORIGINS=*
+      - RUSTFS_ACCESS_KEY=flow
+      - RUSTFS_SECRET_KEY=flow
+      - RUSTFS_OBS_LOGGER_LEVEL=info
+      - RUSTFS_TLS_PATH=/opt/tls
+    networks:
+      flow-test:
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://127.0.0.1:9000/health && curl -f http://127.0.0.1:9001/rustfs/console/health"
+        ]
+      interval: 1s
+
+#  storage-create-bucket:
+#    image: rustfs/rustfs:latest
+#    pull_policy: always
+#    networks:
+#      flow-test:
+#    depends_on:
+#      storage:
+#        condition: service_healthy
+#    restart: "no"
+#    entrypoint: >
+#      curl -s -X PUT http://storage:9000/test-bucket
+#      --aws-sigv4 "aws:amz:us-east-1:s3"
+#      --user "flow:flow"
 
 
 networks:
