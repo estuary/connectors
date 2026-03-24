@@ -2,10 +2,8 @@ from datetime import datetime
 from logging import Logger
 from typing import (
     AsyncGenerator,
-    Iterable,
 )
 
-from estuary_cdk.capture.common import PageCursor
 from estuary_cdk.http import HTTPSession
 
 from ..models import (
@@ -24,17 +22,10 @@ def fetch_recent_feedback_submissions(
     until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, FeedbackSubmission], None]:
 
-    async def do_fetch(
-        page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-        return await fetch_search_objects(
-            Names.feedback_submissions, log, http, since, until, page
-        )
-
     return fetch_changes_with_associations(
         Names.feedback_submissions,
         FeedbackSubmission,
-        do_fetch,
+        fetch_search_objects(Names.feedback_submissions, log, http, since, until),
         log,
         http,
         with_history,

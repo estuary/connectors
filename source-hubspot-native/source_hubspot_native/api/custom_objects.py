@@ -2,10 +2,8 @@ from datetime import datetime
 from logging import Logger
 from typing import (
     AsyncGenerator,
-    Iterable,
 )
 
-from estuary_cdk.capture.common import PageCursor
 from estuary_cdk.http import HTTPSession
 
 from ..models import (
@@ -27,13 +25,10 @@ def fetch_recent_custom_objects(
     until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, CustomObject], None]:
 
-    async def do_fetch(
-        page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-        return await fetch_search_objects(object_name, log, http, since, until, page)
-
     return fetch_changes_with_associations(
-        object_name, CustomObject, do_fetch, log, http, with_history, since, until
+        object_name, CustomObject,
+        fetch_search_objects(object_name, log, http, since, until),
+        log, http, with_history, since, until,
     )
 
 
@@ -46,13 +41,10 @@ def fetch_delayed_custom_objects(
     until: datetime,
 ) -> AsyncGenerator[tuple[datetime, str, CustomObject], None]:
 
-    async def do_fetch(
-        page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-        return await fetch_search_objects(object_name, log, http, since, until, page)
-
     return fetch_changes_with_associations(
-        object_name, CustomObject, do_fetch, log, http, with_history, since, until
+        object_name, CustomObject,
+        fetch_search_objects(object_name, log, http, since, until),
+        log, http, with_history, since, until,
     )
 
 async def list_custom_objects(

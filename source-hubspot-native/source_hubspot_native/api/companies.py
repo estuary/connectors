@@ -2,10 +2,8 @@ from datetime import datetime
 from logging import Logger
 from typing import (
     AsyncGenerator,
-    Iterable,
 )
 
-from estuary_cdk.capture.common import PageCursor
 from estuary_cdk.http import HTTPSession
 
 from ..models import (
@@ -29,26 +27,30 @@ def fetch_recent_companies(
     until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, Company], None]:
 
-    async def do_fetch(
-        page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-        if count >= 9_900:
-            log.warn("limit of 9,900 recent companies reached")
-            return [], None
+    async def fetch_ids():
+        count = 0
+        page = None
+        while True:
+            if count >= 9_900:
+                log.warn("limit of 9,900 recent companies reached")
+                return
 
-        url = f"{HUB}/companies/v2/companies/recent/modified"
-        params = {"count": 100, "offset": page} if page else {"count": 1}
+            url = f"{HUB}/companies/v2/companies/recent/modified"
+            params = {"count": 100, "offset": page} if page else {"count": 1}
 
-        result = OldRecentCompanies.model_validate_json(
-            await http.request(log, url, params=params)
-        )
-        return (
-            (ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.companyId))
-            for r in result.results
-        ), result.hasMore and result.offset
+            result = OldRecentCompanies.model_validate_json(
+                await http.request(log, url, params=params)
+            )
+            for r in result.results:
+                yield (ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.companyId))
+                count += 1
+
+            if not (result.hasMore and result.offset):
+                return
+            page = result.offset
 
     return fetch_changes_with_associations(
-        Names.companies, Company, do_fetch, log, http, with_history, since, until
+        Names.companies, Company, fetch_ids(), log, http, with_history, since, until
     )
 
 
@@ -56,13 +58,8 @@ def fetch_delayed_companies(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
 ) -> AsyncGenerator[tuple[datetime, str, Company], None]:
 
-    async def do_fetch(
-        page: PageCursor, count: int
-    ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-        return await fetch_search_objects(
-            Names.companies, log, http, since, until, page
-        )
-
     return fetch_changes_with_associations(
-        Names.companies, Company, do_fetch, log, http, with_history, since, until
+        Names.companies, Company,
+        fetch_search_objects(Names.companies, log, http, since, until),
+        log, http, with_history, since, until,
     )

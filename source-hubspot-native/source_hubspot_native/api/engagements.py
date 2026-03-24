@@ -1,12 +1,9 @@
-import functools
 from datetime import datetime
 from logging import Logger
 from typing import (
     AsyncGenerator,
-    Iterable,
 )
 
-from estuary_cdk.capture.common import PageCursor
 from estuary_cdk.http import HTTPSession
 
 from ..models import (
@@ -22,27 +19,33 @@ from .shared import (
 )
 
 
-async def _fetch_engagements(
-    log: Logger, http: HTTPSession, page: PageCursor, count: int
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
-    if count >= 9_900:
-        # "Engagements" as we are capturing them has a 10k limit on how many
-        # items the API can return, and there is no other API that can be used
-        # to get them within a certain time window. The only option here is to
-        # re-backfill.
-        log.warn("limit of 9,900 recent engagements reached")
-        raise MustBackfillBinding
+async def _fetch_engagement_ids(
+    log: Logger, http: HTTPSession,
+):
+    count = 0
+    page = None
+    while True:
+        if count >= 9_900:
+            # "Engagements" as we are capturing them has a 10k limit on how many
+            # items the API can return, and there is no other API that can be used
+            # to get them within a certain time window. The only option here is to
+            # re-backfill.
+            log.warn("limit of 9,900 recent engagements reached")
+            raise MustBackfillBinding
 
-    url = f"{HUB}/engagements/v1/engagements/recent/modified"
-    params = {"count": 100, "offset": page} if page else {"count": 1}
+        url = f"{HUB}/engagements/v1/engagements/recent/modified"
+        params = {"count": 100, "offset": page} if page else {"count": 1}
 
-    result = OldRecentEngagements.model_validate_json(
-        await http.request(log, url, params=params)
-    )
-    return (
-        (ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
-        for r in result.results
-    ), result.hasMore and result.offset
+        result = OldRecentEngagements.model_validate_json(
+            await http.request(log, url, params=params)
+        )
+        for r in result.results:
+            yield (ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
+            count += 1
+
+        if not (result.hasMore and result.offset):
+            return
+        page = result.offset
 
 
 def fetch_recent_engagements(
@@ -55,7 +58,7 @@ def fetch_recent_engagements(
     return fetch_changes_with_associations(
         Names.engagements,
         Engagement,
-        functools.partial(_fetch_engagements, log, http),
+        _fetch_engagement_ids(log, http),
         log,
         http,
         with_history,
@@ -74,7 +77,7 @@ def fetch_delayed_engagements(
     return fetch_changes_with_associations(
         Names.engagements,
         Engagement,
-        functools.partial(_fetch_engagements, log, http),
+        _fetch_engagement_ids(log, http),
         log,
         http,
         with_history,

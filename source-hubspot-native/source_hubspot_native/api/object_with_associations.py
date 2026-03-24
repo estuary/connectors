@@ -6,7 +6,6 @@ from typing import (
     Any,
     AsyncGenerator,
     Awaitable,
-    Callable,
     Iterable,
 )
 
@@ -30,17 +29,14 @@ from .shared import (
 )
 
 
-_FetchIdsFn = Callable[
-    [PageCursor, int],
-    Awaitable[tuple[Iterable[tuple[datetime, str]], PageCursor]],
-]
+FetchIdsFn = AsyncGenerator[tuple[datetime, str], None]
 """
-Returns a stream of object IDs that can be used to fetch the full object details
-along with its associations. Used in `fetch_changes_with_associations`.
+An async generator that yields (datetime, id) tuples for fetching the full
+object details along with associations. Used in `fetch_changes_with_associations`.
 
-IDs may be returned in any order, but iteration will be stopped upon seeing an
-entry that's as-old or older than the datetime cursor. Entries newer than the
-until datetime will be discarded.
+IDs may be yielded in any order. Entries as-old or older than the `since` cursor
+will be filtered out by `fetch_changes_with_associations`. Entries newer than the
+`until` datetime will be discarded.
 """
 
 
@@ -220,7 +216,7 @@ async def fetch_batch_with_associations(
 async def fetch_changes_with_associations(
     object_name: str,
     cls: type[CRMObject],
-    fetcher: _FetchIdsFn,
+    fetch_ids: FetchIdsFn,
     log: Logger,
     http: HTTPSession,
     with_history: bool,
@@ -228,35 +224,13 @@ async def fetch_changes_with_associations(
     until: datetime | None,
 ) -> AsyncGenerator[tuple[datetime, str, CRMObject], None]:
 
-    # Walk pages of recent IDs until we see one which is as-old
-    # as `since`, or no pages remain.
-    recent: list[tuple[datetime, str]] = []
-    next_page: PageCursor = None
-    count = 0
-
-    while True:
-        iter, next_page = await fetcher(next_page, count)
-
-        for ts, id in iter:
-            count += 1
-            if until and ts > until:
-                continue
-            elif ts > since:
-                # TODO(whb): It may be worth consulting the emitted changes
-                # cache here to see if we have already emitted a more recent
-                # change event before we do all the associations fetching work.
-                # Before implementing that I'd like to make sure that the
-                # top-level filtering works in production. Since the delayed
-                # changes stream only runs every 5 minutes or so it shouldn't be
-                # a huge load on the connector.
-                recent.append((ts, id))
-            else:
-                next_page = None
-
-        if not next_page:
-            break
-
-    recent.sort()  # Oldest updates first.
+    batch_size = 50 if with_history else 100
+    # Collect enough IDs for several concurrent batch fetches before
+    # processing, keeping the buffer_ordered pipeline saturated while
+    # limiting peak memory to a small multiple of the batch size.
+    concurrent_batches = 3
+    batches_per_chunk = 3
+    chunk_size = batch_size * concurrent_batches * batches_per_chunk
 
     async def _do_batch_fetch(
         batch: list[tuple[datetime, str]],
@@ -283,25 +257,46 @@ async def fetch_changes_with_associations(
 
         return ((dts[str(doc.id)], str(doc.id), doc) for doc in documents.results)
 
-    async def _batches_gen() -> (
-        AsyncGenerator[Awaitable[Iterable[tuple[datetime, str, CRMObject]]], None]
-    ):
-        for batch_it in itertools.batched(recent, 50 if with_history else 100):
-            yield _do_batch_fetch(list(batch_it))
+    async def _process_chunk(
+        chunk: list[tuple[datetime, str]],
+    ) -> AsyncGenerator[tuple[datetime, str, CRMObject], None]:
+        async def _batches_gen() -> (
+            AsyncGenerator[Awaitable[Iterable[tuple[datetime, str, CRMObject]]], None]
+        ):
+            for batch_it in itertools.batched(chunk, batch_size):
+                yield _do_batch_fetch(list(batch_it))
 
-    total = len(recent)
-    if total >= 10_000:
-        log.info(
-            "will process large batch of changes with associations", {"total": total}
-        )
+        async for res in buffer_ordered(_batches_gen(), concurrent_batches):
+            for item in res:
+                yield item
 
-    count = 0
-    async for res in buffer_ordered(_batches_gen(), 3):
-        for ts, id, doc in res:
-            count += 1
-            if count > 0 and count % 10_000 == 0:
+    # Consume IDs from the generator incrementally, processing each chunk of
+    # IDs as it fills up rather than buffering all IDs in memory.
+    chunk: list[tuple[datetime, str]] = []
+    emitted = 0
+
+    async for ts, id in fetch_ids:
+        if until and ts > until:
+            continue
+        elif ts > since:
+            chunk.append((ts, id))
+            if len(chunk) >= chunk_size:
+                async for item in _process_chunk(chunk):
+                    emitted += 1
+                    if emitted % 10_000 == 0:
+                        log.info(
+                            "fetching changes with associations",
+                            {"count": emitted},
+                        )
+                    yield item
+                chunk = []
+
+    if chunk:
+        async for item in _process_chunk(chunk):
+            emitted += 1
+            if emitted % 10_000 == 0:
                 log.info(
                     "fetching changes with associations",
-                    {"count": count, "total": total},
+                    {"count": emitted},
                 )
-            yield ts, id, doc
+            yield item

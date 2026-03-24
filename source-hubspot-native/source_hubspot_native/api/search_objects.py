@@ -2,10 +2,9 @@ from datetime import datetime, timedelta
 from logging import Logger
 from typing import (
     Any,
-    Iterable,
+    AsyncGenerator,
 )
 
-from estuary_cdk.capture.common import PageCursor
 from estuary_cdk.http import HTTPSession
 
 from ..models import (
@@ -24,26 +23,25 @@ async def fetch_search_objects(
     http: HTTPSession,
     since: datetime,
     until: datetime | None,
-    _: PageCursor,
     last_modified_property_name: str = "hs_lastmodifieddate",
-) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
+) -> AsyncGenerator[tuple[datetime, str], None]:
     """
-    Retrieve all records between 'since' and 'until' (or the present time).
+    Yields (modified_time, id) tuples for records between 'since' and 'until'.
 
-    The HubSpot Search API has an undocumented maximum offset of 10,000 items,
-    so the logic here will completely enumerate all available records, kicking
-    off new searches if needed to work around that limit. The returned
-    PageCursor is always None.
+    Results are yielded incrementally as each search API page is received,
+    rather than buffered in memory. The HubSpot Search API has an undocumented
+    maximum offset of 10,000 items, so the logic here will kick off new
+    searches if needed to work around that limit.
 
     Multiple records can have the same "last modified" property value, and
-    indeed large runs of these may have the same value. So a "new" search will
-    inevitably grab some records again, and deduplication is handled here via
-    the set.
+    indeed large runs of these may have the same value. When a new search is
+    initiated at the 10k boundary, some records may be yielded again. Callers
+    are expected to handle deduplication (e.g. via the emitted changes cache).
     """
 
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
     limit = 200
-    output_items: set[tuple[datetime, str]] = set()
+    count = 0
     cursor: int | None = None
     max_updated: datetime = since
     original_since = since
@@ -116,14 +114,15 @@ async def fetch_search_objects(
                 )
 
             max_updated = this_mod_time
-            output_items.add((this_mod_time, str(r.id)))
+            count += 1
+            yield (this_mod_time, str(r.id))
 
         if not result.paging:
             if since is not original_since:
                 log.info(
                     "finished multi-request fetch",
                     {
-                        "final_count": len(output_items),
+                        "final_count": count,
                         "total": original_total,
                     },
                 )
@@ -141,11 +140,11 @@ async def fetch_search_objects(
                     "cycle detected for lastmodifieddate, fetching all ids for records modified at that instant",
                     {"object_name": object_name, "instant": since},
                 )
-                output_items.update(
-                    await fetch_search_objects_modified_at(
-                        object_name, log, http, max_updated, last_modified_property_name
-                    )
-                )
+                for item in await fetch_search_objects_modified_at(
+                    object_name, log, http, max_updated, last_modified_property_name
+                ):
+                    count += 1
+                    yield item
 
                 # HubSpot APIs use millisecond resolution, so move the time
                 # cursor forward by that minimum amount now that we know we have
@@ -165,14 +164,10 @@ async def fetch_search_objects(
                     "since": since,
                     "until": until,
                     "original_since": original_since,
-                    "count": len(output_items),
+                    "count": count,
                     "total": original_total,
                 },
             )
-
-    # Sort newest to oldest to match the convention of most of "fetch ID"
-    # functions.
-    return sorted(list(output_items), reverse=True), None
 
 
 async def fetch_search_objects_modified_at(
