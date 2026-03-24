@@ -48,7 +48,13 @@ def fetch_recent_contacts(
                 await http.request(log, url, params=params)
             )
             for r in result.contacts:
-                yield (ms_to_dt(int(r.properties.lastmodifieddate.value)), str(r.vid))
+                ts = ms_to_dt(int(r.properties.lastmodifieddate.value))
+                # This API returns results newest-first, so once we
+                # see a record at or before `since` there's nothing
+                # left worth fetching.
+                if ts <= since:
+                    return
+                yield (ts, str(r.vid))
                 count += 1
 
             if not (result.has_more and result.time_offset):

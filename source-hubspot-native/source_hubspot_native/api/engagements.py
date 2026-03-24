@@ -20,7 +20,7 @@ from .shared import (
 
 
 async def _fetch_engagement_ids(
-    log: Logger, http: HTTPSession,
+    log: Logger, http: HTTPSession, since: datetime,
 ):
     count = 0
     page = None
@@ -40,7 +40,13 @@ async def _fetch_engagement_ids(
             await http.request(log, url, params=params)
         )
         for r in result.results:
-            yield (ms_to_dt(r.engagement.lastUpdated), str(r.engagement.id))
+            ts = ms_to_dt(r.engagement.lastUpdated)
+            # This API returns results newest-first, so once we
+            # see a record at or before `since` there's nothing
+            # left worth fetching.
+            if ts <= since:
+                return
+            yield (ts, str(r.engagement.id))
             count += 1
 
         if not (result.hasMore and result.offset):
@@ -58,7 +64,7 @@ def fetch_recent_engagements(
     return fetch_changes_with_associations(
         Names.engagements,
         Engagement,
-        _fetch_engagement_ids(log, http),
+        _fetch_engagement_ids(log, http, since),
         log,
         http,
         with_history,
@@ -77,7 +83,7 @@ def fetch_delayed_engagements(
     return fetch_changes_with_associations(
         Names.engagements,
         Engagement,
-        _fetch_engagement_ids(log, http),
+        _fetch_engagement_ids(log, http, since),
         log,
         http,
         with_history,

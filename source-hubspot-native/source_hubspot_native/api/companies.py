@@ -42,7 +42,13 @@ def fetch_recent_companies(
                 await http.request(log, url, params=params)
             )
             for r in result.results:
-                yield (ms_to_dt(r.properties.hs_lastmodifieddate.timestamp), str(r.companyId))
+                ts = ms_to_dt(r.properties.hs_lastmodifieddate.timestamp)
+                # This API returns results newest-first, so once we
+                # see a record at or before `since` there's nothing
+                # left worth fetching.
+                if ts <= since:
+                    return
+                yield (ts, str(r.companyId))
                 count += 1
 
             if not (result.hasMore and result.offset):
