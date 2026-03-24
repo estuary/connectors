@@ -1,5 +1,7 @@
 # materialize-clickhouse
 
+**Minimum ClickHouse version: 25.3** — required for the `enable_replacing_merge_with_cleanup_for_min_age_to_force_merge` table setting used by automatic background CLEANUP merges. ClickHouse Cloud users should verify their cluster version meets this requirement.
+
 ## ClickHouse Tables
 
 Tables don't have primary keys in the usual sense.

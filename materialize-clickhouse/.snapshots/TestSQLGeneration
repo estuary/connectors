@@ -103,6 +103,28 @@ TRUNCATE TABLE key_value_stage_load;
 TRUNCATE TABLE delta_updates_stage_load;
 --- End delta_updates loadTruncateTable ---
 
+--- Begin key_value loadDropTable ---
+
+DROP TABLE IF EXISTS key_value_stage_load;
+--- End key_value loadDropTable ---
+
+--- Begin delta_updates loadDropTable ---
+
+DROP TABLE IF EXISTS delta_updates_stage_load;
+--- End delta_updates loadDropTable ---
+
+--- Begin key_value storeCreateTable ---
+
+CREATE OR REPLACE TABLE key_value_stage_store
+AS key_value;
+--- End key_value storeCreateTable ---
+
+--- Begin delta_updates storeCreateTable ---
+
+CREATE OR REPLACE TABLE delta_updates_stage_store
+AS delta_updates;
+--- End delta_updates storeCreateTable ---
+
 --- Begin key_value storeInsert ---
 
 INSERT INTO key_value_stage_store (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document)
@@ -112,6 +134,54 @@ INSERT INTO key_value_stage_store (key1, key2, `key!binary`, `array`, binary, bo
 
 INSERT INTO delta_updates_stage_store (`theKey`, `aValue`, flow_published_at)
 --- End delta_updates storeInsert ---
+
+--- Begin key_value storeTruncateTable ---
+
+TRUNCATE TABLE key_value_stage_store;
+--- End key_value storeTruncateTable ---
+
+--- Begin delta_updates storeTruncateTable ---
+
+TRUNCATE TABLE delta_updates_stage_store;
+--- End delta_updates storeTruncateTable ---
+
+--- Begin key_value storeQueryParts ---
+
+SELECT DISTINCT partition_id FROM system.parts
+WHERE table = 'key_value_stage_store'
+  AND database = ? AND active;
+--- End key_value storeQueryParts ---
+
+--- Begin delta_updates storeQueryParts ---
+
+SELECT DISTINCT partition_id FROM system.parts
+WHERE table = 'delta_updates_stage_store'
+  AND database = ? AND active;
+--- End delta_updates storeQueryParts ---
+
+--- Begin key_value storeMovePartition ---
+
+ALTER TABLE key_value_stage_store
+MOVE PARTITION ID ?
+TO TABLE key_value;
+--- End key_value storeMovePartition ---
+
+--- Begin delta_updates storeMovePartition ---
+
+ALTER TABLE delta_updates_stage_store
+MOVE PARTITION ID ?
+TO TABLE delta_updates;
+--- End delta_updates storeMovePartition ---
+
+--- Begin key_value storeDropTable ---
+
+DROP TABLE IF EXISTS key_value_stage_store;
+--- End key_value storeDropTable ---
+
+--- Begin delta_updates storeDropTable ---
+
+DROP TABLE IF EXISTS delta_updates_stage_store;
+--- End delta_updates storeDropTable ---
 
 --- Begin alter table add columns and drop not nulls ---
 

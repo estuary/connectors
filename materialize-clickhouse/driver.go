@@ -157,7 +157,6 @@ func newClickHouseDriver() *sql.Driver[config, tableConfig] {
 			return &sql.Endpoint[config]{
 				Config:              cfg,
 				Dialect:             dialect,
-				MetaCheckpoints:     nil, // ClickHouse lacks multi-statement transactions; no fencing.
 				NewClient:           newClient,
 				CreateTableTemplate: tpls.targetCreateTable,
 				NewTransactor:       prepareNewTransactor(tpls),
@@ -204,15 +203,20 @@ func prepareNewTransactor(
 		var d = &transactor{dialect: ep.Dialect, templates: tpls, cfg: cfg, be: be}
 
 		var err error
+		// Each binding needs a chdriver.Batch object, and each batch holds a connection in the pool,
+		// so the connection pools must each be at least that size.
+		maxIdleConns := len(bindings)
 
 		loadOptions := cfg.newClickhouseOptions()
-		loadOptions.MaxIdleConns = 40
+		loadOptions.MaxOpenConns = maxIdleConns + 5
+		loadOptions.MaxIdleConns = maxIdleConns
 		if d.load.conn, err = clickhouse.Open(loadOptions); err != nil {
 			return nil, fmt.Errorf("openNativeConn (load): %w", err)
 		}
 
 		storeOptions := cfg.newClickhouseOptions()
-		storeOptions.MaxIdleConns = 40
+		storeOptions.MaxOpenConns = maxIdleConns + 5
+		storeOptions.MaxIdleConns = maxIdleConns
 		if d.store.conn, err = clickhouse.Open(storeOptions); err != nil {
 			return nil, fmt.Errorf("openNativeConn (store): %w", err)
 		}
@@ -311,7 +315,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("truncating load table: %w", err)
 		}
 	}
-	batchByBinding := make(map[int]chdriver.Batch, 2)
+	batchByBinding := make(map[int]chdriver.Batch, len(t.bindings))
 
 	defer func() {
 		for _, batch := range batchByBinding {
@@ -397,7 +401,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		}
 	}
 
-	batchByBinding := make(map[int]chdriver.Batch, 2)
+	batchByBinding := make(map[int]chdriver.Batch, len(t.bindings))
 
 	defer func() {
 		for _, batch := range batchByBinding {
@@ -455,28 +459,39 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 func (t *transactor) commit(ctx context.Context, batchByBinding map[int]chdriver.Batch) error {
 	defer func() {
 		for _, b := range t.bindings {
-			// Free storage on the ClickHouse server
+			// Truncate store tables after commit to free storage. This is an optimization,
+			// not a correctness requirement: Store() truncates at the start of each
+			// transaction, so stale data would be cleared on the next cycle regardless.
 			_ = t.store.conn.Exec(ctx, b.store.truncateTableSQL)
 		}
 	}()
 
 	for bindingIndex := range batchByBinding {
-		rows, err := t.store.conn.Query(ctx, t.bindings[bindingIndex].store.queryPartsSQL, t.cfg.Database)
-		if err != nil {
-			return fmt.Errorf("querying store table partitions: %w", err)
+		if err := t.movePartitions(ctx, bindingIndex); err != nil {
+			return err
 		}
-		for rows.Next() {
-			var partitionID string
-			if err = rows.Scan(&partitionID); err != nil {
-				return fmt.Errorf("scanning store table partition: %w", err)
-			}
-			if err = t.store.conn.Exec(ctx, t.bindings[bindingIndex].store.movePartitionSQL, partitionID); err != nil {
-				return fmt.Errorf("moving store table partition: %w", err)
-			}
+	}
+	return nil
+}
+
+func (t *transactor) movePartitions(ctx context.Context, bindingIndex int) error {
+	rows, err := t.store.conn.Query(ctx, t.bindings[bindingIndex].store.queryPartsSQL, t.cfg.Database)
+	if err != nil {
+		return fmt.Errorf("querying store table partitions: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var partitionID string
+		if err = rows.Scan(&partitionID); err != nil {
+			return fmt.Errorf("scanning store table partition: %w", err)
 		}
-		if err = rows.Err(); err != nil {
-			return fmt.Errorf("iterating store table partitions: %w", err)
+		if err = t.store.conn.Exec(ctx, t.bindings[bindingIndex].store.movePartitionSQL, partitionID); err != nil {
+			return fmt.Errorf("moving store table partition: %w", err)
 		}
+	}
+	if err = rows.Err(); err != nil {
+		return fmt.Errorf("iterating store table partitions: %w", err)
 	}
 	return nil
 }
