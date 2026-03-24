@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
@@ -58,8 +59,10 @@ var (
 	// rxBufferInitialSize is the initial size of the receive buffer into which replication messages are read.
 	rxBufferInitialSize = 1 * 1024 * 1024
 
-	// rxBufferMaximumSize is the maximum size to which the receive buffer may grow, and thus also the maximum size of a single message we can handle.
-	rxBufferMaximumSize = 512 * 1024 * 1024
+	// rxBufferMaximumSize is the maximum size to which the receive buffer may grow, and thus also the
+	// maximum size of a single message we can handle. Set to 50% of the container memory limit, which
+	// is determined at startup by common.ConfigureMemoryLimit reading the cgroup limit.
+	rxBufferMaximumSize = int(common.MemoryLimit() / 2)
 )
 
 // A replicationStream represents the process of receiving PostgreSQL
