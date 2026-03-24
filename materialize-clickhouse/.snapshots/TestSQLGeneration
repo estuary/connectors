@@ -1,4 +1,4 @@
---- Begin key_value createTargetTable ---
+--- Begin key_value targetCreateTable ---
 
 CREATE TABLE IF NOT EXISTS key_value (
 		key1 Int64,
@@ -32,9 +32,9 @@ SETTINGS
 	min_age_to_force_merge_seconds = 604800,
 	min_age_to_force_merge_on_partition_only = 1,
 	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
---- End key_value createTargetTable ---
+--- End key_value targetCreateTable ---
 
---- Begin delta_updates createTargetTable ---
+--- Begin delta_updates targetCreateTable ---
 
 CREATE TABLE IF NOT EXISTS delta_updates (
 		`theKey` String,
@@ -49,11 +49,11 @@ SETTINGS
 	min_age_to_force_merge_seconds = 604800,
 	min_age_to_force_merge_on_partition_only = 1,
 	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
---- End delta_updates createTargetTable ---
+--- End delta_updates targetCreateTable ---
 
 --- Begin key_value loadCreateTable ---
 
-CREATE TEMPORARY TABLE flow_temp_load_0 (
+CREATE OR REPLACE TABLE key_value_stage_load (
 		key1 Int64,
 		key2 Bool,
 		`key!binary` String
@@ -63,7 +63,7 @@ ENGINE = Join(ALL, INNER, key1, key2, `key!binary`);
 
 --- Begin delta_updates loadCreateTable ---
 
-CREATE TEMPORARY TABLE flow_temp_load_1 (
+CREATE OR REPLACE TABLE delta_updates_stage_load (
 		`theKey` String
 )
 ENGINE = Join(ALL, INNER, `theKey`);
@@ -73,47 +73,44 @@ ENGINE = Join(ALL, INNER, `theKey`);
 
 SELECT 0::Int32, r.flow_document
 	FROM key_value AS r FINAL
-	JOIN flow_temp_load_0 AS l
-		 ON  l.key1 = r.key1
+	JOIN key_value_stage_load AS l
+		 ON l.key1 = r.key1
 		 AND l.key2 = r.key2
 		 AND l.`key!binary` = r.`key!binary`
-
 --- End key_value loadQuery ---
 
 --- Begin delta_updates loadQuery ---
-
-SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 
 --- End delta_updates loadQuery ---
 
 --- Begin key_value loadInsert ---
 
-INSERT INTO flow_temp_load_0 (key1, key2, `key!binary`)
+INSERT INTO key_value_stage_load (key1, key2, `key!binary`)
 --- End key_value loadInsert ---
 
 --- Begin delta_updates loadInsert ---
 
-INSERT INTO flow_temp_load_1 (`theKey`)
+INSERT INTO delta_updates_stage_load (`theKey`)
 --- End delta_updates loadInsert ---
 
 --- Begin key_value loadTruncateTable ---
 
-TRUNCATE TABLE flow_temp_load_0;
+TRUNCATE TABLE key_value_stage_load;
 --- End key_value loadTruncateTable ---
 
 --- Begin delta_updates loadTruncateTable ---
 
-TRUNCATE TABLE flow_temp_load_1;
+TRUNCATE TABLE delta_updates_stage_load;
 --- End delta_updates loadTruncateTable ---
 
 --- Begin key_value storeInsert ---
 
-INSERT INTO key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document)
+INSERT INTO key_value_stage_store (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document)
 --- End key_value storeInsert ---
 
 --- Begin delta_updates storeInsert ---
 
-INSERT INTO delta_updates (`theKey`, `aValue`, flow_published_at)
+INSERT INTO delta_updates_stage_store (`theKey`, `aValue`, flow_published_at)
 --- End delta_updates storeInsert ---
 
 --- Begin alter table add columns and drop not nulls ---

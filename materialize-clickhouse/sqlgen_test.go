@@ -20,16 +20,16 @@ func TestSQLGeneration(t *testing.T) {
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				testTemplates.createTargetTable,
+				testTemplates.targetCreateTable,
 				testTemplates.loadCreateTable,
 				testTemplates.loadQuery,
 				testTemplates.loadInsert,
 				testTemplates.loadTruncateTable,
 				testTemplates.storeInsert,
 			},
-			TplAddColumns:    testTemplates.alterTableColumns,
-			TplDropNotNulls:  testTemplates.alterTableColumns,
-			TplCombinedAlter: testTemplates.alterTableColumns,
+			TplAddColumns:    testTemplates.targetAlterColumns,
+			TplDropNotNulls:  testTemplates.targetAlterColumns,
+			TplCombinedAlter: testTemplates.targetAlterColumns,
 		},
 	)
 

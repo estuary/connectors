@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
@@ -158,7 +159,7 @@ func newClickHouseDriver() *sql.Driver[config, tableConfig] {
 				Dialect:             dialect,
 				MetaCheckpoints:     nil, // ClickHouse lacks multi-statement transactions; no fencing.
 				NewClient:           newClient,
-				CreateTableTemplate: tpls.createTargetTable,
+				CreateTableTemplate: tpls.targetCreateTable,
 				NewTransactor:       prepareNewTransactor(tpls),
 				ConcurrentApply:     false,
 				RequireMetaOp:       true,
@@ -204,12 +205,8 @@ func prepareNewTransactor(
 
 		var err error
 
-		// We use temporary tables to store load keys.
-		// The lifetime of a temporary table is tied to its TCP connections, so we must limit
-		// the connection pool to just one.
 		loadOptions := cfg.newClickhouseOptions()
-		loadOptions.MaxOpenConns = 1
-		loadOptions.MaxIdleConns = 1
+		loadOptions.MaxIdleConns = 40
 		if d.load.conn, err = clickhouse.Open(loadOptions); err != nil {
 			return nil, fmt.Errorf("openNativeConn (load): %w", err)
 		}
@@ -231,36 +228,68 @@ func prepareNewTransactor(
 }
 
 type binding struct {
-	target               sql.Table
-	loadCreateTableSQL   string
-	loadTruncateTableSQL string
-	loadInsertSQL        string
-	loadQuerySQL         string
-	storeInsertSQL       string
+	target sql.Table
+	load   struct {
+		createTableSQL   string
+		truncateTableSQL string
+		insertSQL        string
+		querySQL         string
+		dropTableSQL     string
+	}
+	store struct {
+		createTableSQL   string
+		truncateTableSQL string
+		insertSQL        string
+		queryPartsSQL    string
+		movePartitionSQL string
+		dropTableSQL     string
+	}
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	b := &binding{target: target}
 
 	var err error
-	if b.loadCreateTableSQL, err = sql.RenderTableTemplate(target, t.templates.loadCreateTable); err != nil {
+	if b.load.createTableSQL, err = sql.RenderTableTemplate(target, t.templates.loadCreateTable); err != nil {
 		return fmt.Errorf("rendering loadCreateTable template: %w", err)
 	}
-	if b.loadTruncateTableSQL, err = sql.RenderTableTemplate(target, t.templates.loadTruncateTable); err != nil {
+	if b.load.truncateTableSQL, err = sql.RenderTableTemplate(target, t.templates.loadTruncateTable); err != nil {
 		return fmt.Errorf("rendering loadTruncateTable template: %w", err)
 	}
-	if b.loadInsertSQL, err = sql.RenderTableTemplate(target, t.templates.loadInsert); err != nil {
+	if b.load.insertSQL, err = sql.RenderTableTemplate(target, t.templates.loadInsert); err != nil {
 		return fmt.Errorf("rendering loadInsert template: %w", err)
 	}
-	if b.loadQuerySQL, err = sql.RenderTableTemplate(target, t.templates.loadQuery); err != nil {
+	if b.load.querySQL, err = sql.RenderTableTemplate(target, t.templates.loadQuery); err != nil {
 		return fmt.Errorf("rendering loadQuery template: %w", err)
 	}
-	if b.storeInsertSQL, err = sql.RenderTableTemplate(target, t.templates.storeInsert); err != nil {
-		return fmt.Errorf("rendering storeInsert template: %w", err)
+	if b.load.dropTableSQL, err = sql.RenderTableTemplate(target, t.templates.loadDropTable); err != nil {
+		return fmt.Errorf("rendering loadDropTable template: %w", err)
 	}
 
-	if err = t.load.conn.Exec(ctx, b.loadCreateTableSQL); err != nil {
-		return fmt.Errorf("creating load temp table: %w", err)
+	if b.store.createTableSQL, err = sql.RenderTableTemplate(target, t.templates.storeCreateTable); err != nil {
+		return fmt.Errorf("rendering storeCreateTable template: %w", err)
+	}
+	if b.store.truncateTableSQL, err = sql.RenderTableTemplate(target, t.templates.storeTruncateTable); err != nil {
+		return fmt.Errorf("rendering storeTruncateTable template: %w", err)
+	}
+	if b.store.insertSQL, err = sql.RenderTableTemplate(target, t.templates.storeInsert); err != nil {
+		return fmt.Errorf("rendering storeInsert template: %w", err)
+	}
+	if b.store.queryPartsSQL, err = sql.RenderTableTemplate(target, t.templates.storeQueryParts); err != nil {
+		return fmt.Errorf("rendering storeQueryParts template: %w", err)
+	}
+	if b.store.movePartitionSQL, err = sql.RenderTableTemplate(target, t.templates.storeMovePartition); err != nil {
+		return fmt.Errorf("rendering storeMovePartition template: %w", err)
+	}
+	if b.store.dropTableSQL, err = sql.RenderTableTemplate(target, t.templates.storeDropTable); err != nil {
+		return fmt.Errorf("rendering storeDropTable template: %w", err)
+	}
+
+	if err = t.load.conn.Exec(ctx, b.load.createTableSQL); err != nil {
+		return fmt.Errorf("creating load stage table: %w", err)
+	}
+	if err = t.store.conn.Exec(ctx, b.store.createTableSQL); err != nil {
+		return fmt.Errorf("creating store stage table: %w", err)
 	}
 
 	t.bindings = append(t.bindings, b)
@@ -276,29 +305,31 @@ const maxBatchSize = 100_000
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (err error) {
 	var ctx = it.Context()
 
-	batchByBinding := make(map[int]chdriver.Batch, 2)
-	defer func() {
-		for _, batch := range batchByBinding {
-			_ = batch.Abort()
-		}
-	}()
-
-	// Truncate all temp tables to clear keys from prior transactions.
+	// Clear keys from prior transaction.
 	for _, b := range t.bindings {
-		if err := t.load.conn.Exec(ctx, b.loadTruncateTableSQL); err != nil {
+		if err := t.load.conn.Exec(ctx, b.load.truncateTableSQL); err != nil {
 			return fmt.Errorf("truncating load table: %w", err)
 		}
 	}
+	batchByBinding := make(map[int]chdriver.Batch, 2)
+
+	defer func() {
+		for _, batch := range batchByBinding {
+			// Release the associated network connection to the pool.
+			_ = batch.Abort()
+		}
+		for _, b := range t.bindings {
+			// Free memory on the ClickHouse server
+			_ = t.load.conn.Exec(ctx, b.load.truncateTableSQL)
+		}
+	}()
 
 	for it.Next() {
 		b := t.bindings[it.Binding]
 
 		batch, found := batchByBinding[it.Binding]
 		if !found {
-			// WithReleaseConnection because a single TCP connection is shared by all bindings:
-			// 1) This batch can trust us to reuse the connection, and not pick up another one from the pool.
-			// 2) We can write to multiple temporary tables, each with its own batch.
-			batch, err = t.load.conn.PrepareBatch(ctx, b.loadInsertSQL, chdriver.WithReleaseConnection())
+			batch, err = t.load.conn.PrepareBatch(ctx, b.load.insertSQL)
 			if err != nil {
 				return fmt.Errorf("preparing load batch: %w", err)
 			}
@@ -331,7 +362,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 	loadQueries := make([]string, len(t.bindings))
 	for i, b := range t.bindings {
-		loadQueries[i] = b.loadQuerySQL
+		loadQueries[i] = b.load.querySQL
 	}
 	loadQueryUnionSQL := strings.Join(loadQueries, "\nUNION ALL\n") + ";"
 	rows, err := t.load.conn.Query(ctx, loadQueryUnionSQL)
@@ -359,9 +390,18 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
 
+	// Clear records from prior transaction.
+	for _, b := range t.bindings {
+		if err := t.store.conn.Exec(ctx, b.store.truncateTableSQL); err != nil {
+			return nil, fmt.Errorf("truncating store table: %w", err)
+		}
+	}
+
 	batchByBinding := make(map[int]chdriver.Batch, 2)
+
 	defer func() {
 		for _, batch := range batchByBinding {
+			// Release the associated network connection to the pool.
 			_ = batch.Abort()
 		}
 	}()
@@ -375,7 +415,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		batch, found := batchByBinding[it.Binding]
 		if !found {
-			batch, err = t.store.conn.PrepareBatch(ctx, b.storeInsertSQL)
+			batch, err = t.store.conn.PrepareBatch(ctx, b.store.insertSQL)
 			if err != nil {
 				return nil, fmt.Errorf("preparing store batch: %w", err)
 			}
@@ -406,11 +446,49 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() error { return nil })
+		return nil, m.RunAsyncOperation(func() error {
+			return t.commit(ctx, batchByBinding)
+		})
 	}, nil
 }
 
+func (t *transactor) commit(ctx context.Context, batchByBinding map[int]chdriver.Batch) error {
+	defer func() {
+		for _, b := range t.bindings {
+			// Free storage on the ClickHouse server
+			_ = t.store.conn.Exec(ctx, b.store.truncateTableSQL)
+		}
+	}()
+
+	for bindingIndex := range batchByBinding {
+		rows, err := t.store.conn.Query(ctx, t.bindings[bindingIndex].store.queryPartsSQL, t.cfg.Database)
+		if err != nil {
+			return fmt.Errorf("querying store table partitions: %w", err)
+		}
+		for rows.Next() {
+			var partitionID string
+			if err = rows.Scan(&partitionID); err != nil {
+				return fmt.Errorf("scanning store table partition: %w", err)
+			}
+			if err = t.store.conn.Exec(ctx, t.bindings[bindingIndex].store.movePartitionSQL, partitionID); err != nil {
+				return fmt.Errorf("moving store table partition: %w", err)
+			}
+		}
+		if err = rows.Err(); err != nil {
+			return fmt.Errorf("iterating store table partitions: %w", err)
+		}
+	}
+	return nil
+}
+
 func (t *transactor) Destroy() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	for _, b := range t.bindings {
+		_ = t.store.conn.Exec(ctx, b.store.dropTableSQL)
+		_ = t.load.conn.Exec(ctx, b.load.dropTableSQL)
+	}
 	_ = t.store.conn.Close()
 	_ = t.load.conn.Close()
 }

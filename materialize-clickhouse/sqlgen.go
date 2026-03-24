@@ -98,13 +98,19 @@ var clickHouseDialect = func(database string) sql.Dialect {
 }
 
 type templates struct {
-	createTargetTable *template.Template
-	loadCreateTable   *template.Template
-	loadTruncateTable *template.Template
-	loadInsert        *template.Template
-	loadQuery         *template.Template
-	storeInsert       *template.Template
-	alterTableColumns *template.Template
+	targetCreateTable  *template.Template
+	targetAlterColumns *template.Template
+	loadCreateTable    *template.Template
+	loadTruncateTable  *template.Template
+	loadInsert         *template.Template
+	loadQuery          *template.Template
+	loadDropTable      *template.Template
+	storeCreateTable   *template.Template
+	storeTruncateTable *template.Template
+	storeInsert        *template.Template
+	storeQueryParts    *template.Template
+	storeMovePartition *template.Template
+	storeDropTable     *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -135,7 +141,7 @@ func renderTemplates(dialect sql.Dialect) templates {
 --     cleanup only happens via OPTIMIZE ... FINAL CLEANUP.
 --     Added in ClickHouse 25.3.
 
-{{ define "createTargetTable" }}
+{{ define "targetCreateTable" }}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{- range $ind, $col := $.Columns }}
 		{{$col.Identifier}} {{ if not $col.MustExist }}Nullable({{ end }}{{$col.DDL}}{{ if not $col.MustExist }}){{ end }},
@@ -162,8 +168,23 @@ SETTINGS
 	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
 {{ end }}
 
+{{ define "targetAlterColumns" }}
+{{- range $ind, $col := $.AddColumns }}
+ALTER TABLE {{$.Identifier}} ADD COLUMN IF NOT EXISTS {{$col.Identifier}} Nullable({{$col.NullableDDL}});
+{{ end -}}
+{{- range $ind, $col := $.DropNotNulls }}
+ALTER TABLE {{$.Identifier}} MODIFY COLUMN {{ ColumnIdentifier $col.Name }} Nullable({{$col.Type}});
+{{ end -}}
+{{ end }}
+
+-- Load tables
+
+{{ define "loadTableName" -}}
+{{$.Identifier}}_stage_load
+{{- end }}
+
 {{ define "loadCreateTable" }}
-CREATE TEMPORARY TABLE flow_temp_load_{{ $.Binding }} (
+CREATE OR REPLACE TABLE {{ template "loadTableName" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
@@ -177,13 +198,11 @@ ENGINE = Join(ALL, INNER
 {{ end }}
 
 {{ define "loadTruncateTable" }}
-TRUNCATE TABLE flow_temp_load_{{ $.Binding }};
+TRUNCATE TABLE {{ template "loadTableName" . }};
 {{ end }}
 
--- Templated INSERT for staging load keys into the temp table via PrepareBatch.
-
 {{ define "loadInsert" }}
-INSERT INTO flow_temp_load_{{ $.Binding }} (
+INSERT INTO {{ template "loadTableName" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{ end -}}
 		{{$key.Identifier}}
@@ -199,20 +218,38 @@ INSERT INTO flow_temp_load_{{ $.Binding }} (
 {{ if $.Document -}}
 SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
 	FROM {{$.Identifier}} AS r FINAL
-	JOIN flow_temp_load_{{ $.Binding }} AS l
+	JOIN {{ template "loadTableName" . }} AS l
 	{{- range $ind, $key := $.Keys }}
-		{{ if $ind }} AND {{ else }} ON  {{ end -}}
+		{{ if $ind }} AND {{ else }} ON {{ end -}}
 		l.{{$key.Identifier}} = r.{{$key.Identifier}}
 	{{- end }}
-{{ else -}}
-SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
-{{ end }}
+{{ end -}}
 {{ end }}
 
--- Templated INSERT for storing documents into the target table.
+{{ define "loadDropTable" }}
+DROP TABLE IF EXISTS {{ template "loadTableName" . }};
+{{ end }}
+
+-- Store tables
+-- Store tables have the same schema as target tables, used to stage insert batches.
+-- When the store phase completes, transaction documents wait for commit in the store tables.
+-- Commit is a quick operation that moves partitions from store tables to target tables.
+
+{{ define "storeTableName" -}}
+{{$.Identifier}}_stage_store
+{{- end }}
+
+{{ define "storeCreateTable" }}
+CREATE OR REPLACE TABLE {{ template "storeTableName" . }}
+AS {{$.Identifier}};
+{{ end }}
+
+{{ define "storeTruncateTable" }}
+TRUNCATE TABLE {{ template "storeTableName" . }};
+{{ end }}
 
 {{ define "storeInsert" }}
-INSERT INTO {{$.Identifier}} (
+INSERT INTO {{ template "storeTableName" . }} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
 		{{$col.Identifier}}
@@ -220,25 +257,36 @@ INSERT INTO {{$.Identifier}} (
 )
 {{ end }}
 
--- Templated ALTER TABLE for adding columns and modifying nullable constraints.
+{{ define "storeQueryParts" }}
+SELECT DISTINCT partition_id FROM system.parts
+WHERE table = '{{ template "storeTableName" . }}'
+  AND database = ? AND active;
+{{ end }}
 
-{{ define "alterTableColumns" }}
-{{- range $ind, $col := $.AddColumns }}
-ALTER TABLE {{$.Identifier}} ADD COLUMN IF NOT EXISTS {{$col.Identifier}} Nullable({{$col.NullableDDL}});
-{{ end -}}
-{{- range $ind, $col := $.DropNotNulls }}
-ALTER TABLE {{$.Identifier}} MODIFY COLUMN {{ ColumnIdentifier $col.Name }} Nullable({{$col.Type}});
-{{ end -}}
+{{ define "storeMovePartition" }}
+ALTER TABLE {{ template "storeTableName" . }}
+MOVE PARTITION ID ?
+TO TABLE {{ $.Identifier }};
+{{ end }}
+
+{{ define "storeDropTable" }}
+DROP TABLE IF EXISTS {{ template "storeTableName" . }};
 {{ end }}
 `)
 
 	return templates{
-		createTargetTable: tplAll.Lookup("createTargetTable"),
-		loadCreateTable:   tplAll.Lookup("loadCreateTable"),
-		loadTruncateTable: tplAll.Lookup("loadTruncateTable"),
-		loadInsert:        tplAll.Lookup("loadInsert"),
-		loadQuery:         tplAll.Lookup("loadQuery"),
-		storeInsert:       tplAll.Lookup("storeInsert"),
-		alterTableColumns: tplAll.Lookup("alterTableColumns"),
+		targetCreateTable:  tplAll.Lookup("targetCreateTable"),
+		targetAlterColumns: tplAll.Lookup("targetAlterColumns"),
+		loadCreateTable:    tplAll.Lookup("loadCreateTable"),
+		loadTruncateTable:  tplAll.Lookup("loadTruncateTable"),
+		loadInsert:         tplAll.Lookup("loadInsert"),
+		loadQuery:          tplAll.Lookup("loadQuery"),
+		loadDropTable:      tplAll.Lookup("loadDropTable"),
+		storeCreateTable:   tplAll.Lookup("storeCreateTable"),
+		storeTruncateTable: tplAll.Lookup("storeTruncateTable"),
+		storeInsert:        tplAll.Lookup("storeInsert"),
+		storeQueryParts:    tplAll.Lookup("storeQueryParts"),
+		storeMovePartition: tplAll.Lookup("storeMovePartition"),
+		storeDropTable:     tplAll.Lookup("storeDropTable"),
 	}
 }

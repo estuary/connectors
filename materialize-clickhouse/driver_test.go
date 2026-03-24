@@ -390,22 +390,61 @@ func TestAddBinding(t *testing.T) {
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
 	var tpls = renderTemplates(dialect)
-	var table = buildTestTable(t, dialect, "test_add_binding")
+	var tableName = "test_add_binding"
+	var table = buildTestTable(t, dialect, tableName)
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+	createSQL, err := sql.RenderTableTemplate(table, tpls.targetCreateTable)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, createSQL)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+	})
 
 	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
 	defer tr.load.conn.Close()
+	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.store.conn = storeConn
+	defer tr.store.conn.Close()
 	require.NoError(t, tr.addBinding(ctx, table))
 
 	require.Len(t, tr.bindings, 1)
-	require.NotEmpty(t, tr.bindings[0].loadQuerySQL)
-	require.NotEmpty(t, tr.bindings[0].loadInsertSQL)
-	require.NotEmpty(t, tr.bindings[0].loadTruncateTableSQL)
-	require.NotEmpty(t, tr.bindings[0].storeInsertSQL)
-	require.Contains(t, tr.bindings[0].loadQuerySQL, "flow_document")
-	require.Contains(t, tr.bindings[0].storeInsertSQL, "INSERT INTO")
+	require.NotEmpty(t, tr.bindings[0].load.querySQL)
+	require.NotEmpty(t, tr.bindings[0].load.insertSQL)
+	require.NotEmpty(t, tr.bindings[0].load.truncateTableSQL)
+	require.NotEmpty(t, tr.bindings[0].store.insertSQL)
+	require.Contains(t, tr.bindings[0].load.querySQL, "flow_document")
+	require.Contains(t, tr.bindings[0].store.insertSQL, "INSERT INTO")
+}
+
+// storeRows creates the stage table, inserts rows via PrepareBatch, and moves
+// all partitions to the target table — the same sequence as Store + commit.
+func storeRows(t *testing.T, ctx context.Context, conn chdriver.Conn, b *binding, database string, rows ...[]any) {
+	t.Helper()
+	require.NoError(t, conn.Exec(ctx, b.store.createTableSQL))
+
+	batch, err := conn.PrepareBatch(ctx, b.store.insertSQL)
+	require.NoError(t, err)
+	for _, row := range rows {
+		require.NoError(t, batch.Append(row...))
+	}
+	require.NoError(t, batch.Send())
+
+	partRows, err := conn.Query(ctx, b.store.queryPartsSQL, database)
+	require.NoError(t, err)
+	for partRows.Next() {
+		var partitionID string
+		require.NoError(t, partRows.Scan(&partitionID))
+		require.NoError(t, conn.Exec(ctx, b.store.movePartitionSQL, partitionID))
+	}
+	require.NoError(t, partRows.Err())
 }
 
 // loadDocuments inserts keys into the binding's temp table, runs the load query
@@ -414,14 +453,14 @@ func TestAddBinding(t *testing.T) {
 func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b *binding, keys ...[]any) []string {
 	t.Helper()
 
-	batch, err := loadConn.PrepareBatch(ctx, b.loadInsertSQL)
+	batch, err := loadConn.PrepareBatch(ctx, b.load.insertSQL)
 	require.NoError(t, err)
 	for _, key := range keys {
 		require.NoError(t, batch.Append(key...))
 	}
 	require.NoError(t, batch.Send())
 
-	rows, err := loadConn.Query(ctx, b.loadQuerySQL)
+	rows, err := loadConn.Query(ctx, b.load.querySQL)
 	require.NoError(t, err)
 
 	var docs []string
@@ -434,7 +473,7 @@ func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b 
 	_ = rows.Close()
 	require.NoError(t, rows.Err())
 
-	require.NoError(t, loadConn.Exec(ctx, b.loadTruncateTableSQL))
+	require.NoError(t, loadConn.Exec(ctx, b.load.truncateTableSQL))
 
 	return docs
 }
@@ -452,7 +491,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 
 	// Drop any stale table from a previous run, then create fresh.
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	createSQL, err := sql.RenderTableTemplate(table, tpls.targetCreateTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -466,19 +505,17 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	require.NoError(t, err)
 	tr.load.conn = loadConn
 	defer tr.load.conn.Close()
-	require.NoError(t, tr.addBinding(ctx, table))
-	var b = tr.bindings[0]
 
 	// Open a native connection for store batch inserts.
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
+	tr.store.conn = storeConn
 	defer storeConn.Close()
+	require.NoError(t, tr.addBinding(ctx, table))
+	var b = tr.bindings[0]
 
-	// Store: insert a row via native batch.
-	batch, err := storeConn.PrepareBatch(ctx, b.storeInsertSQL)
-	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "v1", "c", testTime, `{"id":"k1"}`))
-	require.NoError(t, batch.Send())
+	// Store: insert a row via stage table, then move to target.
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
 
 	// Load: query back the document via temp table JOIN.
 	docs := loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"})
@@ -486,16 +523,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	require.JSONEq(t, `{"id":"k1"}`, docs[0])
 
 	// Store a delete row (_meta/op="d") with full record.
-	batch, err = storeConn.PrepareBatch(ctx, b.storeInsertSQL)
-	require.NoError(t, err)
-	require.NoError(t, batch.Append(
-		"k1",
-		nil,
-		"d",
-		testTime.Add(time.Second),
-		`{"id":"k1"}`,
-	))
-	require.NoError(t, batch.Send())
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", nil, "d", testTime.Add(time.Second), `{"id":"k1"}`})
 
 	// Load again: FINAL should exclude the tombstone (_is_deleted is inferred by the MATERIALIZED expression).
 	require.Empty(t, loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"}))
@@ -526,7 +554,7 @@ func TestPrepareNewTransactor(t *testing.T) {
 	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	createSQL, err := sql.RenderTableTemplate(table, tpls.targetCreateTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -631,7 +659,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	defer db.Close()
 
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	createSQL, err := sql.RenderTableTemplate(table, tpls.targetCreateTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -644,30 +672,21 @@ func TestHardDeleteTombstone(t *testing.T) {
 	require.NoError(t, err)
 	tr.load.conn = loadConn
 	defer tr.load.conn.Close()
+	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.store.conn = storeConn
+	defer storeConn.Close()
 	require.NoError(t, tr.addBinding(ctx, table))
 	var b = tr.bindings[0]
 
-	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
-	require.NoError(t, err)
-	defer storeConn.Close()
-
 	// Insert a live row.
-	batch, err := storeConn.PrepareBatch(ctx, b.storeInsertSQL)
-	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "hello", "opt", true, int64(42), "c", testTime, `{"id":"k1"}`))
-	require.NoError(t, batch.Send())
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", "hello", "opt", true, int64(42), "c", testTime, `{"id":"k1"}`})
 
 	// Verify it loads.
 	require.Len(t, loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"}), 1)
 
 	// Store a delete row with full record values, exactly as Store does.
-	var converted []any
-	converted = append(converted, "k1", "hello", "opt", true, int64(42), "d", testTime.Add(time.Second), `{"id":"k1"}`)
-
-	batch, err = storeConn.PrepareBatch(ctx, b.storeInsertSQL)
-	require.NoError(t, err)
-	require.NoError(t, batch.Append(converted...))
-	require.NoError(t, batch.Send())
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", "hello", "opt", true, int64(42), "d", testTime.Add(time.Second), `{"id":"k1"}`})
 
 	// Load again: tombstone should hide the row.
 	require.Empty(t, loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"}))
@@ -683,7 +702,7 @@ func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Diale
 	defer db.Close()
 
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	createSQL, err := sql.RenderTableTemplate(table, tpls.targetCreateTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -697,13 +716,14 @@ func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Diale
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
-	require.NoError(t, tr.addBinding(ctx, table))
 	t.Cleanup(func() { _ = tr.load.conn.Close() })
 
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
+	tr.store.conn = storeConn
 	t.Cleanup(func() { _ = storeConn.Close() })
 
+	require.NoError(t, tr.addBinding(ctx, table))
 	return tr.bindings[0], storeConn, tr.load.conn
 }
 
@@ -792,12 +812,11 @@ func TestLoadMultipleKeys(t *testing.T) {
 	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Store 3 rows.
-	batch, err := storeConn.PrepareBatch(ctx, b.storeInsertSQL)
-	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "v1", "c", testTime, `{"id":"k1"}`))
-	require.NoError(t, batch.Append("k2", "v2", "c", testTime, `{"id":"k2"}`))
-	require.NoError(t, batch.Append("k3", "v3", "c", testTime, `{"id":"k3"}`))
-	require.NoError(t, batch.Send())
+	storeRows(t, ctx, storeConn, b, cfg.Database,
+		[]any{"k1", "v1", "c", testTime, `{"id":"k1"}`},
+		[]any{"k2", "v2", "c", testTime, `{"id":"k2"}`},
+		[]any{"k3", "v3", "c", testTime, `{"id":"k3"}`},
+	)
 
 	// Load all 3 keys.
 	docs := loadDocuments(t, ctx, loadConn, b, []any{"k1"}, []any{"k2"}, []any{"k3"})
@@ -831,12 +850,11 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Store 3 rows with composite keys: (tenant, id).
-	batch, err := storeConn.PrepareBatch(ctx, b.storeInsertSQL)
-	require.NoError(t, err)
-	require.NoError(t, batch.Append("acme", int64(1), "v1", "c", testTime, `{"tenant":"acme","id":1}`))
-	require.NoError(t, batch.Append("acme", int64(2), "v2", "c", testTime, `{"tenant":"acme","id":2}`))
-	require.NoError(t, batch.Append("beta", int64(1), "v3", "c", testTime, `{"tenant":"beta","id":1}`))
-	require.NoError(t, batch.Send())
+	storeRows(t, ctx, storeConn, b, cfg.Database,
+		[]any{"acme", int64(1), "v1", "c", testTime, `{"tenant":"acme","id":1}`},
+		[]any{"acme", int64(2), "v2", "c", testTime, `{"tenant":"acme","id":2}`},
+		[]any{"beta", int64(1), "v3", "c", testTime, `{"tenant":"beta","id":1}`},
+	)
 
 	// Load (acme,1) → doc1.
 	docs := loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)})
@@ -874,14 +892,11 @@ func TestVersionDeduplication(t *testing.T) {
 	b, storeConn, _ := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Simulate 3 successive Store commits for the same key, each in a separate
-	// batch (separate insert/part) with increasing flow_published_at timestamps.
+	// batch with increasing flow_published_at timestamps.
 	for seq := 1; seq <= 3; seq++ {
-		batch, err := storeConn.PrepareBatch(ctx, b.storeInsertSQL)
-		require.NoError(t, err)
 		doc := fmt.Sprintf(`{"id":"k1","seq":%d}`, seq)
 		ts := testTime.Add(time.Duration(seq) * time.Second)
-		require.NoError(t, batch.Append("k1", fmt.Sprintf("v%d", seq), "c", ts, doc))
-		require.NoError(t, batch.Send())
+		storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", fmt.Sprintf("v%d", seq), "c", ts, doc})
 	}
 
 	// Query ClickHouse directly with FINAL to verify deduplication picks the
@@ -908,13 +923,12 @@ func TestStoreBatchMultipleRows(t *testing.T) {
 
 	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
-	// Single PrepareBatch, append 3 rows, then Send.
-	batch, err := storeConn.PrepareBatch(ctx, b.storeInsertSQL)
-	require.NoError(t, err)
-	require.NoError(t, batch.Append("k1", "v1", "c", testTime, `{"id":"k1"}`))
-	require.NoError(t, batch.Append("k2", "v2", "c", testTime, `{"id":"k2"}`))
-	require.NoError(t, batch.Append("k3", "v3", "c", testTime, `{"id":"k3"}`))
-	require.NoError(t, batch.Send())
+	// Store 3 rows in a single batch, then move to target.
+	storeRows(t, ctx, storeConn, b, cfg.Database,
+		[]any{"k1", "v1", "c", testTime, `{"id":"k1"}`},
+		[]any{"k2", "v2", "c", testTime, `{"id":"k2"}`},
+		[]any{"k3", "v3", "c", testTime, `{"id":"k3"}`},
+	)
 
 	// Load all 3 → all present.
 	docs := loadDocuments(t, ctx, loadConn, b, []any{"k1"}, []any{"k2"}, []any{"k3"})
@@ -941,7 +955,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tn)))
 	}
 	for _, tbl := range []sql.Table{tableA, tableB} {
-		createSQL, err := sql.RenderTableTemplate(tbl, tpls.createTargetTable)
+		createSQL, err := sql.RenderTableTemplate(tbl, tpls.targetCreateTable)
 		require.NoError(t, err)
 		_, err = db.ExecContext(ctx, createSQL)
 		require.NoError(t, err)
@@ -959,31 +973,26 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
-	require.NoError(t, tr.addBinding(ctx, tableA))
-	require.NoError(t, tr.addBinding(ctx, tableB))
-	require.Len(t, tr.bindings, 2)
 	t.Cleanup(func() {
 		_ = tr.load.conn.Close()
 	})
 
 	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
+	tr.store.conn = storeConn
+	require.NoError(t, tr.addBinding(ctx, tableA))
+	require.NoError(t, tr.addBinding(ctx, tableB))
+	require.Len(t, tr.bindings, 2)
 	defer storeConn.Close()
 
 	var bA = tr.bindings[0]
 	var bB = tr.bindings[1]
 
 	// Store a row into table A.
-	batch, err := storeConn.PrepareBatch(ctx, bA.storeInsertSQL)
-	require.NoError(t, err)
-	require.NoError(t, batch.Append("keyA", "valA", "c", testTime, `{"id":"keyA"}`))
-	require.NoError(t, batch.Send())
+	storeRows(t, ctx, storeConn, bA, cfg.Database, []any{"keyA", "valA", "c", testTime, `{"id":"keyA"}`})
 
 	// Store a row into table B.
-	batch, err = storeConn.PrepareBatch(ctx, bB.storeInsertSQL)
-	require.NoError(t, err)
-	require.NoError(t, batch.Append("keyB", "valB", "c", testTime, `{"id":"keyB"}`))
-	require.NoError(t, batch.Send())
+	storeRows(t, ctx, storeConn, bB, cfg.Database, []any{"keyB", "valB", "c", testTime, `{"id":"keyB"}`})
 
 	// Load from table A → correct doc.
 	docs := loadDocuments(t, ctx, tr.load.conn, bA, []any{"keyA"})
@@ -1010,10 +1019,7 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Store a live row (acme, 1).
-	batch, err := storeConn.PrepareBatch(ctx, b.storeInsertSQL)
-	require.NoError(t, err)
-	require.NoError(t, batch.Append("acme", int64(1), "val", "c", testTime, `{"tenant":"acme","id":1}`))
-	require.NoError(t, batch.Send())
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"acme", int64(1), "val", "c", testTime, `{"tenant":"acme","id":1}`})
 
 	// Load → present.
 	docs := loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)})
@@ -1021,14 +1027,7 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	require.JSONEq(t, `{"tenant":"acme","id":1}`, docs[0])
 
 	// Store delete row with _meta/op="d", using full record.
-	var converted []any
-	converted = append(converted, "acme", int64(1)) // keys
-	converted = append(converted, "val", "d", testTime.Add(time.Second), `{"tenant":"acme","id":1}`)
-
-	batch, err = storeConn.PrepareBatch(ctx, b.storeInsertSQL)
-	require.NoError(t, err)
-	require.NoError(t, batch.Append(converted...))
-	require.NoError(t, batch.Send())
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"acme", int64(1), "val", "d", testTime.Add(time.Second), `{"tenant":"acme","id":1}`})
 
 	// Load → empty (tombstone hides the row).
 	require.Empty(t, loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)}))

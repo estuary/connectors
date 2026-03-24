@@ -135,7 +135,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 
 	if len(ta.AddColumns) > 0 || len(ta.DropNotNulls) > 0 {
 		var alterStmtBuilder strings.Builder
-		if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&alterStmtBuilder, ta); err != nil {
+		if err := renderTemplates(c.ep.Dialect).targetAlterColumns.Execute(&alterStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table statement: %w", err)
 		}
 		var alterStmt = alterStmtBuilder.String()
