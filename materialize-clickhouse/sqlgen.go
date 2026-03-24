@@ -115,7 +115,8 @@ type templates struct {
 
 func renderTemplates(dialect sql.Dialect) templates {
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
--- Templated creation of a materialized table definition.
+---- Target tables
+
 -- ClickHouse is an "append-only" database. We use ReplacingMergeTree so that
 -- multiple versions of an Estuary key (as ClickHouse ORDER BY key) can exist
 -- concurrently, with monotonically increasing flow_published_at timestamps.
@@ -177,7 +178,17 @@ ALTER TABLE {{$.Identifier}} MODIFY COLUMN {{ ColumnIdentifier $col.Name }} Null
 {{ end -}}
 {{ end }}
 
--- Load tables
+---- Load tables
+
+-- Load tables use the Join engine, an in-memory hash table keyed by the binding's
+-- ORDER BY keys. During a transaction's load phase, the connector inserts the keys
+-- of documents it needs to look up into the staging load table. It then joins the
+-- target table (using FINAL for deduplication) against the staging table to retrieve
+-- the current version of documents for those keys.
+--
+-- CREATE OR REPLACE TABLE is used so that the table is reset on connector restart,
+-- discarding any stale in-memory state from a previous run. The table is truncated
+-- between transactions and dropped when the connector shuts down.
 
 {{ define "loadTableName" -}}
 {{$.Identifier}}_stage_load
@@ -210,10 +221,6 @@ INSERT INTO {{ template "loadTableName" . }} (
 )
 {{ end }}
 
--- Templated query which joins the temp table with the target table to look up
--- existing documents. Returns binding index and document JSON for UNION ALL.
--- FINAL deduplicates per-key and omits deleted records at query time.
-
 {{ define "loadQuery" }}
 {{ if $.Document -}}
 SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
@@ -230,10 +237,28 @@ SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
 DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 {{ end }}
 
--- Store tables
--- Store tables have the same schema as target tables, used to stage insert batches.
--- When the store phase completes, transaction documents wait for commit in the store tables.
--- Commit is a quick operation that moves partitions from store tables to target tables.
+---- Store tables
+
+-- Store tables stage documents written during a transaction's store phase. They are
+-- created with CREATE TABLE ... AS, which clones the target table's schema and engine
+-- (ReplacingMergeTree), so that their on-disk parts are partition-compatible with the
+-- target table.
+--
+-- Documents are inserted into the store table during the store phase. On commit, the
+-- connector enumerates the store table's parts via system.parts and moves each
+-- partition to the target table using ALTER TABLE ... MOVE PARTITION. Moving a
+-- partition is a metadata-only operation (it relinks existing parts rather than
+-- copying data), so the commit phase is very low latency regardless of transaction
+-- size. This is significantly faster than INSERT ... SELECT or other bulk-copy
+-- methods that would rewrite data.
+--
+-- The commit is not atomic across bindings: partitions are moved one at a time and a
+-- failure mid-commit will leave some partitions moved and others not. This is safe
+-- because the target table uses ReplacingMergeTree, which deduplicates by ORDER BY
+-- key and flow_published_at version — re-applying a partial commit is idempotent.
+--
+-- CREATE OR REPLACE TABLE resets the store table on connector restart. The table is
+-- truncated between transactions and dropped when the connector shuts down.
 
 {{ define "storeTableName" -}}
 {{$.Identifier}}_stage_store

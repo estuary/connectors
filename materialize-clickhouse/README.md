@@ -32,8 +32,11 @@ To reconcile updates, we utilize the ClickHouse ReplacingMergeTree engine.
 ReplacingMergeTree augments the merge process by dropping duplicate rows (according to the `ORDER BY` key),
 retaining only the most recent version.
 
-To reconcile deletes, we enable automatic background CLEANUP merges.
-This means that records marked for deletion are omitted from merge operations; they are dropped.
+To reconcile deletes, we configure `_is_deleted` as a deletion marker in the ReplacingMergeTree engine.
+During regular merges, the tombstone record (`_is_deleted = 1`) is retained as the winning version.
+The `FINAL` query qualifier excludes these tombstones at query time.
+We also enable automatic background [CLEANUP merges](#cleanup-merge-settings),
+which periodically remove tombstones from disk entirely.
 
 ## Querying ClickHouse
 
@@ -56,6 +59,66 @@ The `_is_deleted` column is automatically inferred by ClickHouse via a MATERIALI
 To update a record, we clone the previous version of the record, update the fields so specified, and insert the clone.
 `flow_published_at` is a standard Estuary metadata timestamp that naturally increases with each transaction,
 so the row with the highest timestamp is retained at merge time.
+
+## CLEANUP Merge Settings
+
+Target tables are created with four SETTINGS that enable automatic background CLEANUP merges:
+
+| Setting | Value | Purpose | Since |
+|---------|-------|---------|-------|
+| `allow_experimental_replacing_merge_with_cleanup` | `1` | Enables the CLEANUP merge feature (experimental). Required for the other settings to have any effect. Also enables manual `OPTIMIZE TABLE ... FINAL CLEANUP`. | 23.12 / 24.1 |
+| `min_age_to_force_merge_seconds` | `604800` (1 week) | Minimum age of all parts in a partition before forcing a merge. Only partitions where every part is older than this threshold are eligible. | 22.10 |
+| `min_age_to_force_merge_on_partition_only` | `1` | Restricts forced merges to only run when merging an entire partition into one part. Required for CLEANUP to safely remove deleted rows (ensures no older versions remain in other parts). | 22.10 |
+| `enable_replacing_merge_with_cleanup_for_min_age_to_force_merge` | `1` | Enables automatic background CLEANUP merges when the age threshold is met. Without this, cleanup only happens via manual `OPTIMIZE ... FINAL CLEANUP`. | 25.3 |
+
+Together, these settings mean that once all parts in a partition are older than one week,
+ClickHouse will automatically perform a CLEANUP merge that physically removes rows where `_is_deleted = 1`.
+
+## Connector Transaction Architecture
+
+The connector writes to ClickHouse using a three-phase transaction: **load**, **store**, **commit**.
+Two auxiliary table types support this: load tables and store tables.
+
+### Load Phase
+
+Load tables use the ClickHouse [Join engine](https://clickhouse.com/docs/engines/table-engines/special/join),
+an in-memory hash table keyed by the binding's `ORDER BY` keys.
+They are named `{table}_stage_load`.
+
+During the load phase, the connector inserts the keys of documents it needs to look up
+into the load table, then joins the target table (using `FINAL` for deduplication) against
+the load table to retrieve the current version of documents for those keys.
+
+- **Created** with `CREATE OR REPLACE TABLE` on connector start (discards stale in-memory state)
+- **Truncated** between transactions to free server memory
+- **Dropped** on connector shutdown
+
+### Store Phase
+
+Store tables stage documents written during a transaction's store phase.
+They are named `{table}_stage_store`.
+
+Store tables are created with `CREATE OR REPLACE TABLE ... AS {target}`, which clones the target table's
+schema and engine (ReplacingMergeTree). This makes their on-disk parts partition-compatible
+with the target table, which is critical for the commit phase.
+
+- **Created** with `CREATE OR REPLACE TABLE` on connector start
+- **Truncated** between transactions
+- **Dropped** on connector shutdown
+
+### Commit Phase
+
+On commit, the connector enumerates the store table's parts via `system.parts`
+and moves each partition to the target table using `ALTER TABLE ... MOVE PARTITION`.
+
+Moving a partition is a **metadata-only operation**: it relinks existing parts in the filesystem
+rather than copying or rewriting data. This makes the commit phase very low latency regardless
+of transaction size, and is significantly faster than `INSERT ... SELECT` or other bulk-copy methods.
+
+The commit is **not atomic** across bindings: partitions are moved one at a time. A failure
+mid-commit leaves some partitions moved and others not. This is safe because the target table
+uses ReplacingMergeTree — re-applying a partial commit is idempotent, since duplicate versions
+are deduplicated by `ORDER BY` key and `flow_published_at`.
 
 ## Illustrated
 
@@ -148,9 +211,24 @@ The `c` record in Part 2 has `_is_deleted = 1`, instead of `0`.
 | c   | charlie | 30      | T2                | 1           |
 | d   | delta   | 40      | T2                | 0           |
 
-The result of this merge operation is that both `c` records are removed.
+A **regular merge** deduplicates the `c` records, retaining the one with the highest `flow_published_at`.
+The tombstone (`_is_deleted = 1`) survives as the winning version:
 
-**Part 3**
+**Part 3** (after regular merge)
+
+| key | value_a | value_b | flow_published_at | _is_deleted |
+|-----|---------|---------|-------------------|-------------|
+| a   | alpha   | 10      | T1                | 0           |
+| b   | bravo   | 20      | T1                | 0           |
+| c   | charlie | 30      | T2                | 1           |
+| d   | delta   | 40      | T2                | 0           |
+
+`SELECT * FROM t` yields 5 records before merge (both `c` versions) and 4 records after (one `c` tombstone remains).
+
+A **CLEANUP merge** goes further: it physically removes records where `_is_deleted = 1`.
+This is the eventual steady state once parts are old enough (see [CLEANUP Merge Settings](#cleanup-merge-settings)):
+
+**Part 3** (after CLEANUP merge)
 
 | key | value_a | value_b | flow_published_at | _is_deleted |
 |-----|---------|---------|-------------------|-------------|
@@ -158,14 +236,13 @@ The result of this merge operation is that both `c` records are removed.
 | b   | bravo   | 20      | T1                | 0           |
 | d   | delta   | 40      | T2                | 0           |
 
-As before, we queried all records in the table (`SELECT * FROM t`), the results would change after merge.
-Before merge, `SELECT * FROM t` yields 5 records, including both `c` records.
-After merge, the same query yields just 3 records; both `c` versions are gone.
+`SELECT * FROM t` now yields 3 records.
 
+Regardless of merge state, the `FINAL` qualifier handles both cases at query time.
 Because Estuary destination tables configure `_is_deleted` in the `ReplacingMergeTree` engine,
-the `FINAL` qualifier both deduplicates by `ORDER BY` key and
-[skips deleted records](https://clickhouse.com/docs/guides/replacing-merge-tree#querying-replacingmergetree) at query time.
-This query yields *3* records both before and after merge:
+`FINAL` both deduplicates by `ORDER BY` key and
+[skips deleted records](https://clickhouse.com/docs/guides/replacing-merge-tree#querying-replacingmergetree).
+This query yields *3* records at all times — before merge, after regular merge, and after CLEANUP merge:
 `SELECT * FROM t FINAL`.
 For explicitness, queries can also include a predicate to omit deleted records:
 `SELECT * FROM t FINAL WHERE _is_deleted = 0`
