@@ -203,20 +203,14 @@ func prepareNewTransactor(
 		var d = &transactor{dialect: ep.Dialect, templates: tpls, cfg: cfg, be: be}
 
 		var err error
-		// Each binding needs a chdriver.Batch object, and each batch holds a connection in the pool,
-		// so the connection pools must each be at least that size.
-		maxIdleConns := len(bindings)
-
 		loadOptions := cfg.newClickhouseOptions()
-		loadOptions.MaxOpenConns = maxIdleConns + 5
-		loadOptions.MaxIdleConns = maxIdleConns
+		loadOptions.MaxIdleConns = 40
 		if d.load.conn, err = clickhouse.Open(loadOptions); err != nil {
 			return nil, fmt.Errorf("openNativeConn (load): %w", err)
 		}
 
 		storeOptions := cfg.newClickhouseOptions()
-		storeOptions.MaxOpenConns = maxIdleConns + 5
-		storeOptions.MaxIdleConns = maxIdleConns
+		storeOptions.MaxIdleConns = 40
 		if d.store.conn, err = clickhouse.Open(storeOptions); err != nil {
 			return nil, fmt.Errorf("openNativeConn (store): %w", err)
 		}
@@ -333,7 +327,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		batch, found := batchByBinding[it.Binding]
 		if !found {
-			batch, err = t.load.conn.PrepareBatch(ctx, b.load.insertSQL)
+			batch, err = t.load.conn.PrepareBatch(ctx, b.load.insertSQL,
+				chdriver.WithReleaseConnection(), // release connection to pool after PrepareBatch()
+				chdriver.WithCloseOnFlush())      // release connection to pool after Flush()
 			if err != nil {
 				return fmt.Errorf("preparing load batch: %w", err)
 			}
@@ -419,7 +415,9 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		batch, found := batchByBinding[it.Binding]
 		if !found {
-			batch, err = t.store.conn.PrepareBatch(ctx, b.store.insertSQL)
+			batch, err = t.store.conn.PrepareBatch(ctx, b.store.insertSQL,
+				chdriver.WithReleaseConnection(), // release connection to pool after PrepareBatch()
+				chdriver.WithCloseOnFlush())      // release connection to pool after Flush()
 			if err != nil {
 				return nil, fmt.Errorf("preparing store batch: %w", err)
 			}
