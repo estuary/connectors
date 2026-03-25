@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+from ipaddress import ip_address
 import traceback
 from collections.abc import Mapping, Sequence
 from typing import ClassVar, cast, override
 
 from aiohttp import web
-from pydantic import BaseModel
+from pydantic import BaseModel, IPvAnyNetwork
 from pydantic.fields import Field
 
 from estuary_cdk.capture.common import (
@@ -70,6 +71,10 @@ class WebhookResourceConfig(BaseResourceConfig):
         default_factory=lambda: UrlMatch(value="*"),
         description="Matching spec for routing incoming webhooks to this collection",
     )
+    ip_allowlist: set[IPvAnyNetwork] | None = Field(
+        default=None,
+        description="The set of IP addresses or CIDR blocks allowed to write to this collection",
+    )
 
     @override
     def path(self) -> list[str]:
@@ -95,7 +100,13 @@ class WebhookCaptureSpec(BaseModel):
         default="webhook-data",
         description="Unique name representing the set of captured messages",
     )
-    discriminator: CollectionDiscriminatorSpec = Field(default_factory=UrlDiscriminator)
+    discriminator: CollectionDiscriminatorSpec = Field(
+        default_factory=UrlDiscriminator, description="TODO: Write this"
+    )
+    ip_allowlist: set[IPvAnyNetwork] | None = Field(
+        default=None,
+        description="The set of IP addresses or CIDR blocks allowed to write to this capture",
+    )
 
     def create_resources(
         self,
@@ -111,7 +122,9 @@ class WebhookCaptureSpec(BaseModel):
                 open=_open_webhook_binding,  # pyright: ignore[reportArgumentType]
                 initial_state=ResourceState(),
                 initial_config=WebhookResourceConfig(
-                    name=f"{self.name}_{rule.display_name}", match_rule=rule
+                    name=f"{self.name}_{rule.display_name}",
+                    match_rule=rule,
+                    ip_allowlist=self.ip_allowlist,
                 ),
                 schema_inference=True,
             )
@@ -148,17 +161,32 @@ async def _run_webhook_server(
         if _rejecting:
             return web.Response(status=503, text="Server shutting down")
 
-        matching_binding_index = await anext(
-            (
-                idx
-                for idx, rsc in binding_index_mapping.items()
-                if await rsc.initial_config.match_rule.matches(req)
-            ),
-            None,
-        )
-        if matching_binding_index is None:
-            # TODO: Log error message and exit
-            return web.Response(status=500)
+        try:
+            matching_binding_index, matching_resource = await anext(
+                (
+                    (idx, rsc)
+                    for idx, rsc in binding_index_mapping.items()
+                    if await rsc.initial_config.match_rule.matches(req)
+                ),
+            )
+        except StopAsyncIteration:
+            # TODO: This error needs a little more detail.
+            # What if we're using body discriminators?
+            # I can't log the entire request body, right?
+            task.log.error(
+                "No handler found for incoming webhook request",
+                {"path": req.path},
+            )
+            return web.Response(status=404, text="No matching binding for request")
+
+        if (ip_allowlists := matching_resource.initial_config.ip_allowlist) is not None:
+            if req.remote is None:
+                return web.Response(status=403, text="Unable to determine client IP")
+
+            if not any(
+                ip_address(req.remote) in allowlist for allowlist in ip_allowlists
+            ):
+                return web.Response(status=403, text="Client IP not in allowlist")
 
         body = cast(dict[str, JsonValue], await req.json())
         body["_meta"] = {

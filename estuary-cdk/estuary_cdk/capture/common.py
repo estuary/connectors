@@ -1333,7 +1333,7 @@ async def _binding_webhook_task(
         bindingStateV1={binding.stateKey: ResourceState(webhook=state)}
     )
 
-    # TODO: Is this while True doing anything for us?
+    # TODO: This is mostly dead code. Clean up
     while True:
         # Yield to the event loop to prevent starvation.
         await asyncio.sleep(0)
