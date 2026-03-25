@@ -1,13 +1,9 @@
 from .match import (
-    BodyDiscriminator,
     BodyMatch,
-    CATCH_ALL_DISCRIMINATOR,
     CollectionDiscriminatorSpec,
     CollectionMatchingSpec,
     Discriminator,
-    HeaderDiscriminator,
     HeaderMatch,
-    UrlDiscriminator,
     UrlMatch,
 )
 from .server import (
@@ -18,16 +14,12 @@ from .server import (
 )
 
 __all__ = [
-    "BodyDiscriminator",
     "BodyMatch",
-    "CATCH_ALL_DISCRIMINATOR",
     "CollectionDiscriminatorSpec",
     "CollectionMatchingSpec",
     "Discriminator",
     "GENERIC_WEBHOOK_RESOURCE",
-    "HeaderDiscriminator",
     "HeaderMatch",
-    "UrlDiscriminator",
     "UrlMatch",
     "WebhookCaptureSpec",
     "WebhookResourceConfig",

@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import traceback
 from collections.abc import Mapping, Sequence
-from typing import ClassVar, override
+from typing import ClassVar, cast, override
 
 from aiohttp import web
 from pydantic import BaseModel
@@ -19,9 +19,9 @@ from estuary_cdk.capture.common import (
     open_binding,  # pyright: ignore[reportUnknownVariableType]
 )
 from estuary_cdk.flow import CaptureBinding
+from estuary_cdk.pydantic_polyfill import JsonValue
 
 from .match import (
-    CATCH_ALL_DISCRIMINATOR,
     CollectionDiscriminatorSpec,
     CollectionMatchingSpec,
     UrlDiscriminator,
@@ -63,8 +63,7 @@ def _open_webhook_binding(
 
 
 class WebhookResourceConfig(BaseResourceConfig):
-    # TODO: What does this classvar do exactly?
-    PATH_POINTERS: ClassVar[list[str]] = ["/webhookId"]
+    PATH_POINTERS: ClassVar[list[str]] = ["/name"]
 
     name: str = Field(description="Name of this resource")
     match_rule: CollectionMatchingSpec = Field(
@@ -77,6 +76,7 @@ class WebhookResourceConfig(BaseResourceConfig):
         return [self.name]
 
 
+CATCH_ALL_DISCRIMINATOR = UrlDiscriminator()
 GENERIC_WEBHOOK_RESOURCE = Resource(
     name="webhook-data",
     key=["/_meta/webhookId"],
@@ -84,7 +84,7 @@ GENERIC_WEBHOOK_RESOURCE = Resource(
     open=_open_webhook_binding,  # pyright: ignore[reportArgumentType]
     initial_state=ResourceState(),
     initial_config=WebhookResourceConfig(
-        name="webhook-data", match_rule=CATCH_ALL_DISCRIMINATOR
+        name="webhook-data", match_rule=CATCH_ALL_DISCRIMINATOR.for_value("*")
     ),
     schema_inference=True,
 )
@@ -92,31 +92,30 @@ GENERIC_WEBHOOK_RESOURCE = Resource(
 
 class WebhookCaptureSpec(BaseModel):
     name: str = Field(
-        description="Unique name representing the set of captured messages"
+        default="webhook-data",
+        description="Unique name representing the set of captured messages",
     )
     discriminator: CollectionDiscriminatorSpec = Field(default_factory=UrlDiscriminator)
 
     def create_resources(
         self,
     ) -> list[Resource[WebhookDocument, WebhookResourceConfig, ResourceState]]:
-        # TODO: Tighten this up so it only applies to bare bones instantiations
-        if not self.discriminator.known_values:
+        if self.discriminator == CATCH_ALL_DISCRIMINATOR:
             return [GENERIC_WEBHOOK_RESOURCE]
 
         return [
             Resource(
-                name=f"{self.name}_{value}",
+                name=f"{self.name}_{rule.display_name}",
                 key=["/_meta/webhookId"],
                 model=WebhookDocument,
                 open=_open_webhook_binding,  # pyright: ignore[reportArgumentType]
                 initial_state=ResourceState(),
                 initial_config=WebhookResourceConfig(
-                    name=value,
-                    match_rule=self.discriminator.for_value(value),
+                    name=f"{self.name}_{rule.display_name}", match_rule=rule
                 ),
                 schema_inference=True,
             )
-            for value in self.discriminator.known_values
+            for rule in self.discriminator.create_match_rules()
         ]
 
 
@@ -139,9 +138,7 @@ async def _run_webhook_server(
     binding_index_mapping = dict(
         sorted(
             binding_index_mapping.items(),
-            key=lambda idx_and_rsc: idx_and_rsc[
-                1
-            ].initial_config.match_rule.sort_key,
+            key=lambda idx_and_rsc: idx_and_rsc[1].initial_config.match_rule.sort_key,
             reverse=True,
         )
     )
@@ -163,9 +160,16 @@ async def _run_webhook_server(
             # TODO: Log error message and exit
             return web.Response(status=500)
 
+        body = cast(dict[str, JsonValue], await req.json())
+        body["_meta"] = {
+            "op": "u",
+            "headers": dict(req.headers),
+            "reqPath": req.path,
+        }
+
         task.captured(
             matching_binding_index,
-            WebhookDocument.model_validate(await req.json()),
+            WebhookDocument.model_validate(body),
         )
         await task.checkpoint(
             state=ConnectorState()  # pyright: ignore[reportUnknownArgumentType]

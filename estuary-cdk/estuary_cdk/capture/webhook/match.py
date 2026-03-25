@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from abc import ABCMeta, abstractmethod
 from collections.abc import Sequence
 from typing import Annotated, Literal, cast, override
@@ -19,9 +20,33 @@ from estuary_cdk.pydantic_polyfill import JsonValue
 # ------------------------------------------------------------------------------
 
 
-class UrlMatch(BaseModel, frozen=True):
-    type: Literal["url"] = "url"
+class MatchRule(BaseModel, frozen=True, metaclass=ABCMeta):
     value: str
+
+    @property
+    @abstractmethod
+    def display_name(self) -> str: ...
+
+    @abstractmethod
+    def list_compatibility_errors(
+        self, other: CollectionMatchingSpec
+    ) -> str | None: ...
+
+    @abstractmethod
+    async def matches(self, req: web.Request) -> bool: ...
+
+    @property
+    @abstractmethod
+    def sort_key(self) -> tuple[int, int]: ...
+
+
+class UrlMatch(MatchRule, frozen=True):
+    type: Literal["url"] = "url"
+
+    @property
+    @override
+    def display_name(self) -> str:
+        return re.sub("[^a-zA-Z]*", "_", self.value)
 
     @model_validator(mode="after")
     def _validate_url_pattern(self) -> UrlMatch:
@@ -34,6 +59,7 @@ class UrlMatch(BaseModel, frozen=True):
     def _is_placeholder_segment(segment: str) -> bool:
         return segment.startswith("{") and segment.endswith("}")
 
+    @override
     def list_compatibility_errors(self, other: CollectionMatchingSpec) -> str | None:
         if not isinstance(other, type(self)):
             return None
@@ -79,6 +105,7 @@ class UrlMatch(BaseModel, frozen=True):
 
         return f"URL patterns '{self.value}' and '{other.value}' match the same URLs"
 
+    @override
     async def matches(self, req: web.Request) -> bool:
         if self.value == "*":
             return True
@@ -91,6 +118,7 @@ class UrlMatch(BaseModel, frozen=True):
         )
 
     @property
+    @override
     def sort_key(self) -> tuple[int, int]:
         if self.value == "*":
             return (0, -1)
@@ -98,10 +126,15 @@ class UrlMatch(BaseModel, frozen=True):
         return (0, sum(1 for s in segments if not self._is_placeholder_segment(s)))
 
 
-class _KeyValueMatch(BaseModel, frozen=True):
+class _KeyValueMatch(MatchRule, frozen=True, metaclass=ABCMeta):
     key: str
-    value: str
 
+    @property
+    @override
+    def display_name(self) -> str:
+        return self.value
+
+    @override
     def list_compatibility_errors(self, other: CollectionMatchingSpec) -> str | None:
         if not isinstance(other, type(self)):
             return None
@@ -118,6 +151,7 @@ class _KeyValueMatch(BaseModel, frozen=True):
 class HeaderMatch(_KeyValueMatch, frozen=True):
     type: Literal["header"] = "header"
 
+    @override
     async def matches(self, req: web.Request) -> bool:
         header_value = req.headers.get(self.key)
         if header_value is None:
@@ -125,6 +159,7 @@ class HeaderMatch(_KeyValueMatch, frozen=True):
         return header_value == self.value
 
     @property
+    @override
     def sort_key(self) -> tuple[int, int]:
         return (2, 0)
 
@@ -133,6 +168,7 @@ class BodyMatch(_KeyValueMatch, frozen=True):
     type: Literal["body"] = "body"
     key: str = Field(pattern=r"^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*$")
 
+    @override
     async def matches(self, req: web.Request) -> bool:
         if "_parsed_body" not in req:
             # Cache the result to avoid re-parsing on every match rule
@@ -151,6 +187,7 @@ class BodyMatch(_KeyValueMatch, frozen=True):
         return value is not None and str(value) == self.value
 
     @property
+    @override
     def sort_key(self) -> tuple[int, int]:
         return (1, 0)
 
@@ -198,7 +235,7 @@ class UrlDiscriminator(Discriminator, frozen=True):
 
     @override
     def for_value(self, value: str) -> UrlMatch:
-        return UrlMatch(value=value)
+        return UrlMatch(type="url", value=value)
 
     @override
     def create_match_rules(self):
@@ -215,7 +252,7 @@ class HeaderDiscriminator(Discriminator, frozen=True):
 
     @override
     def for_value(self, value: str) -> HeaderMatch:
-        return HeaderMatch(key=self.key, value=value)
+        return HeaderMatch(type="header", key=self.key, value=value)
 
 
 class BodyDiscriminator(Discriminator, frozen=True):
@@ -225,7 +262,7 @@ class BodyDiscriminator(Discriminator, frozen=True):
 
     @override
     def for_value(self, value: str) -> BodyMatch:
-        return BodyMatch(key=self.key, value=value)
+        return BodyMatch(type="body", key=self.key, value=value)
 
 
 CollectionDiscriminatorSpec = Annotated[
@@ -233,6 +270,3 @@ CollectionDiscriminatorSpec = Annotated[
     Field(discriminator="type"),
 ]
 """Essentially a factory for resource matching rules."""
-
-
-CATCH_ALL_DISCRIMINATOR = UrlDiscriminator().for_value("*")
