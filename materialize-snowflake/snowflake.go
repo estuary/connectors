@@ -311,6 +311,8 @@ func newTransactor(
 		}
 	}
 
+	d.logAllClusteringInfo(ctx)
+
 	return d, nil
 }
 
@@ -849,7 +851,7 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 						return fmt.Errorf("running ack query: %w", err)
 					}
 
-					logMergePartitionStats(ctx, d.db, queryID, item.Table)
+					logQueryStats(ctx, d.db, queryID, item.Table)
 				} else {
 					if _, err := d.db.ExecContext(ctx, item.Query); err != nil {
 						return fmt.Errorf("running ack query: %w", err)
@@ -918,6 +920,8 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	if err := group.Wait(); err != nil {
 		return nil, fmt.Errorf("executing concurrent store query: %w", err)
 	}
+
+	d.logAllClusteringInfo(ctx)
 
 	// Keep asking for a report on the files that have been submitted for processing
 	// until they have all been successful, or an error has been thrown
@@ -1174,7 +1178,7 @@ func (d *transactor) Destroy() {
 	d.db.Close()
 }
 
-func logMergePartitionStats(ctx context.Context, db *stdsql.DB, queryID string, table string) {
+func logQueryStats(ctx context.Context, db *stdsql.DB, queryID string, table string) {
 	var scanned, total stdsql.NullInt64
 	row := db.QueryRowContext(ctx,
 		`SELECT SUM(VALUE:"partitions_scanned"::INT), SUM(VALUE:"partitions_total"::INT)
@@ -1184,16 +1188,80 @@ func logMergePartitionStats(ctx context.Context, db *stdsql.DB, queryID string, 
 		queryID,
 	)
 	if err := row.Scan(&scanned, &total); err != nil {
-		log.WithField("query_id", queryID).WithError(err).Warn("could not fetch merge partition stats")
+		log.WithField("query_id", queryID).WithError(err).Warn("could not fetch query partition stats")
+		return
+	}
+
+	var queuedOverloadTime stdsql.NullInt64
+	row = db.QueryRowContext(ctx,
+		`SELECT QUEUED_OVERLOAD_TIME FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY()) WHERE QUERY_ID = ?`,
+		queryID,
+	)
+	if err := row.Scan(&queuedOverloadTime); err != nil {
+		log.WithField("query_id", queryID).WithError(err).Warn("could not fetch queued overload time")
+	}
+
+	log.WithFields(log.Fields{
+		"table":                   table,
+		"query_id":                queryID,
+		"partitions_scanned":      scanned.Int64,
+		"partitions_total":        total.Int64,
+		"queued_overload_time_ms": queuedOverloadTime.Int64,
+	}).Info("query stats")
+}
+
+func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr string) {
+	var result stdsql.NullString
+	query := fmt.Sprintf("SELECT SYSTEM$CLUSTERING_INFORMATION('%s', '%s')", table, keyExpr)
+	if err := db.QueryRowContext(ctx, query).Scan(&result); err != nil {
+		log.WithFields(log.Fields{
+			"table":          table,
+			"clustering_key": keyExpr,
+		}).WithError(err).Warn("could not fetch clustering information")
+		return
+	}
+
+	if !result.Valid {
+		return
+	}
+
+	var info struct {
+		AverageDepth    float64 `json:"average_depth"`
+		AverageOverlaps float64 `json:"average_overlaps"`
+		TotalPartitions int64   `json:"total_partition_count"`
+	}
+	if err := json.Unmarshal([]byte(result.String), &info); err != nil {
+		log.WithFields(log.Fields{
+			"table": table,
+			"raw":   result.String,
+		}).WithError(err).Warn("could not parse clustering information")
 		return
 	}
 
 	log.WithFields(log.Fields{
-		"table":              table,
-		"query_id":           queryID,
-		"partitions_scanned": scanned.Int64,
-		"partitions_total":   total.Int64,
-	}).Info("merge partition stats")
+		"table":            table,
+		"clustering_key":   keyExpr,
+		"average_depth":    info.AverageDepth,
+		"average_overlaps": info.AverageOverlaps,
+		"total_partitions": info.TotalPartitions,
+	}).Info("clustering information")
+}
+
+func clusteringKeyExpr(keys []sql.Column) string {
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = k.Identifier
+	}
+	return "(" + strings.Join(parts, ", ") + ")"
+}
+
+func (d *transactor) logAllClusteringInfo(ctx context.Context) {
+	for _, b := range d.bindings {
+		if len(b.target.Keys) == 0 {
+			continue
+		}
+		logClusteringInfo(ctx, d.db, b.target.Identifier, clusteringKeyExpr(b.target.Keys))
+	}
 }
 
 func main() {
