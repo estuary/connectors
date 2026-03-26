@@ -182,8 +182,7 @@ type transactor struct {
 	be       *m.BindingEvents
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error                { return nil }
-func (t *transactor) Acknowledge(_ context.Context) (*pf.ConnectorState, error) { return nil, nil }
+func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
 
 func prepareNewTransactor(
 	tpls templates,
@@ -448,32 +447,21 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return nil, m.RunAsyncOperation(func() error {
-			return t.commit(ctx, batchByBinding)
-		})
+		return nil, pf.FinishedOperation(nil)
 	}, nil
 }
 
-func (t *transactor) commit(ctx context.Context, batchByBinding map[int]chdriver.Batch) error {
-	defer func() {
-		for _, b := range t.bindings {
-			// Truncate store tables after commit to free storage. This is an optimization,
-			// not a correctness requirement: Store() truncates at the start of each
-			// transaction, so stale data would be cleared on the next cycle regardless.
-			_ = t.store.conn.Exec(ctx, b.store.truncateTableSQL)
-		}
-	}()
-
-	for bindingIndex := range batchByBinding {
-		if err := t.movePartitions(ctx, bindingIndex); err != nil {
-			return err
+func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+	for _, b := range t.bindings {
+		if err := t.moveStorePartitionsToTarget(ctx, b); err != nil {
+			return nil, fmt.Errorf("moving stage to target: %w", err)
 		}
 	}
-	return nil
+	return nil, nil
 }
 
-func (t *transactor) movePartitions(ctx context.Context, bindingIndex int) error {
-	rows, err := t.store.conn.Query(ctx, t.bindings[bindingIndex].store.queryPartsSQL, t.cfg.Database)
+func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding) error {
+	rows, err := t.store.conn.Query(ctx, b.store.queryPartsSQL, t.cfg.Database)
 	if err != nil {
 		return fmt.Errorf("querying store table partitions: %w", err)
 	}
@@ -484,7 +472,7 @@ func (t *transactor) movePartitions(ctx context.Context, bindingIndex int) error
 		if err = rows.Scan(&partitionID); err != nil {
 			return fmt.Errorf("scanning store table partition: %w", err)
 		}
-		if err = t.store.conn.Exec(ctx, t.bindings[bindingIndex].store.movePartitionSQL, partitionID); err != nil {
+		if err = t.store.conn.Exec(ctx, b.store.movePartitionSQL, partitionID); err != nil {
 			return fmt.Errorf("moving store table partition: %w", err)
 		}
 	}
