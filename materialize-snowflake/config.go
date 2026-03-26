@@ -130,7 +130,7 @@ func (c config) toURI(includeSchema bool, materializationName string) (string, e
 	// arrow record batch we receive. This option, together with the MaxChunkDownloadWorkers option of
 	// gosnowflake which defaults to 10, determine how much memory can be used at once. With 80 megabytes per chunk
 	// we can go up to 800MB assuming 10 download workers.
-	queryParams.Add("CLIENT_RESULT_CHUNK_SIZE", "80")
+	queryParams.Add("CLIENT_RESULT_CHUNK_SIZE", "40")
 
 	// Optional params
 	if c.Warehouse != "" {
