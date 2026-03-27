@@ -4,67 +4,43 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-export LOCALSTACK_CONTAINER_NAME=localstack
-export LOCALSTACK_S3_ENDPOINT=http://${LOCALSTACK_CONTAINER_NAME}.flow-test:4566
-export LOCALSTACK_S3_LOCAL_ENDPOINT=http://localhost:4566
-
-# Dummy configs for awscli to access localstack.
-export AWS_ACCESS_KEY_ID=test_key
-export AWS_SECRET_ACCESS_KEY=test_secret
+export AWS_ACCESS_KEY_ID=flow
+export AWS_SECRET_ACCESS_KEY=flow
 export AWS_DEFAULT_REGION=us-east-1
+export S3_CONTAINER_ENDPOINT_URL=http://storage:9000
+export S3_LOCALHOST_ENDPOINT_URL=http://localhost:9000
 
 export TEST_BUCKET="test-bucket"
-export TEST_PATH_PREFIX_SIMPLE="${CONNECTOR}/simple"
-export TEST_PATH_PREFIX_MULTIPLE_DATATYPES="${CONNECTOR}/multiple-datatypes"
+export TEST_PATH_SIMPLE="${CONNECTOR}/simple"
+export TEST_PATH_MULTIPLE_DATATYPES="${CONNECTOR}/multiple-datatypes"
 
-function startLocalStack() {
-    docker run -d \
-      --rm \
-      --user 0 \
-      --network "flow-test" \
-      --publish 4566:4566 \
-      --name="${LOCALSTACK_CONTAINER_NAME}" \
-      --env "SERVICES=s3" \
-      localstack/localstack
+docker compose -f materialize-s3-parquet/docker-compose.yaml up --wait
 
-    for i in {1..20}; do
-        # Wait until the local stack is ready for serving.
-        if aws s3 ls --endpoint-url "${LOCALSTACK_S3_LOCAL_ENDPOINT}";  then
-            echo "localstack started successfully."
-            return 0
-        fi
-        echo "Not ready, retrying ${i}."
-        sleep 3
-    done
-    echo "Localstack logs:"
-    docker logs "${LOCALSTACK_CONTAINER_NAME}"
-    return 1
-}
-startLocalStack || bail "failed to start localstack."
-
-aws s3 mb "s3://${TEST_BUCKET}" --endpoint "${LOCALSTACK_S3_LOCAL_ENDPOINT}"
+aws s3 mb "s3://${TEST_BUCKET}" --endpoint-url "${S3_LOCALHOST_ENDPOINT_URL}"
 
 config_json_template='{
     "bucket": "${TEST_BUCKET}",
+    "credentials": {
+    	"auth_type": "AWSAccessKey",
+    	"awsAccessKeyId": "${AWS_ACCESS_KEY_ID}",
+    	"awsSecretAccessKey": "${AWS_SECRET_ACCESS_KEY}"
+	},
     "region": "${AWS_DEFAULT_REGION}",
-    "advanced": {
-      "endpoint": "${LOCALSTACK_S3_ENDPOINT}"
-    },
-    "uploadIntervalInSeconds": 2
+    "uploadInterval": "1s",
+	"endpoint": "${S3_CONTAINER_ENDPOINT_URL}",
+	"use_path_style": true
 }'
 
 resources_json_template='[
   {
     "resource": {
-      "pathPrefix": "${TEST_PATH_PREFIX_SIMPLE}",
-      "compressionType": "snappy"
+      "path": "${TEST_PATH_SIMPLE}"
     },
     "source": "${TEST_COLLECTION_SIMPLE}"
   },
   {
     "resource": {
-      "pathPrefix": "${TEST_PATH_PREFIX_MULTIPLE_DATATYPES}",
-      "compressionType": "none"
+      "path": "${TEST_PATH_MULTIPLE_DATATYPES}"
     },
     "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",
     "fields": {

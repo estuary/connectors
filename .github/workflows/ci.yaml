@@ -330,6 +330,7 @@ jobs:
               "materialize-bigquery",
               "materialize-redshift",
               "materialize-s3-iceberg",
+              "materialize-s3-parquet",
               "materialize-iceberg"
             ]'), matrix.connector)
 

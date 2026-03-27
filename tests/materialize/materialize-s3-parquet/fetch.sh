@@ -9,7 +9,7 @@ tmp_dir=tmp
 mkdir -p ${TEMP_DIR}/${tmp_dir}
 
 # Sync data to local.
->&2 aws s3 sync "s3://${TEST_BUCKET}" ${TEMP_DIR}/${tmp_dir}/ --endpoint-url "${LOCALSTACK_S3_LOCAL_ENDPOINT}" \
+>&2 aws s3 sync "s3://${TEST_BUCKET}" ${TEMP_DIR}/${tmp_dir}/ --endpoint-url "${S3_LOCALHOST_ENDPOINT_URL}" \
     || bail "syncing data from s3 failed"
 
 # Read all the pq data as jsonl output.
@@ -35,5 +35,5 @@ function exportParquetToJson() {
     done
 }
 
-exportParquetToJson "${tmp_dir}/${TEST_PATH_PREFIX_SIMPLE}"
-exportParquetToJson "${tmp_dir}/${TEST_PATH_PREFIX_MULTIPLE_DATATYPES}"
+exportParquetToJson "${tmp_dir}/${TEST_PATH_SIMPLE}"
+exportParquetToJson "${tmp_dir}/${TEST_PATH_MULTIPLE_DATATYPES}"
