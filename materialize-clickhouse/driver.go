@@ -489,7 +489,6 @@ func (t *transactor) Destroy() {
 	defer cancel()
 
 	for _, b := range t.bindings {
-		_ = t.store.conn.Exec(ctx, b.store.dropTableSQL)
 		_ = t.load.conn.Exec(ctx, b.load.dropTableSQL)
 	}
 	_ = t.store.conn.Close()
