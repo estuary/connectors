@@ -396,7 +396,7 @@ func TestAddBinding(t *testing.T) {
 	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.targetCreateTable)
+	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -492,7 +492,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 
 	// Drop any stale table from a previous run, then create fresh.
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.targetCreateTable)
+	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -555,7 +555,7 @@ func TestPrepareNewTransactor(t *testing.T) {
 	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
 	defer db.Close()
 
-	createSQL, err := sql.RenderTableTemplate(table, tpls.targetCreateTable)
+	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -660,7 +660,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	defer db.Close()
 
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.targetCreateTable)
+	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -703,7 +703,7 @@ func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Diale
 	defer db.Close()
 
 	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
-	createSQL, err := sql.RenderTableTemplate(table, tpls.targetCreateTable)
+	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, createSQL)
 	require.NoError(t, err)
@@ -956,7 +956,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tn)))
 	}
 	for _, tbl := range []sql.Table{tableA, tableB} {
-		createSQL, err := sql.RenderTableTemplate(tbl, tpls.targetCreateTable)
+		createSQL, err := sql.RenderTableTemplate(tbl, tpls.createTargetTable)
 		require.NoError(t, err)
 		_, err = db.ExecContext(ctx, createSQL)
 		require.NoError(t, err)

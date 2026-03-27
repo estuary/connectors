@@ -16,15 +16,15 @@ func TestSQLGeneration(t *testing.T) {
 	// provide, so only the target template goes through the standard test harness.
 	// The load/store templates are rendered separately with renderTableAndRangeKey.
 	rangeKeyTemplates := []*template.Template{
-		testTemplates.loadCreateTable,
-		testTemplates.loadQuery,
-		testTemplates.loadInsert,
-		testTemplates.loadDropTable,
-		testTemplates.storeCreateTable,
-		testTemplates.storeInsert,
-		testTemplates.storeQueryParts,
-		testTemplates.storeMovePartition,
-		testTemplates.storeDropTable,
+		testTemplates.createLoadTable,
+		testTemplates.queryLoadTable,
+		testTemplates.insertLoadTable,
+		testTemplates.dropLoadTable,
+		testTemplates.createStoreTable,
+		testTemplates.insertStoreTable,
+		testTemplates.queryStoreParts,
+		testTemplates.moveStorePartition,
+		testTemplates.dropStoreTable,
 	}
 
 	snap, tables := sql.RunSqlGenTests(
@@ -35,11 +35,11 @@ func TestSQLGeneration(t *testing.T) {
 		},
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
-				testTemplates.targetCreateTable,
+				testTemplates.createTargetTable,
 			},
-			TplAddColumns:    testTemplates.targetAlterColumns,
-			TplDropNotNulls:  testTemplates.targetAlterColumns,
-			TplCombinedAlter: testTemplates.targetAlterColumns,
+			TplAddColumns:    testTemplates.alterTargetColumns,
+			TplDropNotNulls:  testTemplates.alterTargetColumns,
+			TplCombinedAlter: testTemplates.alterTargetColumns,
 		},
 	)
 

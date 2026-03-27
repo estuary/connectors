@@ -158,7 +158,7 @@ func newClickHouseDriver() *sql.Driver[config, tableConfig] {
 				Config:              cfg,
 				Dialect:             dialect,
 				NewClient:           newClient,
-				CreateTableTemplate: tpls.targetCreateTable,
+				CreateTableTemplate: tpls.createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     false,
 				RequireMetaOp:       true,
@@ -253,33 +253,33 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	b := &binding{target: target}
 
 	var err error
-	if b.load.createTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.loadCreateTable); err != nil {
-		return fmt.Errorf("rendering loadCreateTable template: %w", err)
+	if b.load.createTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.createLoadTable); err != nil {
+		return fmt.Errorf("rendering createLoadTable template: %w", err)
 	}
-	if b.load.insertSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.loadInsert); err != nil {
-		return fmt.Errorf("rendering loadInsert template: %w", err)
+	if b.load.insertSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.insertLoadTable); err != nil {
+		return fmt.Errorf("rendering insertLoadTable template: %w", err)
 	}
-	if b.load.querySQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.loadQuery); err != nil {
-		return fmt.Errorf("rendering loadQuery template: %w", err)
+	if b.load.querySQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.queryLoadTable); err != nil {
+		return fmt.Errorf("rendering queryLoadTable template: %w", err)
 	}
-	if b.load.dropTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.loadDropTable); err != nil {
-		return fmt.Errorf("rendering loadDropTable template: %w", err)
+	if b.load.dropTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.dropLoadTable); err != nil {
+		return fmt.Errorf("rendering dropLoadTable template: %w", err)
 	}
 
-	if b.store.createTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.storeCreateTable); err != nil {
-		return fmt.Errorf("rendering storeCreateTable template: %w", err)
+	if b.store.createTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.createStoreTable); err != nil {
+		return fmt.Errorf("rendering createStoreTable template: %w", err)
 	}
-	if b.store.insertSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.storeInsert); err != nil {
-		return fmt.Errorf("rendering storeInsert template: %w", err)
+	if b.store.insertSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.insertStoreTable); err != nil {
+		return fmt.Errorf("rendering insertStoreTable template: %w", err)
 	}
-	if b.store.queryPartsSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.storeQueryParts); err != nil {
-		return fmt.Errorf("rendering storeQueryParts template: %w", err)
+	if b.store.queryPartsSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.queryStoreParts); err != nil {
+		return fmt.Errorf("rendering queryStoreParts template: %w", err)
 	}
-	if b.store.movePartitionSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.storeMovePartition); err != nil {
-		return fmt.Errorf("rendering storeMovePartition template: %w", err)
+	if b.store.movePartitionSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.moveStorePartition); err != nil {
+		return fmt.Errorf("rendering moveStorePartition template: %w", err)
 	}
-	if b.store.dropTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.storeDropTable); err != nil {
-		return fmt.Errorf("rendering storeDropTable template: %w", err)
+	if b.store.dropTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.dropStoreTable); err != nil {
+		return fmt.Errorf("rendering dropStoreTable template: %w", err)
 	}
 
 	t.bindings = append(t.bindings, b)

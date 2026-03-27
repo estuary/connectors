@@ -100,17 +100,17 @@ var clickHouseDialect = func(database string) sql.Dialect {
 }
 
 type templates struct {
-	targetCreateTable  *template.Template
-	targetAlterColumns *template.Template
-	loadCreateTable    *template.Template
-	loadInsert         *template.Template
-	loadQuery          *template.Template
-	loadDropTable      *template.Template
-	storeCreateTable   *template.Template
-	storeInsert        *template.Template
-	storeQueryParts    *template.Template
-	storeMovePartition *template.Template
-	storeDropTable     *template.Template
+	createTargetTable  *template.Template
+	alterTargetColumns *template.Template
+	createLoadTable    *template.Template
+	insertLoadTable    *template.Template
+	queryLoadTable     *template.Template
+	dropLoadTable      *template.Template
+	createStoreTable   *template.Template
+	insertStoreTable   *template.Template
+	queryStoreParts    *template.Template
+	moveStorePartition *template.Template
+	dropStoreTable     *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect) templates {
@@ -142,7 +142,7 @@ func renderTemplates(dialect sql.Dialect) templates {
 --     cleanup only happens via OPTIMIZE ... FINAL CLEANUP.
 --     Added in ClickHouse 25.3.
 
-{{ define "targetCreateTable" }}
+{{ define "createTargetTable" }}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{- range $ind, $col := $.Columns }}
 		{{$col.Identifier}} {{ if not $col.MustExist }}Nullable({{ end }}{{$col.DDL}}{{ if not $col.MustExist }}){{ end }},
@@ -169,7 +169,7 @@ SETTINGS
 	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
 {{ end }}
 
-{{ define "targetAlterColumns" }}
+{{ define "alterTargetColumns" }}
 {{- range $ind, $col := $.AddColumns }}
 ALTER TABLE {{$.Identifier}} ADD COLUMN IF NOT EXISTS {{$col.Identifier}} Nullable({{$col.NullableDDL}});
 {{ end -}}
@@ -194,7 +194,7 @@ ALTER TABLE {{$.Identifier}} MODIFY COLUMN {{ ColumnIdentifier $col.Name }} Null
 flow_temp_load_{{$.Binding}}_{{$.RangeKey}}_{{$.Identifier}}
 {{- end }}
 
-{{ define "loadCreateTable" }}
+{{ define "createLoadTable" }}
 CREATE OR REPLACE TABLE {{ template "loadTableName" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
@@ -208,7 +208,7 @@ ENGINE = Join(ALL, INNER
 );
 {{ end }}
 
-{{ define "loadInsert" }}
+{{ define "insertLoadTable" }}
 INSERT INTO {{ template "loadTableName" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{ end -}}
@@ -217,7 +217,7 @@ INSERT INTO {{ template "loadTableName" . }} (
 )
 {{ end }}
 
-{{ define "loadQuery" }}
+{{ define "queryLoadTable" }}
 {{ if $.Document -}}
 SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
 	FROM {{$.Identifier}} AS r FINAL
@@ -229,7 +229,7 @@ SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
 {{ end -}}
 {{ end }}
 
-{{ define "loadDropTable" }}
+{{ define "dropLoadTable" }}
 DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 {{ end }}
 
@@ -260,12 +260,12 @@ DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 flow_temp_store_{{$.Binding}}_{{$.RangeKey}}_{{$.Identifier}}
 {{- end }}
 
-{{ define "storeCreateTable" }}
+{{ define "createStoreTable" }}
 CREATE OR REPLACE TABLE {{ template "storeTableName" . }}
 AS {{$.Identifier}};
 {{ end }}
 
-{{ define "storeInsert" }}
+{{ define "insertStoreTable" }}
 INSERT INTO {{ template "storeTableName" . }} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
@@ -274,35 +274,35 @@ INSERT INTO {{ template "storeTableName" . }} (
 )
 {{ end }}
 
-{{ define "storeQueryParts" }}
+{{ define "queryStoreParts" }}
 SELECT DISTINCT partition_id FROM system.parts
 WHERE table = '{{ template "storeTableName" . }}'
   AND database = ? AND active;
 {{ end }}
 
-{{ define "storeMovePartition" }}
+{{ define "moveStorePartition" }}
 ALTER TABLE {{ template "storeTableName" . }}
 MOVE PARTITION ID ?
 TO TABLE {{ $.Identifier }};
 {{ end }}
 
-{{ define "storeDropTable" }}
+{{ define "dropStoreTable" }}
 DROP TABLE IF EXISTS {{ template "storeTableName" . }};
 {{ end }}
 `)
 
 	return templates{
-		targetCreateTable:  tplAll.Lookup("targetCreateTable"),
-		targetAlterColumns: tplAll.Lookup("targetAlterColumns"),
-		loadCreateTable:    tplAll.Lookup("loadCreateTable"),
-		loadInsert:         tplAll.Lookup("loadInsert"),
-		loadQuery:          tplAll.Lookup("loadQuery"),
-		loadDropTable:      tplAll.Lookup("loadDropTable"),
-		storeCreateTable:   tplAll.Lookup("storeCreateTable"),
-		storeInsert:        tplAll.Lookup("storeInsert"),
-		storeQueryParts:    tplAll.Lookup("storeQueryParts"),
-		storeMovePartition: tplAll.Lookup("storeMovePartition"),
-		storeDropTable:     tplAll.Lookup("storeDropTable"),
+		createTargetTable:  tplAll.Lookup("createTargetTable"),
+		alterTargetColumns: tplAll.Lookup("alterTargetColumns"),
+		createLoadTable:    tplAll.Lookup("createLoadTable"),
+		insertLoadTable:    tplAll.Lookup("insertLoadTable"),
+		queryLoadTable:     tplAll.Lookup("queryLoadTable"),
+		dropLoadTable:      tplAll.Lookup("dropLoadTable"),
+		createStoreTable:   tplAll.Lookup("createStoreTable"),
+		insertStoreTable:   tplAll.Lookup("insertStoreTable"),
+		queryStoreParts:    tplAll.Lookup("queryStoreParts"),
+		moveStorePartition: tplAll.Lookup("moveStorePartition"),
+		dropStoreTable:     tplAll.Lookup("dropStoreTable"),
 	}
 }
 
