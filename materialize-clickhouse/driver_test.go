@@ -404,7 +404,7 @@ func TestAddBinding(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -501,7 +501,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	})
 
 	// Build the binding to get rendered SQL.
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -542,10 +542,10 @@ func TestPrepareNewTransactor(t *testing.T) {
 	}
 	// BindingEvents zero value is safe: all methods check the enabled flag first.
 	var be = &m.BindingEvents{}
-	var factory = prepareNewTransactor(tpls)
+	var open = pm.Request_Open{Range: &pf.RangeSpec{}}
 
 	// No bindings — returns a valid transactor.
-	txn, err := factory(ctx, "test", nil, ep, sql.Fence{}, nil, pm.Request_Open{}, nil, be)
+	txn, err := newTransactor(ctx, "test", nil, ep, sql.Fence{}, nil, open, nil, be)
 	require.NoError(t, err)
 	require.NotNil(t, txn)
 	txn.Destroy()
@@ -563,7 +563,7 @@ func TestPrepareNewTransactor(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier("test_prepare_txn")))
 	})
 
-	txn, err = factory(ctx, "test", nil, ep, sql.Fence{}, []sql.Table{table}, pm.Request_Open{}, nil, be)
+	txn, err = newTransactor(ctx, "test", nil, ep, sql.Fence{}, []sql.Table{table}, open, nil, be)
 	require.NoError(t, err)
 	require.NotNil(t, txn)
 
@@ -668,7 +668,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -713,7 +713,7 @@ func setupTable(t *testing.T, ctx context.Context, cfg config, dialect sql.Diale
 		_, _ = cleanDB.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
 	})
 
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn
@@ -970,7 +970,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	})
 
 	// Build transactor with 2 bindings.
-	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg}
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
 	loadConn, err := clickhouse.Open(cfg.newClickhouseOptions())
 	require.NoError(t, err)
 	tr.load.conn = loadConn

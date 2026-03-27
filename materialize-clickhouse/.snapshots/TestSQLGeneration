@@ -51,118 +51,6 @@ SETTINGS
 	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
 --- End delta_updates targetCreateTable ---
 
---- Begin key_value loadCreateTable ---
-
-CREATE OR REPLACE TABLE key_value_stage_load (
-		key1 Int64,
-		key2 Bool,
-		`key!binary` String
-)
-ENGINE = Join(ALL, INNER, key1, key2, `key!binary`);
---- End key_value loadCreateTable ---
-
---- Begin delta_updates loadCreateTable ---
-
-CREATE OR REPLACE TABLE delta_updates_stage_load (
-		`theKey` String
-)
-ENGINE = Join(ALL, INNER, `theKey`);
---- End delta_updates loadCreateTable ---
-
---- Begin key_value loadQuery ---
-
-SELECT 0::Int32, r.flow_document
-	FROM key_value AS r FINAL
-	JOIN key_value_stage_load AS l
-		 ON l.key1 = r.key1
-		 AND l.key2 = r.key2
-		 AND l.`key!binary` = r.`key!binary`
---- End key_value loadQuery ---
-
---- Begin delta_updates loadQuery ---
-
---- End delta_updates loadQuery ---
-
---- Begin key_value loadInsert ---
-
-INSERT INTO key_value_stage_load (key1, key2, `key!binary`)
---- End key_value loadInsert ---
-
---- Begin delta_updates loadInsert ---
-
-INSERT INTO delta_updates_stage_load (`theKey`)
---- End delta_updates loadInsert ---
-
---- Begin key_value loadDropTable ---
-
-DROP TABLE IF EXISTS key_value_stage_load;
---- End key_value loadDropTable ---
-
---- Begin delta_updates loadDropTable ---
-
-DROP TABLE IF EXISTS delta_updates_stage_load;
---- End delta_updates loadDropTable ---
-
---- Begin key_value storeCreateTable ---
-
-CREATE OR REPLACE TABLE key_value_stage_store
-AS key_value;
---- End key_value storeCreateTable ---
-
---- Begin delta_updates storeCreateTable ---
-
-CREATE OR REPLACE TABLE delta_updates_stage_store
-AS delta_updates;
---- End delta_updates storeCreateTable ---
-
---- Begin key_value storeInsert ---
-
-INSERT INTO key_value_stage_store (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document)
---- End key_value storeInsert ---
-
---- Begin delta_updates storeInsert ---
-
-INSERT INTO delta_updates_stage_store (`theKey`, `aValue`, flow_published_at)
---- End delta_updates storeInsert ---
-
---- Begin key_value storeQueryParts ---
-
-SELECT DISTINCT partition_id FROM system.parts
-WHERE table = 'key_value_stage_store'
-  AND database = ? AND active;
---- End key_value storeQueryParts ---
-
---- Begin delta_updates storeQueryParts ---
-
-SELECT DISTINCT partition_id FROM system.parts
-WHERE table = 'delta_updates_stage_store'
-  AND database = ? AND active;
---- End delta_updates storeQueryParts ---
-
---- Begin key_value storeMovePartition ---
-
-ALTER TABLE key_value_stage_store
-MOVE PARTITION ID ?
-TO TABLE key_value;
---- End key_value storeMovePartition ---
-
---- Begin delta_updates storeMovePartition ---
-
-ALTER TABLE delta_updates_stage_store
-MOVE PARTITION ID ?
-TO TABLE delta_updates;
---- End delta_updates storeMovePartition ---
-
---- Begin key_value storeDropTable ---
-
-DROP TABLE IF EXISTS key_value_stage_store;
---- End key_value storeDropTable ---
-
---- Begin delta_updates storeDropTable ---
-
-DROP TABLE IF EXISTS delta_updates_stage_store;
---- End delta_updates storeDropTable ---
-
 --- Begin alter table add columns and drop not nulls ---
 
 ALTER TABLE key_value ADD COLUMN IF NOT EXISTS first_new_column Nullable(STRING);
@@ -187,5 +75,117 @@ ALTER TABLE key_value MODIFY COLUMN first_required_column Nullable(string);
 
 ALTER TABLE key_value MODIFY COLUMN second_required_column Nullable(bool);
 --- End alter table drop not nulls ---
+
+--- Begin key_value loadCreateTable ---
+
+CREATE OR REPLACE TABLE flow_temp_load_0_0_key_value (
+		key1 Int64,
+		key2 Bool,
+		`key!binary` String
+)
+ENGINE = Join(ALL, INNER, key1, key2, `key!binary`);
+--- End key_value loadCreateTable ---
+
+--- Begin delta_updates loadCreateTable ---
+
+CREATE OR REPLACE TABLE flow_temp_load_1_0_delta_updates (
+		`theKey` String
+)
+ENGINE = Join(ALL, INNER, `theKey`);
+--- End delta_updates loadCreateTable ---
+
+--- Begin key_value loadQuery ---
+
+SELECT 0::Int32, r.flow_document
+	FROM key_value AS r FINAL
+	JOIN flow_temp_load_0_0_key_value AS l
+		 ON l.key1 = r.key1
+		 AND l.key2 = r.key2
+		 AND l.`key!binary` = r.`key!binary`
+--- End key_value loadQuery ---
+
+--- Begin delta_updates loadQuery ---
+
+--- End delta_updates loadQuery ---
+
+--- Begin key_value loadInsert ---
+
+INSERT INTO flow_temp_load_0_0_key_value (key1, key2, `key!binary`)
+--- End key_value loadInsert ---
+
+--- Begin delta_updates loadInsert ---
+
+INSERT INTO flow_temp_load_1_0_delta_updates (`theKey`)
+--- End delta_updates loadInsert ---
+
+--- Begin key_value loadDropTable ---
+
+DROP TABLE IF EXISTS flow_temp_load_0_0_key_value;
+--- End key_value loadDropTable ---
+
+--- Begin delta_updates loadDropTable ---
+
+DROP TABLE IF EXISTS flow_temp_load_1_0_delta_updates;
+--- End delta_updates loadDropTable ---
+
+--- Begin key_value storeCreateTable ---
+
+CREATE OR REPLACE TABLE flow_temp_store_0_0_key_value
+AS key_value;
+--- End key_value storeCreateTable ---
+
+--- Begin delta_updates storeCreateTable ---
+
+CREATE OR REPLACE TABLE flow_temp_store_1_0_delta_updates
+AS delta_updates;
+--- End delta_updates storeCreateTable ---
+
+--- Begin key_value storeInsert ---
+
+INSERT INTO flow_temp_store_0_0_key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document)
+--- End key_value storeInsert ---
+
+--- Begin delta_updates storeInsert ---
+
+INSERT INTO flow_temp_store_1_0_delta_updates (`theKey`, `aValue`, flow_published_at)
+--- End delta_updates storeInsert ---
+
+--- Begin key_value storeQueryParts ---
+
+SELECT DISTINCT partition_id FROM system.parts
+WHERE table = 'flow_temp_store_0_0_key_value'
+  AND database = ? AND active;
+--- End key_value storeQueryParts ---
+
+--- Begin delta_updates storeQueryParts ---
+
+SELECT DISTINCT partition_id FROM system.parts
+WHERE table = 'flow_temp_store_1_0_delta_updates'
+  AND database = ? AND active;
+--- End delta_updates storeQueryParts ---
+
+--- Begin key_value storeMovePartition ---
+
+ALTER TABLE flow_temp_store_0_0_key_value
+MOVE PARTITION ID ?
+TO TABLE key_value;
+--- End key_value storeMovePartition ---
+
+--- Begin delta_updates storeMovePartition ---
+
+ALTER TABLE flow_temp_store_1_0_delta_updates
+MOVE PARTITION ID ?
+TO TABLE delta_updates;
+--- End delta_updates storeMovePartition ---
+
+--- Begin key_value storeDropTable ---
+
+DROP TABLE IF EXISTS flow_temp_store_0_0_key_value;
+--- End key_value storeDropTable ---
+
+--- Begin delta_updates storeDropTable ---
+
+DROP TABLE IF EXISTS flow_temp_store_1_0_delta_updates;
+--- End delta_updates storeDropTable ---
 
 

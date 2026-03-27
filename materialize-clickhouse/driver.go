@@ -159,7 +159,7 @@ func newClickHouseDriver() *sql.Driver[config, tableConfig] {
 				Dialect:             dialect,
 				NewClient:           newClient,
 				CreateTableTemplate: tpls.targetCreateTable,
-				NewTransactor:       prepareNewTransactor(tpls),
+				NewTransactor:       newTransactor,
 				ConcurrentApply:     false,
 				RequireMetaOp:       true,
 			}, nil
@@ -181,47 +181,50 @@ type transactor struct {
 	bindings             []*binding
 	pendingStoreBindings []*binding
 	be                   *m.BindingEvents
+	_range               *pf.RangeSpec
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
 
-func prepareNewTransactor(
-	tpls templates,
-) func(context.Context, string, map[string]bool, *sql.Endpoint[config], sql.Fence, []sql.Table, pm.Request_Open, *boilerplate.InfoSchema, *m.BindingEvents) (m.Transactor, error) {
-	return func(
-		ctx context.Context,
-		materializationName string,
-		featureFlags map[string]bool,
-		ep *sql.Endpoint[config],
-		fence sql.Fence,
-		bindings []sql.Table,
-		open pm.Request_Open,
-		is *boilerplate.InfoSchema,
-		be *m.BindingEvents,
-	) (m.Transactor, error) {
-		var cfg = ep.Config
-		var d = &transactor{dialect: ep.Dialect, templates: tpls, cfg: cfg, be: be}
-
-		var err error
-		loadOptions := cfg.newClickhouseOptions()
-		if d.load.conn, err = clickhouse.Open(loadOptions); err != nil {
-			return nil, fmt.Errorf("openNativeConn (load): %w", err)
-		}
-
-		storeOptions := cfg.newClickhouseOptions()
-		if d.store.conn, err = clickhouse.Open(storeOptions); err != nil {
-			return nil, fmt.Errorf("openNativeConn (store): %w", err)
-		}
-
-		for _, target := range bindings {
-			if err := d.addBinding(ctx, target); err != nil {
-				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
-			}
-		}
-		d.pendingStoreBindings = make([]*binding, 0, len(bindings))
-
-		return d, nil
+func newTransactor(
+	ctx context.Context,
+	materializationName string,
+	featureFlags map[string]bool,
+	ep *sql.Endpoint[config],
+	_ sql.Fence,
+	bindings []sql.Table,
+	open pm.Request_Open,
+	_ *boilerplate.InfoSchema,
+	be *m.BindingEvents,
+) (m.Transactor, error) {
+	var cfg = ep.Config
+	t := &transactor{
+		dialect:   ep.Dialect,
+		templates: renderTemplates(ep.Dialect),
+		cfg:       cfg,
+		be:        be,
+		_range:    open.Range,
 	}
+
+	var err error
+	loadOptions := cfg.newClickhouseOptions()
+	if t.load.conn, err = clickhouse.Open(loadOptions); err != nil {
+		return nil, fmt.Errorf("openNativeConn (load): %w", err)
+	}
+
+	storeOptions := cfg.newClickhouseOptions()
+	if t.store.conn, err = clickhouse.Open(storeOptions); err != nil {
+		return nil, fmt.Errorf("openNativeConn (store): %w", err)
+	}
+
+	for _, target := range bindings {
+		if err = t.addBinding(ctx, target); err != nil {
+			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
+		}
+	}
+	t.pendingStoreBindings = make([]*binding, 0, len(bindings))
+
+	return t, nil
 }
 
 type binding struct {
@@ -250,32 +253,32 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	b := &binding{target: target}
 
 	var err error
-	if b.load.createTableSQL, err = sql.RenderTableTemplate(target, t.templates.loadCreateTable); err != nil {
+	if b.load.createTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.loadCreateTable); err != nil {
 		return fmt.Errorf("rendering loadCreateTable template: %w", err)
 	}
-	if b.load.insertSQL, err = sql.RenderTableTemplate(target, t.templates.loadInsert); err != nil {
+	if b.load.insertSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.loadInsert); err != nil {
 		return fmt.Errorf("rendering loadInsert template: %w", err)
 	}
-	if b.load.querySQL, err = sql.RenderTableTemplate(target, t.templates.loadQuery); err != nil {
+	if b.load.querySQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.loadQuery); err != nil {
 		return fmt.Errorf("rendering loadQuery template: %w", err)
 	}
-	if b.load.dropTableSQL, err = sql.RenderTableTemplate(target, t.templates.loadDropTable); err != nil {
+	if b.load.dropTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.loadDropTable); err != nil {
 		return fmt.Errorf("rendering loadDropTable template: %w", err)
 	}
 
-	if b.store.createTableSQL, err = sql.RenderTableTemplate(target, t.templates.storeCreateTable); err != nil {
+	if b.store.createTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.storeCreateTable); err != nil {
 		return fmt.Errorf("rendering storeCreateTable template: %w", err)
 	}
-	if b.store.insertSQL, err = sql.RenderTableTemplate(target, t.templates.storeInsert); err != nil {
+	if b.store.insertSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.storeInsert); err != nil {
 		return fmt.Errorf("rendering storeInsert template: %w", err)
 	}
-	if b.store.queryPartsSQL, err = sql.RenderTableTemplate(target, t.templates.storeQueryParts); err != nil {
+	if b.store.queryPartsSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.storeQueryParts); err != nil {
 		return fmt.Errorf("rendering storeQueryParts template: %w", err)
 	}
-	if b.store.movePartitionSQL, err = sql.RenderTableTemplate(target, t.templates.storeMovePartition); err != nil {
+	if b.store.movePartitionSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.storeMovePartition); err != nil {
 		return fmt.Errorf("rendering storeMovePartition template: %w", err)
 	}
-	if b.store.dropTableSQL, err = sql.RenderTableTemplate(target, t.templates.storeDropTable); err != nil {
+	if b.store.dropTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.storeDropTable); err != nil {
 		return fmt.Errorf("rendering storeDropTable template: %w", err)
 	}
 

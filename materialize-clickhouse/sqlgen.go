@@ -4,11 +4,13 @@ import (
 	"fmt"
 	"math"
 	"slices"
+	"strconv"
 	"strings"
 	"text/template"
 	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
+	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -189,7 +191,7 @@ ALTER TABLE {{$.Identifier}} MODIFY COLUMN {{ ColumnIdentifier $col.Name }} Null
 -- between transactions and dropped when the connector shuts down.
 
 {{ define "loadTableName" -}}
-{{$.Identifier}}_stage_load
+flow_temp_load_{{$.Binding}}_{{$.RangeKey}}_{{$.Identifier}}
 {{- end }}
 
 {{ define "loadCreateTable" }}
@@ -255,7 +257,7 @@ DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 -- truncated between transactions and dropped when the connector shuts down.
 
 {{ define "storeTableName" -}}
-{{$.Identifier}}_stage_store
+flow_temp_store_{{$.Binding}}_{{$.RangeKey}}_{{$.Identifier}}
 {{- end }}
 
 {{ define "storeCreateTable" }}
@@ -302,4 +304,26 @@ DROP TABLE IF EXISTS {{ template "storeTableName" . }};
 		storeMovePartition: tplAll.Lookup("storeMovePartition"),
 		storeDropTable:     tplAll.Lookup("storeDropTable"),
 	}
+}
+
+func renderTableAndRangeKey(table sql.Table, rangeKey uint32, tpl *template.Template) (rendered string, err error) {
+	v := struct {
+		sql.Table
+		RangeKey string
+	}{
+		Table:    table,
+		RangeKey: strconv.FormatInt(int64(rangeKey), 16),
+	}
+
+	var w strings.Builder
+	if err = tpl.Execute(&w, &v); err != nil {
+		return
+	}
+	rendered = w.String()
+	log.WithFields(log.Fields{
+		"rendered":  rendered,
+		"table":     table,
+		"range-key": rangeKey,
+	}).Debug("rendered template")
+	return
 }
