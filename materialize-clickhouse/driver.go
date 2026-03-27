@@ -240,6 +240,7 @@ type binding struct {
 		insertSQL        string
 		queryPartsSQL    string
 		movePartitionSQL string
+		existsSQL        string
 		dropTableSQL     string
 	}
 }
@@ -277,6 +278,9 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	}
 	if b.store.movePartitionSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.moveStorePartition); err != nil {
 		return fmt.Errorf("rendering moveStorePartition template: %w", err)
+	}
+	if b.store.existsSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.existsStoreTable); err != nil {
+		return fmt.Errorf("rendering existsStoreTable template: %w", err)
 	}
 	if b.store.dropTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.dropStoreTable); err != nil {
 		return fmt.Errorf("rendering dropStoreTable template: %w", err)
@@ -453,15 +457,31 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 }
 
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	for _, b := range t.pendingStoreBindings {
-		if err := t.moveStorePartitionsToTarget(ctx, b); err != nil {
-			return nil, fmt.Errorf("moving stage to target: %w", err)
+	if len(t.pendingStoreBindings) > 0 {
+		for _, b := range t.pendingStoreBindings {
+			if err := t.moveStorePartitionsToTarget(ctx, b); err != nil {
+				return nil, fmt.Errorf("moving stage to target: %w", err)
+			}
+		}
+		for _, b := range t.pendingStoreBindings {
+			_ = t.store.conn.Exec(ctx, b.store.dropTableSQL)
+		}
+		t.pendingStoreBindings = t.pendingStoreBindings[:0]
+	} else {
+		// It may be that Acknowledge was not called after Store, so we'll check all possible bindings
+		// for not-yet-ack'd store stage records.
+		for _, b := range t.bindings {
+			var count uint64
+			if err := t.store.conn.QueryRow(ctx, b.store.existsSQL).Scan(&count); err != nil {
+				return nil, fmt.Errorf("checking store stage table existence: %w", err)
+			}
+			if count > 0 {
+				if err := t.moveStorePartitionsToTarget(ctx, b); err != nil {
+					return nil, fmt.Errorf("moving stage to target: %w", err)
+				}
+			}
 		}
 	}
-	for _, b := range t.pendingStoreBindings {
-		_ = t.store.conn.Exec(ctx, b.store.dropTableSQL)
-	}
-	t.pendingStoreBindings = t.pendingStoreBindings[:0]
 	return nil, nil
 }
 

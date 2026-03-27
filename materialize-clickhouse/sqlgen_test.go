@@ -24,6 +24,7 @@ func TestSQLGeneration(t *testing.T) {
 		testTemplates.insertStoreTable,
 		testTemplates.queryStoreParts,
 		testTemplates.moveStorePartition,
+		testTemplates.existsStoreTable,
 		testTemplates.dropStoreTable,
 	}
 

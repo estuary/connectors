@@ -110,6 +110,7 @@ type templates struct {
 	insertStoreTable   *template.Template
 	queryStoreParts    *template.Template
 	moveStorePartition *template.Template
+	existsStoreTable   *template.Template
 	dropStoreTable     *template.Template
 }
 
@@ -286,6 +287,12 @@ MOVE PARTITION ID ?
 TO TABLE {{ $.Identifier }};
 {{ end }}
 
+{{ define "existsStoreTable" }}
+SELECT count() FROM system.tables
+WHERE database = currentDatabase()
+  AND name = '{{ template "storeTableName" . }}';
+{{ end }}
+
 {{ define "dropStoreTable" }}
 DROP TABLE IF EXISTS {{ template "storeTableName" . }};
 {{ end }}
@@ -302,6 +309,7 @@ DROP TABLE IF EXISTS {{ template "storeTableName" . }};
 		insertStoreTable:   tplAll.Lookup("insertStoreTable"),
 		queryStoreParts:    tplAll.Lookup("queryStoreParts"),
 		moveStorePartition: tplAll.Lookup("moveStorePartition"),
+		existsStoreTable:   tplAll.Lookup("existsStoreTable"),
 		dropStoreTable:     tplAll.Lookup("dropStoreTable"),
 	}
 }

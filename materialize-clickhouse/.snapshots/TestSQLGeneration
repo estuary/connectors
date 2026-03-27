@@ -178,6 +178,20 @@ MOVE PARTITION ID ?
 TO TABLE delta_updates;
 --- End delta_updates moveStorePartition ---
 
+--- Begin key_value existsStoreTable ---
+
+SELECT count() FROM system.tables
+WHERE database = currentDatabase()
+  AND name = 'flow_temp_store_0_0_key_value';
+--- End key_value existsStoreTable ---
+
+--- Begin delta_updates existsStoreTable ---
+
+SELECT count() FROM system.tables
+WHERE database = currentDatabase()
+  AND name = 'flow_temp_store_1_0_delta_updates';
+--- End delta_updates existsStoreTable ---
+
 --- Begin key_value dropStoreTable ---
 
 DROP TABLE IF EXISTS flow_temp_store_0_0_key_value;
