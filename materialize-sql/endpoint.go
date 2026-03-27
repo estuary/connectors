@@ -139,6 +139,8 @@ type Endpoint[EC boilerplate.EndpointConfiger] struct {
 	ConcurrentApply bool
 	// NoFlowDocument indicates whether flow_document projection should be optional (true) or mandatory (false)
 	NoFlowDocument bool
+	// RequireMetaOp makes the _meta/op projection required instead of recommended.
+	RequireMetaOp bool
 	// Options are general materialization options that apply to this task.
 	Options m.MaterializeOptions
 }

@@ -225,8 +225,13 @@ func (s *sqlMaterialization[EC, RC]) NewConstraint(p pf.Projection, deltaUpdates
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "Required root-level properties must be present when flow_document is disabled"
 	case p.Field == "_meta/op":
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
-		constraint.Reason = "The operation type should usually be materialized"
+		if s.endpoint.RequireMetaOp {
+			constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
+			constraint.Reason = "The operation type is required for this materialization"
+		} else {
+			constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
+			constraint.Reason = "The operation type should usually be materialized"
+		}
 	case strings.HasPrefix(p.Field, "_meta/"):
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
 		constraint.Reason = "Metadata fields are able to be materialized"

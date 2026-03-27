@@ -106,6 +106,8 @@ jobs:
           - materialize-azure-blob-parquet
           - materialize-azure-fabric-warehouse
           - materialize-bigquery
+          - materialize-clickhouse
+          - materialize-cratedb
           - materialize-databricks
           - materialize-dynamodb
           - materialize-elasticsearch
@@ -125,14 +127,13 @@ jobs:
           - materialize-s3-csv
           - materialize-s3-iceberg
           - materialize-s3-parquet
+          - materialize-slack
           - materialize-snowflake
           - materialize-spanner
-          - materialize-starburst
           - materialize-sqlite
-          - materialize-webhook
           - materialize-sqlserver
-          - materialize-slack
-          - materialize-cratedb
+          - materialize-starburst
+          - materialize-webhook
         include:
           - connector: source-criteo
             connector_type: capture
@@ -187,6 +188,7 @@ jobs:
       - name: Start Dockerized test infrastructure
         if: |
           contains(fromJson('[
+            "materialize-clickhouse",
             "materialize-dynamodb",
             "materialize-elasticsearch",
             "materialize-kafka",
@@ -312,25 +314,26 @@ jobs:
       - name: Materialization connector ${{ matrix.connector }} integration tests
         if: |
           contains(fromJson('[
-              "materialize-firebolt",
+              "materialize-azure-fabric-warehouse",
+              "materialize-bigquery",
+              "materialize-clickhouse",
+              "materialize-databricks",
               "materialize-dynamodb",
               "materialize-elasticsearch",
+              "materialize-firebolt",
               "materialize-google-sheets",
-              "materialize-pinecone",
-              "materialize-postgres",
-              "materialize-mysql",
-              "materialize-sqlserver",
-              "materialize-spanner",
+              "materialize-iceberg",
               "materialize-kafka",
               "materialize-mongodb",
               "materialize-motherduck",
-              "materialize-snowflake",
-              "materialize-databricks",
-              "materialize-azure-fabric-warehouse",
-              "materialize-bigquery",
+              "materialize-mysql",
+              "materialize-pinecone",
+              "materialize-postgres",
               "materialize-redshift",
               "materialize-s3-iceberg",
-              "materialize-iceberg"
+              "materialize-snowflake",
+              "materialize-spanner",
+              "materialize-sqlserver"
             ]'), matrix.connector)
 
         run: CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
