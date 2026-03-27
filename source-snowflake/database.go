@@ -9,7 +9,7 @@ import (
 
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
-	"github.com/snowflakedb/gosnowflake/v2"
+	"github.com/snowflakedb/gosnowflake"
 )
 
 func connectSnowflake(ctx context.Context, cfg *config) (*sql.DB, error) {

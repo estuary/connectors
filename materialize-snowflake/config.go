@@ -12,7 +12,7 @@ import (
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
 	log "github.com/sirupsen/logrus"
-	sf "github.com/snowflakedb/gosnowflake/v2"
+	sf "github.com/snowflakedb/gosnowflake"
 )
 
 var featureFlagDefaults = map[string]bool{
@@ -128,9 +128,9 @@ func (c config) toURI(includeSchema bool, materializationName string) (string, e
 	queryParams.Add("maxRetryCount", "35")
 	// The default for CLIENT_RESULT_CHUNK_SIZE is 160. This specifies how many megabytes are in each
 	// arrow record batch we receive. This option, together with the MaxChunkDownloadWorkers option of
-	// gosnowflake which defaults to 10, determine how much memory can be used at once. With 80 megabytes per chunk
-	// we can go up to 800MB assuming 10 download workers.
-	queryParams.Add("CLIENT_RESULT_CHUNK_SIZE", "40")
+	// gosnowflake which defaults to 10, determine how much memory can be used at once. With 16 megabytes per chunk
+	// we can go up to 160MB assuming 10 download workers.
+	queryParams.Add("CLIENT_RESULT_CHUNK_SIZE", "16")
 
 	// Optional params
 	if c.Warehouse != "" {

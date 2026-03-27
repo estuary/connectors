@@ -18,7 +18,7 @@ import (
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
-	"github.com/snowflakedb/gosnowflake/v2"
+	"github.com/snowflakedb/gosnowflake"
 	"github.com/stretchr/testify/require"
 )
 

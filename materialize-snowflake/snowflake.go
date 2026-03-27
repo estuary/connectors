@@ -21,7 +21,7 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
-	sf "github.com/snowflakedb/gosnowflake/v2"
+	sf "github.com/snowflakedb/gosnowflake"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
 )
@@ -480,7 +480,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// NB: Not using groupCtx here since the Go Snowflake driver
 			// retains contexts internally, and the group context is cancelled
 			// after group.Wait() returns.
-			rows, err := d.db.QueryContext(ctx, query)
+			rows, err := d.db.QueryContext(sf.WithStreamDownloader(ctx), query)
 			if err != nil {
 				return fmt.Errorf("querying Load documents: %w", err)
 			}
