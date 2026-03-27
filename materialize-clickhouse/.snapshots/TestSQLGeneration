@@ -93,16 +93,6 @@ INSERT INTO key_value_stage_load (key1, key2, `key!binary`)
 INSERT INTO delta_updates_stage_load (`theKey`)
 --- End delta_updates loadInsert ---
 
---- Begin key_value loadTruncateTable ---
-
-TRUNCATE TABLE key_value_stage_load;
---- End key_value loadTruncateTable ---
-
---- Begin delta_updates loadTruncateTable ---
-
-TRUNCATE TABLE delta_updates_stage_load;
---- End delta_updates loadTruncateTable ---
-
 --- Begin key_value loadDropTable ---
 
 DROP TABLE IF EXISTS key_value_stage_load;
@@ -134,16 +124,6 @@ INSERT INTO key_value_stage_store (key1, key2, `key!binary`, `array`, binary, bo
 
 INSERT INTO delta_updates_stage_store (`theKey`, `aValue`, flow_published_at)
 --- End delta_updates storeInsert ---
-
---- Begin key_value storeTruncateTable ---
-
-TRUNCATE TABLE key_value_stage_store;
---- End key_value storeTruncateTable ---
-
---- Begin delta_updates storeTruncateTable ---
-
-TRUNCATE TABLE delta_updates_stage_store;
---- End delta_updates storeTruncateTable ---
 
 --- Begin key_value storeQueryParts ---
 

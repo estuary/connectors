@@ -101,12 +101,10 @@ type templates struct {
 	targetCreateTable  *template.Template
 	targetAlterColumns *template.Template
 	loadCreateTable    *template.Template
-	loadTruncateTable  *template.Template
 	loadInsert         *template.Template
 	loadQuery          *template.Template
 	loadDropTable      *template.Template
 	storeCreateTable   *template.Template
-	storeTruncateTable *template.Template
 	storeInsert        *template.Template
 	storeQueryParts    *template.Template
 	storeMovePartition *template.Template
@@ -208,10 +206,6 @@ ENGINE = Join(ALL, INNER
 );
 {{ end }}
 
-{{ define "loadTruncateTable" }}
-TRUNCATE TABLE {{ template "loadTableName" . }};
-{{ end }}
-
 {{ define "loadInsert" }}
 INSERT INTO {{ template "loadTableName" . }} (
 	{{- range $ind, $key := $.Keys }}
@@ -269,10 +263,6 @@ CREATE OR REPLACE TABLE {{ template "storeTableName" . }}
 AS {{$.Identifier}};
 {{ end }}
 
-{{ define "storeTruncateTable" }}
-TRUNCATE TABLE {{ template "storeTableName" . }};
-{{ end }}
-
 {{ define "storeInsert" }}
 INSERT INTO {{ template "storeTableName" . }} (
 	{{- range $ind, $col := $.Columns }}
@@ -303,12 +293,10 @@ DROP TABLE IF EXISTS {{ template "storeTableName" . }};
 		targetCreateTable:  tplAll.Lookup("targetCreateTable"),
 		targetAlterColumns: tplAll.Lookup("targetAlterColumns"),
 		loadCreateTable:    tplAll.Lookup("loadCreateTable"),
-		loadTruncateTable:  tplAll.Lookup("loadTruncateTable"),
 		loadInsert:         tplAll.Lookup("loadInsert"),
 		loadQuery:          tplAll.Lookup("loadQuery"),
 		loadDropTable:      tplAll.Lookup("loadDropTable"),
 		storeCreateTable:   tplAll.Lookup("storeCreateTable"),
-		storeTruncateTable: tplAll.Lookup("storeTruncateTable"),
 		storeInsert:        tplAll.Lookup("storeInsert"),
 		storeQueryParts:    tplAll.Lookup("storeQueryParts"),
 		storeMovePartition: tplAll.Lookup("storeMovePartition"),

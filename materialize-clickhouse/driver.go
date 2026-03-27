@@ -178,8 +178,9 @@ type transactor struct {
 	store struct {
 		conn chdriver.Conn
 	}
-	bindings []*binding
-	be       *m.BindingEvents
+	bindings             []*binding
+	pendingStoreBindings []*binding
+	be                   *m.BindingEvents
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
@@ -219,6 +220,7 @@ func prepareNewTransactor(
 				return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 			}
 		}
+		d.pendingStoreBindings = make([]*binding, 0, len(bindings))
 
 		return d, nil
 	}
@@ -227,15 +229,13 @@ func prepareNewTransactor(
 type binding struct {
 	target sql.Table
 	load   struct {
-		createTableSQL   string
-		truncateTableSQL string
-		insertSQL        string
-		querySQL         string
-		dropTableSQL     string
+		createTableSQL string
+		insertSQL      string
+		querySQL       string
+		dropTableSQL   string
 	}
 	store struct {
 		createTableSQL   string
-		truncateTableSQL string
 		insertSQL        string
 		queryPartsSQL    string
 		movePartitionSQL string
@@ -243,15 +243,17 @@ type binding struct {
 	}
 }
 
-func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
+type activeBinding struct {
+	binding *binding
+	batch   chdriver.Batch
+}
+
+func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	b := &binding{target: target}
 
 	var err error
 	if b.load.createTableSQL, err = sql.RenderTableTemplate(target, t.templates.loadCreateTable); err != nil {
 		return fmt.Errorf("rendering loadCreateTable template: %w", err)
-	}
-	if b.load.truncateTableSQL, err = sql.RenderTableTemplate(target, t.templates.loadTruncateTable); err != nil {
-		return fmt.Errorf("rendering loadTruncateTable template: %w", err)
 	}
 	if b.load.insertSQL, err = sql.RenderTableTemplate(target, t.templates.loadInsert); err != nil {
 		return fmt.Errorf("rendering loadInsert template: %w", err)
@@ -266,9 +268,6 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	if b.store.createTableSQL, err = sql.RenderTableTemplate(target, t.templates.storeCreateTable); err != nil {
 		return fmt.Errorf("rendering storeCreateTable template: %w", err)
 	}
-	if b.store.truncateTableSQL, err = sql.RenderTableTemplate(target, t.templates.storeTruncateTable); err != nil {
-		return fmt.Errorf("rendering storeTruncateTable template: %w", err)
-	}
 	if b.store.insertSQL, err = sql.RenderTableTemplate(target, t.templates.storeInsert); err != nil {
 		return fmt.Errorf("rendering storeInsert template: %w", err)
 	}
@@ -280,13 +279,6 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	}
 	if b.store.dropTableSQL, err = sql.RenderTableTemplate(target, t.templates.storeDropTable); err != nil {
 		return fmt.Errorf("rendering storeDropTable template: %w", err)
-	}
-
-	if err = t.load.conn.Exec(ctx, b.load.createTableSQL); err != nil {
-		return fmt.Errorf("creating load stage table: %w", err)
-	}
-	if err = t.store.conn.Exec(ctx, b.store.createTableSQL); err != nil {
-		return fmt.Errorf("creating store stage table: %w", err)
 	}
 
 	t.bindings = append(t.bindings, b)
@@ -302,48 +294,41 @@ const maxBatchSize = 100_000
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (err error) {
 	var ctx = it.Context()
 
-	// Clear keys from prior transaction.
-	for _, b := range t.bindings {
-		if err := t.load.conn.Exec(ctx, b.load.truncateTableSQL); err != nil {
-			return fmt.Errorf("truncating load table: %w", err)
-		}
-	}
-	batchByBinding := make(map[int]chdriver.Batch, len(t.bindings))
-
+	activeBindings := make(map[int]activeBinding, len(t.bindings))
 	defer func() {
-		for _, batch := range batchByBinding {
-			// Release the associated network connection to the pool.
-			_ = batch.Abort()
-		}
-		for _, b := range t.bindings {
+		for _, ab := range activeBindings {
+			_ = ab.batch.Close()
 			// Free memory on the ClickHouse server
-			_ = t.load.conn.Exec(ctx, b.load.truncateTableSQL)
+			_ = t.load.conn.Exec(ctx, ab.binding.load.dropTableSQL)
 		}
 	}()
 
 	for it.Next() {
-		b := t.bindings[it.Binding]
-
-		batch, found := batchByBinding[it.Binding]
+		ab, found := activeBindings[it.Binding]
 		if !found {
-			batch, err = t.load.conn.PrepareBatch(ctx, b.load.insertSQL,
+			b := t.bindings[it.Binding]
+			if err = t.load.conn.Exec(ctx, b.load.createTableSQL); err != nil {
+				return fmt.Errorf("creating load stage table: %w", err)
+			}
+			batch, err := t.load.conn.PrepareBatch(ctx, b.load.insertSQL,
 				chdriver.WithReleaseConnection(), // release connection to pool after PrepareBatch()
 				chdriver.WithCloseOnFlush())      // release connection to pool after Flush()
 			if err != nil {
 				return fmt.Errorf("preparing load batch: %w", err)
 			}
-			batchByBinding[it.Binding] = batch
+			ab = activeBinding{b, batch}
+			activeBindings[it.Binding] = ab
 		}
 
-		converted, err := b.target.ConvertKey(it.Key)
+		converted, err := ab.binding.target.ConvertKey(it.Key)
 		if err != nil {
 			return fmt.Errorf("converting load key: %w", err)
 		}
-		if err = batch.Append(converted...); err != nil {
+		if err = ab.batch.Append(converted...); err != nil {
 			return fmt.Errorf("appending load batch: %w", err)
 		}
-		if batch.Rows() >= maxBatchSize {
-			if err = batch.Flush(); err != nil {
+		if ab.batch.Rows() >= maxBatchSize {
+			if err = ab.batch.Flush(); err != nil {
 				return fmt.Errorf("flushing load batch: %w", err)
 			}
 		}
@@ -351,17 +336,20 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	if it.Err() != nil {
 		return it.Err()
 	}
-	for _, batch := range batchByBinding {
-		if err := batch.Send(); err != nil {
+	if len(activeBindings) == 0 {
+		return nil
+	}
+	for _, ab := range activeBindings {
+		if err := ab.batch.Send(); err != nil {
 			return fmt.Errorf("sending load batch: %w", err)
 		}
 	}
 
 	// Keys are now ready to be JOIN'd between the temporary and target tables.
 
-	loadQueries := make([]string, len(t.bindings))
-	for i, b := range t.bindings {
-		loadQueries[i] = b.load.querySQL
+	loadQueries := make([]string, 0, len(activeBindings))
+	for _, ab := range activeBindings {
+		loadQueries = append(loadQueries, ab.binding.load.querySQL)
 	}
 	loadQueryUnionSQL := strings.Join(loadQueries, "\nUNION ALL\n") + ";"
 	rows, err := t.load.conn.Query(ctx, loadQueryUnionSQL)
@@ -389,19 +377,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
 
-	// Clear records from prior transaction.
-	for _, b := range t.bindings {
-		if err := t.store.conn.Exec(ctx, b.store.truncateTableSQL); err != nil {
-			return nil, fmt.Errorf("truncating store table: %w", err)
-		}
-	}
-
-	batchByBinding := make(map[int]chdriver.Batch, len(t.bindings))
-
+	activeBindings := make(map[int]activeBinding, len(t.bindings))
 	defer func() {
-		for _, batch := range batchByBinding {
-			// Release the associated network connection to the pool.
-			_ = batch.Abort()
+		for _, ab := range activeBindings {
+			_ = ab.batch.Close()
 		}
 	}()
 
@@ -410,29 +389,32 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			continue // nothing to delete if it was never stored
 		}
 
-		b := t.bindings[it.Binding]
-
-		batch, found := batchByBinding[it.Binding]
+		ab, found := activeBindings[it.Binding]
 		if !found {
-			batch, err = t.store.conn.PrepareBatch(ctx, b.store.insertSQL,
+			b := t.bindings[it.Binding]
+			if err = t.store.conn.Exec(ctx, b.store.createTableSQL); err != nil {
+				return nil, fmt.Errorf("creating store stage table: %w", err)
+			}
+			batch, err := t.store.conn.PrepareBatch(ctx, b.store.insertSQL,
 				chdriver.WithReleaseConnection(), // release connection to pool after PrepareBatch()
 				chdriver.WithCloseOnFlush())      // release connection to pool after Flush()
 			if err != nil {
 				return nil, fmt.Errorf("preparing store batch: %w", err)
 			}
-			batchByBinding[it.Binding] = batch
+			ab = activeBinding{b, batch}
+			activeBindings[it.Binding] = ab
 		}
 
 		var converted []any
-		converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+		converted, err = ab.binding.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting store fields: %w", err)
 		}
-		if err = batch.Append(converted...); err != nil {
+		if err = ab.batch.Append(converted...); err != nil {
 			return nil, fmt.Errorf("appending store batch: %w", err)
 		}
-		if batch.Rows() >= maxBatchSize {
-			if err = batch.Flush(); err != nil {
+		if ab.batch.Rows() >= maxBatchSize {
+			if err = ab.batch.Flush(); err != nil {
 				return nil, fmt.Errorf("flushing store batch: %w", err)
 			}
 		}
@@ -440,10 +422,12 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	if it.Err() != nil {
 		return nil, it.Err()
 	}
-	for _, batch := range batchByBinding {
-		if err := batch.Send(); err != nil {
+	t.pendingStoreBindings = t.pendingStoreBindings[:0]
+	for _, ab := range activeBindings {
+		if err = ab.batch.Send(); err != nil {
 			return nil, fmt.Errorf("sending store batch: %w", err)
 		}
+		t.pendingStoreBindings = append(t.pendingStoreBindings, ab.binding)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
@@ -452,11 +436,15 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 }
 
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	for _, b := range t.bindings {
+	for _, b := range t.pendingStoreBindings {
 		if err := t.moveStorePartitionsToTarget(ctx, b); err != nil {
 			return nil, fmt.Errorf("moving stage to target: %w", err)
 		}
 	}
+	for _, b := range t.pendingStoreBindings {
+		_ = t.store.conn.Exec(ctx, b.store.dropTableSQL)
+	}
+	t.pendingStoreBindings = t.pendingStoreBindings[:0]
 	return nil, nil
 }
 

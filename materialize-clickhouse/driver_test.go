@@ -418,7 +418,6 @@ func TestAddBinding(t *testing.T) {
 	require.Len(t, tr.bindings, 1)
 	require.NotEmpty(t, tr.bindings[0].load.querySQL)
 	require.NotEmpty(t, tr.bindings[0].load.insertSQL)
-	require.NotEmpty(t, tr.bindings[0].load.truncateTableSQL)
 	require.NotEmpty(t, tr.bindings[0].store.insertSQL)
 	require.Contains(t, tr.bindings[0].load.querySQL, "flow_document")
 	require.Contains(t, tr.bindings[0].store.insertSQL, "INSERT INTO")
@@ -453,6 +452,8 @@ func storeRows(t *testing.T, ctx context.Context, conn chdriver.Conn, b *binding
 func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b *binding, keys ...[]any) []string {
 	t.Helper()
 
+	require.NoError(t, loadConn.Exec(ctx, b.load.createTableSQL))
+
 	batch, err := loadConn.PrepareBatch(ctx, b.load.insertSQL)
 	require.NoError(t, err)
 	for _, key := range keys {
@@ -473,7 +474,7 @@ func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b 
 	_ = rows.Close()
 	require.NoError(t, rows.Err())
 
-	require.NoError(t, loadConn.Exec(ctx, b.load.truncateTableSQL))
+	require.NoError(t, loadConn.Exec(ctx, b.load.dropTableSQL))
 
 	return docs
 }
