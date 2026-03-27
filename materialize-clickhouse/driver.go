@@ -204,13 +204,11 @@ func prepareNewTransactor(
 
 		var err error
 		loadOptions := cfg.newClickhouseOptions()
-		loadOptions.MaxIdleConns = 40
 		if d.load.conn, err = clickhouse.Open(loadOptions); err != nil {
 			return nil, fmt.Errorf("openNativeConn (load): %w", err)
 		}
 
 		storeOptions := cfg.newClickhouseOptions()
-		storeOptions.MaxIdleConns = 40
 		if d.store.conn, err = clickhouse.Open(storeOptions); err != nil {
 			return nil, fmt.Errorf("openNativeConn (store): %w", err)
 		}
@@ -245,7 +243,7 @@ type binding struct {
 
 type activeBinding struct {
 	binding *binding
-	batch   chdriver.Batch
+	batch   [][]any
 }
 
 func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
@@ -294,10 +292,30 @@ const maxBatchSize = 100_000
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (err error) {
 	var ctx = it.Context()
 
-	activeBindings := make(map[int]activeBinding, len(t.bindings))
+	activeBindings := make(map[int]*activeBinding, len(t.bindings))
+	flushActiveBinding := func(ab *activeBinding) error {
+		if len(ab.batch) == 0 {
+			return nil
+		}
+		chBatch, err := t.load.conn.PrepareBatch(ctx, ab.binding.load.insertSQL)
+		if err != nil {
+			return fmt.Errorf("preparing load batch: %w", err)
+		}
+		defer chBatch.Close()
+		for _, record := range ab.batch {
+			if err = chBatch.Append(record...); err != nil {
+				return fmt.Errorf("appending load batch: %w", err)
+			}
+		}
+		ab.batch = ab.batch[:0]
+		if err = chBatch.Send(); err != nil {
+			return fmt.Errorf("flushing load batch: %w", err)
+		}
+		return nil
+	}
+
 	defer func() {
 		for _, ab := range activeBindings {
-			_ = ab.batch.Close()
 			// Free memory on the ClickHouse server
 			_ = t.load.conn.Exec(ctx, ab.binding.load.dropTableSQL)
 		}
@@ -310,13 +328,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			if err = t.load.conn.Exec(ctx, b.load.createTableSQL); err != nil {
 				return fmt.Errorf("creating load stage table: %w", err)
 			}
-			batch, err := t.load.conn.PrepareBatch(ctx, b.load.insertSQL,
-				chdriver.WithReleaseConnection(), // release connection to pool after PrepareBatch()
-				chdriver.WithCloseOnFlush())      // release connection to pool after Flush()
-			if err != nil {
-				return fmt.Errorf("preparing load batch: %w", err)
-			}
-			ab = activeBinding{b, batch}
+			ab = &activeBinding{b, make([][]any, 0, maxBatchSize)}
 			activeBindings[it.Binding] = ab
 		}
 
@@ -324,12 +336,10 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err != nil {
 			return fmt.Errorf("converting load key: %w", err)
 		}
-		if err = ab.batch.Append(converted...); err != nil {
-			return fmt.Errorf("appending load batch: %w", err)
-		}
-		if ab.batch.Rows() >= maxBatchSize {
-			if err = ab.batch.Flush(); err != nil {
-				return fmt.Errorf("flushing load batch: %w", err)
+		ab.batch = append(ab.batch, converted)
+		if len(ab.batch) >= maxBatchSize {
+			if err = flushActiveBinding(ab); err != nil {
+				return err
 			}
 		}
 	}
@@ -340,8 +350,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		return nil
 	}
 	for _, ab := range activeBindings {
-		if err := ab.batch.Send(); err != nil {
-			return fmt.Errorf("sending load batch: %w", err)
+		if err = flushActiveBinding(ab); err != nil {
+			return err
 		}
 	}
 
@@ -376,13 +386,29 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
+	t.pendingStoreBindings = t.pendingStoreBindings[:0]
 
-	activeBindings := make(map[int]activeBinding, len(t.bindings))
-	defer func() {
-		for _, ab := range activeBindings {
-			_ = ab.batch.Close()
+	activeBindings := make(map[int]*activeBinding, len(t.bindings))
+	flushActiveBinding := func(ab *activeBinding) error {
+		if len(ab.batch) == 0 {
+			return nil
 		}
-	}()
+		chBatch, err := t.store.conn.PrepareBatch(ctx, ab.binding.store.insertSQL)
+		if err != nil {
+			return fmt.Errorf("preparing store batch: %w", err)
+		}
+		defer chBatch.Close()
+		for _, record := range ab.batch {
+			if err = chBatch.Append(record...); err != nil {
+				return fmt.Errorf("appending store batch: %w", err)
+			}
+		}
+		ab.batch = ab.batch[:0]
+		if err = chBatch.Send(); err != nil {
+			return fmt.Errorf("flushing store batch: %w", err)
+		}
+		return nil
+	}
 
 	for it.Next() {
 		if it.Delete && !it.Exists {
@@ -395,37 +421,25 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			if err = t.store.conn.Exec(ctx, b.store.createTableSQL); err != nil {
 				return nil, fmt.Errorf("creating store stage table: %w", err)
 			}
-			batch, err := t.store.conn.PrepareBatch(ctx, b.store.insertSQL,
-				chdriver.WithReleaseConnection(), // release connection to pool after PrepareBatch()
-				chdriver.WithCloseOnFlush())      // release connection to pool after Flush()
-			if err != nil {
-				return nil, fmt.Errorf("preparing store batch: %w", err)
-			}
-			ab = activeBinding{b, batch}
+			ab = &activeBinding{b, make([][]any, 0, maxBatchSize)}
 			activeBindings[it.Binding] = ab
 		}
 
 		var converted []any
 		converted, err = ab.binding.target.ConvertAll(it.Key, it.Values, it.RawJSON)
-		if err != nil {
-			return nil, fmt.Errorf("converting store fields: %w", err)
-		}
-		if err = ab.batch.Append(converted...); err != nil {
-			return nil, fmt.Errorf("appending store batch: %w", err)
-		}
-		if ab.batch.Rows() >= maxBatchSize {
-			if err = ab.batch.Flush(); err != nil {
-				return nil, fmt.Errorf("flushing store batch: %w", err)
+		ab.batch = append(ab.batch, converted)
+		if len(ab.batch) >= maxBatchSize {
+			if err = flushActiveBinding(ab); err != nil {
+				return nil, err
 			}
 		}
 	}
 	if it.Err() != nil {
 		return nil, it.Err()
 	}
-	t.pendingStoreBindings = t.pendingStoreBindings[:0]
 	for _, ab := range activeBindings {
-		if err = ab.batch.Send(); err != nil {
-			return nil, fmt.Errorf("sending store batch: %w", err)
+		if err = flushActiveBinding(ab); err != nil {
+			return nil, err
 		}
 		t.pendingStoreBindings = append(t.pendingStoreBindings, ab.binding)
 	}
