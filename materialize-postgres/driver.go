@@ -278,13 +278,7 @@ func (r tableConfig) Validate() error {
 }
 
 func (c tableConfig) Parameters() ([]string, bool, error) {
-	var path []string
-	if c.Schema != "" {
-		path = []string{c.Schema, c.Table}
-	} else {
-		path = []string{c.Table}
-	}
-	return path, c.Delta, nil
+	return []string{c.Schema, c.Table}, c.Delta, nil
 }
 
 func newPostgresDriver() *sql.Driver[config, tableConfig] {
@@ -426,13 +420,13 @@ func newTransactor(
 }
 
 type binding struct {
-	target             sql.Table
-	nullFieldsToStrip  []string
-	loadInsertSQL      string
-	storeUpdateSQL     string
-	storeInsertSQL     string
-	deleteQuerySQL     string
-	loadQuerySQL       string
+	target            sql.Table
+	nullFieldsToStrip []string
+	loadInsertSQL     string
+	storeUpdateSQL    string
+	storeInsertSQL    string
+	deleteQuerySQL    string
+	loadQuerySQL      string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
