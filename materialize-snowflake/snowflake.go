@@ -921,8 +921,6 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		return nil, fmt.Errorf("executing concurrent store query: %w", err)
 	}
 
-	d.logAllClusteringInfo(ctx)
-
 	// Keep asking for a report on the files that have been submitted for processing
 	// until they have all been successful, or an error has been thrown
 
