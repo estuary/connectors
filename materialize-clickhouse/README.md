@@ -78,48 +78,47 @@ ClickHouse will automatically perform a CLEANUP merge that physically removes ro
 
 ## Connector Transaction Architecture
 
-The connector writes to ClickHouse using a three-phase transaction: **load**, **store**, **commit**.
+The connector writes to ClickHouse using a three-phase transaction: **load**, **store**, **acknowledge**.
 Two auxiliary table types support this: load tables and store tables.
 
 ### Load Phase
 
 Load tables use the ClickHouse [Join engine](https://clickhouse.com/docs/engines/table-engines/special/join),
 an in-memory hash table keyed by the binding's `ORDER BY` keys.
-They are named `{table}_stage_load`.
+They are named `flow_temp_load_{binding}_{rangeKey}_{table}`.
 
 During the load phase, the connector inserts the keys of documents it needs to look up
 into the load table, then joins the target table (using `FINAL` for deduplication) against
 the load table to retrieve the current version of documents for those keys.
 
-- **Created** with `CREATE OR REPLACE TABLE` on connector start (discards stale in-memory state)
-- **Truncated** between transactions to free server memory
-- **Dropped** on connector shutdown
+- **Created** with `CREATE OR REPLACE TABLE` on first use in each load phase
+- **Dropped** after each load phase completes (frees server memory)
+- **Dropped** on connector shutdown (safety net for any remaining tables)
 
 ### Store Phase
 
 Store tables stage documents written during a transaction's store phase.
-They are named `{table}_stage_store`.
+They are named `flow_temp_store_{binding}_{rangeKey}_{table}`.
 
 Store tables are created with `CREATE OR REPLACE TABLE ... AS {target}`, which clones the target table's
 schema and engine (ReplacingMergeTree). This makes their on-disk parts partition-compatible
-with the target table, which is critical for the commit phase.
+with the target table, which is critical for the acknowledge phase.
 
-- **Created** with `CREATE OR REPLACE TABLE` on connector start
-- **Truncated** between transactions
-- **Dropped** on connector shutdown
+- **Created** with `CREATE OR REPLACE TABLE` on first document in each store phase
+- **Dropped** after each acknowledge phase (once partitions are moved to target)
 
-### Commit Phase
+### Acknowledge Phase
 
-On commit, the connector enumerates the store table's parts via `system.parts`
+On acknowledge, the connector enumerates the store table's parts via `system.parts`
 and moves each partition to the target table using `ALTER TABLE ... MOVE PARTITION`.
 
 Moving a partition is a **metadata-only operation**: it relinks existing parts in the filesystem
-rather than copying or rewriting data. This makes the commit phase very low latency regardless
+rather than copying or rewriting data. This makes the acknowledge phase very low latency regardless
 of transaction size, and is significantly faster than `INSERT ... SELECT` or other bulk-copy methods.
 
-The commit is **not atomic** across bindings: partitions are moved one at a time. A failure
-mid-commit leaves some partitions moved and others not. This is safe because the target table
-uses ReplacingMergeTree — re-applying a partial commit is idempotent, since duplicate versions
+The acknowledge is **not atomic** across bindings: partitions are moved one at a time. A failure
+mid-acknowledge leaves some partitions moved and others not. This is safe because the target table
+uses ReplacingMergeTree — re-applying a partial acknowledge is idempotent, since duplicate versions
 are deduplicated by `ORDER BY` key and `flow_published_at`.
 
 ## Illustrated
