@@ -115,6 +115,8 @@ func TestReencrypt(t *testing.T) {
 	input := make([]byte, 1024*1024+3)
 	_, err := rand.Read(input)
 	require.NoError(t, err)
+	copy(input, "PAR1")
+
 	encryptionKey := "aGVsbG8K"
 	oldFileName := blobFileName("old")
 	newFileName := blobFileName("new")
@@ -131,6 +133,11 @@ func TestReencrypt(t *testing.T) {
 	sum := md5.Sum(encrypted)
 	hsh := hex.EncodeToString(sum[:])
 
+	channel := &channel{
+		EncryptionKey:   encryptionKey,
+		EncryptionKeyId: 12345,
+	}
+
 	blob := &blobMetadata{
 		Path:   string(oldFileName),
 		MD5:    hsh,
@@ -140,7 +147,8 @@ func TestReencrypt(t *testing.T) {
 	var in = bytes.NewReader(encrypted)
 	var out bytes.Buffer
 
-	require.NoError(t, reencrypt(in, &out, blob, encryptionKey, newFileName))
+	err = reencrypt(in, &out, blob, encryptionKey, channel, newFileName)
+	require.NoError(t, err)
 
 	// The re-encrypted file matches the original input.
 	newKey, err := deriveKey(encryptionKey, newFileName)
