@@ -13,7 +13,7 @@ pytz = "^2024.1"
 requests-futures = "^1.0.1"
 urllib3 = "^2.2.4"
 pycares = "^4.9.0"
-requests = "^2.32.4"
+requests = "^2.33.0"
 Jinja2 = "^3.1.5"
 aiohttp = "^3.11.11"
 
