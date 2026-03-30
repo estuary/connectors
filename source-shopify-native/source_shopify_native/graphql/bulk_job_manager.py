@@ -1,6 +1,5 @@
 import asyncio
 import re
-import time
 from logging import Logger
 from typing import Any
 
@@ -28,7 +27,6 @@ JOB_ID_PATTERN = re.compile(r"gid://shopify/BulkOperation/\d+")
 INITIAL_SLEEP = 1
 MAX_SLEEP = 2
 SIX_HOURS = 6 * 60 * 60
-CANCEL_TIMEOUT = 5 * 60  # 5 minutes
 MAX_CONCURRENT_BULK_OPS = 5
 MAX_QUERY_REQUEST_ATTEMPTS = 5
 MAX_QUERY_REQUEST_RETRY_INTERVAL = 60  # 1 minute
@@ -69,6 +67,7 @@ class BulkJobManager:
         self.log = log
         self.semaphore = asyncio.Semaphore(MAX_CONCURRENT_BULK_OPS)
         self._tracked_jobs: set[str] = set()
+        self._cancel_tasks: set[asyncio.Task[None]] = set()
 
     async def check_connectivity(self) -> None:
         """Verify that the store's credentials are valid by issuing a lightweight API call."""
@@ -80,36 +79,68 @@ class BulkJobManager:
         if not running_jobs:
             return
 
-        # First, issue cancel requests for all running jobs
-        job_statuses: dict[str, BulkOperationStatuses] = {}
+        # Issue cancel requests for all running jobs immediately.
         for job_details in running_jobs:
-            job_id = job_details.id
-            self.log.info(f"[{self.client.store}] Cancelling bulk job {job_id}.")
-            status = await self._cancel(job_id)
-            job_statuses[job_id] = status
+            self.log.info(
+                f"[{self.client.store}] Cancelling bulk job {job_details.id}."
+            )
+            _ = await self._cancel(job_details.id)
 
-        # Then, wait for all jobs to finish cancelling
-        for job_id, status in job_statuses.items():
-            deadline = time.monotonic() + CANCEL_TIMEOUT
+        # Each pre-existing job claims a semaphore slot and polls for completion in the
+        # background. This lets new jobs start as soon as a slot frees up.
+        for job_details in running_jobs:
+            _ = await self.semaphore.acquire()
+            task = asyncio.create_task(
+                self._wait_for_cancel_and_release(job_details.id)
+            )
+            self._cancel_tasks.add(task)
+            task.add_done_callback(self._cancel_tasks.discard)
+
+        # Block until at least one semaphore slot is free so the caller
+        # can proceed to submit new jobs.
+        _ = await self.semaphore.acquire()
+        self.semaphore.release()
+
+    async def _wait_for_cancel_and_release(self, job_id: str):
+        """Poll until a cancelling job reaches a terminal state, then release its semaphore slot."""
+        try:
+            poll_count = 0
+
             while True:
-                match status:
-                    case BulkOperationStatuses.CANCELED | BulkOperationStatuses.COMPLETED:
-                        self.log.info(f"[{self.client.store}] Bulk job {job_id} is {status}.")
-                        break
+                details = await self._get_job(job_id)
+
+                match details.status:
+                    case (
+                        BulkOperationStatuses.CANCELED | BulkOperationStatuses.COMPLETED
+                    ):
+                        self.log.info(
+                            f"[{self.client.store}] Bulk job {job_id} is {details.status}."
+                        )
+                        return
+
                     case BulkOperationStatuses.CANCELING:
-                        if time.monotonic() >= deadline:
+                        poll_count += 1
+                        if poll_count % 60 == 0:
                             self.log.warning(
-                                f"[{self.client.store}] Timed out waiting for bulk job {job_id} to cancel "
-                                f"after {CANCEL_TIMEOUT}s. Will retry on next startup."
+                                (
+                                    f"[{self.client.store}] Still waiting for bulk job {job_id} to cancel "
+                                    f"({poll_count * 5}s elapsed)."
+                                )
                             )
-                            break
-                        self.log.info(f"[{self.client.store}] Waiting for bulk job {job_id} to be CANCELED.")
+
                         await asyncio.sleep(5)
 
-                        details = await self._get_job(job_id)
-                        status = details.status
                     case _:
-                        raise BulkJobError(f"Unable to cancel bulk job {job_id}.")
+                        self.log.warning(
+                            f"[{self.client.store}] Unexpected status {details.status} while cancelling job {job_id}."
+                        )
+                        return
+        except Exception:
+            self.log.exception(
+                f"[{self.client.store}] Error while waiting for bulk job {job_id} to cancel."
+            )
+        finally:
+            self.semaphore.release()
 
     async def _retryable_request[T](self, query: str, data_model: type[T]) -> T:
         last_exception = None
