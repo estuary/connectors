@@ -311,7 +311,9 @@ func newTransactor(
 		}
 	}
 
-	d.logAllClusteringInfo(ctx)
+	go func() {
+		d.logAllClusteringInfo(ctx)
+	}()
 
 	return d, nil
 }
