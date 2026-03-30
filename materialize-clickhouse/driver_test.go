@@ -13,8 +13,10 @@ import (
 	"testing"
 	"time"
 
+	chproto "github.com/ClickHouse/ch-go/proto"
 	"github.com/ClickHouse/clickhouse-go/v2"
 	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	clickhouseproto "github.com/ClickHouse/clickhouse-go/v2/lib/proto"
 	m "github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
@@ -1037,4 +1039,64 @@ func TestCompositeKeyTombstone(t *testing.T) {
 
 	// Load → empty (tombstone hides the row).
 	require.Empty(t, loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)}))
+}
+
+func TestMovePartitionMissingTarget(t *testing.T) {
+	var cfg = testConfig()
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tableName = "test_move_partition_missing_target"
+	var table = buildTestTable(t, dialect, tableName)
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+
+	// Create the target table so that CREATE TABLE ... AS can clone its schema
+	// for the store stage table.
+	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+	createSQL, err := sql.RenderTableTemplate(table, tpls.createTargetTable)
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, createSQL)
+	require.NoError(t, err)
+
+	var tr = &transactor{dialect: dialect, templates: tpls, cfg: cfg, _range: &pf.RangeSpec{}}
+	storeConn, err := clickhouse.Open(cfg.newClickhouseOptions())
+	require.NoError(t, err)
+	tr.store.conn = storeConn
+	defer storeConn.Close()
+	require.NoError(t, tr.addBinding(ctx, table))
+	var b = tr.bindings[0]
+
+	// Create the store stage table and insert a row.
+	require.NoError(t, storeConn.Exec(ctx, b.store.createTableSQL))
+	batch, err := storeConn.PrepareBatch(ctx, b.store.insertSQL)
+	require.NoError(t, err)
+	require.NoError(t, batch.Append("k1", "v1", "c", testTime, `{"id":"k1"}`))
+	require.NoError(t, batch.Send())
+
+	// Drop the target table so that MOVE PARTITION has nowhere to go.
+	_, err = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+	require.NoError(t, err)
+
+	// Attempt to move partitions to the now-missing target table.
+	rows, err := storeConn.Query(ctx, b.store.queryPartsSQL, cfg.Database)
+	require.NoError(t, err)
+
+	var moveErr error
+	for rows.Next() {
+		var partitionID string
+		require.NoError(t, rows.Scan(&partitionID))
+		if err = storeConn.Exec(ctx, b.store.movePartitionSQL, partitionID); err != nil {
+			moveErr = err
+			break
+		}
+	}
+	_ = rows.Close()
+
+	require.Error(t, moveErr)
+	var exc *clickhouseproto.Exception
+	require.ErrorAs(t, moveErr, &exc)
+	require.EqualValues(t, chproto.ErrUnknownTable, exc.Code) // UNKNOWN_TABLE
+	t.Logf("move partition error with missing target: %v", moveErr)
 }

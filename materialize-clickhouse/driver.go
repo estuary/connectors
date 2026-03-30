@@ -3,12 +3,15 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	chproto "github.com/ClickHouse/ch-go/proto"
 	"github.com/ClickHouse/clickhouse-go/v2"
 	chdriver "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
+	clickhouseproto "github.com/ClickHouse/clickhouse-go/v2/lib/proto"
 	m "github.com/estuary/connectors/go/materialize"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
@@ -177,13 +180,37 @@ type transactor struct {
 	store struct {
 		conn chdriver.Conn
 	}
-	bindings             []*binding
-	pendingStoreBindings []*binding
-	be                   *m.BindingEvents
-	_range               *pf.RangeSpec
+	bindings []*binding
+	be       *m.BindingEvents
+	_range   *pf.RangeSpec
+
+	recovery bool
+	state    connectorState
 }
 
-func (t *transactor) UnmarshalState(state json.RawMessage) error { return nil }
+type stateItem struct {
+	QueryPartsSQL    string
+	MovePartitionSQL string
+	DropTableSQL     string
+}
+
+type connectorState map[string]*stateItem
+
+func (cp connectorState) ToConnectorState(mergePatch bool) (*pf.ConnectorState, error) {
+	b, err := json.Marshal(cp)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling connectorState: %w", err)
+	}
+	return &pf.ConnectorState{UpdatedJson: b, MergePatch: mergePatch}, nil
+}
+
+func (t *transactor) UnmarshalState(state json.RawMessage) error {
+	if err := json.Unmarshal(state, &t.state); err != nil {
+		return fmt.Errorf("unmarshalling connectorState: %w", err)
+	}
+	t.recovery = true
+	return nil
+}
 
 func newTransactor(
 	ctx context.Context,
@@ -203,6 +230,7 @@ func newTransactor(
 		cfg:       cfg,
 		be:        be,
 		_range:    open.Range,
+		state:     make(connectorState, len(bindings)),
 	}
 
 	var err error
@@ -221,7 +249,6 @@ func newTransactor(
 			return nil, fmt.Errorf("addBinding of %s: %w", target.Path, err)
 		}
 	}
-	t.pendingStoreBindings = make([]*binding, 0, len(bindings))
 
 	return t, nil
 }
@@ -392,7 +419,6 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
-	t.pendingStoreBindings = t.pendingStoreBindings[:0]
 
 	activeBindings := make(map[int]*activeBinding, len(t.bindings))
 	flushActiveBinding := func(ab *activeBinding) error {
@@ -453,49 +479,52 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	if it.Err() != nil {
 		return nil, it.Err()
 	}
+
 	for _, ab := range activeBindings {
 		if err = flushActiveBinding(ab); err != nil {
 			return nil, err
 		}
-		t.pendingStoreBindings = append(t.pendingStoreBindings, ab.binding)
+		t.state[ab.binding.target.StateKey] = &stateItem{
+			QueryPartsSQL:    ab.binding.store.queryPartsSQL,
+			MovePartitionSQL: ab.binding.store.movePartitionSQL,
+			DropTableSQL:     ab.binding.store.dropTableSQL,
+		}
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		return nil, pf.FinishedOperation(nil)
+		cs, err := t.state.ToConnectorState(false)
+		return cs, pf.FinishedOperation(err)
 	}, nil
 }
 
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	if len(t.pendingStoreBindings) > 0 {
-		for _, b := range t.pendingStoreBindings {
-			if err := t.moveStorePartitionsToTarget(ctx, b); err != nil {
-				return nil, fmt.Errorf("moving stage to target: %w", err)
-			}
+	for stateKey, ci := range t.state {
+		if err := t.moveStorePartitionsToTarget(ctx, ci); err != nil {
+			return nil, fmt.Errorf("moving stage to target: %w", err)
 		}
-		for _, b := range t.pendingStoreBindings {
-			_ = t.store.conn.Exec(ctx, b.store.dropTableSQL)
-		}
-		t.pendingStoreBindings = t.pendingStoreBindings[:0]
-	} else {
-		// It may be that Acknowledge was not called after Store, so we'll check all possible bindings
-		// for not-yet-ack'd store stage records.
-		for _, b := range t.bindings {
-			var count uint64
-			if err := t.store.conn.QueryRow(ctx, b.store.existsSQL).Scan(&count); err != nil {
-				return nil, fmt.Errorf("checking store stage table existence: %w", err)
-			}
-			if count > 0 {
-				if err := t.moveStorePartitionsToTarget(ctx, b); err != nil {
-					return nil, fmt.Errorf("moving stage to target: %w", err)
-				}
-			}
-		}
+		delete(t.state, stateKey)
 	}
-	return nil, nil
+	t.recovery = false
+
+	// After having applied the connectorState, we try to clean up the connectorState in the ack response
+	// so that a restart of the connector does not need to run the same queries again
+	// Note that this is an best-effort "attempt" and there is no guarantee that this connectorState update
+	// can actually be committed
+	// Important to note that in this case we do not reset the connectorState for all bindings, but only the ones
+	// that have been committed in this transaction. The reason is that it may be the case that a binding
+	// which has been disabled right after a failed attempt to run its queries, must be able to recover by enabling
+	// the binding and running the queries that are pending for its last transaction.
+	var stateClear = make(connectorState, len(t.bindings))
+	for _, b := range t.bindings {
+		stateClear[b.target.StateKey] = nil
+		delete(t.state, b.target.StateKey)
+	}
+
+	return stateClear.ToConnectorState(true)
 }
 
-func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding) error {
-	rows, err := t.store.conn.Query(ctx, b.store.queryPartsSQL, t.cfg.Database)
+func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, si *stateItem) error {
+	rows, err := t.store.conn.Query(ctx, si.QueryPartsSQL, t.cfg.Database)
 	if err != nil {
 		return fmt.Errorf("querying store table partitions: %w", err)
 	}
@@ -506,12 +535,22 @@ func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, b *binding
 		if err = rows.Scan(&partitionID); err != nil {
 			return fmt.Errorf("scanning store table partition: %w", err)
 		}
-		if err = t.store.conn.Exec(ctx, b.store.movePartitionSQL, partitionID); err != nil {
+		if err = t.store.conn.Exec(ctx, si.MovePartitionSQL, partitionID); err != nil {
+			if t.recovery {
+				var typedErr *clickhouseproto.Exception
+				if errors.As(err, &typedErr) && int(typedErr.Code) == int(chproto.ErrUnknownTable) {
+					continue
+				}
+			}
 			return fmt.Errorf("moving store table partition: %w", err)
 		}
 	}
 	if err = rows.Err(); err != nil {
 		return fmt.Errorf("iterating store table partitions: %w", err)
+	}
+
+	if err = t.store.conn.Exec(ctx, si.DropTableSQL); err != nil {
+		return fmt.Errorf("dropping stage table: %w", err)
 	}
 	return nil
 }

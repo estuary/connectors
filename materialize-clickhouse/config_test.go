@@ -69,7 +69,8 @@ func TestAcknowledge(t *testing.T) {
 	var tr transactor
 	state, err := tr.Acknowledge(t.Context())
 	require.NoError(t, err)
-	require.Nil(t, state)
+	require.JSONEq(t, `{}`, string(state.UpdatedJson))
+	require.True(t, state.MergePatch)
 }
 
 func TestSpecification(t *testing.T) {
