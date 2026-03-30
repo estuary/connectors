@@ -142,12 +142,14 @@ AS delta_updates;
 
 --- Begin key_value insertStoreTable ---
 
-INSERT INTO flow_temp_store_0_0_key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document)
+INSERT INTO flow_temp_store_0_0_key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document, _is_deleted
+)
 --- End key_value insertStoreTable ---
 
 --- Begin delta_updates insertStoreTable ---
 
-INSERT INTO flow_temp_store_1_0_delta_updates (`theKey`, `aValue`, flow_published_at)
+INSERT INTO flow_temp_store_1_0_delta_updates (`theKey`, `aValue`, flow_published_at, _is_deleted
+)
 --- End delta_updates insertStoreTable ---
 
 --- Begin key_value queryStoreParts ---

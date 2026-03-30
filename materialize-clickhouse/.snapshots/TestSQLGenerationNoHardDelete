@@ -1,0 +1,62 @@
+--- Begin key_value createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS key_value (
+		key1 Int64,
+		key2 Bool,
+		`key!binary` String,
+		`array` Nullable(String),
+		binary Nullable(String),
+		boolean Nullable(Bool),
+		field_with_projection Nullable(String),
+		flow_published_at DateTime64(6, 'UTC'),
+		integer Nullable(Int64),
+		`integerGt64Bit` Nullable(String),
+		`integerWithUserDDL` Nullable(DECIMAL(20)),
+		multiple Nullable(String),
+		`nonAsciiκόσμε` Nullable(String),
+		number Nullable(Float64),
+		`numberCastToString` Nullable(String),
+		object Nullable(String),
+		string Nullable(String),
+		`stringInteger` Nullable(String),
+		`stringInteger39Chars` Nullable(String),
+		`stringInteger66Chars` Nullable(String),
+		`stringNumber` Nullable(Float64),
+		flow_document String
+)
+ENGINE = ReplacingMergeTree(`flow_published_at`)
+ORDER BY (key1, key2, `key!binary`)
+SETTINGS
+	allow_experimental_replacing_merge_with_cleanup = 1,
+	min_age_to_force_merge_seconds = 604800,
+	min_age_to_force_merge_on_partition_only = 1,
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+--- End key_value createTargetTable ---
+
+--- Begin key_value insertStoreTable ---
+
+INSERT INTO flow_temp_store_0_0_key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document)
+--- End key_value insertStoreTable ---
+
+--- Begin delta_updates createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS delta_updates (
+		`theKey` String,
+		`aValue` Nullable(Int64),
+		flow_published_at DateTime64(6, 'UTC')
+)
+ENGINE = ReplacingMergeTree(`flow_published_at`)
+ORDER BY (`theKey`)
+SETTINGS
+	allow_experimental_replacing_merge_with_cleanup = 1,
+	min_age_to_force_merge_seconds = 604800,
+	min_age_to_force_merge_on_partition_only = 1,
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+--- End delta_updates createTargetTable ---
+
+--- Begin delta_updates insertStoreTable ---
+
+INSERT INTO flow_temp_store_1_0_delta_updates (`theKey`, `aValue`, flow_published_at)
+--- End delta_updates insertStoreTable ---
+
+

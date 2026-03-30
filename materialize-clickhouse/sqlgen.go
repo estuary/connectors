@@ -114,7 +114,16 @@ type templates struct {
 	dropStoreTable     *template.Template
 }
 
-func renderTemplates(dialect sql.Dialect) templates {
+func renderTemplates(dialect sql.Dialect, hardDelete bool) templates {
+	var isDeletedColumn string
+	var isDeletedEngineArg string
+	var isDeletedInsert string
+	if hardDelete {
+		isDeletedColumn = ",\n\t\t`_is_deleted` UInt8 DEFAULT 0"
+		isDeletedEngineArg = ", `_is_deleted`"
+		isDeletedInsert = "\n\t, _is_deleted"
+	}
+
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
 ---- Target tables
 
@@ -146,17 +155,11 @@ func renderTemplates(dialect sql.Dialect) templates {
 {{ define "createTargetTable" }}
 CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{- range $ind, $col := $.Columns }}
-		{{$col.Identifier}} {{ if not $col.MustExist }}Nullable({{ end }}{{$col.DDL}}{{ if not $col.MustExist }}){{ end }},
-	{{- end }}
-	{{- $hasMetaOp := false -}}
-	{{- range $.Columns }}{{ if eq .Field "_meta/op" }}{{ $hasMetaOp = true }}{{ end }}{{ end }}
-	{{- if $hasMetaOp }}
-		`+"`_is_deleted`"+` UInt8 MATERIALIZED if(`+"`_meta/op`"+` = 'd', 1, 0)
-	{{- else }}
-		`+"`_is_deleted`"+` UInt8 DEFAULT 0
-	{{- end }}
+		{{- if $ind }},{{ end }}
+		{{$col.Identifier}} {{ if not $col.MustExist }}Nullable({{ end }}{{$col.DDL}}{{ if not $col.MustExist }}){{ end }}
+	{{- end }}`+isDeletedColumn+`
 )
-ENGINE = ReplacingMergeTree(`+"`flow_published_at`"+`, `+"`_is_deleted`"+`)
+ENGINE = ReplacingMergeTree(`+"`flow_published_at`"+isDeletedEngineArg+`)
 ORDER BY (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{ end -}}
@@ -271,7 +274,7 @@ INSERT INTO {{ template "storeTableName" . }} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
 		{{$col.Identifier}}
-	{{- end -}}
+	{{- end -}}`+isDeletedInsert+`
 )
 {{ end }}
 

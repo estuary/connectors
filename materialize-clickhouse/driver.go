@@ -152,7 +152,7 @@ func newClickHouseDriver() *sql.Driver[config, tableConfig] {
 			}).Info("opening database")
 
 			var dialect = clickHouseDialect(cfg.Database)
-			var tpls = renderTemplates(dialect)
+			var tpls = renderTemplates(dialect, cfg.HardDelete)
 
 			return &sql.Endpoint[config]{
 				Config:              cfg,
@@ -161,7 +161,6 @@ func newClickHouseDriver() *sql.Driver[config, tableConfig] {
 				CreateTableTemplate: tpls.createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     false,
-				RequireMetaOp:       true,
 			}, nil
 		},
 		PreReqs: preReqs,
@@ -200,7 +199,7 @@ func newTransactor(
 	var cfg = ep.Config
 	t := &transactor{
 		dialect:   ep.Dialect,
-		templates: renderTemplates(ep.Dialect),
+		templates: renderTemplates(ep.Dialect, cfg.HardDelete),
 		cfg:       cfg,
 		be:        be,
 		_range:    open.Range,
@@ -418,7 +417,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	for it.Next() {
-		if it.Delete && !it.Exists {
+		if it.Delete && t.cfg.HardDelete && !it.Exists {
 			continue // nothing to delete if it was never stored
 		}
 
@@ -434,6 +433,16 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		var converted []any
 		converted, err = ab.binding.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+		if err != nil {
+			return nil, fmt.Errorf("converting store record: %w", err)
+		}
+		if t.cfg.HardDelete {
+			var deleteState uint8 = 0
+			if it.Delete {
+				deleteState = 1
+			}
+			converted = append(converted, deleteState)
+		}
 		ab.batch = append(ab.batch, converted)
 		if len(ab.batch) >= maxBatchSize {
 			if err = flushActiveBinding(ab); err != nil {

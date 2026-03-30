@@ -81,6 +81,7 @@ func clickHouseGetSchema(ctx context.Context, db *stdsql.DB, database string, ta
 
 func TestValidateAndApply(t *testing.T) {
 	cfg := testConfig()
+	cfg.HardDelete = true
 
 	resourceConfig := tableConfig{
 		Table: "target",
@@ -111,6 +112,7 @@ func TestValidateAndApply(t *testing.T) {
 
 func TestValidateAndApplyMigrations(t *testing.T) {
 	cfg := testConfig()
+	cfg.HardDelete = true
 
 	resourceConfig := tableConfig{
 		Table: "target",
@@ -389,7 +391,7 @@ func TestAddBinding(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
 	var tableName = "test_add_binding"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -481,9 +483,10 @@ func loadDocuments(t *testing.T, ctx context.Context, loadConn chdriver.Conn, b 
 
 func TestStoreAndLoadDataPath(t *testing.T) {
 	var cfg = testConfig()
+	cfg.HardDelete = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
 	var tableName = "test_data_path"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -516,7 +519,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	var b = tr.bindings[0]
 
 	// Store: insert a row via stage table, then move to target.
-	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`})
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", "v1", "c", testTime, `{"id":"k1"}`, uint8(0)})
 
 	// Load: query back the document via temp table JOIN.
 	docs := loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"})
@@ -524,9 +527,9 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	require.JSONEq(t, `{"id":"k1"}`, docs[0])
 
 	// Store a delete row (_meta/op="d") with full record.
-	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", nil, "d", testTime.Add(time.Second), `{"id":"k1"}`})
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", nil, "d", testTime.Add(time.Second), `{"id":"k1"}`, uint8(1)})
 
-	// Load again: FINAL should exclude the tombstone (_is_deleted is inferred by the MATERIALIZED expression).
+	// Load again: FINAL should exclude the tombstone.
 	require.Empty(t, loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"}))
 }
 
@@ -534,7 +537,7 @@ func TestPrepareNewTransactor(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
 
 	var ep = &sql.Endpoint[config]{
 		Config:  cfg,
@@ -576,9 +579,10 @@ func TestPrepareNewTransactor(t *testing.T) {
 // (which infer _is_deleted=1 via the MATERIALIZED expression) are hidden by FINAL.
 func TestHardDeleteTombstone(t *testing.T) {
 	var cfg = testConfig()
+	cfg.HardDelete = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
 	var tableName = "test_hard_delete"
 
 	// Build a table with a mix of nullable and non-nullable value columns.
@@ -681,13 +685,13 @@ func TestHardDeleteTombstone(t *testing.T) {
 	var b = tr.bindings[0]
 
 	// Insert a live row.
-	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", "hello", "opt", true, int64(42), "c", testTime, `{"id":"k1"}`})
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", "hello", "opt", true, int64(42), "c", testTime, `{"id":"k1"}`, uint8(0)})
 
 	// Verify it loads.
 	require.Len(t, loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"}), 1)
 
 	// Store a delete row with full record values, exactly as Store does.
-	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", "hello", "opt", true, int64(42), "d", testTime.Add(time.Second), `{"id":"k1"}`})
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"k1", "hello", "opt", true, int64(42), "d", testTime.Add(time.Second), `{"id":"k1"}`, uint8(1)})
 
 	// Load again: tombstone should hide the row.
 	require.Empty(t, loadDocuments(t, ctx, tr.load.conn, b, []any{"k1"}))
@@ -792,7 +796,7 @@ func TestLoadNonExistentKey(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
 	var tableName = "test_load_nonexistent"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -806,7 +810,7 @@ func TestLoadMultipleKeys(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
 	var tableName = "test_load_multi"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -844,7 +848,7 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
 	var tableName = "test_composite_key"
 	var table = buildCompositeKeyTable(t, dialect, tableName)
 
@@ -886,7 +890,7 @@ func TestVersionDeduplication(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
 	var tableName = "test_version_dedup"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -907,7 +911,7 @@ func TestVersionDeduplication(t *testing.T) {
 
 	var doc string
 	err := db.QueryRowContext(ctx, fmt.Sprintf(
-		"SELECT flow_document FROM %s FINAL WHERE _is_deleted = 0 AND id = 'k1'",
+		"SELECT flow_document FROM %s FINAL WHERE id = 'k1'",
 		dialect.Identifier(tableName),
 	)).Scan(&doc)
 	require.NoError(t, err)
@@ -918,7 +922,7 @@ func TestStoreBatchMultipleRows(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
 	var tableName = "test_store_batch"
 	var table = buildTestTable(t, dialect, tableName)
 
@@ -940,7 +944,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	var cfg = testConfig()
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
 
 	var tableNameA = "test_multi_bind_a"
 	var tableNameB = "test_multi_bind_b"
@@ -1011,16 +1015,17 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 
 func TestCompositeKeyTombstone(t *testing.T) {
 	var cfg = testConfig()
+	cfg.HardDelete = true
 	var ctx = t.Context()
 	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
 	var tableName = "test_composite_tombstone"
 	var table = buildCompositeKeyTable(t, dialect, tableName)
 
 	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	// Store a live row (acme, 1).
-	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"acme", int64(1), "val", "c", testTime, `{"tenant":"acme","id":1}`})
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"acme", int64(1), "val", "c", testTime, `{"tenant":"acme","id":1}`, uint8(0)})
 
 	// Load → present.
 	docs := loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)})
@@ -1028,7 +1033,7 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	require.JSONEq(t, `{"tenant":"acme","id":1}`, docs[0])
 
 	// Store delete row with _meta/op="d", using full record.
-	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"acme", int64(1), "val", "d", testTime.Add(time.Second), `{"tenant":"acme","id":1}`})
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{"acme", int64(1), "val", "d", testTime.Add(time.Second), `{"tenant":"acme","id":1}`, uint8(1)})
 
 	// Load → empty (tombstone hides the row).
 	require.Empty(t, loadDocuments(t, ctx, loadConn, b, []any{"acme", int64(1)}))
