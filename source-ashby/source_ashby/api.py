@@ -17,7 +17,9 @@ API_BASE_URL = "https://api.ashbyhq.com"
 
 
 async def fetch_api_key_scopes(http: HTTPSession, log: Logger) -> set[str]:
-    response = await http.request(log, f"{API_BASE_URL}/apiKey.info", method="POST")
+    # Ashby requires Content-Type: application/json on all POST requests.
+    # Passing json={} ensures aiohttp sets the header automatically.
+    response = await http.request(log, f"{API_BASE_URL}/apiKey.info", method="POST", json={})
     info = ApiKeyInfoResponse.model_validate_json(response)
 
     if info.errorInfo is not None:
