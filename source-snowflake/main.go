@@ -106,9 +106,11 @@ func (c *config) ToURI() (string, error) {
 	queryParams.Add("GO_QUERY_RESULT_FORMAT", jsonString)
 	// The default for CLIENT_RESULT_CHUNK_SIZE is 160. This specifies how many megabytes are in each
 	// result chunk we receive. This option, together with the MaxChunkDownloadWorkers option of
-	// gosnowflake which defaults to 10, determine how much memory can be used at once. With 40
-	// megabytes per chunk we can go up to 400MB assuming 10 download workers.
-	queryParams.Add("CLIENT_RESULT_CHUNK_SIZE", "40")
+	// gosnowflake which defaults to 10, determine how much memory can be used at once. With 24
+	// megabytes per chunk we can go up to 240MB assuming 10 download workers, however
+	// according to https://github.com/snowflakedb/gosnowflake/issues/1371#issuecomment-2854052516
+	// there is some overhead that we need to be cautious about
+	queryParams.Add("CLIENT_RESULT_CHUNK_SIZE", "24")
 
 	// Optional params
 	if c.Warehouse != "" {
