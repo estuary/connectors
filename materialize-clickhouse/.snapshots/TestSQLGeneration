@@ -83,7 +83,8 @@ CREATE OR REPLACE TABLE flow_temp_load_0_0_key_value (
 		key2 Bool,
 		`key!binary` String
 )
-ENGINE = Join(ALL, INNER, key1, key2, `key!binary`);
+ENGINE = MergeTree
+ORDER BY (key1, key2, `key!binary`);
 --- End key_value createLoadTable ---
 
 --- Begin delta_updates createLoadTable ---
@@ -91,7 +92,8 @@ ENGINE = Join(ALL, INNER, key1, key2, `key!binary`);
 CREATE OR REPLACE TABLE flow_temp_load_1_0_delta_updates (
 		`theKey` String
 )
-ENGINE = Join(ALL, INNER, `theKey`);
+ENGINE = MergeTree
+ORDER BY (`theKey`);
 --- End delta_updates createLoadTable ---
 
 --- Begin key_value queryLoadTable ---

@@ -184,15 +184,17 @@ ALTER TABLE {{$.Identifier}} MODIFY COLUMN {{ ColumnIdentifier $col.Name }} Null
 
 ---- Load tables
 
--- Load tables use the Join engine, an in-memory hash table keyed by the binding's
--- ORDER BY keys. During a transaction's load phase, the connector inserts the keys
--- of documents it needs to look up into the staging load table. It then joins the
--- target table (using FINAL for deduplication) against the staging table to retrieve
--- the current version of documents for those keys.
+-- Load tables stage the keys of documents the connector needs to look up during a
+-- transaction's load phase. The connector inserts keys into the staging load table,
+-- then joins the target table (using FINAL for deduplication) against the staging
+-- table to retrieve the current version of documents for those keys.
+--
+-- Load tables use the MergeTree engine so that large key sets are spilled to disk
+-- rather than held entirely in memory, avoiding server memory limit issues.
 --
 -- CREATE OR REPLACE TABLE is used so that the table is reset on connector restart,
--- discarding any stale in-memory state from a previous run. The table is truncated
--- between transactions and dropped when the connector shuts down.
+-- discarding any stale state from a previous run. The table is dropped when the
+-- connector shuts down.
 
 {{ define "loadTableName" -}}
 flow_temp_load_{{$.Binding}}_{{$.RangeKey}}_{{$.Identifier}}
@@ -205,9 +207,11 @@ CREATE OR REPLACE TABLE {{ template "loadTableName" . }} (
 		{{ $key.Identifier }} {{ $key.DDL }}
 	{{- end }}
 )
-ENGINE = Join(ALL, INNER
+ENGINE = MergeTree
+ORDER BY (
 	{{- range $ind, $key := $.Keys -}}
-		, {{ $key.Identifier }}
+		{{- if $ind }}, {{ end -}}
+		{{ $key.Identifier }}
 	{{- end -}}
 );
 {{ end }}
