@@ -16,7 +16,7 @@ COPY materialize-boilerplate   ./materialize-boilerplate
 COPY materialize-google-pubsub ./materialize-google-pubsub
 
 # Test and build the connector.
-RUN go test  -tags nozstd -v ./materialize-google-pubsub/...
+RUN go test  -tags nozstd,nodb -v ./materialize-google-pubsub/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-google-pubsub/cmd/connector
 
 # Runtime Stage

@@ -17,7 +17,7 @@ COPY materialize-boilerplate   ./materialize-boilerplate
 COPY materialize-slack         ./materialize-slack
 
 # Test and build the connector.
-RUN go test  -tags nozstd -v ./materialize-slack/...
+RUN go test  -tags nozstd,nodb -v ./materialize-slack/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-slack
 
 # Runtime Stage
