@@ -4,6 +4,10 @@ vendor
 connector
 !*/cmd/connector
 
+# Ignore connector binaries built locally (binary name matches directory name)
+materialize-*/materialize-*
+source-*/source-*
+
 .docker-cache/*
 !.docker-cache/.keep
 /.build/
