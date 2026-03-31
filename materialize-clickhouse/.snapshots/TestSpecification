@@ -87,6 +87,13 @@
         "title": "Table",
         "description": "Name of the database table.",
         "x-collection-name": true
+      },
+      "delta_updates": {
+        "type": "boolean",
+        "title": "Delta Update",
+        "description": "Should updates to this table be done via delta updates. Default is false.",
+        "default": false,
+        "x-delta-updates": true
       }
     },
     "type": "object",

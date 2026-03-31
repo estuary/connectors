@@ -25,12 +25,7 @@ CREATE TABLE IF NOT EXISTS key_value (
 		flow_document String
 )
 ENGINE = ReplacingMergeTree(`flow_published_at`)
-ORDER BY (key1, key2, `key!binary`)
-SETTINGS
-	allow_experimental_replacing_merge_with_cleanup = 1,
-	min_age_to_force_merge_seconds = 604800,
-	min_age_to_force_merge_on_partition_only = 1,
-	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+ORDER BY (key1, key2, `key!binary`);
 --- End key_value createTargetTable ---
 
 --- Begin key_value insertStoreTable ---
@@ -45,7 +40,7 @@ CREATE TABLE IF NOT EXISTS delta_updates (
 		`aValue` Nullable(Int64),
 		flow_published_at DateTime64(6, 'UTC')
 )
-ENGINE = ReplacingMergeTree(`flow_published_at`)
+ENGINE = MergeTree
 ORDER BY (`theKey`)
 SETTINGS
 	allow_experimental_replacing_merge_with_cleanup = 1,

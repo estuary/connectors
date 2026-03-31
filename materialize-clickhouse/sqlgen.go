@@ -127,9 +127,13 @@ func renderTemplates(dialect sql.Dialect, hardDelete bool) templates {
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
 ---- Target tables
 
--- ClickHouse is an "append-only" database. We use ReplacingMergeTree so that
--- multiple versions of an Estuary key (as ClickHouse ORDER BY key) can exist
--- concurrently, with monotonically increasing flow_published_at timestamps.
+-- ClickHouse is an "append-only" database. When DeltaUpdates is enabled, we use
+-- a plain MergeTree: every Store is appended as-is with no deduplication or
+-- deletion — rows accumulate and are never removed.
+--
+-- When DeltaUpdates is disabled (standard mode), we use ReplacingMergeTree so
+-- that multiple versions of an Estuary key (as ClickHouse ORDER BY key) can
+-- exist concurrently, with monotonically increasing flow_published_at timestamps.
 -- Primary keys are deduplicated in a background ClickHouse process, but queries
 -- must use the FINAL qualifier, which deduplicates per ORDER BY key (selecting
 -- the highest flow_published_at record) and excludes rows where _is_deleted = 1.
@@ -157,20 +161,27 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
 		{{$col.Identifier}} {{ if not $col.MustExist }}Nullable({{ end }}{{$col.DDL}}{{ if not $col.MustExist }}){{ end }}
-	{{- end }}`+isDeletedColumn+`
+	{{- end -}}
+    {{ if not $.DeltaUpdates }}`+isDeletedColumn+`{{ end }}
 )
+{{ if $.DeltaUpdates -}}
+ENGINE = MergeTree
+{{ else -}}
 ENGINE = ReplacingMergeTree(`+"`flow_published_at`"+isDeletedEngineArg+`)
+{{ end -}}
 ORDER BY (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{ end -}}
 		{{$key.Identifier}}
 	{{- end -}}
 )
+{{- if $.DeltaUpdates }}
 SETTINGS
 	allow_experimental_replacing_merge_with_cleanup = 1,
 	min_age_to_force_merge_seconds = 604800,
 	min_age_to_force_merge_on_partition_only = 1,
-	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1
+{{- end -}};
 {{ end }}
 
 {{ define "alterTargetColumns" }}

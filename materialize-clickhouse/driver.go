@@ -118,11 +118,9 @@ func (c config) newClickhouseOptions() *clickhouse.Options {
 }
 
 // tableConfig defines per-binding resource configuration.
-// Delta updates are not supported: they skip the Load phase and lose reduce/merge
-// semantics that Flow uses to compute correct document state. Standard mode always
-// performs Load → merge → Store, using ReplacingMergeTree to deduplicate on read.
 type tableConfig struct {
 	Table string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
+	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
 }
 
 func (r tableConfig) Validate() error {
@@ -134,11 +132,8 @@ func (r tableConfig) Validate() error {
 
 func (r tableConfig) WithDefaults(_ config) tableConfig { return r }
 
-// Parameters always returns delta=false. ClickHouse materializations always run in
-// standard mode so that Flow loads existing documents, computes reductions, and stores
-// the merged result. This is required for correct reduce/sum/etc. semantics.
 func (r tableConfig) Parameters() ([]string, bool, error) {
-	return []string{r.Table}, false, nil
+	return []string{r.Table}, r.Delta, nil
 }
 
 func newClickHouseDriver() *sql.Driver[config, tableConfig] {
@@ -479,7 +474,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		if err != nil {
 			return nil, fmt.Errorf("converting store record: %w", err)
 		}
-		if t.cfg.HardDelete {
+		if t.cfg.HardDelete && !b.target.DeltaUpdates {
 			var deleteState uint8 = 0
 			if it.Delete {
 				deleteState = 1
