@@ -51,4 +51,6 @@ ENV DOCS_URL=${DOCS_URL}
 ENV ENCRYPTION_URL=${ENCRYPTION_URL}
 ENV CONNECTOR_NAME=${CONNECTOR_NAME}
 
+EXPOSE 8080
+
 CMD ["/bin/sh", "-c", "/opt/venv/bin/python -m $(echo \"$CONNECTOR_NAME\" | tr '-' '_')"]
