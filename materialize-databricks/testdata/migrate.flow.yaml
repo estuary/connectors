@@ -1,0 +1,16 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.migrate-base.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-databricks:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true

@@ -163,7 +163,7 @@ func (c *client) FlushDDL(ctx context.Context) error {
 	return nil
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	if len(resourcePaths) == 0 {
 		return nil
 	}
@@ -540,6 +540,154 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 
 	log.Info("client: installed fence")
 	return resultFence, nil
+}
+
+func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
+	checkpointsTable := c.ep.Dialect.Identifier(sql.DefaultFlowCheckpoints)
+	stmt := spanner.Statement{
+		SQL: fmt.Sprintf("SELECT materialization FROM %s", checkpointsTable),
+	}
+
+	iter := c.dataClient.Single().Query(ctx, stmt)
+	defer iter.Stop()
+
+	var out []string
+	for {
+		row, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("querying materializations from checkpoints table: %w", err)
+		}
+
+		var taskName string
+		if err := row.Columns(&taskName); err != nil {
+			return nil, fmt.Errorf("scanning materialization name: %w", err)
+		}
+		out = append(out, taskName)
+	}
+
+	return out, nil
+}
+
+func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
+	checkpointsTable := c.ep.Dialect.Identifier(sql.DefaultFlowCheckpoints)
+	_, err := c.dataClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		stmt := spanner.Statement{
+			SQL:    fmt.Sprintf("DELETE FROM %s WHERE materialization = @taskName", checkpointsTable),
+			Params: map[string]interface{}{"taskName": taskName},
+		}
+		_, err := txn.Update(ctx, stmt)
+		return err
+	})
+	return err
+}
+
+func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	tableIdentifier := c.ep.Dialect.Identifier(path...)
+
+	stmt := spanner.Statement{
+		SQL: fmt.Sprintf("SELECT * FROM %s", tableIdentifier),
+	}
+
+	iter := c.dataClient.Single().Query(ctx, stmt)
+	defer iter.Stop()
+
+	var columnsSet bool
+	for {
+		row, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("querying table %s: %w", tableIdentifier, err)
+		}
+
+		if !columnsSet {
+			for _, f := range row.ColumnNames() {
+				columnNames = append(columnNames, f)
+			}
+			columnsSet = true
+		}
+
+		values := make([]spanner.GenericColumnValue, row.Size())
+		ptrs := make([]interface{}, row.Size())
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+		if err := row.Columns(ptrs...); err != nil {
+			return nil, nil, fmt.Errorf("scanning row: %w", err)
+		}
+
+		rowValues := make([]any, len(values))
+		for i, v := range values {
+			rowValues[i] = formatSpannerValue(v)
+		}
+		rows = append(rows, rowValues)
+	}
+
+	return columnNames, rows, nil
+}
+
+// formatSpannerValue converts a spanner.GenericColumnValue to a Go value suitable for test snapshots.
+func formatSpannerValue(v spanner.GenericColumnValue) any {
+	if v.Value == nil {
+		return nil
+	}
+
+	switch v.Type.Code.String() {
+	case "STRING":
+		var s string
+		if err := v.Decode(&s); err == nil {
+			return s
+		}
+	case "INT64":
+		var i int64
+		if err := v.Decode(&i); err == nil {
+			return i
+		}
+	case "BYTES":
+		var b []byte
+		if err := v.Decode(&b); err == nil {
+			return string(b)
+		}
+	case "BOOL":
+		var b bool
+		if err := v.Decode(&b); err == nil {
+			return b
+		}
+	case "FLOAT64":
+		var f float64
+		if err := v.Decode(&f); err == nil {
+			return f
+		}
+	case "JSON":
+		var s string
+		if err := v.Decode(&s); err == nil {
+			return s
+		}
+	case "NUMERIC":
+		var s spanner.NullNumeric
+		if err := v.Decode(&s); err == nil {
+			if s.Valid {
+				return s.Numeric.FloatString(10)
+			}
+			return nil
+		}
+	case "TIMESTAMP":
+		var s string
+		if err := v.Decode(&s); err == nil {
+			return s
+		}
+	case "DATE":
+		var s string
+		if err := v.Decode(&s); err == nil {
+			return s
+		}
+	}
+
+	return fmt.Sprintf("%v", v.Value)
 }
 
 func (c *client) Close() {

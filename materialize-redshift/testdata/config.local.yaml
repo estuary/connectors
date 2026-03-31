@@ -1,0 +1,11 @@
+address: localhost:5439
+user: test
+password: test
+database: test
+schema: public
+bucket: test-bucket
+awsAccessKeyId: test
+awsSecretAccessKey: test
+region: us-east-1
+advanced:
+  feature_flags: allow_existing_tables_for_new_bindings
