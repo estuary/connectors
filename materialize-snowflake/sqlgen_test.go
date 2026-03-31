@@ -9,6 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testDialect = snowflakeDialect("PUBLIC", timestampTypeLTZ, featureFlagDefaults)
+var testTemplates = renderTemplates(testDialect)
+
 func TestSQLGeneration(t *testing.T) {
 
 	snap, tables := sql.RunSqlGenTests(
