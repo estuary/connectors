@@ -19,9 +19,6 @@ import (
 	_ "github.com/snowflakedb/gosnowflake/v2"
 )
 
-var testDialect = snowflakeDialect("PUBLIC", timestampTypeLTZ, featureFlagDefaults)
-var testTemplates = renderTemplates(testDialect)
-
 func mustGetCfg(t *testing.T) config {
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
