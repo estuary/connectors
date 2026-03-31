@@ -271,11 +271,6 @@ type binding struct {
 	}
 }
 
-type activeBinding struct {
-	binding *binding
-	batch   [][]any
-}
-
 func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	b := &binding{target: target}
 
@@ -325,22 +320,25 @@ const maxBatchSize = 100_000
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (err error) {
 	var ctx = it.Context()
 
-	activeBindings := make(map[int]*activeBinding, len(t.bindings))
-	flushActiveBinding := func(ab *activeBinding) error {
-		if len(ab.batch) == 0 {
+	activeBindings := make(map[int]struct{}, len(t.bindings))
+	lastBinding := -1
+	batch := make([][]any, 0, maxBatchSize)
+
+	flushLastBinding := func() error {
+		if len(batch) == 0 || lastBinding < 0 {
 			return nil
 		}
-		chBatch, err := t.load.conn.PrepareBatch(ctx, ab.binding.load.insertSQL)
+		chBatch, err := t.store.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
 		if err != nil {
 			return fmt.Errorf("preparing load batch: %w", err)
 		}
 		defer chBatch.Close()
-		for _, record := range ab.batch {
+		for _, record := range batch {
 			if err = chBatch.Append(record...); err != nil {
 				return fmt.Errorf("appending load batch: %w", err)
 			}
 		}
-		ab.batch = ab.batch[:0]
+		batch = batch[:0]
 		if err = chBatch.Send(); err != nil {
 			return fmt.Errorf("flushing load batch: %w", err)
 		}
@@ -348,30 +346,37 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	}
 
 	defer func() {
-		for _, ab := range activeBindings {
-			// Free memory on the ClickHouse server
-			_ = t.load.conn.Exec(ctx, ab.binding.load.dropTableSQL)
+		for i := range activeBindings {
+			b := t.bindings[i]
+			// Free resources on the ClickHouse server
+			_ = t.load.conn.Exec(ctx, b.load.dropTableSQL)
 		}
 	}()
 
 	for it.Next() {
-		ab, found := activeBindings[it.Binding]
-		if !found {
-			b := t.bindings[it.Binding]
-			if err = t.load.conn.Exec(ctx, b.load.createTableSQL); err != nil {
-				return fmt.Errorf("creating load stage table: %w", err)
+		if it.Binding != lastBinding {
+			if err = flushLastBinding(); err != nil {
+				return err
 			}
-			ab = &activeBinding{b, make([][]any, 0, maxBatchSize)}
-			activeBindings[it.Binding] = ab
+			lastBinding = it.Binding
+
+			if _, found := activeBindings[it.Binding]; !found {
+				b := t.bindings[it.Binding]
+				if err = t.load.conn.Exec(ctx, b.load.createTableSQL); err != nil {
+					return fmt.Errorf("creating load stage table: %w", err)
+				}
+				activeBindings[it.Binding] = struct{}{}
+			}
 		}
 
-		converted, err := ab.binding.target.ConvertKey(it.Key)
+		b := t.bindings[it.Binding]
+		converted, err := b.target.ConvertKey(it.Key)
 		if err != nil {
 			return fmt.Errorf("converting load key: %w", err)
 		}
-		ab.batch = append(ab.batch, converted)
-		if len(ab.batch) >= maxBatchSize {
-			if err = flushActiveBinding(ab); err != nil {
+		batch = append(batch, converted)
+		if len(batch) >= maxBatchSize {
+			if err = flushLastBinding(); err != nil {
 				return err
 			}
 		}
@@ -382,17 +387,15 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	if len(activeBindings) == 0 {
 		return nil
 	}
-	for _, ab := range activeBindings {
-		if err = flushActiveBinding(ab); err != nil {
-			return err
-		}
+	if err = flushLastBinding(); err != nil {
+		return err
 	}
 
 	// Keys are now ready to be JOIN'd between the temporary and target tables.
 
 	loadQueries := make([]string, 0, len(activeBindings))
-	for _, ab := range activeBindings {
-		loadQueries = append(loadQueries, ab.binding.load.querySQL)
+	for i := range activeBindings {
+		loadQueries = append(loadQueries, t.bindings[i].load.querySQL)
 	}
 	loadQueryUnionSQL := strings.Join(loadQueries, "\nUNION ALL\n") + ";"
 	rows, err := t.load.conn.Query(ctx, loadQueryUnionSQL)
@@ -420,22 +423,28 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
 
-	activeBindings := make(map[int]*activeBinding, len(t.bindings))
-	flushActiveBinding := func(ab *activeBinding) error {
-		if len(ab.batch) == 0 {
+	for stateKey := range t.state {
+		delete(t.state, stateKey)
+	}
+
+	lastBinding := -1
+	batch := make([][]any, 0, maxBatchSize)
+
+	flushLastBinding := func() error {
+		if len(batch) == 0 || lastBinding < 0 {
 			return nil
 		}
-		chBatch, err := t.store.conn.PrepareBatch(ctx, ab.binding.store.insertSQL)
+		chBatch, err := t.store.conn.PrepareBatch(ctx, t.bindings[lastBinding].store.insertSQL)
 		if err != nil {
 			return fmt.Errorf("preparing store batch: %w", err)
 		}
 		defer chBatch.Close()
-		for _, record := range ab.batch {
+		for _, record := range batch {
 			if err = chBatch.Append(record...); err != nil {
 				return fmt.Errorf("appending store batch: %w", err)
 			}
 		}
-		ab.batch = ab.batch[:0]
+		batch = batch[:0]
 		if err = chBatch.Send(); err != nil {
 			return fmt.Errorf("flushing store batch: %w", err)
 		}
@@ -446,19 +455,27 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		if it.Delete && t.cfg.HardDelete && !it.Exists {
 			continue // nothing to delete if it was never stored
 		}
-
-		ab, found := activeBindings[it.Binding]
-		if !found {
-			b := t.bindings[it.Binding]
-			if err = t.store.conn.Exec(ctx, b.store.createTableSQL); err != nil {
-				return nil, fmt.Errorf("creating store stage table: %w", err)
+		if it.Binding != lastBinding {
+			if err = flushLastBinding(); err != nil {
+				return nil, err
 			}
-			ab = &activeBinding{b, make([][]any, 0, maxBatchSize)}
-			activeBindings[it.Binding] = ab
+			lastBinding = it.Binding
+
+			stateKey := t.bindings[it.Binding].target.StateKey
+			if _, found := t.state[stateKey]; !found {
+				if err = t.store.conn.Exec(ctx, t.bindings[it.Binding].store.createTableSQL); err != nil {
+					return nil, fmt.Errorf("creating store stage table: %w", err)
+				}
+				t.state[stateKey] = &stateItem{
+					QueryPartsSQL:    t.bindings[it.Binding].store.queryPartsSQL,
+					MovePartitionSQL: t.bindings[it.Binding].store.movePartitionSQL,
+					DropTableSQL:     t.bindings[it.Binding].store.dropTableSQL,
+				}
+			}
 		}
 
-		var converted []any
-		converted, err = ab.binding.target.ConvertAll(it.Key, it.Values, it.RawJSON)
+		b := t.bindings[it.Binding]
+		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting store record: %w", err)
 		}
@@ -469,9 +486,9 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 			converted = append(converted, deleteState)
 		}
-		ab.batch = append(ab.batch, converted)
-		if len(ab.batch) >= maxBatchSize {
-			if err = flushActiveBinding(ab); err != nil {
+		batch = append(batch, converted)
+		if len(batch) >= maxBatchSize {
+			if err = flushLastBinding(); err != nil {
 				return nil, err
 			}
 		}
@@ -479,16 +496,8 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	if it.Err() != nil {
 		return nil, it.Err()
 	}
-
-	for _, ab := range activeBindings {
-		if err = flushActiveBinding(ab); err != nil {
-			return nil, err
-		}
-		t.state[ab.binding.target.StateKey] = &stateItem{
-			QueryPartsSQL:    ab.binding.store.queryPartsSQL,
-			MovePartitionSQL: ab.binding.store.movePartitionSQL,
-			DropTableSQL:     ab.binding.store.dropTableSQL,
-		}
+	if err = flushLastBinding(); err != nil {
+		return nil, err
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
