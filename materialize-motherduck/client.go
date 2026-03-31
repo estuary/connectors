@@ -172,15 +172,15 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
-	return sql.ListCheckpointsEntries(ctx, c.db, duckDialect.Identifier(c.ep.Config.Database, c.ep.Config.Schema, sql.DefaultFlowCheckpoints))
+	return sql.ListCheckpointsEntries(ctx, c.db, c.ep.Dialect.Identifier(c.ep.Config.Database, c.ep.Config.Schema, sql.DefaultFlowCheckpoints))
 }
 
 func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
-	return sql.DeleteCheckpointsEntry(ctx, c.db, duckDialect.Identifier(c.ep.Config.Database, c.ep.Config.Schema, sql.DefaultFlowCheckpoints), taskName)
+	return sql.DeleteCheckpointsEntry(ctx, c.db, c.ep.Dialect.Identifier(c.ep.Config.Database, c.ep.Config.Schema, sql.DefaultFlowCheckpoints), taskName)
 }
 
 func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
-	return sql.SnapshotTestTable(ctx, c.db, duckDialect.Identifier(path...))
+	return sql.SnapshotTestTable(ctx, c.db, c.ep.Dialect.Identifier(path...))
 }
 
 func (c *client) Close() {

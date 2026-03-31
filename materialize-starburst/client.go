@@ -49,7 +49,7 @@ func newClient(_ context.Context, materializationName string, ep *sql.Endpoint[c
 	}, nil
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	// Map the resource paths to an appropriate identifier for inclusion in the coming query.
 	schemas := []string{c.ep.Dialect.Literal(c.ep.Config.Schema)}
 	for _, p := range resourcePaths {
@@ -191,6 +191,18 @@ func (c *client) InstallFence(_ context.Context, _ sql.Table, _ sql.Fence) (sql.
 
 func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
 	return false, nil
+}
+
+func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
+	return nil
+}
+
+func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	return sql.SnapshotTestTable(ctx, c.db, c.ep.Dialect.Identifier(path...))
 }
 
 func (c *client) Close() {

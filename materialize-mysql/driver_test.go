@@ -62,7 +62,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("fence", func(t *testing.T) {
-		var templates = renderTemplates(testDialect)
+		var templates = renderTemplates(testDialect, "mysql")
 		sql.RunFencingTest(
 			t,
 			newMysqlDriver(),

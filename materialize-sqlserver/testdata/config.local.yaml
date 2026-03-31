@@ -1,0 +1,7 @@
+address: localhost:1433
+user: sa
+password: "!Flow1234"
+database: master
+hardDelete: true
+advanced:
+    feature_flags: allow_existing_tables_for_new_bindings

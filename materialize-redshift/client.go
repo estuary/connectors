@@ -53,7 +53,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 	}, nil
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	catalog := c.cfg.Database
 	if catalog == "" {
 		// An endpoint-level database configuration is not required, so query for the active
@@ -259,6 +259,37 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 
 func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
 	return false, nil
+}
+
+func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
+	var out []string
+	if err := c.withDB(func(db *stdsql.DB) error {
+		var err error
+		checkpointsTable := c.ep.Dialect.Identifier(c.cfg.Schema, sql.DefaultFlowCheckpoints)
+		out, err = sql.ListCheckpointsEntries(ctx, db, checkpointsTable)
+		return err
+	}); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
+	return c.withDB(func(db *stdsql.DB) error {
+		checkpointsTable := c.ep.Dialect.Identifier(c.cfg.Schema, sql.DefaultFlowCheckpoints)
+		return sql.DeleteCheckpointsEntry(ctx, db, checkpointsTable, taskName)
+	})
+}
+
+func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	if err := c.withDB(func(db *stdsql.DB) error {
+		var err error
+		columnNames, rows, err = sql.SnapshotTestTable(ctx, db, c.ep.Dialect.Identifier(path...))
+		return err
+	}); err != nil {
+		return nil, nil, err
+	}
+	return columnNames, rows, nil
 }
 
 func (c *client) Close() {

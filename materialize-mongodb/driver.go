@@ -139,7 +139,7 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 	}
 }
 
-func (d *materialization) PopulateInfoSchema(ctx context.Context, resourcePaths [][]string, is *boilerplate.InfoSchema) error {
+func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	db := d.client.Database(d.cfg.Database)
 	collections, err := db.ListCollectionSpecifications(ctx, bson.D{})
 	if err != nil {
@@ -240,6 +240,18 @@ func (d *materialization) NewMaterializerTransactor(
 		client:   d.client,
 		bindings: bindings,
 	}, nil
+}
+
+func (d *materialization) ListTestTasks(ctx context.Context) ([]string, error) {
+	return nil, nil
+}
+
+func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) error {
+	return nil
+}
+
+func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
+	return nil, nil, nil
 }
 
 func (d *materialization) Close(ctx context.Context) {}

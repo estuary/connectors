@@ -1,0 +1,7 @@
+address: ""
+http_path: ""
+catalog_name: ""
+schema_name: ""
+credentials:
+  auth_type: "PAT"
+  personal_access_token: ""
