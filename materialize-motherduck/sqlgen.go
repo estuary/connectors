@@ -24,7 +24,7 @@ func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
 	// Define base date/time mappings without primary key wrapper
 	primaryKeyTextType := sql.MapStatic("VARCHAR")
 	dateMapping := sql.MapStatic("DATE")
-	datetimeMapping := sql.MapStatic("TIMESTAMP WITH TIME ZONE")
+	datetimeMapping := sql.MapStatic("TIMESTAMP WITH TIME ZONE", sql.UsingConverter(sql.NormalizeDatetimeString))
 	timeMapping := sql.MapStatic("TIME")
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
