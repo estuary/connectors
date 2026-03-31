@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-from ipaddress import ip_address
 import traceback
 from collections.abc import Mapping, Sequence
 from typing import ClassVar, cast, override
 
 from aiohttp import web
-from pydantic import BaseModel, IPvAnyNetwork
+from pydantic import BaseModel
 from pydantic.fields import Field
 
 from estuary_cdk.capture.common import (
@@ -71,10 +70,6 @@ class WebhookResourceConfig(BaseResourceConfig):
         default_factory=lambda: UrlMatch(value="*"),
         description="Matching spec for routing incoming webhooks to this collection",
     )
-    ip_allowlist: set[IPvAnyNetwork] | None = Field(
-        default=None,
-        description="The set of IP addresses or CIDR blocks allowed to write to this collection",
-    )
 
     @override
     def path(self) -> list[str]:
@@ -82,14 +77,15 @@ class WebhookResourceConfig(BaseResourceConfig):
 
 
 CATCH_ALL_DISCRIMINATOR = UrlDiscriminator()
-GENERIC_WEBHOOK_RESOURCE = Resource(
+_GENERIC_WEBHOOK_RESOURCE = Resource(
     name="webhook-data",
     key=["/_meta/webhookId"],
     model=WebhookDocument,
     open=_open_webhook_binding,  # pyright: ignore[reportArgumentType]
     initial_state=ResourceState(),
     initial_config=WebhookResourceConfig(
-        name="webhook-data", match_rule=CATCH_ALL_DISCRIMINATOR.for_value("*")
+        name="webhook-data",
+        match_rule=CATCH_ALL_DISCRIMINATOR.for_value("*"),
     ),
     schema_inference=True,
 )
@@ -103,16 +99,12 @@ class WebhookCaptureSpec(BaseModel):
     discriminator: CollectionDiscriminatorSpec = Field(
         default_factory=UrlDiscriminator, description="TODO: Write this"
     )
-    ip_allowlist: set[IPvAnyNetwork] | None = Field(
-        default=None,
-        description="The set of IP addresses or CIDR blocks allowed to write to this capture",
-    )
 
     def create_resources(
         self,
     ) -> list[Resource[WebhookDocument, WebhookResourceConfig, ResourceState]]:
         if self.discriminator == CATCH_ALL_DISCRIMINATOR:
-            return [GENERIC_WEBHOOK_RESOURCE]
+            return [_GENERIC_WEBHOOK_RESOURCE]
 
         return [
             Resource(
@@ -124,7 +116,6 @@ class WebhookCaptureSpec(BaseModel):
                 initial_config=WebhookResourceConfig(
                     name=f"{self.name}_{rule.display_name}",
                     match_rule=rule,
-                    ip_allowlist=self.ip_allowlist,
                 ),
                 schema_inference=True,
             )
@@ -132,40 +123,38 @@ class WebhookCaptureSpec(BaseModel):
         ]
 
 
-async def _run_webhook_server(
+_rejecting_key = web.AppKey("rejecting", bool)
+
+
+def build_webhook_app(
     binding_index_mapping: Mapping[
         int, Resource[WebhookDocument, WebhookResourceConfig, ResourceState]
     ],
     task: Task,
-):
-    # TODO: We need to classify webhook processing features as pre- and post-
-    # collection routing. So, we need an universal handler for all requests,
-    # then it gets routed to the collection handler.
-
+) -> web.Application:
     # Sort resources by their match rule, going from most to least specific.
     # The ordering is:
     #     1. Header matches (exact key-value)
     #     2. Body matches (exact dot-path value)
     #     3. URL paths, from most to least specific
     #     4. URL wildcard '*'
-    binding_index_mapping = dict(
+    sorted_mapping = dict(
         sorted(
             binding_index_mapping.items(),
             key=lambda idx_and_rsc: idx_and_rsc[1].initial_config.match_rule.sort_key,
             reverse=True,
         )
     )
-    _rejecting = False
 
     async def webhook_handler(req: web.Request) -> web.Response:
-        if _rejecting:
+        if req.app.get(_rejecting_key, False):
             return web.Response(status=503, text="Server shutting down")
 
         try:
-            matching_binding_index, matching_resource = await anext(
+            matching_binding_index, _ = await anext(
                 (
                     (idx, rsc)
-                    for idx, rsc in binding_index_mapping.items()
+                    for idx, rsc in sorted_mapping.items()
                     if await rsc.initial_config.match_rule.matches(req)
                 ),
             )
@@ -179,20 +168,11 @@ async def _run_webhook_server(
             )
             return web.Response(status=404, text="No matching binding for request")
 
-        if (ip_allowlists := matching_resource.initial_config.ip_allowlist) is not None:
-            if req.remote is None:
-                return web.Response(status=403, text="Unable to determine client IP")
-
-            if not any(
-                ip_address(req.remote) in allowlist for allowlist in ip_allowlists
-            ):
-                return web.Response(status=403, text="Client IP not in allowlist")
-
         body = cast(dict[str, JsonValue], await req.json())
         body["_meta"] = {
             "op": "u",
             "headers": dict(req.headers),
-            "reqPath": req.path,
+            "reqPath": req.remote,
         }
 
         task.captured(
@@ -205,10 +185,22 @@ async def _run_webhook_server(
 
         return web.Response(text="{published: 1}")
 
-    listener = web.Application()
-    _ = listener.router.add_post("/{path:.*}", webhook_handler)
+    app = web.Application()
+    _ = app.router.add_post("/{path:.*}", webhook_handler)
+    return app
 
-    runner = web.AppRunner(listener)
+
+async def _run_webhook_server(
+    binding_index_mapping: Mapping[
+        int, Resource[WebhookDocument, WebhookResourceConfig, ResourceState]
+    ],
+    task: Task,
+):
+    # TODO: We need to classify webhook processing features as pre- and post-
+    # collection routing. So, we need an universal handler for all requests,
+    # then it gets routed to the collection handler.
+    app = build_webhook_app(binding_index_mapping, task)
+    runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, port=8080)
     await site.start()
@@ -216,7 +208,7 @@ async def _run_webhook_server(
     try:
         _ = await task.stopping.webhook_event.wait()
         task.log.debug("webhook server is yielding to stop")
-        _rejecting = True
+        app[_rejecting_key] = True
     finally:
         await runner.cleanup()
 
