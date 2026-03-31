@@ -3,7 +3,6 @@ from aiohttp.test_utils import make_mocked_request
 from pydantic import ValidationError
 
 from estuary_cdk.capture.webhook.match import (
-    CATCH_ALL_DISCRIMINATOR,
     BodyDiscriminator,
     BodyMatch,
     HeaderDiscriminator,
@@ -11,6 +10,7 @@ from estuary_cdk.capture.webhook.match import (
     UrlDiscriminator,
     UrlMatch,
 )
+from estuary_cdk.capture.webhook.server import CATCH_ALL_DISCRIMINATOR
 from estuary_cdk.pydantic_polyfill import JsonValue
 
 
@@ -303,10 +303,15 @@ class TestDiscriminators:
             _ = BodyDiscriminator(key="event", known_values=set())
 
     def test_catch_all_discriminator(self):
-        assert isinstance(CATCH_ALL_DISCRIMINATOR, UrlMatch)
-        assert CATCH_ALL_DISCRIMINATOR.value == "*"
+        assert isinstance(CATCH_ALL_DISCRIMINATOR, UrlDiscriminator)
+
+        rules = CATCH_ALL_DISCRIMINATOR.create_match_rules()
+        assert len(rules) == 1
+        assert isinstance(rules[0], UrlMatch)
+        assert rules[0].value == "*"
 
     @pytest.mark.asyncio
     async def test_catch_all_matches_any_request(self):
+        rule = CATCH_ALL_DISCRIMINATOR.create_match_rules()[0]
         req = _make_request(path="/anything/at/all")
-        assert await CATCH_ALL_DISCRIMINATOR.matches(req) is True
+        assert await rule.matches(req) is True
