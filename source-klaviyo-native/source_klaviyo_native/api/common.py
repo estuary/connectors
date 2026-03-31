@@ -202,19 +202,20 @@ async def fetch_incremental_resources(
     ):
         doc_cursor = doc.get_cursor_value()
 
-        # Sanity check to confirm documents are received in ascending
-        # order of their cursor field.
-        if doc_cursor < last_seen_dt:
-            msg = f"Received documents out of order from the Klaviyo API."
-            log.error(msg, {
-                "id": doc.id,
-                model.cursor_field: doc_cursor,
-                f"previous {model.cursor_field}": last_seen_dt,
-            })
-            raise RuntimeError(msg)
+        if model.assume_sorted:
+            # Sanity check to confirm documents are received in ascending
+            # order of their cursor field.
+            if doc_cursor < last_seen_dt:
+                msg = f"Received documents out of order from the Klaviyo API."
+                log.error(msg, {
+                    "id": doc.id,
+                    model.cursor_field: doc_cursor,
+                    f"previous {model.cursor_field}": last_seen_dt,
+                })
+                raise RuntimeError(msg)
 
         # If we see a document with a cursor field value on or after
-        # the upper bound datetime, stop paginating. This prevents 
+        # the upper bound datetime, stop paginating. This prevents
         # delayed streams from progressing too close to the present
         # and also prevents real-time streams from moving far into
         # the future when Klaviyo returns records that have a cursor
@@ -222,9 +223,15 @@ async def fetch_incremental_resources(
         if doc_cursor >= upper_bound:
             break
 
-        # If we see a document updated more recently than the previous
-        # document we emitted, checkpoint the previous documents.
+        # Skip documents that were already captured in a previous sweep.
+        if doc_cursor <= lower_bound:
+            continue
+
+        # If this endpoint returns sorted results and we see a document
+        # updated more recently than the previous document we emitted,
+        # checkpoint the previous documents.
         if (
+            model.assume_sorted and
             count >= CHECKPOINT_INTERVAL and
             doc_cursor > last_seen_dt
         ):
@@ -233,7 +240,7 @@ async def fetch_incremental_resources(
 
         yield doc
         count += 1
-        last_seen_dt = doc_cursor
+        last_seen_dt = max(last_seen_dt, doc_cursor)
 
     # Emit a final checkpoint if there are yielded documents that weren't checkpointed.
     if last_seen_dt != log_cursor and count > 0:
@@ -296,9 +303,11 @@ async def backfill_incremental_resources(
         if doc_cursor > cutoff:
             return
 
-        # If we see a document updated more recently than the previous
-        # document we emitted, checkpoint the previous documents.
+        # If this endpoint returns sorted results and we see a document
+        # updated more recently than the previous document we emitted,
+        # checkpoint the previous documents.
         if (
+            model.assume_sorted and
             count >= CHECKPOINT_INTERVAL and
             doc_cursor > last_seen_dt
         ):
@@ -313,4 +322,4 @@ async def backfill_incremental_resources(
 
         yield doc
         count += 1
-        last_seen_dt = doc_cursor
+        last_seen_dt = max(last_seen_dt, doc_cursor)

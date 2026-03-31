@@ -1,18 +1,13 @@
 [tool.poetry]
-name = "iceberg_ctl"
 version = "0.1.0"
+name = "source_greenhouse_native"
 description = ""
-authors = ["Will Baker <wbaker@gmail.com>"]
+authors = [ "Alex Bair <alexb@estuary.dev>"]
 
 [tool.poetry.dependencies]
-pydantic = "^2"
+estuary-cdk = {path="../estuary-cdk", develop = true}
 python = "^3.11"
-pyiceberg = {extras = ["glue", "pyarrow", "s3fs"], version = "^0.7.0"}
-click = "^8.1.7"
-setuptools = "^78.1.1"
-asyncio = "^3.4.3"
-urllib3 = "^2.6.3"
-aiohttp = "^3.13.3"
+pydantic = "^2"
 
 [tool.poetry.group.dev.dependencies]
 debugpy = "^1.8.0"

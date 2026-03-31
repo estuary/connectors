@@ -14,7 +14,7 @@ import (
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
 	pc "github.com/estuary/flow/go/protocols/capture"
-	sf "github.com/snowflakedb/gosnowflake"
+	sf "github.com/snowflakedb/gosnowflake/v2"
 )
 
 func main() {
@@ -104,6 +104,13 @@ func (c *config) ToURI() (string, error) {
 	// GO_QUERY_RESULT_FORMAT returns query results as individual JSON documents
 	// representing rows rather than as *batches* of Arrow records.
 	queryParams.Add("GO_QUERY_RESULT_FORMAT", jsonString)
+	// The default for CLIENT_RESULT_CHUNK_SIZE is 160. This specifies how many megabytes are in each
+	// result chunk we receive. This option, together with the MaxChunkDownloadWorkers option of
+	// gosnowflake which defaults to 10, determine how much memory can be used at once. With 24
+	// megabytes per chunk we can go up to 240MB assuming 10 download workers, however
+	// according to https://github.com/snowflakedb/gosnowflake/issues/1371#issuecomment-2854052516
+	// there is some overhead that we need to be cautious about
+	queryParams.Add("CLIENT_RESULT_CHUNK_SIZE", "24")
 
 	// Optional params
 	if c.Warehouse != "" {

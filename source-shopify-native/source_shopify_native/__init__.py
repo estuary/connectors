@@ -151,19 +151,21 @@ class Connector(
         resolved = common.resolve_bindings(validate.bindings, resources)
         return common.validated(resolved)
 
+    async def update_config(
+        self,
+        log: FlowLogger,
+        config: EndpointConfig,
+    ) -> tuple[str, EndpointConfig] | None:
+        if config._was_migrated:
+            return ("Migrating legacy single-store config to multi-store format.", config)
+        return None
+
     async def open(
         self,
         log: FlowLogger,
         open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
         config = open.capture.config
-
-        if config._was_migrated:
-            encrypted_config = await self._encrypt_config(log, config)
-            log.event.config_update(
-                "Migrating legacy single-store config to multi-store format.",
-                encrypted_config,
-            )
 
         resources = await all_resources(
             log, self, config, should_cancel_ongoing_job=True

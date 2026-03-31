@@ -249,10 +249,6 @@
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         },
-        "email": {
-          "title": "Email",
-          "type": "string"
-        },
         "createdAt": {
           "format": "date-time",
           "title": "Createdat",
@@ -264,6 +260,10 @@
         },
         "_estuary_id": {
           "title": "Estuary Id",
+          "type": "string"
+        },
+        "email": {
+          "title": "Email",
           "type": "string"
         },
         "itblUserId": {
@@ -280,7 +280,6 @@
         }
       },
       "required": [
-        "email",
         "createdAt",
         "eventType",
         "_estuary_id"

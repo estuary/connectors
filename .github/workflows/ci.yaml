@@ -331,6 +331,7 @@ jobs:
               "materialize-postgres",
               "materialize-redshift",
               "materialize-s3-iceberg",
+              "materialize-s3-parquet",
               "materialize-snowflake",
               "materialize-spanner",
               "materialize-sqlserver"

@@ -16,6 +16,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -51,6 +52,8 @@ func RunMain(connector Connector) {
 	} else {
 		log.SetLevel(lvl)
 	}
+
+	common.ConfigureMemoryLimit()
 
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	var stream m.Stream

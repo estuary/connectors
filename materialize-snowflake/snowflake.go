@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 	stdsql "database/sql"
+	"database/sql/driver"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"os"
 	"slices"
 	"strings"
@@ -21,7 +21,7 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/jmoiron/sqlx"
 	log "github.com/sirupsen/logrus"
-	sf "github.com/snowflakedb/gosnowflake"
+	sf "github.com/snowflakedb/gosnowflake/v2"
 	"go.gazette.dev/core/consumer/protocol"
 	"golang.org/x/sync/errgroup"
 )
@@ -311,6 +311,10 @@ func newTransactor(
 		}
 	}
 
+	go func() {
+		d.logAllClusteringInfo(ctx)
+	}()
+
 	return d, nil
 }
 
@@ -480,7 +484,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			// NB: Not using groupCtx here since the Go Snowflake driver
 			// retains contexts internally, and the group context is cancelled
 			// after group.Wait() returns.
-			rows, err := d.db.QueryContext(sf.WithStreamDownloader(ctx), query)
+			rows, err := d.db.QueryContext(ctx, query)
 			if err != nil {
 				return fmt.Errorf("querying Load documents: %w", err)
 			}
@@ -825,17 +829,39 @@ func (d *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 				// NB: Not using groupTx here since the Go Snowflake driver
 				// retains contexts internally, and groupCtx is cancelled after
 				// group.Wait() returns.
-				result, err := d.db.ExecContext(ctx, item.Query)
-				if err != nil {
-					return fmt.Errorf("query %q failed: %w", item.Query, err)
+				if strings.HasPrefix(item.Query, "\nMERGE INTO") {
+					conn, err := d.db.Conn(ctx)
+					if err != nil {
+						return fmt.Errorf("getting connection for MERGE INTO: %w", err)
+					}
+					defer conn.Close()
+
+					var queryID string
+					err = conn.Raw(func(x any) error {
+						stmt, err := x.(driver.ConnPrepareContext).PrepareContext(ctx, item.Query)
+						if err != nil {
+							return err
+						}
+						result, err := stmt.(driver.StmtExecContext).ExecContext(ctx, nil)
+						if err != nil {
+							return err
+						}
+						queryID = result.(sf.SnowflakeResult).GetQueryID()
+						return nil
+					})
+					if err != nil {
+						return fmt.Errorf("running ack query: %w", err)
+					}
+
+					logQueryStats(ctx, d.db, queryID, item.Table)
+				} else {
+					if _, err := d.db.ExecContext(ctx, item.Query); err != nil {
+						return fmt.Errorf("running ack query: %w", err)
+					}
 				}
 
 				d.be.FinishedResourceCommit(path)
 
-				// Log partition scan stats for merge observability.
-				if sfResult, ok := result.(sf.SnowflakeResult); ok {
-					logMergePartitionStats(ctx, d.db, sfResult.GetQueryID(), path)
-				}
 				if err := d.deleteFiles(groupCtx, []string{item.StagedDir}); err != nil {
 					return fmt.Errorf("cleaning up files: %w", err)
 				}
@@ -1152,30 +1178,96 @@ func (d *transactor) Destroy() {
 	d.db.Close()
 }
 
-func logMergePartitionStats(ctx context.Context, db *stdsql.DB, queryID string, path []string) {
+func logQueryStats(ctx context.Context, db *stdsql.DB, queryID string, table string) {
 	var scanned, total stdsql.NullInt64
 	row := db.QueryRowContext(ctx,
-		`SELECT PARTITIONS_SCANNED, PARTITIONS_TOTAL
-         FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY_BY_SESSION(RESULT_LIMIT => 20))
-         WHERE QUERY_ID = ?`,
+		`SELECT SUM(VALUE:"partitions_scanned"::INT), SUM(VALUE:"partitions_total"::INT)
+         FROM TABLE(GET_QUERY_OPERATOR_STATS(?)),
+         LATERAL FLATTEN(INPUT => operator_statistics)
+         WHERE VALUE:"partitions_scanned" IS NOT NULL`,
 		queryID,
 	)
 	if err := row.Scan(&scanned, &total); err != nil {
-		log.WithField("query_id", queryID).WithError(err).Debug("could not fetch merge partition stats")
+		log.WithField("query_id", queryID).WithError(err).Warn("could not fetch query partition stats")
 		return
 	}
+
+	var queuedOverloadTime stdsql.NullInt64
+	row = db.QueryRowContext(ctx,
+		`SELECT QUEUED_OVERLOAD_TIME FROM TABLE(INFORMATION_SCHEMA.QUERY_HISTORY()) WHERE QUERY_ID = ?`,
+		queryID,
+	)
+	if err := row.Scan(&queuedOverloadTime); err != nil {
+		log.WithField("query_id", queryID).WithError(err).Warn("could not fetch queued overload time")
+	}
+
 	log.WithFields(log.Fields{
-		"table":              path,
-		"query_id":           queryID,
-		"partitions_scanned": scanned.Int64,
-		"partitions_total":   total.Int64,
-	}).Info("merge partition stats")
+		"table":                   table,
+		"query_id":                queryID,
+		"partitions_scanned":      scanned.Int64,
+		"partitions_total":        total.Int64,
+		"queued_overload_time_ms": queuedOverloadTime.Int64,
+	}).Info("query stats")
+}
+
+func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr string) {
+	var result stdsql.NullString
+	query := fmt.Sprintf("SELECT SYSTEM$CLUSTERING_INFORMATION('%s', '%s')", table, keyExpr)
+	if err := db.QueryRowContext(ctx, query).Scan(&result); err != nil {
+		log.WithFields(log.Fields{
+			"table":          table,
+			"clustering_key": keyExpr,
+		}).WithError(err).Warn("could not fetch clustering information")
+		return
+	}
+
+	if !result.Valid {
+		return
+	}
+
+	var info struct {
+		AverageDepth    float64 `json:"average_depth"`
+		AverageOverlaps float64 `json:"average_overlaps"`
+		TotalPartitions int64   `json:"total_partition_count"`
+	}
+	if err := json.Unmarshal([]byte(result.String), &info); err != nil {
+		log.WithFields(log.Fields{
+			"table": table,
+			"raw":   result.String,
+		}).WithError(err).Warn("could not parse clustering information")
+		return
+	}
+
+	log.WithFields(log.Fields{
+		"table":            table,
+		"clustering_key":   keyExpr,
+		"average_depth":    info.AverageDepth,
+		"average_overlaps": info.AverageOverlaps,
+		"total_partitions": info.TotalPartitions,
+	}).Info("clustering information")
+}
+
+func clusteringKeyExpr(keys []sql.Column) string {
+	parts := make([]string, len(keys))
+	for i, k := range keys {
+		parts[i] = k.Identifier
+	}
+	return "(" + strings.Join(parts, ", ") + ")"
+}
+
+func (d *transactor) logAllClusteringInfo(ctx context.Context) {
+	for _, b := range d.bindings {
+		if len(b.target.Keys) == 0 {
+			continue
+		}
+		logClusteringInfo(ctx, d.db, b.target.Identifier, clusteringKeyExpr(b.target.Keys))
+	}
 }
 
 func main() {
 	// gosnowflake also uses logrus for logging and the logs it produces may be confusing when
 	// intermixed with our connector logs. We disable the gosnowflake logger here and log as needed
 	// when handling errors from the sql driver.
-	sf.GetLogger().SetOutput(io.Discard)
+	sf.GetLogger().SetLogLevel("OFF")
 	boilerplate.RunMain(newSnowflakeDriver())
 }
