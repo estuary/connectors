@@ -1,0 +1,24 @@
+services:
+  storage:
+    image: rustfs/rustfs:1.0.0-alpha.90
+    pull_policy: missing
+    ports:
+      - "9000:9000" # S3 API port
+    environment:
+      - RUSTFS_ADDRESS=0.0.0.0:9000
+      - RUSTFS_ACCESS_KEY=flow
+      - RUSTFS_SECRET_KEY=flow
+    networks:
+      flow-test:
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://127.0.0.1:9000/health"
+        ]
+      interval: 1s
+
+
+networks:
+  flow-test:
+    external: true
