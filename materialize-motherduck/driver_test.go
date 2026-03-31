@@ -1,3 +1,5 @@
+//go:build !nodb
+
 package main
 
 import (
