@@ -4,25 +4,16 @@ package main
 
 import (
 	"context"
-	stdsql "database/sql"
-	"encoding/json"
 	"fmt"
-	"os"
-	"slices"
+	"os/exec"
 	"strings"
 	"testing"
 
-	"github.com/bradleyjkemp/cupaloy"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pf "github.com/estuary/flow/go/protocols/flow"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 
 	_ "github.com/microsoft/go-mssqldb"
 )
-
-//go:generate ../materialize-boilerplate/testdata/generate-spec-proto.sh testdata/apply-changes.flow.yaml
 
 func testConfig() config {
 	return config{
@@ -37,227 +28,52 @@ func testConfig() config {
 	}
 }
 
-func TestValidateAndApply(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testConfig()
-
-	resourceConfig := tableConfig{
-		Table: "target",
+func TestIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
 	}
 
-	uri := cfg.ToURI().String()
-
-	db, err := stdsql.Open("sqlserver", uri)
-	require.NoError(t, err)
-	defer db.Close()
-
-	boilerplate.RunValidateAndApplyTestCases(
-		t,
-		newSqlServerDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
-
-			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, "dbo", resourceConfig.Table)
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T) {
-			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Table)))
-		},
-	)
-}
-
-func TestValidateAndApplyMigrations(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testConfig()
-
-	resourceConfig := tableConfig{
-		Table: "target",
+	makeResourceFn := func(table string, delta bool) tableConfig {
+		return tableConfig{
+			Table: table,
+			Delta: delta,
+		}
 	}
 
-	uri := cfg.ToURI().String()
-
-	db, err := stdsql.Open("sqlserver", uri)
-	require.NoError(t, err)
-	defer db.Close()
-
-	sql.RunValidateAndApplyMigrationsTests(
-		t,
-		newSqlServerDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
-
-			sch, err := sql.StdGetSchema(ctx, db, cfg.Database, "dbo", resourceConfig.Table)
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T, cols []string, values []string) {
-			t.Helper()
-
-			var keys = make([]string, len(cols))
-			for i, col := range cols {
-				keys[i] = testDialect.Identifier(col)
-			}
-			for i := range values {
-				if values[i] == "true" {
-					values[i] = "1"
-				} else if values[i] == "false" {
-					values[i] = "0"
-				}
-			}
-
-			keys = append(keys, testDialect.Identifier("_meta/flow_truncated"))
-			values = append(values, "0")
-			keys = append(keys, testDialect.Identifier("flow_published_at"))
-			values = append(values, "'2024-09-13 01:01:01'")
-			keys = append(keys, testDialect.Identifier("flow_document"))
-			values = append(values, "'{}'")
-			q := fmt.Sprintf("insert into %s (%s) VALUES (%s);", testDialect.Identifier(resourceConfig.Table), strings.Join(keys, ","), strings.Join(values, ","))
-			_, err = db.ExecContext(ctx, q)
-
-			require.NoError(t, err)
-		},
-		func(t *testing.T) string {
-			t.Helper()
-
-			rows, err := sql.DumpTestTable(t, db, testDialect.Identifier(resourceConfig.Table))
-
-			require.NoError(t, err)
-
-			return rows
-		},
-		func(t *testing.T) {
-			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s;", testDialect.Identifier(resourceConfig.Table)))
-		},
-	)
-}
-
-func TestApplyChanges(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := testConfig()
-	configJson, err := json.Marshal(cfg)
-	require.NoError(t, err)
-
-	resourceConfig := tableConfig{
-		Table: "data_types",
-	}
-	resourceConfigJson, err := json.Marshal(resourceConfig)
-	require.NoError(t, err)
-
-	uri := cfg.ToURI().String()
-
-	db, err := stdsql.Open("sqlserver", uri)
-	require.NoError(t, err)
-	defer db.Close()
-
-	cleanup := func() {
-		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s;", testDialect.Identifier(resourceConfig.Table)))
-	}
-	cleanup()
-	t.Cleanup(cleanup)
-
-	// These data types are somewhat interesting as test-cases to make sure we don't lose anything
-	// about them when dropping nullability constraints, since we must re-state the column
-	// definition when doing that.
-	q := fmt.Sprintf(`
-	CREATE TABLE %s(
-		vc123 VARCHAR(123) COLLATE Latin1_General_100_BIN2 NOT NULL,
-		vcMax VARCHAR(MAX) NOT NULL,
-		t TEXT NOT NULL,
-		nvc123 NVARCHAR(123) NOT NULL,
-		nvcMax NVARCHAR(MAX) NOT NULL,
-		c10 CHAR(10) NOT NULL,
-		n38 NUMERIC(38,0) NOT NULL,
-		d DECIMAL NOT NULL,
-		n NUMERIC NOT NULL,
-		mn NUMERIC(30,5) NOT NULL,
-		money MONEY NOT NULL,
-		datetime DATETIME2(2) NOT NULL,
-		time TIME(3) NOT NULL,
-		dtoffset DATETIMEOFFSET(5) NOT NULL,
-		dbl DOUBLE PRECISION NOT NULL
-	);
-	`,
-		testDialect.Identifier(resourceConfig.Table),
-	)
-
-	_, err = db.ExecContext(ctx, q)
-	require.NoError(t, err)
-
-	// Initial snapshot of the table, as created.
-	original, err := snapshotTable(t, ctx, db, cfg.Database, "dbo", resourceConfig.Table)
-	require.NoError(t, err)
-
-	// Apply the spec, which will drop the nullability constraints because none of the fields are in
-	// the materialized collection.
-	specBytes, err := os.ReadFile("testdata/generated_specs/apply-changes.flow.proto")
-	require.NoError(t, err)
-	var spec pf.MaterializationSpec
-	require.NoError(t, spec.Unmarshal(specBytes))
-
-	spec.ConfigJson = configJson
-	spec.Bindings[0].ResourceConfigJson = resourceConfigJson
-	path, _, err := resourceConfig.Parameters()
-	require.NoError(t, err)
-	spec.Bindings[0].ResourcePath = path
-
-	_, err = newSqlServerDriver().Apply(ctx, &pm.Request_Apply{
-		Materialization: &spec,
-		Version:         "",
+	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
+	t.Cleanup(func() {
+		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
-	require.NoError(t, err)
 
-	// Snapshot of the table after our apply.
-	new, err := snapshotTable(t, ctx, db, cfg.Database, "dbo", resourceConfig.Table)
-	require.NoError(t, err)
+	t.Run("materialize", func(t *testing.T) {
+		sql.RunMaterializationTest(t, newSqlServerDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
+	})
 
-	var snap strings.Builder
-	snap.WriteString("Pre-Apply Table Schema:\n")
-	snap.WriteString(original)
-	snap.WriteString("\nPost-Apply Table Schema:\n")
-	snap.WriteString(new)
-	cupaloy.SnapshotT(t, snap.String())
-}
+	t.Run("apply", func(t *testing.T) {
+		sql.RunApplyTest(t, newSqlServerDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+	})
 
-func TestFencingCases(t *testing.T) {
-	var ctx = context.Background()
-	var dialect = testDialect
+	t.Run("migrate", func(t *testing.T) {
+		sql.RunMigrationTest(t, newSqlServerDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+	})
 
-	c, err := newClient(ctx, "", &sql.Endpoint[config]{Config: testConfig(), Dialect: dialect})
-	require.NoError(t, err)
-	defer c.Close()
-
-	sql.RunFenceTestCases(t,
-		c,
-		[]string{"temp_test_fencing_checkpoints"},
-		dialect,
-		testTemplates.createTargetTable,
-		func(table sql.Table, fence sql.Fence) error {
-			var fenceUpdate strings.Builder
-			if err := testTemplates.updateFence.Execute(&fenceUpdate, fence); err != nil {
-				return fmt.Errorf("evaluating fence template: %w", err)
-			}
-			return c.ExecStatements(ctx, []string{fenceUpdate.String()})
-		},
-		func(table sql.Table) (out string, err error) {
-			out, err = sql.StdDumpTable(ctx, c.(*client).db, table)
-			// SQLServer quotes "checkpoint" because it is a reserved word. The
-			// snapshots for the test expect a checkpoint without quotes, so this is
-			// a hack to allow this test to proceed
-			return strings.Replace(out, "\"checkpoint\"", "checkpoint", 1), err
-		},
-	)
+	t.Run("fence", func(t *testing.T) {
+		var templates = renderTemplates(testDialect)
+		sql.RunFencingTest(
+			t,
+			newSqlServerDriver(),
+			"testdata/fence.flow.yaml",
+			makeResourceFn,
+			templates.createTargetTable,
+			func(ctx context.Context, client sql.Client, fence sql.Fence) error {
+				var fenceUpdate strings.Builder
+				if err := templates.updateFence.Execute(&fenceUpdate, fence); err != nil {
+					return fmt.Errorf("evaluating fence template: %w", err)
+				}
+				return client.ExecStatements(ctx, []string{fenceUpdate.String()})
+			},
+		)
+	})
 }
 
 func TestPrereqs(t *testing.T) {
@@ -311,30 +127,4 @@ func TestPrereqs(t *testing.T) {
 			}
 		})
 	}
-}
-
-func snapshotTable(t *testing.T, ctx context.Context, db *stdsql.DB, catalog string, schema string, name string) (string, error) {
-	t.Helper()
-
-	cols, err := tableDetails(ctx, db, testDialect, catalog, schema, name)
-	require.NoError(t, err)
-
-	colSlice := make([]foundColumn, 0, len(cols))
-	for _, c := range cols {
-		colSlice = append(colSlice, c)
-	}
-
-	slices.SortFunc(colSlice, func(a, b foundColumn) int {
-		return strings.Compare(a.Name, b.Name)
-	})
-
-	var out strings.Builder
-	enc := json.NewEncoder(&out)
-	for _, c := range colSlice {
-		if err := enc.Encode(c); err != nil {
-			return "", err
-		}
-	}
-
-	return out.String(), nil
 }

@@ -1,0 +1,8 @@
+materializations:
+  acmeCo/tests/materialize-redshift:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.yaml
+    bindings: []

@@ -64,10 +64,10 @@ func TestIntegration(t *testing.T) {
 			newPostgresDriver(),
 			"testdata/fence.flow.yaml",
 			makeResourceFn,
-			tplCreateTargetTable,
+			testTemplates.createTargetTable,
 			func(ctx context.Context, client sql.Client, fence sql.Fence) error {
 				var fenceUpdate strings.Builder
-				if err := tplUpdateFence.Execute(&fenceUpdate, fence); err != nil {
+				if err := testTemplates.updateFence.Execute(&fenceUpdate, fence); err != nil {
 					return fmt.Errorf("evaluating fence template: %w", err)
 				}
 				return client.ExecStatements(ctx, []string{fenceUpdate.String()})

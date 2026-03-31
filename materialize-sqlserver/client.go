@@ -84,7 +84,7 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	return errs
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, c.ep.Config.Database, resourcePaths)
 }
 
@@ -262,6 +262,25 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 
 func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error) {
 	return false, nil
+}
+
+func (c *client) checkpointsIdentifier() string {
+	if c.ep.Config.Schema != "" {
+		return c.ep.Dialect.Identifier(c.ep.Config.Schema, sql.DefaultFlowCheckpoints)
+	}
+	return c.ep.Dialect.Identifier(sql.DefaultFlowCheckpoints)
+}
+
+func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
+	return sql.ListCheckpointsEntries(ctx, c.db, c.checkpointsIdentifier())
+}
+
+func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
+	return sql.DeleteCheckpointsEntry(ctx, c.db, c.checkpointsIdentifier(), taskName)
+}
+
+func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	return sql.SnapshotTestTable(ctx, c.db, c.ep.Dialect.Identifier(path...))
 }
 
 func (c *client) Close() {

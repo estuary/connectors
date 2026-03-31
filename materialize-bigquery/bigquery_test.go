@@ -12,6 +12,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+var testDialect = bqDialect(featureFlagDefaults)
+var testTemplates = renderTemplates(testDialect)
+
 func TestIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip()

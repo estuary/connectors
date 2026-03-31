@@ -1,0 +1,9 @@
+project_id: test-project
+instance_id: test-instance
+database: test-database
+credentials:
+  service_account_json: "{}"
+advanced:
+  no_flow_document: true
+  disable_key_distribution_optimization: true
+  feature_flags: allow_existing_tables_for_new_bindings

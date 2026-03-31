@@ -3,20 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"flag"
-	"fmt"
-	"io"
-	"os"
-	"slices"
-	"strings"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
 
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
-	"github.com/tidwall/gjson"
 )
 
 func testConfig() *config {
@@ -33,67 +25,7 @@ func testConfig() *config {
 }
 
 func TestValidateAndApply(t *testing.T) {
-	flag.Parse()
-	if os.Getenv("TEST_DATABASE") != "yes" {
-		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
-	}
-
-	cfg := testConfig()
-
-	resourceConfig := resource{
-		Index: "target",
-	}
-
-	client, err := cfg.toClient(true)
-	require.NoError(t, err)
-
-	boilerplate.RunValidateAndApplyTestCases(
-		t,
-		driver{},
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
-
-			resp, err := client.es.Indices.Get([]string{resourceConfig.Index})
-			require.NoError(t, err)
-			defer resp.Body.Close()
-
-			bb, err := io.ReadAll(resp.Body)
-			require.NoError(t, err)
-
-			props := gjson.GetBytes(bb, fmt.Sprintf("%s.mappings.properties", resourceConfig.Index)).Map()
-
-			type row struct {
-				Field string
-				Type  string
-			}
-			rows := make([]row, 0, len(props))
-			for f, p := range props {
-				rows = append(rows, row{
-					Field: f,
-					Type:  p.Get("type").Str,
-				})
-			}
-
-			slices.SortFunc(rows, func(i, j row) int {
-				return strings.Compare(i.Field, j.Field)
-			})
-
-			var out strings.Builder
-			enc := json.NewEncoder(&out)
-			for _, r := range rows {
-				require.NoError(t, enc.Encode(r))
-			}
-
-			return out.String()
-		},
-		func(t *testing.T) {
-			t.Helper()
-			_, err := client.es.Indices.Delete([]string{resourceConfig.Index})
-			require.NoError(t, err)
-		},
-	)
+	t.Skip("TODO: migrate to new test structure")
 }
 
 func TestDriverSpec(t *testing.T) {

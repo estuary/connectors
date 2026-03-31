@@ -1,3 +1,5 @@
+Task: acmeCo/tests/materialize-sqlserver
+
 Big Schema Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
 {"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
@@ -5,7 +7,7 @@ Big Schema Initial Constraints:
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"intField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
+{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The first collection key component is required to be included for standard updates"}
 {"Field":"multipleField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
 {"Field":"nullField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"Cannot materialize a field where the only possible type is 'null'"}
 {"Field":"numField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
@@ -79,24 +81,24 @@ Big Schema Re-validated Constraints:
 Big Schema Changed Types Constraints:
 {"Field":"_meta/flow_truncated","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"boolField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'boolField' is already being materialized as endpoint type 'BOOLEAN' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
+{"Field":"boolField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'boolField' is already being materialized as endpoint type 'BIT' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
 {"Field":"flow_document","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is the document in the current materialization"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"intField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'intField' is already being materialized as endpoint type 'BIGINT' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
+{"Field":"intField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"key","Type":1,"TypeString":"FIELD_REQUIRED","Reason":"This field is a key in the current materialization"}
 {"Field":"multipleField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
-{"Field":"numField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'numField' is already being materialized as endpoint type 'DOUBLE' but endpoint type 'BOOLEAN' is required by its schema '{ type: [boolean] }'"}
+{"Field":"numField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'numField' is already being materialized as endpoint type 'FLOAT' but endpoint type 'BIT' is required by its schema '{ type: [boolean] }'"}
 {"Field":"objField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringDateField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringDateField' is already being materialized as endpoint type 'DATE' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
-{"Field":"stringDateTimeField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringDateTimeField' is already being materialized as endpoint type 'TIMESTAMP(6) WITH TIME ZONE' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
+{"Field":"stringDateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringDateTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringDurationField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringField' is already being materialized as endpoint type 'VARCHAR' but endpoint type 'BIGINT' is required by its schema '{ type: [integer] }'"}
 {"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringIntegerField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringIntegerField' is already being materialized as endpoint type 'BIGINT' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
+{"Field":"stringIntegerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIpv4Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIpv6Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -104,101 +106,101 @@ Big Schema Changed Types Constraints:
 {"Field":"stringJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringMacAddr8Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringMacAddrField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringNumberField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringNumberField' is already being materialized as endpoint type 'DOUBLE' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
+{"Field":"stringNumberField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringRegexField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringRelativeJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringUint32Field","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringUint32Field' is already being materialized as endpoint type 'BIGINT' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
-{"Field":"stringUint64Field","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringUint64Field' is already being materialized as endpoint type 'BIGINT' but endpoint type 'VARCHAR' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUint32Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringUint64Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Big Schema Materialized Resource Schema With All Fields Required:
-{"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
-{"Name":"arrayfield","Nullable":"YES","Type":"varchar"}
-{"Name":"boolfield","Nullable":"YES","Type":"boolean"}
-{"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
-{"Name":"intfield","Nullable":"YES","Type":"bigint"}
-{"Name":"key","Nullable":"YES","Type":"varchar"}
-{"Name":"multiplefield","Nullable":"YES","Type":"varchar"}
-{"Name":"numfield","Nullable":"YES","Type":"double"}
-{"Name":"objfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringdatefield","Nullable":"YES","Type":"date"}
-{"Name":"stringdatetimefield","Nullable":"YES","Type":"timestamp(6) with time zone"}
-{"Name":"stringdurationfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringemailfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringhostnamefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringidnemailfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringidnhostnamefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringintegerfield","Nullable":"YES","Type":"bigint"}
-{"Name":"stringipv4field","Nullable":"YES","Type":"varchar"}
-{"Name":"stringipv6field","Nullable":"YES","Type":"varchar"}
-{"Name":"stringirifield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringirireferencefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringjsonpointerfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringmacaddr8field","Nullable":"YES","Type":"varchar"}
-{"Name":"stringmacaddrfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringnumberfield","Nullable":"YES","Type":"double"}
-{"Name":"stringregexfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringrelativejsonpointerfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringtimefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringuint32field","Nullable":"YES","Type":"bigint"}
-{"Name":"stringuint64field","Nullable":"YES","Type":"bigint"}
-{"Name":"stringurifield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringurireferencefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringuritemplatefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringuuidfield","Nullable":"YES","Type":"varchar"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"bit"}
+{"Name":"arrayField","Nullable":false,"Type":"varchar"}
+{"Name":"boolField","Nullable":false,"Type":"bit"}
+{"Name":"flow_document","Nullable":false,"Type":"varchar"}
+{"Name":"flow_published_at","Nullable":false,"Type":"datetime2"}
+{"Name":"intField","Nullable":false,"Type":"bigint"}
+{"Name":"key","Nullable":false,"Type":"varchar"}
+{"Name":"multipleField","Nullable":false,"Type":"varchar"}
+{"Name":"numField","Nullable":false,"Type":"float"}
+{"Name":"objField","Nullable":false,"Type":"varchar"}
+{"Name":"stringDateField","Nullable":false,"Type":"date"}
+{"Name":"stringDateTimeField","Nullable":false,"Type":"datetime2"}
+{"Name":"stringDurationField","Nullable":false,"Type":"varchar"}
+{"Name":"stringEmailField","Nullable":false,"Type":"varchar"}
+{"Name":"stringField","Nullable":false,"Type":"varchar"}
+{"Name":"stringHostnameField","Nullable":false,"Type":"varchar"}
+{"Name":"stringIdnEmailField","Nullable":false,"Type":"varchar"}
+{"Name":"stringIdnHostnameField","Nullable":false,"Type":"varchar"}
+{"Name":"stringIntegerField","Nullable":false,"Type":"bigint"}
+{"Name":"stringIpv4Field","Nullable":false,"Type":"varchar"}
+{"Name":"stringIpv6Field","Nullable":false,"Type":"varchar"}
+{"Name":"stringIriField","Nullable":false,"Type":"varchar"}
+{"Name":"stringIriReferenceField","Nullable":false,"Type":"varchar"}
+{"Name":"stringJsonPointerField","Nullable":false,"Type":"varchar"}
+{"Name":"stringMacAddr8Field","Nullable":false,"Type":"varchar"}
+{"Name":"stringMacAddrField","Nullable":false,"Type":"varchar"}
+{"Name":"stringNumberField","Nullable":false,"Type":"float"}
+{"Name":"stringRegexField","Nullable":false,"Type":"varchar"}
+{"Name":"stringRelativeJsonPointerField","Nullable":false,"Type":"varchar"}
+{"Name":"stringTimeField","Nullable":false,"Type":"time"}
+{"Name":"stringUint32Field","Nullable":false,"Type":"bigint"}
+{"Name":"stringUint64Field","Nullable":false,"Type":"bigint"}
+{"Name":"stringUriField","Nullable":false,"Type":"varchar"}
+{"Name":"stringUriReferenceField","Nullable":false,"Type":"varchar"}
+{"Name":"stringUriTemplateField","Nullable":false,"Type":"varchar"}
+{"Name":"stringUuidField","Nullable":false,"Type":"varchar"}
 
 Big Schema Materialized Resource Schema With No Fields Required:
-{"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
-{"Name":"arrayfield","Nullable":"YES","Type":"varchar"}
-{"Name":"boolfield","Nullable":"YES","Type":"boolean"}
-{"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
-{"Name":"intfield","Nullable":"YES","Type":"bigint"}
-{"Name":"key","Nullable":"YES","Type":"varchar"}
-{"Name":"multiplefield","Nullable":"YES","Type":"varchar"}
-{"Name":"numfield","Nullable":"YES","Type":"double"}
-{"Name":"objfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringdatefield","Nullable":"YES","Type":"date"}
-{"Name":"stringdatetimefield","Nullable":"YES","Type":"timestamp(6) with time zone"}
-{"Name":"stringdurationfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringemailfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringhostnamefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringidnemailfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringidnhostnamefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringintegerfield","Nullable":"YES","Type":"bigint"}
-{"Name":"stringipv4field","Nullable":"YES","Type":"varchar"}
-{"Name":"stringipv6field","Nullable":"YES","Type":"varchar"}
-{"Name":"stringirifield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringirireferencefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringjsonpointerfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringmacaddr8field","Nullable":"YES","Type":"varchar"}
-{"Name":"stringmacaddrfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringnumberfield","Nullable":"YES","Type":"double"}
-{"Name":"stringregexfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringrelativejsonpointerfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringtimefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringuint32field","Nullable":"YES","Type":"bigint"}
-{"Name":"stringuint64field","Nullable":"YES","Type":"bigint"}
-{"Name":"stringurifield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringurireferencefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringuritemplatefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringuuidfield","Nullable":"YES","Type":"varchar"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"bit"}
+{"Name":"arrayField","Nullable":true,"Type":"varchar"}
+{"Name":"boolField","Nullable":true,"Type":"bit"}
+{"Name":"flow_document","Nullable":false,"Type":"varchar"}
+{"Name":"flow_published_at","Nullable":false,"Type":"datetime2"}
+{"Name":"intField","Nullable":true,"Type":"bigint"}
+{"Name":"key","Nullable":false,"Type":"varchar"}
+{"Name":"multipleField","Nullable":true,"Type":"varchar"}
+{"Name":"numField","Nullable":true,"Type":"float"}
+{"Name":"objField","Nullable":true,"Type":"varchar"}
+{"Name":"stringDateField","Nullable":true,"Type":"date"}
+{"Name":"stringDateTimeField","Nullable":true,"Type":"datetime2"}
+{"Name":"stringDurationField","Nullable":true,"Type":"varchar"}
+{"Name":"stringEmailField","Nullable":true,"Type":"varchar"}
+{"Name":"stringField","Nullable":true,"Type":"varchar"}
+{"Name":"stringHostnameField","Nullable":true,"Type":"varchar"}
+{"Name":"stringIdnEmailField","Nullable":true,"Type":"varchar"}
+{"Name":"stringIdnHostnameField","Nullable":true,"Type":"varchar"}
+{"Name":"stringIntegerField","Nullable":true,"Type":"bigint"}
+{"Name":"stringIpv4Field","Nullable":true,"Type":"varchar"}
+{"Name":"stringIpv6Field","Nullable":true,"Type":"varchar"}
+{"Name":"stringIriField","Nullable":true,"Type":"varchar"}
+{"Name":"stringIriReferenceField","Nullable":true,"Type":"varchar"}
+{"Name":"stringJsonPointerField","Nullable":true,"Type":"varchar"}
+{"Name":"stringMacAddr8Field","Nullable":true,"Type":"varchar"}
+{"Name":"stringMacAddrField","Nullable":true,"Type":"varchar"}
+{"Name":"stringNumberField","Nullable":true,"Type":"float"}
+{"Name":"stringRegexField","Nullable":true,"Type":"varchar"}
+{"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"varchar"}
+{"Name":"stringTimeField","Nullable":true,"Type":"time"}
+{"Name":"stringUint32Field","Nullable":true,"Type":"bigint"}
+{"Name":"stringUint64Field","Nullable":true,"Type":"bigint"}
+{"Name":"stringUriField","Nullable":true,"Type":"varchar"}
+{"Name":"stringUriReferenceField","Nullable":true,"Type":"varchar"}
+{"Name":"stringUriTemplateField","Nullable":true,"Type":"varchar"}
+{"Name":"stringUuidField","Nullable":true,"Type":"varchar"}
 
-Big Schema Changed Types With Table Replacement Constraints:
+Big Schema Changed Types With Backfill Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
 {"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
 {"Field":"flow_published_at","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"intField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
-{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"All Locations that are part of the collections key are required"}
+{"Field":"key","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The first collection key component is required to be included for standard updates"}
 {"Field":"multipleField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
 {"Field":"nullField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"numField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
@@ -230,117 +232,117 @@ Big Schema Changed Types With Table Replacement Constraints:
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
-Big Schema Materialized Resource Schema Changed Types With Table Replacement:
-{"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
-{"Name":"arrayfield","Nullable":"YES","Type":"varchar"}
-{"Name":"boolfield","Nullable":"YES","Type":"bigint"}
-{"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
-{"Name":"intfield","Nullable":"YES","Type":"varchar"}
-{"Name":"key","Nullable":"YES","Type":"varchar"}
-{"Name":"multiplefield","Nullable":"YES","Type":"varchar"}
-{"Name":"nullfield","Nullable":"YES","Type":"varchar"}
-{"Name":"numfield","Nullable":"YES","Type":"boolean"}
-{"Name":"objfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringdatefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringdatetimefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringdurationfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringemailfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringfield","Nullable":"YES","Type":"bigint"}
-{"Name":"stringhostnamefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringidnemailfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringidnhostnamefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringintegerfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringipv4field","Nullable":"YES","Type":"varchar"}
-{"Name":"stringipv6field","Nullable":"YES","Type":"varchar"}
-{"Name":"stringirifield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringirireferencefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringjsonpointerfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringmacaddr8field","Nullable":"YES","Type":"varchar"}
-{"Name":"stringmacaddrfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringnumberfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringregexfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringrelativejsonpointerfield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringtimefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringuint32field","Nullable":"YES","Type":"varchar"}
-{"Name":"stringuint64field","Nullable":"YES","Type":"varchar"}
-{"Name":"stringurifield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringurireferencefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringuritemplatefield","Nullable":"YES","Type":"varchar"}
-{"Name":"stringuuidfield","Nullable":"YES","Type":"varchar"}
+Big Schema Materialized Resource Schema Changed Types With Backfill:
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"bit"}
+{"Name":"arrayField","Nullable":false,"Type":"varchar"}
+{"Name":"boolField","Nullable":false,"Type":"bigint"}
+{"Name":"flow_document","Nullable":false,"Type":"varchar"}
+{"Name":"flow_published_at","Nullable":false,"Type":"datetime2"}
+{"Name":"intField","Nullable":false,"Type":"varchar"}
+{"Name":"key","Nullable":false,"Type":"varchar"}
+{"Name":"multipleField","Nullable":false,"Type":"varchar"}
+{"Name":"nullField","Nullable":true,"Type":"varchar"}
+{"Name":"numField","Nullable":false,"Type":"bit"}
+{"Name":"objField","Nullable":false,"Type":"varchar"}
+{"Name":"stringDateField","Nullable":false,"Type":"varchar"}
+{"Name":"stringDateTimeField","Nullable":false,"Type":"varchar"}
+{"Name":"stringDurationField","Nullable":false,"Type":"varchar"}
+{"Name":"stringEmailField","Nullable":false,"Type":"varchar"}
+{"Name":"stringField","Nullable":false,"Type":"bigint"}
+{"Name":"stringHostnameField","Nullable":false,"Type":"varchar"}
+{"Name":"stringIdnEmailField","Nullable":false,"Type":"varchar"}
+{"Name":"stringIdnHostnameField","Nullable":false,"Type":"varchar"}
+{"Name":"stringIntegerField","Nullable":false,"Type":"varchar"}
+{"Name":"stringIpv4Field","Nullable":false,"Type":"varchar"}
+{"Name":"stringIpv6Field","Nullable":false,"Type":"varchar"}
+{"Name":"stringIriField","Nullable":false,"Type":"varchar"}
+{"Name":"stringIriReferenceField","Nullable":false,"Type":"varchar"}
+{"Name":"stringJsonPointerField","Nullable":false,"Type":"varchar"}
+{"Name":"stringMacAddr8Field","Nullable":false,"Type":"varchar"}
+{"Name":"stringMacAddrField","Nullable":false,"Type":"varchar"}
+{"Name":"stringNumberField","Nullable":false,"Type":"varchar"}
+{"Name":"stringRegexField","Nullable":false,"Type":"varchar"}
+{"Name":"stringRelativeJsonPointerField","Nullable":false,"Type":"varchar"}
+{"Name":"stringTimeField","Nullable":false,"Type":"varchar"}
+{"Name":"stringUint32Field","Nullable":false,"Type":"varchar"}
+{"Name":"stringUint64Field","Nullable":false,"Type":"varchar"}
+{"Name":"stringUriField","Nullable":false,"Type":"varchar"}
+{"Name":"stringUriReferenceField","Nullable":false,"Type":"varchar"}
+{"Name":"stringUriTemplateField","Nullable":false,"Type":"varchar"}
+{"Name":"stringUuidField","Nullable":false,"Type":"varchar"}
 
 add a single field:
-{"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
-{"Name":"addedoptionalstring","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
-{"Name":"key","Nullable":"YES","Type":"varchar"}
-{"Name":"optionalboolean","Nullable":"YES","Type":"boolean"}
-{"Name":"optionalinteger","Nullable":"YES","Type":"bigint"}
-{"Name":"optionalobject","Nullable":"YES","Type":"varchar"}
-{"Name":"optionalstring","Nullable":"YES","Type":"varchar"}
-{"Name":"requiredboolean","Nullable":"YES","Type":"boolean"}
-{"Name":"requiredinteger","Nullable":"YES","Type":"bigint"}
-{"Name":"requiredobject","Nullable":"YES","Type":"varchar"}
-{"Name":"requiredstring","Nullable":"YES","Type":"varchar"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"bit"}
+{"Name":"addedOptionalString","Nullable":true,"Type":"varchar"}
+{"Name":"flow_document","Nullable":false,"Type":"varchar"}
+{"Name":"flow_published_at","Nullable":false,"Type":"datetime2"}
+{"Name":"key","Nullable":false,"Type":"varchar"}
+{"Name":"optionalBoolean","Nullable":true,"Type":"bit"}
+{"Name":"optionalInteger","Nullable":true,"Type":"bigint"}
+{"Name":"optionalObject","Nullable":true,"Type":"varchar"}
+{"Name":"optionalString","Nullable":true,"Type":"varchar"}
+{"Name":"requiredBoolean","Nullable":false,"Type":"bit"}
+{"Name":"requiredInteger","Nullable":false,"Type":"bigint"}
+{"Name":"requiredObject","Nullable":false,"Type":"varchar"}
+{"Name":"requiredString","Nullable":false,"Type":"varchar"}
 
 remove a single optional field:
-{"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
-{"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
-{"Name":"key","Nullable":"YES","Type":"varchar"}
-{"Name":"optionalboolean","Nullable":"YES","Type":"boolean"}
-{"Name":"optionalinteger","Nullable":"YES","Type":"bigint"}
-{"Name":"optionalobject","Nullable":"YES","Type":"varchar"}
-{"Name":"optionalstring","Nullable":"YES","Type":"varchar"}
-{"Name":"requiredboolean","Nullable":"YES","Type":"boolean"}
-{"Name":"requiredinteger","Nullable":"YES","Type":"bigint"}
-{"Name":"requiredobject","Nullable":"YES","Type":"varchar"}
-{"Name":"requiredstring","Nullable":"YES","Type":"varchar"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"bit"}
+{"Name":"flow_document","Nullable":false,"Type":"varchar"}
+{"Name":"flow_published_at","Nullable":false,"Type":"datetime2"}
+{"Name":"key","Nullable":false,"Type":"varchar"}
+{"Name":"optionalBoolean","Nullable":true,"Type":"bit"}
+{"Name":"optionalInteger","Nullable":true,"Type":"bigint"}
+{"Name":"optionalObject","Nullable":true,"Type":"varchar"}
+{"Name":"optionalString","Nullable":true,"Type":"varchar"}
+{"Name":"requiredBoolean","Nullable":false,"Type":"bit"}
+{"Name":"requiredInteger","Nullable":false,"Type":"bigint"}
+{"Name":"requiredObject","Nullable":false,"Type":"varchar"}
+{"Name":"requiredString","Nullable":false,"Type":"varchar"}
 
 remove a single required field:
-{"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
-{"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
-{"Name":"key","Nullable":"YES","Type":"varchar"}
-{"Name":"optionalboolean","Nullable":"YES","Type":"boolean"}
-{"Name":"optionalinteger","Nullable":"YES","Type":"bigint"}
-{"Name":"optionalobject","Nullable":"YES","Type":"varchar"}
-{"Name":"optionalstring","Nullable":"YES","Type":"varchar"}
-{"Name":"requiredboolean","Nullable":"YES","Type":"boolean"}
-{"Name":"requiredinteger","Nullable":"YES","Type":"bigint"}
-{"Name":"requiredobject","Nullable":"YES","Type":"varchar"}
-{"Name":"requiredstring","Nullable":"YES","Type":"varchar"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"bit"}
+{"Name":"flow_document","Nullable":false,"Type":"varchar"}
+{"Name":"flow_published_at","Nullable":false,"Type":"datetime2"}
+{"Name":"key","Nullable":false,"Type":"varchar"}
+{"Name":"optionalBoolean","Nullable":true,"Type":"bit"}
+{"Name":"optionalInteger","Nullable":true,"Type":"bigint"}
+{"Name":"optionalObject","Nullable":true,"Type":"varchar"}
+{"Name":"optionalString","Nullable":true,"Type":"varchar"}
+{"Name":"requiredBoolean","Nullable":false,"Type":"bit"}
+{"Name":"requiredInteger","Nullable":false,"Type":"bigint"}
+{"Name":"requiredObject","Nullable":false,"Type":"varchar"}
+{"Name":"requiredString","Nullable":true,"Type":"varchar"}
 
 add and remove many fields:
-{"Name":"_meta/flow_truncated","Nullable":"YES","Type":"boolean"}
-{"Name":"addedoptionalstring","Nullable":"YES","Type":"varchar"}
-{"Name":"addedrequiredstring","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
-{"Name":"key","Nullable":"YES","Type":"varchar"}
-{"Name":"optionalboolean","Nullable":"YES","Type":"boolean"}
-{"Name":"optionalinteger","Nullable":"YES","Type":"bigint"}
-{"Name":"optionalobject","Nullable":"YES","Type":"varchar"}
-{"Name":"optionalstring","Nullable":"YES","Type":"varchar"}
-{"Name":"requiredboolean","Nullable":"YES","Type":"boolean"}
-{"Name":"requiredinteger","Nullable":"YES","Type":"bigint"}
-{"Name":"requiredobject","Nullable":"YES","Type":"varchar"}
-{"Name":"requiredstring","Nullable":"YES","Type":"varchar"}
+{"Name":"_meta/flow_truncated","Nullable":false,"Type":"bit"}
+{"Name":"addedOptionalString","Nullable":true,"Type":"varchar"}
+{"Name":"addedRequiredString","Nullable":true,"Type":"varchar"}
+{"Name":"flow_document","Nullable":false,"Type":"varchar"}
+{"Name":"flow_published_at","Nullable":false,"Type":"datetime2"}
+{"Name":"key","Nullable":false,"Type":"varchar"}
+{"Name":"optionalBoolean","Nullable":true,"Type":"bit"}
+{"Name":"optionalInteger","Nullable":true,"Type":"bigint"}
+{"Name":"optionalObject","Nullable":true,"Type":"varchar"}
+{"Name":"optionalString","Nullable":true,"Type":"varchar"}
+{"Name":"requiredBoolean","Nullable":false,"Type":"bit"}
+{"Name":"requiredInteger","Nullable":false,"Type":"bigint"}
+{"Name":"requiredObject","Nullable":true,"Type":"varchar"}
+{"Name":"requiredString","Nullable":true,"Type":"varchar"}
 
 Challenging Field Names Materialized Columns:
-{"Name":" ,;{}().- problematickey � 𐀀 嶲 ","Nullable":"YES","Type":"varchar"}
-{"Name":" ,;{}().- problematicvalue � 𐀀 嶲 ","Nullable":"YES","Type":"varchar"}
-{"Name":"$dollar$signs","Nullable":"YES","Type":"varchar"}
-{"Name":"123","Nullable":"YES","Type":"varchar"}
-{"Name":"123startswithdigits","Nullable":"YES","Type":"varchar"}
-{"Name":"_id","Nullable":"YES","Type":"varchar"}
-{"Name":"a\"string`with`quote'characters","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_document","Nullable":"YES","Type":"varchar"}
-{"Name":"flow_published_at","Nullable":"YES","Type":"timestamp(6) with time zone"}
-{"Name":"value with separated words","Nullable":"YES","Type":"varchar"}
-{"Name":"value-with-separated-words","Nullable":"YES","Type":"varchar"}
-{"Name":"value.with-separated_words","Nullable":"YES","Type":"varchar"}
-{"Name":"value.with.separated.words","Nullable":"YES","Type":"varchar"}
-{"Name":"value_with_separated_words","Nullable":"YES","Type":"varchar"}
+{"Name":" ,;{}().- problematicKey � 𐀀 嶲 ","Nullable":false,"Type":"varchar"}
+{"Name":" ,;{}().- problematicValue � 𐀀 嶲 ","Nullable":true,"Type":"varchar"}
+{"Name":"$dollar$signs","Nullable":true,"Type":"varchar"}
+{"Name":"123","Nullable":true,"Type":"varchar"}
+{"Name":"123startsWithDigits","Nullable":true,"Type":"varchar"}
+{"Name":"_id","Nullable":false,"Type":"varchar"}
+{"Name":"a\"string`with`quote'characters","Nullable":true,"Type":"varchar"}
+{"Name":"flow_document","Nullable":false,"Type":"varchar"}
+{"Name":"flow_published_at","Nullable":false,"Type":"datetime2"}
+{"Name":"value with separated words","Nullable":true,"Type":"varchar"}
+{"Name":"value-with-separated-words","Nullable":true,"Type":"varchar"}
+{"Name":"value.with-separated_words","Nullable":true,"Type":"varchar"}
+{"Name":"value.with.separated.words","Nullable":true,"Type":"varchar"}
+{"Name":"value_with_separated_words","Nullable":true,"Type":"varchar"}
 

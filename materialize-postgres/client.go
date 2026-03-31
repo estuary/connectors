@@ -208,11 +208,11 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 }
 
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
-	return sql.ListCheckpointsEntries(ctx, c.db, pgDialect.Identifier(c.cfg.Database, c.cfg.Schema, sql.DefaultFlowCheckpoints))
+	return sql.ListCheckpointsEntries(ctx, c.db, c.ep.Dialect.Identifier(c.cfg.Database, c.cfg.Schema, sql.DefaultFlowCheckpoints))
 }
 
 func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
-	return sql.DeleteCheckpointsEntry(ctx, c.db, pgDialect.Identifier(c.cfg.Database, c.cfg.Schema, sql.DefaultFlowCheckpoints), taskName)
+	return sql.DeleteCheckpointsEntry(ctx, c.db, c.ep.Dialect.Identifier(c.cfg.Database, c.cfg.Schema, sql.DefaultFlowCheckpoints), taskName)
 }
 
 func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
@@ -229,7 +229,7 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 	}
 	defer db.Close()
 
-	return sql.SnapshotTestTable(ctx, db, pgDialect.Identifier(path...))
+	return sql.SnapshotTestTable(ctx, db, c.ep.Dialect.Identifier(path...))
 }
 
 func (c *client) Close() {
