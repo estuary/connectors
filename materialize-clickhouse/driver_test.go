@@ -1097,6 +1097,5 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	require.Error(t, moveErr)
 	var exc *clickhouseproto.Exception
 	require.ErrorAs(t, moveErr, &exc)
-	require.EqualValues(t, chproto.ErrUnknownTable, exc.Code) // UNKNOWN_TABLE
-	t.Logf("move partition error with missing target: %v", moveErr)
+	require.EqualValues(t, chproto.ErrUnknownTable, exc.Code)
 }
