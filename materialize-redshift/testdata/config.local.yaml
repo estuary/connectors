@@ -1,11 +1,23 @@
-address: localhost:5439
-user: test
-password: test
-database: test
-schema: public
-bucket: test-bucket
-awsAccessKeyId: test
-awsSecretAccessKey: test
-region: us-east-1
+address: estuary-connector-test.076183946664.us-east-2.redshift-serverless.amazonaws.com:5439
+database: dev
+password_sops: ENC[AES256_GCM,data:kcluRuHji9ckwA==,iv:SRE4ZtcVSFOPHikXJhXEFF5xXcMa7kTbPUCqmgBqbQ0=,tag:mjqomw4ihdngh9yzvIKTkg==,type:str]
+user: estuary
+bucket: estuary-connector-test-bucket
+bucketPath: /data
+awsAccessKeyId_sops: ENC[AES256_GCM,data:3L+AVRhCzLkB4U8w60c2yGy2+d0=,iv:28lMs99/dxbwRXHTq+wrMWQ1O5NOVKQ68MSBknYH23Q=,tag:xpVNrAD3jAsRskHF1U0mlQ==,type:str]
+awsSecretAccessKey_sops: ENC[AES256_GCM,data:Pxfnq7DKq37jczCgThj0YxJVXG2oGAjecoOLsdxXocW8HtHj2uFCpQ==,iv:aK9IQZfzoDGLXSjCxnAL8uzGnxQoMUamHNgCkIb7A3A=,tag:ofO838dR/xnXVyOGTSWfAA==,type:str]
+region: us-east-2
+hardDelete: true
+syncSchedule:
+    syncFrequency: 0s
 advanced:
-  feature_flags: allow_existing_tables_for_new_bindings
+    no_flow_document: true
+sops:
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-02-01T17:08:49Z"
+          enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
+    lastmodified: "2025-10-07T17:37:57Z"
+    mac: ENC[AES256_GCM,data:TukNmERD7cMzMXNmZInpluK0nZWyuYfIVjhQBLqXmJthitXXRmhBdkRpWlOSfHuP8R+mHvMvkt55OVEJ2o1EXYzlN/GOxQY1VRyFcI+CiWCiWeIR2UCMZ7z2b9KmTxMGZ5XsrSI7OSkmY9EccFGUvMLIGfpZL8jaRj4Akn6L5Ic=,iv:jENsHMNHz85D+H9SliYpiccm7zFdps98NztdXFrI96k=,tag:Rg2Kixxk+jZCjwtoG7eRnw==,type:str]
+    encrypted_suffix: _sops
+    version: 3.10.2

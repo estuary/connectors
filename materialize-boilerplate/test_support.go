@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"slices"
 	"strconv"
@@ -829,11 +830,12 @@ func RunFlowctl(t *testing.T, args ...string) []byte {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
+	ansiEscape := regexp.MustCompile(`\\x1b\[[0-9;]*m`)
 	go func() {
 		defer wg.Done()
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
-			t.Log(scanner.Text())
+			t.Log(ansiEscape.ReplaceAllString(scanner.Text(), ""))
 		}
 	}()
 

@@ -32,11 +32,12 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 	primaryKeyTextType := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"), sql.UsingConverter(textConverter))
 
 	// Define base date/time mappings without primary key wrapper
-	dateMapping := sql.MapStatic("DATE")
+	dateMapping := sql.MapStatic("DATE", sql.UsingConverter(sql.NormalizeDatetimeString))
 	datetimeMapping := sql.MapStatic("TIMESTAMPTZ", sql.AlsoCompatibleWith("timestamp with time zone"), sql.UsingConverter(sql.StringCastConverter(func(s string) (any, error) {
 		// Redshift supports timestamps with microsecond precision. It will reject
 		// timestamps with higher precision than that, so we truncate anything
 		// beyond microseconds.
+		s = strings.Replace(s, "z", "Z", 1)
 		parsed, err := time.Parse(time.RFC3339Nano, s)
 		if err != nil {
 			return nil, fmt.Errorf("could not parse date-time value %q as time: %w", s, err)
