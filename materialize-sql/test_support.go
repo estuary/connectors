@@ -114,7 +114,7 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 		checkpointsPath, _, err := checkpointsRes.Parameters()
 		require.NoError(t, err)
 
-		client, err := ep.NewClient(ctx, ep)
+		client, err := ep.NewClient(ctx, taskName, ep)
 		require.NoError(t, err)
 
 		var metaShape = FlowCheckpointsTable(checkpointsPath)
