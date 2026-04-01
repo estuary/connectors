@@ -430,10 +430,6 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error) {
 	ctx := it.Context()
 
-	for stateKey := range t.state {
-		delete(t.state, stateKey)
-	}
-
 	lastBinding := -1
 	batch := make([][]any, 0, maxBatchSize)
 	batchBytes := 0
@@ -518,11 +514,10 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 }
 
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	for stateKey, ci := range t.state {
-		if err := t.moveStorePartitionsToTarget(ctx, ci); err != nil {
+	for _, si := range t.state {
+		if err := t.moveStorePartitionsToTarget(ctx, si); err != nil {
 			return nil, fmt.Errorf("moving stage to target: %w", err)
 		}
-		delete(t.state, stateKey)
 	}
 	t.recovery = false
 
