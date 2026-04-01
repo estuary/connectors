@@ -306,6 +306,12 @@ type transactor struct {
 	cfg       config
 }
 
+var _ m.Transactor = (*transactor)(nil)
+
+func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return d.fence.Checkpoint, nil
+}
+
 func prepareNewTransactor(
 	templates templates,
 	caseSensitiveIdentifierEnabled bool,

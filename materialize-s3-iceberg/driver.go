@@ -431,13 +431,13 @@ func (d *materialization) UpdateResource(
 	return d.catalog.UpdateResource(ctx, update)
 }
 
-func (d *materialization) NewMaterializerTransactor(
+func (d *materialization) NewTransactor(
 	ctx context.Context,
 	req pm.Request_Open,
 	is boilerplate.InfoSchema,
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
 	be *m.BindingEvents,
-) (boilerplate.MaterializerTransactor, error) {
+) (m.Transactor, error) {
 	var resourcePaths [][]string
 	var bindings []binding
 

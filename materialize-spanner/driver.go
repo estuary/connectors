@@ -51,9 +51,9 @@ type config struct {
 }
 
 type advancedConfig struct {
-	NoFlowDocument              bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
+	NoFlowDocument                     bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
 	DisableKeyDistributionOptimization bool   `json:"disable_key_distribution_optimization,omitempty" jsonschema:"title=Disable Key Distribution Optimization,description=When enabled the hash prefix normally added to table keys will be omitted. The hash prefix distributes writes across Spanner splits and avoids hotspots.,default=false"`
-	FeatureFlags                string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags                       string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 // Validate the configuration
@@ -239,7 +239,7 @@ func keyDistributionOptimizationChanged(oldConfig, newConfig []byte) (bool, erro
 	}
 
 	var newCfg config
-	var oldFullCfg struct{
+	var oldFullCfg struct {
 		Config config `json:"config"`
 	}
 	if err := json.Unmarshal(oldConfig, &oldFullCfg); err != nil {
@@ -251,6 +251,8 @@ func keyDistributionOptimizationChanged(oldConfig, newConfig []byte) (bool, erro
 
 	return oldFullCfg.Config.Advanced.DisableKeyDistributionOptimization != newCfg.Advanced.DisableKeyDistributionOptimization, nil
 }
+
+var _ m.Transactor = (*transactor)(nil)
 
 // transactor implements the materialization transactor for Spanner using mutations
 type transactor struct {
@@ -407,6 +409,10 @@ func queryNodeCount(ctx context.Context, projectID, instanceID string, opts []op
 	}).Info("queried Spanner instance node count")
 
 	return nodeCount, nil
+}
+
+func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return t.fence.Checkpoint, nil
 }
 
 func newTransactor(

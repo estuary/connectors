@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	m "github.com/estuary/connectors/go/materialize"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -46,7 +45,7 @@ type binding struct {
 	deltaUpdates bool
 }
 
-func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
 }
 

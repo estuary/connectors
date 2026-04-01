@@ -351,6 +351,8 @@ func newPostgresDriver() *sql.Driver[config, tableConfig] {
 	}
 }
 
+var _ m.Transactor = (*transactor)(nil)
+
 type transactor struct {
 	cfg       config
 	templates templates
@@ -426,13 +428,13 @@ func newTransactor(
 }
 
 type binding struct {
-	target             sql.Table
-	nullFieldsToStrip  []string
-	loadInsertSQL      string
-	storeUpdateSQL     string
-	storeInsertSQL     string
-	deleteQuerySQL     string
-	loadQuerySQL       string
+	target            sql.Table
+	nullFieldsToStrip []string
+	loadInsertSQL     string
+	storeUpdateSQL    string
+	storeInsertSQL    string
+	deleteQuerySQL    string
+	loadQuerySQL      string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
@@ -486,6 +488,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	}
 
 	return nil
+}
+
+func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return t.store.fence.Checkpoint, nil
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
