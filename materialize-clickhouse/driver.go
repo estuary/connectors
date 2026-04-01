@@ -191,17 +191,9 @@ type stateItem struct {
 
 type connectorState map[string]*stateItem
 
-func (cp connectorState) ToConnectorState(mergePatch bool) (*pf.ConnectorState, error) {
-	b, err := json.Marshal(cp)
-	if err != nil {
-		return nil, fmt.Errorf("marshalling connectorState: %w", err)
-	}
-	return &pf.ConnectorState{UpdatedJson: b, MergePatch: mergePatch}, nil
-}
-
 func (t *transactor) UnmarshalState(state json.RawMessage) error {
 	if err := json.Unmarshal(state, &t.state); err != nil {
-		return fmt.Errorf("unmarshalling connectorState: %w", err)
+		return fmt.Errorf("unmarshalling connector state: %w", err)
 	}
 	t.recovery = true
 	return nil
@@ -508,8 +500,12 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 
 	return func(ctx context.Context, runtimeCheckpoint *protocol.Checkpoint) (*pf.ConnectorState, m.OpFuture) {
-		cs, err := t.state.ToConnectorState(false)
-		return cs, pf.FinishedOperation(err)
+		checkpointJSON, err := json.Marshal(t.state)
+		if err != nil {
+			return nil, pf.FinishedOperation(fmt.Errorf("marshalling connector state JSON: %w", err))
+		}
+
+		return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: false}, pf.FinishedOperation(err)
 	}, nil
 }
 
@@ -535,7 +531,12 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		delete(t.state, b.target.StateKey)
 	}
 
-	return stateClear.ToConnectorState(true)
+	checkpointJSON, err := json.Marshal(stateClear)
+	if err != nil {
+		return nil, fmt.Errorf("marshalling connector state clearing JSON: %w", err)
+	}
+
+	return &pf.ConnectorState{UpdatedJson: checkpointJSON, MergePatch: true}, nil
 }
 
 func (t *transactor) moveStorePartitionsToTarget(ctx context.Context, si *stateItem) error {
