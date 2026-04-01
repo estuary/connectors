@@ -218,9 +218,6 @@ def start_webhook_server(
     """
     task.log.info("Starting webhook server")
 
-    # TODO: We want to reject bad messages as fast as possible.
-    # 1. Verify IP ranges, signatures, auth, everything
-    # 2. Only then, route to the appropriate collection handling fn
     async def run():
         async with asyncio.TaskGroup() as webhook_tg:
             try:

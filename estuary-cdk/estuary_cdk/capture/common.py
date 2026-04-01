@@ -107,6 +107,16 @@ and "no pages remain" in a response context.
 
 # TODO: explain that I don't really have any use for this yet, I just want to be permissive for future purposes
 WebhookCursor = str | int | datetime | dict[str, JsonValue] | None
+"""WebhookCursor is a cursor into a webhook capture.
+
+They may represent any arbitrary values like increasing message counters or a list of missing
+message ids, to give two examples.
+Cursors are not required for most webhook systems and their use is not standardized,
+so the type definition is kept as broad a possible for flexibility.
+
+When a dict is used, it represents a structured cursor that supports JSON merge patches
+for efficient incremental updates.
+"""
 
 
 class Triggers(Enum):
@@ -144,7 +154,6 @@ class BaseDocument(BaseModel):
     )
 
 
-# TODO: I may need to have WebhookDocument inherit from AssociatedDocument
 class WebhookDocument(BaseDocument):
     class Meta(BaseDocument.Meta):
         webhookId: str = Field(default_factory=lambda: str(uuid4()))
@@ -156,7 +165,7 @@ class WebhookDocument(BaseDocument):
         # TODO: Conditionally include path params and query params like s-h-i
 
     meta_: Meta = Field(
-        default_factory=lambda: WebhookDocument.Meta(op="u"),
+        default_factory=lambda: WebhookDocument.Meta(op="u", headers={}, reqPath=""),
         alias="_meta",
         description="Document metadata",
     )
@@ -285,8 +294,9 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
     class Webhook(BaseModel, extra="forbid"):
         """Partial state of a resource which listens for webhook messages"""
 
-        # TODO: Add description
-        cursor: WebhookCursor = Field(default=None, description="ASDF")
+        cursor: WebhookCursor = Field(
+            default=None, description="WebhookCursor to carry over to the next listener"
+        )
 
     inc: Incremental | dict[str, Incremental | None] | None = Field(
         default=None, description="Incremental capture progress"
@@ -449,8 +459,6 @@ Implementations SHOULD NOT sleep or implement their own coarse rate limit
 # Any fns that extend it should call it so we perform all the usual data validation and transformation,
 # and only then would it do its own thing. The same way in existing connectors we define an `open` fn
 # to decorate `open_binding`'s behaviour.
-# I mean, kind of. Some checks we want to perform before collection routing, like signature verifications.
-# Some messages will come encrypted and we can't even read the discriminator until we verify.
 ProcessWebhookFn = Callable[
     [
         Logger,
