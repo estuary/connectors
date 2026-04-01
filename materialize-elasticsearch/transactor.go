@@ -187,7 +187,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	var batch []byte
 	var lastIndex string
-	for it.NextSkipNoop(t.cfg.HardDelete) {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(t.cfg.HardDelete) {
 		b := t.bindings[it.Binding]
 
 		if len(batch) > storeBatchSize || (lastIndex != b.index && lastIndex != "") {

@@ -426,13 +426,13 @@ func newTransactor(
 }
 
 type binding struct {
-	target             sql.Table
-	nullFieldsToStrip  []string
-	loadInsertSQL      string
-	storeUpdateSQL     string
-	storeInsertSQL     string
-	deleteQuerySQL     string
-	loadQuerySQL       string
+	target            sql.Table
+	nullFieldsToStrip []string
+	loadInsertSQL     string
+	storeUpdateSQL    string
+	storeInsertSQL    string
+	deleteQuerySQL    string
+	loadQuerySQL      string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
@@ -621,7 +621,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	var batch pgx.Batch
 	batchBytes := 0
-	for it.NextSkipNoop(d.cfg.HardDelete) {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
 
 		if it.Delete && d.cfg.HardDelete {

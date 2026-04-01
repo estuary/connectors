@@ -244,7 +244,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
-	for it.NextSkipNoop(t.cfg.HardDelete) {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(t.cfg.HardDelete) {
 		var b = t.bindings[it.Binding]
 
 		flowDelete := t.cfg.HardDelete && it.Delete

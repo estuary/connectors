@@ -627,7 +627,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	// memory use
 	var lastBinding = -1
 
-	for it.NextSkipNoop(d.cfg.HardDelete) {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(d.cfg.HardDelete) {
 		if lastBinding == -1 {
 			lastBinding = it.Binding
 		}

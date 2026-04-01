@@ -485,7 +485,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	var batch pgx.Batch
 	batchBytes := 0
-	for it.NextSkipNoop(d.cfg.HardDelete) {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
 
 		if it.Delete && d.cfg.HardDelete {

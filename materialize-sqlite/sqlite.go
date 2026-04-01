@@ -344,7 +344,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, fmt.Errorf("conn.BeginTx: %w", err)
 	}
 
-	for it.Next() {
+	for it.Next(false) {
 		var ctx = it.Context()
 		var b = d.bindings[it.Binding]
 

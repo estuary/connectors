@@ -371,7 +371,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 	defer db.Close()
 
-	for it.NextSkipNoop(d.cfg.HardDelete) {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
 
 		flowDelete := d.cfg.HardDelete && it.Delete

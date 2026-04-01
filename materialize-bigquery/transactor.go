@@ -326,7 +326,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
-	for it.Next() {
+	for it.Next(false) {
 		var b = t.bindings[it.Binding]
 
 		flowDelete := t.cfg.HardDelete && it.Delete

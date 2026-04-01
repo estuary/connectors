@@ -584,7 +584,7 @@ type checkpoint = map[string]*checkpointItem
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
-	for it.Next() {
+	for it.Next(false) {
 		var b = d.bindings[it.Binding]
 
 		flowDelete := d.cfg.HardDelete && it.Delete

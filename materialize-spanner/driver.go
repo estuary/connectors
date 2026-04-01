@@ -803,7 +803,8 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}()
 
 	// Process all store operations
-	for it.NextSkipNoop(t.cfg.HardDelete) {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(t.cfg.HardDelete) {
 		storeCount++
 		b := t.bindings[it.Binding]
 

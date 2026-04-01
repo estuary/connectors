@@ -143,7 +143,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	for it.NextSkipNoop(t.cfg.HardDelete) {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(t.cfg.HardDelete) {
 		if lastBinding != -1 && (lastBinding != it.Binding || len(batch) == storeBatchSize || batchSize >= batchByteLimit) {
 			if err := sendBatch(); err != nil {
 				return nil, err

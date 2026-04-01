@@ -157,7 +157,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
-	for it.NextSkipNoop(t.cfg.HardDelete) {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(t.cfg.HardDelete) {
 
 		b := t.bindings[it.Binding]
 

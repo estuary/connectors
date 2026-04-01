@@ -117,14 +117,21 @@ type StoreIterator struct {
 // Context returns the Context of this StoreIterator.
 func (it *StoreIterator) Context() context.Context { return it.ctx }
 
-// NextSkipNoop wraps Next, skipping documents that represent no-op:
-// hardDeleteEnabled && it.Delete && !it.Exists
-func (it *StoreIterator) NextSkipNoop(hardDeleteEnabled bool) bool {
-	if !hardDeleteEnabled {
-		return it.Next()
-	}
-	for it.Next() {
-		if it.Delete && !it.Exists {
+// Next returns true if there is another Store and makes it available.
+// When no Stores remain, or if an error is encountered, it returns false
+// and must not be called again.
+//
+// When skipDeleteNotExist is true, skips documents that have been deleted
+// and do not exist in the destination. This is useful for materializers that
+// implement the HardDelete feature, which when enabled, should ignore such
+// documents:
+//
+//	for it.Next(t.cfg.HardDelete) {
+//		...
+//	}
+func (it *StoreIterator) Next(skipDeleteNotExist bool) bool {
+	for it.next() {
+		if skipDeleteNotExist && it.Delete && !it.Exists {
 			continue
 		}
 		return true
@@ -132,10 +139,7 @@ func (it *StoreIterator) NextSkipNoop(hardDeleteEnabled bool) bool {
 	return false
 }
 
-// Next returns true if there is another Store and makes it available.
-// When no Stores remain, or if an error is encountered, it returns false
-// and must not be called again.
-func (it *StoreIterator) Next() bool {
+func (it *StoreIterator) next() bool {
 	if it.request.Flush == nil && it.request.Store == nil {
 		panic(fmt.Sprintf("expected prior request is Flush or Store, got %#v", it.request))
 	}
