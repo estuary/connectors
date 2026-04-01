@@ -20,6 +20,7 @@ func TestSQLGeneration(t *testing.T) {
 	rangeKeyTemplates := []*template.Template{
 		testTemplates.createLoadTable,
 		testTemplates.queryLoadTable,
+		testTemplates.queryLoadTableNoFlowDocument,
 		testTemplates.insertLoadTable,
 		testTemplates.dropLoadTable,
 		testTemplates.createStoreTable,

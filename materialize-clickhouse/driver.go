@@ -71,7 +71,8 @@ type config struct {
 }
 
 type advancedConfig struct {
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
 }
 
 func (c config) Validate() error {
@@ -159,6 +160,7 @@ func newClickHouseDriver() *sql.Driver[config, tableConfig] {
 				CreateTableTemplate: tpls.createTargetTable,
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     false,
+				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
 			}, nil
 		},
 		PreReqs: preReqs,
@@ -241,8 +243,9 @@ func newTransactor(
 }
 
 type binding struct {
-	target sql.Table
-	load   struct {
+	target            sql.Table
+	nullFieldsToStrip []string
+	load              struct {
 		createTableSQL string
 		insertSQL      string
 		querySQL       string
@@ -261,6 +264,12 @@ type binding struct {
 func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	b := &binding{target: target}
 
+	var queryLoadTemplate = t.templates.queryLoadTable
+	if t.cfg.Advanced.NoFlowDocument {
+		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+		queryLoadTemplate = t.templates.queryLoadTableNoFlowDocument
+	}
+
 	var err error
 	if b.load.createTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.createLoadTable); err != nil {
 		return fmt.Errorf("rendering createLoadTable template: %w", err)
@@ -268,7 +277,7 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	if b.load.insertSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.insertLoadTable); err != nil {
 		return fmt.Errorf("rendering insertLoadTable template: %w", err)
 	}
-	if b.load.querySQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.queryLoadTable); err != nil {
+	if b.load.querySQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, queryLoadTemplate); err != nil {
 		return fmt.Errorf("rendering queryLoadTable template: %w", err)
 	}
 	if b.load.dropTableSQL, err = renderTableAndRangeKey(target, t._range.KeyBegin, t.templates.dropLoadTable); err != nil {
@@ -407,6 +416,11 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		var doc json.RawMessage
 		if err = rows.Scan(&bindingId, &doc); err != nil {
 			return fmt.Errorf("scanning Load document: %w", err)
+		}
+		if b := t.bindings[bindingId]; len(b.nullFieldsToStrip) > 0 {
+			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
+				return fmt.Errorf("stripping null fields: %w", err)
+			}
 		}
 		if err = loaded(int(bindingId), doc); err != nil {
 			return err

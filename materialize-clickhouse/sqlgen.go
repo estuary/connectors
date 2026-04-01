@@ -100,18 +100,19 @@ var clickHouseDialect = func(database string) sql.Dialect {
 }
 
 type templates struct {
-	createTargetTable  *template.Template
-	alterTargetColumns *template.Template
-	createLoadTable    *template.Template
-	insertLoadTable    *template.Template
-	queryLoadTable     *template.Template
-	dropLoadTable      *template.Template
-	createStoreTable   *template.Template
-	insertStoreTable   *template.Template
-	queryStoreParts    *template.Template
-	moveStorePartition *template.Template
-	existsStoreTable   *template.Template
-	dropStoreTable     *template.Template
+	createTargetTable            *template.Template
+	alterTargetColumns           *template.Template
+	createLoadTable              *template.Template
+	insertLoadTable              *template.Template
+	queryLoadTable               *template.Template
+	queryLoadTableNoFlowDocument *template.Template
+	dropLoadTable                *template.Template
+	createStoreTable             *template.Template
+	insertStoreTable             *template.Template
+	queryStoreParts              *template.Template
+	moveStorePartition           *template.Template
+	existsStoreTable             *template.Template
+	dropStoreTable               *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect, hardDelete bool) templates {
@@ -248,6 +249,62 @@ SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
 {{ end -}}
 {{ end }}
 
+-- Templated query for no_flow_document mode - reconstructs JSON from root-level columns.
+-- ClickHouse lacks a native JSON object builder (its JSON type only supports objects,
+-- not arrays or scalars, so formatRow/named-tuple approaches double-encode JSON-stored
+-- columns). We use concat() with toJSONString() per value instead.
+--
+-- toJSONString handles most types correctly (Int64, Float64, Bool, String, Date32, NULL),
+-- but needs special handling for:
+--   - OBJECT/ARRAY/MULTIPLE: stored as String containing raw JSON; passed through raw
+--     via ifNull to avoid double-encoding by toJSONString.
+--   - DateTime64: toJSONString produces "2024-06-15 10:30:45.123456" (space separator,
+--     no timezone) instead of RFC3339; we use formatDateTime to produce the correct format.
+--   - STRING_NUMBER: stored as Float64 but must appear as a JSON string; we toString()
+--     before toJSONString() to re-stringify.
+--
+-- For nullable columns, ifNull(toJSONString(col), 'null') is sufficient because
+-- toJSONString(NULL) returns NULL (not the string "null"), and concat propagates NULLs.
+
+{{ define "jsonValue" -}}
+{{ $ident := printf "%s.%s" $.Alias $.Identifier }}
+{{- if or (eq $.AsFlatType "object") (eq $.AsFlatType "array") (eq $.AsFlatType "multiple") -}}
+	ifNull({{ $ident }}, 'null')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+	{{- if $.MustExist -}}
+		concat('"', formatDateTime({{ $ident }}, '%Y-%m-%dT%H:%i:%S.%f', 'UTC'), 'Z"')
+	{{- else -}}
+		ifNull(concat('"', formatDateTime({{ $ident }}, '%Y-%m-%dT%H:%i:%S.%f', 'UTC'), 'Z"'), 'null')
+	{{- end -}}
+{{- else if eq $.AsFlatType "string_number" -}}
+	ifNull(toJSONString(toString({{ $ident }})), 'null')
+{{- else if $.MustExist -}}
+	toJSONString({{ $ident }})
+{{- else -}}
+	ifNull(toJSONString({{ $ident }}), 'null')
+{{- end -}}
+{{- end }}
+
+{{ define "queryLoadTableNoFlowDocument" }}
+{{ if not $.DeltaUpdates -}}
+SELECT {{ $.Binding }}::Int32,
+concat(
+{{- range $i, $col := $.RootLevelColumns }}
+	{{- if $i }} ',',{{ else }}'{',{{ end }}
+	'"{{ $col.Field }}":', {{ template "jsonValue" (ColumnWithAlias $col "r") }},
+{{- end }}
+'}') as flow_document
+	FROM {{$.Identifier}} AS r FINAL
+	JOIN {{ template "loadTableName" . }} AS l
+	{{- range $ind, $key := $.Keys }}
+		{{ if $ind }} AND {{ else }} ON {{ end -}}
+		l.{{$key.Identifier}} = r.{{$key.Identifier}}
+	{{- end }}
+{{ else -}}
+SELECT * FROM (SELECT -1::Int32, ''::String LIMIT 0) as nodoc
+{{ end -}}
+{{ end }}
+
 {{ define "dropLoadTable" }}
 DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 {{ end }}
@@ -318,18 +375,19 @@ DROP TABLE IF EXISTS {{ template "storeTableName" . }};
 `)
 
 	return templates{
-		createTargetTable:  tplAll.Lookup("createTargetTable"),
-		alterTargetColumns: tplAll.Lookup("alterTargetColumns"),
-		createLoadTable:    tplAll.Lookup("createLoadTable"),
-		insertLoadTable:    tplAll.Lookup("insertLoadTable"),
-		queryLoadTable:     tplAll.Lookup("queryLoadTable"),
-		dropLoadTable:      tplAll.Lookup("dropLoadTable"),
-		createStoreTable:   tplAll.Lookup("createStoreTable"),
-		insertStoreTable:   tplAll.Lookup("insertStoreTable"),
-		queryStoreParts:    tplAll.Lookup("queryStoreParts"),
-		moveStorePartition: tplAll.Lookup("moveStorePartition"),
-		existsStoreTable:   tplAll.Lookup("existsStoreTable"),
-		dropStoreTable:     tplAll.Lookup("dropStoreTable"),
+		createTargetTable:            tplAll.Lookup("createTargetTable"),
+		alterTargetColumns:           tplAll.Lookup("alterTargetColumns"),
+		createLoadTable:              tplAll.Lookup("createLoadTable"),
+		insertLoadTable:              tplAll.Lookup("insertLoadTable"),
+		queryLoadTable:               tplAll.Lookup("queryLoadTable"),
+		queryLoadTableNoFlowDocument: tplAll.Lookup("queryLoadTableNoFlowDocument"),
+		dropLoadTable:                tplAll.Lookup("dropLoadTable"),
+		createStoreTable:             tplAll.Lookup("createStoreTable"),
+		insertStoreTable:             tplAll.Lookup("insertStoreTable"),
+		queryStoreParts:              tplAll.Lookup("queryStoreParts"),
+		moveStorePartition:           tplAll.Lookup("moveStorePartition"),
+		existsStoreTable:             tplAll.Lookup("existsStoreTable"),
+		dropStoreTable:               tplAll.Lookup("dropStoreTable"),
 	}
 }
 

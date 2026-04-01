@@ -104,6 +104,43 @@ SELECT 0::Int32, r.flow_document
 
 --- End delta_updates queryLoadTable ---
 
+--- Begin key_value queryLoadTableNoFlowDocument ---
+
+SELECT 0::Int32,
+concat('{',
+	'"key1":', toJSONString(r.key1), ',',
+	'"key2":', toJSONString(r.key2), ',',
+	'"key!binary":', toJSONString(r.`key!binary`), ',',
+	'"array":', ifNull(r.`array`, 'null'), ',',
+	'"binary":', ifNull(toJSONString(r.binary), 'null'), ',',
+	'"boolean":', ifNull(toJSONString(r.boolean), 'null'), ',',
+	'"field_with_projection":', ifNull(toJSONString(r.field_with_projection), 'null'), ',',
+	'"integer":', ifNull(toJSONString(r.integer), 'null'), ',',
+	'"integerGt64Bit":', ifNull(toJSONString(r.`integerGt64Bit`), 'null'), ',',
+	'"integerWithUserDDL":', ifNull(toJSONString(r.`integerWithUserDDL`), 'null'), ',',
+	'"multiple":', ifNull(r.multiple, 'null'), ',',
+	'"nonAsciiκόσμε":', ifNull(toJSONString(r.`nonAsciiκόσμε`), 'null'), ',',
+	'"number":', ifNull(toJSONString(r.number), 'null'), ',',
+	'"numberCastToString":', ifNull(toJSONString(toString(r.`numberCastToString`)), 'null'), ',',
+	'"object":', ifNull(r.object, 'null'), ',',
+	'"string":', ifNull(toJSONString(r.string), 'null'), ',',
+	'"stringInteger":', ifNull(toJSONString(r.`stringInteger`), 'null'), ',',
+	'"stringInteger39Chars":', ifNull(toJSONString(r.`stringInteger39Chars`), 'null'), ',',
+	'"stringInteger66Chars":', ifNull(toJSONString(r.`stringInteger66Chars`), 'null'), ',',
+	'"stringNumber":', ifNull(toJSONString(toString(r.`stringNumber`)), 'null'),
+'}') as flow_document
+	FROM key_value AS r FINAL
+	JOIN flow_temp_load_0_0_key_value AS l
+		 ON l.key1 = r.key1
+		 AND l.key2 = r.key2
+		 AND l.`key!binary` = r.`key!binary`
+--- End key_value queryLoadTableNoFlowDocument ---
+
+--- Begin delta_updates queryLoadTableNoFlowDocument ---
+
+SELECT * FROM (SELECT -1::Int32, ''::String LIMIT 0) as nodoc
+--- End delta_updates queryLoadTableNoFlowDocument ---
+
 --- Begin key_value insertLoadTable ---
 
 INSERT INTO flow_temp_load_0_0_key_value (key1, key2, `key!binary`)

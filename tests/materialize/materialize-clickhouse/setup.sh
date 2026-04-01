@@ -28,7 +28,10 @@ config_json_template='{
      "password": "$CLICKHOUSE_PASSWORD"
    },
    "database": "$CLICKHOUSE_DATABASE",
-   "hardDelete": true
+   "hardDelete": true,
+   "advanced": {
+    "no_flow_document": true
+   }
 }'
 
 standard_resources_json_template='[
