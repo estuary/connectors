@@ -269,4 +269,4 @@ CollectionDiscriminatorSpec = Annotated[
     UrlDiscriminator | HeaderDiscriminator | BodyDiscriminator,
     Field(discriminator="type"),
 ]
-"""Essentially a factory for resource matching rules."""
+"""A factory for resource matching rules."""

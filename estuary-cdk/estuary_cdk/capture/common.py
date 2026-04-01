@@ -162,7 +162,8 @@ class WebhookDocument(BaseDocument):
         )
         headers: dict[str, JsonValue]
         reqPath: str
-        # TODO: Conditionally include path params and query params like s-h-i
+        pathParams: dict[str, str] | None = None
+        queryParams: dict[str, str] | None = None
 
     meta_: Meta = Field(
         default_factory=lambda: WebhookDocument.Meta(op="u", headers={}, reqPath=""),

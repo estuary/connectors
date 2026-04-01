@@ -170,11 +170,17 @@ def build_webhook_app(
             )
             raise web_exceptions.HTTPNotFound(text="No matching binding for request")
 
-        raw_doc["_meta"] = {
+        meta: dict[str, JsonValue] = {
             "op": "u",
             "headers": dict(req.headers),
             "reqPath": req.path,
         }
+        if req.match_info:
+            meta["pathParams"] = dict(req.match_info)
+        if req.query:
+            meta["queryParams"] = dict(req.query)
+
+        raw_doc["_meta"] = meta
 
         # NOTE: This is where we would execute arbitrary document post-processing fns
 
