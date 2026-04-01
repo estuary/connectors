@@ -207,6 +207,44 @@ class TestWebhookHandler:
             )
             assert resp.status == 500
 
+    @pytest.mark.asyncio
+    async def test_array_body_publishes_all(self):
+        resource = _make_resource("catch-all")
+        async with run_server({0: resource}) as ctx:
+            resp = await ctx.client.post("/hook", json=[{"a": 1}, {"b": 2}, {"c": 3}])
+            assert resp.status == 200
+            assert await resp.text() == "{published: 3}"
+
+            output = _read_output(ctx.task)
+            captured_lines = [line for line in output if "captured" in line]
+            assert len(captured_lines) == 3
+
+    @pytest.mark.asyncio
+    async def test_array_body_single_element(self):
+        resource = _make_resource("catch-all")
+        async with run_server({0: resource}) as ctx:
+            resp = await ctx.client.post("/hook", json=[{"x": 1}])
+            assert resp.status == 200
+            assert await resp.text() == "{published: 1}"
+
+    @pytest.mark.asyncio
+    async def test_non_dict_in_array_rejected(self):
+        resource = _make_resource("catch-all")
+        async with run_server({0: resource}) as ctx:
+            resp = await ctx.client.post("/hook", json=[{"ok": 1}, "bad"])
+            assert resp.status == 500
+
+    @pytest.mark.asyncio
+    async def test_non_dict_scalar_body_rejected(self):
+        resource = _make_resource("catch-all")
+        async with run_server({0: resource}) as ctx:
+            resp = await ctx.client.post(
+                "/hook",
+                data=b"42",
+                headers={"Content-Type": "application/json"},
+            )
+            assert resp.status == 500
+
 
 class TestRequestRouting:
     @pytest.mark.asyncio

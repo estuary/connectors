@@ -5,7 +5,7 @@ import traceback
 from collections.abc import Mapping, Sequence
 from typing import ClassVar, cast, override
 
-from aiohttp import web
+from aiohttp import web, web_exceptions
 from pydantic import BaseModel
 from pydantic.fields import Field
 
@@ -146,10 +146,11 @@ def build_webhook_app(
         )
     )
 
-    async def webhook_handler(req: web.Request) -> web.Response:
-        if req.app.get(_rejecting_key, False):
-            return web.Response(status=503, text="Server shutting down")
-
+    async def _handle_webhook_doc(
+        raw_doc: JsonValue,
+        req: web.Request,
+    ) -> None:
+        assert isinstance(raw_doc, dict), "Documents are expected to be JSON objects"
         try:
             matching_binding_index, _ = await anext(
                 (
@@ -159,58 +160,48 @@ def build_webhook_app(
                 ),
             )
         except StopAsyncIteration:
-            # TODO: This error needs a little more detail.
-            # What if we're using body discriminators?
-            # I can't log the entire request body, right?
             task.log.error(
                 "No handler found for incoming webhook request",
-                {"path": req.path},
+                {
+                    "path": req.path,
+                    "header_names": sorted(req.headers.keys()),
+                    "body_keys": sorted(raw_doc.keys()),
+                },
             )
-            return web.Response(status=404, text="No matching binding for request")
+            raise web_exceptions.HTTPNotFound(text="No matching binding for request")
 
-        body = cast(dict[str, JsonValue], await req.json())
-        body["_meta"] = {
+        raw_doc["_meta"] = {
             "op": "u",
             "headers": dict(req.headers),
-            "reqPath": req.remote,
+            "reqPath": req.path,
         }
+
+        # NOTE: This is where we would execute arbitrary document post-processing fns
 
         task.captured(
             matching_binding_index,
-            WebhookDocument.model_validate(body),
+            WebhookDocument.model_validate(raw_doc),
         )
+
+    async def webhook_handler(req: web.Request) -> web.Response:
+        if req.app.get(_rejecting_key, False):
+            return web.Response(status=503, text="Server shutting down")
+
+        parsed_body = cast(JsonValue, await req.json())
+        all_docs = parsed_body if isinstance(parsed_body, list) else [parsed_body]
+
+        for raw_doc in all_docs:
+            await _handle_webhook_doc(raw_doc, req)
+
         await task.checkpoint(
             state=ConnectorState()  # pyright: ignore[reportUnknownArgumentType]
         )
 
-        return web.Response(text="{published: 1}")
+        return web.Response(text=f"{{published: {len(all_docs)}}}")
 
     app = web.Application()
     _ = app.router.add_post("/{path:.*}", webhook_handler)
     return app
-
-
-async def _run_webhook_server(
-    binding_index_mapping: Mapping[
-        int, Resource[WebhookDocument, WebhookResourceConfig, ResourceState]
-    ],
-    task: Task,
-):
-    # TODO: We need to classify webhook processing features as pre- and post-
-    # collection routing. So, we need an universal handler for all requests,
-    # then it gets routed to the collection handler.
-    app = build_webhook_app(binding_index_mapping, task)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, port=8080)
-    await site.start()
-
-    try:
-        _ = await task.stopping.webhook_event.wait()
-        task.log.debug("webhook server is yielding to stop")
-        app[_rejecting_key] = True
-    finally:
-        await runner.cleanup()
 
 
 def start_webhook_server(
@@ -241,7 +232,21 @@ def start_webhook_server(
                     task.stopping,
                     webhook_tg,
                 )
-                await _run_webhook_server(binding_index_mapping, webhook_task)
+
+                app = build_webhook_app(binding_index_mapping, webhook_task)
+                runner = web.AppRunner(app)
+                await runner.setup()
+
+                site = web.TCPSite(runner, port=8080)
+                await site.start()
+
+                try:
+                    _ = await webhook_task.stopping.webhook_event.wait()
+                    webhook_task.log.debug("webhook server is yielding to stop")
+                    app[_rejecting_key] = True
+                finally:
+                    await runner.cleanup()
+
             except Exception as exc:
                 task.log.error("".join(traceback.format_exception(exc)))
                 if task.stopping.first_error is None:
