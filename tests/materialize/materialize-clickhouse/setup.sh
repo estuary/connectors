@@ -46,6 +46,26 @@ standard_resources_json_template='[
   },
   {
     "resource": {
+      "table": "duplicate_keys_delta",
+      "delta_updates": true
+    },
+    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"
+  },
+  {
+    "resource": {
+      "table": "duplicate_keys_delta_exclude_flow_doc",
+      "delta_updates": true
+    },
+    "source": "${TEST_COLLECTION_DUPLICATED_KEYS}",
+    "fields": {
+      "recommended": true,
+      "exclude": [
+        "flow_document"
+      ]
+    }
+  },
+  {
+    "resource": {
       "table": "multiple_types"
     },
     "source": "${TEST_COLLECTION_MULTIPLE_DATATYPES}",

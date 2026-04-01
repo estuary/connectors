@@ -121,7 +121,7 @@ func renderTemplates(dialect sql.Dialect, hardDelete bool) templates {
 	if hardDelete {
 		isDeletedColumn = ",\n\t\t`_is_deleted` UInt8 DEFAULT 0"
 		isDeletedEngineArg = ", `_is_deleted`"
-		isDeletedInsert = "\n\t, _is_deleted"
+		isDeletedInsert = ", _is_deleted"
 	}
 
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
@@ -289,7 +289,8 @@ INSERT INTO {{ template "storeTableName" . }} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
 		{{$col.Identifier}}
-	{{- end -}}`+isDeletedInsert+`
+	{{- end -}}
+    {{- if not $.DeltaUpdates }}`+isDeletedInsert+`{{ end -}}
 )
 {{ end }}
 
