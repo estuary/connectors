@@ -105,7 +105,6 @@ None means "begin a new iteration" in a request context,
 and "no pages remain" in a response context.
 """
 
-# TODO: explain that I don't really have any use for this yet, I just want to be permissive for future purposes
 WebhookCursor = str | int | datetime | dict[str, JsonValue] | None
 """WebhookCursor is a cursor into a webhook capture.
 
@@ -454,28 +453,6 @@ Implementations SHOULD NOT sleep or implement their own coarse rate limit
 (use `ResourceConfig.interval`).
 """
 
-# TODO: Should these fns receive an async generator of messages, as produced by the webhook listener?
-# How would they inform the server that the data's been checkpointed so it can ACK the HTTP request?
-# I need to provide a "heavy lifting" ReceiveWebhookFn type function that performs all the heavy lifting.
-# Any fns that extend it should call it so we perform all the usual data validation and transformation,
-# and only then would it do its own thing. The same way in existing connectors we define an `open` fn
-# to decorate `open_binding`'s behaviour.
-ProcessWebhookFn = Callable[
-    [
-        Logger,
-        WebhookCursor,
-    ],
-    AsyncGenerator[_WebhookDocument | dict[str, JsonValue], None],
-]
-"""
-TODO: Add high-level description. 
-
-This fn should execute after all usual verifications (auth, signatures) happen
-and should be responsible for publishing documents
-
-We need to mention this fn needs to run as fast as possible, we don't want HTTP reqs to time out
-"""
-
 
 def is_recurring_fetch_page_fn(
     fn: FetchPageFn | RecurringFetchPageFn,
@@ -819,7 +796,6 @@ def open_binding(
         | None
     ) = None,
     fetch_snapshot: FetchSnapshotFn[_BaseDocument] | None = None,
-    process_webhook: ProcessWebhookFn[_WebhookDocument] | None = None,
     tombstone: _BaseDocument | None = None,
 ):
     """
@@ -948,28 +924,6 @@ def open_binding(
 
         task.spawn_child(f"{prefix}.snapshot", closure)
 
-    # TODO: How about feeding discriminated processing fns as a dict? Something to keep in mind
-    if process_webhook:
-
-        async def webhook_closure(
-            task: Task,
-            process_webhook: ProcessWebhookFn[_WebhookDocument],
-            state: ResourceState.Webhook,
-        ):
-            assert state and not isinstance(state, dict)
-            await _binding_webhook_task(
-                binding, binding_index, process_webhook, state, task
-            )
-
-        assert resource_state.webhook and isinstance(resource_state.webhook, dict)
-        _ = task.spawn_child(
-            f"{prefix}.webhook",
-            functools.partial(
-                webhook_closure,
-                process_webhook=process_webhook,
-                state=resource_state.webhook,
-            ),
-        )
 
 
 async def _binding_snapshot_task(
@@ -1326,33 +1280,3 @@ async def _binding_incremental_task(
         )
 
 
-async def _binding_webhook_task(
-    binding: CaptureBinding[_ResourceConfig],
-    binding_index: int,
-    process_webhook: ProcessWebhookFn[_WebhookDocument],
-    state: ResourceState.Webhook | None,
-    task: Task,
-):
-    """Process incoming webhook data for a resource"""
-
-    if not state:
-        state = ResourceState.Webhook()
-
-    connector_state = ConnectorState(
-        bindingStateV1={binding.stateKey: ResourceState(webhook=state)}
-    )
-
-    # TODO: This is mostly dead code. Clean up
-    while True:
-        # Yield to the event loop to prevent starvation.
-        await asyncio.sleep(0)
-
-        async for item in process_webhook(task.log, state.cursor):
-            if isinstance(item, WebhookDocument) or isinstance(item, dict):
-                task.captured(binding_index, item)
-                # TODO: s-h-i can checkpoint multiple incoming messages, how is that done?
-                await task.checkpoint(connector_state)
-            else:
-                # TODO: Do I want to push this to prod?
-                # Aren't there any other doc types to handle?
-                raise ValueError("Unexpected webhook yield received")
