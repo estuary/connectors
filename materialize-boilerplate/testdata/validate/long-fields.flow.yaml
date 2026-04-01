@@ -22,3 +22,4 @@ materializations:
         resource: { table: key_value }
         fields:
           recommended: true
+          groupBy: [key, longKeyLongKeyLongKey]
