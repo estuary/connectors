@@ -32,7 +32,7 @@ func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 	// Define base date/time mappings without primary key wrapper
 	primaryKeyTextType := sql.MapStatic("STRING")
 	dateMapping := sql.MapStatic("DATE")
-	datetimeMapping := sql.MapStatic("TIMESTAMP")
+	datetimeMapping := sql.MapStatic("TIMESTAMP", sql.UsingConverter(sql.NormalizeDatetimeString))
 
 	// If feature flag is enabled, wrap with MapPrimaryKey to use string types for primary keys
 	if featureFlags["datetime_keys_as_string"] {

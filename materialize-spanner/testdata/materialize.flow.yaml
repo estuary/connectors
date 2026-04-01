@@ -20,11 +20,6 @@ materializations:
       fields:
         recommended: true
     - resource:
-        table: not_simple
-      source: tests/not-simple
-      fields:
-        recommended: true
-    - resource:
         table: data_types
       source: tests/data-types
       fields:

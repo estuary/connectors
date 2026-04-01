@@ -821,6 +821,10 @@ func shouldCleanup(t *testing.T, now time.Time, item string, suffix string) bool
 func RunFlowctl(t *testing.T, args ...string) []byte {
 	t.Helper()
 
+	// Set TZ=UTC to make tests always run as if the machine
+	// has UTC timezone, consisent across contributors' machines
+	// and the CI
+	os.Setenv("TZ", "UTC")
 	cmd := exec.Command("flowctl", args...)
 	stdout, err := cmd.StdoutPipe()
 	require.NoError(t, err)
