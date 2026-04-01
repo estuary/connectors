@@ -22,7 +22,11 @@ cd $ROOT_DIR/materialize-boilerplate && go test -v ./...
 
 # Run the specific connector tests.
 cd $ROOT_DIR/$CONNECTOR
-go test -v ./...
+if [ -f Cargo.toml ]; then
+  cargo test
+else
+  go test -v ./...
+fi
 
 # Verify that the built image at least works enough to run the spec command.
 # This is intended as a smoke test to detect completely broken images, since the

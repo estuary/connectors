@@ -191,6 +191,7 @@ func (c config) ToURI() string {
 	mysqlCfg.User = c.User
 	mysqlCfg.Passwd = c.Password
 	mysqlCfg.DBName = c.Database
+	mysqlCfg.ClientFoundRows = true
 
 	if c.Advanced.SSLMode != "" {
 		// see https://pkg.go.dev/github.com/go-sql-driver/mysql#section-readme
