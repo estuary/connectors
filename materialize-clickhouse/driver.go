@@ -509,8 +509,22 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}, nil
 }
 
+func (t *transactor) bindingForStateKey(stateKey string) (*binding, bool) {
+	for _, b := range t.bindings {
+		if b.target.StateKey == stateKey {
+			return b, true
+		}
+	}
+	return nil, false
+}
+
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
-	for _, si := range t.state {
+	for stateKey, si := range t.state {
+		// Skip targets tables which do not have a binding anymore
+		// since these tables might be deleted already
+		if _, found := t.bindingForStateKey(stateKey); !found {
+			continue
+		}
 		if err := t.moveStorePartitionsToTarget(ctx, si); err != nil {
 			return nil, fmt.Errorf("moving stage to target: %w", err)
 		}
