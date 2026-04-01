@@ -148,6 +148,7 @@ func migrationIdentifier(migration sql.ColumnTypeMigration) string {
 
 func rfc3339ToUTC() sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
+		str = strings.Replace(str, "z", "Z", 1)
 		if t, err := time.Parse(time.RFC3339Nano, str); err != nil {
 			return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
 		} else {
@@ -158,6 +159,7 @@ func rfc3339ToUTC() sql.ElementConverter {
 
 func rfc3339TimeToUTC() sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
+		str = strings.Replace(str, "z", "Z", 1)
 		if t, err := time.Parse("15:04:05.999999999Z07:00", str); err != nil {
 			return nil, fmt.Errorf("could not parse %q as RFC3339 time: %w", str, err)
 		} else {
