@@ -28,6 +28,7 @@ function cleanup {
 }
 trap cleanup EXIT
 
+export DOCKER_CLIENT_TIMEOUT=500
 flowctl raw build \
     --build-id 12345 \
     --db-path ${TEMP_DIR}/build.db \

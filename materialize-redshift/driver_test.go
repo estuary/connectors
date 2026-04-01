@@ -79,6 +79,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("fence", func(t *testing.T) {
+		cfg := mustGetCfg(t)
 		var testDialect = createRsDialect(false, featureFlagDefaults)
 		var testTemplates = renderTemplates(testDialect)
 
@@ -89,7 +90,6 @@ func TestIntegration(t *testing.T) {
 			makeResourceFn,
 			testTemplates.createTargetTable,
 			func(ctx context.Context, client sql.Client, fence sql.Fence) error {
-				cfg := mustGetCfg(t)
 				conn, err := pgx.Connect(ctx, cfg.toURI())
 				if err != nil {
 					return fmt.Errorf("store pgx.Connect: %w", err)
