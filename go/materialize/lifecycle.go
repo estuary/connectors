@@ -117,6 +117,21 @@ type StoreIterator struct {
 // Context returns the Context of this StoreIterator.
 func (it *StoreIterator) Context() context.Context { return it.ctx }
 
+// NextSkipNoop wraps Next, skipping documents that represent no-op:
+// hardDeleteEnabled && it.Delete && !it.Exists
+func (it *StoreIterator) NextSkipNoop(hardDeleteEnabled bool) bool {
+	if !hardDeleteEnabled {
+		return it.Next()
+	}
+	for it.Next() {
+		if it.Delete && !it.Exists {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
 // Next returns true if there is another Store and makes it available.
 // When no Stores remain, or if an error is encountered, it returns false
 // and must not be called again.

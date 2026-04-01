@@ -157,10 +157,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
-	for it.Next() {
-		if t.cfg.HardDelete && it.Delete && !it.Exists {
-			continue
-		}
+	for it.NextSkipNoop(t.cfg.HardDelete) {
 
 		b := t.bindings[it.Binding]
 

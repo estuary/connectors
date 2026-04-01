@@ -143,7 +143,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	for it.Next() {
+	for it.NextSkipNoop(t.cfg.HardDelete) {
 		if lastBinding != -1 && (lastBinding != it.Binding || len(batch) == storeBatchSize || batchSize >= batchByteLimit) {
 			if err := sendBatch(); err != nil {
 				return nil, err
@@ -153,14 +153,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		key := fmt.Sprintf("%x", it.PackedKey) // Hex-encode
 
 		if it.Delete && t.cfg.HardDelete {
-			if it.Exists {
-				del := &mongo.DeleteOneModel{Filter: map[string]string{idField: key}}
-				batch = append(batch, del)
-				batchSize += len(key)
-			} else {
-				// Ignore items which do not exist and are already deleted
-				continue
-			}
+			del := &mongo.DeleteOneModel{Filter: map[string]string{idField: key}}
+			batch = append(batch, del)
+			batchSize += len(key)
 		} else {
 			var doc bson.M
 			if err := json.Unmarshal(it.RawJSON, &doc); err != nil {

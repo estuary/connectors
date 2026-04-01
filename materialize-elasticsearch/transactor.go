@@ -187,7 +187,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	var batch []byte
 	var lastIndex string
-	for it.Next() {
+	for it.NextSkipNoop(t.cfg.HardDelete) {
 		b := t.bindings[it.Binding]
 
 		if len(batch) > storeBatchSize || (lastIndex != b.index && lastIndex != "") {
@@ -210,16 +210,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		if it.Delete && t.cfg.HardDelete {
-			// Ignore items which do not exist and are already deleted.
-			if it.Exists {
-				batch = append(batch, []byte(`{"delete":{"_id":"`+id+`"`)...)
-				if routingVal != nil {
-					batch = append(batch, []byte(`,"routing":`+string(routingVal))...)
-				}
-				batch = append(batch, []byte(`}}`)...)
-				batch = append(batch, '\n')
+		if it.Delete && t.cfg.HardDelete && it.Exists {
+			batch = append(batch, []byte(`{"delete":{"_id":"`+id+`"`)...)
+			if routingVal != nil {
+				batch = append(batch, []byte(`,"routing":`+string(routingVal))...)
 			}
+			batch = append(batch, []byte(`}}`)...)
+			batch = append(batch, '\n')
 			continue
 		}
 

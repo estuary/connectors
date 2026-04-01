@@ -759,7 +759,7 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	// memory use
 	var lastBinding = -1
 
-	for it.Next() {
+	for it.NextSkipNoop(d.cfg.HardDelete) {
 		if lastBinding == -1 {
 			lastBinding = it.Binding
 		}
@@ -777,14 +777,9 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		var converted []any
 		if it.Delete && d.cfg.HardDelete {
-			if it.Exists {
-				converted, err = b.target.ConvertKey(it.Key)
-				if err != nil {
-					return nil, fmt.Errorf("converting delete parameters: %w", err)
-				}
-			} else {
-				// Ignore items which do not exist and are already deleted
-				continue
+			converted, err = b.target.ConvertKey(it.Key)
+			if err != nil {
+				return nil, fmt.Errorf("converting delete parameters: %w", err)
 			}
 		} else {
 			converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)

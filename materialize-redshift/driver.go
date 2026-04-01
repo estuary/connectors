@@ -659,7 +659,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	var lastBinding = -1
-	for it.Next() {
+	for it.NextSkipNoop(d.cfg.HardDelete) {
 		if lastBinding == -1 {
 			lastBinding = it.Binding
 		}
@@ -684,17 +684,12 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		// so we can't use it to both update and delete rows. So instead we use a separate
 		// temporary table and run a `DELETE USING` query to delete rows
 		if d.cfg.HardDelete && it.Delete {
-			if it.Exists {
-				file = b.deleteFile
-				b.hasDeletes = true
+			file = b.deleteFile
+			b.hasDeletes = true
 
-				converted, err = b.target.ConvertKey(it.Key)
-				if err != nil {
-					return nil, fmt.Errorf("converting delete parameters: %w", err)
-				}
-			} else {
-				// Ignore items which do not exist and are already deleted
-				continue
+			converted, err = b.target.ConvertKey(it.Key)
+			if err != nil {
+				return nil, fmt.Errorf("converting delete parameters: %w", err)
 			}
 		} else {
 			b.hasStores = true
