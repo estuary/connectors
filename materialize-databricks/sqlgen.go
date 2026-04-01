@@ -77,6 +77,7 @@ func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 			"double":    {sql.NewMigrationSpec([]string{"string"})},
 			"timestamp": {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
 			"date":      {sql.NewMigrationSpec([]string{"string"})},
+			"boolean":   {sql.NewMigrationSpec([]string{"string"})},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{

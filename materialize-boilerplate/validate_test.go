@@ -24,7 +24,6 @@ import (
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/ambiguous-fields-incompatible.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/nullable-key.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/long-fields.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate/key-subset.flow.yaml
 //go:generate ./testdata/generate-spec-proto.sh testdata/validate/ambiguous-key.flow.yaml
 
 //go:embed testdata/validate/generated_specs

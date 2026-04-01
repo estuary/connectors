@@ -12,12 +12,13 @@ syncSchedule:
     syncFrequency: 0s
 advanced:
     no_flow_document: true
+    feature_flags: allow_existing_tables_for_new_bindings
 sops:
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2024-02-01T17:08:49Z"
           enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
-    lastmodified: "2025-10-07T17:37:57Z"
-    mac: ENC[AES256_GCM,data:TukNmERD7cMzMXNmZInpluK0nZWyuYfIVjhQBLqXmJthitXXRmhBdkRpWlOSfHuP8R+mHvMvkt55OVEJ2o1EXYzlN/GOxQY1VRyFcI+CiWCiWeIR2UCMZ7z2b9KmTxMGZ5XsrSI7OSkmY9EccFGUvMLIGfpZL8jaRj4Akn6L5Ic=,iv:jENsHMNHz85D+H9SliYpiccm7zFdps98NztdXFrI96k=,tag:Rg2Kixxk+jZCjwtoG7eRnw==,type:str]
+    lastmodified: "2026-04-01T17:26:00Z"
+    mac: ENC[AES256_GCM,data:9ezBX4E3s8FfOHtCbAo1wv8AMSRv1VpHdZ2jbTe4RqDSeqmPzfqvf5MNrYZjV1GLaBvSrStqigS2vq22HG49ypAhxZtd+lD1USxS0hJiTiQQDZOvjWsrfeAhjoHBbjs3huesyBHNu9jhmfuQ7l1Tnav2MP9o+iPLVszLeA/IM5A=,iv:vF8eJb262vfwc+RAF/u2W8DGFW5WpkmxsnN5OQ2ks3I=,tag:3PTO7ce+Y8llfouJmU6xzg==,type:str]
     encrypted_suffix: _sops
     version: 3.10.2

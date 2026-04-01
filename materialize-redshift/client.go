@@ -261,12 +261,20 @@ func (c *client) MustRecreateResource(req *pm.Request_Apply, lastBinding, newBin
 	return false, nil
 }
 
+func (c *client) checkpointsTableIdentifier() string {
+	var path []string
+	if c.cfg.Schema != "" {
+		path = append(path, c.cfg.Schema)
+	}
+	path = append(path, sql.DefaultFlowCheckpoints)
+	return c.ep.Dialect.Identifier(path...)
+}
+
 func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
 	var out []string
 	if err := c.withDB(func(db *stdsql.DB) error {
 		var err error
-		checkpointsTable := c.ep.Dialect.Identifier(c.cfg.Schema, sql.DefaultFlowCheckpoints)
-		out, err = sql.ListCheckpointsEntries(ctx, db, checkpointsTable)
+		out, err = sql.ListCheckpointsEntries(ctx, db, c.checkpointsTableIdentifier())
 		return err
 	}); err != nil {
 		return nil, err
@@ -276,8 +284,7 @@ func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
 
 func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
 	return c.withDB(func(db *stdsql.DB) error {
-		checkpointsTable := c.ep.Dialect.Identifier(c.cfg.Schema, sql.DefaultFlowCheckpoints)
-		return sql.DeleteCheckpointsEntry(ctx, db, checkpointsTable, taskName)
+		return sql.DeleteCheckpointsEntry(ctx, db, c.checkpointsTableIdentifier(), taskName)
 	})
 }
 

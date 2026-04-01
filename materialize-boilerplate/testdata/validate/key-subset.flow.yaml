@@ -32,3 +32,4 @@ materializations:
             flow_document: {}
           exclude:
             - keyC
+          groupBy: [keyA, keyB]

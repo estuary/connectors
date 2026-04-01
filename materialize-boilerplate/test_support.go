@@ -684,10 +684,24 @@ func applyReq(spec *pf.MaterializationSpec, lastSpec *pf.MaterializationSpec, co
 func selectedFields(binding *pm.Response_Validated_Binding, collection pf.CollectionSpec, includeOptional bool) pf.FieldSelection {
 	out := pf.FieldSelection{}
 
+	var foldedFieldMap = make(map[string]struct{})
+
 	for field, constraint := range binding.Constraints {
 		if constraint.Type.IsForbidden() || !includeOptional && constraint.Type == pm.Response_Validated_Constraint_FIELD_OPTIONAL {
 			continue
 		}
+
+		var foldedField = field
+		if constraint.FoldedField != "" {
+			foldedField = constraint.FoldedField
+		}
+
+		// The runtime only keeps one of the fields which have equal FoldedFields. We replicate
+		// the same logic here:
+		if _, ok := foldedFieldMap[foldedField]; ok {
+			continue
+		}
+		foldedFieldMap[foldedField] = struct{}{}
 
 		proj := collection.GetProjection(field)
 		if proj.IsPrimaryKey {
