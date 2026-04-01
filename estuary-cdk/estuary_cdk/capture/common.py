@@ -562,9 +562,6 @@ _ResolvableBinding = TypeVar(
 """_ResolvableBinding is either a CaptureBinding or a request.ValidateBinding"""
 
 
-# TODO: How should we handle users removing declared webhook resources completely?
-# Do we log an error on newfound undiscovered bindings like it's unexpected behaviour?
-# Do we silently put them back in?
 def resolve_bindings(
     bindings: list[_ResolvableBinding],
     resources: list[Resource[Any, _BaseResourceConfig, Any]],
@@ -925,7 +922,6 @@ def open_binding(
         task.spawn_child(f"{prefix}.snapshot", closure)
 
 
-
 async def _binding_snapshot_task(
     binding: CaptureBinding[_ResourceConfig],
     binding_index: int,
@@ -1278,5 +1274,3 @@ async def _binding_incremental_task(
             "incremental task is idle",
             {"sleep_for": sleep_for, "cursor": state.cursor, "subtask_id": subtask_id},
         )
-
-
