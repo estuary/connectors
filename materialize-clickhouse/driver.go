@@ -306,11 +306,19 @@ func (t *transactor) addBinding(_ context.Context, target sql.Table) error {
 	return nil
 }
 
-// ClickHouse recommends inserting batches of 100,000 rows.
-// https://clickhouse.com/docs/optimize/bulk-inserts
-// Load phase: insert keys to temporary tables for subsequent join on the target table.
-// Store phase: insert documents to stage tables for subsequent move to the target table.
-const maxBatchSize = 100_000
+const (
+	// ClickHouse recommends inserting batches of 100,000 rows.
+	// https://clickhouse.com/docs/optimize/bulk-inserts
+	// Load phase: insert keys to temporary tables for subsequent join on the target table.
+	// Store phase: insert documents to stage tables for subsequent move to the target table.
+	maxBatchSize = 100_000
+
+	// As a very rough approximation, this will limit the amount of memory used for accumulating
+	// batches of keys to load or documents to store based on the size of their packed tuples. As an
+	// example, if documents average 2kb then a 10mb batch size will allow for ~5000 documents per
+	// batch.
+	batchBytesLimit = 10 * 1024 * 1024
+)
 
 func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) error) (err error) {
 	var ctx = it.Context()
@@ -318,6 +326,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 	activeBindings := make(map[int]struct{}, len(t.bindings))
 	lastBinding := -1
 	batch := make([][]any, 0, maxBatchSize)
+	batchBytes := 0
 
 	flushLastBinding := func() error {
 		if len(batch) == 0 || lastBinding < 0 {
@@ -334,6 +343,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			}
 		}
 		batch = batch[:0]
+		batchBytes = 0
 		if err = chBatch.Send(); err != nil {
 			return fmt.Errorf("flushing load batch: %w", err)
 		}
@@ -370,7 +380,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			return fmt.Errorf("converting load key: %w", err)
 		}
 		batch = append(batch, converted)
-		if len(batch) >= maxBatchSize {
+		batchBytes += len(it.PackedKey)
+
+		if len(batch) >= maxBatchSize || batchBytes >= batchBytesLimit {
 			if err = flushLastBinding(); err != nil {
 				return err
 			}
@@ -424,6 +436,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	lastBinding := -1
 	batch := make([][]any, 0, maxBatchSize)
+	batchBytes := 0
 
 	flushLastBinding := func() error {
 		if len(batch) == 0 || lastBinding < 0 {
@@ -440,6 +453,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 		}
 		batch = batch[:0]
+		batchBytes = 0
 		if err = chBatch.Send(); err != nil {
 			return fmt.Errorf("flushing store batch: %w", err)
 		}
@@ -482,7 +496,9 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			converted = append(converted, deleteState)
 		}
 		batch = append(batch, converted)
-		if len(batch) >= maxBatchSize {
+		batchBytes += len(it.PackedKey) + len(it.PackedValues) + len(it.RawJSON)
+
+		if len(batch) >= maxBatchSize || batchBytes >= batchBytesLimit {
 			if err = flushLastBinding(); err != nil {
 				return nil, err
 			}
