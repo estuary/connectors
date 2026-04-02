@@ -247,57 +247,44 @@ SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
 {{ end -}}
 {{ end }}
 
--- Templated query for no_flow_document mode - reconstructs JSON from root-level columns.
--- ClickHouse lacks a native JSON object builder (its JSON type only supports objects,
--- not arrays or scalars, so formatRow/named-tuple approaches double-encode JSON-stored
--- columns). We use concat() with toJSONString() per value instead.
+-- Templated query for no_flow_document mode - reconstructs JSON from root-level columns
+-- using toJSONString(map(...)) with SETTINGS use_variant_as_common_type = 1 to allow
+-- mixed-type map values.
 --
--- toJSONString handles most types correctly (Int64, Float64, Bool, String, Date32, NULL),
--- but needs special handling for:
---   - OBJECT/ARRAY/MULTIPLE: stored as String containing raw JSON; passed through raw
---     via ifNull to avoid double-encoding by toJSONString.
---   - DateTime64: toJSONString produces "2024-06-15 10:30:45.123456" (space separator,
---     no timezone) instead of RFC3339; we use formatDateTime to produce the correct format.
---   - STRING_NUMBER: stored as Float64 but must appear as a JSON string; we toString()
---     before toJSONString() to re-stringify.
---
--- For nullable columns, ifNull(toJSONString(col), 'null') is sufficient because
--- toJSONString(NULL) returns NULL (not the string "null"), and concat propagates NULLs.
+-- toJSONString(map(...)) handles most types correctly, including Nullable columns
+-- (serialized as null). Four types need pre-processing before going into the map:
+--   - DateTime64: toJSONString formats as "YYYY-MM-DD HH:MM:SS.ffffff" which isn't
+--     RFC3339; we formatDateTime and append 'Z' to produce a proper string value.
+--   - STRING_NUMBER: stored as Float64 but must appear as a JSON string; toString()
+--     converts it so the map serializes it quoted.
 
-{{ define "jsonValue" -}}
+{{ define "mapValue" -}}
 {{ $ident := printf "%s.%s" $.Alias $.Identifier }}
-{{- if or (eq $.AsFlatType "object") (eq $.AsFlatType "array") (eq $.AsFlatType "multiple") -}}
-	ifNull({{ $ident }}, 'null')
-{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
-	{{- if $.MustExist -}}
-		concat('"', formatDateTime({{ $ident }}, '%Y-%m-%dT%H:%i:%S.%f', 'UTC'), 'Z"')
-	{{- else -}}
-		ifNull(concat('"', formatDateTime({{ $ident }}, '%Y-%m-%dT%H:%i:%S.%f', 'UTC'), 'Z"'), 'null')
-	{{- end -}}
+{{- if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+	formatDateTime({{ $ident }}, '%Y-%m-%dT%H:%i:%S.%f', 'UTC') || 'Z'
 {{- else if eq $.AsFlatType "string_number" -}}
-	ifNull(toJSONString(toString({{ $ident }})), 'null')
-{{- else if $.MustExist -}}
-	toJSONString({{ $ident }})
+	toString({{ $ident }})
 {{- else -}}
-	ifNull(toJSONString({{ $ident }}), 'null')
+	{{ $ident }}
 {{- end -}}
 {{- end }}
 
 {{ define "queryLoadTableNoFlowDocument" }}
 {{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }}::Int32,
-concat(
-{{- range $i, $col := $.RootLevelColumns }}
-	{{- if $i }} ',',{{ else }}'{',{{ end }}
-	'"{{ $col.Field }}":', {{ template "jsonValue" (ColumnWithAlias $col "r") }},
+toJSONString(map(
+{{- range $i, $col := $.RootLevelColumns -}}
+	{{- if $i }},{{ end }}
+	{{ Literal $col.Field }}, {{ template "mapValue" (ColumnWithAlias $col "r") }}
 {{- end }}
-'}') as flow_document
+)) AS flow_document
 	FROM {{$.Identifier}} AS r FINAL
 	JOIN {{ template "loadTableName" . }} AS l
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON {{ end -}}
 		l.{{$key.Identifier}} = r.{{$key.Identifier}}
 	{{- end }}
+SETTINGS use_variant_as_common_type = 1
 {{ else -}}
 SELECT * FROM (SELECT -1::Int32, ''::String LIMIT 0) as nodoc
 {{ end -}}

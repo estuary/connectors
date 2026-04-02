@@ -25,6 +25,10 @@
   }
 ]
 {
+  "rows": null,
+  "table": "Simple"
+}
+{
   "rows": [
     {
       "canary": "amputation's",
@@ -78,6 +82,10 @@
     }
   ],
   "table": "Simple"
+}
+{
+  "rows": null,
+  "table": "duplicate_keys_standard"
 }
 {
   "rows": [
@@ -143,6 +151,10 @@
     }
   ],
   "table": "duplicate_keys_standard"
+}
+{
+  "rows": null,
+  "table": "duplicate_keys_delta"
 }
 {
   "rows": [
@@ -240,6 +252,10 @@
   "table": "duplicate_keys_delta"
 }
 {
+  "rows": null,
+  "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
   "rows": [
     {
       "flow_published_at": "1970-01-01 01:00:06.000000",
@@ -333,6 +349,10 @@
     }
   ],
   "table": "duplicate_keys_delta_exclude_flow_doc"
+}
+{
+  "rows": null,
+  "table": "Multiple Types"
 }
 {
   "rows": [
@@ -516,6 +536,10 @@
   "table": "Multiple Types"
 }
 {
+  "rows": null,
+  "table": "Formatted Strings"
+}
+{
   "rows": [
     {
       "date": "0000-01-01",
@@ -609,6 +633,10 @@
   "table": "Formatted Strings"
 }
 {
+  "rows": null,
+  "table": "long-string"
+}
+{
   "rows": [
     {
       "flow_published_at": "1970-01-01 02:00:24.000000",
@@ -619,6 +647,10 @@
   "table": "long-string"
 }
 {
+  "rows": null,
+  "table": "unsigned_bigint"
+}
+{
   "rows": [
     {
       "flow_published_at": "1970-01-01 01:00:28.000000",
@@ -627,6 +659,10 @@
     }
   ],
   "table": "unsigned_bigint"
+}
+{
+  "rows": null,
+  "table": "deletions"
 }
 {
   "rows": [
@@ -644,6 +680,10 @@
   "table": "deletions"
 }
 {
+  "rows": null,
+  "table": "all_key_types_part_one"
+}
+{
   "rows": [
     {
       "counter": 2,
@@ -656,6 +696,10 @@
     }
   ],
   "table": "all_key_types_part_one"
+}
+{
+  "rows": null,
+  "table": "all_key_types_part_two"
 }
 {
   "rows": [
@@ -672,6 +716,10 @@
   "table": "all_key_types_part_two"
 }
 {
+  "rows": null,
+  "table": "all_key_types_part_three"
+}
+{
   "rows": [
     {
       "counter": 2,
@@ -686,6 +734,10 @@
   "table": "all_key_types_part_three"
 }
 {
+  "rows": null,
+  "table": "fields_with_projections"
+}
+{
   "rows": [
     {
       "another_field": "another_updated",
@@ -696,6 +748,10 @@
     }
   ],
   "table": "fields_with_projections"
+}
+{
+  "rows": null,
+  "table": "many_columns"
 }
 {
   "rows": [
@@ -807,26 +863,7 @@
   "table": "many_columns"
 }
 {
-  "rows": [
-    {
-      "flow_published_at": "1970-01-01 01:00:36.000000",
-      "id": 1,
-      "offset_datetime": "2024-01-15 15:30:00.000000",
-      "utc_datetime": "2024-01-15 15:30:00.000000"
-    },
-    {
-      "flow_published_at": "1970-01-01 01:00:37.000000",
-      "id": 2,
-      "offset_datetime": "0001-01-01 00:00:00.000000",
-      "utc_datetime": "0000-01-01 00:00:00.000000"
-    },
-    {
-      "flow_published_at": "1970-01-01 01:00:38.000000",
-      "id": 3,
-      "offset_datetime": "2025-01-01 00:00:00.123456",
-      "utc_datetime": "2025-01-01 00:00:00.123456"
-    }
-  ],
+  "rows": null,
   "table": "timezone_datetimes_standard"
 }
 {
@@ -850,7 +887,38 @@
       "utc_datetime": "2025-01-01 00:00:00.123456"
     }
   ],
+  "table": "timezone_datetimes_standard"
+}
+{
+  "rows": null,
   "table": "timezone_datetimes_delta"
+}
+{
+  "rows": [
+    {
+      "flow_published_at": "1970-01-01 01:00:36.000000",
+      "id": 1,
+      "offset_datetime": "2024-01-15 15:30:00.000000",
+      "utc_datetime": "2024-01-15 15:30:00.000000"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:37.000000",
+      "id": 2,
+      "offset_datetime": "0001-01-01 00:00:00.000000",
+      "utc_datetime": "0000-01-01 00:00:00.000000"
+    },
+    {
+      "flow_published_at": "1970-01-01 01:00:38.000000",
+      "id": 3,
+      "offset_datetime": "2025-01-01 00:00:00.123456",
+      "utc_datetime": "2025-01-01 00:00:00.123456"
+    }
+  ],
+  "table": "timezone_datetimes_delta"
+}
+{
+  "rows": null,
+  "table": "optional_non_nullable"
 }
 {
   "rows": [

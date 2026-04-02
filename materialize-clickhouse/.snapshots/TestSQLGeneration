@@ -112,33 +112,34 @@ SELECT 0::Int32, r.flow_document
 --- Begin key_value queryLoadTableNoFlowDocument ---
 
 SELECT 0::Int32,
-concat('{',
-	'"key1":', toJSONString(r.key1), ',',
-	'"key2":', toJSONString(r.key2), ',',
-	'"key!binary":', toJSONString(r.`key!binary`), ',',
-	'"array":', ifNull(r.`array`, 'null'), ',',
-	'"binary":', ifNull(toJSONString(r.binary), 'null'), ',',
-	'"boolean":', ifNull(toJSONString(r.boolean), 'null'), ',',
-	'"field_with_projection":', ifNull(toJSONString(r.field_with_projection), 'null'), ',',
-	'"integer":', ifNull(toJSONString(r.integer), 'null'), ',',
-	'"integerGt64Bit":', ifNull(toJSONString(r.`integerGt64Bit`), 'null'), ',',
-	'"integerWithUserDDL":', ifNull(toJSONString(r.`integerWithUserDDL`), 'null'), ',',
-	'"multiple":', ifNull(r.multiple, 'null'), ',',
-	'"nonAsciiκόσμε":', ifNull(toJSONString(r.`nonAsciiκόσμε`), 'null'), ',',
-	'"number":', ifNull(toJSONString(r.number), 'null'), ',',
-	'"numberCastToString":', ifNull(toJSONString(toString(r.`numberCastToString`)), 'null'), ',',
-	'"object":', ifNull(r.object, 'null'), ',',
-	'"string":', ifNull(toJSONString(r.string), 'null'), ',',
-	'"stringInteger":', ifNull(toJSONString(r.`stringInteger`), 'null'), ',',
-	'"stringInteger39Chars":', ifNull(toJSONString(r.`stringInteger39Chars`), 'null'), ',',
-	'"stringInteger66Chars":', ifNull(toJSONString(r.`stringInteger66Chars`), 'null'), ',',
-	'"stringNumber":', ifNull(toJSONString(toString(r.`stringNumber`)), 'null'),
-'}') as flow_document
+toJSONString(map(
+	'key1', r.key1,
+	'key2', r.key2,
+	'key!binary', r.`key!binary`,
+	'array', r.`array`,
+	'binary', r.binary,
+	'boolean', r.boolean,
+	'field_with_projection', r.field_with_projection,
+	'integer', r.integer,
+	'integerGt64Bit', r.`integerGt64Bit`,
+	'integerWithUserDDL', r.`integerWithUserDDL`,
+	'multiple', r.multiple,
+	'nonAsciiκόσμε', r.`nonAsciiκόσμε`,
+	'number', r.number,
+	'numberCastToString', toString(r.`numberCastToString`),
+	'object', r.object,
+	'string', r.string,
+	'stringInteger', r.`stringInteger`,
+	'stringInteger39Chars', r.`stringInteger39Chars`,
+	'stringInteger66Chars', r.`stringInteger66Chars`,
+	'stringNumber', toString(r.`stringNumber`)
+)) AS flow_document
 	FROM key_value AS r FINAL
 	JOIN flow_temp_load_0_0 AS l
 		 ON l.key1 = r.key1
 		 AND l.key2 = r.key2
 		 AND l.`key!binary` = r.`key!binary`
+SETTINGS use_variant_as_common_type = 1
 --- End key_value queryLoadTableNoFlowDocument ---
 
 --- Begin delta_updates queryLoadTableNoFlowDocument ---
