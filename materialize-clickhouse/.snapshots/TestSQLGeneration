@@ -26,7 +26,12 @@ CREATE TABLE IF NOT EXISTS key_value (
 		`_is_deleted` UInt8 DEFAULT 0
 )
 ENGINE = ReplacingMergeTree(`flow_published_at`, `_is_deleted`)
-ORDER BY (key1, key2, `key!binary`);
+ORDER BY (key1, key2, `key!binary`)
+SETTINGS
+	allow_experimental_replacing_merge_with_cleanup = 1,
+	min_age_to_force_merge_seconds = 604800,
+	min_age_to_force_merge_on_partition_only = 1,
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
 --- End key_value createTargetTable ---
 
 --- Begin delta_updates createTargetTable ---

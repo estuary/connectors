@@ -176,13 +176,11 @@ ORDER BY (
 		{{$key.Identifier}}
 	{{- end -}}
 )
-{{- if $.DeltaUpdates }}
 SETTINGS
 	allow_experimental_replacing_merge_with_cleanup = 1,
 	min_age_to_force_merge_seconds = 604800,
 	min_age_to_force_merge_on_partition_only = 1,
-	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1
-{{- end -}};
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
 {{ end }}
 
 {{ define "alterTargetColumns" }}
