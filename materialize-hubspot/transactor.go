@@ -7,7 +7,7 @@ import (
 	"github.com/estuary/connectors/go/materialize"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
-	"github.com/pingcap/log"
+	log "github.com/sirupsen/logrus"
 )
 
 type transactor struct {

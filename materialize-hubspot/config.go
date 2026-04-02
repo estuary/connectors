@@ -19,7 +19,6 @@ type OAuth2Credentials struct {
 	RefreshToken         string `json:"refresh_token,default=missing" jsonschema_extras:"secret=true"`
 	AccessToken          string `json:"access_token,default=missing" jsonschema_extras:"secret=true"`
 	AccessTokenExpiresAt string `json:"access_token_expires_at,default=missing"`
-	// ExpiresIn            string `json:"expires_in,default=missing"`
 }
 
 type Credentials struct {

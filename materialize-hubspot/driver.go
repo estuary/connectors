@@ -241,7 +241,6 @@ func newMaterialization(
 		"refresh_token":           config.Credentials.RefreshToken,
 		"access_token":            config.Credentials.AccessToken,
 		"access_token_expires_at": config.Credentials.AccessTokenExpiresAt,
-		// "expires_in":              config.Credentials.ExpiresIn,
 	}).Info("newMaterialization")
 	return &materialization{
 		config: config,
