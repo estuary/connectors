@@ -126,6 +126,68 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	return errs
 }
 
+// spannerMigrationSteps customizes the standard migration steps for Spanner.
+// Spanner does not support ALTER TABLE ... RENAME COLUMN, so instead of renaming
+// the temp column, we add the original column back, copy data from temp, and drop temp.
+// Spanner also uses ALTER COLUMN with the full type for setting NOT NULL.
+// The step indices must match StdMigrationSteps (0-4) since StdColumnTypeMigrations
+// uses hardcoded step indices for resuming interrupted migrations.
+var spannerMigrationSteps = []sql.ColumnMigrationStep{
+	sql.StdMigrationSteps[0], // Step 0: Add temp column
+	sql.StdMigrationSteps[1], // Step 1: Copy data from original to temp
+	sql.StdMigrationSteps[2], // Step 2: Drop original column
+	// Step 3: Instead of RENAME COLUMN, add the original column back, copy from temp, and drop temp
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		var queries []string
+		for _, ins := range instructions {
+			queries = append(queries,
+				fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s",
+					table.Identifier,
+					ins.TypeMigration.Identifier,
+					ins.TypeMigration.NullableDDL,
+				),
+			)
+		}
+
+		var update strings.Builder
+		update.WriteString(fmt.Sprintf("UPDATE %s SET ", table.Identifier))
+		for i, ins := range instructions {
+			if i > 0 {
+				update.WriteString(", ")
+			}
+			update.WriteString(fmt.Sprintf("%s = %s", ins.TypeMigration.Identifier, ins.TempColumnIdentifier))
+		}
+		update.WriteString(" WHERE true;")
+		queries = append(queries, update.String())
+
+		for _, ins := range instructions {
+			queries = append(queries,
+				fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s",
+					table.Identifier,
+					ins.TempColumnIdentifier,
+				),
+			)
+		}
+		return queries, nil
+	},
+	// Step 4: Set NOT NULL using Spanner's ALTER COLUMN syntax
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		var queries []string
+		for _, ins := range instructions {
+			if ins.TypeMigration.NullableDDL != ins.TypeMigration.DDL {
+				queries = append(queries,
+					fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s %s",
+						table.Identifier,
+						ins.TypeMigration.Identifier,
+						ins.TypeMigration.DDL,
+					),
+				)
+			}
+		}
+		return queries, nil
+	},
+}
+
 // addPendingDDL accumulates DDL statements to be executed in a batch later
 func (c *client) addPendingDDL(statements ...string) {
 	c.ddlMutex.Lock()
@@ -238,6 +300,13 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		var tableSchema, tableName, columnName, isNullable, spannerType string
 		if err := row.Columns(&tableSchema, &tableName, &columnName, &isNullable, &spannerType); err != nil {
 			return fmt.Errorf("scanning column row: %w", err)
+		}
+
+		// Skip the flow_key_hash column — it is an internal column managed by
+		// the connector for key distribution optimization and is not part of
+		// the Flow collection schema.
+		if columnName == "flow_key_hash" {
+			continue
 		}
 
 		is.PushResource(tableSchema, tableName).PushField(boilerplate.ExistingField{
@@ -359,27 +428,61 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		if err := c.templates.alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
-		alterColumnStmt := alterColumnStmtBuilder.String()
 
-		if alterColumnStmt != "" {
-			ddlStatements = append(ddlStatements, alterColumnStmt)
+		for _, stmt := range strings.Split(alterColumnStmtBuilder.String(), ";") {
+			stmt = strings.TrimSpace(stmt)
+			if stmt != "" {
+				ddlStatements = append(ddlStatements, stmt)
+			}
 		}
 	}
 
+	var migrationSteps []string
 	if len(ta.ColumnTypeChanges) > 0 {
-		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges); err != nil {
+		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, spannerMigrationSteps...); err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		} else {
-			ddlStatements = append(ddlStatements, steps...)
+			migrationSteps = steps
 		}
 	}
 
-	return strings.Join(ddlStatements, "\n"), func(ctx context.Context) error {
-		if len(ddlStatements) == 0 {
+	allStatements := append(ddlStatements, migrationSteps...)
+	return strings.Join(allStatements, "\n"), func(ctx context.Context) error {
+		if len(ddlStatements) == 0 && len(migrationSteps) == 0 {
 			return nil
 		}
 
 		c.addPendingDDL(ddlStatements...)
+
+		if len(migrationSteps) == 0 {
+			return nil
+		}
+
+		// Migration steps interleave DDL (ALTER TABLE) and DML (UPDATE/DELETE).
+		// Spanner requires DDL and DML to be executed through different APIs,
+		// and DDL must be flushed before DML that depends on it can run.
+		for _, stmt := range migrationSteps {
+			stmt = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(stmt), ";"))
+			if stmt == "" {
+				continue
+			}
+
+			isDML := strings.HasPrefix(strings.ToUpper(stmt), "UPDATE") ||
+				strings.HasPrefix(strings.ToUpper(stmt), "DELETE")
+
+			if isDML {
+				// Flush any pending DDL first since the DML may depend on it
+				if err := c.FlushDDL(ctx); err != nil {
+					return fmt.Errorf("flushing batched DDL: %w", err)
+				}
+				if _, err := c.dataClient.PartitionedUpdate(ctx, spanner.Statement{SQL: stmt}); err != nil {
+					return fmt.Errorf("executing migration DML: %w", err)
+				}
+			} else {
+				c.addPendingDDL(stmt)
+			}
+		}
+
 		return nil
 	}, nil
 }

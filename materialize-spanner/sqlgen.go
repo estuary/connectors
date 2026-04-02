@@ -108,6 +108,9 @@ func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
 		Identifierer: sql.IdentifierFn(func(path ...string) string {
 			var parts []string
 			for _, part := range path {
+				if part == "" {
+					continue
+				}
 				sanitized := sanitizeSpannerIdentifier(part)
 				if slices.Contains(SPANNER_RESERVED_WORDS, strings.ToLower(sanitized)) {
 					parts = append(parts, sql.QuoteTransform("`", "``")(sanitized))
@@ -189,15 +192,11 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 -- single statement for efficiency.
 
 {{ define "alterTableColumns" }}
-ALTER TABLE {{$.Identifier}}
-{{- range $ind, $col := $.AddColumns }}
-	{{- if $ind }},{{ end }}
-	ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}}
+{{- range $col := $.AddColumns }}
+ALTER TABLE {{$.Identifier}} ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}};
 {{- end }}
-{{- if and $.DropNotNulls $.AddColumns}},{{ end }}
-{{- range $ind, $col := $.DropNotNulls }}
-	{{- if $ind }},{{ end }}
-	ALTER COLUMN {{ ColumnIdentifier $col.Name }} {{$col.Type}}
+{{- range $col := $.DropNotNulls }}
+ALTER TABLE {{$.Identifier}} ALTER COLUMN {{ ColumnIdentifier $col.Name }} {{$col.Type}};
 {{- end }}
 {{ end }}
 
