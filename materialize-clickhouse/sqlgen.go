@@ -207,7 +207,7 @@ ALTER TABLE {{$.Identifier}} MODIFY COLUMN {{ ColumnIdentifier $col.Name }} Null
 -- connector shuts down.
 
 {{ define "loadTableName" -}}
-flow_temp_load_{{$.Binding}}_{{$.RangeKey}}_{{$.Identifier}}
+flow_temp_load_{{$.Binding}}_{{$.RangeKey}}
 {{- end }}
 
 {{ define "createLoadTable" }}
@@ -331,7 +331,7 @@ DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 -- truncated between transactions and dropped when the connector shuts down.
 
 {{ define "storeTableName" -}}
-flow_temp_store_{{$.Binding}}_{{$.RangeKey}}_{{$.Identifier}}
+flow_temp_store_{{$.Binding}}_{{$.RangeKey}}
 {{- end }}
 
 {{ define "createStoreTable" }}

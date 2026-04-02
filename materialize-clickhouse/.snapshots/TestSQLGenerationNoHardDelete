@@ -35,7 +35,7 @@ SETTINGS
 
 --- Begin key_value insertStoreTable ---
 
-INSERT INTO flow_temp_store_0_0_key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document)
+INSERT INTO flow_temp_store_0_0 (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document)
 --- End key_value insertStoreTable ---
 
 --- Begin delta_updates createTargetTable ---
@@ -56,7 +56,7 @@ SETTINGS
 
 --- Begin delta_updates insertStoreTable ---
 
-INSERT INTO flow_temp_store_1_0_delta_updates (`theKey`, `aValue`, flow_published_at)
+INSERT INTO flow_temp_store_1_0 (`theKey`, `aValue`, flow_published_at)
 --- End delta_updates insertStoreTable ---
 
 

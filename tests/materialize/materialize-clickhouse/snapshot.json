@@ -13,74 +13,74 @@
   {
     "updated": {
       "all_key_types_part_one": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_9_0_all_key_types_part_one'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_9_0_all_key_types_part_one\nMOVE PARTITION ID ?\nTO TABLE all_key_types_part_one;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_9_0_all_key_types_part_one;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_9_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_9_0\nMOVE PARTITION ID ?\nTO TABLE all_key_types_part_one;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_9_0;\n"
       },
       "all_key_types_part_three": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_11_0_all_key_types_part_three'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_11_0_all_key_types_part_three\nMOVE PARTITION ID ?\nTO TABLE all_key_types_part_three;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_11_0_all_key_types_part_three;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_11_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_11_0\nMOVE PARTITION ID ?\nTO TABLE all_key_types_part_three;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_11_0;\n"
       },
       "all_key_types_part_two": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_10_0_all_key_types_part_two'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_10_0_all_key_types_part_two\nMOVE PARTITION ID ?\nTO TABLE all_key_types_part_two;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_10_0_all_key_types_part_two;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_10_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_10_0\nMOVE PARTITION ID ?\nTO TABLE all_key_types_part_two;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_10_0;\n"
       },
       "deletions": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_8_0_deletions'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_8_0_deletions\nMOVE PARTITION ID ?\nTO TABLE deletions;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_8_0_deletions;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_8_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_8_0\nMOVE PARTITION ID ?\nTO TABLE deletions;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_8_0;\n"
       },
       "duplicate_keys_delta": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_2_0_duplicate_keys_delta'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_2_0_duplicate_keys_delta\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_2_0_duplicate_keys_delta;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_2_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_2_0\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_2_0;\n"
       },
       "duplicate_keys_delta_exclude_flow_doc": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_3_0_duplicate_keys_delta_exclude_flow_doc'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_3_0_duplicate_keys_delta_exclude_flow_doc\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta_exclude_flow_doc;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_3_0_duplicate_keys_delta_exclude_flow_doc;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_3_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_3_0\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta_exclude_flow_doc;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_3_0;\n"
       },
       "duplicate_keys_standard": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_1_0_duplicate_keys_standard'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_1_0_duplicate_keys_standard\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_standard;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_1_0_duplicate_keys_standard;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_1_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_1_0\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_standard;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_1_0;\n"
       },
       "fields_with_projections": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_12_0_fields_with_projections'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_12_0_fields_with_projections\nMOVE PARTITION ID ?\nTO TABLE fields_with_projections;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_12_0_fields_with_projections;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_12_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_12_0\nMOVE PARTITION ID ?\nTO TABLE fields_with_projections;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_12_0;\n"
       },
       "formatted_strings": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_5_0_formatted_strings'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_5_0_formatted_strings\nMOVE PARTITION ID ?\nTO TABLE formatted_strings;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_5_0_formatted_strings;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_5_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_5_0\nMOVE PARTITION ID ?\nTO TABLE formatted_strings;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_5_0;\n"
       },
       "many_columns": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_13_0_many_columns'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_13_0_many_columns\nMOVE PARTITION ID ?\nTO TABLE many_columns;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_13_0_many_columns;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_13_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_13_0\nMOVE PARTITION ID ?\nTO TABLE many_columns;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_13_0;\n"
       },
       "multiple_types": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_4_0_multiple_types'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_4_0_multiple_types\nMOVE PARTITION ID ?\nTO TABLE multiple_types;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_4_0_multiple_types;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_4_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_4_0\nMOVE PARTITION ID ?\nTO TABLE multiple_types;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_4_0;\n"
       },
       "simple": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_0_0_simple'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_0_0_simple\nMOVE PARTITION ID ?\nTO TABLE simple;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_0_0_simple;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_0_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_0_0\nMOVE PARTITION ID ?\nTO TABLE simple;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_0_0;\n"
       },
       "timezone_datetimes_standard": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_14_0_timezone_datetimes_standard'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_14_0_timezone_datetimes_standard\nMOVE PARTITION ID ?\nTO TABLE timezone_datetimes_standard;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_14_0_timezone_datetimes_standard;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_14_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_14_0\nMOVE PARTITION ID ?\nTO TABLE timezone_datetimes_standard;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_14_0;\n"
       },
       "unsigned_bigint": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_7_0_unsigned_bigint'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_7_0_unsigned_bigint\nMOVE PARTITION ID ?\nTO TABLE unsigned_bigint;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_7_0_unsigned_bigint;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_7_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_7_0\nMOVE PARTITION ID ?\nTO TABLE unsigned_bigint;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_7_0;\n"
       }
     }
   }
@@ -90,69 +90,69 @@
   {
     "updated": {
       "all_key_types_part_one": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_9_0_all_key_types_part_one'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_9_0_all_key_types_part_one\nMOVE PARTITION ID ?\nTO TABLE all_key_types_part_one;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_9_0_all_key_types_part_one;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_9_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_9_0\nMOVE PARTITION ID ?\nTO TABLE all_key_types_part_one;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_9_0;\n"
       },
       "all_key_types_part_three": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_11_0_all_key_types_part_three'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_11_0_all_key_types_part_three\nMOVE PARTITION ID ?\nTO TABLE all_key_types_part_three;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_11_0_all_key_types_part_three;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_11_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_11_0\nMOVE PARTITION ID ?\nTO TABLE all_key_types_part_three;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_11_0;\n"
       },
       "all_key_types_part_two": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_10_0_all_key_types_part_two'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_10_0_all_key_types_part_two\nMOVE PARTITION ID ?\nTO TABLE all_key_types_part_two;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_10_0_all_key_types_part_two;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_10_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_10_0\nMOVE PARTITION ID ?\nTO TABLE all_key_types_part_two;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_10_0;\n"
       },
       "deletions": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_8_0_deletions'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_8_0_deletions\nMOVE PARTITION ID ?\nTO TABLE deletions;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_8_0_deletions;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_8_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_8_0\nMOVE PARTITION ID ?\nTO TABLE deletions;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_8_0;\n"
       },
       "duplicate_keys_delta": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_2_0_duplicate_keys_delta'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_2_0_duplicate_keys_delta\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_2_0_duplicate_keys_delta;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_2_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_2_0\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_2_0;\n"
       },
       "duplicate_keys_delta_exclude_flow_doc": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_3_0_duplicate_keys_delta_exclude_flow_doc'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_3_0_duplicate_keys_delta_exclude_flow_doc\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta_exclude_flow_doc;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_3_0_duplicate_keys_delta_exclude_flow_doc;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_3_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_3_0\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta_exclude_flow_doc;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_3_0;\n"
       },
       "duplicate_keys_standard": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_1_0_duplicate_keys_standard'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_1_0_duplicate_keys_standard\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_standard;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_1_0_duplicate_keys_standard;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_1_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_1_0\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_standard;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_1_0;\n"
       },
       "fields_with_projections": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_12_0_fields_with_projections'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_12_0_fields_with_projections\nMOVE PARTITION ID ?\nTO TABLE fields_with_projections;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_12_0_fields_with_projections;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_12_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_12_0\nMOVE PARTITION ID ?\nTO TABLE fields_with_projections;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_12_0;\n"
       },
       "formatted_strings": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_5_0_formatted_strings'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_5_0_formatted_strings\nMOVE PARTITION ID ?\nTO TABLE formatted_strings;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_5_0_formatted_strings;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_5_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_5_0\nMOVE PARTITION ID ?\nTO TABLE formatted_strings;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_5_0;\n"
       },
       "long_string": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_6_0_long_string'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_6_0_long_string\nMOVE PARTITION ID ?\nTO TABLE long_string;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_6_0_long_string;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_6_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_6_0\nMOVE PARTITION ID ?\nTO TABLE long_string;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_6_0;\n"
       },
       "many_columns": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_13_0_many_columns'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_13_0_many_columns\nMOVE PARTITION ID ?\nTO TABLE many_columns;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_13_0_many_columns;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_13_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_13_0\nMOVE PARTITION ID ?\nTO TABLE many_columns;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_13_0;\n"
       },
       "multiple_types": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_4_0_multiple_types'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_4_0_multiple_types\nMOVE PARTITION ID ?\nTO TABLE multiple_types;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_4_0_multiple_types;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_4_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_4_0\nMOVE PARTITION ID ?\nTO TABLE multiple_types;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_4_0;\n"
       },
       "simple": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_0_0_simple'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_0_0_simple\nMOVE PARTITION ID ?\nTO TABLE simple;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_0_0_simple;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_0_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_0_0\nMOVE PARTITION ID ?\nTO TABLE simple;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_0_0;\n"
       }
     }
   }
@@ -162,19 +162,19 @@
   {
     "updated": {
       "duplicate_keys_delta": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_2_0_duplicate_keys_delta'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_2_0_duplicate_keys_delta\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_2_0_duplicate_keys_delta;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_2_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_2_0\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_2_0;\n"
       },
       "duplicate_keys_delta_exclude_flow_doc": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_3_0_duplicate_keys_delta_exclude_flow_doc'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_3_0_duplicate_keys_delta_exclude_flow_doc\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta_exclude_flow_doc;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_3_0_duplicate_keys_delta_exclude_flow_doc;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_3_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_3_0\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta_exclude_flow_doc;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_3_0;\n"
       },
       "duplicate_keys_standard": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_1_0_duplicate_keys_standard'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_1_0_duplicate_keys_standard\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_standard;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_1_0_duplicate_keys_standard;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_1_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_1_0\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_standard;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_1_0;\n"
       }
     }
   }
@@ -184,19 +184,19 @@
   {
     "updated": {
       "duplicate_keys_delta": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_2_0_duplicate_keys_delta'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_2_0_duplicate_keys_delta\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_2_0_duplicate_keys_delta;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_2_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_2_0\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_2_0;\n"
       },
       "duplicate_keys_delta_exclude_flow_doc": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_3_0_duplicate_keys_delta_exclude_flow_doc'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_3_0_duplicate_keys_delta_exclude_flow_doc\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta_exclude_flow_doc;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_3_0_duplicate_keys_delta_exclude_flow_doc;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_3_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_3_0\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_delta_exclude_flow_doc;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_3_0;\n"
       },
       "duplicate_keys_standard": {
-        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_1_0_duplicate_keys_standard'\n  AND database = ? AND active;\n",
-        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_1_0_duplicate_keys_standard\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_standard;\n",
-        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_1_0_duplicate_keys_standard;\n"
+        "QueryPartsSQL": "\nSELECT DISTINCT partition_id FROM system.parts\nWHERE table = 'flow_temp_store_1_0'\n  AND database = ? AND active;\n",
+        "MovePartitionSQL": "\nALTER TABLE flow_temp_store_1_0\nMOVE PARTITION ID ?\nTO TABLE duplicate_keys_standard;\n",
+        "DropTableSQL": "\nDROP TABLE IF EXISTS flow_temp_store_1_0;\n"
       }
     }
   }
