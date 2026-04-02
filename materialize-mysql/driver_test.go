@@ -51,6 +51,10 @@ func TestIntegration(t *testing.T) {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
 
+	if out, err := exec.Command("testdata/setup-singlestore.sh").CombinedOutput(); err != nil {
+		t.Logf("singlestore workspace setup failed: %s: %s", err, string(out))
+	}
+
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, newMysqlDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
 	})
