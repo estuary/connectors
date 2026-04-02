@@ -333,7 +333,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if len(batch) == 0 || lastBinding < 0 {
 			return nil
 		}
-		chBatch, err := t.store.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
+		chBatch, err := t.load.conn.PrepareBatch(ctx, t.bindings[lastBinding].load.insertSQL)
 		if err != nil {
 			return fmt.Errorf("preparing load batch: %w", err)
 		}
