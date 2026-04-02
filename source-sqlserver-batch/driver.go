@@ -375,8 +375,8 @@ func (c *capture) emitSourcedSchemas(ctx context.Context) error {
 		return fmt.Errorf("error discovering tables: %w", err)
 	}
 	for _, binding := range c.Bindings {
-		if binding.resource.SchemaName == "" || binding.resource.TableName == "" || binding.resource.Template != "" {
-			continue // Skip bindings with no schema/table or a custom query because we can't know what their schema will look like just from discovery info
+		if binding.resource.SchemaName == "" || binding.resource.TableName == "" {
+			continue // Skip bindings with no schema/table because we need both to look up discovery info
 		}
 		var tableID = binding.resource.SchemaName + "." + binding.resource.TableName
 		var table, ok = tableInfo[tableID]
