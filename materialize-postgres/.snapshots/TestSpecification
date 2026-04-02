@@ -154,7 +154,8 @@
           "propertyName": "auth_type"
         },
         "order": 5,
-        "x-iam-auth": true
+        "x-iam-auth": true,
+        "x-iam-azure-scope": "https://ossrdbms-aad.database.windows.net/.default"
       },
       "dbt_job_trigger": {
         "properties": {
