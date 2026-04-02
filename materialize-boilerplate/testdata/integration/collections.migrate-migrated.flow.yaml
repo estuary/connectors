@@ -19,7 +19,7 @@ collections:
         stringToMulti: { type: [string, boolean] }
         binaryToString: { type: string }
         intToString: { type: string }
-        hugeIntToString: { type: string }
+        hugeIntToString: { type: string, maxLength: 19 }
         numToString: { type: string }
         dateToString: { type: string }
         datetimeToString: { type: string }
