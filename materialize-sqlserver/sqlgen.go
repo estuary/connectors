@@ -110,6 +110,7 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 			"time":      {sql.NewMigrationSpec([]string{textType}, nocast)},
 			"datetime2": {sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(datetimeToStringCast))},
 			"varchar":   {sql.NewMigrationSpecTarget(&StringSizeMigrationTarget{}, nocast)},
+			"*":         {sql.NewMigrationSpec([]string{textType}, nocast)},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
