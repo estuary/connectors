@@ -7,6 +7,14 @@ materializations:
         config: config.local.mysql.yaml
     bindings: []
 
+  acmeCo/tests/materialize-mysql/singlestore:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.singlestore.yaml
+    bindings: []
+
   acmeCo/tests/materialize-mysql/mariadb:
     endpoint:
       local:
