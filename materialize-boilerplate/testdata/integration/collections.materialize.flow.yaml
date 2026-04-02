@@ -98,7 +98,7 @@ collections:
         stringRelativeJsonPointerField: { type: string, format: relative-json-pointer }
         stringRegexField: { type: string, format: regex }
         stringUint32Field: { type: string, format: uint32 }
-        stringUint64Field: { type: string, format: uint64 }
+        stringUint64Field: { type: string, format: uint64, maxLength: 20 }
         stringIriField: { type: string, format: iri }
         stringIriReferenceField: { type: string, format: iri-reference }
       required: [id]

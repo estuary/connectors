@@ -19,7 +19,7 @@ collections:
         stringToMulti: { type: string }
         binaryToString: { type: string, contentEncoding: base64 }
         intToString: { type: string, format: integer }
-        hugeIntToString: { type: string, format: integer, maximum: 18446744073709551615 }
+        hugeIntToString: { type: string, format: integer, maximum: 18446744073709551615, maxLength: 19 }
         numToString: { type: string, format: number }
         dateToString: { type: string, format: date }
         datetimeToString: { type: string, format: date-time }
@@ -39,7 +39,7 @@ collections:
         relativeJsonPointerToString: { type: string, format: relative-json-pointer }
         regexToString: { type: string, format: regex }
         uint32ToString: { type: string, format: uint32 }
-        uint64ToString: { type: string, format: uint64 }
+        uint64ToString: { type: string, format: uint64, maxLength: 20 }
         iriToString: { type: string, format: iri }
         iriReferenceToString: { type: string, format: iri-reference }
       required: [id]
