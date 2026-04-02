@@ -33,7 +33,7 @@ func toSpannerValue(val interface{}, columnName string, columnType string) (inte
 		case strings.Contains(columnType, "DATE"):
 			return spanner.NullDate{Valid: false}, nil
 		case strings.Contains(columnType, "JSON"):
-			return spanner.NullJSON{Valid: false}, nil
+			return nil, nil
 		case strings.Contains(columnType, "NUMERIC"):
 			return spanner.NullNumeric{Valid: false}, nil
 		case strings.Contains(columnType, "BYTES"):
@@ -46,7 +46,10 @@ func toSpannerValue(val interface{}, columnName string, columnType string) (inte
 
 	switch v := val.(type) {
 	case json.RawMessage:
-		return spanner.NullJSON{Value: v, Valid: len(v) > 0}, nil
+		if len(v) == 0 {
+			return nil, nil
+		}
+		return string(v), nil
 	case []byte:
 		return v, nil
 	case string:
@@ -410,7 +413,6 @@ func (f *asyncBatchFlusher) flushSingleBatch(mutations []*spanner.Mutation, muta
 
 	_, batchDuration, err := f.t.timedSpannerApply(f.ctx, mutations, fmt.Sprintf("%s-batch-%d", f.operation, batchNum))
 	if err != nil {
-		// Log mutation details for debugging
 		for i, m := range mutations {
 			log.WithFields(log.Fields{
 				"batch":    batchNum,

@@ -136,9 +136,16 @@ var spannerMigrationSteps = []sql.ColumnMigrationStep{
 	sql.StdMigrationSteps[0], // Step 0: Add temp column
 	sql.StdMigrationSteps[1], // Step 1: Copy data from original to temp
 	sql.StdMigrationSteps[2], // Step 2: Drop original column
-	// Step 3: Instead of RENAME COLUMN, add the original column back, copy from temp, and drop temp
+	// Step 3: Instead of RENAME COLUMN, add the original column back, copy from temp, and drop temp.
+	// A no-op DELETE is emitted first to force a DDL flush between step 2's DROP COLUMN
+	// and this step's ADD COLUMN (same column name). Spanner cannot drop and re-add a
+	// column with the same name in a single DDL batch.
 	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
 		var queries []string
+
+		// Force flush of pending DDL (step 2's DROP COLUMN) before adding columns back
+		queries = append(queries, fmt.Sprintf("DELETE FROM %s WHERE false", table.Identifier))
+
 		for _, ins := range instructions {
 			queries = append(queries,
 				fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s",

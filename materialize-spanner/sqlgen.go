@@ -86,12 +86,12 @@ func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"numeric":  {sql.NewMigrationSpec([]string{"float64", "string"})},
-			"int64":    {sql.NewMigrationSpec([]string{"float64", "numeric", "string"})},
-			"float64":  {sql.NewMigrationSpec([]string{"string"})},
-			"date":     {sql.NewMigrationSpec([]string{"string"})},
-			"timestamp": {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(timestampToStringCast))},
-			"*":        {sql.NewMigrationSpec([]string{"JSON"}, sql.WithCastSQL(toJsonCast))},
+			"numeric":   {sql.NewMigrationSpec([]string{"float64"}), sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
+			"int64":     {sql.NewMigrationSpec([]string{"float64", "numeric"}), sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
+			"float64":   {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
+			"date":      {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
+			"timestamp": {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(timestampToStringCast))},
+			"*":         {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 2 {
@@ -129,6 +129,10 @@ func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
 		MaxColumnCharLength:    128, // Spanner has a 128-character limit for identifiers
 		CaseInsensitiveColumns: false,
 	}
+}
+
+func toStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`CAST(%s AS STRING)`, migration.Identifier)
 }
 
 func timestampToStringCast(migration sql.ColumnTypeMigration) string {
