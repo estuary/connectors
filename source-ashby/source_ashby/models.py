@@ -27,7 +27,7 @@ ConnectorState = GenericConnectorState[ResourceState]
 
 class ResponseMeta(BaseModel, extra="allow"):
     success: bool
-    moreDataAvailable: bool
+    moreDataAvailable: bool = False
     nextCursor: str | None = None
     syncToken: str | None = None
     errors: list[str] = []

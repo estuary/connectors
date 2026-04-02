@@ -345,7 +345,6 @@ class EventValidationContext:
 class Events(ExportResource):
     name: ClassVar[str] = "events"
 
-    email: str
     createdAt: AwareDatetime
     eventType: str
 
@@ -358,6 +357,10 @@ class Events(ExportResource):
 
     # Optional fields used in synthetic ID computation.
     # These may be absent from the source data.
+    email: str = Field(
+        default=None,
+        json_schema_extra=lambda x: x.pop('default')  # type: ignore
+    )
     itblUserId: str = Field(
         default=None,
         json_schema_extra=lambda x: x.pop('default')  # type: ignore

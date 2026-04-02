@@ -26,6 +26,10 @@ def default_start_date():
     return pendulum.now().subtract(hours=1).in_timezone("UTC").format("YYYY-MM-DDTHH:mm:ssZ")
 
 
+DEFAULT_INCREMENTAL_LIMIT = 1_000
+DEFAULT_BACKFILL_LIMIT = 50_000
+
+
 class EndpointConfig(BaseModel):
     host: PendoHost = Field(
         description="The Pendo host to connect to. Select the host that matches the region of your Pendo subscription.",
@@ -42,6 +46,29 @@ class EndpointConfig(BaseModel):
     )
     credentials: AccessToken = Field(
         title="Authentication",
+    )
+
+    class Advanced(BaseModel):
+        incremental_limit: int = Field(
+            description=f"Maximum number of documents to request per API call during incremental replication. Defaults to {DEFAULT_INCREMENTAL_LIMIT:,}.",
+            title="Incremental Limit",
+            default=DEFAULT_INCREMENTAL_LIMIT,
+            ge=1,
+            le=50000,
+        )
+        backfill_limit: int = Field(
+            description=f"Maximum number of documents to request per API call during historical backfills. Defaults to {DEFAULT_BACKFILL_LIMIT:,}.",
+            title="Backfill Limit",
+            default=DEFAULT_BACKFILL_LIMIT,
+            ge=1,
+            le=50000,
+        )
+
+    advanced: Advanced = Field(
+        default_factory=Advanced, # type: ignore
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
     )
 
 

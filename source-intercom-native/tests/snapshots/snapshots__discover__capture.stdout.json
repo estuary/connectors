@@ -31,14 +31,13 @@
           "type": "object"
         }
       },
-      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
-      "title": "IntercomResource",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true
     },
@@ -78,14 +77,13 @@
           "type": "object"
         }
       },
-      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
-      "title": "IntercomResource",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true
     },
@@ -125,14 +123,13 @@
           "type": "object"
         }
       },
-      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
-      "title": "IntercomResource",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true
     },
@@ -172,14 +169,13 @@
           "type": "object"
         }
       },
-      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
-      "title": "IntercomResource",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true
     },
@@ -219,14 +215,13 @@
           "type": "object"
         }
       },
-      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
-      "title": "IntercomResource",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true
     },
@@ -266,14 +261,13 @@
           "type": "object"
         }
       },
-      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
         }
       },
-      "title": "IntercomResource",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true
     },

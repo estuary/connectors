@@ -232,9 +232,14 @@ func (c config) ToURI(ctx context.Context) (string, error) {
 		// Enable SSL for cloud provider IAM connections by default when not explicitly set
 		params.Set("sslmode", "require")
 	}
-	if len(params) > 0 {
-		uri.RawQuery = params.Encode()
-	}
+
+	// Set a short keepalive interval to detect half-open connections more
+	// quickly.  The default is OS specific, but is over 2 hours on many
+	// systems.  This will detect within 120 + (30 * 6) = 5 minutes
+	params.Set("tcp_keepalives_idle", "120")
+	params.Set("tcp_keepalives_interval", "30")
+	params.Set("tcp_keepalives_count", "6")
+	uri.RawQuery = params.Encode()
 
 	return uri.String(), nil
 }
@@ -421,16 +426,21 @@ func newTransactor(
 }
 
 type binding struct {
-	target         sql.Table
-	loadInsertSQL  string
-	storeUpdateSQL string
-	storeInsertSQL string
-	deleteQuerySQL string
-	loadQuerySQL   string
+	target             sql.Table
+	nullFieldsToStrip  []string
+	loadInsertSQL      string
+	storeUpdateSQL     string
+	storeInsertSQL     string
+	deleteQuerySQL     string
+	loadQuerySQL       string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
 	var b = &binding{target: target}
+
+	if t.cfg.Advanced.NoFlowDocument {
+		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+	}
 
 	// Choose the appropriate load query template based on configuration
 	var loadQueryTemplate *template.Template
@@ -552,7 +562,15 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		if err = rows.Scan(&binding, &document); err != nil {
 			return fmt.Errorf("scanning Load document: %w", err)
-		} else if err = loaded(binding, json.RawMessage(document)); err != nil {
+		}
+
+		doc := json.RawMessage(document)
+		if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
+			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
+				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if err = loaded(binding, doc); err != nil {
 			return err
 		}
 	}

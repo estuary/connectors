@@ -90,6 +90,20 @@ class BaseCaptureConnector(
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
         raise NotImplementedError()
 
+    async def update_config(
+        self,
+        log: FlowLogger,
+        config: EndpointConfig,
+    ) -> tuple[str, EndpointConfig] | None:
+        """Hook for connectors to update their endpoint config after receiving
+        an Open RPC but before responding with Opened.
+
+        Returns (message, updated_config) to trigger encryption and a configUpdate
+        event, or None to leave the config unchanged. This is commonly used for
+        migrating configs from a legacy format or setting feature flags on existing captures.
+        """
+        return None # No-op by default.
+
     async def acknowledge(self, acknowledge: request.Acknowledge) -> None:
         return None  # No-op.
 
@@ -114,6 +128,13 @@ class BaseCaptureConnector(
             await self._emit(Response(applied=await self.apply(log, apply)))
 
         elif open := request.open:
+            updated = await self.update_config(log, open.capture.config)
+            if updated is not None:
+                message, updated_config = updated
+                open.capture.config = updated_config
+                encrypted_config = await self._encrypt_config(log, updated_config)
+                log.event.config_update(message, encrypted_config)
+
             opened, capture = await self.open(log, open)
             await self._emit(Response(opened=opened))
 

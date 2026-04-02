@@ -92,6 +92,7 @@
         "type": "string",
         "enum": [
           "1s",
+          "1m",
           "5m",
           "15m",
           "30m",
@@ -105,7 +106,7 @@
       "prefix": {
         "type": "string",
         "title": "Prefix",
-        "description": "Optional prefix that will be used to store objects.",
+        "description": "Optional prefix that will be used to store objects. May contain date patterns.",
         "order": 6
       },
       "fileSizeLimit": {

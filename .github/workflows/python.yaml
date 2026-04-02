@@ -61,6 +61,8 @@ on:
       - "source-ringcentral/**"
       - "source-posthog/**"
       - "source-ashby/**"
+      - "source-gong/**"
+      - "source-greenhouse-native/**"
 
   pull_request:
     branches: [main]
@@ -123,6 +125,8 @@ on:
       - "source-ringcentral/**"
       - "source-posthog/**"
       - "source-ashby/**"
+      - "source-gong/**"
+      - "source-greenhouse-native/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -359,6 +363,14 @@ jobs:
             version: v1
             usage_rate: "1.0"
           - name: source-ashby
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-gong
+            type: capture
+            version: v1
+            usage_rate: "1.0"
+          - name: source-greenhouse-native
             type: capture
             version: v1
             usage_rate: "1.0"

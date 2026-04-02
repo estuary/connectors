@@ -23,6 +23,28 @@
           "title": "AccessToken",
           "type": "object"
         },
+        "Advanced": {
+          "properties": {
+            "incremental_limit": {
+              "default": 1000,
+              "description": "Maximum number of documents to request per API call during incremental replication. Defaults to 1,000.",
+              "maximum": 50000,
+              "minimum": 1,
+              "title": "Incremental Limit",
+              "type": "integer"
+            },
+            "backfill_limit": {
+              "default": 50000,
+              "description": "Maximum number of documents to request per API call during historical backfills. Defaults to 50,000.",
+              "maximum": 50000,
+              "minimum": 1,
+              "title": "Backfill Limit",
+              "type": "integer"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
         "PendoHost": {
           "enum": [
             "app.pendo.io",
@@ -55,6 +77,12 @@
         "credentials": {
           "$ref": "#/$defs/AccessToken",
           "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
         }
       },
       "required": [

@@ -4,4 +4,4 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-docker rm -f "${LOCALSTACK_CONTAINER_NAME}"
+docker compose -f materialize-s3-parquet/docker-compose.yaml down -v

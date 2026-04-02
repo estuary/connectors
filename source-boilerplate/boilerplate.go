@@ -19,6 +19,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 
+	"github.com/estuary/connectors/go/common"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
@@ -68,6 +69,8 @@ func RunMain(connector Connector) {
 	} else {
 		log.SetLevel(lvl)
 	}
+
+	common.ConfigureMemoryLimit()
 
 	var ctx, _ = signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 

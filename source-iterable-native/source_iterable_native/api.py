@@ -37,10 +37,10 @@ from .shared import BASE_URL, EPOCH, dt_to_ms, dt_to_str, ms_to_dt, str_to_dt
 
 
 MAX_CAMPAIGNS_PAGE_SIZE = 1_000
-# If too many campaigns are included in the query params for a metrics request, the URL gets
-# too long and Iterable returns an error indicating as such. Empirically, 400 campaigns per
-# metrics request seems to be just below the upper limit.
-MAX_CAMPAIGNS_PER_METRICS_REQUEST = 400
+# Each campaign ID is passed as a query parameter, and URLs exceeding 2048 characters
+# result in a 414 error. With ~20 chars per campaignId param, 80 IDs keeps the URL
+# well under the limit.
+MAX_CAMPAIGNS_PER_METRICS_REQUEST = 80
 # Fetch metrics for campaigns in a final state within the past 15 days
 # so we capture any late arriving attributions.
 CAMPAIGN_METRICS_LOOKBACK_WINDOW = timedelta(days=15)

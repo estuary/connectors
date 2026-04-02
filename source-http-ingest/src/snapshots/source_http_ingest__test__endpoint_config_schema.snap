@@ -9,9 +9,11 @@ expression: schema
   "properties": {
     "allowedCorsOrigins": {
       "title": "CORS Allowed Origins",
-      "description": "List of allowed CORS origins. If empty, then CORS will be disabled. Otherwise, each item\nin the list will be interpreted as a specific request origin that will be permitted by the\n`Access-Control-Allow-Origin` header for preflight requests coming from that origin. As a special\ncase, the value `*` is permitted in order to allow all origins. The `*` should be used with extreme\ncaution, however. See: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin",
+      "description": "List of allowed CORS origins.\nEach item will be interpreted as a specific request origin permitted by the Access-Control-Allow-Origin header.\nDefaults to [\"*\"], which allows all origins.\nSet to an empty array to disable CORS.\nMust not include \"*\" when an authentication token is configured.\nSee: https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Access-Control-Allow-Origin",
       "type": "array",
-      "default": [],
+      "default": [
+        "*"
+      ],
       "items": {
         "type": "string"
       },

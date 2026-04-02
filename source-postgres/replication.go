@@ -14,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/google/uuid"
@@ -58,8 +59,10 @@ var (
 	// rxBufferInitialSize is the initial size of the receive buffer into which replication messages are read.
 	rxBufferInitialSize = 1 * 1024 * 1024
 
-	// rxBufferMaximumSize is the maximum size to which the receive buffer may grow, and thus also the maximum size of a single message we can handle.
-	rxBufferMaximumSize = 512 * 1024 * 1024
+	// rxBufferMaximumSize is the maximum size to which the receive buffer may grow, and thus also the
+	// maximum size of a single message we can handle. Set to 50% of the container memory limit, which
+	// is determined at startup by common.ConfigureMemoryLimit reading the cgroup limit.
+	rxBufferMaximumSize = int(common.MemoryLimit() / 2)
 )
 
 // A replicationStream represents the process of receiving PostgreSQL
@@ -170,13 +173,6 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 
 	var slot, publication = db.config.Advanced.SlotName, db.config.Advanced.PublicationName
 
-	// Obtain the current WAL flush location on the server. We will need this either to
-	// initialize our cursor or to sanity-check it.
-	serverFlushLSN, err := queryLatestServerLSN(ctx, db.conn)
-	if err != nil {
-		return nil, err
-	}
-
 	var startLSN pglogrepl.LSN
 	if startCursor != "" {
 		// Parse the cursor into an LSN value
@@ -192,6 +188,10 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		// which includes situations like "DB version upgrade")
 		//
 		// TODO(wgd): Upgrade this check to an actual failure once it's been verified to work in prod.
+		serverFlushLSN, err := queryLatestServerLSN(ctx, db.conn)
+		if err != nil {
+			return nil, err
+		}
 		if startLSN > serverFlushLSN {
 			logrus.WithFields(logrus.Fields{
 				"resumeLSN": startLSN.String(),
@@ -219,6 +219,10 @@ func (db *postgresDatabase) ReplicationStream(ctx context.Context, startCursorJS
 		}
 
 		// Initialize our start LSN to the current server flush LSN.
+		serverFlushLSN, err := queryLatestServerLSN(ctx, db.conn)
+		if err != nil {
+			return nil, err
+		}
 		startLSN = serverFlushLSN
 	}
 

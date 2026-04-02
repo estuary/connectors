@@ -261,7 +261,7 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 		return errs
 	}
 
-	db, err := stdsql.Open("databricks", cfg.ToURI("n/a"))
+	db, err := stdsql.Open("databricks", cfg.ToURI(""))
 	if err != nil {
 		errs.Err(fmt.Errorf("opening database: %w", err))
 		return errs

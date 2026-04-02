@@ -555,6 +555,7 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, b
 	}
 
 	var cursor *firestore.DocumentSnapshot
+	var prevCursor = resumeState.Cursor
 	if resumeState.Cursor == "" {
 		// If the cursor path is empty then we just leave the cursor document pointer nil
 		logEntry.Info("starting async backfill")
@@ -568,7 +569,12 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, b
 		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 			return err
 		}
-		return fmt.Errorf("restarting backfill %q: error fetching resume document %q", backfill.CollectionID, resumeState.Cursor)
+		// Sleep briefly to give the runtime a chance to commit the checkpoint clearing
+		// the cursor before we return an error. Without this, the error may kill the
+		// connector before the checkpoint is committed, causing an infinite restart loop
+		// where the same stale cursor is retried on every startup.
+		time.Sleep(10 * time.Second)
+		return fmt.Errorf("restarting backfill %q: error fetching resume document %q", backfill.CollectionID, prevCursor)
 	} else if !resumeDocument.UpdateTime.Equal(resumeState.MTime) {
 		// Just like if the resume document fetch fails, mtime mismatches cause us to error out, so
 		// we'll restart from the beginning when the connector gets restarted and in the meantime
@@ -579,124 +585,32 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, b
 		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
 			return err
 		}
-		return fmt.Errorf("restarting backfill %q: resume document %q modified during backfill", backfill.CollectionID, resumeState.Cursor)
+		// See comment above for why we sleep here.
+		time.Sleep(10 * time.Second)
+		return fmt.Errorf("restarting backfill %q: resume document %q modified during backfill", backfill.CollectionID, prevCursor)
 	} else {
 		cursor = resumeDocument
 	}
 
 	// In order to limit the number of concurrent backfills we're buffering
-	// in memory at any moment we use a semaphore. Instead of waiting to
-	// acquire the semaphore before each query, we instead acquire it up-
-	// front so that we can ensure that any return path from this function
-	// will correctly release it. Then before each query we *release and
-	// reacquire* the semaphore to give other backfills a chance to make
-	// progress.
-	if err := c.backfillSemaphore.Acquire(ctx, 1); err != nil {
-		return err
-	}
-	defer c.backfillSemaphore.Release(1)
-
+	// in memory at any moment we use a semaphore. Each iteration acquires
+	// the semaphore, processes one chunk, and releases it, giving other
+	// backfills a chance to make progress between chunks.
 	var numDocuments int
 	for {
-		// Give other backfills a chance to acquire the semaphore, then take
-		// it back for ourselves.
-		c.backfillSemaphore.Release(1)
 		if err := c.backfillSemaphore.Acquire(ctx, 1); err != nil {
 			return err
 		}
-
-		// Block any further backfill work so long as any StreamChanges workers are
-		// not fully caught up. Async backfills are not time-critical -- while it's
-		// nice for them to finish as quickly as they can, nothing major will break
-		// if a backfill takes a bit longer. Change streaming however *must* always
-		// remain fully caught up or Very Bad Things happen.
-		c.streamsInCatchup.Wait()
-
-		var query firestore.Query = client.CollectionGroup(backfill.CollectionID).Query
-		if backfill.RestartCursorPath != nil {
-			query = query.OrderByPath(firestore.FieldPath(backfill.RestartCursorPath), firestore.Asc)
-		}
-		if cursor != nil {
-			query = query.StartAfter(cursor)
-		} else if backfill.RestartCursorPath != nil && backfill.RestartCursorValue != nil {
-			var startAfter = backfill.RestartCursorValue
-			if restartString, ok := backfill.RestartCursorValue.(string); ok {
-				// If the RestartCursorValue is a string holding a valid RFC3339 timestamp then
-				// assume that it's actually a typed timestamp in the source dataset.
-				if ts, err := time.Parse(time.RFC3339Nano, restartString); err == nil {
-					startAfter = ts
-				}
-			}
-			query = query.StartAfter(startAfter)
-		}
-		query = query.Limit(backfillChunkSize)
-
-		var docs, err = query.Documents(ctx).GetAll()
+		var newCursor, newNumDocuments, done, err = c.backfillChunk(ctx, client, backfill, logEntry, resumeState, cursor, numDocuments)
+		c.backfillSemaphore.Release(1)
 		if err != nil {
-			if status.Code(err) == codes.Canceled {
-				err = context.Canceled // Undo an awful bit of wrapping which breaks errors.Is()
-			}
-			return fmt.Errorf("error backfilling %q: chunk query failed after %d documents: %w", backfill.CollectionID, numDocuments, err)
+			return err
 		}
-		logEntry.WithFields(log.Fields{
-			"total": numDocuments,
-			"chunk": len(docs),
-		}).Debug("processing backfill documents")
-		if len(docs) == 0 {
+		if done {
 			break
 		}
-
-		for _, doc := range docs {
-			logEntry.WithField("doc", doc.Ref.Path).Trace("got document")
-
-			// We update the cursor before checking whether this document is being
-			// backfilled. This does, unfortunately, mean that it's possible for changes
-			// to a document which *isn't being captured* could break the ongoing backfill
-			// resume behavior, but that's just how Firestore collection group queries
-			// work.
-			cursor = doc
-
-			// The 'CollectionGroup' query is potentially over-broad, so skip documents
-			// which aren't actually part of the current backfill.
-			var resourcePath = documentToResourcePath(doc.Ref.Path)
-			if !slices.Contains(backfill.ResourcePaths, resourcePath) {
-				continue
-			}
-
-			// Convert the document into JSON-serializable form
-			var fields = doc.Data()
-			for key, value := range fields {
-				fields[key] = sanitizeValue(value)
-			}
-			fields[metaProperty] = &documentMetadata{
-				Path:       doc.Ref.Path,
-				CreateTime: &doc.CreateTime,
-				UpdateTime: &doc.UpdateTime,
-				Snapshot:   true,
-			}
-
-			if bindingIndex, ok := c.State.BindingIndex(resourcePath); !ok {
-				return fmt.Errorf("internal error: no binding index for async backfill of resource %q", resourcePath)
-			} else if docJSON, err := json.Marshal(fields); err != nil {
-				return fmt.Errorf("error serializing document %q: %w", doc.Ref.Path, err)
-			} else if err := c.Output.Documents(bindingIndex, docJSON); err != nil {
-				return err
-			}
-			numDocuments++
-		}
-
-		resumeState.Cursor = trimDatabasePath(cursor.Ref.Path)
-		resumeState.MTime = cursor.UpdateTime
-		logEntry.WithFields(log.Fields{
-			"total":  numDocuments,
-			"cursor": resumeState.Cursor,
-			"mtime":  resumeState.MTime,
-		}).Debug("updating backfill cursor")
-		if checkpointJSON, err := c.State.UpdateBackfillState(backfill.ResourcePaths, resumeState); err != nil {
-			return err
-		} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
-			return err
-		}
+		cursor = newCursor
+		numDocuments = newNumDocuments
 	}
 
 	logEntry.WithField("docs", numDocuments).Info("backfill complete")
@@ -709,6 +623,114 @@ func (c *capture) BackfillAsync(ctx context.Context, client *firestore.Client, b
 		return err
 	}
 	return nil
+}
+
+// backfillChunk processes a single chunk of backfill documents. It returns the
+// updated cursor and document count, a done flag when there are no more documents,
+// and any error encountered. The caller is responsible for semaphore management.
+func (c *capture) backfillChunk(
+	ctx context.Context,
+	client *firestore.Client,
+	backfill *backfillDescription,
+	logEntry *log.Entry,
+	resumeState *backfillState,
+	cursor *firestore.DocumentSnapshot,
+	numDocuments int,
+) (*firestore.DocumentSnapshot, int, bool, error) {
+	// Block any further backfill work so long as any StreamChanges workers are
+	// not fully caught up. Async backfills are not time-critical -- while it's
+	// nice for them to finish as quickly as they can, nothing major will break
+	// if a backfill takes a bit longer. Change streaming however *must* always
+	// remain fully caught up or Very Bad Things happen.
+	c.streamsInCatchup.Wait()
+
+	var query firestore.Query = client.CollectionGroup(backfill.CollectionID).Query
+	if backfill.RestartCursorPath != nil {
+		query = query.OrderByPath(firestore.FieldPath(backfill.RestartCursorPath), firestore.Asc)
+	}
+	if cursor != nil {
+		query = query.StartAfter(cursor)
+	} else if backfill.RestartCursorPath != nil && backfill.RestartCursorValue != nil {
+		var startAfter = backfill.RestartCursorValue
+		if restartString, ok := backfill.RestartCursorValue.(string); ok {
+			// If the RestartCursorValue is a string holding a valid RFC3339 timestamp then
+			// assume that it's actually a typed timestamp in the source dataset.
+			if ts, err := time.Parse(time.RFC3339Nano, restartString); err == nil {
+				startAfter = ts
+			}
+		}
+		query = query.StartAfter(startAfter)
+	}
+	query = query.Limit(backfillChunkSize)
+
+	var docs, err = query.Documents(ctx).GetAll()
+	if err != nil {
+		if status.Code(err) == codes.Canceled {
+			err = context.Canceled // Undo an awful bit of wrapping which breaks errors.Is()
+		}
+		return cursor, numDocuments, false, fmt.Errorf("error backfilling %q: chunk query failed after %d documents: %w", backfill.CollectionID, numDocuments, err)
+	}
+	logEntry.WithFields(log.Fields{
+		"total": numDocuments,
+		"chunk": len(docs),
+	}).Debug("processing backfill documents")
+	if len(docs) == 0 {
+		return cursor, numDocuments, true, nil
+	}
+
+	for _, doc := range docs {
+		logEntry.WithField("doc", doc.Ref.Path).Trace("got document")
+
+		// We update the cursor before checking whether this document is being
+		// backfilled. This does, unfortunately, mean that it's possible for changes
+		// to a document which *isn't being captured* could break the ongoing backfill
+		// resume behavior, but that's just how Firestore collection group queries
+		// work.
+		cursor = doc
+
+		// The 'CollectionGroup' query is potentially over-broad, so skip documents
+		// which aren't actually part of the current backfill.
+		var resourcePath = documentToResourcePath(doc.Ref.Path)
+		if !slices.Contains(backfill.ResourcePaths, resourcePath) {
+			continue
+		}
+
+		// Convert the document into JSON-serializable form
+		var fields = doc.Data()
+		for key, value := range fields {
+			fields[key] = sanitizeValue(value)
+		}
+		fields[metaProperty] = &documentMetadata{
+			Path:       doc.Ref.Path,
+			CreateTime: &doc.CreateTime,
+			UpdateTime: &doc.UpdateTime,
+			Snapshot:   true,
+		}
+
+		if bindingIndex, ok := c.State.BindingIndex(resourcePath); !ok {
+			return cursor, numDocuments, false, fmt.Errorf("internal error: no binding index for async backfill of resource %q", resourcePath)
+		} else if docJSON, err := json.Marshal(fields); err != nil {
+			return cursor, numDocuments, false, fmt.Errorf("error serializing document %q: %w", doc.Ref.Path, err)
+		} else if err := c.Output.Documents(bindingIndex, docJSON); err != nil {
+			return cursor, numDocuments, false, err
+		}
+		numDocuments++
+	}
+
+	resumeState.Cursor = trimDatabasePath(cursor.Ref.Path)
+	resumeState.MTime = cursor.UpdateTime
+	logEntry.WithFields(log.Fields{
+		"total":  numDocuments,
+		"cursor": resumeState.Cursor,
+		"mtime":  resumeState.MTime,
+	}).Debug("updating backfill cursor")
+	if checkpointJSON, err := c.State.UpdateBackfillState(backfill.ResourcePaths, resumeState); err != nil {
+		return cursor, numDocuments, false, err
+	} else if err := c.Output.Checkpoint(checkpointJSON, true); err != nil {
+		return cursor, numDocuments, false, err
+	}
+
+	return cursor, numDocuments, false, nil
 }
 
 func (c *capture) StreamChanges(ctx context.Context, client *firestore_v1.Client, collectionID string, readTime time.Time) error {

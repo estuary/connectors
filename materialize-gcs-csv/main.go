@@ -50,7 +50,7 @@ func (c config) CommonConfig() filesink.CommonConfig {
 	}
 }
 
-var driver = filesink.FileDriver{
+var driver = filesink.FileDriver[*filesink.SinglePhase]{
 	NewConfig: func(raw json.RawMessage) (filesink.Config, error) {
 		var cfg config
 		if err := pf.UnmarshalStrict(raw, &cfg); err != nil {
@@ -58,7 +58,7 @@ var driver = filesink.FileDriver{
 		}
 		return cfg, nil
 	},
-	NewStore: func(ctx context.Context, c filesink.Config, featureFlags map[string]bool) (filesink.Store, error) {
+	NewStore: func(ctx context.Context, c filesink.Config, featureFlags map[string]bool) (filesink.Store[*filesink.SinglePhase], error) {
 		return filesink.NewGCSStore(ctx, c.(config).GCSStoreConfig)
 	},
 	NewWriter: func(c filesink.Config, featureFlags map[string]bool, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (filesink.StreamWriter, error) {

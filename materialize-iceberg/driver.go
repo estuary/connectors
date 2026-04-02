@@ -340,12 +340,40 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 		location = &base
 	}
 
+	var properties map[string]string
+	if len(res.Config.AdditionalTableProperties) > 0 {
+		properties = make(map[string]string)
+		for k, v := range res.Config.AdditionalTableProperties {
+			properties[k] = v
+		}
+	}
+
 	return fmt.Sprintf("created table %q.%q as %s", ns, name, schema.String()), func(ctx context.Context) error {
 		// The list of IdentifierFieldIDs will be empty for delta updates
 		// tables. For standard updates it is populated in collection key order.
 		// Collection keys are never allowed to change, and neither are the keys
 		// that were initially selected for a materialization.
-		return d.catalog.CreateTable(ctx, ns, name, schema, schema.IdentifierFieldIDs, location)
+		if err := d.catalog.CreateTable(ctx, ns, name, schema, schema.IdentifierFieldIDs, location, properties); err != nil {
+			return err
+		}
+
+		if d.cfg.GlueOptimizers.anyEnabled() {
+			signingName, err := SigningName(d.cfg.URL)
+			if err != nil {
+				return fmt.Errorf("determining signing name: %w", err)
+			}
+			if signingName == "glue" {
+				glueClient, err := d.cfg.toGlueClient(ctx)
+				if err != nil {
+					return fmt.Errorf("creating Glue client: %w", err)
+				}
+				if err := configureTableOptimizers(ctx, glueClient, d.cfg.Warehouse, ns, name, d.cfg.GlueOptimizers); err != nil {
+					return fmt.Errorf("configuring Glue table optimizers for %s.%s: %w", ns, name, err)
+				}
+			}
+		}
+
+		return nil
 	}, nil
 }
 
@@ -372,12 +400,31 @@ func (d *materialization) UpdateResource(
 	existing boilerplate.ExistingResource,
 	update boilerplate.BindingUpdate[config, resource, mapped],
 ) (string, boilerplate.ActionApplyFn, error) {
-	if len(update.NewProjections) == 0 && len(update.NewlyNullableFields) == 0 && len(update.FieldsToMigrate) == 0 {
-		return "", nil, nil
-	}
-
 	ns := resourcePath[0]
 	name := resourcePath[1]
+
+	needsGlueOptimizers := false
+	if d.cfg.GlueOptimizers.anyEnabled() {
+		signingName, err := SigningName(d.cfg.URL)
+		if err != nil {
+			return "", nil, fmt.Errorf("determining signing name: %w", err)
+		}
+		needsGlueOptimizers = signingName == "glue"
+	}
+
+	if len(update.NewProjections) == 0 && len(update.NewlyNullableFields) == 0 && len(update.FieldsToMigrate) == 0 {
+		if !needsGlueOptimizers {
+			return "", nil, nil
+		}
+		return fmt.Sprintf("configured Glue table optimizers for %q.%q", ns, name), func(ctx context.Context) error {
+			glueClient, err := d.cfg.toGlueClient(ctx)
+			if err != nil {
+				return fmt.Errorf("creating Glue client: %w", err)
+			}
+			return configureTableOptimizers(ctx, glueClient, d.cfg.Warehouse, ns, name, d.cfg.GlueOptimizers)
+		}, nil
+	}
+
 	table := existing.Meta.(table.Metadata)
 	current := table.CurrentSchema()
 	next := computeSchemaForUpdatedTable(table.LastColumnID(), current, update)
@@ -458,6 +505,16 @@ func (d *materialization) UpdateResource(
 				return fmt.Errorf("failed to update table %s.%s after migration job: %w", ns, name, err)
 			}
 
+		}
+
+		if needsGlueOptimizers {
+			glueClient, err := d.cfg.toGlueClient(ctx)
+			if err != nil {
+				return fmt.Errorf("creating Glue client: %w", err)
+			}
+			if err := configureTableOptimizers(ctx, glueClient, d.cfg.Warehouse, ns, name, d.cfg.GlueOptimizers); err != nil {
+				return fmt.Errorf("configuring Glue table optimizers for %s.%s: %w", ns, name, err)
+			}
 		}
 
 		return nil

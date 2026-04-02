@@ -44,7 +44,6 @@
       "features": [
         "alert-filters",
         "profile-functions-metrics-eap-ingestion",
-        "project-detail-apple-app-hang-rate",
         "similarity-embeddings",
         "similarity-indexing",
         "similarity-view"
@@ -127,7 +126,6 @@
       "features": [
         "alert-filters",
         "profile-functions-metrics-eap-ingestion",
-        "project-detail-apple-app-hang-rate",
         "similarity-embeddings",
         "similarity-indexing",
         "similarity-view"
@@ -212,7 +210,6 @@
       "features": [
         "alert-filters",
         "profile-functions-metrics-eap-ingestion",
-        "project-detail-apple-app-hang-rate",
         "releases",
         "similarity-embeddings",
         "similarity-indexing",

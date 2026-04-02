@@ -489,7 +489,8 @@ type varcharColumnMeta struct {
 }
 
 type binding struct {
-	target sql.Table
+	target            sql.Table
+	nullFieldsToStrip []string
 
 	varcharColumnMetas []varcharColumnMeta
 	tempVarcharMetas   []varcharColumnMeta
@@ -518,6 +519,10 @@ type binding struct {
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
 	var b = &binding{target: target}
+
+	if t.cfg.Advanced.NoFlowDocument {
+		b.nullFieldsToStrip = target.NullableFieldsToStrip()
+	}
 
 	// Choose the appropriate load query template based on configuration
 	var loadQueryTemplate *template.Template
@@ -697,7 +702,15 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 		if err = rows.Scan(&binding, &document); err != nil {
 			return fmt.Errorf("scanning Load document: %w", err)
-		} else if err = loaded(binding, json.RawMessage(document)); err != nil {
+		}
+
+		doc := json.RawMessage(document)
+		if b := d.bindings[binding]; len(b.nullFieldsToStrip) > 0 {
+			if doc, err = sql.StripNullFields(doc, b.nullFieldsToStrip); err != nil {
+				return fmt.Errorf("stripping null fields: %w", err)
+			}
+		}
+		if err = loaded(binding, doc); err != nil {
 			return err
 		}
 	}

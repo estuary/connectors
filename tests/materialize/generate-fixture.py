@@ -110,8 +110,8 @@ def write_phase_documents(f, collection: str, schema: dict, properties: list[str
         f.write(json.dumps(entry, separators=(',', ':')) + '\n')
 
 def write_ack(f):
-    """Write an ack marker to indicate end of transaction."""
-    f.write('{"ack":true}\n')
+    """Write a commit marker to indicate end of transaction."""
+    f.write('{"commit":true}\n')
 
 def main():
     if len(sys.argv) != 3:

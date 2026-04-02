@@ -16,7 +16,7 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/snowflakedb/gosnowflake"
+	_ "github.com/snowflakedb/gosnowflake/v2"
 )
 
 var testDialect = snowflakeDialect("PUBLIC", timestampTypeLTZ, featureFlagDefaults)
@@ -72,7 +72,7 @@ func TestValidateAndApply(t *testing.T) {
 		Schema: "PUBLIC",
 	}
 
-	dsn, err := cfg.toURI(true)
+	dsn, err := cfg.toURI(true, "")
 	require.NoError(t, err)
 
 	db, err := stdsql.Open("snowflake", dsn)
@@ -109,7 +109,7 @@ func TestValidateAndApplyMigrations(t *testing.T) {
 		Schema: "PUBLIC",
 	}
 
-	dsn, err := cfg.toURI(true)
+	dsn, err := cfg.toURI(true, "")
 	require.NoError(t, err)
 
 	db, err := stdsql.Open("snowflake", dsn)

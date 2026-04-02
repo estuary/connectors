@@ -12,8 +12,11 @@ RUN mkdir /home/nonroot/.ssh
 RUN chmod 700 /home/nonroot/.ssh
 RUN chmod 755 /home/nonroot
 
-# Ask the Go runtime to keep heap size below 900MiB. Our real memory limit is
-# 1GiB so this is 10% headroom as recommended in https://go.dev/doc/gc-guide
+# Fallback Go GC memory limit, 90% of the default 1GiB container allocation,
+# per the recommendations in https://go.dev/doc/gc-guide.
+#
+# Overridden dynamically via `common.ConfigureMemoryLimit()` which reads the
+# actual cgroup `memory.max` and uses 90% of that instead.
 ENV GOMEMLIMIT=900MiB
 
 USER root

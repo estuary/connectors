@@ -127,6 +127,7 @@ def incremental_resources(
                 model,
                 updated_at_field,
                 identifying_field,
+                config.advanced.incremental_limit,
             ),
             fetch_page=functools.partial(
                 backfill_resources,
@@ -136,6 +137,7 @@ def incremental_resources(
                 model,
                 updated_at_field,
                 identifying_field,
+                config.advanced.backfill_limit,
             )
         )
 
@@ -232,6 +234,7 @@ def events(
                 entity,
                 model,
                 identifying_field,
+                config.advanced.incremental_limit,
             ),
             fetch_page=functools.partial(
                 backfill_events,
@@ -240,6 +243,7 @@ def events(
                 entity,
                 model,
                 identifying_field,
+                config.advanced.backfill_limit,
             )
         )
 
@@ -302,6 +306,7 @@ def aggregated_events(
                 entity,
                 model,
                 identifying_field,
+                config.advanced.incremental_limit,
             ),
             fetch_page=functools.partial(
                 backfill_aggregated_events,
@@ -310,6 +315,7 @@ def aggregated_events(
                 entity,
                 model,
                 identifying_field,
+                config.advanced.backfill_limit,
             )
         )
 

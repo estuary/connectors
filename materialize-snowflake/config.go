@@ -11,15 +11,15 @@ import (
 	snowflake_auth "github.com/estuary/connectors/go/auth/snowflake"
 	"github.com/estuary/connectors/go/dbt"
 	m "github.com/estuary/connectors/go/materialize"
-	sf "github.com/snowflakedb/gosnowflake"
 	log "github.com/sirupsen/logrus"
+	sf "github.com/snowflakedb/gosnowflake/v2"
 )
 
 var featureFlagDefaults = map[string]bool{
 	// Use Snowpipe streaming for delta-updates bindings that use JWT
 	// authentication.
-	"snowpipe_streaming":      true,
-	"datetime_keys_as_string": true,
+	"snowpipe_streaming":               true,
+	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
 }
 
@@ -55,7 +55,7 @@ func (t snowflakeTimestampType) toTimestampTypeMapping() timestampTypeMapping {
 // isCompatibleWith checks if the configured timestamp type is compatible with the warehouse's TIMESTAMP_TYPE_MAPPING.
 func (t snowflakeTimestampType) isCompatibleWith(mapping timestampTypeMapping) bool {
 	log.WithFields(log.Fields{
-		"configured_type": t,
+		"configured_type":   t,
 		"warehouse_mapping": mapping,
 	}).Info("checking timestamp type compatibility")
 
@@ -72,18 +72,18 @@ func (t snowflakeTimestampType) isCompatibleWith(mapping timestampTypeMapping) b
 }
 
 type config struct {
-	Host              string                           `json:"host" jsonschema:"title=Host (Account URL),description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
-	Database          string                           `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=3"`
-	Schema            string                           `json:"schema" jsonschema:"title=Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration)." jsonschema_extras:"order=4"`
-	Warehouse         string                           `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=5"`
-	Role              string                           `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=6"`
-	Account           string                           `json:"account,omitempty" jsonschema:"title=Account,description=Optional Snowflake account identifier." jsonschema_extras:"order=7,x-hidden-field=true"`
-	TimestampType     snowflakeTimestampType           `json:"timestamp_type" jsonschema:"title=Snowflake Timestamp Type,description=Controls how timestamp columns are stored in Snowflake.,enum=TIMESTAMP_LTZ,enum=TIMESTAMP_NTZ (discard TZ),enum=TIMESTAMP_NTZ (normalize to UTC),enum=TIMESTAMP_TZ" jsonschema_extras:"order=8"`
-	HardDelete        bool                             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=9"`
-	Credentials       *snowflake_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
-	Schedule          m.ScheduleConfig                 `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
-	DBTJobTrigger     dbt.JobConfig                    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
-	Advanced          advancedConfig                   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+	Host          string                           `json:"host" jsonschema:"title=Host (Account URL),description=The Snowflake Host used for the connection. Must include the account identifier and end in .snowflakecomputing.com. Example: orgname-accountname.snowflakecomputing.com (do not include the protocol)." jsonschema_extras:"order=0,pattern=^[^/:]+.snowflakecomputing.com$"`
+	Database      string                           `json:"database" jsonschema:"title=Database,description=The SQL database to connect to." jsonschema_extras:"order=3"`
+	Schema        string                           `json:"schema" jsonschema:"title=Schema,description=Database schema for bound collection tables (unless overridden within the binding resource configuration)." jsonschema_extras:"order=4"`
+	Warehouse     string                           `json:"warehouse,omitempty" jsonschema:"title=Warehouse,description=The Snowflake virtual warehouse used to execute queries. Uses the default warehouse for the Snowflake user if left blank." jsonschema_extras:"order=5"`
+	Role          string                           `json:"role,omitempty" jsonschema:"title=Role,description=The user role used to perform actions." jsonschema_extras:"order=6"`
+	Account       string                           `json:"account,omitempty" jsonschema:"title=Account,description=Optional Snowflake account identifier." jsonschema_extras:"order=7,x-hidden-field=true"`
+	TimestampType snowflakeTimestampType           `json:"timestamp_type" jsonschema:"title=Snowflake Timestamp Type,description=Controls how timestamp columns are stored in Snowflake.,enum=TIMESTAMP_LTZ,enum=TIMESTAMP_NTZ (discard TZ),enum=TIMESTAMP_NTZ (normalize to UTC),enum=TIMESTAMP_TZ" jsonschema_extras:"order=8"`
+	HardDelete    bool                             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=9"`
+	Credentials   *snowflake_auth.CredentialConfig `json:"credentials" jsonschema:"title=Authentication"`
+	Schedule      m.ScheduleConfig                 `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
+	DBTJobTrigger dbt.JobConfig                    `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
+	Advanced      advancedConfig                   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 type advancedConfig struct {
@@ -96,7 +96,7 @@ type advancedConfig struct {
 // `includeSchema`, to preserve legacy behavior where having the schema set on
 // the connection level is necessary for queries involving tables that don't
 // have the schema as part of their resource path.
-func (c config) toURI(includeSchema bool) (string, error) {
+func (c config) toURI(includeSchema bool, materializationName string) (string, error) {
 	var uri = url.URL{
 		Host: c.Host + ":443",
 	}
@@ -109,6 +109,9 @@ func (c config) toURI(includeSchema bool) (string, error) {
 
 	// Required params
 	queryParams.Add("application", "EstuaryFlow")
+	if materializationName != "" {
+		queryParams.Add("query_tag", "materialization_name:"+materializationName)
+	}
 	queryParams.Add("database", c.Database)
 	// GO_QUERY_RESULT_FORMAT is json in order to enable stream downloading of load results.
 	queryParams.Add("GO_QUERY_RESULT_FORMAT", "json")
@@ -123,6 +126,20 @@ func (c config) toURI(includeSchema bool) (string, error) {
 	// bumps that up quite a bit, to continue attempting retryable errors for
 	// about 10 minutes before crashing.
 	queryParams.Add("maxRetryCount", "35")
+	// jwtClientTimeout controls the HTTP client timeout in seconds for each
+	// attempt to authenticate when using the JWT authentication.  The default
+	// values is 10s.
+	//
+	// In addition to this variable, retries are made according to the
+	// maxRetryCount and loginTimeout variables on certain errors.
+	queryParams.Add("jwtClientTimeout", "30")
+	// The default for CLIENT_RESULT_CHUNK_SIZE is 160. This specifies how many megabytes are in each
+	// result chunk we receive. This option, together with the MaxChunkDownloadWorkers option of
+	// gosnowflake which defaults to 10, determine how much memory can be used at once. With 24
+	// megabytes per chunk we can go up to 240MB assuming 10 download workers, however
+	// according to https://github.com/snowflakedb/gosnowflake/issues/1371#issuecomment-2854052516
+	// there is some overhead that we need to be cautious about
+	queryParams.Add("CLIENT_RESULT_CHUNK_SIZE", "24")
 
 	// Optional params
 	if c.Warehouse != "" {
