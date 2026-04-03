@@ -43,6 +43,12 @@ standard_resources_json_template='[
   },
   {
     "resource": {
+      "table": "name-requires-backticks"
+    },
+    "source": "${TEST_COLLECTION_SIMPLE}"
+  },
+  {
+    "resource": {
       "table": "duplicate_keys_standard"
     },
     "source": "${TEST_COLLECTION_DUPLICATED_KEYS}"

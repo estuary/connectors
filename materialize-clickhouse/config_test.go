@@ -53,6 +53,9 @@ func TestTableConfigValidation(t *testing.T) {
 
 	var valid = tableConfig{Table: "my_table"}
 	require.NoError(t, valid.Validate())
+
+	valid = tableConfig{Table: "name-requires-backticks"}
+	require.NoError(t, valid.Validate())
 }
 
 func TestResolvedAddress(t *testing.T) {
