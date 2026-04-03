@@ -24,7 +24,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ boilerplate.MaterializerTransactor = (*transactor)(nil)
+var _ m.Transactor = (*transactor)(nil)
 
 type binding struct {
 	Idx    int
@@ -57,7 +57,7 @@ type transactor struct {
 	pyFiles pyFileURIs
 }
 
-func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
 }
 

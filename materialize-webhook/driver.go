@@ -279,6 +279,10 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 // Destroy is a no-op.
 func (d *transactor) Destroy() {}
 
+func (d *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return nil, nil
+}
+
 func backoff(attempt int) time.Duration {
 	switch attempt {
 	case 0:

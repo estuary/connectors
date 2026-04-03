@@ -456,6 +456,10 @@ func (t *transactor[T]) Acknowledge(ctx context.Context) (*pf.ConnectorState, er
 
 func (t *transactor[T]) Destroy() {}
 
+func (t *transactor[T]) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return nil, nil
+}
+
 // StdConstraints represents standard constraints for a projection when materializing columns of
 // data to files.
 func StdConstraints(p *pf.Projection) *pm.Response_Validated_Constraint {

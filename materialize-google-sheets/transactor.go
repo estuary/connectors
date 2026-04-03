@@ -322,3 +322,7 @@ func valueToCell(e tuple.TupleElement) *sheets.CellData {
 
 // Destroy is a no-op.
 func (d *transactor) Destroy() {}
+
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return nil, nil
+}

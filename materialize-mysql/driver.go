@@ -398,6 +398,8 @@ func queryTimeZone(ctx context.Context, conn *stdsql.Conn, product string) (stri
 	return tzName, nil
 }
 
+var _ m.Transactor = (*transactor)(nil)
+
 type transactor struct {
 	cfg config
 
@@ -421,6 +423,10 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
+}
+
+func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return t.store.fence.Checkpoint, nil
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }

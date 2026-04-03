@@ -310,6 +310,10 @@ func (t *transactor) UnmarshalState(state json.RawMessage) error {
 	return nil
 }
 
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return nil, nil
+}
+
 func main() {
 	boilerplate.RunMain(new(driver))
 }
