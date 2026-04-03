@@ -371,15 +371,11 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 	defer db.Close()
 
-	for it.Next() {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
 
 		flowDelete := d.cfg.HardDelete && it.Delete
-		if flowDelete && !it.Exists {
-			// Ignore items which do not exist and are already deleted
-			continue
-		}
-
 		if err := b.storeFile.start(ctx, db); err != nil {
 			return nil, err
 		} else if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {

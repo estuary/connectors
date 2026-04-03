@@ -627,7 +627,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	// memory use
 	var lastBinding = -1
 
-	for it.Next() {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(d.cfg.HardDelete) {
 		if lastBinding == -1 {
 			lastBinding = it.Binding
 		}
@@ -647,10 +648,6 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		var b = d.bindings[it.Binding]
 
 		var flowDelete = d.cfg.HardDelete && it.Delete
-		if flowDelete && !it.Exists {
-			// Ignore items which do not exist and are already deleted
-			continue
-		}
 		converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON)
 		if err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
