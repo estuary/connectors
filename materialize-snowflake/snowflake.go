@@ -584,14 +584,9 @@ type checkpoint = map[string]*checkpointItem
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
-	for it.Next(false) {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
-
-		flowDelete := d.cfg.HardDelete && it.Delete
-		if flowDelete && !it.Exists {
-			// Ignore items which do not exist and are already deleted
-			continue
-		}
 
 		if it.Exists {
 			b.store.mustMerge = true
@@ -608,7 +603,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			if err := d.streamManager.writeRow(ctx, it.Binding, converted); err != nil {
 				return nil, fmt.Errorf("encoding Store to stream for resource %s: %w", b.target.Path, err)
 			}
-		} else if err = b.store.stage.writeRow(append(converted, flowDelete)); err != nil {
+		} else if err = b.store.stage.writeRow(append(converted, d.cfg.HardDelete && it.Delete)); err != nil {
 			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
 		} else {
 			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])
