@@ -1,2 +1,2 @@
-will:secret1234@tcp(example.com:3306)/somedb
+will:secret1234@tcp(example.com:3306)/somedb?connectionAttributes=program_name%3AEstuary+materialize-mysql
 invalid 'sslmode' configuration: unknown setting "whoops-this-isnt-right"
