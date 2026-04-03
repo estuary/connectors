@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -77,23 +78,31 @@ var clickHouseDialect = func(database string) sql.Dialect {
 		// ClickHouse columns are NOT NULL by default. We handle Nullable wrapping in templates.
 	)
 
+	// Identifiers can contain any special characters, wrapping with backticks
+	// is required in those cases. Backtick is the only escaped character.
+	// https://clickhouse.com/docs/sql-reference/syntax#identifiers
+	isSimpleIdentifier := regexp.MustCompile(`^[a-zA-Z_][0-9a-zA-Z_]*$`).MatchString
+	identifierer := sql.IdentifierFn(func(path ...string) string {
+		if isSimpleIdentifier(path[0]) && !slices.Contains(CLICKHOUSE_RESERVED_WORDS, strings.ToLower(path[0])) {
+			return path[0]
+		}
+		return "`" + strings.ReplaceAll(path[0], "`", "``") + "`"
+	})
+
+	// String literals can be much more complicated, but
+	// backslashes and single-quotes cover our needs.
+	// https://clickhouse.com/docs/sql-reference/syntax#string
+	literaler := sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "\\'"))
+
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: database, TableName: path[0]}
 		}),
-		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string { return schema }),
-		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
-		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
-			sql.PassThroughTransform(
-				func(s string) bool {
-					return sql.IsSimpleIdentifier(s) && !slices.Contains(CLICKHOUSE_RESERVED_WORDS, strings.ToLower(s))
-				},
-				sql.QuoteTransform("`", "``"),
-			))),
-		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "\\'")),
-		Placeholderer: sql.PlaceholderFn(func(index int) string {
-			return "?"
-		}),
+		SchemaLocatorer:     sql.SchemaLocatorFn(func(schema string) string { return schema }),
+		ColumnLocatorer:     sql.ColumnLocatorFn(func(field string) string { return field }),
+		Identifierer:        identifierer,
+		Literaler:           literaler,
+		Placeholderer:       sql.PlaceholderFn(func(index int) string { return "?" }),
 		TypeMapper:          mapper,
 		MaxColumnCharLength: 256,
 	}
@@ -120,8 +129,8 @@ func renderTemplates(dialect sql.Dialect, hardDelete bool) templates {
 	var isDeletedEngineArg string
 	var isDeletedInsert string
 	if hardDelete {
-		isDeletedColumn = ",\n\t\t`_is_deleted` UInt8 DEFAULT 0"
-		isDeletedEngineArg = ", `_is_deleted`"
+		isDeletedColumn = ",\n\t\t_is_deleted UInt8 DEFAULT 0"
+		isDeletedEngineArg = ", _is_deleted"
 		isDeletedInsert = ", _is_deleted"
 	}
 
@@ -168,7 +177,7 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 {{ if $.DeltaUpdates -}}
 ENGINE = MergeTree
 {{ else -}}
-ENGINE = ReplacingMergeTree(`+"`flow_published_at`"+isDeletedEngineArg+`)
+ENGINE = ReplacingMergeTree(flow_published_at`+isDeletedEngineArg+`)
 {{ end -}}
 ORDER BY (
 	{{- range $ind, $key := $.Keys }}
@@ -207,7 +216,7 @@ ALTER TABLE {{$.Identifier}} MODIFY COLUMN {{ ColumnIdentifier $col.Name }} Null
 -- connector shuts down.
 
 {{ define "loadTableName" -}}
-flow_temp_load_{{$.Binding}}_{{$.RangeKey}}
+{{ printf "flow_temp_load_%d_%s_%s" $.Binding $.RangeKey (index $.Path 0) | ColumnIdentifier }}
 {{- end }}
 
 {{ define "createLoadTable" }}
@@ -317,17 +326,21 @@ DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 -- CREATE OR REPLACE TABLE resets the store table on connector restart. The table is
 -- truncated between transactions and dropped when the connector shuts down.
 
-{{ define "storeTableName" -}}
-flow_temp_store_{{$.Binding}}_{{$.RangeKey}}
+{{ define "storeTableNameIdentifier" -}}
+{{ printf "flow_temp_store_%d_%s_%s" $.Binding $.RangeKey (index $.Path 0) | ColumnIdentifier }}
+{{- end }}
+
+{{ define "storeTableNameString" -}}
+{{ printf "flow_temp_store_%d_%s_%s" $.Binding $.RangeKey (index $.Path 0) | Literal }}
 {{- end }}
 
 {{ define "createStoreTable" }}
-CREATE OR REPLACE TABLE {{ template "storeTableName" . }}
+CREATE OR REPLACE TABLE {{ template "storeTableNameIdentifier" . }}
 AS {{$.Identifier}};
 {{ end }}
 
 {{ define "insertStoreTable" }}
-INSERT INTO {{ template "storeTableName" . }} (
+INSERT INTO {{ template "storeTableNameIdentifier" . }} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
 		{{$col.Identifier}}
@@ -338,12 +351,12 @@ INSERT INTO {{ template "storeTableName" . }} (
 
 {{ define "queryStoreParts" }}
 SELECT DISTINCT partition_id FROM system.parts
-WHERE table = '{{ template "storeTableName" . }}'
+WHERE table = {{ template "storeTableNameString" . }}
   AND database = ? AND active;
 {{ end }}
 
 {{ define "moveStorePartition" }}
-ALTER TABLE {{ template "storeTableName" . }}
+ALTER TABLE {{ template "storeTableNameIdentifier" . }}
 MOVE PARTITION ID ?
 TO TABLE {{ $.Identifier }};
 {{ end }}
@@ -351,11 +364,11 @@ TO TABLE {{ $.Identifier }};
 {{ define "existsStoreTable" }}
 SELECT count() FROM system.tables
 WHERE database = currentDatabase()
-  AND name = '{{ template "storeTableName" . }}';
+  AND name = {{ template "storeTableNameString" . }};
 {{ end }}
 
 {{ define "dropStoreTable" }}
-DROP TABLE IF EXISTS {{ template "storeTableName" . }};
+DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
 {{ end }}
 `)
 

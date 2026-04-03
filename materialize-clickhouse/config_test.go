@@ -54,7 +54,7 @@ func TestTableConfigValidation(t *testing.T) {
 	var valid = tableConfig{Table: "my_table"}
 	require.NoError(t, valid.Validate())
 
-	valid = tableConfig{Table: "name-requires-backticks"}
+	valid = tableConfig{Table: "my_table_@你好-`-\"especiál"}
 	require.NoError(t, valid.Validate())
 }
 

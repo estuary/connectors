@@ -10,22 +10,22 @@ CREATE TABLE IF NOT EXISTS key_value (
 		field_with_projection Nullable(String),
 		flow_published_at DateTime64(6, 'UTC'),
 		integer Nullable(Int64),
-		`integerGt64Bit` Nullable(String),
-		`integerWithUserDDL` Nullable(DECIMAL(20)),
+		integerGt64Bit Nullable(String),
+		integerWithUserDDL Nullable(DECIMAL(20)),
 		multiple Nullable(String),
 		`nonAsciiκόσμε` Nullable(String),
 		number Nullable(Float64),
-		`numberCastToString` Nullable(String),
+		numberCastToString Nullable(String),
 		object Nullable(String),
 		string Nullable(String),
-		`stringInteger` Nullable(String),
-		`stringInteger39Chars` Nullable(String),
-		`stringInteger66Chars` Nullable(String),
-		`stringNumber` Nullable(Float64),
+		stringInteger Nullable(String),
+		stringInteger39Chars Nullable(String),
+		stringInteger66Chars Nullable(String),
+		stringNumber Nullable(Float64),
 		flow_document String,
-		`_is_deleted` UInt8 DEFAULT 0
+		_is_deleted UInt8 DEFAULT 0
 )
-ENGINE = ReplacingMergeTree(`flow_published_at`, `_is_deleted`)
+ENGINE = ReplacingMergeTree(flow_published_at, _is_deleted)
 ORDER BY (key1, key2, `key!binary`)
 SETTINGS
 	allow_experimental_replacing_merge_with_cleanup = 1,
@@ -37,12 +37,12 @@ SETTINGS
 --- Begin delta_updates createTargetTable ---
 
 CREATE TABLE IF NOT EXISTS delta_updates (
-		`theKey` String,
-		`aValue` Nullable(Int64),
+		theKey String,
+		aValue Nullable(Int64),
 		flow_published_at DateTime64(6, 'UTC')
 )
 ENGINE = MergeTree
-ORDER BY (`theKey`)
+ORDER BY (theKey)
 SETTINGS
 	allow_experimental_replacing_merge_with_cleanup = 1,
 	min_age_to_force_merge_seconds = 604800,
@@ -77,7 +77,7 @@ ALTER TABLE key_value MODIFY COLUMN second_required_column Nullable(bool);
 
 --- Begin key_value createLoadTable ---
 
-CREATE OR REPLACE TABLE flow_temp_load_0_0 (
+CREATE OR REPLACE TABLE flow_temp_load_0_0_key_value (
 		key1 Int64,
 		key2 Bool,
 		`key!binary` String
@@ -88,18 +88,18 @@ ORDER BY (key1, key2, `key!binary`);
 
 --- Begin delta_updates createLoadTable ---
 
-CREATE OR REPLACE TABLE flow_temp_load_1_0 (
-		`theKey` String
+CREATE OR REPLACE TABLE flow_temp_load_1_0_delta_updates (
+		theKey String
 )
 ENGINE = MergeTree
-ORDER BY (`theKey`);
+ORDER BY (theKey);
 --- End delta_updates createLoadTable ---
 
 --- Begin key_value queryLoadTable ---
 
 SELECT 0::Int32, r.flow_document
 	FROM key_value AS r FINAL
-	JOIN flow_temp_load_0_0 AS l
+	JOIN flow_temp_load_0_0_key_value AS l
 		 ON l.key1 = r.key1
 		 AND l.key2 = r.key2
 		 AND l.`key!binary` = r.`key!binary`
@@ -121,21 +121,21 @@ toJSONString(map(
 	'boolean', r.boolean,
 	'field_with_projection', r.field_with_projection,
 	'integer', r.integer,
-	'integerGt64Bit', r.`integerGt64Bit`,
-	'integerWithUserDDL', r.`integerWithUserDDL`,
+	'integerGt64Bit', r.integerGt64Bit,
+	'integerWithUserDDL', r.integerWithUserDDL,
 	'multiple', r.multiple,
 	'nonAsciiκόσμε', r.`nonAsciiκόσμε`,
 	'number', r.number,
-	'numberCastToString', toString(r.`numberCastToString`),
+	'numberCastToString', toString(r.numberCastToString),
 	'object', r.object,
 	'string', r.string,
-	'stringInteger', r.`stringInteger`,
-	'stringInteger39Chars', r.`stringInteger39Chars`,
-	'stringInteger66Chars', r.`stringInteger66Chars`,
-	'stringNumber', toString(r.`stringNumber`)
+	'stringInteger', r.stringInteger,
+	'stringInteger39Chars', r.stringInteger39Chars,
+	'stringInteger66Chars', r.stringInteger66Chars,
+	'stringNumber', toString(r.stringNumber)
 )) AS flow_document
 	FROM key_value AS r FINAL
-	JOIN flow_temp_load_0_0 AS l
+	JOIN flow_temp_load_0_0_key_value AS l
 		 ON l.key1 = r.key1
 		 AND l.key2 = r.key2
 		 AND l.`key!binary` = r.`key!binary`
@@ -149,70 +149,70 @@ SELECT * FROM (SELECT -1::Int32, ''::String LIMIT 0) as nodoc
 
 --- Begin key_value insertLoadTable ---
 
-INSERT INTO flow_temp_load_0_0 (key1, key2, `key!binary`)
+INSERT INTO flow_temp_load_0_0_key_value (key1, key2, `key!binary`)
 --- End key_value insertLoadTable ---
 
 --- Begin delta_updates insertLoadTable ---
 
-INSERT INTO flow_temp_load_1_0 (`theKey`)
+INSERT INTO flow_temp_load_1_0_delta_updates (theKey)
 --- End delta_updates insertLoadTable ---
 
 --- Begin key_value dropLoadTable ---
 
-DROP TABLE IF EXISTS flow_temp_load_0_0;
+DROP TABLE IF EXISTS flow_temp_load_0_0_key_value;
 --- End key_value dropLoadTable ---
 
 --- Begin delta_updates dropLoadTable ---
 
-DROP TABLE IF EXISTS flow_temp_load_1_0;
+DROP TABLE IF EXISTS flow_temp_load_1_0_delta_updates;
 --- End delta_updates dropLoadTable ---
 
 --- Begin key_value createStoreTable ---
 
-CREATE OR REPLACE TABLE flow_temp_store_0_0
+CREATE OR REPLACE TABLE flow_temp_store_0_0_key_value
 AS key_value;
 --- End key_value createStoreTable ---
 
 --- Begin delta_updates createStoreTable ---
 
-CREATE OR REPLACE TABLE flow_temp_store_1_0
+CREATE OR REPLACE TABLE flow_temp_store_1_0_delta_updates
 AS delta_updates;
 --- End delta_updates createStoreTable ---
 
 --- Begin key_value insertStoreTable ---
 
-INSERT INTO flow_temp_store_0_0 (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, `integerGt64Bit`, `integerWithUserDDL`, multiple, `nonAsciiκόσμε`, number, `numberCastToString`, object, string, `stringInteger`, `stringInteger39Chars`, `stringInteger66Chars`, `stringNumber`, flow_document, _is_deleted)
+INSERT INTO flow_temp_store_0_0_key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, `nonAsciiκόσμε`, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document, _is_deleted)
 --- End key_value insertStoreTable ---
 
 --- Begin delta_updates insertStoreTable ---
 
-INSERT INTO flow_temp_store_1_0 (`theKey`, `aValue`, flow_published_at)
+INSERT INTO flow_temp_store_1_0_delta_updates (theKey, aValue, flow_published_at)
 --- End delta_updates insertStoreTable ---
 
 --- Begin key_value queryStoreParts ---
 
 SELECT DISTINCT partition_id FROM system.parts
-WHERE table = 'flow_temp_store_0_0'
+WHERE table = 'flow_temp_store_0_0_key_value'
   AND database = ? AND active;
 --- End key_value queryStoreParts ---
 
 --- Begin delta_updates queryStoreParts ---
 
 SELECT DISTINCT partition_id FROM system.parts
-WHERE table = 'flow_temp_store_1_0'
+WHERE table = 'flow_temp_store_1_0_delta_updates'
   AND database = ? AND active;
 --- End delta_updates queryStoreParts ---
 
 --- Begin key_value moveStorePartition ---
 
-ALTER TABLE flow_temp_store_0_0
+ALTER TABLE flow_temp_store_0_0_key_value
 MOVE PARTITION ID ?
 TO TABLE key_value;
 --- End key_value moveStorePartition ---
 
 --- Begin delta_updates moveStorePartition ---
 
-ALTER TABLE flow_temp_store_1_0
+ALTER TABLE flow_temp_store_1_0_delta_updates
 MOVE PARTITION ID ?
 TO TABLE delta_updates;
 --- End delta_updates moveStorePartition ---
@@ -221,24 +221,24 @@ TO TABLE delta_updates;
 
 SELECT count() FROM system.tables
 WHERE database = currentDatabase()
-  AND name = 'flow_temp_store_0_0';
+  AND name = 'flow_temp_store_0_0_key_value';
 --- End key_value existsStoreTable ---
 
 --- Begin delta_updates existsStoreTable ---
 
 SELECT count() FROM system.tables
 WHERE database = currentDatabase()
-  AND name = 'flow_temp_store_1_0';
+  AND name = 'flow_temp_store_1_0_delta_updates';
 --- End delta_updates existsStoreTable ---
 
 --- Begin key_value dropStoreTable ---
 
-DROP TABLE IF EXISTS flow_temp_store_0_0;
+DROP TABLE IF EXISTS flow_temp_store_0_0_key_value;
 --- End key_value dropStoreTable ---
 
 --- Begin delta_updates dropStoreTable ---
 
-DROP TABLE IF EXISTS flow_temp_store_1_0;
+DROP TABLE IF EXISTS flow_temp_store_1_0_delta_updates;
 --- End delta_updates dropStoreTable ---
 
 

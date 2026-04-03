@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 	"text/template"
@@ -99,6 +100,55 @@ func TestSQLGenerationNoHardDelete(t *testing.T) {
 		}
 		snap.WriteString(rendered)
 		snap.WriteString("--- End " + tbl.Identifier + " insertStoreTable ---\n\n")
+	}
+
+	cupaloy.SnapshotT(t, snap.String())
+}
+
+func TestSQLGenerationQuotedTableNames(t *testing.T) {
+	var testTemplates = renderTemplates(testDialect, true)
+
+	rangeKeyTemplates := []*template.Template{
+		testTemplates.createLoadTable,
+		testTemplates.queryLoadTable,
+		testTemplates.queryLoadTableNoFlowDocument,
+		testTemplates.insertLoadTable,
+		testTemplates.dropLoadTable,
+		testTemplates.createStoreTable,
+		testTemplates.insertStoreTable,
+		testTemplates.queryStoreParts,
+		testTemplates.moveStorePartition,
+		testTemplates.existsStoreTable,
+		testTemplates.dropStoreTable,
+	}
+
+	snap, tables := sql.RunSqlGenTests(
+		t,
+		testDialect,
+		func(table string) []string {
+			return []string{fmt.Sprintf("%s-@你好-`-\"especiál", table)}
+		},
+		sql.TestTemplates{
+			TableTemplates: []*template.Template{
+				testTemplates.createTargetTable,
+			},
+			TplAddColumns:    testTemplates.alterTargetColumns,
+			TplDropNotNulls:  testTemplates.alterTargetColumns,
+			TplCombinedAlter: testTemplates.alterTargetColumns,
+		},
+	)
+
+	for _, tpl := range rangeKeyTemplates {
+		for _, tbl := range tables {
+			var testcase = tbl.Identifier + " " + tpl.Name()
+			snap.WriteString("--- Begin " + testcase + " ---\n")
+			rendered, err := renderTableAndRangeKey(tbl, 0, tpl)
+			if err != nil {
+				t.Fatalf("rendering %s: %v", testcase, err)
+			}
+			snap.WriteString(rendered)
+			snap.WriteString("--- End " + testcase + " ---\n\n")
+		}
 	}
 
 	cupaloy.SnapshotT(t, snap.String())

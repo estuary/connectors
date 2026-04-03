@@ -43,7 +43,7 @@ standard_resources_json_template='[
   },
   {
     "resource": {
-      "table": "name-requires-backticks"
+      "table": "name-@你好-`-\"especiál"
     },
     "source": "${TEST_COLLECTION_SIMPLE}"
   },
