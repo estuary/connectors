@@ -20,6 +20,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	firestore_pb "google.golang.org/genproto/googleapis/firestore/v1"
 	"google.golang.org/grpc"
@@ -663,22 +664,23 @@ func (c *capture) backfillChunk(
 	}
 	query = query.Limit(backfillChunkSize)
 
-	var docs, err = query.Documents(ctx).GetAll()
-	if err != nil {
-		if status.Code(err) == codes.Canceled {
-			err = context.Canceled // Undo an awful bit of wrapping which breaks errors.Is()
-		}
-		return cursor, numDocuments, false, fmt.Errorf("error backfilling %q: chunk query failed after %d documents: %w", backfill.CollectionID, numDocuments, err)
-	}
-	logEntry.WithFields(log.Fields{
-		"total": numDocuments,
-		"chunk": len(docs),
-	}).Debug("processing backfill documents")
-	if len(docs) == 0 {
-		return cursor, numDocuments, true, nil
-	}
+	var iter = query.Documents(ctx)
+	defer iter.Stop()
 
-	for _, doc := range docs {
+	var chunkSize int
+	for {
+		doc, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			if status.Code(err) == codes.Canceled {
+				err = context.Canceled // Undo an awful bit of wrapping which breaks errors.Is()
+			}
+			return cursor, numDocuments, false, fmt.Errorf("error backfilling %q: chunk query failed after %d documents: %w", backfill.CollectionID, numDocuments, err)
+		}
+		chunkSize++
+
 		logEntry.WithField("doc", doc.Ref.Path).Trace("got document")
 
 		// We update the cursor before checking whether this document is being
@@ -715,6 +717,14 @@ func (c *capture) backfillChunk(
 			return cursor, numDocuments, false, err
 		}
 		numDocuments++
+	}
+
+	logEntry.WithFields(log.Fields{
+		"total": numDocuments,
+		"chunk": chunkSize,
+	}).Debug("processed backfill documents")
+	if chunkSize == 0 {
+		return cursor, numDocuments, true, nil
 	}
 
 	resumeState.Cursor = trimDatabasePath(cursor.Ref.Path)
