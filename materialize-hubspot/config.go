@@ -1,6 +1,8 @@
 package main
 
 import (
+	"time"
+
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	"github.com/invopop/jsonschema"
 )
@@ -10,28 +12,34 @@ var featureFlagDefaults = map[string]bool{}
 type AuthType string
 
 const (
-	OAuth2AuthType AuthType = "OAuth2"
+	OAuth2AuthType     AuthType = "OAuth2"
+	ServiceKeyAuthType AuthType = "ServiceKey"
 )
 
 type OAuth2Credentials struct {
-	ClientID             string `json:"client_id,default=missing" jsonschema_extras:"secret=true"`
-	ClientSecret         string `json:"client_secret,default=missing" jsonschema_extras:"secret=true"`
-	RefreshToken         string `json:"refresh_token,default=missing" jsonschema_extras:"secret=true"`
-	AccessToken          string `json:"access_token,default=missing" jsonschema_extras:"secret=true"`
-	AccessTokenExpiresAt string `json:"access_token_expires_at,default=missing"`
+	ClientID             string    `json:"client_id" jsonschema_extras:"secret=true"`
+	ClientSecret         string    `json:"client_secret" jsonschema_extras:"secret=true"`
+	RefreshToken         string    `json:"refresh_token" jsonschema_extras:"secret=true"`
+	AccessToken          string    `json:"access_token" jsonschema_extras:"secret=true"`
+	AccessTokenExpiresAt time.Time `json:"access_token_expires_at"`
+}
+
+type ServiceKeyCredentials struct {
+	ServiceKey string `json:"service_key" jsonschema:"title=Service Key,description=HubSpot Service Key with required scope grants.", jsonschema_extras:"secret=true"`
 }
 
 type Credentials struct {
 	AuthType AuthType `json:"auth_type"`
 
 	OAuth2Credentials
+	ServiceKeyCredentials
 }
 
 func (Credentials) JSONSchema() *jsonschema.Schema {
 	subSchemas := []schemagen.OneOfSubSchemaT{
 		schemagen.OneOfSubSchema("OAuth2", OAuth2Credentials{}, string(OAuth2AuthType)).WithOAuth2Provider(oauth2Provider),
+		schemagen.OneOfSubSchema("Service Key", ServiceKeyCredentials{}, string(ServiceKeyAuthType)),
 	}
-
 	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(OAuth2AuthType), subSchemas...)
 }
 
@@ -67,7 +75,7 @@ type ValidConfig struct {
 
 type Resource struct {
 	Path   string `json:"path" jsonschema_extras:"x-collection-name=true"`
-	Object string `json:"object" jsonschema:"title=Object type,enum=Company,enum=Contact,default=Contact"`
+	Object string `json:"object" jsonschema:"title=Object type,description=Object type.,enum=Company,enum=Contact,default=Contact"`
 }
 
 func (r *Resource) Validate() error {

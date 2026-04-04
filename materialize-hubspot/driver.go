@@ -161,7 +161,7 @@ func (m *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fiel
 		"projection":   p,
 		"deltaUpdates": deltaUpdates,
 		"fieldConfig":  fieldConfig,
-	}).Info("PopulateInfoSchema")
+	}).Info("NewConstraint")
 	var constraint = pm.Response_Validated_Constraint{}
 
 	constraint.Type = pm.Response_Validated_Constraint_LOCATION_RECOMMENDED
@@ -178,18 +178,22 @@ func (m *materialization) MapType(
 }
 
 func (m *materialization) Setup(context.Context, *boilerplate.InfoSchema) (string, error) {
+	log.Info("Setup")
 	return "", nil
 }
 
-func (m *materialization) CreateNamespace(context.Context, string) (string, error) {
+func (m *materialization) CreateNamespace(ctx context.Context, name string) (string, error) {
+	log.WithField("name", name).Info("CreateNamespace")
 	return "", nil
 }
 
-func (m *materialization) CreateResource(context.Context, boilerplate.MappedBinding[*Config, *Resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
+func (m *materialization) CreateResource(ctx context.Context, binding boilerplate.MappedBinding[*Config, *Resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
+	log.WithField("keys", binding.Keys).Info("CreateResource")
 	return "", nil, nil
 }
 
-func (m *materialization) DeleteResource(context.Context, []string) (string, boilerplate.ActionApplyFn, error) {
+func (m *materialization) DeleteResource(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	log.WithField("path", path).Info("DeleteResource")
 	return "", nil, nil
 }
 
@@ -199,10 +203,12 @@ func (m *materialization) UpdateResource(
 	existing boilerplate.ExistingResource,
 	update boilerplate.BindingUpdate[*Config, *Resource, mappedType],
 ) (string, boilerplate.ActionApplyFn, error) {
+	log.Info("UpdateResource")
 	return "", nil, nil
 }
 
 func (m *materialization) TruncateResource(context.Context, []string) (string, boilerplate.ActionApplyFn, error) {
+	log.Info("TruncateResource")
 	return "", nil, nil
 }
 
@@ -221,7 +227,12 @@ func (m *materialization) NewMaterializerTransactor(
 	mappedBindings []boilerplate.MappedBinding[*Config, *Resource, mappedType],
 	be *m.BindingEvents,
 ) (boilerplate.MaterializerTransactor, error) {
+	client, err := NewClient(m.config.Credentials)
+	if err != nil {
+		return nil, err
+	}
 	return &transactor{
+		client: client,
 		config: m.config,
 	}, nil
 }
