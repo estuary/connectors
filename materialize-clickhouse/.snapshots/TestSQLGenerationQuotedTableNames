@@ -1,0 +1,244 @@
+--- Begin `key_value-@你好-``-"especiál` createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS `key_value-@你好-``-"especiál` (
+		key1 Int64,
+		key2 Bool,
+		`key!binary` String,
+		`array` Nullable(String),
+		binary Nullable(String),
+		boolean Nullable(Bool),
+		field_with_projection Nullable(String),
+		flow_published_at DateTime64(6, 'UTC'),
+		integer Nullable(Int64),
+		integerGt64Bit Nullable(String),
+		integerWithUserDDL Nullable(DECIMAL(20)),
+		multiple Nullable(String),
+		`nonAsciiκόσμε` Nullable(String),
+		number Nullable(Float64),
+		numberCastToString Nullable(String),
+		object Nullable(String),
+		string Nullable(String),
+		stringInteger Nullable(String),
+		stringInteger39Chars Nullable(String),
+		stringInteger66Chars Nullable(String),
+		stringNumber Nullable(Float64),
+		flow_document String,
+		_is_deleted UInt8 DEFAULT 0
+)
+ENGINE = ReplacingMergeTree(flow_published_at, _is_deleted)
+ORDER BY (key1, key2, `key!binary`)
+SETTINGS
+	allow_experimental_replacing_merge_with_cleanup = 1,
+	min_age_to_force_merge_seconds = 604800,
+	min_age_to_force_merge_on_partition_only = 1,
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+--- End `key_value-@你好-``-"especiál` createTargetTable ---
+
+--- Begin `delta_updates-@你好-``-"especiál` createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS `delta_updates-@你好-``-"especiál` (
+		theKey String,
+		aValue Nullable(Int64),
+		flow_published_at DateTime64(6, 'UTC')
+)
+ENGINE = MergeTree
+ORDER BY (theKey)
+SETTINGS
+	allow_experimental_replacing_merge_with_cleanup = 1,
+	min_age_to_force_merge_seconds = 604800,
+	min_age_to_force_merge_on_partition_only = 1,
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+--- End `delta_updates-@你好-``-"especiál` createTargetTable ---
+
+--- Begin alter table add columns and drop not nulls ---
+
+ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN IF NOT EXISTS first_new_column Nullable(STRING);
+
+ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN IF NOT EXISTS second_new_column Nullable(BOOL);
+
+ALTER TABLE `key_value-@你好-``-"especiál` MODIFY COLUMN first_required_column Nullable(string);
+
+ALTER TABLE `key_value-@你好-``-"especiál` MODIFY COLUMN second_required_column Nullable(bool);
+--- End alter table add columns and drop not nulls ---
+
+--- Begin alter table add columns ---
+
+ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN IF NOT EXISTS first_new_column Nullable(STRING);
+
+ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN IF NOT EXISTS second_new_column Nullable(BOOL);
+--- End alter table add columns ---
+
+--- Begin alter table drop not nulls ---
+
+ALTER TABLE `key_value-@你好-``-"especiál` MODIFY COLUMN first_required_column Nullable(string);
+
+ALTER TABLE `key_value-@你好-``-"especiál` MODIFY COLUMN second_required_column Nullable(bool);
+--- End alter table drop not nulls ---
+
+--- Begin `key_value-@你好-``-"especiál` createLoadTable ---
+
+CREATE OR REPLACE TABLE `flow_temp_load_0_0_key_value-@你好-``-"especiál` (
+		key1 Int64,
+		key2 Bool,
+		`key!binary` String
+)
+ENGINE = MergeTree
+ORDER BY (key1, key2, `key!binary`);
+--- End `key_value-@你好-``-"especiál` createLoadTable ---
+
+--- Begin `delta_updates-@你好-``-"especiál` createLoadTable ---
+
+CREATE OR REPLACE TABLE `flow_temp_load_1_0_delta_updates-@你好-``-"especiál` (
+		theKey String
+)
+ENGINE = MergeTree
+ORDER BY (theKey);
+--- End `delta_updates-@你好-``-"especiál` createLoadTable ---
+
+--- Begin `key_value-@你好-``-"especiál` queryLoadTable ---
+
+SELECT 0::Int32, r.flow_document
+	FROM `key_value-@你好-``-"especiál` AS r FINAL
+	JOIN `flow_temp_load_0_0_key_value-@你好-``-"especiál` AS l
+		 ON l.key1 = r.key1
+		 AND l.key2 = r.key2
+		 AND l.`key!binary` = r.`key!binary`
+--- End `key_value-@你好-``-"especiál` queryLoadTable ---
+
+--- Begin `delta_updates-@你好-``-"especiál` queryLoadTable ---
+
+--- End `delta_updates-@你好-``-"especiál` queryLoadTable ---
+
+--- Begin `key_value-@你好-``-"especiál` queryLoadTableNoFlowDocument ---
+
+SELECT 0::Int32,
+toJSONString(map(
+	'key1', r.key1,
+	'key2', r.key2,
+	'key!binary', r.`key!binary`,
+	'array', r.`array`,
+	'binary', r.binary,
+	'boolean', r.boolean,
+	'field_with_projection', r.field_with_projection,
+	'integer', r.integer,
+	'integerGt64Bit', r.integerGt64Bit,
+	'integerWithUserDDL', r.integerWithUserDDL,
+	'multiple', r.multiple,
+	'nonAsciiκόσμε', r.`nonAsciiκόσμε`,
+	'number', r.number,
+	'numberCastToString', toString(r.numberCastToString),
+	'object', r.object,
+	'string', r.string,
+	'stringInteger', r.stringInteger,
+	'stringInteger39Chars', r.stringInteger39Chars,
+	'stringInteger66Chars', r.stringInteger66Chars,
+	'stringNumber', toString(r.stringNumber)
+)) AS flow_document
+	FROM `key_value-@你好-``-"especiál` AS r FINAL
+	JOIN `flow_temp_load_0_0_key_value-@你好-``-"especiál` AS l
+		 ON l.key1 = r.key1
+		 AND l.key2 = r.key2
+		 AND l.`key!binary` = r.`key!binary`
+SETTINGS use_variant_as_common_type = 1
+--- End `key_value-@你好-``-"especiál` queryLoadTableNoFlowDocument ---
+
+--- Begin `delta_updates-@你好-``-"especiál` queryLoadTableNoFlowDocument ---
+
+SELECT * FROM (SELECT -1::Int32, ''::String LIMIT 0) as nodoc
+--- End `delta_updates-@你好-``-"especiál` queryLoadTableNoFlowDocument ---
+
+--- Begin `key_value-@你好-``-"especiál` insertLoadTable ---
+
+INSERT INTO `flow_temp_load_0_0_key_value-@你好-``-"especiál` (key1, key2, `key!binary`)
+--- End `key_value-@你好-``-"especiál` insertLoadTable ---
+
+--- Begin `delta_updates-@你好-``-"especiál` insertLoadTable ---
+
+INSERT INTO `flow_temp_load_1_0_delta_updates-@你好-``-"especiál` (theKey)
+--- End `delta_updates-@你好-``-"especiál` insertLoadTable ---
+
+--- Begin `key_value-@你好-``-"especiál` dropLoadTable ---
+
+DROP TABLE IF EXISTS `flow_temp_load_0_0_key_value-@你好-``-"especiál`;
+--- End `key_value-@你好-``-"especiál` dropLoadTable ---
+
+--- Begin `delta_updates-@你好-``-"especiál` dropLoadTable ---
+
+DROP TABLE IF EXISTS `flow_temp_load_1_0_delta_updates-@你好-``-"especiál`;
+--- End `delta_updates-@你好-``-"especiál` dropLoadTable ---
+
+--- Begin `key_value-@你好-``-"especiál` createStoreTable ---
+
+CREATE OR REPLACE TABLE `flow_temp_store_0_0_key_value-@你好-``-"especiál`
+AS `key_value-@你好-``-"especiál`;
+--- End `key_value-@你好-``-"especiál` createStoreTable ---
+
+--- Begin `delta_updates-@你好-``-"especiál` createStoreTable ---
+
+CREATE OR REPLACE TABLE `flow_temp_store_1_0_delta_updates-@你好-``-"especiál`
+AS `delta_updates-@你好-``-"especiál`;
+--- End `delta_updates-@你好-``-"especiál` createStoreTable ---
+
+--- Begin `key_value-@你好-``-"especiál` insertStoreTable ---
+
+INSERT INTO `flow_temp_store_0_0_key_value-@你好-``-"especiál` (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, `nonAsciiκόσμε`, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document, _is_deleted)
+--- End `key_value-@你好-``-"especiál` insertStoreTable ---
+
+--- Begin `delta_updates-@你好-``-"especiál` insertStoreTable ---
+
+INSERT INTO `flow_temp_store_1_0_delta_updates-@你好-``-"especiál` (theKey, aValue, flow_published_at)
+--- End `delta_updates-@你好-``-"especiál` insertStoreTable ---
+
+--- Begin `key_value-@你好-``-"especiál` queryStoreParts ---
+
+SELECT DISTINCT partition_id FROM system.parts
+WHERE table = 'flow_temp_store_0_0_key_value-@你好-`-"especiál'
+  AND database = ? AND active;
+--- End `key_value-@你好-``-"especiál` queryStoreParts ---
+
+--- Begin `delta_updates-@你好-``-"especiál` queryStoreParts ---
+
+SELECT DISTINCT partition_id FROM system.parts
+WHERE table = 'flow_temp_store_1_0_delta_updates-@你好-`-"especiál'
+  AND database = ? AND active;
+--- End `delta_updates-@你好-``-"especiál` queryStoreParts ---
+
+--- Begin `key_value-@你好-``-"especiál` moveStorePartition ---
+
+ALTER TABLE `flow_temp_store_0_0_key_value-@你好-``-"especiál`
+MOVE PARTITION ID ?
+TO TABLE `key_value-@你好-``-"especiál`;
+--- End `key_value-@你好-``-"especiál` moveStorePartition ---
+
+--- Begin `delta_updates-@你好-``-"especiál` moveStorePartition ---
+
+ALTER TABLE `flow_temp_store_1_0_delta_updates-@你好-``-"especiál`
+MOVE PARTITION ID ?
+TO TABLE `delta_updates-@你好-``-"especiál`;
+--- End `delta_updates-@你好-``-"especiál` moveStorePartition ---
+
+--- Begin `key_value-@你好-``-"especiál` existsStoreTable ---
+
+SELECT count() FROM system.tables
+WHERE database = currentDatabase()
+  AND name = 'flow_temp_store_0_0_key_value-@你好-`-"especiál';
+--- End `key_value-@你好-``-"especiál` existsStoreTable ---
+
+--- Begin `delta_updates-@你好-``-"especiál` existsStoreTable ---
+
+SELECT count() FROM system.tables
+WHERE database = currentDatabase()
+  AND name = 'flow_temp_store_1_0_delta_updates-@你好-`-"especiál';
+--- End `delta_updates-@你好-``-"especiál` existsStoreTable ---
+
+--- Begin `key_value-@你好-``-"especiál` dropStoreTable ---
+
+DROP TABLE IF EXISTS `flow_temp_store_0_0_key_value-@你好-``-"especiál`;
+--- End `key_value-@你好-``-"especiál` dropStoreTable ---
+
+--- Begin `delta_updates-@你好-``-"especiál` dropStoreTable ---
+
+DROP TABLE IF EXISTS `flow_temp_store_1_0_delta_updates-@你好-``-"especiál`;
+--- End `delta_updates-@你好-``-"especiál` dropStoreTable ---
+
+
