@@ -1,0 +1,22 @@
+address: dbc-79ab10a0-dcb1.cloud.databricks.com
+http_path: /sql/1.0/warehouses/50f785ba42d98541
+catalog_name: integration
+schema_name: some-schema
+hardDelete: true
+syncSchedule:
+    syncFrequency: 0s
+credentials:
+    auth_type: PAT
+    personal_access_token_sops: ENC[AES256_GCM,data:AlxeFzMacWPhgJUGhKozPhgc3LivBhB1TFqIVq88ql6EqaVQ,iv:aQ59jcRnZd9udZpHXUyVLgeaZtjs98wx6R1v31DV3oY=,tag:n0z1+wQNZER379lfkeneZA==,type:str]
+advanced:
+    no_flow_document: true
+    feature_flags: allow_existing_tables_for_new_bindings
+sops:
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-02-01T17:08:49Z"
+          enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
+    lastmodified: "2026-04-01T17:23:36Z"
+    mac: ENC[AES256_GCM,data:MTPhJPXoxeac4Pb+Ul7Niai1EVXVmwCI5IJnBgusB1Pnwr5mm6dRrxdoEsDkyJtzcMjYAUHaRszMst0q1x9rSN3DBX4zP5aa8CvEpneer1TDeC/J6kra7RpyDpMX99JJuRMlikLngxqzrw+7vGZgEvr+Vr9wRJ3IlIAWzUWsvZc=,iv:IELAU0MtUK1ChK9HlW07golhygeNOAWkqbgA3dVA2YE=,tag:GvqRn8BepFZMnPIioSqmIA==,type:str]
+    encrypted_suffix: _sops
+    version: 3.10.2

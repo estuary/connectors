@@ -1,4 +1,4 @@
-package connector
+package main
 
 import (
 	"testing"
@@ -8,6 +8,9 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 )
+
+var testDialect = bqDialect(featureFlagDefaults)
+var testTemplates = renderTemplates(testDialect)
 
 func TestSQLGeneration(t *testing.T) {
 

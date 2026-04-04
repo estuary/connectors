@@ -1,4 +1,4 @@
-package connector
+package main
 
 import (
 	"context"
@@ -285,4 +285,8 @@ func newBigQueryDriver() *sql.Driver[config, tableConfig] {
 		},
 		PreReqs: preReqs,
 	}
+}
+
+func main() {
+	boilerplate.RunMain(newBigQueryDriver())
 }

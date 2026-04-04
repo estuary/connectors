@@ -163,6 +163,12 @@ const (
 	minimumDate      = "0001-01-01"
 )
 
+// NormalizeDatetimeString replaces a lowercase trailing "z" with uppercase "Z" to ensure
+// RFC3339 compliance.
+var NormalizeDatetimeString ElementConverter = StringCastConverter(func(str string) (interface{}, error) {
+	return strings.Replace(str, "z", "Z", 1), nil
+})
+
 // ClampDatetime provides handling for endpoints that do not accept "0000" as a year by replacing
 // these datetimes with minimumTimestamp.
 var ClampDatetime ElementConverter = StringCastConverter(func(str string) (interface{}, error) {

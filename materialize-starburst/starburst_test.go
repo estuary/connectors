@@ -4,139 +4,35 @@ package main
 
 import (
 	"context"
-	stdsql "database/sql"
 	"encoding/json"
-	"fmt"
-	"os"
-	"slices"
-	"strings"
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	sql "github.com/estuary/connectors/materialize-sql"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
 
-func mustGetCfg(t *testing.T) config {
-	if os.Getenv("TEST_DATABASE") != "yes" {
-		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
-		return config{}
+func TestIntegration(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
 	}
 
-	out := config{}
-
-	for _, prop := range []struct {
-		key  string
-		dest *string
-	}{
-		{"STARBURST_HOST", &out.Host},
-		{"STARBURST_CATALOG", &out.Catalog},
-		{"STARBURST_SCHEMA", &out.Schema},
-		{"STARBURST_ACCOUNT", &out.Account},
-		{"STARBURST_PASSWORD", &out.Password},
-		{"STARBURST_AWS_KEY_ID", &out.AWSAccessKeyID},
-		{"STARBURST_AWS_SECRET_KEY", &out.AWSSecretAccessKey},
-		{"STARBURST_REGION", &out.Region},
-		{"STARBURST_BUCKET", &out.Bucket},
-		{"STARBURST_BUCKET_PATH", &out.BucketPath},
-	} {
-		*prop.dest = os.Getenv(prop.key)
-	}
-
-	if err := out.Validate(); err != nil {
-		t.Fatal(err)
-	}
-
-	return out
-}
-
-func TestValidateAndApply(t *testing.T) {
-	ctx := context.Background()
-
-	cfg := mustGetCfg(t)
-
-	resourceConfig := tableConfig{
-		Table:  "target",
-		Schema: cfg.Schema,
-	}
-
-	db, err := stdsql.Open("trino", cfg.ToURI())
-	require.NoError(t, err)
-	defer db.Close()
-
-	boilerplate.RunValidateAndApplyTestCases(
-		t,
-		newStarburstDriver(),
-		cfg,
-		resourceConfig,
-		func(t *testing.T) string {
-			t.Helper()
-
-			sch, err := getSchema(ctx, db, cfg.Catalog, resourceConfig.Schema, resourceConfig.Table)
-			require.NoError(t, err)
-
-			return sch
-		},
-		func(t *testing.T) {
-			t.Helper()
-			_, _ = db.ExecContext(ctx, fmt.Sprintf("drop table %s", targetTableDialect.Identifier(resourceConfig.Schema, resourceConfig.Table)))
-		},
-	)
-}
-
-// sql.StdGetSchema with removed semicolon from query
-func getSchema(ctx context.Context, db *stdsql.DB, catalog string, schema string, name string) (string, error) {
-	q := fmt.Sprintf(`
-	select column_name, is_nullable, data_type
-	from information_schema.columns
-	where 
-		table_catalog = '%s' 
-		and table_schema = '%s'
-		and table_name = '%s'
-`,
-		catalog,
-		schema,
-		name,
-	)
-
-	rows, err := db.QueryContext(ctx, q)
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-
-	type foundColumn struct {
-		Name     string
-		Nullable string // string "YES" or "NO"
-		Type     string
-	}
-
-	cols := []foundColumn{}
-	for rows.Next() {
-		var c foundColumn
-		if err := rows.Scan(&c.Name, &c.Nullable, &c.Type); err != nil {
-			return "", err
+	makeResourceFn := func(table string, delta bool) tableConfig {
+		return tableConfig{
+			Table: table,
 		}
-		cols = append(cols, c)
-	}
-	if err := rows.Err(); err != nil {
-		return "", err
 	}
 
-	slices.SortFunc(cols, func(a, b foundColumn) int {
-		return strings.Compare(a.Name, b.Name)
+	t.Run("materialize", func(t *testing.T) {
+		sql.RunMaterializationTest(t, newStarburstDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
 	})
-
-	var out strings.Builder
-	enc := json.NewEncoder(&out)
-	for _, c := range cols {
-		if err := enc.Encode(c); err != nil {
-			return "", err
-		}
-	}
-
-	return out.String(), nil
+	t.Run("apply", func(t *testing.T) {
+		sql.RunApplyTest(t, newStarburstDriver(), "testdata/apply.flow.yaml", makeResourceFn)
+	})
+	t.Run("migrate", func(t *testing.T) {
+		sql.RunMigrationTest(t, newStarburstDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+	})
 }
 
 func TestStarburstConfig(t *testing.T) {

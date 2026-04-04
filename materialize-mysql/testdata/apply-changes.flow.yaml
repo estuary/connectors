@@ -8,13 +8,22 @@ collections:
     key: [/key]
 
 materializations:
-  test/sqlite:
+  acmeCo/tests/materialize-mysql/mysql:
     endpoint:
-      connector:
-        image: ghcr.io/estuary/materialize-sqlite:dev
-        config: {}
-    bindings:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.mysql.yaml
+    bindings: &bindings
       - source: key/value
-        resource: { table: key_value }
+        resource: { table: testing }
         fields:
           recommended: true
+
+  acmeCo/tests/materialize-mysql/mariadb:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.mariadb.yaml
+    bindings: *bindings

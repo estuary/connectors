@@ -19,7 +19,7 @@ COPY materialize-boilerplate ./materialize-boilerplate
 COPY materialize-firebolt    ./materialize-firebolt
 
 # Test and build the connector.
-RUN go test  -tags nozstd -v ./materialize-firebolt/...
+RUN go test  -tags nozstd,nodb -v ./materialize-firebolt/...
 RUN go build -tags nozstd -v -o ./connector ./materialize-firebolt
 
 # Runtime Stage

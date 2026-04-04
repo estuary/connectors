@@ -33,7 +33,9 @@ func toSpannerValue(val interface{}, columnName string, columnType string) (inte
 		case strings.Contains(columnType, "DATE"):
 			return spanner.NullDate{Valid: false}, nil
 		case strings.Contains(columnType, "JSON"):
-			return spanner.NullJSON{Valid: false}, nil
+			return nil, nil
+		case strings.Contains(columnType, "NUMERIC"):
+			return spanner.NullNumeric{Valid: false}, nil
 		case strings.Contains(columnType, "BYTES"):
 			return []byte(nil), nil
 		default:
@@ -44,7 +46,10 @@ func toSpannerValue(val interface{}, columnName string, columnType string) (inte
 
 	switch v := val.(type) {
 	case json.RawMessage:
-		return spanner.NullJSON{Value: v, Valid: len(v) > 0}, nil
+		if len(v) == 0 {
+			return nil, nil
+		}
+		return string(v), nil
 	case []byte:
 		return v, nil
 	case string:
@@ -104,6 +109,9 @@ func toSpannerValue(val interface{}, columnName string, columnType string) (inte
 		if strings.Contains(columnType, "FLOAT64") {
 			return float64(v), nil
 		}
+		if strings.Contains(columnType, "NUMERIC") {
+			return big.NewRat(v, 1), nil
+		}
 		return v, nil
 	case uint:
 		if strings.Contains(columnType, "FLOAT64") {
@@ -143,10 +151,19 @@ func toSpannerValue(val interface{}, columnName string, columnType string) (inte
 	case float32:
 		return float64(v), nil
 	case float64:
+		if strings.Contains(columnType, "INT64") {
+			return int64(v), nil
+		}
+		if strings.Contains(columnType, "NUMERIC") {
+			return big.NewRat(0, 1).SetFloat64(v), nil
+		}
 		return v, nil
 	case bool:
 		return v, nil
 	case *big.Int:
+		if strings.Contains(columnType, "NUMERIC") {
+			return new(big.Rat).SetInt(v), nil
+		}
 		return v.String(), nil
 	default:
 		// For unknown types, pass through as-is
@@ -396,6 +413,13 @@ func (f *asyncBatchFlusher) flushSingleBatch(mutations []*spanner.Mutation, muta
 
 	_, batchDuration, err := f.t.timedSpannerApply(f.ctx, mutations, fmt.Sprintf("%s-batch-%d", f.operation, batchNum))
 	if err != nil {
+		for i, m := range mutations {
+			log.WithFields(log.Fields{
+				"batch":    batchNum,
+				"mutation": i,
+				"detail":   fmt.Sprintf("%v", m),
+			}).Error("failed mutation detail")
+		}
 		return 0, fmt.Errorf("applying %s batch %d (%d operations, %d mutations): %w", f.operation, batchNum, len(mutations), mutationCount, err)
 	}
 

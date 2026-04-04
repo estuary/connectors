@@ -1,0 +1,104 @@
+Task: acmeCo/tests/materialize-spanner
+
+Resource: simple_standard
+["applied.actionDescription", "\nCREATE TABLE IF NOT EXISTS simple_standard (\n\tflow_key_hash INT64 NOT NULL,\n\t\tid INT64 NOT NULL,\n\t\tc__meta JSON NOT NULL,\n\t\tc__meta_op STRING(MAX) NOT NULL,\n\t\tcanary STRING(MAX) NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tval INT64,\n\n\t\tPRIMARY KEY (flow_key_hash, id)\n)\n\n\nCREATE TABLE IF NOT EXISTS simple_delta (\n\tflow_key_hash INT64 NOT NULL,\n\t\tid INT64 NOT NULL,\n\t\tc__meta JSON NOT NULL,\n\t\tc__meta_op STRING(MAX) NOT NULL,\n\t\tcanary STRING(MAX) NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tval INT64,\n\n\t\tPRIMARY KEY (flow_key_hash, id)\n)\n\n\nCREATE TABLE IF NOT EXISTS data_types (\n\tflow_key_hash INT64 NOT NULL,\n\t\tid INT64 NOT NULL,\n\t\tarrayField JSON,\n\t\tboolField BOOL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tintField INT64,\n\t\tmultipleField JSON,\n\t\tnumField FLOAT64,\n\t\tobjField JSON,\n\t\tstringAndIntegerField NUMERIC,\n\t\tstringAndNumberField FLOAT64,\n\t\tstringDateField DATE,\n\t\tstringDateTimeField TIMESTAMP,\n\t\tstringDurationField STRING(MAX),\n\t\tstringEmailField STRING(MAX),\n\t\tstringField STRING(MAX),\n\t\tstringHostnameField STRING(MAX),\n\t\tstringIntegerField NUMERIC,\n\t\tstringIpv4Field STRING(MAX),\n\t\tstringIpv6Field STRING(MAX),\n\t\tstringIriField STRING(MAX),\n\t\tstringIriReferenceField STRING(MAX),\n\t\tstringJsonPointerField STRING(MAX),\n\t\tstringMacAddr8Field STRING(MAX),\n\t\tstringMacAddrField STRING(MAX),\n\t\tstringNumberField FLOAT64,\n\t\tstringRegexField STRING(MAX),\n\t\tstringRelativeJsonPointerField STRING(MAX),\n\t\tstringTimeField STRING(MAX),\n\t\tstringUint32Field NUMERIC,\n\t\tstringUint64Field NUMERIC,\n\t\tstringUriField STRING(MAX),\n\t\tstringUriReferenceField STRING(MAX),\n\t\tstringUriTemplateField STRING(MAX),\n\t\tstringUuidField STRING(36),\n\n\t\tPRIMARY KEY (flow_key_hash, id)\n)\n"]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{"updated":{}}]
+
+{"Name":"c__meta","Nullable":false,"Type":"JSON"}
+{"Name":"c__meta_op","Nullable":false,"Type":"STRING(MAX)"}
+{"Name":"canary","Nullable":false,"Type":"STRING(MAX)"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP"}
+{"Name":"id","Nullable":false,"Type":"INT64"}
+{"Name":"val","Nullable":true,"Type":"INT64"}
+
+Table Data:
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"39ffa500-1deb-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"devilish","flow_key_hash":-9105318085603802964,"flow_published_at":"string_value:\"1970-01-01T03:00:02Z\"","id":9,"val":9}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"39670e80-1deb-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"roaches","flow_key_hash":-6873002678636213555,"flow_published_at":"string_value:\"1970-01-01T03:00:01Z\"","id":8,"val":8}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"d\\\",\\\"uuid\\\":\\\"3b30d200-1deb-11b2-8000-071353030311\\\"}\"","c__meta_op":"d","canary":"asteroid","flow_key_hash":-4640687271668624146,"flow_published_at":"string_value:\"1970-01-01T03:00:04Z\"","id":11,"val":11}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"u\\\",\\\"uuid\\\":\\\"3e2bc280-1deb-11b2-8000-071353030311\\\"}\"","c__meta_op":"u","canary":"splatters","flow_key_hash":-4052466453699787802,"flow_published_at":"string_value:\"1970-01-01T03:00:09Z\"","id":3,"val":3}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"3a983b80-1deb-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"glucose's","flow_key_hash":-2408371864701034737,"flow_published_at":"string_value:\"1970-01-01T03:00:03Z\"","id":10,"val":10}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"77a80200-1dda-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"Kringle's","flow_key_hash":1000385178204227360,"flow_published_at":"string_value:\"1970-01-01T01:00:04Z\"","id":5,"val":5}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"770f6b80-1dda-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"strengthen","flow_key_hash":3232700585171816769,"flow_published_at":"string_value:\"1970-01-01T01:00:03Z\"","id":4,"val":4}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"38ce7800-1deb-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"pieced","flow_key_hash":5465015992139406178,"flow_published_at":"string_value:\"1970-01-01T03:00:00Z\"","id":7,"val":7}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"78409880-1dda-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"grosbeak's","flow_key_hash":7697331399106995587,"flow_published_at":"string_value:\"1970-01-01T01:00:05Z\"","id":6,"val":6}
+
+Resource: simple_delta
+["applied.actionDescription", "\nCREATE TABLE IF NOT EXISTS simple_standard (\n\tflow_key_hash INT64 NOT NULL,\n\t\tid INT64 NOT NULL,\n\t\tc__meta JSON NOT NULL,\n\t\tc__meta_op STRING(MAX) NOT NULL,\n\t\tcanary STRING(MAX) NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tval INT64,\n\n\t\tPRIMARY KEY (flow_key_hash, id)\n)\n\n\nCREATE TABLE IF NOT EXISTS simple_delta (\n\tflow_key_hash INT64 NOT NULL,\n\t\tid INT64 NOT NULL,\n\t\tc__meta JSON NOT NULL,\n\t\tc__meta_op STRING(MAX) NOT NULL,\n\t\tcanary STRING(MAX) NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tval INT64,\n\n\t\tPRIMARY KEY (flow_key_hash, id)\n)\n\n\nCREATE TABLE IF NOT EXISTS data_types (\n\tflow_key_hash INT64 NOT NULL,\n\t\tid INT64 NOT NULL,\n\t\tarrayField JSON,\n\t\tboolField BOOL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tintField INT64,\n\t\tmultipleField JSON,\n\t\tnumField FLOAT64,\n\t\tobjField JSON,\n\t\tstringAndIntegerField NUMERIC,\n\t\tstringAndNumberField FLOAT64,\n\t\tstringDateField DATE,\n\t\tstringDateTimeField TIMESTAMP,\n\t\tstringDurationField STRING(MAX),\n\t\tstringEmailField STRING(MAX),\n\t\tstringField STRING(MAX),\n\t\tstringHostnameField STRING(MAX),\n\t\tstringIntegerField NUMERIC,\n\t\tstringIpv4Field STRING(MAX),\n\t\tstringIpv6Field STRING(MAX),\n\t\tstringIriField STRING(MAX),\n\t\tstringIriReferenceField STRING(MAX),\n\t\tstringJsonPointerField STRING(MAX),\n\t\tstringMacAddr8Field STRING(MAX),\n\t\tstringMacAddrField STRING(MAX),\n\t\tstringNumberField FLOAT64,\n\t\tstringRegexField STRING(MAX),\n\t\tstringRelativeJsonPointerField STRING(MAX),\n\t\tstringTimeField STRING(MAX),\n\t\tstringUint32Field NUMERIC,\n\t\tstringUint64Field NUMERIC,\n\t\tstringUriField STRING(MAX),\n\t\tstringUriReferenceField STRING(MAX),\n\t\tstringUriTemplateField STRING(MAX),\n\t\tstringUuidField STRING(36),\n\n\t\tPRIMARY KEY (flow_key_hash, id)\n)\n"]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{"updated":{}}]
+
+{"Name":"c__meta","Nullable":false,"Type":"JSON"}
+{"Name":"c__meta_op","Nullable":false,"Type":"STRING(MAX)"}
+{"Name":"canary","Nullable":false,"Type":"STRING(MAX)"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP"}
+{"Name":"id","Nullable":false,"Type":"INT64"}
+{"Name":"val","Nullable":true,"Type":"INT64"}
+
+Table Data:
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"39ffa500-1deb-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"devilish","flow_key_hash":-9105318085603802964,"flow_published_at":"string_value:\"1970-01-01T03:00:02Z\"","id":9,"val":9}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"39670e80-1deb-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"roaches","flow_key_hash":-6873002678636213555,"flow_published_at":"string_value:\"1970-01-01T03:00:01Z\"","id":8,"val":8}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"d\\\",\\\"uuid\\\":\\\"3b30d200-1deb-11b2-8000-071353030311\\\"}\"","c__meta_op":"d","canary":"asteroid","flow_key_hash":-4640687271668624146,"flow_published_at":"string_value:\"1970-01-01T03:00:04Z\"","id":11,"val":11}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"u\\\",\\\"uuid\\\":\\\"3e2bc280-1deb-11b2-8000-071353030311\\\"}\"","c__meta_op":"u","canary":"splatters","flow_key_hash":-4052466453699787802,"flow_published_at":"string_value:\"1970-01-01T03:00:09Z\"","id":3,"val":3}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"3a983b80-1deb-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"glucose's","flow_key_hash":-2408371864701034737,"flow_published_at":"string_value:\"1970-01-01T03:00:03Z\"","id":10,"val":10}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"77a80200-1dda-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"Kringle's","flow_key_hash":1000385178204227360,"flow_published_at":"string_value:\"1970-01-01T01:00:04Z\"","id":5,"val":5}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"770f6b80-1dda-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"strengthen","flow_key_hash":3232700585171816769,"flow_published_at":"string_value:\"1970-01-01T01:00:03Z\"","id":4,"val":4}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"38ce7800-1deb-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"pieced","flow_key_hash":5465015992139406178,"flow_published_at":"string_value:\"1970-01-01T03:00:00Z\"","id":7,"val":7}
+{"c__meta":"string_value:\"{\\\"op\\\":\\\"c\\\",\\\"uuid\\\":\\\"78409880-1dda-11b2-8000-071353030311\\\"}\"","c__meta_op":"c","canary":"grosbeak's","flow_key_hash":7697331399106995587,"flow_published_at":"string_value:\"1970-01-01T01:00:05Z\"","id":6,"val":6}
+
+Resource: data_types
+["applied.actionDescription", "\nCREATE TABLE IF NOT EXISTS simple_standard (\n\tflow_key_hash INT64 NOT NULL,\n\t\tid INT64 NOT NULL,\n\t\tc__meta JSON NOT NULL,\n\t\tc__meta_op STRING(MAX) NOT NULL,\n\t\tcanary STRING(MAX) NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tval INT64,\n\n\t\tPRIMARY KEY (flow_key_hash, id)\n)\n\n\nCREATE TABLE IF NOT EXISTS simple_delta (\n\tflow_key_hash INT64 NOT NULL,\n\t\tid INT64 NOT NULL,\n\t\tc__meta JSON NOT NULL,\n\t\tc__meta_op STRING(MAX) NOT NULL,\n\t\tcanary STRING(MAX) NOT NULL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tval INT64,\n\n\t\tPRIMARY KEY (flow_key_hash, id)\n)\n\n\nCREATE TABLE IF NOT EXISTS data_types (\n\tflow_key_hash INT64 NOT NULL,\n\t\tid INT64 NOT NULL,\n\t\tarrayField JSON,\n\t\tboolField BOOL,\n\t\tflow_published_at TIMESTAMP NOT NULL,\n\t\tintField INT64,\n\t\tmultipleField JSON,\n\t\tnumField FLOAT64,\n\t\tobjField JSON,\n\t\tstringAndIntegerField NUMERIC,\n\t\tstringAndNumberField FLOAT64,\n\t\tstringDateField DATE,\n\t\tstringDateTimeField TIMESTAMP,\n\t\tstringDurationField STRING(MAX),\n\t\tstringEmailField STRING(MAX),\n\t\tstringField STRING(MAX),\n\t\tstringHostnameField STRING(MAX),\n\t\tstringIntegerField NUMERIC,\n\t\tstringIpv4Field STRING(MAX),\n\t\tstringIpv6Field STRING(MAX),\n\t\tstringIriField STRING(MAX),\n\t\tstringIriReferenceField STRING(MAX),\n\t\tstringJsonPointerField STRING(MAX),\n\t\tstringMacAddr8Field STRING(MAX),\n\t\tstringMacAddrField STRING(MAX),\n\t\tstringNumberField FLOAT64,\n\t\tstringRegexField STRING(MAX),\n\t\tstringRelativeJsonPointerField STRING(MAX),\n\t\tstringTimeField STRING(MAX),\n\t\tstringUint32Field NUMERIC,\n\t\tstringUint64Field NUMERIC,\n\t\tstringUriField STRING(MAX),\n\t\tstringUriReferenceField STRING(MAX),\n\t\tstringUriTemplateField STRING(MAX),\n\t\tstringUuidField STRING(36),\n\n\t\tPRIMARY KEY (flow_key_hash, id)\n)\n"]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{"updated":{}}]
+
+{"Name":"arrayField","Nullable":true,"Type":"JSON"}
+{"Name":"boolField","Nullable":true,"Type":"BOOL"}
+{"Name":"flow_published_at","Nullable":false,"Type":"TIMESTAMP"}
+{"Name":"id","Nullable":false,"Type":"INT64"}
+{"Name":"intField","Nullable":true,"Type":"INT64"}
+{"Name":"multipleField","Nullable":true,"Type":"JSON"}
+{"Name":"numField","Nullable":true,"Type":"FLOAT64"}
+{"Name":"objField","Nullable":true,"Type":"JSON"}
+{"Name":"stringAndIntegerField","Nullable":true,"Type":"NUMERIC"}
+{"Name":"stringAndNumberField","Nullable":true,"Type":"FLOAT64"}
+{"Name":"stringDateField","Nullable":true,"Type":"DATE"}
+{"Name":"stringDateTimeField","Nullable":true,"Type":"TIMESTAMP"}
+{"Name":"stringDurationField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringEmailField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringHostnameField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringIntegerField","Nullable":true,"Type":"NUMERIC"}
+{"Name":"stringIpv4Field","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringIpv6Field","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringIriField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringIriReferenceField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringJsonPointerField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringMacAddr8Field","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringMacAddrField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringNumberField","Nullable":true,"Type":"FLOAT64"}
+{"Name":"stringRegexField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringTimeField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringUint32Field","Nullable":true,"Type":"NUMERIC"}
+{"Name":"stringUint64Field","Nullable":true,"Type":"NUMERIC"}
+{"Name":"stringUriField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringUriReferenceField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringUriTemplateField","Nullable":true,"Type":"STRING(MAX)"}
+{"Name":"stringUuidField","Nullable":true,"Type":"STRING(36)"}
+
+Table Data:
+{"arrayField":"string_value:\"[1,\\\"two\\\",3.0,true,null]\"","boolField":true,"flow_key_hash":-8517097267634966620,"flow_published_at":"string_value:\"1970-01-01T03:00:12Z\"","id":1,"intField":42,"multipleField":"string_value:\"\\\"string value\\\"\"","numField":3.14159,"objField":"string_value:\"{\\\"count\\\":123,\\\"nested\\\":\\\"value\\\"}\"","stringAndIntegerField":"1.0000000000","stringAndNumberField":123.456,"stringDateField":"string_value:\"2023-01-15\"","stringDateTimeField":"string_value:\"2023-01-15T10:30:45Z\"","stringDurationField":"P1Y2M3DT4H5M6S","stringEmailField":"test@example.com","stringField":"hello world","stringHostnameField":"example.com","stringIntegerField":"1.0000000000","stringIpv4Field":"192.168.1.1","stringIpv6Field":"2001:db8::1","stringIriField":"https://例え.テスト","stringIriReferenceField":"/例え/テスト","stringJsonPointerField":"/path/to/field","stringMacAddr8Field":"00:14:22:ff:fe:01:23:45","stringMacAddrField":"00:14:22:01:23:45","stringNumberField":123.456,"stringRegexField":"^[a-zA-Z0-9]+$","stringRelativeJsonPointerField":"1/name","stringTimeField":"14:30:00+02:30","stringUint32Field":"4294967295.0000000000","stringUint64Field":"18446744073709551615.0000000000","stringUriField":"https://example.com/path","stringUriReferenceField":"/relative/path","stringUriTemplateField":"https://api.example.com/{id}","stringUuidField":"550e8400-e29b-41d4-a716-446655440000"}
+{"arrayField":"string_value:\"[{\\\"obj\\\":\\\"in array\\\"},[1,[2,[3]]],\\\"mixed types\\\"]\"","boolField":true,"flow_key_hash":-4052466453699787802,"flow_published_at":"string_value:\"1970-01-01T01:00:11Z\"","id":3,"intField":0,"multipleField":"string_value:\"{\\\"object\\\":\\\"value\\\"}\"","numField":0,"objField":"string_value:\"{\\\"array\\\":[1,2,3],\\\"nested\\\":{\\\"deep\\\":\\\"value\\\"}}\"","stringAndIntegerField":"2147483647.0000000000","stringAndNumberField":0,"stringDateField":"string_value:\"2024-02-29\"","stringDateTimeField":"string_value:\"2024-02-29T12:00:00Z\"","stringDurationField":"P0D","stringEmailField":"user+tag@sub.domain.com","stringField":"special chars: !@#$%^\u0026*()[]{}|\\:;\"'\u003c\u003e?/.,","stringHostnameField":"sub.domain.example.org","stringIntegerField":"2147483647.0000000000","stringIpv4Field":"10.0.0.1","stringIpv6Field":"2001:0db8:0000:0000:0000:ff00:0042:8329","stringIriField":"https://москва.рф/path","stringIriReferenceField":"/москва/путь","stringJsonPointerField":"/nested/array/0/field","stringMacAddr8Field":"01:23:45:67:89:ab:cd:ef","stringMacAddrField":"01:23:45:67:89:ab","stringNumberField":0,"stringRegexField":"[0-9]{3}-[0-9]{2}-[0-9]{4}","stringRelativeJsonPointerField":"2/nested/field","stringTimeField":"23:59:59.999-01:15","stringUint32Field":"2147483648.0000000000","stringUint64Field":"9223372036854775808.0000000000","stringUriField":"ftp://user:pass@host.com:21/path?query=value","stringUriReferenceField":"?query=value\u0026other=param","stringUriTemplateField":"https://{host}{/path*}{?query*}","stringUuidField":"f47ac10b-58cc-4372-a567-0e02b2c3d479"}
+{"arrayField":"string_value:\"[]\"","boolField":false,"flow_key_hash":-1820151046732198393,"flow_published_at":"string_value:\"1970-01-01T03:00:13Z\"","id":2,"intField":-999,"multipleField":"string_value:\"42\"","numField":-2.718281828,"objField":"string_value:\"{}\"","stringAndIntegerField":"-123.0000000000","stringAndNumberField":-456.789,"stringDateField":"string_value:\"1999-12-31\"","stringDateTimeField":"string_value:\"1999-12-31T23:59:59.123456789Z\"","stringDurationField":"PT30M","stringEmailField":"admin@localhost","stringField":"","stringHostnameField":"localhost","stringIntegerField":"-123.0000000000","stringIpv4Field":"127.0.0.1","stringIpv6Field":"::1","stringIriField":"http://localhost","stringIriReferenceField":"/","stringJsonPointerField":"/0","stringMacAddr8Field":"ff:ff:ff:ff:ff:ff:ff:ff","stringMacAddrField":"ff:ff:ff:ff:ff:ff","stringNumberField":-456.789,"stringRegexField":".*","stringRelativeJsonPointerField":"0","stringTimeField":"03:55:23.123456789Z","stringUint32Field":"0.0000000000","stringUint64Field":"0.0000000000","stringUriField":"http://localhost:8080","stringUriReferenceField":"#fragment","stringUriTemplateField":"http://example.com/~{username}/","stringUuidField":"00000000-0000-0000-0000-000000000000"}
+{"arrayField":"string_value:\"[\\\"updated\\\",\\\"array\\\",\\\"values\\\"]\"","boolField":false,"flow_key_hash":3232700585171816769,"flow_published_at":"string_value:\"1970-01-01T03:00:11Z\"","id":4,"intField":2147483647,"multipleField":"string_value:\"999\"","numField":12345678900,"objField":"string_value:\"{\\\"timestamp\\\":\\\"2024-01-01\\\",\\\"updated\\\":true}\"","stringAndIntegerField":"999.0000000000","stringAndNumberField":999.999,"stringDateField":"string_value:\"2024-12-25\"","stringDateTimeField":"string_value:\"2024-12-25T00:00:00Z\"","stringDurationField":"P1D","stringEmailField":"updated@test.org","stringField":"updated value","stringHostnameField":"api.example.org","stringIntegerField":"999.0000000000","stringIpv4Field":"8.8.8.8","stringIpv6Field":"2001:4860:4860::8888","stringIriField":"https://テスト.例","stringIriReferenceField":"/テスト/例","stringJsonPointerField":"/data/items/0/name","stringMacAddr8Field":"aa:bb:cc:dd:ee:ff:00:11","stringMacAddrField":"aa:bb:cc:dd:ee:ff","stringNumberField":999.999,"stringRegexField":"^\\d{4}-\\d{2}-\\d{2}$","stringRelativeJsonPointerField":"3/updated","stringTimeField":"12:00:00z","stringUint32Field":"1000000000.0000000000","stringUint64Field":"1000000000000000000.0000000000","stringUriField":"https://api.example.org/v1/resource","stringUriReferenceField":"../parent/resource","stringUriTemplateField":"/api/v{version}/users/{id}","stringUuidField":"123e4567-e89b-12d3-a456-426614174000"}
+
+

@@ -5,152 +5,31 @@ set -o pipefail
 set -o nounset
 
 command -v flowctl >/dev/null 2>&1 || { echo >&2 "flowctl must be available via PATH, aborting."; exit 1; }
+test -n "${CONNECTOR}" || bail "must specify CONNECTOR env variable"
+test -n "${VERSION}" || bail "must specify VERSION env variable"
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
-# The base test directory containing test scripts of the connector.
-TEST_DIR="${ROOT_DIR}/tests/materialize"
-CONNECTOR_TEST_DIR="${TEST_DIR}/${CONNECTOR}"
+# Test common materialization packages. This is repeated for each
+# materialization during CI runs which is quite redundant, but these tests are
+# fast so it doesn't really matter. This should be optimized later with other CI
+# improvements.
 
-# The docker image of the connector to be tested.
-# The connector image needs to be available to envsubst.
-export CONNECTOR_IMAGE="ghcr.io/estuary/${CONNECTOR}:${VERSION}"
+cd $ROOT_DIR/go && go test -v ./...
+cd $ROOT_DIR/filesink && go test -v ./...
+cd $ROOT_DIR/materialize-boilerplate && go test -v ./...
 
-function bail() {
-    >&2 echo "$@"
-    exit 1
-}
-export -f bail
-
-test -n "${CONNECTOR}" || bail "must specify CONNECTOR env variable"
-test -n "${VERSION}" || bail "must specify VERSION env variable"
-
-# Temporary directory into which we'll write files.
-TEMP_DIR=$(mktemp -d /tmp/${CONNECTOR}-XXXXXX)
-
-# Arrange to clean up on exit.
-TEST_STATUS="Test Failed"
-function test_shutdown() {
-    source $CONNECTOR_TEST_DIR/cleanup.sh || true
-    rm -r ${TEMP_DIR}
-    >&2 echo -e "===========\n${TEST_STATUS}\n==========="
-}
-trap test_shutdown EXIT
-
-
-# TODO(johnny): These no longer need to be enviornment variables.
-# I'm leaving them as such to avoid churning tests more than is needed.
-export TEST_COLLECTION_SIMPLE="tests/simple"
-export TEST_COLLECTION_DUPLICATED_KEYS="tests/duplicated-keys"
-export TEST_COLLECTION_MULTIPLE_DATATYPES="tests/multiple-data-types"
-export TEST_COLLECTION_FORMATTED_STRINGS="tests/formatted-strings"
-export TEST_COLLECTION_LONG_STRING="tests/long-string"
-export TEST_COLLECTION_COMPOUND_KEY="tests/compound-key"
-export TEST_COLLECTION_SYMBOLS="tests/symbols"
-export TEST_COLLECTION_UNSIGNED_BIGINT="tests/unsigned-bigint"
-export TEST_COLLECTION_DELETIONS="tests/deletions"
-export TEST_COLLECTION_BINARY_KEY="tests/binary-key"
-export TEST_COLLECTION_STRING_ESCAPED_KEY="tests/string-escaped-key"
-export TEST_COLLECTION_UNDERSCORE_COLUMN="tests/underscore-column"
-export TEST_COLLECTION_ALL_KEY_TYPES_PART_ONE="tests/all-key-types-part-one"
-export TEST_COLLECTION_ALL_KEY_TYPES_PART_TWO="tests/all-key-types-part-two"
-export TEST_COLLECTION_ALL_KEY_TYPES_PART_THREE="tests/all-key-types-part-three"
-export TEST_COLLECTION_TIMEZONE_DATETIMES="tests/timezone-datetimes"
-export TEST_COLLECTION_FIELDS_WITH_PROJECTIONS="tests/fields-with-projections"
-export TEST_COLLECTION_MANY_COLUMNS="tests/many-columns"
-export TEST_COLLECTION_OPTIONAL_NON_NULLABLE="tests/optional-non-nullable"
-export TEST_COLLECTION_PERF_SIMPLE="tests/perf-simple"
-export TEST_COLLECTION_PERF_UUID_KEY="tests/perf-uuid-key"
-
-function decrypt_config {
-  sops --output-type json --decrypt $1 | jq 'walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)' 
-}
-
-source $CONNECTOR_TEST_DIR/setup.sh || bail "setup failed"
-
-if [[ -z "${CONNECTOR_CONFIG}" ]]; then
-    bail "setup did not set CONNECTOR_CONFIG"
-fi
-if [[ -z "${RESOURCES_CONFIG}" ]]; then
-    bail "setup did not set RESOURCES_CONFIG"
-fi
-
-envsubst < ${TEST_DIR}/flow.json.template > ${TEMP_DIR}/flow.json \
-    || bail "generating catalog failed"
-envsubst < ${TEST_DIR}/empty.flow.json.template > ${TEMP_DIR}/empty.flow.json \
-    || bail "generating empty catalog failed"
-
-# Check if we have performance collections (tests/perf-*)
-PERF_MODE=$(echo "${RESOURCES_CONFIG}" | jq -r 'any(.source | test("tests/perf-"))' 2>/dev/null || echo "false")
-
-# Generate performance fixture if in performance mode
-if [[ "${PERF_MODE}" == "true" ]]; then
-    echo "Performance mode detected - generating large-scale fixture..."
-    FIXTURE=${TEMP_DIR}/perf-fixture.json
-    ${TEST_DIR}/generate-fixture.sh ${TEMP_DIR}/flow.json ${FIXTURE} \
-        || bail "performance fixture generation failed"
+# Run the specific connector tests.
+cd $ROOT_DIR/$CONNECTOR
+if [ -f Cargo.toml ]; then
+  cargo test
 else
-    FIXTURE=${TEST_DIR}/fixture.json
+  go test -v ./...
 fi
 
-# File into which we'll write a snapshot of the connector output.
-SNAPSHOT=$CONNECTOR_TEST_DIR/snapshot.json
-if [[ "${PERF_MODE}" != "true" ]]; then
-    rm ${SNAPSHOT} || true
-fi
-
-function drive_connector {
-    local source=$1;
-    local fixture=$2;
-
-    if [[ "${PERF_MODE}" == "true" ]]; then
-        # Drive the connector without writing output into the snapshot.
-        RUST_LOG=info flowctl preview --source ${source} --fixture ${fixture} --output-state --output-apply --network flow-test \
-        || bail "connector invocation failed"
-    else
-        # Drive the connector, writing its output into the snapshot.
-        RUST_LOG=info flowctl preview --source ${source} --fixture ${fixture} --output-state --output-apply --network flow-test \
-        | jq '.' >> ${SNAPSHOT} \
-        || bail "connector invocation failed"
-    fi
-}
-
-# Drive the connector with the fixture.
-echo "Starting connector test run..."
-START_TIME=$(date +%s)
-drive_connector ${TEMP_DIR}/flow.json ${FIXTURE}
-END_TIME=$(date +%s)
-DURATION=$((END_TIME - START_TIME))
-echo "Connector run completed in ${DURATION} seconds"
-
-# Extend the snapshot with additional fetched content for this connector (skip in performance mode)
-if [[ "${PERF_MODE}" == "true" ]]; then
-    echo "Performance mode: skipping fetch.sh"
-else
-    source $CONNECTOR_TEST_DIR/fetch.sh | jq -S '.' >> ${SNAPSHOT} || bail "fetching results failed"
-fi
-
-# Drive it again to excercise any cleanup behavior when bindings are removed.
-drive_connector ${TEMP_DIR}/empty.flow.json ${TEST_DIR}/empty.fixture.json
-
-if [[ -f "$CONNECTOR_TEST_DIR/checks.sh" ]]; then
-  # Run connector-specific checks
-  source $CONNECTOR_TEST_DIR/checks.sh || bail "connector-specific checks failed"
-fi
-
-# Compare actual and expected snapshots (skip in performance mode)
-if [[ "${PERF_MODE}" == "true" ]]; then
-    echo "Performance mode: skipping snapshot verification"
-    echo "Snapshot written to: ${SNAPSHOT}"
-else
-    # Produce patch output, so that differences in CI can be reviewed and manually
-    # patched into the expectation without having to run the test locally via:
-    git diff --exit-code ${SNAPSHOT} || bail "Test Failed because snapshot is different"
-fi
-
-TEST_STATUS="Test Passed"
-
-
-
-
+# Verify that the built image at least works enough to run the spec command.
+# This is intended as a smoke test to detect completely broken images, since the
+# connector integration tests run with a local command, rather than a built
+# container image.
+echo "{\"materializations\":{\"acmeCo/tests/spec\":{\"endpoint\":{\"connector\":{\"image\":\"ghcr.io/estuary/${CONNECTOR}:${VERSION}\",\"config\":{}}},\"bindings\":[]}}}" | flowctl raw spec --source - | jq >/dev/null 2>&1

@@ -233,7 +233,7 @@ func prepareDatetimeToStringCast(loc *time.Location) sql.CastSQLFunc {
 
 func rfc3339ToTZ(loc *time.Location, clamp bool) sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
-		var date = str
+		var date = strings.Replace(str, "z", "Z", 1)
 		if clamp {
 			if clamped, err := SingleStoreClampDatetime(str); err != nil {
 				return nil, err

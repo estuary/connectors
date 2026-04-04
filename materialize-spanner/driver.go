@@ -468,6 +468,30 @@ func newTransactor(
 		if err := t.addBinding(ctx, binding, is); err != nil {
 			return nil, fmt.Errorf("addBinding of %s: %w", binding.Path, err)
 		}
+		// Debug: dump actual table schema from Spanner
+		tableName := binding.Path[len(binding.Path)-1]
+		schemaIter := clients.dataClient.Single().Query(ctx, spanner.Statement{
+			SQL:    "SELECT column_name, spanner_type, is_nullable FROM information_schema.columns WHERE table_name = @table ORDER BY ordinal_position",
+			Params: map[string]interface{}{"table": tableName},
+		})
+		var schemaCols []string
+		for {
+			row, err := schemaIter.Next()
+			if err != nil {
+				break
+			}
+			var colName, colType, nullable string
+			if err := row.Columns(&colName, &colType, &nullable); err != nil {
+				log.WithError(err).Error("debug: error scanning column")
+				break
+			}
+			schemaCols = append(schemaCols, fmt.Sprintf("%s(%s,null=%s)", colName, colType, nullable))
+		}
+		schemaIter.Stop()
+		log.WithFields(log.Fields{
+			"table":   tableName,
+			"columns": schemaCols,
+		}).Info("debug: actual table schema from Spanner")
 	}
 
 	// Build DDL statements for flow_internal schema and Load tables
@@ -916,6 +940,16 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			}
 
 			mutation = spanner.InsertOrUpdate(b.target.Identifier, b.columnNames, spannerValues)
+
+			// Debug: log value types for troubleshooting
+			valueTypes := make([]string, len(spannerValues))
+			for vi, sv := range spannerValues {
+				valueTypes[vi] = fmt.Sprintf("%s=%T", b.columnNames[vi], sv)
+			}
+			log.WithFields(log.Fields{
+				"table":      b.target.Identifier,
+				"valueTypes": valueTypes,
+			}).Info("store: mutation value types")
 
 			// Calculate actual byte size of the mutation values
 			mutationSize := calculateMutationByteSize(spannerValues)

@@ -126,6 +126,75 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 	return errs
 }
 
+// spannerMigrationSteps customizes the standard migration steps for Spanner.
+// Spanner does not support ALTER TABLE ... RENAME COLUMN, so instead of renaming
+// the temp column, we add the original column back, copy data from temp, and drop temp.
+// Spanner also uses ALTER COLUMN with the full type for setting NOT NULL.
+// The step indices must match StdMigrationSteps (0-4) since StdColumnTypeMigrations
+// uses hardcoded step indices for resuming interrupted migrations.
+var spannerMigrationSteps = []sql.ColumnMigrationStep{
+	sql.StdMigrationSteps[0], // Step 0: Add temp column
+	sql.StdMigrationSteps[1], // Step 1: Copy data from original to temp
+	sql.StdMigrationSteps[2], // Step 2: Drop original column
+	// Step 3: Instead of RENAME COLUMN, add the original column back, copy from temp, and drop temp.
+	// A no-op DELETE is emitted first to force a DDL flush between step 2's DROP COLUMN
+	// and this step's ADD COLUMN (same column name). Spanner cannot drop and re-add a
+	// column with the same name in a single DDL batch.
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		var queries []string
+
+		// Force flush of pending DDL (step 2's DROP COLUMN) before adding columns back
+		queries = append(queries, fmt.Sprintf("DELETE FROM %s WHERE false", table.Identifier))
+
+		for _, ins := range instructions {
+			queries = append(queries,
+				fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s",
+					table.Identifier,
+					ins.TypeMigration.Identifier,
+					ins.TypeMigration.NullableDDL,
+				),
+			)
+		}
+
+		var update strings.Builder
+		update.WriteString(fmt.Sprintf("UPDATE %s SET ", table.Identifier))
+		for i, ins := range instructions {
+			if i > 0 {
+				update.WriteString(", ")
+			}
+			update.WriteString(fmt.Sprintf("%s = %s", ins.TypeMigration.Identifier, ins.TempColumnIdentifier))
+		}
+		update.WriteString(" WHERE true;")
+		queries = append(queries, update.String())
+
+		for _, ins := range instructions {
+			queries = append(queries,
+				fmt.Sprintf("ALTER TABLE %s DROP COLUMN %s",
+					table.Identifier,
+					ins.TempColumnIdentifier,
+				),
+			)
+		}
+		return queries, nil
+	},
+	// Step 4: Set NOT NULL using Spanner's ALTER COLUMN syntax
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		var queries []string
+		for _, ins := range instructions {
+			if ins.TypeMigration.NullableDDL != ins.TypeMigration.DDL {
+				queries = append(queries,
+					fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s %s",
+						table.Identifier,
+						ins.TypeMigration.Identifier,
+						ins.TypeMigration.DDL,
+					),
+				)
+			}
+		}
+		return queries, nil
+	},
+}
+
 // addPendingDDL accumulates DDL statements to be executed in a batch later
 func (c *client) addPendingDDL(statements ...string) {
 	c.ddlMutex.Lock()
@@ -163,7 +232,7 @@ func (c *client) FlushDDL(ctx context.Context) error {
 	return nil
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
 	if len(resourcePaths) == 0 {
 		return nil
 	}
@@ -238,6 +307,13 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		var tableSchema, tableName, columnName, isNullable, spannerType string
 		if err := row.Columns(&tableSchema, &tableName, &columnName, &isNullable, &spannerType); err != nil {
 			return fmt.Errorf("scanning column row: %w", err)
+		}
+
+		// Skip the flow_key_hash column — it is an internal column managed by
+		// the connector for key distribution optimization and is not part of
+		// the Flow collection schema.
+		if columnName == "flow_key_hash" {
+			continue
 		}
 
 		is.PushResource(tableSchema, tableName).PushField(boilerplate.ExistingField{
@@ -359,27 +435,61 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		if err := c.templates.alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
-		alterColumnStmt := alterColumnStmtBuilder.String()
 
-		if alterColumnStmt != "" {
-			ddlStatements = append(ddlStatements, alterColumnStmt)
+		for _, stmt := range strings.Split(alterColumnStmtBuilder.String(), ";") {
+			stmt = strings.TrimSpace(stmt)
+			if stmt != "" {
+				ddlStatements = append(ddlStatements, stmt)
+			}
 		}
 	}
 
+	var migrationSteps []string
 	if len(ta.ColumnTypeChanges) > 0 {
-		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges); err != nil {
+		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, spannerMigrationSteps...); err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		} else {
-			ddlStatements = append(ddlStatements, steps...)
+			migrationSteps = steps
 		}
 	}
 
-	return strings.Join(ddlStatements, "\n"), func(ctx context.Context) error {
-		if len(ddlStatements) == 0 {
+	allStatements := append(ddlStatements, migrationSteps...)
+	return strings.Join(allStatements, "\n"), func(ctx context.Context) error {
+		if len(ddlStatements) == 0 && len(migrationSteps) == 0 {
 			return nil
 		}
 
 		c.addPendingDDL(ddlStatements...)
+
+		if len(migrationSteps) == 0 {
+			return nil
+		}
+
+		// Migration steps interleave DDL (ALTER TABLE) and DML (UPDATE/DELETE).
+		// Spanner requires DDL and DML to be executed through different APIs,
+		// and DDL must be flushed before DML that depends on it can run.
+		for _, stmt := range migrationSteps {
+			stmt = strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(stmt), ";"))
+			if stmt == "" {
+				continue
+			}
+
+			isDML := strings.HasPrefix(strings.ToUpper(stmt), "UPDATE") ||
+				strings.HasPrefix(strings.ToUpper(stmt), "DELETE")
+
+			if isDML {
+				// Flush any pending DDL first since the DML may depend on it
+				if err := c.FlushDDL(ctx); err != nil {
+					return fmt.Errorf("flushing batched DDL: %w", err)
+				}
+				if _, err := c.dataClient.PartitionedUpdate(ctx, spanner.Statement{SQL: stmt}); err != nil {
+					return fmt.Errorf("executing migration DML: %w", err)
+				}
+			} else {
+				c.addPendingDDL(stmt)
+			}
+		}
+
 		return nil
 	}, nil
 }
@@ -540,6 +650,154 @@ func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence 
 
 	log.Info("client: installed fence")
 	return resultFence, nil
+}
+
+func (c *client) ListCheckpointsEntries(ctx context.Context) ([]string, error) {
+	checkpointsTable := c.ep.Dialect.Identifier(sql.DefaultFlowCheckpoints)
+	stmt := spanner.Statement{
+		SQL: fmt.Sprintf("SELECT materialization FROM %s", checkpointsTable),
+	}
+
+	iter := c.dataClient.Single().Query(ctx, stmt)
+	defer iter.Stop()
+
+	var out []string
+	for {
+		row, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("querying materializations from checkpoints table: %w", err)
+		}
+
+		var taskName string
+		if err := row.Columns(&taskName); err != nil {
+			return nil, fmt.Errorf("scanning materialization name: %w", err)
+		}
+		out = append(out, taskName)
+	}
+
+	return out, nil
+}
+
+func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) error {
+	checkpointsTable := c.ep.Dialect.Identifier(sql.DefaultFlowCheckpoints)
+	_, err := c.dataClient.ReadWriteTransaction(ctx, func(ctx context.Context, txn *spanner.ReadWriteTransaction) error {
+		stmt := spanner.Statement{
+			SQL:    fmt.Sprintf("DELETE FROM %s WHERE materialization = @taskName", checkpointsTable),
+			Params: map[string]interface{}{"taskName": taskName},
+		}
+		_, err := txn.Update(ctx, stmt)
+		return err
+	})
+	return err
+}
+
+func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	tableIdentifier := c.ep.Dialect.Identifier(path...)
+
+	stmt := spanner.Statement{
+		SQL: fmt.Sprintf("SELECT * FROM %s", tableIdentifier),
+	}
+
+	iter := c.dataClient.Single().Query(ctx, stmt)
+	defer iter.Stop()
+
+	var columnsSet bool
+	for {
+		row, err := iter.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("querying table %s: %w", tableIdentifier, err)
+		}
+
+		if !columnsSet {
+			for _, f := range row.ColumnNames() {
+				columnNames = append(columnNames, f)
+			}
+			columnsSet = true
+		}
+
+		values := make([]spanner.GenericColumnValue, row.Size())
+		ptrs := make([]interface{}, row.Size())
+		for i := range values {
+			ptrs[i] = &values[i]
+		}
+		if err := row.Columns(ptrs...); err != nil {
+			return nil, nil, fmt.Errorf("scanning row: %w", err)
+		}
+
+		rowValues := make([]any, len(values))
+		for i, v := range values {
+			rowValues[i] = formatSpannerValue(v)
+		}
+		rows = append(rows, rowValues)
+	}
+
+	return columnNames, rows, nil
+}
+
+// formatSpannerValue converts a spanner.GenericColumnValue to a Go value suitable for test snapshots.
+func formatSpannerValue(v spanner.GenericColumnValue) any {
+	if v.Value == nil {
+		return nil
+	}
+
+	switch v.Type.Code.String() {
+	case "STRING":
+		var s string
+		if err := v.Decode(&s); err == nil {
+			return s
+		}
+	case "INT64":
+		var i int64
+		if err := v.Decode(&i); err == nil {
+			return i
+		}
+	case "BYTES":
+		var b []byte
+		if err := v.Decode(&b); err == nil {
+			return string(b)
+		}
+	case "BOOL":
+		var b bool
+		if err := v.Decode(&b); err == nil {
+			return b
+		}
+	case "FLOAT64":
+		var f float64
+		if err := v.Decode(&f); err == nil {
+			return f
+		}
+	case "JSON":
+		var s string
+		if err := v.Decode(&s); err == nil {
+			return s
+		}
+	case "NUMERIC":
+		var s spanner.NullNumeric
+		if err := v.Decode(&s); err == nil {
+			if s.Valid {
+				return s.Numeric.FloatString(10)
+			}
+			return nil
+		}
+	case "TIMESTAMP":
+		var s string
+		if err := v.Decode(&s); err == nil {
+			return s
+		}
+	case "DATE":
+		var s string
+		if err := v.Decode(&s); err == nil {
+			return s
+		}
+	}
+
+	return fmt.Sprintf("%v", v.Value)
 }
 
 func (c *client) Close() {

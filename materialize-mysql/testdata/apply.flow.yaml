@@ -1,0 +1,16 @@
+materializations:
+  acmeCo/tests/materialize-mysql/mysql:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.mysql.yaml
+    bindings: []
+
+  acmeCo/tests/materialize-mysql/mariadb:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.mariadb.yaml
+    bindings: []

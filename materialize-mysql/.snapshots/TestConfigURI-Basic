@@ -1,2 +1,2 @@
-will:secret1234@tcp(example.com:3306)/somedb
+will:secret1234@tcp(example.com:3306)/somedb?clientFoundRows=true
 config valid

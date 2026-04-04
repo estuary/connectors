@@ -110,6 +110,7 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 			"time":      {sql.NewMigrationSpec([]string{textType}, nocast)},
 			"datetime2": {sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(datetimeToStringCast))},
 			"varchar":   {sql.NewMigrationSpecTarget(&StringSizeMigrationTarget{}, nocast)},
+			"*":         {sql.NewMigrationSpec([]string{textType}, nocast)},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -148,6 +149,7 @@ func migrationIdentifier(migration sql.ColumnTypeMigration) string {
 
 func rfc3339ToUTC() sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
+		str = strings.Replace(str, "z", "Z", 1)
 		if t, err := time.Parse(time.RFC3339Nano, str); err != nil {
 			return nil, fmt.Errorf("could not parse %q as RFC3339 date-time: %w", str, err)
 		} else {
@@ -158,6 +160,7 @@ func rfc3339ToUTC() sql.ElementConverter {
 
 func rfc3339TimeToUTC() sql.ElementConverter {
 	return sql.StringCastConverter(func(str string) (interface{}, error) {
+		str = strings.Replace(str, "z", "Z", 1)
 		if t, err := time.Parse("15:04:05.999999999Z07:00", str); err != nil {
 			return nil, fmt.Errorf("could not parse %q as RFC3339 time: %w", str, err)
 		} else {
