@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/md5"
@@ -415,22 +416,24 @@ func getCipherStream(encryptionKey string, fileName blobFileName) (cipher.Stream
 	return cipher.NewCTR(block, make([]byte, aes.BlockSize)), nil
 }
 
-// reencrypt reads encrypted blob data from r, decrypts it using the encryption
-// key and original file name, and then re-encrypts it using the new file name
-// and writes the output to w. The blob metadata is updated in place.
+// reencrypt reads encrypted blob data from r, decrypts it using the
+// decryptKey and original file name, and then re-encrypts it using the
+// new file name and writes the output to w. The blob metadata is updated in
+// place.
 func reencrypt(
 	r io.Reader,
 	w io.Writer,
 	blob *blobMetadata,
-	encryptionKey string,
+	decryptKey string,
+	channel *channel,
 	newFileName blobFileName,
 ) error {
-	decryptStream, err := getCipherStream(encryptionKey, blobFileName(blob.Path))
+	decryptStream, err := getCipherStream(decryptKey, blobFileName(blob.Path))
 	if err != nil {
 		return fmt.Errorf("getting decryptStream: %w", err)
 	}
 
-	encryptStream, err := getCipherStream(encryptionKey, newFileName)
+	encryptStream, err := getCipherStream(channel.EncryptionKey, newFileName)
 	if err != nil {
 		return fmt.Errorf("getting encryptStream: %w", err)
 	}
@@ -439,14 +442,14 @@ func reencrypt(
 	upMd5 := md5.New()
 
 	buf := make([]byte, 64*1024)
-	for {
-		n, err := r.Read(buf)
-		if err != nil && !errors.Is(err, io.EOF) {
-			return fmt.Errorf("reading from r: %w", err)
-		} else if n == 0 {
-			break
-		}
 
+	firstRead := true
+	n, err := io.ReadAtLeast(r, buf, 4)
+	if err != nil {
+		return fmt.Errorf("reading from r: %w", err)
+	}
+
+	for n != 0 {
 		if m, err := downMd5.Write(buf[:n]); err != nil {
 			return fmt.Errorf("writing to downMd5: %w", err)
 		} else if m != n {
@@ -454,6 +457,13 @@ func reencrypt(
 		}
 
 		decryptStream.XORKeyStream(buf[:n], buf[:n])
+
+		// The stream must be a valid parquet file, if the magic is incorrect
+		// is is very likely we have the wrong decryption key.
+		if firstRead && !bytes.Equal(buf[:4], []byte("PAR1")) {
+			return fmt.Errorf("unexpected magic: %v", buf[:4])
+		}
+
 		encryptStream.XORKeyStream(buf[:n], buf[:n])
 
 		if m, err := upMd5.Write(buf[:n]); err != nil {
@@ -464,6 +474,12 @@ func reencrypt(
 			return fmt.Errorf("writing to w: %w", err)
 		} else if written != n {
 			return fmt.Errorf("written bytes %d != expected bytes %d", written, n)
+		}
+
+		firstRead = false
+		n, err = r.Read(buf)
+		if err != nil && !errors.Is(err, io.EOF) {
+			return fmt.Errorf("reading from r: %w", err)
 		}
 	}
 
@@ -476,6 +492,7 @@ func reencrypt(
 	blob.Path = string(newFileName)
 	blob.MD5 = upHash
 	blob.Chunks[0].ChunkMD5 = upHash
+	blob.Chunks[0].EncryptionKeyID = channel.EncryptionKeyId
 
 	return nil
 }
