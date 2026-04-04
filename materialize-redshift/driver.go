@@ -203,13 +203,7 @@ func (r tableConfig) Validate() error {
 }
 
 func (c tableConfig) Parameters() ([]string, bool, error) {
-	var path []string
-	if c.Schema != "" {
-		path = []string{c.Schema, c.Table}
-	} else {
-		path = []string{c.Table}
-	}
-	return path, c.Delta, nil
+	return []string{c.Schema, c.Table}, c.Delta, nil
 }
 
 func newRedshiftDriver() *sql.Driver[config, tableConfig] {
