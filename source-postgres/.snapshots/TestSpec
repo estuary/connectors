@@ -147,7 +147,8 @@
           "propertyName": "auth_type"
         },
         "order": 4,
-        "x-iam-auth": true
+        "x-iam-auth": true,
+        "x-iam-azure-scope": "https://ossrdbms-aad.database.windows.net/.default"
       },
       "advanced": {
         "properties": {

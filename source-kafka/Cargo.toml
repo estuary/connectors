@@ -10,7 +10,7 @@ json = { git = "https://github.com/estuary/flow" }
 proto-flow = { git = "https://github.com/estuary/flow" }
 
 anyhow = "1.0"
-aws-sdk-iam = "1.48.0"
+aws-sdk-iam = "1.95.0"
 aws-sigv4 = { version = "1.2.4", features = ["sign-http", "http0-compat"] }
 base64 = "0.22"
 hex = "0.4"
