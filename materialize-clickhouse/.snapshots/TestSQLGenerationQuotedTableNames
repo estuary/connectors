@@ -169,50 +169,50 @@ DROP TABLE IF EXISTS `flow_temp_load_1_0_delta_updates-@你好-``-"especiál`;
 
 --- Begin `key_value-@你好-``-"especiál` createStoreTable ---
 
-CREATE OR REPLACE TABLE `flow_temp_store_0_0_key_value-@你好-``-"especiál`
+CREATE OR REPLACE TABLE `flow_temp_store_0_key_value-@你好-``-"especiál`
 AS `key_value-@你好-``-"especiál`;
 --- End `key_value-@你好-``-"especiál` createStoreTable ---
 
 --- Begin `delta_updates-@你好-``-"especiál` createStoreTable ---
 
-CREATE OR REPLACE TABLE `flow_temp_store_1_0_delta_updates-@你好-``-"especiál`
+CREATE OR REPLACE TABLE `flow_temp_store_0_delta_updates-@你好-``-"especiál`
 AS `delta_updates-@你好-``-"especiál`;
 --- End `delta_updates-@你好-``-"especiál` createStoreTable ---
 
 --- Begin `key_value-@你好-``-"especiál` insertStoreTable ---
 
-INSERT INTO `flow_temp_store_0_0_key_value-@你好-``-"especiál` (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, `nonAsciiκόσμε`, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document, _is_deleted)
+INSERT INTO `flow_temp_store_0_key_value-@你好-``-"especiál` (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, `nonAsciiκόσμε`, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document, _is_deleted)
 --- End `key_value-@你好-``-"especiál` insertStoreTable ---
 
 --- Begin `delta_updates-@你好-``-"especiál` insertStoreTable ---
 
-INSERT INTO `flow_temp_store_1_0_delta_updates-@你好-``-"especiál` (theKey, aValue, flow_published_at)
+INSERT INTO `flow_temp_store_0_delta_updates-@你好-``-"especiál` (theKey, aValue, flow_published_at)
 --- End `delta_updates-@你好-``-"especiál` insertStoreTable ---
 
 --- Begin `key_value-@你好-``-"especiál` queryStoreParts ---
 
 SELECT DISTINCT partition_id FROM system.parts
-WHERE table = 'flow_temp_store_0_0_key_value-@你好-`-"especiál'
+WHERE table = 'flow_temp_store_0_key_value-@你好-`-"especiál'
   AND database = ? AND active;
 --- End `key_value-@你好-``-"especiál` queryStoreParts ---
 
 --- Begin `delta_updates-@你好-``-"especiál` queryStoreParts ---
 
 SELECT DISTINCT partition_id FROM system.parts
-WHERE table = 'flow_temp_store_1_0_delta_updates-@你好-`-"especiál'
+WHERE table = 'flow_temp_store_0_delta_updates-@你好-`-"especiál'
   AND database = ? AND active;
 --- End `delta_updates-@你好-``-"especiál` queryStoreParts ---
 
 --- Begin `key_value-@你好-``-"especiál` moveStorePartition ---
 
-ALTER TABLE `flow_temp_store_0_0_key_value-@你好-``-"especiál`
+ALTER TABLE `flow_temp_store_0_key_value-@你好-``-"especiál`
 MOVE PARTITION ID ?
 TO TABLE `key_value-@你好-``-"especiál`;
 --- End `key_value-@你好-``-"especiál` moveStorePartition ---
 
 --- Begin `delta_updates-@你好-``-"especiál` moveStorePartition ---
 
-ALTER TABLE `flow_temp_store_1_0_delta_updates-@你好-``-"especiál`
+ALTER TABLE `flow_temp_store_0_delta_updates-@你好-``-"especiál`
 MOVE PARTITION ID ?
 TO TABLE `delta_updates-@你好-``-"especiál`;
 --- End `delta_updates-@你好-``-"especiál` moveStorePartition ---
@@ -221,24 +221,24 @@ TO TABLE `delta_updates-@你好-``-"especiál`;
 
 SELECT count() FROM system.tables
 WHERE database = currentDatabase()
-  AND name = 'flow_temp_store_0_0_key_value-@你好-`-"especiál';
+  AND name = 'flow_temp_store_0_key_value-@你好-`-"especiál';
 --- End `key_value-@你好-``-"especiál` existsStoreTable ---
 
 --- Begin `delta_updates-@你好-``-"especiál` existsStoreTable ---
 
 SELECT count() FROM system.tables
 WHERE database = currentDatabase()
-  AND name = 'flow_temp_store_1_0_delta_updates-@你好-`-"especiál';
+  AND name = 'flow_temp_store_0_delta_updates-@你好-`-"especiál';
 --- End `delta_updates-@你好-``-"especiál` existsStoreTable ---
 
 --- Begin `key_value-@你好-``-"especiál` dropStoreTable ---
 
-DROP TABLE IF EXISTS `flow_temp_store_0_0_key_value-@你好-``-"especiál`;
+DROP TABLE IF EXISTS `flow_temp_store_0_key_value-@你好-``-"especiál`;
 --- End `key_value-@你好-``-"especiál` dropStoreTable ---
 
 --- Begin `delta_updates-@你好-``-"especiál` dropStoreTable ---
 
-DROP TABLE IF EXISTS `flow_temp_store_1_0_delta_updates-@你好-``-"especiál`;
+DROP TABLE IF EXISTS `flow_temp_store_0_delta_updates-@你好-``-"especiál`;
 --- End `delta_updates-@你好-``-"especiál` dropStoreTable ---
 
 

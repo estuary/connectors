@@ -327,11 +327,11 @@ DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 -- truncated between transactions and dropped when the connector shuts down.
 
 {{ define "storeTableNameIdentifier" -}}
-{{ printf "flow_temp_store_%d_%s_%s" $.Binding $.RangeKey (index $.Path 0) | ColumnIdentifier }}
+{{ printf "flow_temp_store_%s_%s" $.RangeKey (index $.Path 0) | ColumnIdentifier }}
 {{- end }}
 
 {{ define "storeTableNameString" -}}
-{{ printf "flow_temp_store_%d_%s_%s" $.Binding $.RangeKey (index $.Path 0) | Literal }}
+{{ printf "flow_temp_store_%s_%s" $.RangeKey (index $.Path 0) | Literal }}
 {{- end }}
 
 {{ define "createStoreTable" }}
