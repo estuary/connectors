@@ -25,7 +25,7 @@ def fetch_recent_feedback_submissions(
     return fetch_changes_with_associations(
         Names.feedback_submissions,
         FeedbackSubmission,
-        fetch_search_objects(Names.feedback_submissions, log, http, since, until),
+        fetch_search_objects(Names.feedback_submissions, log, http, since, until, ignore_out_of_order_results=True),
         log,
         http,
         with_history,
@@ -37,4 +37,14 @@ def fetch_recent_feedback_submissions(
 def fetch_delayed_feedback_submissions(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
 ) -> AsyncGenerator[tuple[datetime, str, FeedbackSubmission], None]:
-    return fetch_recent_feedback_submissions(log, http, with_history, since, until)
+
+    return fetch_changes_with_associations(
+        Names.feedback_submissions,
+        FeedbackSubmission,
+        fetch_search_objects(Names.feedback_submissions, log, http, since, until),
+        log,
+        http,
+        with_history,
+        since,
+        until,
+    )

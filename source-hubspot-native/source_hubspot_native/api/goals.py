@@ -24,7 +24,7 @@ def fetch_recent_goals(
 
     return fetch_changes_with_associations(
         Names.goals, Goals,
-        fetch_search_objects(Names.goals, log, http, since, until),
+        fetch_search_objects(Names.goals, log, http, since, until, ignore_out_of_order_results=True),
         log, http, with_history, since, until,
     )
 

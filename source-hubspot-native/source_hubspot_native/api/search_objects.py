@@ -24,6 +24,7 @@ async def fetch_search_objects(
     since: datetime,
     until: datetime | None,
     last_modified_property_name: str = "hs_lastmodifieddate",
+    ignore_out_of_order_results: bool = False,
 ) -> AsyncGenerator[tuple[datetime, str], None]:
     """
     Yields (modified_time, id) tuples for records between 'since' and 'until'.
@@ -108,6 +109,12 @@ async def fetch_search_objects(
                 continue
 
             if this_mod_time < max_updated:
+                if ignore_out_of_order_results:
+                    log.warning(
+                        "ignoring out-of-order search result",
+                        {"id": r.id, "this_mod_time": this_mod_time, "max_updated": max_updated},
+                    )
+                    continue
                 log.error("search query input", input)
                 raise Exception(
                     f"search query returned records out of order for {r.id} with {this_mod_time} < {max_updated}"

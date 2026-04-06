@@ -24,7 +24,7 @@ def fetch_recent_line_items(
 
     return fetch_changes_with_associations(
         Names.line_items, LineItem,
-        fetch_search_objects(Names.line_items, log, http, since, until),
+        fetch_search_objects(Names.line_items, log, http, since, until, ignore_out_of_order_results=True),
         log, http, with_history, since, until,
     )
 

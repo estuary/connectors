@@ -24,7 +24,7 @@ def fetch_recent_orders(
 
     return fetch_changes_with_associations(
         Names.orders, Order,
-        fetch_search_objects(Names.orders, log, http, since, until),
+        fetch_search_objects(Names.orders, log, http, since, until, ignore_out_of_order_results=True),
         log, http, with_history, since, until,
     )
 

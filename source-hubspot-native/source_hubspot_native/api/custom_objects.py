@@ -27,7 +27,7 @@ def fetch_recent_custom_objects(
 
     return fetch_changes_with_associations(
         object_name, CustomObject,
-        fetch_search_objects(object_name, log, http, since, until),
+        fetch_search_objects(object_name, log, http, since, until, ignore_out_of_order_results=True),
         log, http, with_history, since, until,
     )
 
