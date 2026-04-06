@@ -36,8 +36,7 @@ async def fetch_search_objects(
 
     Multiple records can have the same "last modified" property value, and
     indeed large runs of these may have the same value. When a new search is
-    initiated at the 10k boundary, some records may be yielded again. Callers
-    are expected to handle deduplication (e.g. via the emitted changes cache).
+    initiated at the 10k boundary, duplicates are filtered out locally.
     """
 
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
@@ -45,6 +44,7 @@ async def fetch_search_objects(
     count = 0
     cursor: int | None = None
     max_updated: datetime = since
+    ids_at_max: set[str] = set()
     original_since = since
     original_total: int | None = None
 
@@ -120,7 +120,10 @@ async def fetch_search_objects(
                     f"search query returned records out of order for {r.id} with {this_mod_time} < {max_updated}"
                 )
 
-            max_updated = this_mod_time
+            if this_mod_time > max_updated:
+                max_updated = this_mod_time
+                ids_at_max = set()
+            ids_at_max.add(str(r.id))
             count += 1
             yield (this_mod_time, str(r.id))
 
@@ -150,8 +153,9 @@ async def fetch_search_objects(
                 for item in await fetch_search_objects_modified_at(
                     object_name, log, http, max_updated, last_modified_property_name
                 ):
-                    count += 1
-                    yield item
+                    if item[1] not in ids_at_max:
+                        count += 1
+                        yield item
 
                 # HubSpot APIs use millisecond resolution, so move the time
                 # cursor forward by that minimum amount now that we know we have
