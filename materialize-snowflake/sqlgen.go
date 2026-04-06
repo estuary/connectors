@@ -184,7 +184,6 @@ type templates struct {
 	loadQueryNoFlowDocument *template.Template
 	copyInto                *template.Template
 	mergeInto               *template.Template
-	pipeName                *template.Template
 	createPipe              *template.Template
 	copyHistory             *template.Template
 }
@@ -400,7 +399,6 @@ FILE_NAME IN ('{{ Join $.Files "','" }}')
 		loadQueryNoFlowDocument: tplAll.Lookup("loadQueryNoFlowDocument"),
 		copyInto:                tplAll.Lookup("copyInto"),
 		mergeInto:               tplAll.Lookup("mergeInto"),
-		pipeName:                tplAll.Lookup("pipe_name"),
 		createPipe:              tplAll.Lookup("createPipe"),
 		copyHistory:             tplAll.Lookup("copyHistory"),
 	}
