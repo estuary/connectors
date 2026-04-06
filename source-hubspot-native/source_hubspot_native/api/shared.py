@@ -209,7 +209,7 @@ async def fetch_delayed_changes(
                 continue
             elif ts > lower_bound:
                 max_ts = max(max_ts, ts)
-                if cache.should_yield(object_name, key, ts):
+                if not cache.has_as_recent_as(object_name, key, ts):
                     emitted += 1
                     yield obj
                 else:
