@@ -65,7 +65,8 @@ Resource schema rendered in the UI:
 
 After the connector has been configured by knowing what inputs it takes, and having the user provide those configurations, the control plane and the runtime validate the new configuration, and the configured resources (e.g. tables, topics) that the user would like to materialize in their destination.
 
-Here `Request.Validate` contains the JSON `config`, along with a list of `bindings`. Each binding is essentially a Flow collection _bound_ to a materialized resource, so for example, if I want to materialize my flow collection `my-lovely-collection`, there is going to be a binding that binds this collection to a table `lovely_table` in postgres.
+Here `Request.Validate` contains the JSON `config` (following `Response.Spec.configSchema`), along with a list of `bindings` (whose field `resourceConfig` follows `Response.Spec.resourceConfigSchema`).
+Each binding is essentially a Flow collection _bound_ to a materialized resource, so for example, if I want to materialize my flow collection `my-lovely-collection`, there is going to be a binding that binds this collection to a table `lovely_table` in postgres.
 
 A binding looks like this in YAML:
 ```
