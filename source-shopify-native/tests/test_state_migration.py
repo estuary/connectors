@@ -141,8 +141,9 @@ class TestReconcileConnectorState:
         assert state.backfill["store-b"] is not None
         task.checkpoint.assert_called_once()
 
-    async def test_independent_backfill_addition(self):
-        """Backfill is added for a store even when its inc already exists."""
+    async def test_completed_backfill_not_readded(self):
+        """A store present in inc but missing from backfill means backfill completed.
+        Reconciliation must not re-add backfill state for it."""
         state = ResourceState(
             inc={"a": ResourceState.Incremental(cursor=CURSOR), "b": ResourceState.Incremental(cursor=CURSOR)},
             backfill={"a": ResourceState.Backfill(cutoff=CURSOR, next_page="p1")},
@@ -150,8 +151,24 @@ class TestReconcileConnectorState:
 
         task = await _reconcile(state, ["a", "b"], _make_initial_state(["a", "b"], use_backfill=True), "a")
 
-        assert state.backfill["b"] is not None
+        assert "b" not in state.backfill
         assert state.backfill["a"].next_page == "p1"
+        task.checkpoint.assert_not_called()
+
+    async def test_add_store_bulk_resource_no_backfill(self):
+        """Adding a store to a bulk resource (no backfill state) must initialize inc
+        for the new store. Backfill is None for both state and initial_state."""
+        state = ResourceState(inc={"existing": ResourceState.Incremental(cursor=CURSOR)})
+        store_ids = ["existing", "new-store"]
+        initial = _make_initial_state(store_ids, use_backfill=False)
+
+        assert initial.backfill is None  # bulk resources have no backfill
+
+        task = await _reconcile(state, store_ids, initial, "existing")
+
+        assert state.inc["existing"].cursor == CURSOR
+        assert "new-store" in state.inc
+        assert state.backfill is None
         task.checkpoint.assert_called_once()
 
     async def test_removed_store_state_preserved(self):
