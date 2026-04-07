@@ -205,6 +205,8 @@ func (c config) ToURI() string {
 		mysqlCfg.TLSConfig = tlsConfigMap[c.Advanced.SSLMode]
 	}
 
+	mysqlCfg.ConnectionAttributes = "program_name:Estuary materialize-mysql"
+
 	return mysqlCfg.FormatDSN()
 }
 
