@@ -1,5 +1,0 @@
-{"_id":"(1)","id":{"$numberInt":"1"},"int":{"$numberInt":"14"},"str":"str 6"}
-{"_id":"(2)","id":{"$numberInt":"2"},"int":{"$numberInt":"18"},"str":"str 7"}
-{"_id":"(3)","id":{"$numberInt":"3"},"int":{"$numberInt":"22"},"str":"str 8"}
-{"_id":"(4)","id":{"$numberInt":"4"},"int":{"$numberInt":"26"},"str":"str 9"}
-{"_id":"(5)","id":{"$numberInt":"5"},"int":{"$numberInt":"30"},"str":"str 10"}

@@ -83,6 +83,9 @@ func TestIntegration(t *testing.T) {
 			return regexp.MustCompile(`"PipeStartTime":\s*"[^"]+"`).ReplaceAllString(s, `"PipeStartTime": "<timestamp>"`)
 		},
 		func(s string) string {
+			return regexp.MustCompile(`"EncryptionKey":\s*"[^"]+"`).ReplaceAllString(s, `"EncryptionKey": "<encryption_key>"`)
+		},
+		func(s string) string {
 			return regexp.MustCompile(`"channel_name":\s*"([^_]+_[^_]+_[^_]+_[^_]+_)[A-F0-9]+(_[^"]+)"`).ReplaceAllString(s, `"channel_name":"${1}<channel_id>${2}"`)
 		},
 		func(s string) string {
