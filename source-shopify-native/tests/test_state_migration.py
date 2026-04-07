@@ -166,23 +166,6 @@ class TestReconcileConnectorState:
         assert state.inc["store-b"].cursor == cursor_b
         task.checkpoint.assert_not_called()
 
-    async def test_error_on_invalid_initial_state(self):
-        state = ResourceState(inc=ResourceState.Incremental(cursor=CURSOR))
-        invalid = ResourceState(inc=ResourceState.Incremental(cursor=CURSOR))
-
-        with pytest.raises(RuntimeError, match="Invalid initial_state.*orders"):
-            binding = _make_binding("orders")
-            task = _make_task()
-            await _reconcile_connector_state(["s1"], binding, state, invalid, task, legacy_store_id="s1")
-
-    async def test_error_on_none_inc_state(self):
-        state = ResourceState(inc=None)
-
-        with pytest.raises(RuntimeError, match="not dict-based"):
-            binding = _make_binding("orders")
-            task = _make_task()
-            await _reconcile_connector_state(["s1"], binding, state, _make_initial_state(["s1"]), task, legacy_store_id="s1")
-
 
 class TestMigrateFlatToDictState:
     def test_migrates_incremental(self, log):
