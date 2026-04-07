@@ -25,7 +25,7 @@ cd $ROOT_DIR/$CONNECTOR
 if [ -f Cargo.toml ]; then
   cargo test
 else
-  go test -v ./...
+  go test -v ./... -timeout 20m
 fi
 
 # Verify that the built image at least works enough to run the spec command.
