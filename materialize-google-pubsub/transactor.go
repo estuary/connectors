@@ -92,3 +92,7 @@ func (t *transactor) Destroy() {
 		b.topic.Stop()
 	}
 }
+
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return nil, nil
+}

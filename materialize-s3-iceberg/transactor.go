@@ -14,7 +14,6 @@ import (
 	"github.com/estuary/connectors/filesink"
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/go/writer"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -108,7 +107,7 @@ type transactor struct {
 	state           connectorState
 }
 
-var _ boilerplate.MaterializerTransactor = &transactor{}
+var _ m.Transactor = &transactor{}
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error {
 	if err := pf.UnmarshalStrict(state, &t.state); err != nil {
@@ -277,7 +276,7 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	return &pf.ConnectorState{UpdatedJson: checkpointJSON}, nil
 }
 
-func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, range_ pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, range_ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
 }
 

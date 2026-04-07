@@ -178,22 +178,6 @@ type MigrateField[MT MappedTyper] struct {
 	To   MappedProjection[MT]
 }
 
-// RuntimeCheckpoint is the raw bytes of a persisted Flow checkpoint. In the
-// `Opened` response, it will be marshalled into a protocol.Checkpoint.
-type RuntimeCheckpoint []byte
-
-// MaterializerTransactor adds the RecoverCheckpoint method to the traditional
-// "Transactor" interface. Eventually we should consolidate these two
-// interfaces.
-type MaterializerTransactor interface {
-	// RecoverCheckpoint specifically retrieves the last persisted checkpoint in
-	// the destination system. Systems that do not use the "authoritative
-	// endpoint" pattern to persist a checkpoint should return `nil` for
-	// RuntimeCheckpoint.
-	RecoverCheckpoint(context.Context, pf.MaterializationSpec, pf.RangeSpec) (RuntimeCheckpoint, error)
-	m.Transactor
-}
-
 // EndpointConfiger represents a parsed endpoint config.
 type EndpointConfiger interface {
 	pb.Validator
@@ -312,9 +296,9 @@ type Materializer[
 	// primary key structure). Return true to force recreation, false to allow truncation.
 	MustRecreateResource(req *pm.Request_Apply, lastBinding, newBinding *pf.MaterializationSpec_Binding) (bool, error)
 
-	// NewMaterializerTransactor builds a new transactor for handling the
+	// NewTransactor builds a new transactor for handling the
 	// transactions lifecycle of the materialization.
-	NewMaterializerTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[EC, RC, MT], *m.BindingEvents) (MaterializerTransactor, error)
+	NewTransactor(context.Context, pm.Request_Open, InfoSchema, []MappedBinding[EC, RC, MT], *m.BindingEvents) (m.Transactor, error)
 
 	// Close performs any cleanup actions that should be done when gracefully
 	// exiting.
@@ -751,7 +735,7 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		}
 	}
 
-	transactor, err := materializer.NewMaterializerTransactor(ctx, req, *is, mapped, be)
+	transactor, err := materializer.NewTransactor(ctx, req, *is, mapped, be)
 	if err != nil {
 		return nil, nil, nil, err
 	}

@@ -14,12 +14,22 @@ import (
 	pc "go.gazette.dev/core/consumer/protocol"
 )
 
+// RuntimeCheckpoint is the raw bytes of a persisted Flow checkpoint. In the
+// `Opened` response, it will be marshaled into a protocol.Checkpoint.
+type RuntimeCheckpoint []byte
+
 // Transactor is a store-agnostic interface for a materialization connector
 // that implements Flow materialization protocol transactions.
 type Transactor interface {
 	// UnmarshalState is called only on transactor startup if there is a persisted state
 	// for this task
 	UnmarshalState(json.RawMessage) error
+
+	// RecoverCheckpoint specifically retrieves the last persisted checkpoint in
+	// the destination system. Systems that do not use the "authoritative
+	// endpoint" pattern to persist a checkpoint should return `nil` for
+	// RuntimeCheckpoint.
+	RecoverCheckpoint(context.Context, pf.MaterializationSpec, pf.RangeSpec) (RuntimeCheckpoint, error)
 
 	// Load implements the transaction load phase by consuming Load requests
 	// from the LoadIterator and calling the provided `loaded` callback.

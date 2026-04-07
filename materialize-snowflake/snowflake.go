@@ -206,12 +206,15 @@ func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeM
 	return m, isExplicit, nil
 }
 
+var _ m.Transactor = (*transactor)(nil)
+
 type transactor struct {
-	cfg           config
-	ep            *sql.Endpoint[config]
-	db            *stdsql.DB
-	streamManager *streamManager
-	pipeClient    *PipeClient
+	runtimeCheckpoint m.RuntimeCheckpoint
+	cfg               config
+	ep                *sql.Endpoint[config]
+	db                *stdsql.DB
+	streamManager     *streamManager
+	pipeClient        *PipeClient
 
 	// Variables exclusively used by Load.
 	load struct {
@@ -229,6 +232,10 @@ type transactor struct {
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
 	version string
+}
+
+func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return d.runtimeCheckpoint, nil
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -277,15 +284,16 @@ func newTransactor(
 	}
 
 	var d = &transactor{
-		cfg:           cfg,
-		ep:            ep,
-		templates:     renderTemplates(ep.Dialect),
-		db:            db,
-		streamManager: sm,
-		pipeClient:    pipeClient,
-		_range:        open.Range,
-		version:       open.Version,
-		be:            be,
+		runtimeCheckpoint: fence.Checkpoint,
+		cfg:               cfg,
+		ep:                ep,
+		templates:         renderTemplates(ep.Dialect),
+		db:                db,
+		streamManager:     sm,
+		pipeClient:        pipeClient,
+		_range:            open.Range,
+		version:           open.Version,
+		be:                be,
 	}
 
 	if db, err := stdsql.Open("snowflake", dsn); err != nil {

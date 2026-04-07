@@ -599,13 +599,13 @@ func (d *materialization) UpdateResource(
 	}, nil
 }
 
-func (d *materialization) NewMaterializerTransactor(
+func (d *materialization) NewTransactor(
 	ctx context.Context,
 	req pm.Request_Open,
 	is boilerplate.InfoSchema,
 	mappedBindings []boilerplate.MappedBinding[config, resource, property],
 	be *m.BindingEvents,
-) (boilerplate.MaterializerTransactor, error) {
+) (m.Transactor, error) {
 	isServerless, err := d.dataClient.isServerless(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("getting serverless status: %w", err)

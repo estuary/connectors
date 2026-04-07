@@ -106,7 +106,10 @@ func newDatabricksDriver() *sql.Driver[config, tableConfig] {
 	}
 }
 
+var _ m.Transactor = (*transactor)(nil)
+
 type transactor struct {
+	runtimeCheckpoint   m.RuntimeCheckpoint
 	cfg                 config
 	cp                  checkpoint
 	cpRecovery          bool // is this checkpoint a recovered checkpoint?
@@ -117,6 +120,10 @@ type transactor struct {
 	ep                  *sql.Endpoint[config]
 	templates           templates
 	materializationName string
+}
+
+func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return d.runtimeCheckpoint, nil
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -151,7 +158,7 @@ func newTransactor(
 		return nil, fmt.Errorf("initialising workspace client: %w", err)
 	}
 
-	var d = &transactor{cfg: cfg, wsClient: wsClient, be: be, ep: ep, templates: renderTemplates(ep.Dialect)}
+	var d = &transactor{runtimeCheckpoint: fence.Checkpoint, cfg: cfg, wsClient: wsClient, be: be, ep: ep, templates: renderTemplates(ep.Dialect)}
 
 	db, err := d.openDB()
 	if err != nil {

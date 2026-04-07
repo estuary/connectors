@@ -397,34 +397,34 @@ func (t testMappedTyper) CanMigrate(e ExistingField) bool {
 	return len(t.jsonTypes) > 1 || (e.Name == "key" && t.jsonTypes[0] == "boolean")
 }
 
-func (m *testMaterializer) NewMaterializerTransactor(ctx context.Context, req pm.Request_Open, is InfoSchema, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *m.BindingEvents) (MaterializerTransactor, error) {
-	return &testMaterializerTransactor{}, nil
+func (m *testMaterializer) NewTransactor(ctx context.Context, req pm.Request_Open, is InfoSchema, bindings []MappedBinding[testEndpointConfiger, testResourcer, testMappedTyper], be *m.BindingEvents) (m.Transactor, error) {
+	return &testTransactor{}, nil
 }
 
 func (m *testMaterializer) Close(ctx context.Context) {}
 
-type testMaterializerTransactor struct{}
+type testTransactor struct{}
 
-func (t *testMaterializerTransactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (RuntimeCheckpoint, error) {
+func (t *testTransactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	panic("unimplemented")
 }
 
-func (t *testMaterializerTransactor) UnmarshalState(state json.RawMessage) error {
+func (t *testTransactor) UnmarshalState(state json.RawMessage) error {
 	panic("unimplemented")
 }
 
-func (t *testMaterializerTransactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.RawMessage) error) error {
+func (t *testTransactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.RawMessage) error) error {
 	panic("unimplemented")
 }
 
-func (t *testMaterializerTransactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
+func (t *testTransactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	panic("unimplemented")
 }
 
-func (t *testMaterializerTransactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
+func (t *testTransactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) {
 	panic("unimplemented")
 }
 
-func (t *testMaterializerTransactor) Destroy() {
+func (t *testTransactor) Destroy() {
 	panic("unimplemented")
 }

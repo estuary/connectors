@@ -252,6 +252,8 @@ func keyDistributionOptimizationChanged(oldConfig, newConfig []byte) (bool, erro
 	return oldFullCfg.Config.Advanced.DisableKeyDistributionOptimization != newCfg.Advanced.DisableKeyDistributionOptimization, nil
 }
 
+var _ m.Transactor = (*transactor)(nil)
+
 // transactor implements the materialization transactor for Spanner using mutations
 type transactor struct {
 	client        *spanner.Client
@@ -407,6 +409,10 @@ func queryNodeCount(ctx context.Context, projectID, instanceID string, opts []op
 	}).Info("queried Spanner instance node count")
 
 	return nodeCount, nil
+}
+
+func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return t.fence.Checkpoint, nil
 }
 
 func newTransactor(
