@@ -176,7 +176,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	lastBinding := -1
-	for it.Next() {
+	for it.Next(false) {
 		b := t.bindings[it.Binding]
 
 		if lastBinding != -1 && lastBinding != it.Binding {

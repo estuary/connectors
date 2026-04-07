@@ -58,7 +58,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var batch []upsertDoc
 
 	lastBinding := -1
-	for it.Next() {
+	for it.Next(false) {
 		if lastBinding == -1 {
 			lastBinding = it.Binding
 		}

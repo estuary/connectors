@@ -213,7 +213,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, fmt.Errorf("building checkpoint: %w", err)
 	}
 
-	for it.Next() {
+	for it.Next(false) {
 		var doc, err = t.projectDocument(t.bindings[it.Binding].spec, it.Key, it.Values)
 		if err != nil {
 			return nil, fmt.Errorf("projecting new store json: %w", err)

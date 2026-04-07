@@ -243,7 +243,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
-	for it.Next() {
+	for it.Next(false) {
 		var b = t.bindings[it.Binding]
 		var parsed = buildDocument(b, it.Key, it.Values)
 		var tsStr, tsOk = parsed["ts"].(string)

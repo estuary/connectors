@@ -109,7 +109,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var stores = make([][]storedRow, len(d.bindings))
 
 	// Gather all of the stored rows on a per-binding basis.
-	for it.Next() {
+	for it.Next(false) {
 		// Verify that we don't read an excessive amount of data from the store iterator, which
 		// would indicate we are reading from a high cardinality collection that will not fit into a
 		// reasonable amount of connector memory.

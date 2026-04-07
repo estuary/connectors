@@ -193,7 +193,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	for it.Next() {
+	for it.Next(false) {
 		b := t.bindings[it.Binding]
 
 		item, err := b.convert(append(it.Key, it.Values...), it.RawJSON)

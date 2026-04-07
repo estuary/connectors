@@ -356,7 +356,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 	defer storeFileProcessor.Destroy()
 
-	for it.Next() {
+	for it.Next(false) {
 		var b = t.bindings[it.Binding]
 		doc, err := b.target.Document.MappedType.Converter(it.RawJSON)
 		if err != nil {

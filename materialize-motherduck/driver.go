@@ -299,14 +299,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
-	for it.Next() {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
 
 		flowDelete := d.cfg.HardDelete && it.Delete
-		if flowDelete && !it.Exists {
-			// Ignore documents which do not exist and are being deleted.
-			continue
-		}
 
 		if it.Exists {
 			b.mustMerge = true
