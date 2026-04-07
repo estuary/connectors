@@ -106,7 +106,9 @@ This is handled by `materialize-boilerplate`'s `Constrainter` and `Validator` in
 
 # Request.Apply
 
-Once the configuration and the various bindings have been validated, the runtime then asks the connector to `Request.Apply` the configurations to the destination. Apply essentially means _set up_ the environment, in most cases this means something like creating the necessary resources (schemas, tables, topics, folders) in the destination, or in cases where the schema of a collection has been updated, it means updating the resources to match the new schema (e.g. altering existing tables to add a new column or drop a colum or change a column's data type, etc.)
+After the configuration and bindings have been validated, the runtime then asks the connector to `Request.Apply` the configurations to the destination.
+Apply essentially means _set up or alter_ the destination environment.
+In most cases the materialization connector creates the necessary destination resources (e.g. tables, folders, message queues), or when a collection schema has been updated, it means updating the destination resources to match (e.g. add or drop existing table columns, change column data types, etc.).
 
 As part of `Request.Apply`, the connector is also given the connector state, and as part of `Response.Applied`, the connector can respond with a connector state update. This is useful for "post-commit apply" materializations (more on this below).
 
@@ -126,7 +128,9 @@ Flow wants to apply [reductions](https://docs.estuary.dev/reference/reduction-st
 
 ## Request.Flush
 
-Once all load requests are sent, the runtime sends `Request.Flush`, to which the connector responds with `Request.Flushed` with a connector state. The use case for this message is quite niche, but explained below.
+Once all load requests are sent, the runtime sends `Request.Flush`.
+Once the connector receives `Request.Flush` *and* has sent all `Request.Loaded` documents, it sends `Request.Flushed` with a connector state.
+The use case for this message is quite niche, but explained below.
 
 Consider a store like materialize-elastic. Elastic is a document DB suited for point lookup and point update. It doesn’t provide a meaningful bulk query API for reads or write (its "batch" operations don’t scale to the degree we’d need), so the basic strategy is to stream out Load’d documents, and stream in Store’d documents. We throw our hands up and say "this connector is at-least-once".
 
