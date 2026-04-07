@@ -65,6 +65,10 @@ func TestResolvedAddress(t *testing.T) {
 
 	// Without port — appends :9000.
 	cfg.Address = "host"
+	require.Equal(t, "host:9440", cfg.resolvedAddress())
+
+	// Without port, without TLS — appends :9440.
+	cfg.Advanced.SSLMode = "disable"
 	require.Equal(t, "host:9000", cfg.resolvedAddress())
 }
 

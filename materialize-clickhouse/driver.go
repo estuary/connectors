@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -62,7 +63,7 @@ func (credentialConfig) JSONSchema() *jsonschema.Schema {
 }
 
 type config struct {
-	Address     string           `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Port 9000 is used as the default if no specific port is provided." jsonschema_extras:"order=0"`
+	Address     string           `json:"address" jsonschema:"title=Address,description=Host and port of the database (in the form of host[:port]). Default is 9000 if SSL is disabled, 9440 if SSL is enabled." jsonschema_extras:"order=0"`
 	Database    string           `json:"database" jsonschema:"title=Database,description=Name of the ClickHouse database to materialize to." jsonschema_extras:"order=1"`
 	HardDelete  bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default this is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=2"`
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=3"`
@@ -71,6 +72,7 @@ type config struct {
 }
 
 type advancedConfig struct {
+	SSLMode        string `json:"sslmode,omitempty" jsonschema:"title=SSL Mode,description=Controls the TLS connection behavior.,enum=disable,enum=require,enum=verify-full,default=verify-full"`
 	FeatureFlags   string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 	NoFlowDocument bool   `json:"no_flow_document,omitempty" jsonschema:"title=Exclude Flow Document,description=When enabled the root document will not be required for standard updates.,default=false"`
 }
@@ -85,7 +87,17 @@ func (c config) Validate() error {
 			return fmt.Errorf("missing '%s'", req[0])
 		}
 	}
-	return c.Credentials.Validate()
+	if err := c.Credentials.Validate(); err != nil {
+		return err
+	}
+
+	switch c.Advanced.SSLMode {
+	case "", "disable", "require", "verify-full":
+	default:
+		return fmt.Errorf("invalid sslmode %q (expected disable, require, or verify-full)", c.Advanced.SSLMode)
+	}
+
+	return nil
 }
 
 func (c config) DefaultNamespace() string {
@@ -99,14 +111,26 @@ func (c config) FeatureFlags() (string, map[string]bool) {
 func (c config) resolvedAddress() string {
 	var address = c.Address
 	if !strings.Contains(address, ":") {
-		address = address + ":9000"
+		if c.Advanced.SSLMode == "disable" {
+			address = address + ":9000"
+		} else {
+			address = address + ":9440"
+		}
 	}
 	return address
 }
 
 func (c config) newClickhouseOptions() *clickhouse.Options {
+	var tlsConfig *tls.Config
+	switch c.Advanced.SSLMode {
+	case "verify-full", "":
+		tlsConfig = &tls.Config{InsecureSkipVerify: false}
+	case "require":
+		tlsConfig = &tls.Config{InsecureSkipVerify: true}
+	}
 	return &clickhouse.Options{
 		Addr: []string{c.resolvedAddress()},
+		TLS:  tlsConfig,
 		Auth: clickhouse.Auth{
 			Database: c.Database,
 			Username: c.Credentials.Username,

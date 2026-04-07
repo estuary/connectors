@@ -34,6 +34,7 @@ func testConfig() config {
 		},
 		Database: "flow",
 		Advanced: advancedConfig{
+			SSLMode:      "disable",
 			FeatureFlags: "allow_existing_tables_for_new_bindings",
 		},
 	}

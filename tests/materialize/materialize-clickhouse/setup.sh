@@ -30,6 +30,7 @@ config_json_template='{
    "database": "$CLICKHOUSE_DATABASE",
    "hardDelete": true,
    "advanced": {
+    "sslmode": "disable",
     "no_flow_document": true
    }
 }'
