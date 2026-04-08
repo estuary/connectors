@@ -184,6 +184,8 @@ func convertNumeric(te tuple.TupleElement) (any, error) {
 		out.innerNumeric = strconv.Itoa(tt)
 	case int64:
 		out.innerNumeric = strconv.FormatInt(tt, 10)
+	case uint64:
+		out.innerNumeric = strconv.FormatUint(tt, 10)
 	case float64:
 		out.innerNumeric = strconv.FormatFloat(tt, 'f', -1, 64)
 	case nil:

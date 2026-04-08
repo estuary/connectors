@@ -1,0 +1,28 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-dynamodb:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        table: simple_standard
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: simple_delta
+      source: tests/simple
+      fields:
+        recommended: true
+    # tests/not-simple is excluded because DynamoDB only supports up to 2 key
+    # attributes (partition key + optional sort key) and not-simple has 3 keys.
+    - resource:
+        table: data_types
+      source: tests/data-types
+      fields:
+        recommended: true

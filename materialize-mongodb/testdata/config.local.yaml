@@ -1,0 +1,7 @@
+address: "mongodb://localhost:27017/?authSource=admin"
+user: flow
+password: flow
+database: test
+hardDelete: true
+advanced:
+  feature_flags: allow_existing_tables_for_new_bindings

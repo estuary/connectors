@@ -22,7 +22,13 @@ type config struct {
 	Database   string `json:"database" jsonschema:"title=Database,description=Name of the database to materialize to." jsonschema_extras:"order=3"`
 	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
 
+	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
+}
+
+type advancedConfig struct {
+	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 }
 
 func (c config) Validate() error {
@@ -52,7 +58,7 @@ func (c config) DefaultNamespace() string {
 }
 
 func (c config) FeatureFlags() (string, map[string]bool) {
-	return "", make(map[string]bool)
+	return c.Advanced.FeatureFlags, make(map[string]bool)
 }
 
 // ToURI converts the Config to a DSN string.

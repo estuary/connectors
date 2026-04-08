@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"sort"
 	"time"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
@@ -16,6 +17,7 @@ import (
 	pm "github.com/estuary/flow/go/protocols/materialize"
 
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
@@ -189,8 +191,13 @@ func (d *materialization) CreateNamespace(ctx context.Context, ns string) (strin
 }
 
 func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
-	// No-op since new databases and collections are automatically created when data is added to them.
-	return "", nil, nil
+	dbName := res.ResourcePath[0]
+	collectionName := res.ResourcePath[1]
+
+	return fmt.Sprintf("create collection %q", collectionName), func(ctx context.Context) error {
+		// Explicitly create the collection so it is visible to PopulateInfoSchema.
+		return d.client.Database(dbName).CreateCollection(ctx, collectionName)
+	}, nil
 }
 
 func (d *materialization) DeleteResource(ctx context.Context, resourcePath []string) (string, boilerplate.ActionApplyFn, error) {
@@ -251,7 +258,72 @@ func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) 
 }
 
 func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
-	return nil, nil, nil
+	dbName := path[0]
+	collectionName := path[1]
+
+	coll := d.client.Database(dbName).Collection(collectionName)
+	cursor, err := coll.Find(ctx, bson.D{})
+	if err != nil {
+		return nil, nil, fmt.Errorf("finding documents in %s.%s: %w", dbName, collectionName, err)
+	}
+	defer cursor.Close(ctx)
+
+	var docs []bson.M
+	if err := cursor.All(ctx, &docs); err != nil {
+		return nil, nil, fmt.Errorf("decoding documents: %w", err)
+	}
+
+	if len(docs) == 0 {
+		return nil, nil, nil
+	}
+
+	// Collect all field names across all documents.
+	colSet := make(map[string]struct{})
+	for _, doc := range docs {
+		for k := range doc {
+			colSet[k] = struct{}{}
+		}
+	}
+
+	columns := make([]string, 0, len(colSet))
+	for k := range colSet {
+		columns = append(columns, k)
+	}
+	sort.Strings(columns)
+
+	// Build rows with values in column order. Normalize MongoDB ObjectIDs to
+	// a stable representation since auto-generated _id values differ between runs.
+	var rows [][]any
+	for _, doc := range docs {
+		row := make([]any, len(columns))
+		for i, col := range columns {
+			if v, ok := doc[col]; ok {
+				// Replace MongoDB ObjectIDs with a stable string so snapshots
+				// don't change between test runs.
+				if oid, ok := v.(primitive.ObjectID); ok {
+					_ = oid
+					row[i] = "<ObjectID>"
+				} else {
+					row[i] = v
+				}
+			}
+		}
+		rows = append(rows, row)
+	}
+
+	// Sort rows for deterministic output.
+	sort.Slice(rows, func(i, j int) bool {
+		for c := range columns {
+			vi := fmt.Sprint(rows[i][c])
+			vj := fmt.Sprint(rows[j][c])
+			if vi != vj {
+				return vi < vj
+			}
+		}
+		return false
+	})
+
+	return columns, rows, nil
 }
 
 func (d *materialization) Close(ctx context.Context) {}

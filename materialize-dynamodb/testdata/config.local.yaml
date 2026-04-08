@@ -1,0 +1,6 @@
+awsAccessKeyId: anything
+awsSecretAccessKey: anything
+region: anything
+advanced:
+  endpoint: http://localhost:8000
+  feature_flags: allow_existing_tables_for_new_bindings
