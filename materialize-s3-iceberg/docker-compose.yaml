@@ -3,7 +3,7 @@ services:
     image: quay.io/hansetag/tip-catalog:v0.3
     pull_policy: always
     environment:
-      - ICEBERG_REST__BASE_URI=http://server:8080
+      - ICEBERG_REST__BASE_URI=http://localhost:8090
       # - ICEBERG_REST__BASE_URI=http://localhost:8090
       - ICEBERG_REST__PG_ENCRYPTION_KEY=something
       - ICEBERG_REST__PG_DATABASE_URL_READ=postgresql://postgres:postgres@db:5432/postgres
@@ -59,7 +59,6 @@ services:
       start_period: 10s
     networks:
       flow-test:
-
 
 networks:
   flow-test:

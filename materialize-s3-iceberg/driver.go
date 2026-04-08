@@ -2,11 +2,16 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
+	"os/exec"
 	"path"
 	"slices"
+	"sort"
 	"strings"
 	"time"
 
@@ -489,7 +494,147 @@ func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) 
 }
 
 func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
-	return nil, nil, nil
+	namespace := path[0]
+	table := path[1]
+
+	// Use iceberg-ctl's table-paths to find the data location.
+	fqn := namespace + "." + table
+	tableNamesJson, err := json.Marshal([]string{fqn})
+	if err != nil {
+		return nil, nil, err
+	}
+
+	b, err := runIcebergctl(ctx, &d.cfg, "table-paths", string(tableNamesJson))
+	if err != nil {
+		return nil, nil, fmt.Errorf("getting table path for %s: %w", fqn, err)
+	}
+
+	fqnToPath := make(map[string]string)
+	if err := json.Unmarshal(b, &fqnToPath); err != nil {
+		return nil, nil, fmt.Errorf("parsing table paths: %w", err)
+	}
+
+	tableLocation := fqnToPath[fqn]
+	if tableLocation == "" {
+		return nil, nil, nil
+	}
+
+	// The data directory is at {tableLocation}/data/
+	// tableLocation is like s3://{bucket}/{prefix}/...
+	dataPrefix := strings.TrimPrefix(tableLocation, "s3://"+d.cfg.Bucket+"/")
+	dataPrefix = dataPrefix + "/data/"
+
+	s3store, err := filesink.NewS3Store(ctx, d.cfg.s3StoreConfig())
+	if err != nil {
+		return nil, nil, fmt.Errorf("creating s3 store: %w", err)
+	}
+	s3client := s3store.Client()
+
+	listOut, err := s3client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{
+		Bucket: aws.String(d.cfg.Bucket),
+		Prefix: aws.String(dataPrefix),
+	})
+	if err != nil {
+		return nil, nil, fmt.Errorf("listing objects at %s: %w", dataPrefix, err)
+	}
+
+	var parquetKeys []string
+	for _, obj := range listOut.Contents {
+		if strings.HasSuffix(*obj.Key, ".parquet") {
+			parquetKeys = append(parquetKeys, *obj.Key)
+		}
+	}
+
+	if len(parquetKeys) == 0 {
+		return nil, nil, nil
+	}
+
+	sort.Strings(parquetKeys)
+
+	// Read parquet files using duckdb.
+	var allRows []map[string]any
+	for _, key := range parquetKeys {
+		getOut, err := s3client.GetObject(ctx, &s3.GetObjectInput{
+			Bucket: aws.String(d.cfg.Bucket),
+			Key:    aws.String(key),
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("getting object %s: %w", key, err)
+		}
+
+		data, err := io.ReadAll(getOut.Body)
+		getOut.Body.Close()
+		if err != nil {
+			return nil, nil, fmt.Errorf("reading object %s: %w", key, err)
+		}
+
+		tmpFile, err := os.CreateTemp("", "iceberg-test-*.parquet")
+		if err != nil {
+			return nil, nil, err
+		}
+		tmpPath := tmpFile.Name()
+		if _, err := tmpFile.Write(data); err != nil {
+			tmpFile.Close()
+			os.Remove(tmpPath)
+			return nil, nil, err
+		}
+		tmpFile.Close()
+
+		out, err := exec.CommandContext(ctx, "duckdb", "-json", ":memory:",
+			fmt.Sprintf("SET timezone TO 'UTC'; SELECT * FROM '%s' ORDER BY flow_published_at;", tmpPath),
+		).Output()
+		os.Remove(tmpPath)
+		if err != nil {
+			return nil, nil, fmt.Errorf("running duckdb on %s: %w", key, err)
+		}
+
+		var rows []map[string]any
+		if err := json.Unmarshal(out, &rows); err != nil {
+			return nil, nil, fmt.Errorf("parsing duckdb output: %w", err)
+		}
+		allRows = append(allRows, rows...)
+	}
+
+	if len(allRows) == 0 {
+		return nil, nil, nil
+	}
+
+	// Extract column names.
+	colSet := make(map[string]struct{})
+	for _, row := range allRows {
+		for k := range row {
+			colSet[k] = struct{}{}
+		}
+	}
+	columns := make([]string, 0, len(colSet))
+	for k := range colSet {
+		columns = append(columns, k)
+	}
+	sort.Strings(columns)
+
+	// Build rows in column order.
+	var result [][]any
+	for _, row := range allRows {
+		r := make([]any, len(columns))
+		for i, col := range columns {
+			r[i] = row[col]
+		}
+		result = append(result, r)
+	}
+
+	// Sort for determinism.
+	sort.Slice(result, func(i, j int) bool {
+		for c := range columns {
+			vi := fmt.Sprint(result[i][c])
+			vj := fmt.Sprint(result[j][c])
+			if vi != vj {
+				return vi < vj
+			}
+		}
+		return false
+	})
+
+	return columns, result, nil
 }
 
 func (d *materialization) Close(ctx context.Context) {}

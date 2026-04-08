@@ -774,6 +774,7 @@ func getDateVal(val any) (got int32, err error) {
 func getTimeVal(val any) (got int64, err error) {
 	switch v := val.(type) {
 	case string:
+		v = strings.Replace(v, "z", "Z", 1)
 		if parsed, parseErr := time.Parse("15:04:05.999999999Z07:00", v); parseErr != nil {
 			err = fmt.Errorf("unable to parse string %q as time: %w", v, parseErr)
 		} else {
@@ -791,6 +792,7 @@ func getTimeVal(val any) (got int64, err error) {
 func getTimestampVal(val any) (got int64, err error) {
 	switch v := val.(type) {
 	case string:
+		v = strings.Replace(v, "z", "Z", 1)
 		if d, parseErr := time.Parse(time.RFC3339Nano, v); parseErr != nil {
 			err = fmt.Errorf("unable to parse string %q as timestamp: %w", v, parseErr)
 		} else {

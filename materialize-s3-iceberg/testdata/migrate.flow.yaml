@@ -1,0 +1,23 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.migrate-base.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-s3-iceberg:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.yaml
+    bindings:
+    - resource:
+        table: migrate
+        delta_updates: true
+      source: key/value
+      fields:
+        recommended: true
+        exclude:
+          - hugeIntToMulti
+          - hugeIntToNum
+          - hugeIntToString
+          - bigIntToHugeInt
+          - uint64ToString

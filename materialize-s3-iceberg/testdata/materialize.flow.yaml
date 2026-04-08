@@ -1,0 +1,33 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-s3-iceberg:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.yaml
+    bindings:
+    - resource:
+        table: simple_delta
+        delta_updates: true
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: not_simple_delta
+        delta_updates: true
+      source: tests/not-simple
+      fields:
+        recommended: true
+        exclude:
+          - unsignedBigint
+    - resource:
+        table: data_types_delta
+        delta_updates: true
+      source: tests/data-types
+      fields:
+        recommended: true
+        exclude:
+          - stringUint64Field

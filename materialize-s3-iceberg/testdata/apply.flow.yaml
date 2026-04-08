@@ -1,0 +1,8 @@
+materializations:
+  acmeCo/tests/materialize-s3-iceberg:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.yaml
+    bindings: []
