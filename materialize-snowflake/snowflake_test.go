@@ -1,5 +1,3 @@
-//go:build !nodb
-
 package main
 
 import (
@@ -17,8 +15,8 @@ import (
 )
 
 func mustGetCfg(t *testing.T) config {
-	if os.Getenv("TEST_DATABASE") != "yes" {
-		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
 		return config{}
 	}
 
@@ -134,6 +132,10 @@ func TestIntegration(t *testing.T) {
 }
 
 func TestPrereqs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
 	cfg := mustGetCfg(t)
 
 	tests := []struct {
