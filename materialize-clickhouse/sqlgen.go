@@ -82,11 +82,12 @@ var clickHouseDialect = func(database string) sql.Dialect {
 	// is required in those cases. Backtick is the only escaped character.
 	// https://clickhouse.com/docs/sql-reference/syntax#identifiers
 	isSimpleIdentifier := regexp.MustCompile(`^[a-zA-Z_][0-9a-zA-Z_]*$`).MatchString
+	quoteTransform := sql.QuoteTransform("`", "``")
 	identifierer := sql.IdentifierFn(func(path ...string) string {
 		if isSimpleIdentifier(path[0]) && !slices.Contains(CLICKHOUSE_RESERVED_WORDS, strings.ToLower(path[0])) {
 			return path[0]
 		}
-		return "`" + strings.ReplaceAll(path[0], "`", "``") + "`"
+		return quoteTransform(path[0])
 	})
 
 	// String literals can be much more complicated, but
