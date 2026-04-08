@@ -13,7 +13,7 @@ function exportTable() {
 
 # Delta-update tables use plain MergeTree and have no _is_deleted column.
 function exportDeltaTable() {
-  query "SELECT * FROM \`$1\` FINAL ORDER BY flow_published_at FORMAT JSON;" \
+  query "SELECT * FROM \`$1\` ORDER BY flow_published_at FORMAT JSON;" \
     | jq -c "{ table: \"$1\", rows: .data | map(del(.flow_document)) }"
 }
 
