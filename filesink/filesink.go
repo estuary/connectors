@@ -375,7 +375,7 @@ func (t *transactor[T]) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 
 	lastBinding := -1
-	for it.Next() {
+	for it.Next(false) {
 		b := t.bindings[it.Binding]
 
 		if lastBinding != -1 && lastBinding != it.Binding {
@@ -455,6 +455,10 @@ func (t *transactor[T]) Acknowledge(ctx context.Context) (*pf.ConnectorState, er
 }
 
 func (t *transactor[T]) Destroy() {}
+
+func (t *transactor[T]) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return nil, nil
+}
 
 // StdConstraints represents standard constraints for a projection when materializing columns of
 // data to files.

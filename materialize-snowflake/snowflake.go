@@ -206,12 +206,15 @@ func getTimestampTypeMapping(ctx context.Context, db *stdsql.DB) (timestampTypeM
 	return m, isExplicit, nil
 }
 
+var _ m.Transactor = (*transactor)(nil)
+
 type transactor struct {
-	cfg           config
-	ep            *sql.Endpoint[config]
-	db            *stdsql.DB
-	streamManager *streamManager
-	pipeClient    *PipeClient
+	runtimeCheckpoint m.RuntimeCheckpoint
+	cfg               config
+	ep                *sql.Endpoint[config]
+	db                *stdsql.DB
+	streamManager     *streamManager
+	pipeClient        *PipeClient
 
 	// Variables exclusively used by Load.
 	load struct {
@@ -229,6 +232,10 @@ type transactor struct {
 	// this shard's range spec and version, used to key pipes so they don't collide
 	_range  *pf.RangeSpec
 	version string
+}
+
+func (d *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return d.runtimeCheckpoint, nil
 }
 
 func (d *transactor) UnmarshalState(state json.RawMessage) error {
@@ -277,15 +284,16 @@ func newTransactor(
 	}
 
 	var d = &transactor{
-		cfg:           cfg,
-		ep:            ep,
-		templates:     renderTemplates(ep.Dialect),
-		db:            db,
-		streamManager: sm,
-		pipeClient:    pipeClient,
-		_range:        open.Range,
-		version:       open.Version,
-		be:            be,
+		runtimeCheckpoint: fence.Checkpoint,
+		cfg:               cfg,
+		ep:                ep,
+		templates:         renderTemplates(ep.Dialect),
+		db:                db,
+		streamManager:     sm,
+		pipeClient:        pipeClient,
+		_range:            open.Range,
+		version:           open.Version,
+		be:                be,
 	}
 
 	if db, err := stdsql.Open("snowflake", dsn); err != nil {
@@ -584,14 +592,9 @@ type checkpoint = map[string]*checkpointItem
 func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
-	for it.Next() {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
-
-		flowDelete := d.cfg.HardDelete && it.Delete
-		if flowDelete && !it.Exists {
-			// Ignore items which do not exist and are already deleted
-			continue
-		}
 
 		if it.Exists {
 			b.store.mustMerge = true
@@ -608,7 +611,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			if err := d.streamManager.writeRow(ctx, it.Binding, converted); err != nil {
 				return nil, fmt.Errorf("encoding Store to stream for resource %s: %w", b.target.Path, err)
 			}
-		} else if err = b.store.stage.writeRow(append(converted, flowDelete)); err != nil {
+		} else if err = b.store.stage.writeRow(append(converted, d.cfg.HardDelete && it.Delete)); err != nil {
 			return nil, fmt.Errorf("writing Store to scratch file: %w", err)
 		} else {
 			b.store.mergeBounds.NextKey(converted[:len(b.target.Keys)])

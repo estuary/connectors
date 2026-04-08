@@ -33,10 +33,13 @@ type checkpointItem struct {
 
 type checkpoint = map[string]*checkpointItem
 
+var _ m.Transactor = (*transactor)(nil)
+
 type transactor struct {
-	cfg       config
-	dialect   sql.Dialect
-	templates templates
+	runtimeCheckpoint m.RuntimeCheckpoint
+	cfg               config
+	dialect           sql.Dialect
+	templates         templates
 
 	client     *client
 	storeFiles *boilerplate.StagedFiles
@@ -83,6 +86,7 @@ func prepareNewTransactor(
 		}
 
 		t := &transactor{
+			runtimeCheckpoint: fence.Checkpoint,
 			cfg:               cfg,
 			dialect:           ep.Dialect,
 			templates:         templates,
@@ -202,6 +206,10 @@ func schemaForCols(cols []*sql.Column, fieldSchemas map[string]*bigquery.FieldSc
 	}
 
 	return s, nil
+}
+
+func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return t.runtimeCheckpoint, nil
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error {
@@ -326,7 +334,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var ctx = it.Context()
 
-	for it.Next() {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(t.cfg.HardDelete) {
 		var b = t.bindings[it.Binding]
 
 		flowDelete := t.cfg.HardDelete && it.Delete

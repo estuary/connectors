@@ -11,7 +11,6 @@ import (
 	"github.com/elastic/go-elasticsearch/v8/esapi"
 	"github.com/elastic/go-elasticsearch/v8/esutil"
 	m "github.com/estuary/connectors/go/materialize"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/sync/errgroup"
@@ -63,7 +62,7 @@ type transactor struct {
 	indexToBinding map[string]int
 }
 
-func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, range_ pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, range_ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
 }
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
@@ -187,7 +186,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 	var batch []byte
 	var lastIndex string
-	for it.Next() {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(t.cfg.HardDelete) {
 		b := t.bindings[it.Binding]
 
 		if len(batch) > storeBatchSize || (lastIndex != b.index && lastIndex != "") {
@@ -210,16 +210,13 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			}
 		}
 
-		if it.Delete && t.cfg.HardDelete {
-			// Ignore items which do not exist and are already deleted.
-			if it.Exists {
-				batch = append(batch, []byte(`{"delete":{"_id":"`+id+`"`)...)
-				if routingVal != nil {
-					batch = append(batch, []byte(`,"routing":`+string(routingVal))...)
-				}
-				batch = append(batch, []byte(`}}`)...)
-				batch = append(batch, '\n')
+		if it.Delete && t.cfg.HardDelete && it.Exists {
+			batch = append(batch, []byte(`{"delete":{"_id":"`+id+`"`)...)
+			if routingVal != nil {
+				batch = append(batch, []byte(`,"routing":`+string(routingVal))...)
 			}
+			batch = append(batch, []byte(`}}`)...)
+			batch = append(batch, '\n')
 			continue
 		}
 

@@ -220,13 +220,13 @@ func (d *materialization) UpdateResource(
 	return "", nil, nil
 }
 
-func (d *materialization) NewMaterializerTransactor(
+func (d *materialization) NewTransactor(
 	ctx context.Context,
 	req pm.Request_Open,
 	is boilerplate.InfoSchema,
 	mappedBindings []boilerplate.MappedBinding[config, resource, mappedType],
 	be *m.BindingEvents,
-) (boilerplate.MaterializerTransactor, error) {
+) (m.Transactor, error) {
 	var bindings []*binding
 	for _, b := range mappedBindings {
 		bindings = append(bindings, &binding{

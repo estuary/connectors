@@ -24,7 +24,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var _ boilerplate.MaterializerTransactor = (*transactor)(nil)
+var _ m.Transactor = (*transactor)(nil)
 
 type binding struct {
 	Idx    int
@@ -57,7 +57,7 @@ type transactor struct {
 	pyFiles pyFileURIs
 }
 
-func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
 	return nil, nil
 }
 
@@ -157,10 +157,8 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
-	for it.Next() {
-		if t.cfg.HardDelete && it.Delete && !it.Exists {
-			continue
-		}
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(t.cfg.HardDelete) {
 
 		b := t.bindings[it.Binding]
 

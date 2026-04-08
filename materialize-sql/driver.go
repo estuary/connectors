@@ -353,13 +353,13 @@ func (s *sqlMaterialization[EC, RC]) UpdateResource(
 	return s.client.AlterTable(ctx, alter)
 }
 
-func (s *sqlMaterialization[EC, RC]) NewMaterializerTransactor(
+func (s *sqlMaterialization[EC, RC]) NewTransactor(
 	ctx context.Context,
 	open pm.Request_Open,
 	is boilerplate.InfoSchema,
 	bindings []boilerplate.MappedBinding[EC, RC, MappedType],
 	be *m.BindingEvents,
-) (boilerplate.MaterializerTransactor, error) {
+) (m.Transactor, error) {
 	tables := make([]Table, 0, len(bindings))
 	for _, binding := range bindings {
 		table, err := getTable(s.endpoint, s.materializationName, binding)
@@ -398,30 +398,7 @@ func (s *sqlMaterialization[EC, RC]) NewMaterializerTransactor(
 		}
 	}
 
-	transactor, err := s.endpoint.NewTransactor(ctx, s.materializationName, s.featureFlags, s.endpoint, fence, tables, open, &is, be)
-	if err != nil {
-		return nil, fmt.Errorf("building transactor: %w", err)
-	}
-
-	return &checkpointRecoverer{
-		Transactor: transactor,
-		cp:         fence.Checkpoint,
-	}, nil
-}
-
-var _ boilerplate.MaterializerTransactor = &checkpointRecoverer{}
-
-// TODO(whb): This wrapper is a temporary implementation of the new Materializer
-// transactor interface, which separates the recovering of a checkpoint with the
-// initialization of the Transactor. This should be revisited when we implement
-// the pattern of materializations always doing an acknowledgement before Apply.
-type checkpointRecoverer struct {
-	m.Transactor
-	cp []byte
-}
-
-func (c *checkpointRecoverer) RecoverCheckpoint(context.Context, pf.MaterializationSpec, pf.RangeSpec) (boilerplate.RuntimeCheckpoint, error) {
-	return c.cp, nil
+	return s.endpoint.NewTransactor(ctx, s.materializationName, s.featureFlags, s.endpoint, fence, tables, open, &is, be)
 }
 
 func (s *sqlMaterialization[EC, RC]) FlushDDL(ctx context.Context) error {

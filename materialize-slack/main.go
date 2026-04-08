@@ -42,7 +42,7 @@ func (c config) buildAPI() (*SlackAPI, error) {
 }
 
 type resource struct {
-	Channel      string            `json:"channel" jsonschema:"title=Channel,description=The name of the channel to post messages to (or a raw channel ID like \"id:C123456\")"`
+	Channel      string            `json:"channel" jsonschema:"title=Channel,description=The name of the channel to post messages to (or a raw channel ID like \"id:C123456\")" jsonschema_extras:"x-collection-name=true"`
 	SenderConfig SlackSenderConfig `json:"sender_config" jsonschema:"title=Configure Appearance"`
 }
 
@@ -243,7 +243,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
-	for it.Next() {
+	for it.Next(false) {
 		var b = t.bindings[it.Binding]
 		var parsed = buildDocument(b, it.Key, it.Values)
 		var tsStr, tsOk = parsed["ts"].(string)
@@ -308,6 +308,10 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error {
 	return nil
+}
+
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return nil, nil
 }
 
 func main() {

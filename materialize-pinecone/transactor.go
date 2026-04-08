@@ -58,7 +58,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	var batch []upsertDoc
 
 	lastBinding := -1
-	for it.Next() {
+	for it.Next(false) {
 		if lastBinding == -1 {
 			lastBinding = it.Binding
 		}
@@ -188,3 +188,7 @@ func (t *transactor) sendBatch(b binding, batch []upsertDoc) error {
 }
 
 func (t *transactor) Destroy() {}
+
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return nil, nil
+}

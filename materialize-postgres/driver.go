@@ -107,7 +107,7 @@ type config struct {
 	Schema     string `json:"schema,omitempty" jsonschema:"title=Database Schema,default=public,description=Database schema for bound collection tables (unless overridden within the binding resource configuration) as well as associated materialization metadata tables" jsonschema_extras:"order=3"`
 	HardDelete bool   `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=4"`
 
-	Credentials *credentialConfig `json:"credentials" jsonschema_extras:"x-iam-auth=true,order=5"`
+	Credentials *credentialConfig `json:"credentials" jsonschema_extras:"x-iam-auth=true,x-iam-azure-scope=https://ossrdbms-aad.database.windows.net/.default,order=5"`
 
 	DBTJobTrigger dbt.JobConfig `json:"dbt_job_trigger,omitempty" jsonschema:"title=dbt Cloud Job Trigger,description=Trigger a dbt Job when new data is available"`
 
@@ -351,6 +351,8 @@ func newPostgresDriver() *sql.Driver[config, tableConfig] {
 	}
 }
 
+var _ m.Transactor = (*transactor)(nil)
+
 type transactor struct {
 	cfg       config
 	templates templates
@@ -426,13 +428,13 @@ func newTransactor(
 }
 
 type binding struct {
-	target             sql.Table
-	nullFieldsToStrip  []string
-	loadInsertSQL      string
-	storeUpdateSQL     string
-	storeInsertSQL     string
-	deleteQuerySQL     string
-	loadQuerySQL       string
+	target            sql.Table
+	nullFieldsToStrip []string
+	loadInsertSQL     string
+	storeUpdateSQL    string
+	storeInsertSQL    string
+	deleteQuerySQL    string
+	loadQuerySQL      string
 }
 
 func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boilerplate.InfoSchema) error {
@@ -486,6 +488,10 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table, is *boile
 	}
 
 	return nil
+}
+
+func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return t.store.fence.Checkpoint, nil
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
@@ -621,22 +627,18 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 	var batch pgx.Batch
 	batchBytes := 0
-	for it.Next() {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(d.cfg.HardDelete) {
 		var b = d.bindings[it.Binding]
 
 		if it.Delete && d.cfg.HardDelete {
-			if it.Exists {
-				if converted, err := b.target.ConvertKey(it.Key); err != nil {
-					return nil, fmt.Errorf("converting delete keys: %w", err)
-				} else if it.Exists {
-					batch.Queue(b.deleteQuerySQL, converted...)
-				}
-
-				batchBytes += len(it.PackedKey)
+			if converted, err := b.target.ConvertKey(it.Key); err != nil {
+				return nil, fmt.Errorf("converting delete keys: %w", err)
 			} else {
-				// Ignore items which do not exist and are already deleted
-				continue
+				batch.Queue(b.deleteQuerySQL, converted...)
 			}
+
+			batchBytes += len(it.PackedKey)
 		} else {
 			// Similar to the accounting in (*transactor).Store, this assumes that lengths of packed
 			// tuples & the document JSON are proportional to the size of the item in the batch.

@@ -126,6 +126,13 @@ func (c config) toURI(includeSchema bool, materializationName string) (string, e
 	// bumps that up quite a bit, to continue attempting retryable errors for
 	// about 10 minutes before crashing.
 	queryParams.Add("maxRetryCount", "35")
+	// jwtClientTimeout controls the HTTP client timeout in seconds for each
+	// attempt to authenticate when using the JWT authentication.  The default
+	// values is 10s.
+	//
+	// In addition to this variable, retries are made according to the
+	// maxRetryCount and loginTimeout variables on certain errors.
+	queryParams.Add("jwtClientTimeout", "30")
 	// The default for CLIENT_RESULT_CHUNK_SIZE is 160. This specifies how many megabytes are in each
 	// result chunk we receive. This option, together with the MaxChunkDownloadWorkers option of
 	// gosnowflake which defaults to 10, determine how much memory can be used at once. With 24

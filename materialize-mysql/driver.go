@@ -205,6 +205,8 @@ func (c config) ToURI() string {
 		mysqlCfg.TLSConfig = tlsConfigMap[c.Advanced.SSLMode]
 	}
 
+	mysqlCfg.ConnectionAttributes = "program_name:Estuary materialize-mysql"
+
 	return mysqlCfg.FormatDSN()
 }
 
@@ -398,6 +400,8 @@ func queryTimeZone(ctx context.Context, conn *stdsql.Conn, product string) (stri
 	return tzName, nil
 }
 
+var _ m.Transactor = (*transactor)(nil)
+
 type transactor struct {
 	cfg config
 
@@ -421,6 +425,10 @@ type transactor struct {
 	}
 	bindings []*binding
 	be       *m.BindingEvents
+}
+
+func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return t.store.fence.Checkpoint, nil
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
@@ -759,7 +767,8 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	// memory use
 	var lastBinding = -1
 
-	for it.Next() {
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(d.cfg.HardDelete) {
 		if lastBinding == -1 {
 			lastBinding = it.Binding
 		}
@@ -777,14 +786,9 @@ func (d *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 
 		var converted []any
 		if it.Delete && d.cfg.HardDelete {
-			if it.Exists {
-				converted, err = b.target.ConvertKey(it.Key)
-				if err != nil {
-					return nil, fmt.Errorf("converting delete parameters: %w", err)
-				}
-			} else {
-				// Ignore items which do not exist and are already deleted
-				continue
+			converted, err = b.target.ConvertKey(it.Key)
+			if err != nil {
+				return nil, fmt.Errorf("converting delete parameters: %w", err)
 			}
 		} else {
 			converted, err = b.target.ConvertAll(it.Key, it.Values, it.RawJSON)

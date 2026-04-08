@@ -210,6 +210,8 @@ func newTransactor(
 	return d, nil
 }
 
+var _ m.Transactor = (*transactor)(nil)
+
 type transactor struct {
 	dialect *sql.Dialect
 
@@ -280,6 +282,13 @@ func (t *transactor) addBinding(ctx context.Context, target sql.Table) error {
 	return nil
 }
 
+func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	if t.store.fence != nil {
+		return t.store.fence.Checkpoint, nil
+	}
+	return nil, nil
+}
+
 func (t *transactor) UnmarshalState(state json.RawMessage) error                  { return nil }
 func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error) { return nil, nil }
 
@@ -344,7 +353,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		return nil, fmt.Errorf("conn.BeginTx: %w", err)
 	}
 
-	for it.Next() {
+	for it.Next(false) {
 		var ctx = it.Context()
 		var b = d.bindings[it.Binding]
 

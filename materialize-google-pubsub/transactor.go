@@ -50,7 +50,7 @@ var highwayHashKey, _ = hex.DecodeString("ba737e89155238d47d8067c35aad4d25ecdd1c
 func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	errGroup, ctx := errgroup.WithContext(it.Context())
 
-	for it.Next() {
+	for it.Next(false) {
 		binding := t.bindings[it.Binding]
 
 		msg := &pubsub.Message{
@@ -91,4 +91,8 @@ func (t *transactor) Destroy() {
 		// Wait for all async messages to finished sending for each topic.
 		b.topic.Stop()
 	}
+}
+
+func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return nil, nil
 }

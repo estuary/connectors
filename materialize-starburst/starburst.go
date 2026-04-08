@@ -150,10 +150,13 @@ func newStarburstDriver() *sql.Driver[config, tableConfig] {
 	}
 }
 
+var _ m.Transactor = (*transactor)(nil)
+
 type transactor struct {
-	cfg  config
-	cp   checkpoint
-	load struct {
+	runtimeCheckpoint m.RuntimeCheckpoint
+	cfg               config
+	cp                checkpoint
+	load              struct {
 		conn *stdsql.Conn
 	}
 	store struct {
@@ -168,7 +171,7 @@ func newTransactor(
 	materializationName string,
 	featureFlags map[string]bool,
 	ep *sql.Endpoint[config],
-	_ sql.Fence,
+	fence sql.Fence,
 	tables []sql.Table,
 	open pm.Request_Open,
 	_ *boilerplate.InfoSchema,
@@ -179,7 +182,8 @@ func newTransactor(
 	var templates = renderTemplates(starburstTrinoDialect)
 
 	var transactor = &transactor{
-		cfg: cfg,
+		runtimeCheckpoint: fence.Checkpoint,
+		cfg:               cfg,
 	}
 
 	// Establish connections.
@@ -263,6 +267,10 @@ func (t *transactor) addBinding(ctx context.Context, materializationSpec *pf.Mat
 	}
 
 	return nil
+}
+
+func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return t.runtimeCheckpoint, nil
 }
 
 func (t *transactor) UnmarshalState(state json.RawMessage) error {
@@ -356,7 +364,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 	}
 	defer storeFileProcessor.Destroy()
 
-	for it.Next() {
+	for it.Next(false) {
 		var b = t.bindings[it.Binding]
 		doc, err := b.target.Document.MappedType.Converter(it.RawJSON)
 		if err != nil {

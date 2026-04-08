@@ -85,7 +85,7 @@ type materialization struct {
 	ssmClient     *ssm.Client
 	emrClient     *emrClient
 	templates     templates
-	pyFiles       *pyFileURIs // populated in Setup and NewMaterializerTransactor
+	pyFiles       *pyFileURIs // populated in Setup and NewTransactor
 	locationStyle LocationStyle
 }
 
@@ -521,13 +521,13 @@ func (d *materialization) UpdateResource(
 	}, nil
 }
 
-func (d *materialization) NewMaterializerTransactor(
+func (d *materialization) NewTransactor(
 	ctx context.Context,
 	req pm.Request_Open,
 	is boilerplate.InfoSchema,
 	mappedBindings []boilerplate.MappedBinding[config, resource, mapped],
 	be *m.BindingEvents,
-) (boilerplate.MaterializerTransactor, error) {
+) (m.Transactor, error) {
 	pyFiles, err := d.putPyFiles(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("putting PySpark scripts: %w", err)

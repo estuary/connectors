@@ -238,7 +238,7 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	ctx := it.Context()
 
 	previousBinding := -1
-	for it.Next() {
+	for it.Next(false) {
 		if previousBinding == -1 {
 			previousBinding = it.Binding
 		}
@@ -278,6 +278,10 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 
 // Destroy is a no-op.
 func (d *transactor) Destroy() {}
+
+func (d *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return nil, nil
+}
 
 func backoff(attempt int) time.Duration {
 	switch attempt {

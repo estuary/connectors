@@ -3,7 +3,7 @@ import asyncio
 import base64
 import json
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from logging import Logger
 from typing import Any, AsyncGenerator, Awaitable, Callable, Protocol, TypeVar
 
@@ -277,8 +277,18 @@ class TokenSource:
     google_spec: GoogleServiceAccountSpec | None = None
     _access_token: AccessTokenResponse | GoogleServiceAccountCredentials | None = None
     _fetched_at: int = 0
+    _lock: asyncio.Lock = field(default_factory=asyncio.Lock)
 
     async def fetch_token(self, log: Logger, session: HTTPSession) -> tuple[str, str]:
+        # Serialize token fetches so that concurrent tasks don't race to refresh
+        # an expiring token. Without this, multiple tasks can each request a new
+        # token from the OAuth2 provider. Some providers revoke the previous token
+        # when a new one is issued, causing in-flight requests that used the old
+        # token to fail.
+        async with self._lock:
+            return await self._fetch_token(log, session)
+
+    async def _fetch_token(self, log: Logger, session: HTTPSession) -> tuple[str, str]:
         if isinstance(
             self.credentials,
             (

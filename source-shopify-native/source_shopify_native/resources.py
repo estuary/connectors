@@ -316,24 +316,28 @@ async def _reconcile_connector_state(
     migrated = _migrate_flat_to_dict_state(state, legacy_store_id, task.log)
 
     # Step 2: Add missing store entries for newly configured stores.
-    # Not all resources use backfill (bulk query resources don't), so backfill
-    # may be None for both state and initial_state — only reconcile it when both are dicts.
     should_checkpoint = migrated
 
     if (
-        isinstance(state.inc, dict)
-        and isinstance(state.backfill, dict)
-        and isinstance(initial_state.inc, dict)
-        and isinstance(initial_state.backfill, dict)
+        isinstance(state.inc, dict) and
+        isinstance(initial_state.inc, dict)
     ):
         for store_id in store_ids:
-            inc_state_exists = store_id in state.inc
-            backfill_state_exists = store_id in state.backfill
-
-            if not inc_state_exists and not backfill_state_exists:
+            # If the store is not in the incremental state dict, that means that this is
+            # a new store that needs to be added to the resource state.
+            if store_id not in state.inc:
                 task.log.info(f"Initializing new subtask state for store {store_id}.")
                 state.inc[store_id] = deepcopy(initial_state.inc[store_id])
-                state.backfill[store_id] = deepcopy(initial_state.backfill[store_id])
+
+                # Not all resources use backfills (ex: bulk query resources), so only add
+                # backfill state for this store if this resource uses backfills.
+                if (
+                    isinstance(state.backfill, dict) and
+                    isinstance(initial_state.backfill, dict)
+                ):
+                    state.backfill[store_id] = deepcopy(
+                        initial_state.backfill[store_id]
+                    )
                 should_checkpoint = True
 
     if should_checkpoint:
