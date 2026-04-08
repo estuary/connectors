@@ -42,7 +42,7 @@ func (c config) buildAPI() (*SlackAPI, error) {
 }
 
 type resource struct {
-	Channel      string            `json:"channel" jsonschema:"title=Channel,description=The name of the channel to post messages to (or a raw channel ID like \"id:C123456\")"`
+	Channel      string            `json:"channel" jsonschema:"title=Channel,description=The name of the channel to post messages to (or a raw channel ID like \"id:C123456\")" jsonschema_extras:"x-collection-name=true"`
 	SenderConfig SlackSenderConfig `json:"sender_config" jsonschema:"title=Configure Appearance"`
 }
 
