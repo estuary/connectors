@@ -78,31 +78,28 @@ var clickHouseDialect = func(database string) sql.Dialect {
 		// ClickHouse columns are NOT NULL by default. We handle Nullable wrapping in templates.
 	)
 
-	// Identifiers can contain any special characters, wrapping with backticks
-	// is required in those cases. Backtick is the only escaped character.
-	// https://clickhouse.com/docs/sql-reference/syntax#identifiers
-	isSimpleIdentifier := regexp.MustCompile(`^[a-zA-Z_][0-9a-zA-Z_]*$`).MatchString
-	quoteTransform := sql.QuoteTransform("`", "``")
-	identifierer := sql.IdentifierFn(func(path ...string) string {
-		if isSimpleIdentifier(path[0]) && !slices.Contains(CLICKHOUSE_RESERVED_WORDS, strings.ToLower(path[0])) {
-			return path[0]
-		}
-		return quoteTransform(path[0])
-	})
-
-	// String literals can be much more complicated, but
-	// backslashes and single-quotes cover our needs.
-	// https://clickhouse.com/docs/sql-reference/syntax#string
-	literaler := sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "\\'"))
+	simpleIdentifier := regexp.MustCompile(`^[a-zA-Z_][0-9a-zA-Z_]*$`)
 
 	return sql.Dialect{
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: database, TableName: path[0]}
 		}),
-		SchemaLocatorer:     sql.SchemaLocatorFn(func(schema string) string { return schema }),
-		ColumnLocatorer:     sql.ColumnLocatorFn(func(field string) string { return field }),
-		Identifierer:        identifierer,
-		Literaler:           literaler,
+		SchemaLocatorer: sql.SchemaLocatorFn(func(schema string) string { return schema }),
+		ColumnLocatorer: sql.ColumnLocatorFn(func(field string) string { return field }),
+		Identifierer: sql.IdentifierFn(sql.JoinTransform(".",
+			sql.PassThroughTransform(
+				func(s string) bool {
+					// Identifiers can contain any special characters, wrapping with backticks
+					// is required in those cases. Backtick is the only escaped character.
+					// https://clickhouse.com/docs/sql-reference/syntax#identifiers
+					return simpleIdentifier.MatchString(s) && !slices.Contains(CLICKHOUSE_RESERVED_WORDS, strings.ToLower(s))
+				},
+				sql.QuoteTransform("`", "``"),
+			))),
+		// String literals can be much more complicated, but
+		// backslashes and single-quotes cover our needs.
+		// https://clickhouse.com/docs/sql-reference/syntax#string
+		Literaler:           sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "\\'")),
 		Placeholderer:       sql.PlaceholderFn(func(index int) string { return "?" }),
 		TypeMapper:          mapper,
 		MaxColumnCharLength: 256,
@@ -186,11 +183,14 @@ ORDER BY (
 		{{$key.Identifier}}
 	{{- end -}}
 )
+{{ if not $.DeltaUpdates -}}
 SETTINGS
 	allow_experimental_replacing_merge_with_cleanup = 1,
 	min_age_to_force_merge_seconds = 604800,
 	min_age_to_force_merge_on_partition_only = 1,
-	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1
+{{- end -}}
+;
 {{ end }}
 
 {{ define "alterTargetColumns" }}
@@ -217,7 +217,7 @@ ALTER TABLE {{$.Identifier}} MODIFY COLUMN {{ ColumnIdentifier $col.Name }} Null
 -- connector shuts down.
 
 {{ define "loadTableName" -}}
-{{ printf "flow_temp_load_%d_%s_%s" $.Binding $.RangeKey (index $.Path 0) | ColumnIdentifier }}
+{{ printf "flow_temp_load_%s_%s" $.RangeKey (index $.Path 0) | ColumnIdentifier }}
 {{- end }}
 
 {{ define "createLoadTable" }}

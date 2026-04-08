@@ -43,11 +43,7 @@ CREATE TABLE IF NOT EXISTS delta_updates (
 )
 ENGINE = MergeTree
 ORDER BY (theKey)
-SETTINGS
-	allow_experimental_replacing_merge_with_cleanup = 1,
-	min_age_to_force_merge_seconds = 604800,
-	min_age_to_force_merge_on_partition_only = 1,
-	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+;
 --- End delta_updates createTargetTable ---
 
 --- Begin alter table add columns and drop not nulls ---
@@ -77,7 +73,7 @@ ALTER TABLE key_value MODIFY COLUMN second_required_column Nullable(bool);
 
 --- Begin key_value createLoadTable ---
 
-CREATE OR REPLACE TABLE flow_temp_load_0_0_key_value (
+CREATE OR REPLACE TABLE flow_temp_load_0_key_value (
 		key1 Int64,
 		key2 Bool,
 		`key!binary` String
@@ -88,7 +84,7 @@ ORDER BY (key1, key2, `key!binary`);
 
 --- Begin delta_updates createLoadTable ---
 
-CREATE OR REPLACE TABLE flow_temp_load_1_0_delta_updates (
+CREATE OR REPLACE TABLE flow_temp_load_0_delta_updates (
 		theKey String
 )
 ENGINE = MergeTree
@@ -99,7 +95,7 @@ ORDER BY (theKey);
 
 SELECT 0::Int32, r.flow_document
 	FROM key_value AS r FINAL
-	JOIN flow_temp_load_0_0_key_value AS l
+	JOIN flow_temp_load_0_key_value AS l
 		 ON l.key1 = r.key1
 		 AND l.key2 = r.key2
 		 AND l.`key!binary` = r.`key!binary`
@@ -135,7 +131,7 @@ toJSONString(map(
 	'stringNumber', toString(r.stringNumber)
 )) AS flow_document
 	FROM key_value AS r FINAL
-	JOIN flow_temp_load_0_0_key_value AS l
+	JOIN flow_temp_load_0_key_value AS l
 		 ON l.key1 = r.key1
 		 AND l.key2 = r.key2
 		 AND l.`key!binary` = r.`key!binary`
@@ -149,22 +145,22 @@ SELECT * FROM (SELECT -1::Int32, ''::String LIMIT 0) as nodoc
 
 --- Begin key_value insertLoadTable ---
 
-INSERT INTO flow_temp_load_0_0_key_value (key1, key2, `key!binary`)
+INSERT INTO flow_temp_load_0_key_value (key1, key2, `key!binary`)
 --- End key_value insertLoadTable ---
 
 --- Begin delta_updates insertLoadTable ---
 
-INSERT INTO flow_temp_load_1_0_delta_updates (theKey)
+INSERT INTO flow_temp_load_0_delta_updates (theKey)
 --- End delta_updates insertLoadTable ---
 
 --- Begin key_value dropLoadTable ---
 
-DROP TABLE IF EXISTS flow_temp_load_0_0_key_value;
+DROP TABLE IF EXISTS flow_temp_load_0_key_value;
 --- End key_value dropLoadTable ---
 
 --- Begin delta_updates dropLoadTable ---
 
-DROP TABLE IF EXISTS flow_temp_load_1_0_delta_updates;
+DROP TABLE IF EXISTS flow_temp_load_0_delta_updates;
 --- End delta_updates dropLoadTable ---
 
 --- Begin key_value createStoreTable ---

@@ -43,11 +43,7 @@ CREATE TABLE IF NOT EXISTS `delta_updates-@你好-``-"especiál` (
 )
 ENGINE = MergeTree
 ORDER BY (theKey)
-SETTINGS
-	allow_experimental_replacing_merge_with_cleanup = 1,
-	min_age_to_force_merge_seconds = 604800,
-	min_age_to_force_merge_on_partition_only = 1,
-	enable_replacing_merge_with_cleanup_for_min_age_to_force_merge = 1;
+;
 --- End `delta_updates-@你好-``-"especiál` createTargetTable ---
 
 --- Begin alter table add columns and drop not nulls ---
@@ -77,7 +73,7 @@ ALTER TABLE `key_value-@你好-``-"especiál` MODIFY COLUMN second_required_colu
 
 --- Begin `key_value-@你好-``-"especiál` createLoadTable ---
 
-CREATE OR REPLACE TABLE `flow_temp_load_0_0_key_value-@你好-``-"especiál` (
+CREATE OR REPLACE TABLE `flow_temp_load_0_key_value-@你好-``-"especiál` (
 		key1 Int64,
 		key2 Bool,
 		`key!binary` String
@@ -88,7 +84,7 @@ ORDER BY (key1, key2, `key!binary`);
 
 --- Begin `delta_updates-@你好-``-"especiál` createLoadTable ---
 
-CREATE OR REPLACE TABLE `flow_temp_load_1_0_delta_updates-@你好-``-"especiál` (
+CREATE OR REPLACE TABLE `flow_temp_load_0_delta_updates-@你好-``-"especiál` (
 		theKey String
 )
 ENGINE = MergeTree
@@ -99,7 +95,7 @@ ORDER BY (theKey);
 
 SELECT 0::Int32, r.flow_document
 	FROM `key_value-@你好-``-"especiál` AS r FINAL
-	JOIN `flow_temp_load_0_0_key_value-@你好-``-"especiál` AS l
+	JOIN `flow_temp_load_0_key_value-@你好-``-"especiál` AS l
 		 ON l.key1 = r.key1
 		 AND l.key2 = r.key2
 		 AND l.`key!binary` = r.`key!binary`
@@ -135,7 +131,7 @@ toJSONString(map(
 	'stringNumber', toString(r.stringNumber)
 )) AS flow_document
 	FROM `key_value-@你好-``-"especiál` AS r FINAL
-	JOIN `flow_temp_load_0_0_key_value-@你好-``-"especiál` AS l
+	JOIN `flow_temp_load_0_key_value-@你好-``-"especiál` AS l
 		 ON l.key1 = r.key1
 		 AND l.key2 = r.key2
 		 AND l.`key!binary` = r.`key!binary`
@@ -149,22 +145,22 @@ SELECT * FROM (SELECT -1::Int32, ''::String LIMIT 0) as nodoc
 
 --- Begin `key_value-@你好-``-"especiál` insertLoadTable ---
 
-INSERT INTO `flow_temp_load_0_0_key_value-@你好-``-"especiál` (key1, key2, `key!binary`)
+INSERT INTO `flow_temp_load_0_key_value-@你好-``-"especiál` (key1, key2, `key!binary`)
 --- End `key_value-@你好-``-"especiál` insertLoadTable ---
 
 --- Begin `delta_updates-@你好-``-"especiál` insertLoadTable ---
 
-INSERT INTO `flow_temp_load_1_0_delta_updates-@你好-``-"especiál` (theKey)
+INSERT INTO `flow_temp_load_0_delta_updates-@你好-``-"especiál` (theKey)
 --- End `delta_updates-@你好-``-"especiál` insertLoadTable ---
 
 --- Begin `key_value-@你好-``-"especiál` dropLoadTable ---
 
-DROP TABLE IF EXISTS `flow_temp_load_0_0_key_value-@你好-``-"especiál`;
+DROP TABLE IF EXISTS `flow_temp_load_0_key_value-@你好-``-"especiál`;
 --- End `key_value-@你好-``-"especiál` dropLoadTable ---
 
 --- Begin `delta_updates-@你好-``-"especiál` dropLoadTable ---
 
-DROP TABLE IF EXISTS `flow_temp_load_1_0_delta_updates-@你好-``-"especiál`;
+DROP TABLE IF EXISTS `flow_temp_load_0_delta_updates-@你好-``-"especiál`;
 --- End `delta_updates-@你好-``-"especiál` dropLoadTable ---
 
 --- Begin `key_value-@你好-``-"especiál` createStoreTable ---
