@@ -1,0 +1,37 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-mongodb:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        collection: simple_standard
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        collection: simple_delta
+        delta_updates: true
+      source: tests/simple
+      fields:
+        recommended: true
+    # tests/not-simple is excluded because MongoDB rejects $-prefixed field
+    # names in replacement documents, and since MongoDB materializes the full
+    # root document, the $dollar$signs field cannot be excluded from the stored
+    # data. Supporting this would require sanitizing field names in the
+    # transactor's store logic.
+    #- resource:
+    #    collection: not_simple
+    #  source: tests/not-simple
+    #  fields:
+    #    recommended: true
+    - resource:
+        collection: data_types
+      source: tests/data-types
+      fields:
+        recommended: true

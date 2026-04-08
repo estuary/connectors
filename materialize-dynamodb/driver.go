@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"sort"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/retry"
@@ -474,7 +475,104 @@ func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) 
 }
 
 func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
-	return nil, nil, nil
+	tableName := path[0]
+
+	var items []map[string]types.AttributeValue
+	var exclusiveStartKey map[string]types.AttributeValue
+
+	for {
+		out, err := d.client.db.Scan(ctx, &dynamodb.ScanInput{
+			TableName:         aws.String(tableName),
+			ExclusiveStartKey: exclusiveStartKey,
+		})
+		if err != nil {
+			return nil, nil, fmt.Errorf("scanning table %q: %w", tableName, err)
+		}
+		items = append(items, out.Items...)
+		if out.LastEvaluatedKey == nil {
+			break
+		}
+		exclusiveStartKey = out.LastEvaluatedKey
+	}
+
+	if len(items) == 0 {
+		return nil, nil, nil
+	}
+
+	// Collect all attribute names across all items.
+	colSet := make(map[string]struct{})
+	for _, item := range items {
+		for k := range item {
+			colSet[k] = struct{}{}
+		}
+	}
+
+	columns := make([]string, 0, len(colSet))
+	for k := range colSet {
+		columns = append(columns, k)
+	}
+	sort.Strings(columns)
+
+	// Build rows with values in column order.
+	var rows [][]any
+	for _, item := range items {
+		row := make([]any, len(columns))
+		for i, col := range columns {
+			if av, ok := item[col]; ok {
+				row[i] = attributeValueToAny(av)
+			}
+		}
+		rows = append(rows, row)
+	}
+
+	// Sort rows for deterministic output.
+	sort.Slice(rows, func(i, j int) bool {
+		for c := range columns {
+			vi := fmt.Sprint(rows[i][c])
+			vj := fmt.Sprint(rows[j][c])
+			if vi != vj {
+				return vi < vj
+			}
+		}
+		return false
+	})
+
+	return columns, rows, nil
+}
+
+func attributeValueToAny(av types.AttributeValue) any {
+	switch v := av.(type) {
+	case *types.AttributeValueMemberS:
+		return v.Value
+	case *types.AttributeValueMemberN:
+		return json.Number(v.Value)
+	case *types.AttributeValueMemberBOOL:
+		return v.Value
+	case *types.AttributeValueMemberNULL:
+		return nil
+	case *types.AttributeValueMemberB:
+		return v.Value
+	case *types.AttributeValueMemberM:
+		m := make(map[string]any, len(v.Value))
+		for k, val := range v.Value {
+			m[k] = attributeValueToAny(val)
+		}
+		return m
+	case *types.AttributeValueMemberL:
+		l := make([]any, len(v.Value))
+		for i, val := range v.Value {
+			l[i] = attributeValueToAny(val)
+		}
+		return l
+	case *types.AttributeValueMemberSS:
+		return v.Value
+	case *types.AttributeValueMemberNS:
+		return v.Value
+	case *types.AttributeValueMemberBS:
+		return v.Value
+	default:
+		return nil
+	}
 }
 
 func (d *materialization) Close(ctx context.Context) {}
