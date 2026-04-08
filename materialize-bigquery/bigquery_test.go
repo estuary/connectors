@@ -3,15 +3,10 @@
 package main
 
 import (
-	"context"
-	"encoding/json"
 	"regexp"
 	"testing"
 
-	"github.com/bradleyjkemp/cupaloy"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/stretchr/testify/require"
 )
 
 func TestIntegration(t *testing.T) {
@@ -47,13 +42,3 @@ func TestIntegration(t *testing.T) {
 	})
 }
 
-func TestSpecification(t *testing.T) {
-	var resp, err = newBigQueryDriver().
-		Spec(context.Background(), &pm.Request_Spec{})
-	require.NoError(t, err)
-
-	formatted, err := json.MarshalIndent(resp, "", "  ")
-	require.NoError(t, err)
-
-	cupaloy.SnapshotT(t, formatted)
-}

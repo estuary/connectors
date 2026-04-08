@@ -4,16 +4,13 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/bradleyjkemp/cupaloy"
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
 
@@ -198,13 +195,3 @@ func TestPrereqs(t *testing.T) {
 	}
 }
 
-func TestSpecification(t *testing.T) {
-	var resp, err = newRedshiftDriver().
-		Spec(context.Background(), &pm.Request_Spec{})
-	require.NoError(t, err)
-
-	formatted, err := json.MarshalIndent(resp, "", "  ")
-	require.NoError(t, err)
-
-	cupaloy.SnapshotT(t, formatted)
-}

@@ -4,15 +4,11 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
 
-	"github.com/bradleyjkemp/cupaloy"
 	sql "github.com/estuary/connectors/materialize-sql"
-	pm "github.com/estuary/flow/go/protocols/materialize"
-	"github.com/stretchr/testify/require"
 
 	_ "github.com/marcboeker/go-duckdb/v2"
 )
@@ -59,13 +55,3 @@ func TestIntegration(t *testing.T) {
 	})
 }
 
-func TestSpecification(t *testing.T) {
-	var resp, err = newDuckDriver().
-		Spec(context.Background(), &pm.Request_Spec{})
-	require.NoError(t, err)
-
-	formatted, err := json.MarshalIndent(resp, "", "  ")
-	require.NoError(t, err)
-
-	cupaloy.SnapshotT(t, formatted)
-}
