@@ -1,0 +1,52 @@
+collections:
+  tests/simple:
+    schema:
+      type: object
+      properties:
+        id: { type: integer }
+        canary: { type: string }
+      required: [id, canary]
+    key: [/id]
+
+  tests/multiple-data-types:
+    schema:
+      type: object
+      properties:
+        id: { type: integer }
+        str_field: { type: string }
+        float_field: { type: number }
+        bool_field: { type: boolean }
+        nullable_int: { type: ["null", integer] }
+        array_int: { type: array, items: { type: integer } }
+        nested: { type: object, required: [id], properties: { id: { type: string } } }
+      required: [id, str_field]
+    key: [/id]
+
+materializations:
+  acmeCo/tests/materialize-s3-parquet:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config:
+          bucket: test-bucket
+          region: us-east-1
+          awsAccessKeyId: test_key
+          awsSecretAccessKey: test_secret
+          uploadInterval: "1s"
+          endpoint: http://localhost:4566
+          use_path_style: true
+    bindings:
+    - resource:
+        path: simple
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        path: multiple-data-types
+      source: tests/multiple-data-types
+      fields:
+        recommended: true
+        include:
+          nested: {}
+          array_int: {}

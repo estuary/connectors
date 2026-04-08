@@ -1,22 +1,22 @@
 services:
   storage:
-    image: rustfs/rustfs:1.0.0-alpha.90
-    pull_policy: missing
+    image: localstack/localstack
     ports:
-      - "9000:9000" # S3 API port
+      - "4566:4566"
     environment:
-      - RUSTFS_ADDRESS=0.0.0.0:9000
-      - RUSTFS_ACCESS_KEY=flow
-      - RUSTFS_SECRET_KEY=flow
+      - SERVICES=s3
     networks:
       flow-test:
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "curl -f http://127.0.0.1:9000/health"
+          "curl -f http://127.0.0.1:4566/_localstack/health"
         ]
-      interval: 1s
+      interval: 2s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
 
 networks:
