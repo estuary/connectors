@@ -178,13 +178,7 @@ func (c tableConfig) WithDefaults(cfg config) tableConfig {
 }
 
 func (c tableConfig) Parameters() ([]string, bool, error) {
-	var path []string
-	if c.Schema != "" {
-		path = []string{c.Schema, normalizeColumn(c.Table)}
-	} else {
-		path = []string{normalizeColumn(c.Table)}
-	}
-	return path, c.Delta, nil
+	return []string{c.Schema, normalizeColumn(c.Table)}, c.Delta, nil
 }
 
 func newPostgresDriver() *sql.Driver[config, tableConfig] {
