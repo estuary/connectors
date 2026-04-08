@@ -6,7 +6,7 @@ import (
 	"os/exec"
 	"testing"
 
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	"github.com/stretchr/testify/require"
 )
 

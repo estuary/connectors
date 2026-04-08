@@ -621,3 +621,36 @@ func TestFlowDocumentFeatureFlag(t *testing.T) {
 		require.NotEqual(t, pm.Response_Validated_Constraint_LOCATION_REQUIRED, constraints["key"].Type)
 	})
 }
+
+func snapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Constraint) string {
+	t.Helper()
+
+	type constraintRow struct {
+		Field      string
+		Type       int
+		TypeString string
+		Reason     string
+	}
+
+	rows := make([]constraintRow, 0, len(cs))
+	for f, c := range cs {
+		rows = append(rows, constraintRow{
+			Field:      f,
+			Type:       int(c.Type),
+			TypeString: c.Type.String(),
+			Reason:     c.Reason,
+		})
+	}
+
+	slices.SortFunc(rows, func(i, j constraintRow) int {
+		return strings.Compare(i.Field, j.Field)
+	})
+
+	var out strings.Builder
+	enc := json.NewEncoder(&out)
+	for _, r := range rows {
+		require.NoError(t, enc.Encode(r))
+	}
+
+	return out.String()
+}

@@ -354,11 +354,11 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 	}
 
 	var cfg EC
-	if err := unmarshalStrict(req.ConfigJson, &cfg); err != nil {
+	if err := UnmarshalStrict(req.ConfigJson, &cfg); err != nil {
 		return nil, err
 	}
 
-	parsedFlags := parseFlags(cfg)
+	parsedFlags := ParseFlags(cfg)
 	materializer, err := newMaterializer(ctx, req.Name.String(), cfg, parsedFlags)
 	if err != nil {
 		return nil, err
@@ -376,7 +376,7 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 	deltaUpdates := make([]bool, 0, len(req.Bindings))
 	for _, b := range req.Bindings {
 		var resCfg RC
-		if err := unmarshalStrict(b.ResourceConfigJson, &resCfg); err != nil {
+		if err := UnmarshalStrict(b.ResourceConfigJson, &resCfg); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
 
@@ -389,7 +389,7 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 		}
 	}
 
-	is := initInfoSchema(mCfg)
+	is := InitInfoSchema(mCfg)
 	if err := materializer.PopulateInfoSchema(ctx, is, paths, false); err != nil {
 		return nil, err
 	}
@@ -426,11 +426,11 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	}
 
 	var endpointCfg EC
-	if err := unmarshalStrict(req.Materialization.ConfigJson, &endpointCfg); err != nil {
+	if err := UnmarshalStrict(req.Materialization.ConfigJson, &endpointCfg); err != nil {
 		return nil, err
 	}
 
-	parsedFlags := parseFlags(endpointCfg)
+	parsedFlags := ParseFlags(endpointCfg)
 	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), endpointCfg, parsedFlags)
 	if err != nil {
 		return nil, err
@@ -449,7 +449,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 		paths = append(paths, b.ResourcePath)
 	}
 
-	is := initInfoSchema(mCfg)
+	is := InitInfoSchema(mCfg)
 	if err := materializer.PopulateInfoSchema(ctx, is, paths, false); err != nil {
 		return nil, err
 	}
@@ -721,11 +721,11 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	}
 
 	var epCfg EC
-	if err := unmarshalStrict(req.Materialization.ConfigJson, &epCfg); err != nil {
+	if err := UnmarshalStrict(req.Materialization.ConfigJson, &epCfg); err != nil {
 		return nil, nil, nil, err
 	}
 
-	featureFlags := parseFlags(epCfg)
+	featureFlags := ParseFlags(epCfg)
 	materializer, err := newMaterializer(ctx, req.Materialization.Name.String(), epCfg, featureFlags)
 	if err != nil {
 		return nil, nil, nil, err
@@ -737,7 +737,7 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 		paths = append(paths, b.ResourcePath)
 	}
 
-	is := initInfoSchema(mCfg)
+	is := InitInfoSchema(mCfg)
 	if err := materializer.PopulateInfoSchema(ctx, is, paths, false); err != nil {
 		return nil, nil, nil, err
 	}
@@ -775,7 +775,7 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	}, &mCfg.MaterializeOptions, nil
 }
 
-func initInfoSchema(cfg MaterializeCfg) *InfoSchema {
+func InitInfoSchema(cfg MaterializeCfg) *InfoSchema {
 	locatePath := func(rp []string) []string { return rp }
 	translateNamespace := func(f string) string { return f }
 	translateField := func(f string) string { return f }
@@ -801,7 +801,7 @@ func buildMappedBinding[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, 
 	binding := *spec.Bindings[idx]
 
 	var resCfg RC
-	if err := unmarshalStrict(binding.ResourceConfigJson, &resCfg); err != nil {
+	if err := UnmarshalStrict(binding.ResourceConfigJson, &resCfg); err != nil {
 		return nil, fmt.Errorf("parsing resource config: %w", err)
 	}
 
@@ -817,7 +817,7 @@ func buildMappedBinding[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, 
 
 			var fieldCfg FC
 			if raw := binding.FieldSelection.FieldConfigJsonMap[f]; raw != nil {
-				if err := unmarshalStrict(raw, &fieldCfg); err != nil {
+				if err := UnmarshalStrict(raw, &fieldCfg); err != nil {
 					return fmt.Errorf("unmarshalling field config json: %w", err)
 				}
 			}
@@ -886,7 +886,7 @@ type constrainterAdapter[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC,
 func (c *constrainterAdapter[EC, FC, RC, MT]) NewConstraints(p *pf.Projection, deltaUpdates bool, rawFieldConfig json.RawMessage) (*pm.Response_Validated_Constraint, error) {
 	var fieldCfg FC
 	if len(rawFieldConfig) > 0 {
-		if err := unmarshalStrict(rawFieldConfig, &fieldCfg); err != nil {
+		if err := UnmarshalStrict(rawFieldConfig, &fieldCfg); err != nil {
 			return nil, err
 		}
 	}
@@ -898,7 +898,7 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) NewConstraints(p *pf.Projection, d
 func (c *constrainterAdapter[EC, FC, RC, MT]) Compatible(existing ExistingField, p *pf.Projection, rawFieldConfig json.RawMessage) (bool, error) {
 	var fieldCfg FC
 	if len(rawFieldConfig) > 0 {
-		if err := unmarshalStrict(rawFieldConfig, &fieldCfg); err != nil {
+		if err := UnmarshalStrict(rawFieldConfig, &fieldCfg); err != nil {
 			return false, err
 		}
 	}
@@ -926,7 +926,7 @@ func mustRecreateTypeChange[MT MappedTyper](p *pf.Projection, mt MT, existing Ex
 func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projection, rawFieldConfig json.RawMessage) (string, error) {
 	var fieldCfg FC
 	if len(rawFieldConfig) > 0 {
-		if err := unmarshalStrict(rawFieldConfig, &fieldCfg); err != nil {
+		if err := UnmarshalStrict(rawFieldConfig, &fieldCfg); err != nil {
 			return "", err
 		}
 	}
@@ -935,7 +935,7 @@ func (c *constrainterAdapter[EC, FC, RC, MT]) DescriptionForType(p *pf.Projectio
 	return mt.String(), nil
 }
 
-func parseFlags(cfg EndpointConfiger) map[string]bool {
+func ParseFlags(cfg EndpointConfiger) map[string]bool {
 	rawFlags, defaultFlags := cfg.FeatureFlags()
 	parsedFlags := common.ParseFeatureFlags(rawFlags, defaultFlags)
 	if rawFlags != "" {
@@ -945,7 +945,7 @@ func parseFlags(cfg EndpointConfiger) map[string]bool {
 	return parsedFlags
 }
 
-func unmarshalStrict[T pb.Validator](raw []byte, into *T) error {
+func UnmarshalStrict[T pb.Validator](raw []byte, into *T) error {
 	var d = json.NewDecoder(bytes.NewReader(raw))
 	d.DisallowUnknownFields()
 

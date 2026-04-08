@@ -18,6 +18,7 @@ import (
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/estuary/connectors/go/common"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	testutil "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
@@ -36,7 +37,7 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Reso
 	makeResourceFn func(string, bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
-	boilerplate.RunMaterializationTest(t, driver.newMaterialization, source, makeResourceFn, actionDescSanitizers)
+	testutil.RunMaterializationTest(t, driver.newMaterialization, source, makeResourceFn, actionDescSanitizers)
 }
 
 func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
@@ -45,7 +46,7 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, 
 	sourcePath string,
 	makeResourceFn func(string, bool) RC,
 ) {
-	boilerplate.RunApplyTest(t, driver, driver.newMaterialization, sourcePath, makeResourceFn)
+	testutil.RunApplyTest(t, driver, driver.newMaterialization, sourcePath, makeResourceFn)
 }
 
 func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC, EC]](
@@ -55,7 +56,7 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[
 	makeResourceFn func(string, bool) RC,
 	actionDescSanitizers []func(string) string,
 ) {
-	boilerplate.RunMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn, actionDescSanitizers)
+	testutil.RunMigrationTest(t, driver.newMaterialization, sourcePath, makeResourceFn, actionDescSanitizers)
 }
 
 // RunFencingTest is a generalized form of test cases over fencing behavior,
@@ -123,7 +124,7 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 		require.NoError(t, err)
 
 		defer func() {
-			boilerplate.CleanupTestResources(t, ctx, m, [][]string{checkpointsPath}, tsSuffix)
+			testutil.CleanupTestResources(t, ctx, m, [][]string{checkpointsPath}, tsSuffix)
 		}()
 
 		createSQL, err := RenderTableTemplate(metaTable, createTableTpl)
@@ -189,7 +190,7 @@ func RunFencingTest[EC boilerplate.EndpointConfiger, RC boilerplate.Resourcer[RC
 				"\nAfter update:\n"+dump3)
 	}
 
-	boilerplate.RunTestAllTasks(t, sourcePath, func(t *testing.T, _ []byte, taskName string, cfg EC) {
+	testutil.RunTestAllTasks(t, sourcePath, func(t *testing.T, _ []byte, taskName string, cfg EC) {
 		// If a fence exactly matches a checkpoint, we'll fence that checkpoint and its parent
 		// but not siblings. The used checkpoint is that of the exact match.
 		t.Run("exact match", func(t *testing.T) {

@@ -37,6 +37,11 @@ type ExistingResource struct {
 	Meta any
 }
 
+// Location returns the resource's location path.
+func (r *ExistingResource) Location() []string {
+	return r.location
+}
+
 // PushField adds a field to the ExistingResource. The location is as-reported
 // by the endpoint.
 func (r *ExistingResource) PushField(field ExistingField) {
@@ -122,6 +127,11 @@ func NewInfoSchema(
 		caseInsensitiveFields:    caseInsensitiveFields,
 		caseInsensitiveResources: caseInsensitiveResources,
 	}
+}
+
+// Resources returns all resources in the InfoSchema.
+func (i *InfoSchema) Resources() []*ExistingResource {
+	return i.resources
 }
 
 // PushNamespace is used to push a namespace to the InfoSchema for tracking and
