@@ -1,5 +1,3 @@
-//go:build !nodb
-
 package main
 
 import (
@@ -77,6 +75,10 @@ func TestIntegration(t *testing.T) {
 }
 
 func TestPrereqs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
 	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
 	t.Cleanup(func() {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()

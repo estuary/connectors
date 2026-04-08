@@ -23,8 +23,8 @@ func TestSpec(t *testing.T) {
 }
 
 func testConfig(t *testing.T, ns string) config {
-	if os.Getenv("TEST_DATABASE") != "yes" {
-		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
 	}
 
 	cfg := config{

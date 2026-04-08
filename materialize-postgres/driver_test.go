@@ -1,5 +1,3 @@
-//go:build !nodb
-
 package main
 
 import (
@@ -77,6 +75,10 @@ func TestIntegration(t *testing.T) {
 }
 
 func TestPrereqs(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
 	t.Skip("todo: fix pre-reqs tests")
 
 	cfg := testConfig()

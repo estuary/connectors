@@ -1,5 +1,3 @@
-//go:build !nodb
-
 package main
 
 import (
@@ -7,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"os"
 	"os/exec"
 	"regexp"
 	"testing"
@@ -22,8 +19,8 @@ import (
 )
 
 func TestSpec(t *testing.T) {
-	if os.Getenv("TEST_DATABASE") != "yes" {
-		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
 	}
 
 	var resp, err = driver{}.

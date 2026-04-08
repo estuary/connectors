@@ -1,5 +1,3 @@
-//go:build !nodb
-
 package main
 
 import (
@@ -17,6 +15,10 @@ import (
 )
 
 func TestStreamManager(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
 	ctx := context.Background()
 
 	cfg := mustGetCfg(t)
@@ -492,6 +494,10 @@ func TestStreamManager(t *testing.T) {
 }
 
 func TestStreamDatatypes(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+
 	ctx := context.Background()
 
 	cfg := mustGetCfg(t)
