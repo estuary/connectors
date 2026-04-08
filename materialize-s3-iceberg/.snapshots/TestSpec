@@ -95,7 +95,7 @@
           },
           "aws_access_key_id": {
             "default": "",
-            "description": "AWS Access Key ID for accessing AWS services.",
+            "description": "AWS Access Key ID for accessing AWS services. Automatically injected by Estuary",
             "order": 3,
             "title": "AWS Access Key ID",
             "type": "string",
@@ -103,7 +103,7 @@
           },
           "aws_secret_access_key": {
             "default": "",
-            "description": "AWS Secret Access Key for accessing AWS services.",
+            "description": "AWS Secret Access Key for accessing AWS services.Automatically injected by Estuary",
             "order": 4,
             "title": "AWS Secret Access Key",
             "type": "string",
@@ -111,7 +111,7 @@
           },
           "aws_session_token": {
             "default": "",
-            "description": "AWS Session Token for accessing AWS services.",
+            "description": "AWS Session Token for accessing AWS services.Automatically injected by Estuary",
             "order": 5,
             "title": "AWS Session Token",
             "type": "string",
@@ -167,6 +167,16 @@
             "order": 4,
             "title": "Warehouse",
             "type": "string"
+          },
+          "scope": {
+            "default": null,
+            "description": "Desired scope of the requested security token.",
+            "order": 5,
+            "title": "Scope",
+            "type": [
+              "string",
+              "null"
+            ]
           }
         },
         "required": [
@@ -180,7 +190,7 @@
     "properties": {
       "aws_access_key_id": {
         "default": null,
-        "description": "Access Key ID for accessing AWS services.",
+        "description": "Access Key ID for accessing AWS services (legacy).",
         "order": 0,
         "title": "AWS Access Key ID",
         "type": [
@@ -191,7 +201,7 @@
       },
       "aws_secret_access_key": {
         "default": null,
-        "description": "Secret Access Key for accessing AWS services.",
+        "description": "Secret Access Key for accessing AWS services (legacy).",
         "order": 1,
         "secret": true,
         "title": "AWS Secret Access Key",
