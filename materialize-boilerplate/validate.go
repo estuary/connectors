@@ -96,8 +96,8 @@ func (v Validator) ValidateBinding(
 			return nil, fmt.Errorf(
 				"table %v already exists for new binding %q. "+
 					"You must drop this table to continue. "+
-					"A 'allow_existing_tables_for_new_bindings' feature flag is available but has several caveats: "+
-					"contact Estuary support to determine if it's appropriate for your use case",
+					"An 'allow_existing_tables_for_new_bindings' feature flag is available but has several caveats: "+
+					"contact Estuary support to determine if it's appropriate for your use case. https://go.estuary.dev/matff",
 				path,
 				boundCollection.Name.String(),
 			)
