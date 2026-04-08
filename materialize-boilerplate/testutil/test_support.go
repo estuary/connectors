@@ -1,10 +1,9 @@
-package boilerplate
+package testutil
 
 import (
 	"bufio"
 	"bytes"
 	"context"
-	"embed"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,6 +20,7 @@ import (
 	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
@@ -29,23 +29,10 @@ import (
 	"github.com/tidwall/sjson"
 )
 
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/add-and-remove-many.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/add-single-optional.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/base.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/big-schema-changed.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/big-schema-nullable.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/big-schema.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/challenging-fields.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/remove-single-optional.flow.yaml
-//go:generate ./testdata/generate-spec-proto.sh testdata/validate_apply_test_cases/remove-single-required.flow.yaml
-
-//go:embed testdata/validate_apply_test_cases/generated_specs
-var applyValidateFs embed.FS
-
 func loadSpec(t *testing.T, path string) *pf.MaterializationSpec {
 	t.Helper()
 
-	specBytes, err := applyValidateFs.ReadFile(filepath.Join("testdata/validate_apply_test_cases/generated_specs", path))
+	specBytes, err := os.ReadFile(testdataPath("validate_apply_test_cases", "generated_specs", path))
 	require.NoError(t, err)
 	var spec pf.MaterializationSpec
 	require.NoError(t, spec.Unmarshal(specBytes))
@@ -55,18 +42,26 @@ func loadSpec(t *testing.T, path string) *pf.MaterializationSpec {
 
 const testItemIdentifier = "_flow_test_"
 
+func testdataPath(parts ...string) string {
+	_, filename, _, _ := runtime.Caller(0)
+	dir := filepath.Dir(filename)
+
+	elems := append([]string{dir, "..", "testdata"}, parts...)
+	return filepath.Join(elems...)
+}
+
 func relativePath(t *testing.T, file string) string {
 	_, filename, _, ok := runtime.Caller(0)
 	require.True(t, ok)
 	dir := filepath.Dir(filename)
 
-	return filepath.Join(dir, file)
+	return filepath.Join(dir, "..", file)
 }
 
 // RunTestAllTasks calls testFn for each materialization task found in the spec
 // at sourcePath. The endpoint configuration for the task is decrypted and
 // unmarshalled into EC.
-func RunTestAllTasks[EC EndpointConfiger](
+func RunTestAllTasks[EC boilerplate.EndpointConfiger](
 	t *testing.T,
 	sourcePath string,
 	testFn func(t *testing.T, bundled []byte, taskName string, cfg EC),
@@ -93,9 +88,9 @@ func RunTestAllTasks[EC EndpointConfiger](
 // configuration of the bindings will be used in the tests, notably: Delta
 // updates can be set, and field selection can be applied, depending on the
 // capabilities of the specific connector.
-func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
-	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
@@ -124,10 +119,10 @@ func RunMaterializationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 // a way to use `flowctl` commands instead of generating the binary spec files -
 // the main blocker for this is that there is not a way to simulate a previously
 // applied materialization spec via `flowctl preview` etc.
-func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
-	driver Connector,
-	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	driver boilerplate.Connector,
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 ) {
@@ -139,7 +134,7 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 
 	gjson.GetBytes(bundled, "materializations").ForEach(func(key, value gjson.Result) bool {
 		cfg := decryptConfig[EC](t, bundled, key.String())
-		materializer, err := newMaterializer(ctx, key.String(), cfg, parseFlags(cfg))
+		materializer, err := newMaterializer(ctx, key.String(), cfg, boilerplate.ParseFlags(cfg))
 		require.NoError(t, err)
 
 		var testResourcePaths [][]string
@@ -198,9 +193,9 @@ func RunApplyTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], M
 // The binding in the materialization task(s) can use field configuration to
 // exclude fields where migration is not supported. Materializations should
 // strive to support all of these migrations though.
-func RunMigrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
-	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
 	sourcePath string,
 	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
 	actionDescSanitizers []func(string) string,
@@ -222,10 +217,10 @@ func RunMigrationTest[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	cupaloy.SnapshotT(t, snap.String())
 }
 
-func runMaterializationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func runMaterializationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
-	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
 	taskName string,
 	bundled []byte,
 	tsSuffix string,
@@ -238,7 +233,7 @@ func runMaterializationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Res
 	workingTaskName := taskName + rndSuffix
 	cfg := decryptConfig[EC](t, bundled, taskName)
 
-	materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
+	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
 	require.NoError(t, err)
 
 	var snapshotResources []RC
@@ -248,7 +243,7 @@ func runMaterializationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Res
 		// run, to prevent concurrent runs of the test from interfering with
 		// each other.
 		var res RC
-		require.NoError(t, unmarshalStrict(json.RawMessage(gjson.Get(binding.Raw, "resource").Raw), &res))
+		require.NoError(t, boilerplate.UnmarshalStrict(json.RawMessage(gjson.Get(binding.Raw, "resource").Raw), &res))
 		path, deltaUpdates, err := res.WithDefaults(cfg).Parameters()
 		require.NoError(t, err)
 		lastPathPart := path[len(path)-1] + rndSuffix
@@ -311,10 +306,10 @@ func runMaterializationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Res
 	return snap.String()
 }
 
-func snapshotTestTable[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func snapshotTestTable[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
-	m Materializer[EC, FC, RC, MT],
+	m boilerplate.Materializer[EC, FC, RC, MT],
 	res RC,
 	actionDescription []byte,
 	rndSuffix string,
@@ -363,7 +358,7 @@ func renderTestTableData(t *testing.T, columnNames []string, rows [][]any) strin
 	return data.String()
 }
 
-func decryptConfig[EC EndpointConfiger](t *testing.T, bundled []byte, taskName string) EC {
+func decryptConfig[EC boilerplate.EndpointConfiger](t *testing.T, bundled []byte, taskName string) EC {
 	t.Helper()
 
 	raw := json.RawMessage(gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.endpoint.local.config", taskName)).Raw)
@@ -382,17 +377,17 @@ func decryptConfig[EC EndpointConfiger](t *testing.T, bundled []byte, taskName s
 	}
 
 	var out EC
-	require.NoError(t, unmarshalStrict(raw, &out))
+	require.NoError(t, boilerplate.UnmarshalStrict(raw, &out))
 
 	return out
 }
 
-func runBigSchemaApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func runBigSchemaApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
 	snap *strings.Builder,
-	driver Connector,
-	m Materializer[EC, FC, RC, MT],
+	driver boilerplate.Connector,
+	m boilerplate.Materializer[EC, FC, RC, MT],
 	cfg EC,
 	res RC,
 ) {
@@ -467,12 +462,12 @@ func runBigSchemaApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[
 	snap.WriteString(dumpSchema(t, ctx, m, res) + "\n")
 }
 
-func runAddAndRemoveFieldsApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func runAddAndRemoveFieldsApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
 	snap *strings.Builder,
-	driver Connector,
-	m Materializer[EC, FC, RC, MT],
+	driver boilerplate.Connector,
+	m boilerplate.Materializer[EC, FC, RC, MT],
 	cfg EC,
 	res RC,
 ) {
@@ -525,12 +520,12 @@ func runAddAndRemoveFieldsApplyTests[EC EndpointConfiger, FC FieldConfiger, RC R
 	}
 }
 
-func runChallengingNamesApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func runChallengingNamesApplyTests[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
 	snap *strings.Builder,
-	driver Connector,
-	m Materializer[EC, FC, RC, MT],
+	driver boilerplate.Connector,
+	m boilerplate.Materializer[EC, FC, RC, MT],
 	cfg EC,
 	res RC,
 ) {
@@ -551,10 +546,10 @@ func runChallengingNamesApplyTests[EC EndpointConfiger, FC FieldConfiger, RC Res
 	snap.WriteString(dumpSchema(t, ctx, m, res))
 }
 
-func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func runMigrationTestForTask[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
-	newMaterializer NewMaterializerFn[EC, FC, RC, MT],
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
 	taskName string,
 	bundled []byte,
 	suffix string,
@@ -570,7 +565,7 @@ func runMigrationTestForTask[EC EndpointConfiger, FC FieldConfiger, RC Resourcer
 	bundledMigratedCollection := RunFlowctl(t, "raw", "bundle", "--source", relativePath(t, "testdata/integration/collections.migrate-migrated.flow.yaml"))
 
 	cfg := decryptConfig[EC](t, bundled, taskName)
-	materializer, err := newMaterializer(ctx, taskName, cfg, parseFlags(cfg))
+	materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
 	require.NoError(t, err)
 
 	bindings := gjson.GetBytes(bundled, fmt.Sprintf("materializations.%s.bindings", taskName)).Array()
@@ -760,10 +755,10 @@ func snapshotConstraints(t *testing.T, cs map[string]*pm.Response_Validated_Cons
 	return out.String()
 }
 
-func cleanupTestTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func cleanupTestTasks[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
-	m Materializer[EC, FC, RC, MT],
+	m boilerplate.Materializer[EC, FC, RC, MT],
 	tsSuffix string,
 ) {
 	t.Helper()
@@ -782,28 +777,28 @@ func cleanupTestTasks[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	}
 }
 
-func CleanupTestResources[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func CleanupTestResources[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
-	m Materializer[EC, FC, RC, MT],
+	m boilerplate.Materializer[EC, FC, RC, MT],
 	paths [][]string,
 	tsSuffix string,
 ) {
 	t.Helper()
 
-	is := initInfoSchema(m.Config())
+	is := boilerplate.InitInfoSchema(m.Config())
 	require.NoError(t, m.PopulateInfoSchema(ctx, is, paths, true))
 	now := time.Now()
 
-	for _, r := range is.resources {
-		if shouldCleanup(t, now, r.location[len(r.location)-1], tsSuffix) {
-			_, fn, err := m.DeleteResource(ctx, r.location)
+	for _, r := range is.Resources() {
+		if shouldCleanup(t, now, r.Location()[len(r.Location())-1], tsSuffix) {
+			_, fn, err := m.DeleteResource(ctx, r.Location())
 			require.NoError(t, err)
 
 			if err := fn(ctx); err != nil {
 				t.Log("failed to clean up resource", err)
 			} else {
-				t.Log("cleaned up resource", r.location)
+				t.Log("cleaned up resource", r.Location())
 			}
 		}
 	}
@@ -867,10 +862,10 @@ func RunFlowctl(t *testing.T, args ...string) []byte {
 	return stdoutBuf.Bytes()
 }
 
-func dumpSchema[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT MappedTyper](
+func dumpSchema[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
 	t *testing.T,
 	ctx context.Context,
-	m Materializer[EC, FC, RC, MT],
+	m boilerplate.Materializer[EC, FC, RC, MT],
 	res RC,
 ) string {
 	t.Helper()
@@ -878,7 +873,7 @@ func dumpSchema[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT 
 	path, _, err := res.Parameters()
 	require.NoError(t, err)
 
-	is := initInfoSchema(m.Config())
+	is := boilerplate.InitInfoSchema(m.Config())
 	require.NoError(t, m.PopulateInfoSchema(ctx, is, [][]string{path}, false))
 
 	type field struct {
@@ -890,7 +885,7 @@ func dumpSchema[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT 
 	var out strings.Builder
 	enc := json.NewEncoder(&out)
 	fields := slices.Clone(is.GetResource(path).AllFields())
-	slices.SortFunc(fields, func(a, b ExistingField) int {
+	slices.SortFunc(fields, func(a, b boilerplate.ExistingField) int {
 		return strings.Compare(a.Name, b.Name)
 	})
 

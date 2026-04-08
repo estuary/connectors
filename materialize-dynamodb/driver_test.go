@@ -11,7 +11,7 @@ import (
 	"testing"
 
 	"github.com/bradleyjkemp/cupaloy"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/stretchr/testify/require"
 )
