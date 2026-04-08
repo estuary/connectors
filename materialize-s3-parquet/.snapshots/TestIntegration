@@ -1,0 +1,13 @@
+=== simple/ ===
+{"canary":"Kringle's","flow_published_at":7201000000,"id":5}
+{"canary":"amputation's","flow_published_at":3600000000,"id":1}
+{"canary":"armament's","flow_published_at":3601000000,"id":2}
+{"canary":"splatters","flow_published_at":3602000000,"id":3}
+{"canary":"strengthen","flow_published_at":7200000000,"id":4}
+
+=== multiple-data-types/ ===
+{"array_int":"W10=","bool_field":false,"float_field":2.718,"flow_published_at":3604000000,"id":2,"nested":"eyJpZCI6Im5lc3RlZC0yIn0=","str_field":"world"}
+{"array_int":"WzEsMiwzXQ==","bool_field":true,"float_field":3.14,"flow_published_at":3603000000,"id":1,"nested":"eyJpZCI6Im5lc3RlZC0xIn0=","nullable_int":42,"str_field":"hello"}
+{"array_int":"Wzk5XQ==","bool_field":true,"float_field":0,"flow_published_at":7202000000,"id":3,"nested":"eyJpZCI6Im5lc3RlZC0zIn0=","nullable_int":-1,"str_field":"test"}
+
+
