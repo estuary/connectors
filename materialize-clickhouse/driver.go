@@ -205,8 +205,13 @@ type transactor struct {
 	be       *m.BindingEvents
 	_range   *pf.RangeSpec
 
-	recovery bool
-	state    connectorState
+	recovery          bool
+	state             connectorState
+	runtimeCheckpoint m.RuntimeCheckpoint
+}
+
+func (t *transactor) RecoverCheckpoint(_ context.Context, _ pf.MaterializationSpec, _ pf.RangeSpec) (m.RuntimeCheckpoint, error) {
+	return t.runtimeCheckpoint, nil
 }
 
 type stateItem struct {
@@ -230,7 +235,7 @@ func newTransactor(
 	materializationName string,
 	featureFlags map[string]bool,
 	ep *sql.Endpoint[config],
-	_ sql.Fence,
+	fence sql.Fence,
 	bindings []sql.Table,
 	open pm.Request_Open,
 	_ *boilerplate.InfoSchema,
@@ -238,12 +243,13 @@ func newTransactor(
 ) (m.Transactor, error) {
 	var cfg = ep.Config
 	t := &transactor{
-		dialect:   ep.Dialect,
-		templates: renderTemplates(ep.Dialect, cfg.HardDelete),
-		cfg:       cfg,
-		be:        be,
-		_range:    open.Range,
-		state:     make(connectorState, len(bindings)),
+		dialect:           ep.Dialect,
+		templates:         renderTemplates(ep.Dialect, cfg.HardDelete),
+		cfg:               cfg,
+		be:                be,
+		_range:            open.Range,
+		state:             make(connectorState, len(bindings)),
+		runtimeCheckpoint: fence.Checkpoint,
 	}
 
 	var err error
@@ -486,10 +492,8 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 		return nil
 	}
 
-	for it.Next() {
-		if it.Delete && t.cfg.HardDelete && !it.Exists {
-			continue // nothing to delete if it was never stored
-		}
+	// Skip deleted, non-existent documents iff HardDelete is enabled.
+	for it.Next(t.cfg.HardDelete) {
 		if it.Binding != lastBinding {
 			if err = flushLastBinding(); err != nil {
 				return nil, err
