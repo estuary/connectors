@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"testing"
@@ -10,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func mustGetCfg(t *testing.T) config {
@@ -18,33 +20,19 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
-	out := config{
-		Advanced: advancedConfig{
-			NoFlowDocument: true,
-			FeatureFlags:   "allow_existing_tables_for_new_bindings",
-		},
-	}
+	var out config
 
-	for _, prop := range []struct {
-		key  string
-		dest *string
-	}{
-		{"REDSHIFT_ADDRESS", &out.Address},
-		{"REDSHIFT_USER", &out.User},
-		{"REDSHIFT_PASSWORD", &out.Password},
-		{"REDSHIFT_DATABASE", &out.Database},
-		{"REDSHIFT_BUCKET", &out.Bucket},
-		{"REDSHIFT_SCHEMA", &out.Schema},
-		{"AWS_ACCESS_KEY_ID", &out.AWSAccessKeyID},
-		{"AWS_SECRET_ACCESS_KEY", &out.AWSSecretAccessKey},
-		{"AWS_REGION", &out.Region},
-	} {
-		*prop.dest = os.Getenv(prop.key)
-	}
+	yamlBytes, err := os.ReadFile("testdata/config.local.yaml")
+	require.NoError(t, err)
 
-	if err := out.Validate(); err != nil {
-		t.Fatal(err)
-	}
+	// The config struct uses json tags, so we unmarshal YAML into a
+	// generic map first, then re-marshal through JSON to honour json tags.
+	var raw map[string]interface{}
+	require.NoError(t, yaml.Unmarshal(yamlBytes, &raw))
+	jsonBytes, err := json.Marshal(raw)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(jsonBytes, &out))
+	require.NoError(t, out.Validate())
 
 	return out
 }
@@ -196,4 +184,3 @@ func TestPrereqs(t *testing.T) {
 		})
 	}
 }
-

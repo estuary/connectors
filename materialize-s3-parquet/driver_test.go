@@ -26,7 +26,8 @@ func TestIntegration(t *testing.T) {
 		t.Skip()
 	}
 
-	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
+	out, err := exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").CombinedOutput()
+	require.NoError(t, err, "docker compose up failed: %s", string(out))
 	t.Cleanup(func() {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
@@ -35,7 +36,7 @@ func TestIntegration(t *testing.T) {
 
 	// Create the test bucket.
 	s3Client := newS3Client(t, ctx)
-	_, err := s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
+	_, err = s3Client.CreateBucket(ctx, &s3.CreateBucketInput{
 		Bucket: aws.String("test-bucket"),
 	})
 	require.NoError(t, err)

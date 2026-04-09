@@ -311,6 +311,12 @@ jobs:
         with:
           version: v1.3.1
 
+      - name: Install iceberg-ctl Python dependencies
+        if: matrix.connector == 'materialize-s3-iceberg'
+        run: |
+          pip install --break-system-packages poetry
+          cd materialize-s3-iceberg/iceberg-ctl && poetry install
+
       - name: Install system dependencies for Rust connectors
         if: matrix.connector == 'materialize-kafka'
         run: |
