@@ -196,7 +196,17 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 
 	return fmt.Sprintf("create collection %q", collectionName), func(ctx context.Context) error {
 		// Explicitly create the collection so it is visible to PopulateInfoSchema.
-		return d.client.Database(dbName).CreateCollection(ctx, collectionName)
+		err := d.client.Database(dbName).CreateCollection(ctx, collectionName)
+
+		mongoErr := mongo.CommandError{}
+		// Error code 48 is "Collection already exists", which we ignore
+		// this error is no longer emitted since Mongo 8, and we keep this code
+		// for backward compatibility with older Mongo versions
+		if errors.As(err, &mongoErr) && mongoErr.Code != 48 {
+			return err
+		}
+
+		return nil
 	}, nil
 }
 
