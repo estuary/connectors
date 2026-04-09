@@ -77,7 +77,7 @@ func newS3Client(t *testing.T, ctx context.Context) *s3.Client {
 	require.NoError(t, err)
 
 	return s3.NewFromConfig(cfg, func(o *s3.Options) {
-		o.BaseEndpoint = aws.String("http://localhost:4566")
+		o.BaseEndpoint = aws.String("http://localhost:9099")
 		o.UsePathStyle = true
 	})
 }
