@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
+	"os/exec"
 	"testing"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 )
 
 func mustGetCfg(t *testing.T) config {
@@ -20,17 +19,10 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
+	jsonBytes, err := exec.Command("sops", "--decrypt", "--output-type", "json", "testdata/config.local.yaml").Output()
+	require.NoError(t, err)
+
 	var out config
-
-	yamlBytes, err := os.ReadFile("testdata/config.local.yaml")
-	require.NoError(t, err)
-
-	// The config struct uses json tags, so we unmarshal YAML into a
-	// generic map first, then re-marshal through JSON to honour json tags.
-	var raw map[string]interface{}
-	require.NoError(t, yaml.Unmarshal(yamlBytes, &raw))
-	jsonBytes, err := json.Marshal(raw)
-	require.NoError(t, err)
 	require.NoError(t, json.Unmarshal(jsonBytes, &out))
 	require.NoError(t, out.Validate())
 

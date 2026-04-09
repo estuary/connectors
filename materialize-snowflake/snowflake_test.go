@@ -1,19 +1,15 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"os"
 	"os/exec"
 	"regexp"
 	"testing"
 
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
-	"github.com/tidwall/gjson"
-	"gopkg.in/yaml.v3"
 
 	_ "github.com/snowflakedb/gosnowflake/v2"
 )
@@ -24,25 +20,8 @@ func mustGetCfg(t *testing.T) config {
 		return config{}
 	}
 
-	yamlBytes, err := os.ReadFile("testdata/config.yaml")
+	jsonBytes, err := exec.Command("sops", "--decrypt", "--output-type", "json", "testdata/config.yaml").Output()
 	require.NoError(t, err)
-
-	var raw map[string]interface{}
-	require.NoError(t, yaml.Unmarshal(yamlBytes, &raw))
-	jsonBytes, err := json.Marshal(raw)
-	require.NoError(t, err)
-
-	if gjson.GetBytes(jsonBytes, "sops").Exists() {
-		sopsCmd := exec.Command("sops", "--decrypt", "--input-type", "json", "--output-type", "json", "/dev/stdin")
-		jqCmd := exec.Command("jq", `walk( if type == "object" then with_entries(.key |= rtrimstr("_sops")) else . end)`)
-		sopsCmd.Stdin = bytes.NewReader(jsonBytes)
-		jqCmd.Stdin, err = sopsCmd.StdoutPipe()
-		require.NoError(t, err)
-		require.NoError(t, sopsCmd.Start())
-		jsonBytes, err = jqCmd.Output()
-		require.NoError(t, err)
-		require.NoError(t, sopsCmd.Wait())
-	}
 
 	var out config
 	require.NoError(t, json.Unmarshal(jsonBytes, &out))
@@ -151,15 +130,15 @@ func TestPrereqs(t *testing.T) {
 				cfg.Credentials.User = "wrong" + cfg.Credentials.User
 				return &cfg
 			},
-			want: []error{fmt.Errorf("incorrect username or password")},
+			want: []error{fmt.Errorf("JWT token is invalid")},
 		},
 		{
-			name: "wrong password",
+			name: "wrong private key",
 			cfg: func(cfg config) *config {
 				cfg.Credentials.Password = "wrong" + cfg.Credentials.Password
 				return &cfg
 			},
-			want: []error{fmt.Errorf("incorrect username or password")},
+			want: []error{fmt.Errorf("JWT token is invalid")},
 		},
 		{
 			name: "wrong role",
@@ -167,7 +146,7 @@ func TestPrereqs(t *testing.T) {
 				cfg.Role = "wrong" + cfg.Role
 				return &cfg
 			},
-			want: []error{fmt.Errorf("role %q does not exist", "wrong"+cfg.Role)},
+			want: []error{fmt.Errorf("JWT token is invalid")},
 		},
 	}
 
@@ -177,4 +156,3 @@ func TestPrereqs(t *testing.T) {
 		})
 	}
 }
-

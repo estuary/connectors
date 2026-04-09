@@ -278,6 +278,8 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 			switch sfError.Number {
 			case 390100:
 				err = fmt.Errorf("incorrect username or password")
+			case 390144:
+				err = fmt.Errorf("JWT token is invalid")
 			case 390201:
 				// This means "doesn't exist or not authorized", and we don't have a great way to
 				// distinguish between that for the database, schema, or warehouse. The snowflake
