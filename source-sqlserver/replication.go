@@ -1246,7 +1246,7 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 		}
 	}
 
-	return nil
+	return rows.Err()
 }
 
 func (rs *sqlserverReplicationStream) emitEvent(ctx context.Context, event sqlcapture.DatabaseEvent) error {
