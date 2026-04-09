@@ -1,24 +1,24 @@
-address: estuary-connector-test.076183946664.us-east-2.redshift-serverless.amazonaws.com:5439
-database: dev
-password_sops: ENC[AES256_GCM,data:kcluRuHji9ckwA==,iv:SRE4ZtcVSFOPHikXJhXEFF5xXcMa7kTbPUCqmgBqbQ0=,tag:mjqomw4ihdngh9yzvIKTkg==,type:str]
-user: estuary
-bucket: estuary-connector-test-bucket
-bucketPath: /data
-awsAccessKeyId_sops: ENC[AES256_GCM,data:3L+AVRhCzLkB4U8w60c2yGy2+d0=,iv:28lMs99/dxbwRXHTq+wrMWQ1O5NOVKQ68MSBknYH23Q=,tag:xpVNrAD3jAsRskHF1U0mlQ==,type:str]
-awsSecretAccessKey_sops: ENC[AES256_GCM,data:Pxfnq7DKq37jczCgThj0YxJVXG2oGAjecoOLsdxXocW8HtHj2uFCpQ==,iv:aK9IQZfzoDGLXSjCxnAL8uzGnxQoMUamHNgCkIb7A3A=,tag:ofO838dR/xnXVyOGTSWfAA==,type:str]
-region: us-east-2
-hardDelete: true
+address: ENC[AES256_GCM,data:ZFVBB+LA8DyZ06A5PIL/YCPVtIeukQGtYt9Q4mWTsjx9MWLT9XqMtTn8VpvIbXgGXly+8MqYb6UXnkbWNKyNFK6QEBD13Muzd4kZDeo2epDzSbgb,iv:cRcCaTkEEd3ci4jOe45WEXEPun869K3kVUP/wAHesbs=,tag:2fRESZ76oqkksTty3385TA==,type:str]
+database: ENC[AES256_GCM,data:4HAI,iv:jRRFQ6xA9U9M4yfN3NtJ26438zAUWyXknc6M8tpiq7Y=,tag:e23jYdNBoKDnF3/Xacl0JA==,type:str]
+password: ENC[AES256_GCM,data:RM/F6mVaPh0Y0A==,iv:h4jD+obK9oGNZt1N0j/rk/0DQA2omjoWAx+VhP7rWZ8=,tag:lJQlQfl2WmB/bo1ry7IjPQ==,type:str]
+user: ENC[AES256_GCM,data:OPFjR0IneQ==,iv:SM1f23T62avLZ+raONdOFh3tse9hEnnNQJS2n1tRur4=,tag:etlqhPIWsMhQFgJ+Ve+jrA==,type:str]
+bucket: ENC[AES256_GCM,data:HYODs0QsD6mjuNLKQfcLMVnaR79a11AN/iLcZ40=,iv:b3GCDEx8/eD7ixV34EQwG8o1Qqeb8gfgDw8XbxS54Vw=,tag:FIGxkokAt6Dwi+sPDLQUNA==,type:str]
+bucketPath: ENC[AES256_GCM,data:LyqzYPs=,iv:nuNwpP0cbnmam2a/u83QIWiYARVj+NwwEIue/UcnQPI=,tag:TJIVFsy6VdTV3zv8P28Rhw==,type:str]
+awsAccessKeyId: ENC[AES256_GCM,data:n9UZV3N1NblyhJzsbsADhUoAoZs=,iv:O0Yu5NEKRBuL+nzvVAuTON2bW/vVd46NofipoTgV1nQ=,tag:Kiq6p8IRRx/tqrr1xZwhmA==,type:str]
+awsSecretAccessKey: ENC[AES256_GCM,data:0JykQG5QKC1L+Bx7y0bvFxY3ZQOFmZM7eNXRMwd6xZ981kA22yFTFw==,iv:d6SLwiXrghwloJLyCK4iFtEx5PrbyFDlUyeoHYHPps4=,tag:InTtw2nnE5NroDVUeYnSMw==,type:str]
+region: ENC[AES256_GCM,data:uftMyxxatl1R,iv:YkxWYnoZhOxZ9SYTLvt4exwJ7yaD3PZXyc2KVbp6p6M=,tag:UTDBYKgFRLJ8H1pM7a+8xg==,type:str]
+hardDelete: ENC[AES256_GCM,data:Pun1Fg==,iv:ZmBz4hC9dWGrvIqHhJgIV38knRK9YJVO0i+PCXeTAKU=,tag:tSEa2OuIjZVjFoagICnpZA==,type:bool]
 syncSchedule:
-    syncFrequency: 0s
+    syncFrequency: ENC[AES256_GCM,data:eDY=,iv:aBg0+1wYG1cncnnJyr8rU1rkb1yPQArMfIJH527aDBM=,tag:V8rsG7UMlAsSMkliLCmzqw==,type:str]
 advanced:
-    no_flow_document: true
-    feature_flags: allow_existing_tables_for_new_bindings
+    no_flow_document: ENC[AES256_GCM,data:aOTcSw==,iv:N3IWJMg2nswZHscoNPtmM2W9ghE5YIGVEJzhs68oquI=,tag:ZbPnGi9yoJV37JXdTuqcvQ==,type:bool]
+    feature_flags: ENC[AES256_GCM,data:ePXDTq7Q8xer2iA/Ry24Jfs5D9f9KN0uTBszqagCnzCpMQBSzpY=,iv:P2JMD7gsHjAGyKhqTZ7iAfI3WfOnVmjYNXSfNoLA+WQ=,tag:js412XQCpKASjLgZr5bLaQ==,type:str]
 sops:
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
-          created_at: "2024-02-01T17:08:49Z"
-          enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
-    lastmodified: "2026-04-01T17:26:00Z"
-    mac: ENC[AES256_GCM,data:9ezBX4E3s8FfOHtCbAo1wv8AMSRv1VpHdZ2jbTe4RqDSeqmPzfqvf5MNrYZjV1GLaBvSrStqigS2vq22HG49ypAhxZtd+lD1USxS0hJiTiQQDZOvjWsrfeAhjoHBbjs3huesyBHNu9jhmfuQ7l1Tnav2MP9o+iPLVszLeA/IM5A=,iv:vF8eJb262vfwc+RAF/u2W8DGFW5WpkmxsnN5OQ2ks3I=,tag:3PTO7ce+Y8llfouJmU6xzg==,type:str]
-    encrypted_suffix: _sops
+          created_at: "2026-04-09T19:47:35Z"
+          enc: CiUAdmEdwiVrd6SZHSJHHiz5QgIqSbtbpF3iutT9lucnwKg3OUHhEkkAJFAC3cA/nAB8tVzMvjIG/QlkAjaw2aU6fgNXxxpeRloG2e/rppB3C7kCrhMDkjQOp8KHxGzECIEhtdNE09noKiLX5VvJhMn2
+    lastmodified: "2026-04-09T19:47:36Z"
+    mac: ENC[AES256_GCM,data:eB3YfnK+BGtL9oTZRtT+xhA3yBKGKeuF373Byy0qm1Kq+RU9qdpFMiXbFH5VONJAmwPlOk1DwFs7AGa9LNPcqaNBhxmqViBUKiaF3pNY8ifvwjiioMC5CvVocGuVsRXcf6dsN41BeD2XfxdqGH5+5tgNajE7Lm6MPetM+cZtbGY=,iv:+x+d8zYS7E0T7Ym1V5BfU0X8G3oR6ODUg5k5BkWYUIk=,tag:pPdC8nDqpA2gd/QxgXZLfA==,type:str]
+    unencrypted_suffix: _unencrypted
     version: 3.10.2
