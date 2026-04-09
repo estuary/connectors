@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/elastic/go-elasticsearch/v8/esapi"
@@ -38,6 +39,10 @@ type binding struct {
 	// must be checked for special +/-Infinity & NaN string values, as ElasticSearch does not handle
 	// these and we'll replace them with NULL.
 	floatFields []bool
+
+	// Index of fields that are date-time values where trailing lowercase 'z' must be normalized
+	// to uppercase 'Z' for Elasticsearch compatibility.
+	dateTimeFields []bool
 
 	// Index of fields that are some type that cannot be materialized natively, and must be wrapped
 	// in a synthetic object and materialized into a flattened mapping.
@@ -257,6 +262,8 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 				if s == "Infinity" || s == "-Infinity" || s == "NaN" {
 					v = nil
 				}
+			} else if s, ok := v.(string); b.dateTimeFields[idx] && ok {
+				v = strings.Replace(s, "z", "Z", 1)
 			} else if b.wrapFields[idx] {
 				v = map[string]any{"json": v}
 			}

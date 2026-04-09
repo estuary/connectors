@@ -620,12 +620,15 @@ func (d *materialization) NewTransactor(
 		ps := append(b.Keys, b.Values...)
 		fields := make([]string, 0, len(ps))
 		floatFields := make([]bool, len(ps))
+		dateTimeFields := make([]bool, len(ps))
 		wrapFields := make([]bool, len(ps))
 
 		for idx, p := range ps {
 			fields = append(fields, translateField(p.Field))
 			if p.Mapped.Type == elasticTypeDouble {
 				floatFields[idx] = true
+			} else if p.Mapped.Type == elasticTypeDate {
+				dateTimeFields[idx] = true
 			} else if mustWrapAndFlatten(&p.Projection.Projection) {
 				wrapFields[idx] = true
 			}
@@ -649,13 +652,14 @@ func (d *materialization) NewTransactor(
 
 		indexToBinding[b.ResourcePath[0]] = idx
 		bindings = append(bindings, binding{
-			index:        b.ResourcePath[0],
-			deltaUpdates: b.DeltaUpdates,
-			fields:       fields,
-			floatFields:  floatFields,
-			wrapFields:   wrapFields,
-			docField:     b.FieldSelection.Document,
-			routingField: routingField,
+			index:          b.ResourcePath[0],
+			deltaUpdates:   b.DeltaUpdates,
+			fields:         fields,
+			floatFields:    floatFields,
+			dateTimeFields: dateTimeFields,
+			wrapFields:     wrapFields,
+			docField:       b.FieldSelection.Document,
+			routingField:   routingField,
 		})
 	}
 

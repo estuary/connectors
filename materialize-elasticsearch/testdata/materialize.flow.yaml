@@ -1,0 +1,32 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-elasticsearch:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        index: simple_standard
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        index: simple_delta
+        delta_updates: true
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        index: not_simple
+      source: tests/not-simple
+      fields:
+        recommended: true
+    - resource:
+        index: data_types
+      source: tests/data-types
+      fields:
+        recommended: true
