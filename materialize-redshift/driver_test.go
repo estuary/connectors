@@ -144,7 +144,7 @@ func TestPrereqs(t *testing.T) {
 				cfg.AWSAccessKeyID = "wrong" + cfg.AWSAccessKeyID
 				return cfg
 			},
-			want: []error{fmt.Errorf("not authorized to write to %q", cfg.Bucket)},
+			want: []error{fmt.Errorf("not authorized to write to \"%s%s\"", cfg.Bucket, cfg.BucketPath)},
 		},
 		{
 			name: "unauthorized to bucket: secret access key",
@@ -152,7 +152,7 @@ func TestPrereqs(t *testing.T) {
 				cfg.AWSSecretAccessKey = "wrong" + cfg.AWSSecretAccessKey
 				return cfg
 			},
-			want: []error{fmt.Errorf("not authorized to write to %q", cfg.Bucket)},
+			want: []error{fmt.Errorf("not authorized to write to \"%s%s\"", cfg.Bucket, cfg.BucketPath)},
 		},
 		{
 			name: "database problem and bucket problem",
