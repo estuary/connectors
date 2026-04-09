@@ -6,7 +6,7 @@
       "address": {
         "type": "string",
         "title": "Address",
-        "description": "Host and port of the database (in the form of host[:port]). Default is 9000 if SSL is disabled",
+        "description": "Host and port of the database (in the form of host[:port]). Default is 9000 if SSL is disabled, 9440 if SSL is enabled.",
         "order": 0
       },
       "database": {
