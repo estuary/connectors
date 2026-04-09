@@ -351,7 +351,7 @@ jobs:
 
         run: |
           if [ "${{ matrix.connector }}" = "materialize-s3-iceberg" ]; then
-            source materialize-s3-iceberg/iceberg-ctl/.venv/bin/activate
+            export PYTHON_PATH=$(pwd)/materialize-s3-iceberg/iceberg-ctl/.venv/bin/python
           fi
           CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 
