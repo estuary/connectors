@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"strings"
 
 	m "github.com/estuary/connectors/go/materialize"
@@ -20,7 +21,8 @@ const (
 	elasticTypeBinary    elasticPropertyType = "binary"
 	elasticTypeDate      elasticPropertyType = "date"
 	elasticTypeIp        elasticPropertyType = "ip"
-	elasticTypeFlattened elasticPropertyType = "flattened"
+	elasticTypeUnsignedLong elasticPropertyType = "unsigned_long"
+	elasticTypeFlattened    elasticPropertyType = "flattened"
 )
 
 type property struct {
@@ -80,7 +82,11 @@ func propForProjection(p *pf.Projection, types []string, fc fieldConfig) propert
 	}
 
 	if numericString, ok := m.AsFormattedNumeric(p); ok {
-		return property{Type: numericStringTypes[numericString], Coerce: true}
+		mappedType := numericStringTypes[numericString]
+		if mappedType == elasticTypeLong && (exceedsSignedLongRange(p) || exceedsSignedLongStringLength(p)) {
+			return property{Type: elasticTypeUnsignedLong}
+		}
+		return property{Type: mappedType, Coerce: true}
 	}
 
 	switch t := typesWithoutNull(types)[0]; t {
@@ -94,6 +100,8 @@ func propForProjection(p *pf.Projection, types []string, fc fieldConfig) propert
 	case pf.JsonTypeInteger:
 		if fc.Keyword {
 			return property{Type: elasticTypeKeyword}
+		} else if exceedsSignedLongRange(p) {
+			return property{Type: elasticTypeUnsignedLong}
 		} else {
 			return property{Type: elasticTypeLong}
 		}
@@ -114,7 +122,7 @@ func propForProjection(p *pf.Projection, types []string, fc fieldConfig) propert
 		case "date":
 			return property{Type: elasticTypeDate}
 		case "date-time":
-			return property{Type: elasticTypeDate}
+			return property{Type: elasticTypeDate, Format: "strict_date_optional_time_nanos||strict_date_optional_time||epoch_millis"}
 		case "ipv4":
 			return property{Type: elasticTypeIp}
 		case "ipv6":
@@ -196,6 +204,16 @@ func mustWrapAndFlatten(p *pf.Projection) bool {
 	}
 
 	return false
+}
+
+func exceedsSignedLongRange(p *pf.Projection) bool {
+	return p.Inference.Numeric != nil && p.Inference.Numeric.HasMaximum && p.Inference.Numeric.Maximum > math.MaxInt64
+}
+
+func exceedsSignedLongStringLength(p *pf.Projection) bool {
+	// int64 max (9223372036854775807) is 19 digits. A MaxLength greater than 18
+	// can represent values exceeding the signed 64-bit range.
+	return p.Inference.String_ != nil && p.Inference.String_.MaxLength > 18
 }
 
 func objProp() property {

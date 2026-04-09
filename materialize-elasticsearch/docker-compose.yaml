@@ -10,6 +10,9 @@ services:
       # must use for connecting over https. This is disabled here for ease of testing, and because
       # production clusters should probably not be using self-signed certificates.
       - "xpack.security.http.ssl.enabled=false"
+      # Disable disk-based shard allocation thresholds so tests work on machines
+      # with limited free disk space.
+      - "cluster.routing.allocation.disk.threshold_enabled=false"
     healthcheck:
       test: curl -u elastic:elastic -s http://localhost:9200 >/dev/null || exit 1
       interval: 1s

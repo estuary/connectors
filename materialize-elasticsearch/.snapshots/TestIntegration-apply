@@ -1,3 +1,5 @@
+Task: acmeCo/tests/materialize-elasticsearch
+
 Big Schema Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
 {"Field":"arrayField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This field is able to be materialized"}
@@ -116,82 +118,82 @@ Big Schema Changed Types Constraints:
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 
 Big Schema Materialized Resource Schema With All Fields Required:
-{"Field":"_meta/flow_truncated","Type":"boolean"}
-{"Field":"arrayField","Type":"flattened"}
-{"Field":"boolField","Type":"boolean"}
-{"Field":"flow_document","Type":"flattened"}
-{"Field":"flow_published_at","Type":"date"}
-{"Field":"intField","Type":"long"}
-{"Field":"key","Type":"keyword"}
-{"Field":"multipleField","Type":"flattened"}
-{"Field":"numField","Type":"double"}
-{"Field":"objField","Type":"flattened"}
-{"Field":"stringDateField","Type":"date"}
-{"Field":"stringDateTimeField","Type":"date"}
-{"Field":"stringDurationField","Type":"text"}
-{"Field":"stringEmailField","Type":"text"}
-{"Field":"stringField","Type":"text"}
-{"Field":"stringHostnameField","Type":"text"}
-{"Field":"stringIdnEmailField","Type":"text"}
-{"Field":"stringIdnHostnameField","Type":"text"}
-{"Field":"stringIntegerField","Type":"long"}
-{"Field":"stringIpv4Field","Type":"ip"}
-{"Field":"stringIpv6Field","Type":"ip"}
-{"Field":"stringIriField","Type":"text"}
-{"Field":"stringIriReferenceField","Type":"text"}
-{"Field":"stringJsonPointerField","Type":"text"}
-{"Field":"stringMacAddr8Field","Type":"text"}
-{"Field":"stringMacAddrField","Type":"text"}
-{"Field":"stringNumberField","Type":"double"}
-{"Field":"stringRegexField","Type":"text"}
-{"Field":"stringRelativeJsonPointerField","Type":"text"}
-{"Field":"stringTimeField","Type":"text"}
-{"Field":"stringUint32Field","Type":"long"}
-{"Field":"stringUint64Field","Type":"long"}
-{"Field":"stringUriField","Type":"text"}
-{"Field":"stringUriReferenceField","Type":"text"}
-{"Field":"stringUriTemplateField","Type":"text"}
-{"Field":"stringUuidField","Type":"text"}
+{"Name":"_meta/flow_truncated","Nullable":true,"Type":"boolean"}
+{"Name":"arrayField","Nullable":true,"Type":"flattened"}
+{"Name":"boolField","Nullable":true,"Type":"boolean"}
+{"Name":"flow_document","Nullable":true,"Type":"flattened"}
+{"Name":"flow_published_at","Nullable":true,"Type":"date"}
+{"Name":"intField","Nullable":true,"Type":"long"}
+{"Name":"key","Nullable":true,"Type":"keyword"}
+{"Name":"multipleField","Nullable":true,"Type":"flattened"}
+{"Name":"numField","Nullable":true,"Type":"double"}
+{"Name":"objField","Nullable":true,"Type":"flattened"}
+{"Name":"stringDateField","Nullable":true,"Type":"date"}
+{"Name":"stringDateTimeField","Nullable":true,"Type":"date"}
+{"Name":"stringDurationField","Nullable":true,"Type":"text"}
+{"Name":"stringEmailField","Nullable":true,"Type":"text"}
+{"Name":"stringField","Nullable":true,"Type":"text"}
+{"Name":"stringHostnameField","Nullable":true,"Type":"text"}
+{"Name":"stringIdnEmailField","Nullable":true,"Type":"text"}
+{"Name":"stringIdnHostnameField","Nullable":true,"Type":"text"}
+{"Name":"stringIntegerField","Nullable":true,"Type":"long"}
+{"Name":"stringIpv4Field","Nullable":true,"Type":"ip"}
+{"Name":"stringIpv6Field","Nullable":true,"Type":"ip"}
+{"Name":"stringIriField","Nullable":true,"Type":"text"}
+{"Name":"stringIriReferenceField","Nullable":true,"Type":"text"}
+{"Name":"stringJsonPointerField","Nullable":true,"Type":"text"}
+{"Name":"stringMacAddr8Field","Nullable":true,"Type":"text"}
+{"Name":"stringMacAddrField","Nullable":true,"Type":"text"}
+{"Name":"stringNumberField","Nullable":true,"Type":"double"}
+{"Name":"stringRegexField","Nullable":true,"Type":"text"}
+{"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"text"}
+{"Name":"stringTimeField","Nullable":true,"Type":"text"}
+{"Name":"stringUint32Field","Nullable":true,"Type":"long"}
+{"Name":"stringUint64Field","Nullable":true,"Type":"long"}
+{"Name":"stringUriField","Nullable":true,"Type":"text"}
+{"Name":"stringUriReferenceField","Nullable":true,"Type":"text"}
+{"Name":"stringUriTemplateField","Nullable":true,"Type":"text"}
+{"Name":"stringUuidField","Nullable":true,"Type":"text"}
 
 Big Schema Materialized Resource Schema With No Fields Required:
-{"Field":"_meta/flow_truncated","Type":"boolean"}
-{"Field":"arrayField","Type":"flattened"}
-{"Field":"boolField","Type":"boolean"}
-{"Field":"flow_document","Type":"flattened"}
-{"Field":"flow_published_at","Type":"date"}
-{"Field":"intField","Type":"long"}
-{"Field":"key","Type":"keyword"}
-{"Field":"multipleField","Type":"flattened"}
-{"Field":"numField","Type":"double"}
-{"Field":"objField","Type":"flattened"}
-{"Field":"stringDateField","Type":"date"}
-{"Field":"stringDateTimeField","Type":"date"}
-{"Field":"stringDurationField","Type":"text"}
-{"Field":"stringEmailField","Type":"text"}
-{"Field":"stringField","Type":"text"}
-{"Field":"stringHostnameField","Type":"text"}
-{"Field":"stringIdnEmailField","Type":"text"}
-{"Field":"stringIdnHostnameField","Type":"text"}
-{"Field":"stringIntegerField","Type":"long"}
-{"Field":"stringIpv4Field","Type":"ip"}
-{"Field":"stringIpv6Field","Type":"ip"}
-{"Field":"stringIriField","Type":"text"}
-{"Field":"stringIriReferenceField","Type":"text"}
-{"Field":"stringJsonPointerField","Type":"text"}
-{"Field":"stringMacAddr8Field","Type":"text"}
-{"Field":"stringMacAddrField","Type":"text"}
-{"Field":"stringNumberField","Type":"double"}
-{"Field":"stringRegexField","Type":"text"}
-{"Field":"stringRelativeJsonPointerField","Type":"text"}
-{"Field":"stringTimeField","Type":"text"}
-{"Field":"stringUint32Field","Type":"long"}
-{"Field":"stringUint64Field","Type":"long"}
-{"Field":"stringUriField","Type":"text"}
-{"Field":"stringUriReferenceField","Type":"text"}
-{"Field":"stringUriTemplateField","Type":"text"}
-{"Field":"stringUuidField","Type":"text"}
+{"Name":"_meta/flow_truncated","Nullable":true,"Type":"boolean"}
+{"Name":"arrayField","Nullable":true,"Type":"flattened"}
+{"Name":"boolField","Nullable":true,"Type":"boolean"}
+{"Name":"flow_document","Nullable":true,"Type":"flattened"}
+{"Name":"flow_published_at","Nullable":true,"Type":"date"}
+{"Name":"intField","Nullable":true,"Type":"long"}
+{"Name":"key","Nullable":true,"Type":"keyword"}
+{"Name":"multipleField","Nullable":true,"Type":"flattened"}
+{"Name":"numField","Nullable":true,"Type":"double"}
+{"Name":"objField","Nullable":true,"Type":"flattened"}
+{"Name":"stringDateField","Nullable":true,"Type":"date"}
+{"Name":"stringDateTimeField","Nullable":true,"Type":"date"}
+{"Name":"stringDurationField","Nullable":true,"Type":"text"}
+{"Name":"stringEmailField","Nullable":true,"Type":"text"}
+{"Name":"stringField","Nullable":true,"Type":"text"}
+{"Name":"stringHostnameField","Nullable":true,"Type":"text"}
+{"Name":"stringIdnEmailField","Nullable":true,"Type":"text"}
+{"Name":"stringIdnHostnameField","Nullable":true,"Type":"text"}
+{"Name":"stringIntegerField","Nullable":true,"Type":"long"}
+{"Name":"stringIpv4Field","Nullable":true,"Type":"ip"}
+{"Name":"stringIpv6Field","Nullable":true,"Type":"ip"}
+{"Name":"stringIriField","Nullable":true,"Type":"text"}
+{"Name":"stringIriReferenceField","Nullable":true,"Type":"text"}
+{"Name":"stringJsonPointerField","Nullable":true,"Type":"text"}
+{"Name":"stringMacAddr8Field","Nullable":true,"Type":"text"}
+{"Name":"stringMacAddrField","Nullable":true,"Type":"text"}
+{"Name":"stringNumberField","Nullable":true,"Type":"double"}
+{"Name":"stringRegexField","Nullable":true,"Type":"text"}
+{"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"text"}
+{"Name":"stringTimeField","Nullable":true,"Type":"text"}
+{"Name":"stringUint32Field","Nullable":true,"Type":"long"}
+{"Name":"stringUint64Field","Nullable":true,"Type":"long"}
+{"Name":"stringUriField","Nullable":true,"Type":"text"}
+{"Name":"stringUriReferenceField","Nullable":true,"Type":"text"}
+{"Name":"stringUriTemplateField","Nullable":true,"Type":"text"}
+{"Name":"stringUuidField","Nullable":true,"Type":"text"}
 
-Big Schema Changed Types With Table Replacement Constraints:
+Big Schema Changed Types With Backfill Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}
 {"Field":"arrayField","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Object fields may be materialized"}
 {"Field":"boolField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
@@ -230,116 +232,116 @@ Big Schema Changed Types With Table Replacement Constraints:
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 {"Field":"stringUuidField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"The projection has a single scalar type"}
 
-Big Schema Materialized Resource Schema Changed Types With Table Replacement:
-{"Field":"_meta/flow_truncated","Type":"boolean"}
-{"Field":"arrayField","Type":"flattened"}
-{"Field":"boolField","Type":"long"}
-{"Field":"flow_document","Type":"flattened"}
-{"Field":"flow_published_at","Type":"date"}
-{"Field":"intField","Type":"text"}
-{"Field":"key","Type":"keyword"}
-{"Field":"multipleField","Type":"flattened"}
-{"Field":"nullField","Type":"flattened"}
-{"Field":"numField","Type":"boolean"}
-{"Field":"objField","Type":"text"}
-{"Field":"stringDateField","Type":"text"}
-{"Field":"stringDateTimeField","Type":"text"}
-{"Field":"stringDurationField","Type":"text"}
-{"Field":"stringEmailField","Type":"text"}
-{"Field":"stringField","Type":"long"}
-{"Field":"stringHostnameField","Type":"text"}
-{"Field":"stringIdnEmailField","Type":"text"}
-{"Field":"stringIdnHostnameField","Type":"text"}
-{"Field":"stringIntegerField","Type":"text"}
-{"Field":"stringIpv4Field","Type":"text"}
-{"Field":"stringIpv6Field","Type":"text"}
-{"Field":"stringIriField","Type":"text"}
-{"Field":"stringIriReferenceField","Type":"text"}
-{"Field":"stringJsonPointerField","Type":"text"}
-{"Field":"stringMacAddr8Field","Type":"text"}
-{"Field":"stringMacAddrField","Type":"text"}
-{"Field":"stringNumberField","Type":"text"}
-{"Field":"stringRegexField","Type":"text"}
-{"Field":"stringRelativeJsonPointerField","Type":"text"}
-{"Field":"stringTimeField","Type":"text"}
-{"Field":"stringUint32Field","Type":"text"}
-{"Field":"stringUint64Field","Type":"text"}
-{"Field":"stringUriField","Type":"text"}
-{"Field":"stringUriReferenceField","Type":"text"}
-{"Field":"stringUriTemplateField","Type":"text"}
-{"Field":"stringUuidField","Type":"text"}
+Big Schema Materialized Resource Schema Changed Types With Backfill:
+{"Name":"_meta/flow_truncated","Nullable":true,"Type":"boolean"}
+{"Name":"arrayField","Nullable":true,"Type":"flattened"}
+{"Name":"boolField","Nullable":true,"Type":"long"}
+{"Name":"flow_document","Nullable":true,"Type":"flattened"}
+{"Name":"flow_published_at","Nullable":true,"Type":"date"}
+{"Name":"intField","Nullable":true,"Type":"text"}
+{"Name":"key","Nullable":true,"Type":"keyword"}
+{"Name":"multipleField","Nullable":true,"Type":"flattened"}
+{"Name":"nullField","Nullable":true,"Type":"flattened"}
+{"Name":"numField","Nullable":true,"Type":"boolean"}
+{"Name":"objField","Nullable":true,"Type":"text"}
+{"Name":"stringDateField","Nullable":true,"Type":"text"}
+{"Name":"stringDateTimeField","Nullable":true,"Type":"text"}
+{"Name":"stringDurationField","Nullable":true,"Type":"text"}
+{"Name":"stringEmailField","Nullable":true,"Type":"text"}
+{"Name":"stringField","Nullable":true,"Type":"long"}
+{"Name":"stringHostnameField","Nullable":true,"Type":"text"}
+{"Name":"stringIdnEmailField","Nullable":true,"Type":"text"}
+{"Name":"stringIdnHostnameField","Nullable":true,"Type":"text"}
+{"Name":"stringIntegerField","Nullable":true,"Type":"text"}
+{"Name":"stringIpv4Field","Nullable":true,"Type":"text"}
+{"Name":"stringIpv6Field","Nullable":true,"Type":"text"}
+{"Name":"stringIriField","Nullable":true,"Type":"text"}
+{"Name":"stringIriReferenceField","Nullable":true,"Type":"text"}
+{"Name":"stringJsonPointerField","Nullable":true,"Type":"text"}
+{"Name":"stringMacAddr8Field","Nullable":true,"Type":"text"}
+{"Name":"stringMacAddrField","Nullable":true,"Type":"text"}
+{"Name":"stringNumberField","Nullable":true,"Type":"text"}
+{"Name":"stringRegexField","Nullable":true,"Type":"text"}
+{"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"text"}
+{"Name":"stringTimeField","Nullable":true,"Type":"text"}
+{"Name":"stringUint32Field","Nullable":true,"Type":"text"}
+{"Name":"stringUint64Field","Nullable":true,"Type":"text"}
+{"Name":"stringUriField","Nullable":true,"Type":"text"}
+{"Name":"stringUriReferenceField","Nullable":true,"Type":"text"}
+{"Name":"stringUriTemplateField","Nullable":true,"Type":"text"}
+{"Name":"stringUuidField","Nullable":true,"Type":"text"}
 
 add a single field:
-{"Field":"_meta/flow_truncated","Type":"boolean"}
-{"Field":"addedOptionalString","Type":"text"}
-{"Field":"flow_document","Type":"flattened"}
-{"Field":"flow_published_at","Type":"date"}
-{"Field":"key","Type":"keyword"}
-{"Field":"optionalBoolean","Type":"boolean"}
-{"Field":"optionalInteger","Type":"long"}
-{"Field":"optionalObject","Type":"flattened"}
-{"Field":"optionalString","Type":"text"}
-{"Field":"requiredBoolean","Type":"boolean"}
-{"Field":"requiredInteger","Type":"long"}
-{"Field":"requiredObject","Type":"flattened"}
-{"Field":"requiredString","Type":"text"}
+{"Name":"_meta/flow_truncated","Nullable":true,"Type":"boolean"}
+{"Name":"addedOptionalString","Nullable":true,"Type":"text"}
+{"Name":"flow_document","Nullable":true,"Type":"flattened"}
+{"Name":"flow_published_at","Nullable":true,"Type":"date"}
+{"Name":"key","Nullable":true,"Type":"keyword"}
+{"Name":"optionalBoolean","Nullable":true,"Type":"boolean"}
+{"Name":"optionalInteger","Nullable":true,"Type":"long"}
+{"Name":"optionalObject","Nullable":true,"Type":"flattened"}
+{"Name":"optionalString","Nullable":true,"Type":"text"}
+{"Name":"requiredBoolean","Nullable":true,"Type":"boolean"}
+{"Name":"requiredInteger","Nullable":true,"Type":"long"}
+{"Name":"requiredObject","Nullable":true,"Type":"flattened"}
+{"Name":"requiredString","Nullable":true,"Type":"text"}
 
 remove a single optional field:
-{"Field":"_meta/flow_truncated","Type":"boolean"}
-{"Field":"flow_document","Type":"flattened"}
-{"Field":"flow_published_at","Type":"date"}
-{"Field":"key","Type":"keyword"}
-{"Field":"optionalBoolean","Type":"boolean"}
-{"Field":"optionalInteger","Type":"long"}
-{"Field":"optionalObject","Type":"flattened"}
-{"Field":"optionalString","Type":"text"}
-{"Field":"requiredBoolean","Type":"boolean"}
-{"Field":"requiredInteger","Type":"long"}
-{"Field":"requiredObject","Type":"flattened"}
-{"Field":"requiredString","Type":"text"}
+{"Name":"_meta/flow_truncated","Nullable":true,"Type":"boolean"}
+{"Name":"flow_document","Nullable":true,"Type":"flattened"}
+{"Name":"flow_published_at","Nullable":true,"Type":"date"}
+{"Name":"key","Nullable":true,"Type":"keyword"}
+{"Name":"optionalBoolean","Nullable":true,"Type":"boolean"}
+{"Name":"optionalInteger","Nullable":true,"Type":"long"}
+{"Name":"optionalObject","Nullable":true,"Type":"flattened"}
+{"Name":"optionalString","Nullable":true,"Type":"text"}
+{"Name":"requiredBoolean","Nullable":true,"Type":"boolean"}
+{"Name":"requiredInteger","Nullable":true,"Type":"long"}
+{"Name":"requiredObject","Nullable":true,"Type":"flattened"}
+{"Name":"requiredString","Nullable":true,"Type":"text"}
 
 remove a single required field:
-{"Field":"_meta/flow_truncated","Type":"boolean"}
-{"Field":"flow_document","Type":"flattened"}
-{"Field":"flow_published_at","Type":"date"}
-{"Field":"key","Type":"keyword"}
-{"Field":"optionalBoolean","Type":"boolean"}
-{"Field":"optionalInteger","Type":"long"}
-{"Field":"optionalObject","Type":"flattened"}
-{"Field":"optionalString","Type":"text"}
-{"Field":"requiredBoolean","Type":"boolean"}
-{"Field":"requiredInteger","Type":"long"}
-{"Field":"requiredObject","Type":"flattened"}
-{"Field":"requiredString","Type":"text"}
+{"Name":"_meta/flow_truncated","Nullable":true,"Type":"boolean"}
+{"Name":"flow_document","Nullable":true,"Type":"flattened"}
+{"Name":"flow_published_at","Nullable":true,"Type":"date"}
+{"Name":"key","Nullable":true,"Type":"keyword"}
+{"Name":"optionalBoolean","Nullable":true,"Type":"boolean"}
+{"Name":"optionalInteger","Nullable":true,"Type":"long"}
+{"Name":"optionalObject","Nullable":true,"Type":"flattened"}
+{"Name":"optionalString","Nullable":true,"Type":"text"}
+{"Name":"requiredBoolean","Nullable":true,"Type":"boolean"}
+{"Name":"requiredInteger","Nullable":true,"Type":"long"}
+{"Name":"requiredObject","Nullable":true,"Type":"flattened"}
+{"Name":"requiredString","Nullable":true,"Type":"text"}
 
 add and remove many fields:
-{"Field":"_meta/flow_truncated","Type":"boolean"}
-{"Field":"addedOptionalString","Type":"text"}
-{"Field":"addedRequiredString","Type":"text"}
-{"Field":"flow_document","Type":"flattened"}
-{"Field":"flow_published_at","Type":"date"}
-{"Field":"key","Type":"keyword"}
-{"Field":"optionalBoolean","Type":"boolean"}
-{"Field":"optionalInteger","Type":"long"}
-{"Field":"optionalObject","Type":"flattened"}
-{"Field":"optionalString","Type":"text"}
-{"Field":"requiredBoolean","Type":"boolean"}
-{"Field":"requiredInteger","Type":"long"}
-{"Field":"requiredObject","Type":"flattened"}
-{"Field":"requiredString","Type":"text"}
+{"Name":"_meta/flow_truncated","Nullable":true,"Type":"boolean"}
+{"Name":"addedOptionalString","Nullable":true,"Type":"text"}
+{"Name":"addedRequiredString","Nullable":true,"Type":"text"}
+{"Name":"flow_document","Nullable":true,"Type":"flattened"}
+{"Name":"flow_published_at","Nullable":true,"Type":"date"}
+{"Name":"key","Nullable":true,"Type":"keyword"}
+{"Name":"optionalBoolean","Nullable":true,"Type":"boolean"}
+{"Name":"optionalInteger","Nullable":true,"Type":"long"}
+{"Name":"optionalObject","Nullable":true,"Type":"flattened"}
+{"Name":"optionalString","Nullable":true,"Type":"text"}
+{"Name":"requiredBoolean","Nullable":true,"Type":"boolean"}
+{"Name":"requiredInteger","Nullable":true,"Type":"long"}
+{"Name":"requiredObject","Nullable":true,"Type":"flattened"}
+{"Name":"requiredString","Nullable":true,"Type":"text"}
 
 Challenging Field Names Materialized Columns:
-{"Field":" ,;{}()_- problematicKey � 𐀀 嶲 ","Type":"keyword"}
-{"Field":" ,;{}()_- problematicValue � 𐀀 嶲 ","Type":"text"}
-{"Field":"$dollar$signs","Type":"text"}
-{"Field":"123","Type":"text"}
-{"Field":"123startsWithDigits","Type":"text"}
-{"Field":"_id_flow","Type":"keyword"}
-{"Field":"a\"string`with`quote'characters","Type":"text"}
-{"Field":"flow_document","Type":"flattened"}
-{"Field":"flow_published_at","Type":"date"}
-{"Field":"value with separated words","Type":"text"}
-{"Field":"value-with-separated-words","Type":"text"}
-{"Field":"value_with-separated_words","Type":"text"}
-{"Field":"value_with_separated_words","Type":"text"}
+{"Name":" ,;{}()_- problematicKey � 𐀀 嶲 ","Nullable":true,"Type":"keyword"}
+{"Name":" ,;{}()_- problematicValue � 𐀀 嶲 ","Nullable":true,"Type":"text"}
+{"Name":"$dollar$signs","Nullable":true,"Type":"text"}
+{"Name":"123","Nullable":true,"Type":"text"}
+{"Name":"123startsWithDigits","Nullable":true,"Type":"text"}
+{"Name":"_id_flow","Nullable":true,"Type":"keyword"}
+{"Name":"a\"string`with`quote'characters","Nullable":true,"Type":"text"}
+{"Name":"flow_document","Nullable":true,"Type":"flattened"}
+{"Name":"flow_published_at","Nullable":true,"Type":"date"}
+{"Name":"value with separated words","Nullable":true,"Type":"text"}
+{"Name":"value-with-separated-words","Nullable":true,"Type":"text"}
+{"Name":"value_with-separated_words","Nullable":true,"Type":"text"}
+{"Name":"value_with_separated_words","Nullable":true,"Type":"text"}
 
