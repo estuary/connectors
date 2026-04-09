@@ -130,7 +130,6 @@ def get_spark_session(args: argparse.Namespace) -> SparkSession:
             "spark.sql.extensions",
             "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
         )
-        .config("spark.sql.defaultCatalog", "estuary")
         .config("spark.sql.catalog.estuary", "org.apache.iceberg.spark.SparkCatalog")
         .config("spark.sql.catalog.estuary.type", "rest")
         .config(
@@ -143,8 +142,7 @@ def get_spark_session(args: argparse.Namespace) -> SparkSession:
 
     if args.oauth2_server_uri is not None:
         builder = builder.config(
-            "spark.sql.catalog.estuary.oauth2-server-uri",
-            args.oauth2_server_uri
+            "spark.sql.catalog.estuary.oauth2-server-uri", args.oauth2_server_uri
         )
 
     if args.credential_secret_name:

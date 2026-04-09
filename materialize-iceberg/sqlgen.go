@@ -36,9 +36,14 @@ func parseTemplates() templates {
 	tpl := template.New("root").Funcs(template.FuncMap{
 		"QuoteIdentifier": quoteIdentifier,
 		"TableFQN": func(in []string) string {
-			quotedParts := make([]string, len(in))
-			for i, part := range in {
-				quotedParts[i] = quoteIdentifier(part)
+			quotedParts := make([]string, 0, 3)
+			// This is the catalog name used by the python scripts, we use a
+			// fully qualified 3-part path: `spark_catalog`.`database`.`table`
+			// in queries to prevent abiguity in case the database has the same
+			// name as the catalog.
+			quotedParts = append(quotedParts, "`estuary`")
+			for _, part := range in {
+				quotedParts = append(quotedParts, quoteIdentifier(part))
 			}
 			return strings.Join(quotedParts, ".")
 		},
