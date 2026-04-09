@@ -276,7 +276,7 @@ type Materializer[
 	// incremented. It will only be called if the materialized resource exists
 	// in the destination system, the resource exists in the prior spec, and the
 	// backfill counter of the new spec is greater than the prior spec.
-	DeleteResource(context.Context, []string) (string, ActionApplyFn, error)
+	DeleteResource(ctx context.Context, path []string) (string, ActionApplyFn, error)
 
 	// UpdateResource updates an existing resource. The
 	// MaterializerBindingUpdate contains specific information about what is
@@ -284,13 +284,13 @@ type Materializer[
 	// even if there are no pre-computed updates. This is to allow
 	// materializations to perform additional specific actions on binding
 	// changes that are not covered by the general cases.
-	UpdateResource(context.Context, []string, ExistingResource, BindingUpdate[EC, RC, MT]) (string, ActionApplyFn, error)
+	UpdateResource(ctx context.Context, path []string, existing ExistingResource, update BindingUpdate[EC, RC, MT]) (string, ActionApplyFn, error)
 
 	// TruncateResource removes all existing data from an existing materialized
 	// resource, while leaving the schema intact. This is called when a resource
 	// is backfilled, but all existing materialized fields are still compatible
 	// with the materialized collection.
-	TruncateResource(context.Context, []string) (string, ActionApplyFn, error)
+	TruncateResource(ctx context.Context, path []string) (string, ActionApplyFn, error)
 
 	// MustRecreateResource checks if a resource must be recreated (rather than truncated)
 	// during a backfill operation. This is useful for connectors that need to force
@@ -306,15 +306,15 @@ type Materializer[
 	// might need to be cleaned up after an integration test. For example, the
 	// list of strings might be a list of materialization names that are present
 	// in a checkpoints table.
-	ListTestTasks(context.Context) ([]string, error)
+	ListTestTasks(ctx context.Context) ([]string, error)
 
 	// CleanupTestTask performs any task-level cleanup actions that should be
 	// run after completing an integration test.
-	CleanupTestTask(context.Context, string) error
+	CleanupTestTask(ctx context.Context, taskName string) error
 
 	// SnapshotTestResource retrieves all rows of data contained in the
 	// materialized resource.
-	SnapshotTestResource(context.Context, []string) (columnNames []string, rows [][]any, _ error)
+	SnapshotTestResource(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error)
 
 	// Close performs any cleanup actions that should be done when gracefully
 	// exiting.
