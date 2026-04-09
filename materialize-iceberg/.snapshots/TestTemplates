@@ -1,6 +1,6 @@
 --- Begin load query ---
 SELECT 0, l.`flow_document`
-FROM `foo`.`bar` AS l
+FROM `estuary`.`foo`.`bar` AS l
 JOIN load_view_0 AS r
 	 ON  l.`first-key` = r.`first-key` AND l.`first-key` >= 1 AND l.`first-key` <= 10
 	 AND l.`second-key` = UNBASE64(r.`second-key`)
@@ -8,7 +8,7 @@ JOIN load_view_0 AS r
 --- End load query ---
 
 --- Begin merge query ---
-MERGE INTO `foo`.`bar` AS l
+MERGE INTO `estuary`.`foo`.`bar` AS l
 USING merge_view_0 AS r
 ON 
 	l.`first-key` = r.`first-key` AND l.`first-key` >= 1 AND l.`first-key` <= 10
@@ -20,7 +20,7 @@ WHEN NOT MATCHED AND r.`flow_document` != '"delete"' THEN INSERT (`first-key`, `
 --- End merge query ---
 
 --- Begin migrate query ---
-UPDATE `some`.`table`
+UPDATE `estuary`.`some`.`table`
 SET
 	`long_to_decimal_flow_tmp` = CAST(`long_to_decimal` AS decimal(38, 0)), 
 	`datetime_to_string_flow_tmp` = DATE_FORMAT(`datetime_to_string`, 'yyyy-MM-dd\'T\'HH:mm:ss.SSSSSS\'Z\''), 

@@ -581,7 +581,7 @@ func (d *materialization) NewTransactor(
 
 func (d *materialization) Close(ctx context.Context) {}
 
-//go:embed python
+//go:embed python/common.py python/exec.py python/load.py python/merge.py
 var pyFilesFS embed.FS
 
 type pyFileURIs struct {
