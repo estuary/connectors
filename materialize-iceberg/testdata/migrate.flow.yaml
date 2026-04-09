@@ -1,0 +1,120 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.migrate-base.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-iceberg/rest:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.rest.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
+
+  acmeCo/tests/materialize-iceberg/rest-deprecated:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.rest-deprecated.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
+
+  acmeCo/tests/materialize-iceberg/glue:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.glue.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
+
+  acmeCo/tests/materialize-iceberg/glue-deprecated:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.glue-deprecated.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
+
+  acmeCo/tests/materialize-iceberg/glue-optimized:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.glue-optimized.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
+
+  acmeCo/tests/materialize-iceberg/glue-catalog-auth:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.glue-catalog-auth.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
+
+  acmeCo/tests/materialize-iceberg/s3tables:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.s3tables.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
+
+  acmeCo/tests/materialize-iceberg/s3tables-deprecated:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.s3tables-deprecated.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
+
+  acmeCo/tests/materialize-iceberg/s3tables-catalog-auth:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.s3tables-catalog-auth.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true

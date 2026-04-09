@@ -11,10 +11,13 @@ WORKDIR /builder
 COPY go.* ./
 RUN go mod download
 
+COPY flow-bin/flowctl-go /usr/local/bin/flowctl-go
+
 COPY go                                   ./go
 COPY materialize-boilerplate              ./materialize-boilerplate
 COPY materialize-iceberg                  ./materialize-iceberg
 COPY materialize-sql                      ./materialize-sql
+COPY testsupport                          ./testsupport
 
 # Test and build the connector.
 RUN go test  -tags nozstd -v ./materialize-sql/...

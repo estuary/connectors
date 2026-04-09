@@ -30,7 +30,7 @@ type migrateInput struct {
 	Migrations   []migrateColumn
 }
 
-func quoteIdentifier(in string) string { return "`" + in + "`" }
+func quoteIdentifier(in string) string { return "`" + strings.ReplaceAll(in, "`", "``") + "`" }
 
 func parseTemplates() templates {
 	tpl := template.New("root").Funcs(template.FuncMap{
