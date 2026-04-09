@@ -1,17 +1,19 @@
 services:
   storage:
-    image: localstack/localstack:3.8
+    image: minio/minio:latest
+    command: server /data
     ports:
-      - "4566:4566"
+      - "9099:9000"
     environment:
-      - SERVICES=s3
+      MINIO_ROOT_USER: test_key
+      MINIO_ROOT_PASSWORD: test_secret
     networks:
       flow-test:
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "curl -f http://127.0.0.1:4566/_localstack/health"
+          "curl -f http://127.0.0.1:9000/minio/health/live"
         ]
       interval: 2s
       timeout: 5s
