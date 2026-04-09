@@ -12,8 +12,8 @@ ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
 # Run the specific connector tests.
-cd $ROOT_DIR/$CONNECTOR
 if [ -f Cargo.toml ]; then
+  cd $ROOT_DIR/$CONNECTOR
   cargo test
 else
   # Test common materialization packages. This is repeated for each
@@ -24,7 +24,7 @@ else
   cd $ROOT_DIR/go && go test -v ./...
   cd $ROOT_DIR/filesink && go test -v ./...
   cd $ROOT_DIR/materialize-boilerplate && go test -v ./...
-  go test -v ./... -timeout 20m
+  cd $ROOT_DIR/$CONNECTOR && go test -v ./... -timeout 20m
 fi
 
 # Verify that the built image at least works enough to run the spec command.
