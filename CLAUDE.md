@@ -34,7 +34,7 @@ go mod vendor
 
 ## Testing (Go)
 
-- Always provide `TEST_DATABASE=yes UPDATE_SNAPSHOTS=true` when running `go test -v ./$connector`
+- Always provide `UPDATE_SNAPSHOTS=true` when running `go test -v ./$connector`
 - For connectors which have a corresponding folder in tests/ or tests/materialize/, also run integration tests using the following command: `CONNECTOR=materialize-mysql VERSION=local ./tests/materialize/run.sh`.
 - To run integration tests, must build the docker image locally.
 
