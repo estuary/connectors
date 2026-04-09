@@ -109,6 +109,7 @@ async def fetch_incremental(
         # Return early and sleep if the end date is before the log cursor
         # or the difference between the end date and log cursor is less than
         # the minimum incremental interval.
+        log.info("fetch_incremental early return", {"stream": cls.NAME, "log_cursor": log_cursor, "end": end, "end_minus_cursor": str(end - log_cursor) if end >= log_cursor else "negative"})
         return
 
     parameters["created[lte]"] = int(end.timestamp())
@@ -185,10 +186,13 @@ async def fetch_incremental(
             break
 
     if max_ts != log_cursor:
-        yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
+        cursor_to_yield = max_ts + timedelta(milliseconds=1)
+        log.info("fetch_incremental yielding cursor", {"stream": cls.NAME, "branch": "max_ts+1ms", "log_cursor": log_cursor, "max_ts": max_ts, "end": end, "cursor_to_yield": cursor_to_yield})
+        yield cursor_to_yield  # startTimestamp is inclusive.
     else:
         # No events were found. Advance the cursor to avoid re-processing the same
         # time window. This is safe because the early return guard ensures end > log_cursor.
+        log.info("fetch_incremental yielding cursor", {"stream": cls.NAME, "branch": "end", "log_cursor": log_cursor, "max_ts": max_ts, "end": end, "cursor_to_yield": end})
         yield end
 
 
@@ -387,10 +391,13 @@ async def fetch_incremental_substreams(
         else:
             break
     if max_ts != log_cursor:
-        yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
+        cursor_to_yield = max_ts + timedelta(milliseconds=1)
+        log.info("fetch_incremental_substreams yielding cursor", {"stream": cls_child.NAME, "branch": "max_ts+1ms", "log_cursor": log_cursor, "max_ts": max_ts, "end": end, "cursor_to_yield": cursor_to_yield})
+        yield cursor_to_yield  # startTimestamp is inclusive.
     else:
         # No events were found. Advance the cursor to avoid re-processing the same
         # time window. This is safe because the early return guard ensures end > log_cursor.
+        log.info("fetch_incremental_substreams yielding cursor", {"stream": cls_child.NAME, "branch": "end", "log_cursor": log_cursor, "max_ts": max_ts, "end": end, "cursor_to_yield": end})
         yield end
 
 
@@ -693,12 +700,15 @@ async def fetch_incremental_no_events(
             break
 
     if max_ts != log_cursor:
-        yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
+        cursor_to_yield = max_ts + timedelta(milliseconds=1)
+        log.info("fetch_incremental_no_events yielding cursor", {"stream": cls.NAME, "branch": "max_ts+1ms", "log_cursor": log_cursor, "max_ts": max_ts, "end": end, "cursor_to_yield": cursor_to_yield})
+        yield cursor_to_yield  # startTimestamp is inclusive.
     elif end > log_cursor:
         # No new documents were found. Advance the cursor to `end` (now - LAG) to avoid
         # re-processing the same time window. This function polls the list endpoint directly
         # (not the Events API), so documents are filtered by their `created` timestamp.
         # Only yield if `end` is actually ahead of the current cursor.
+        log.info("fetch_incremental_no_events yielding cursor", {"stream": cls.NAME, "branch": "end", "log_cursor": log_cursor, "max_ts": max_ts, "end": end, "cursor_to_yield": end})
         yield end
     # Otherwise, don't yield a cursor - the cursor is already ahead of `end`,
     # so let the task sleep and try again later.
@@ -807,10 +817,13 @@ async def fetch_incremental_usage_records(
             break
 
     if max_ts != log_cursor:
-        yield max_ts + timedelta(milliseconds=1)  # startTimestamp is inclusive.
+        cursor_to_yield = max_ts + timedelta(milliseconds=1)
+        log.info("fetch_incremental_usage_records yielding cursor", {"stream": cls_child.NAME, "branch": "max_ts+1ms", "log_cursor": log_cursor, "max_ts": max_ts, "end": end, "cursor_to_yield": cursor_to_yield})
+        yield cursor_to_yield  # startTimestamp is inclusive.
     else:
         # No events were found. Advance the cursor to avoid re-processing the same
         # time window. This is safe because the early return guard ensures end > log_cursor.
+        log.info("fetch_incremental_usage_records yielding cursor", {"stream": cls_child.NAME, "branch": "end", "log_cursor": log_cursor, "max_ts": max_ts, "end": end, "cursor_to_yield": end})
         yield end
 
 

@@ -588,6 +588,7 @@ async def _binding_incremental_task_with_work_item(
                     )
 
                 if not is_larger:
+                    task.log.error("cursor not advancing", {"yielded": item, "state_cursor": state.cursor, "subtask_id": work_item.account_id, "stateKey": binding.stateKey})
                     raise RuntimeError(
                         f"Implementation error: FetchChangesFn yielded LogCursor {item} which is not greater than the last LogCursor {state.cursor}",
                     )
