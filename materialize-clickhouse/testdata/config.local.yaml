@@ -1,0 +1,10 @@
+address: "localhost:9000"
+database: "flow"
+hardDelete: true
+credentials:
+  auth_type: "user_password"
+  username: "flow"
+  password: "flow"
+advanced:
+  sslmode: "disable"
+  feature_flags: allow_existing_tables_for_new_bindings

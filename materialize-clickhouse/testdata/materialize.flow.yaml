@@ -1,0 +1,31 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-clickhouse:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        table: simple_standard
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        table: simple_delta
+        delta_updates: true
+      source: tests/simple
+      fields:
+        recommended: true
+    # not-simple is disabled: the collection key " ,;{}().- problematicKey ..."
+    # contains a comma, which triggers a bug in the clickhouse-go driver's
+    # PrepareBatch INSERT column parser (splits on comma inside backtick-quoted
+    # identifiers). See: https://github.com/ClickHouse/clickhouse-go/issues/1827
+    - resource:
+        table: data_types
+      source: tests/data-types
+      fields:
+        recommended: true
