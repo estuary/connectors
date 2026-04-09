@@ -1,0 +1,31 @@
+url: ENC[AES256_GCM,data:rhYbt31wj+xlVJ0gqrOMVJCsIxR1yk/KzqaqajXaemQR+CLVRLZGFP3Ge2AlYHD1,iv:zUj66nKTf7jT9esGUBz1Bc8TXftQTnXhxxDSTzluqS0=,tag:TQ8gAeDKfJO33ISfrE5HTw==,type:str]
+warehouse: ENC[AES256_GCM,data:KYXYmpjzkniqrABTybBDCe369hxHwxRaiPOihs2OkQrimJWuZb8PLCseLC9RJdDYQHMP27pjqcMEldxU6XG6c9+5pq6KPF3t,iv:a1WJ/fONTbCii7S6qstm8op2/7YLXy39Y5mVyu62XFU=,tag:N1DKN/ICyiE3nbTNdAqpJw==,type:str]
+namespace: ENC[AES256_GCM,data:vPFW1ofFje45dQ==,iv:c1BtS2eRxYoUXffA7+vWfdocnoigvIPeITBhjnBazR4=,tag:XAihGlbvMYsp9K4LNlkEcQ==,type:str]
+hard_delete: ENC[AES256_GCM,data:nfFD2g==,iv:Yz75EslHa0y4K7jJzOHkwLOnXu62g6Bf2J9C9wBbnEU=,tag:cxBHdEpKI+qQOyFYwaYbUA==,type:bool]
+credentials:
+    auth_type: ENC[AES256_GCM,data:Hpm3JvGyOlQN,iv:y5E4EVXHaYE4v6GXN1XZD5yddx1z9Mggv4svz6KztyU=,tag:4ndDwLMLycUsKsyFSOXNpw==,type:str]
+    aws_access_key_id: ENC[AES256_GCM,data:BX6m6jOtn5ZpWg/7ucXN94wrSaQ=,iv:41GzTN4Degv7sMpDzGAi1jSv8ftuq2jEvdeVMRqXtEc=,tag:4ejfB1umIe12iBei4vLvbQ==,type:str]
+    aws_secret_access_key: ENC[AES256_GCM,data:gpawMp6muWJ5h2ftBO4TQlhy3IH8iYntH/+9K7DGpai0zKo+4Jx8Fw==,iv:UeGsWgEGpfAJu28EbSY8jknNLka8KvjwO5yHp2aUzKo=,tag:H8Xj6fQaviyrC+mBabxRkg==,type:str]
+    aws_region: ENC[AES256_GCM,data:Wyk0O5egOJUV,iv:28DhFwg/rvB4VjZlh1PENbpLNtOO5R8mAsiLBL59Q8g=,tag:MNhp/dLWBeV8ggqhuewi0g==,type:str]
+compute:
+    compute_type: ENC[AES256_GCM,data:JRPppaGflSicGMT4SX/F61Ak,iv:IVVc+DKC9kN7Z3W+M4b3F1PzsXHaDzXnIIZnOe2f/Rc=,tag:yJLH/7ZHwtGxHZ24DnnXnw==,type:str]
+    credentials:
+        auth_type: ENC[AES256_GCM,data:hxnCyFKcQxlpDH2qIME=,iv:SQ2y2z6d093NXpbneZaYwXhFH2dIlqBLcqgobW73Ki0=,tag:P2FDDUjE1WG0ZnclUuXEUw==,type:str]
+    region: ENC[AES256_GCM,data:YaUd9MBpOW3k,iv:Qxbld3flxYsJV9o9wMlPBIrfrcn6FYplxDHrPjiOnJI=,tag:DVLvFM0mgM48KTp73TJ/6Q==,type:str]
+    application_id: ENC[AES256_GCM,data:O0dyH8tbqKeKgg2cNZnjyA==,iv:flJ0oErpw4gIPUJxReLp9FYYm3Vv0ElH1phLJ8diXpE=,tag:Qi6e4Q/rIfD50Yf7xsEpYA==,type:str]
+    execution_role_arn: ENC[AES256_GCM,data:J4uoEf4YfaIRgbGPqUwIh+hDmPTTDjHzuVzNLaiNiIZV/4qf6/8eP1fFTimxvcHhmw==,iv:5AxPXAJjPINWNAgEW3hzHp3Fj1b6zSWexOIqfo5iI5s=,tag:VdqGCEKXgNb59IMseP5jJw==,type:str]
+    bucket: ENC[AES256_GCM,data:Sn/2MhyzLCPDU6vW1cDNSPr0cQ==,iv:9BOrwbtj5EaTeyI9Aej2glBcIqGaVYXKufSgX0IuwSU=,tag:5u7mvSEmXspg41yTVu6CnQ==,type:str]
+    bucket_path: ENC[AES256_GCM,data:CqGXsDr4uNdFP28jcYY=,iv:eZ5/eOSdh+H2vtsmr/70jG6TthdTj9AkSU4WApjL9q0=,tag:zF3NSb/O0g4FEiRrZ7UPaA==,type:str]
+syncSchedule:
+    syncFrequency: ENC[AES256_GCM,data:XNA=,iv:NYUqRvF3NSayuYEqnA1IPNIDEHtJxz6+19xZsTuPo6o=,tag:qyvIWS7rVOCZ2ifgvc4eig==,type:str]
+advanced:
+    feature_flags: ENC[AES256_GCM,data:QO+dZ+No4TK1LIszZDWbcMtqcQGX1kbmmFib8mV4g/WCnbZm6tU=,iv:3jrDTztuq9NPjMbvRNFrN/tA3vy4PehH0Fip0CJA92k=,tag:lsUkrKL2XrTsSMERtXLNyA==,type:str]
+sops:
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2026-04-09T20:03:18Z"
+          enc: CiUAdmEdwgO0on67rh6ks1x4JH1XX4BGLt1Y6qkvKNbzJcf0eD7zEkkAJFAC3bPJq4H+fPubhRi9TGEAiZk2L8mb8jvF3/qVlubKuNvnGgjmcC08yuKwvW2ZzBWmP2WGTOl0fF72ebdOLV0GIBCkCZ+d
+    lastmodified: "2026-04-09T20:03:19Z"
+    mac: ENC[AES256_GCM,data:N4gTpGsFwOIL67AdoWAOhKnN3C2u/gQXDCl2RS/5dZt03SNEko679bYHUldXjzA7BwpAT/9AVrt0PSvUVR2OcCKhCgrdiDwOnFXtn/a3dvj0egGatWmWp5y5Dx8kMrJOS/TgL8QbmYzelFezLXZtmnJYSm9+3/ZfW5D5sQQTz6M=,iv:qrm4gSMBJlfuw21DHMvdRSqPXnyaI3Rz0nkOMk6T2Wg=,tag:TV1ZPxOhg7mc5ctv6MHDRA==,type:str]
+    unencrypted_suffix: _unencrypted
+    version: 3.10.2

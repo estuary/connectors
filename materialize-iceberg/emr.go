@@ -43,12 +43,7 @@ func (e *emrClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr) {
 
 	if e.catalogAuth.AuthType == catalogAuthTypeClientCredential {
 		testParameter := e.cfg.SystemsManagerPrefix + "test"
-		if _, err := e.ssmClient.PutParameter(ctx, &ssm.PutParameterInput{
-			Name:      aws.String(testParameter),
-			Value:     aws.String("test"),
-			Type:      ssmTypes.ParameterTypeSecureString,
-			Overwrite: aws.Bool(true),
-		}); err != nil {
+		if err := ssmPutParameterWithRetry(ctx, e.ssmClient, testParameter, "test"); err != nil {
 			errs.Err(fmt.Errorf("failed to put secure string parameter to %s: %w", testParameter, err))
 			return
 		} else if _, err := e.ssmClient.GetParameter(ctx, &ssm.GetParameterInput{
@@ -76,13 +71,7 @@ func (e *emrClient) ensureSecret(ctx context.Context, wantCred string) error {
 		return nil
 	}
 
-	_, err = e.ssmClient.PutParameter(ctx, &ssm.PutParameterInput{
-		Name:      aws.String(e.clientCredSecretName()),
-		Value:     aws.String(wantCred),
-		Type:      ssmTypes.ParameterTypeSecureString,
-		Overwrite: aws.Bool(true),
-	})
-	if err != nil {
+	if err := ssmPutParameterWithRetry(ctx, e.ssmClient, e.clientCredSecretName(), wantCred); err != nil {
 		return fmt.Errorf("error writing catalog credential parameter: %w", err)
 	}
 
@@ -206,6 +195,30 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 
 func (e *emrClient) clientCredSecretName() string {
 	return e.cfg.SystemsManagerPrefix + sanitizeAndAppendHash(e.materializationName)
+}
+
+func ssmPutParameterWithRetry(ctx context.Context, client *ssm.Client, name, value string) error {
+	var err error
+	for attempt := range 5 {
+		if attempt > 0 {
+			time.Sleep(time.Duration(attempt) * 2 * time.Second)
+		}
+		_, err = client.PutParameter(ctx, &ssm.PutParameterInput{
+			Name:      aws.String(name),
+			Value:     aws.String(value),
+			Type:      ssmTypes.ParameterTypeSecureString,
+			Overwrite: aws.Bool(true),
+		})
+		if err == nil {
+			return nil
+		}
+		var tooMany *ssmTypes.TooManyUpdates
+		if !errors.As(err, &tooMany) {
+			return err
+		}
+		log.WithField("attempt", attempt+1).Warn("SSM PutParameter TooManyUpdates, retrying")
+	}
+	return err
 }
 
 func encodeInput(in any) ([]byte, error) {

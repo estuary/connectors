@@ -195,12 +195,6 @@ func computeSchemaForCompletedMigrations(current *iceberg.Schema, fieldsToMigrat
 		})
 	}
 
-	fieldMigratedTo := func(f iceberg.NestedField) bool {
-		return slices.ContainsFunc(fieldsToMigrate, func(field boilerplate.MigrateField[mapped]) bool {
-			return f.Name == field.From.Name+migrateFieldSuffix
-		})
-	}
-
 	// Sanity checks that we don't remove a column without also renaming one to
 	// its original name.
 	var fieldsRemoved []string
@@ -211,8 +205,10 @@ func computeSchemaForCompletedMigrations(current *iceberg.Schema, fieldsToMigrat
 		if fieldWasMigrated(f) {
 			fieldsRemoved = append(fieldsRemoved, f.Name)
 			continue
-		} else if fieldMigratedTo(f) {
-			f.Name = strings.TrimSuffix(f.Name, migrateFieldSuffix)
+		} else if migrationIdx := slices.IndexFunc(fieldsToMigrate, func(field boilerplate.MigrateField[mapped]) bool {
+			return f.Name == field.To.Mapped.Name+migrateFieldSuffix
+		}); migrationIdx != -1 {
+			f.Name = fieldsToMigrate[migrationIdx].From.Name
 			fieldsRenamedTo = append(fieldsRenamedTo, f.Name)
 		}
 

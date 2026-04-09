@@ -1,0 +1,72 @@
+materializations:
+  acmeCo/tests/materialize-iceberg/rest:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.rest.yaml
+    bindings: []
+
+  acmeCo/tests/materialize-iceberg/rest-deprecated:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.rest-deprecated.yaml
+    bindings: []
+
+  acmeCo/tests/materialize-iceberg/glue:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.glue.yaml
+    bindings: []
+
+  acmeCo/tests/materialize-iceberg/glue-deprecated:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.glue-deprecated.yaml
+    bindings: []
+
+  acmeCo/tests/materialize-iceberg/glue-optimized:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.glue-optimized.yaml
+    bindings: []
+
+  acmeCo/tests/materialize-iceberg/glue-catalog-auth:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.glue-catalog-auth.yaml
+    bindings: []
+
+  acmeCo/tests/materialize-iceberg/s3tables:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.s3tables.yaml
+    bindings: []
+
+  acmeCo/tests/materialize-iceberg/s3tables-deprecated:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.s3tables-deprecated.yaml
+    bindings: []
+
+  acmeCo/tests/materialize-iceberg/s3tables-catalog-auth:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.s3tables-catalog-auth.yaml
+    bindings: []
