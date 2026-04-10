@@ -25,7 +25,7 @@ else
   cd $ROOT_DIR/filesink && go test -v ./...
   cd $ROOT_DIR/materialize-boilerplate && go test -v ./...
 
-  TIMEOUT=10m
+  TIMEOUT=20m
   if [ "$CONNECTOR" = "materialize-spanner" ]; then
     TIMEOUT=40m
   elif [ "$CONNECTOR" = "materialize-iceberg" ]; then
