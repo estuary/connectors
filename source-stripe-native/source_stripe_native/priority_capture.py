@@ -177,7 +177,7 @@ class PriorityCalculator:
 class WorkItemManager:
     def __init__(self, priority_calculator: PriorityCalculator):
         self.priority_calculator = priority_calculator
-        self.active_work_by_account: Dict[str, WorkItem] = {}
+        self.tracked_work_by_account: Dict[str, WorkItem] = {}
     
     def generate_work_items(
         self,
@@ -193,7 +193,7 @@ class WorkItemManager:
 
         for account_id in priority_account_ids:
             # Do not create duplicate work items for accounts that already have active work.
-            if account_id in self.active_work_by_account:
+            if account_id in self.tracked_work_by_account:
                 continue
 
             work_item = self._create_work_item_for_account(
@@ -252,15 +252,15 @@ class WorkItemManager:
         return None, None
 
     def cancel_work_for_account(self, account_id: str):
-        if account_id in self.active_work_by_account:
-            work_item = self.active_work_by_account[account_id]
+        if account_id in self.tracked_work_by_account:
+            work_item = self.tracked_work_by_account[account_id]
             work_item.cancellation_event.set()
 
-    def register_active_work(self, work_item: WorkItem):
-        self.active_work_by_account[work_item.account_id] = work_item
+    def register_tracked_work(self, work_item: WorkItem):
+        self.tracked_work_by_account[work_item.account_id] = work_item
 
-    def unregister_active_work(self, work_item: WorkItem):
-        self.active_work_by_account.pop(work_item.account_id, None)
+    def unregister_tracked_work(self, work_item: WorkItem):
+        self.tracked_work_by_account.pop(work_item.account_id, None)
 
 
 class SubtaskExecutor:
@@ -408,7 +408,7 @@ class PriorityQueueManager:
                 try:
                     await self.subtask_executor.execute_work_item(work_item, task)
                 finally:
-                    self.work_item_manager.unregister_active_work(work_item)
+                    self.work_item_manager.unregister_tracked_work(work_item)
                     self.work_queue.task_done()
 
             except asyncio.TimeoutError:
@@ -442,7 +442,7 @@ class PriorityQueueManager:
             self.resource_state
         )
 
-        current_account_ids = set(self.work_item_manager.active_work_by_account.keys())
+        current_account_ids = set(self.work_item_manager.tracked_work_by_account.keys())
         accounts_to_cancel = current_account_ids - prioritized_account_ids
 
         for account_id in accounts_to_cancel:
@@ -454,7 +454,7 @@ class PriorityQueueManager:
                 # Use priority as the sort key for PriorityQueue.
                 # Lower priority values = higher priority in the queue.
                 self.work_queue.put_nowait((work_item.priority, work_item))
-                self.work_item_manager.register_active_work(work_item)
+                self.work_item_manager.register_tracked_work(work_item)
                 work_items_queued += 1
             except asyncio.QueueFull:
                 # Work items should be processed quickly enough to avoid filling the queue.
