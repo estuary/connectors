@@ -24,7 +24,14 @@ else
   cd $ROOT_DIR/go && go test -v ./...
   cd $ROOT_DIR/filesink && go test -v ./...
   cd $ROOT_DIR/materialize-boilerplate && go test -v ./...
-  cd $ROOT_DIR/$CONNECTOR && go test -v ./... -timeout 20m
+
+  TIMEOUT=10m
+  if [ "$CONNECTOR" = "materialize-spanner" ]; then
+    TIMEOUT=20m
+  elif [ "$CONNECTOR" = "materialize-iceberg" ]; then
+    TIMEOUT=40m
+  fi
+  cd $ROOT_DIR/$CONNECTOR && go test -v ./... -timeout $TIMEOUT
 fi
 
 # Verify that the built image at least works enough to run the spec command.
