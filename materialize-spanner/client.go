@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"cloud.google.com/go/spanner"
 	database "cloud.google.com/go/spanner/admin/database/apiv1"
@@ -204,6 +205,10 @@ func (c *client) addPendingDDL(statements ...string) {
 	}
 }
 
+// ddlTimeout is the timeout for Spanner DDL operations, which can be slow
+// especially for large migration batches with many ALTER TABLE statements.
+const ddlTimeout = 10 * time.Minute
+
 // FlushDDL executes all accumulated DDL statements in a single batch operation
 func (c *client) FlushDDL(ctx context.Context) error {
 	c.ddlMutex.Lock()
@@ -215,7 +220,10 @@ func (c *client) FlushDDL(ctx context.Context) error {
 
 	log.WithField("count", len(c.pendingDDL)).Info("flushing batched DDL statements")
 
-	op, err := c.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+	ddlCtx, cancel := context.WithTimeout(ctx, ddlTimeout)
+	defer cancel()
+
+	op, err := c.adminClient.UpdateDatabaseDdl(ddlCtx, &databasepb.UpdateDatabaseDdlRequest{
 		Database:   c.dbPath,
 		Statements: c.pendingDDL,
 	})
@@ -223,7 +231,7 @@ func (c *client) FlushDDL(ctx context.Context) error {
 		return fmt.Errorf("submitting batched DDL: %w", err)
 	}
 
-	if err := op.Wait(ctx); err != nil {
+	if err := op.Wait(ddlCtx); err != nil {
 		return fmt.Errorf("executing batched DDL: %w", err)
 	}
 
@@ -543,7 +551,10 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 	}
 
 	// Execute DDL statements
-	op, err := c.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+	ddlCtx, cancel := context.WithTimeout(ctx, ddlTimeout)
+	defer cancel()
+
+	op, err := c.adminClient.UpdateDatabaseDdl(ddlCtx, &databasepb.UpdateDatabaseDdlRequest{
 		Database:   c.dbPath,
 		Statements: cleanedStatements,
 	})
@@ -551,7 +562,7 @@ func (c *client) ExecStatements(ctx context.Context, statements []string) error 
 		return fmt.Errorf("submitting DDL statements: %w", err)
 	}
 
-	return op.Wait(ctx)
+	return op.Wait(ddlCtx)
 }
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {

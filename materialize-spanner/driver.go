@@ -505,14 +505,17 @@ func newTransactor(
 
 	// Execute all DDL statements in a single operation for efficiency
 	log.WithField("statements", len(ddlStatements)).Info("executing flow_internal schema initialization")
-	op, err := clients.adminClient.UpdateDatabaseDdl(ctx, &databasepb.UpdateDatabaseDdlRequest{
+	ddlCtx, cancel := context.WithTimeout(ctx, ddlTimeout)
+	defer cancel()
+
+	op, err := clients.adminClient.UpdateDatabaseDdl(ddlCtx, &databasepb.UpdateDatabaseDdlRequest{
 		Database:   clients.dbPath,
 		Statements: ddlStatements,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("submitting flow_internal schema DDL: %w", err)
 	}
-	if err := op.Wait(ctx); err != nil {
+	if err := op.Wait(ddlCtx); err != nil {
 		return nil, fmt.Errorf("executing flow_internal schema DDL: %w", err)
 	}
 	log.Info("created flow_internal schema for Load operations")
