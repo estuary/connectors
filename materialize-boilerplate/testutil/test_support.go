@@ -58,6 +58,16 @@ func relativePath(t *testing.T, file string) string {
 	return filepath.Join(dir, "..", file)
 }
 
+// taskNames returns the ordered list of materialization task names from a bundled spec.
+func taskNames(bundled []byte) []string {
+	var names []string
+	gjson.GetBytes(bundled, "materializations").ForEach(func(task, _ gjson.Result) bool {
+		names = append(names, task.String())
+		return true
+	})
+	return names
+}
+
 // RunTestAllTasks calls testFn for each materialization task found in the spec
 // at sourcePath. The endpoint configuration for the task is decrypted and
 // unmarshalled into EC.
@@ -67,16 +77,52 @@ func RunTestAllTasks[EC boilerplate.EndpointConfiger](
 	testFn func(t *testing.T, bundled []byte, taskName string, cfg EC),
 ) {
 	bundled := RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
-	gjson.GetBytes(bundled, "materializations").ForEach(func(task, _ gjson.Result) bool {
-		t.Log("running test for", task.String())
-
-		taskName := task.String()
+	for _, taskName := range taskNames(bundled) {
+		t.Log("running test for", taskName)
 		cfg := decryptConfig[EC](t, bundled, taskName)
 		testFn(t, bundled, taskName, cfg)
+	}
+}
 
-		return true
+// maxParallelTasks limits how many materialization tasks run concurrently to
+// avoid excessive memory usage.
+const maxParallelTasks = 3
+
+// RunTestAllTasksParallel calls testFn for each materialization task
+// concurrently (up to maxParallelTasks at a time) using t.Run subtests. It
+// returns the ordered task names and a map from task name to the string result
+// of testFn, preserving the ability to reassemble results in deterministic
+// order for snapshots.
+func RunTestAllTasksParallel[EC boilerplate.EndpointConfiger](
+	t *testing.T,
+	sourcePath string,
+	testFn func(t *testing.T, bundled []byte, taskName string, cfg EC) string,
+) ([]string, map[string]string) {
+	bundled := RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
+	names := taskNames(bundled)
+
+	results := make(map[string]string, len(names))
+	var mu sync.Mutex
+	sem := make(chan struct{}, maxParallelTasks)
+
+	// Use a group subtest so that t.Run blocks until all parallel subtests complete.
+	t.Run("tasks", func(t *testing.T) {
+		for _, taskName := range names {
+			t.Run(taskName, func(t *testing.T) {
+				t.Parallel()
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				t.Log("running test for", taskName)
+				cfg := decryptConfig[EC](t, bundled, taskName)
+				result := testFn(t, bundled, taskName, cfg)
+				mu.Lock()
+				results[taskName] = result
+				mu.Unlock()
+			})
+		}
 	})
 
+	return names, results
 }
 
 // RunMaterializationTest tests the transactions part of a materialization,
@@ -107,6 +153,32 @@ func RunMaterializationTest[EC boilerplate.EndpointConfiger, FC boilerplate.Fiel
 	cupaloy.SnapshotT(t, snap.String())
 }
 
+// RunMaterializationTestParallel is like RunMaterializationTest but runs tasks
+// concurrently (up to maxParallelTasks at a time). Use this for connectors
+// where parallel task execution is safe and beneficial.
+func RunMaterializationTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
+	sourcePath string,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+	actionDescSanitizers []func(string) string,
+) {
+	ctx := context.Background()
+	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+
+	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
+		return runMaterializationTestForTask(t, ctx, newMaterializer, taskName, bundled, tsSuffix, makeResourceFn, actionDescSanitizers)
+	})
+
+	var snap strings.Builder
+	for _, name := range names {
+		snap.WriteString(fmt.Sprintf("Task: %s\n\n", name))
+		snap.WriteString(results[name])
+	}
+
+	cupaloy.SnapshotT(t, snap.String())
+}
+
 // RunApplyTest tests a variety of scenarios involving changes to materialized
 // resources, such as adding and removing fields from the field selection, and
 // changing them in various ways.
@@ -132,15 +204,15 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 	bundled := RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
 	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
-	gjson.GetBytes(bundled, "materializations").ForEach(func(key, value gjson.Result) bool {
-		cfg := decryptConfig[EC](t, bundled, key.String())
-		materializer, err := newMaterializer(ctx, key.String(), cfg, boilerplate.ParseFlags(cfg))
+	for _, taskName := range taskNames(bundled) {
+		cfg := decryptConfig[EC](t, bundled, taskName)
+		materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
 		require.NoError(t, err)
 
 		var testResourcePaths [][]string
 		t.Cleanup(func() { CleanupTestResources(t, ctx, materializer, testResourcePaths, tsSuffix) })
 
-		snap.WriteString("Task: " + key.String() + "\n\n")
+		snap.WriteString("Task: " + taskName + "\n\n")
 
 		for _, tc := range []struct {
 			tableStartsWith string
@@ -172,9 +244,72 @@ func RunApplyTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger,
 			testResourcePaths = append(testResourcePaths, resourcePath)
 			tc.do(res)
 		}
+	}
 
-		return true
+	cupaloy.SnapshotT(t, snap.String())
+}
+
+// RunApplyTestParallel is like RunApplyTest but runs tasks concurrently (up to
+// maxParallelTasks at a time). Use this for connectors where parallel task
+// execution is safe and beneficial.
+func RunApplyTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	driver boilerplate.Connector,
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
+	sourcePath string,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+) {
+	ctx := context.Background()
+	tsSuffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+
+	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
+		materializer, err := newMaterializer(ctx, taskName, cfg, boilerplate.ParseFlags(cfg))
+		require.NoError(t, err)
+
+		var testResourcePaths [][]string
+		t.Cleanup(func() { CleanupTestResources(t, ctx, materializer, testResourcePaths, tsSuffix) })
+
+		var taskSnap strings.Builder
+
+		for _, tc := range []struct {
+			tableStartsWith string
+			do              func(RC)
+		}{
+			{
+				tableStartsWith: "bigschema_",
+				do: func(res RC) {
+					runBigSchemaApplyTests(t, ctx, &taskSnap, driver, materializer, cfg, res)
+				},
+			},
+			{
+				tableStartsWith: "addandremovefields_",
+				do: func(res RC) {
+					runAddAndRemoveFieldsApplyTests(t, ctx, &taskSnap, driver, materializer, cfg, res)
+				},
+			},
+			{
+				tableStartsWith: "challengingnames_",
+				do: func(res RC) {
+					runChallengingNamesApplyTests(t, ctx, &taskSnap, driver, materializer, cfg, res)
+				},
+			},
+		} {
+			tableName := tc.tableStartsWith + uuid.NewString()[:8] + tsSuffix
+			res := makeResourceFn(tableName, false).WithDefaults(cfg)
+			resourcePath, _, err := res.Parameters()
+			require.NoError(t, err)
+			testResourcePaths = append(testResourcePaths, resourcePath)
+			tc.do(res)
+		}
+
+		return taskSnap.String()
 	})
+
+	var snap strings.Builder
+	for _, name := range names {
+		snap.WriteString("Task: " + name + "\n\n")
+		snap.WriteString(results[name])
+	}
 
 	cupaloy.SnapshotT(t, snap.String())
 }
@@ -206,13 +341,36 @@ func RunMigrationTest[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfi
 	bundled := RunFlowctl(t, "raw", "bundle", "--source", sourcePath)
 	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
 
-	gjson.GetBytes(bundled, "materializations").ForEach(func(task, _ gjson.Result) bool {
-		taskName := task.String()
+	for _, taskName := range taskNames(bundled) {
 		snap.WriteString(fmt.Sprintf("Task: %s\n\n", taskName))
 		snap.WriteString(runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, actionDescSanitizers))
+	}
 
-		return true
+	cupaloy.SnapshotT(t, snap.String())
+}
+
+// RunMigrationTestParallel is like RunMigrationTest but runs tasks concurrently
+// (up to maxParallelTasks at a time). Use this for connectors where parallel
+// task execution is safe and beneficial.
+func RunMigrationTestParallel[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, RC boilerplate.Resourcer[RC, EC], MT boilerplate.MappedTyper](
+	t *testing.T,
+	newMaterializer boilerplate.NewMaterializerFn[EC, FC, RC, MT],
+	sourcePath string,
+	makeResourceFn func(finalResourcePathPart string, deltaUpdates bool) RC,
+	actionDescSanitizers []func(string) string,
+) {
+	ctx := context.Background()
+	suffix := testItemIdentifier + fmt.Sprintf("%d", time.Now().Unix())
+
+	names, results := RunTestAllTasksParallel(t, sourcePath, func(t *testing.T, bundled []byte, taskName string, cfg EC) string {
+		return runMigrationTestForTask(t, ctx, newMaterializer, taskName, bundled, suffix, makeResourceFn, actionDescSanitizers)
 	})
+
+	var snap strings.Builder
+	for _, name := range names {
+		snap.WriteString(fmt.Sprintf("Task: %s\n\n", name))
+		snap.WriteString(results[name])
+	}
 
 	cupaloy.SnapshotT(t, snap.String())
 }
