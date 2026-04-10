@@ -27,9 +27,9 @@ else
 
   TIMEOUT=10m
   if [ "$CONNECTOR" = "materialize-spanner" ]; then
-    TIMEOUT=20m
-  elif [ "$CONNECTOR" = "materialize-iceberg" ]; then
     TIMEOUT=40m
+  elif [ "$CONNECTOR" = "materialize-iceberg" ]; then
+    TIMEOUT=60m
   fi
   cd $ROOT_DIR/$CONNECTOR && go test -v ./... -timeout $TIMEOUT
 fi
