@@ -299,6 +299,45 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 	}); err != nil {
 		return nil, nil, err
 	}
+
+	// Redshift VARBYTE columns are returned as hex-encoded strings by the
+	// driver. Checkpoint data is stored as base64(gzip(bytes)) in VARBYTE,
+	// so the driver returns hex(utf8(base64(gzip(bytes)))). Decode this chain
+	// back to base64(bytes) so that snapshots match the common format used by
+	// other SQL materializations.
+	checkpointIdx := -1
+	for i, col := range columnNames {
+		if col == "checkpoint" {
+			checkpointIdx = i
+			break
+		}
+	}
+	if checkpointIdx >= 0 {
+		for _, row := range rows {
+			s, ok := row[checkpointIdx].(string)
+			if !ok || s == "" {
+				continue
+			}
+			// Hex decode to get the UTF-8 bytes of the base64 string.
+			utf8Bytes, err := hex.DecodeString(s)
+			if err != nil {
+				continue
+			}
+			// Base64 decode to get the gzip-compressed bytes.
+			gzBytes, err := base64.StdEncoding.DecodeString(string(utf8Bytes))
+			if err != nil {
+				continue
+			}
+			// Decompress to get the original checkpoint bytes.
+			raw, err := maybeDecompressBytes(gzBytes)
+			if err != nil {
+				continue
+			}
+			// Re-encode as plain base64 for snapshot comparison.
+			row[checkpointIdx] = base64.StdEncoding.EncodeToString(raw)
+		}
+	}
+
 	return columnNames, rows, nil
 }
 
