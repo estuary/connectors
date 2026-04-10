@@ -405,8 +405,6 @@ class PriorityQueueManager:
                     timeout=1.0  # Short timeout to check stopping condition
                 )
 
-                self.work_item_manager.register_active_work(work_item)
-
                 try:
                     await self.subtask_executor.execute_work_item(work_item, task)
                 finally:
@@ -456,6 +454,7 @@ class PriorityQueueManager:
                 # Use priority as the sort key for PriorityQueue.
                 # Lower priority values = higher priority in the queue.
                 self.work_queue.put_nowait((work_item.priority, work_item))
+                self.work_item_manager.register_active_work(work_item)
                 work_items_queued += 1
             except asyncio.QueueFull:
                 # Work items should be processed quickly enough to avoid filling the queue.
