@@ -1,8 +1,10 @@
 # Materializations
 
-Materialization connectors write Flow collections into a destination system, e.g. a database, warehouse, file storage, messaging queue, etc.
+Materialization [connectors](https://docs.estuary.dev/concepts/connectors/) write Flow [collections](https://docs.estuary.dev/concepts/collections/) into a destination system, e.g. a database, warehouse, file storage, messaging queue, etc. Materializations are processed as cooperative transactions between the Estuary Runtime and a connector Driver, over a long-lived RPC through which the Runtime and Driver exchange messages.
 
-This document's aim is to explain in as much detail as possible the materialization protocol (i.e. how does Flow runtime interact with a materialization connector), and explain the various constraints and considerations necessary when implementing a connector.
+This RPC workflow maintains a materialized view of an Estuary collection in an external system. It has distinct acknowledge, load, and store phases. Estuary's runtime and driver cooperatively maintain a fully-reduced view of each document by loading current states from the store, reducing in a number of updates, and then storing updated documents and checkpoints.
+
+This document's aim is to explain in as much detail as possible the materialization protocol i.e. how does Flow runtime (this an overarching term for all the components and pieces that drive Flow pipelines, including the data plane) interact with a materialization connector, and explain the various constraints and considerations necessary when implementing a connector.
 
 The actual protocol is defined as protobuf messages [here](https://github.com/estuary/flow/blob/master/go/protocols/materialize/materialize.proto). Here we will reference some of those message types (in this doc these message types are denoted with a `Request.` or `Response.` prefix) and will explain their role. This document also references the [materialize-boilerplate](./materialize-boilerplate) implementation to create a real connection between the raw protocol and the actual boilerplate library we use to develop materializations.
 
@@ -42,9 +44,11 @@ The actual protocol is defined as protobuf messages [here](https://github.com/es
 }
 ```
 
-Note that here, `configSchema` is the main configuration that is provided to the connector in order to set up the connection, etc., while `resourceConfigSchema` describes the configuration of each _resource_ in the destination, this is usually a table, a folder, a messaging queue topic, etc.
+Note that here, `configSchema` is the JSONSchema describing the main configuration that is provided to the connector in order to set up the connection, etc., while `resourceConfigSchema` describes the configuration of each _resource_ in the destination, this is usually a table, a folder, a messaging queue topic, etc. The actual JSON values containing the config and  resource configurations are provided as part of subsequent messages exchanged between runtime and connector (e.g. see `Request.Open.materialization.config`).
 
 This message is handled by the `materialize-boilerplate`'s `Materializer.RunSpec` function call, while in `materialize-sql` it is handled separately by `Driver.Spec`.
+
+A fresh instance of a connector is run in a new container to run `Request.Spec`.
 
 For actual specifications of various connectors, look for `TestSpec` or `TestSpecification` files among their snapshots, e.g.:
 
@@ -60,10 +64,9 @@ Resource schema rendered in the UI:
 
 [UI rendering of resource config](spec-resource.png)
 
-
 # Request.Validate
 
-After the connector has been configured by knowing what inputs it takes, and having the user provide those configurations, the control plane and the runtime validate the new configuration, and the configured resources (e.g. tables, topics) that the user would like to materialize in their destination.
+After the connector has been configured by knowing what inputs it takes, and having the user provide those configurations, the control plane and the runtime validate the new configuration (the control plane asks the runtime to run a connector container and send the relevant validate RPC and return its results back to the control plane), and the configured resources (e.g. tables, topics) that the user would like to materialize in their destination.
 
 Here `Request.Validate` contains the JSON `config` (following `Response.Spec.configSchema`), along with a list of `bindings` (whose field `resourceConfig` follows `Response.Spec.resourceConfigSchema`).
 Each binding is essentially a Flow collection _bound_ to a materialized resource, so for example, if I want to materialize my flow collection `my-lovely-collection`, there is going to be a binding that binds this collection to a table `lovely_table` in postgres.
@@ -104,6 +107,8 @@ The connector should also validate that each of the bindings can be materialized
 
 This is handled by `materialize-boilerplate`'s `Constrainter` and `Validator` interfaces, and `materialize-sql` implements `Constrainter` and `Validator`s on behalf of sql connectors.
 
+A fresh instance of a connector is run in a new container to run `Request.Validate`.
+
 # Request.Apply
 
 After the configuration and bindings have been validated, the runtime then asks the connector to `Request.Apply` the configurations to the destination.
@@ -112,9 +117,11 @@ In most cases the materialization connector creates the necessary destination re
 
 As part of `Request.Apply`, the connector is also given the connector state, and as part of `Response.Applied`, the connector can respond with a connector state update. This is useful for "post-commit apply" materializations (more on this below).
 
+A fresh instance of a connector is run in a new container to run `Request.Apply`.
+
 # Request.Open
 
-With the destination set up and prepared by `Request.Apply`, then the actual materialization of data can begin. To begin this process, the runtime starts an instance of the  connector, and sends it an `Request.Open` first, providing information about the bindings and the connector state to the connector, as well as the key range to be covered by this materialization instance.
+With the destination set up and prepared by `Request.Apply`, then the actual materialization of data can begin. To begin this process, the runtime starts an instance of the connector in a new container, and sends it an `Request.Open` first, providing information about the bindings and the connector state to the connector, as well as the key range to be covered by this materialization instance.
 
 The key range provided in `Request.Open.range.key_begin` and `Request.Open.range.key_end` let the connector know that it is being provided part (or all) of the key range for collections that it is materializing. The reason for this is that the runtime can distribute work among multiple instances of the connector, so for example two materialize-postgres instances may be spawned with key ranges `[00000000, 80000000)` and `[80000000, FFFFFFFF]`. The connectors do not need to _filter_ the incoming documents, they are already distributed by the runtime correctly, however it is important for the connector to know which key range it is processing, in order to avoid stomping over another instance's foot. An example is this:
 
@@ -122,17 +129,65 @@ A connector creates staging tables where the data is loaded into before being co
 
 Once the materialization has been "Opened", the connector stays running and it receives the following messages from the runtime in a loop:
 
+## Sequence Diagram
+
+Below is a sequence diagram depicting the various messages exchanged between a materialization connector and the runtime starting with `Request.Open`. As a convention and to reduce ambiguity, message types from the Runtime are
+named in an imperative fashion (`Load`), while responses from the driver always
+have a past-tense name (`Loaded`):
+
+<Mermaid chart={`
+  sequenceDiagram
+    Runtime->>Driver: Open{MaterializationSpec, driverCP}
+    Note right of Driver: Connect to endpoint.<br/>Optionally fetch last-committed<br/>runtime checkpoint.
+    Driver->>Runtime: Opened{runtimeCP}
+    Note over Runtime, Driver: One-time initialization ☝️.<br/> 👇 Repeats for each transaction.
+    Note left of Runtime: Prior txn commits<br/>to recovery log.
+    Note right of Driver: Prior txn commits to DB<br/>(where applicable).
+    Runtime->>Driver: Acknowledge
+    Note right of Runtime: Acknowledged MAY be sent<br/>before Acknowledge.
+    Note right of Driver: MAY perform an idempotent<br/>apply of last txn.
+    Note left of Runtime: Runtime does NOT await<br/>Acknowledged before<br/>proceeding to send Load.
+    Driver->>Runtime: Acknowledged
+    Note left of Runtime: Runtime may now finalize<br/>a pipelined transaction.
+    Note over Runtime, Driver: End of Acknowledge phase.
+    Runtime->>Driver: Load<A>
+    Note left of Runtime: Load keys may<br/> not exist (yet).
+    Runtime->>Driver: Load<B>
+    Note right of Driver: MAY evaluate Load immediately,<br/>or stage for deferred retrieval.
+    Driver->>Runtime: Loaded<A>
+    Runtime->>Driver: Load<C>
+    Runtime->>Driver: Flush
+    Driver->>Runtime: Loaded<C>
+    Note right of Driver: Omits Loaded for keys<br/>that don't exist.
+    Driver->>Runtime: Flushed
+    Note left of Runtime: All existing keys<br/>have been retrieved.
+    Note over Runtime, Driver: End of Load phase.
+    Runtime->>Driver: Store<X>
+    Runtime->>Driver: Store<Y>
+    Runtime->>Driver: Store<Z>
+    Runtime->>Driver: StartCommit{runtimeCP}
+    Note right of Driver: * Completes all Store processing.<br/>* MAY include runtimeCP in DB txn.
+    Note right of Driver: Commit to DB<br/>now underway.
+    Driver->>Runtime: StartedCommit{driverCP}
+    Note left of Runtime: Begins commit to<br/> recovery log.
+    Note over Runtime, Driver: End of Store phase. Loops around<br/>to Acknowledge <=> Acknowledged.
+`}/>
+
+
+Therefore the full cycle is: `Request.Open` -> `Request.Acknowledge` -> `Request.Flush` -> `Request.Store` -> `Request.StartCommit` -> (loop back) `Request.Acknowledge`
+
+
 ## Request.Load
 
-Flow wants to apply [reductions](https://docs.estuary.dev/reference/reduction-strategies/) on top of existing documents, as well as gather information on whether certain keys already exist in the destination or not. In order to achieve this, it sends `Request.Load` messages which point to a binding index as well as the key of the document. The connector then must look for this document in the destination and return the full document as part of `Response.Loaded`. This process gathers information that is later provided back to the connector during `Request.Store`, explained below.
+Flow wants to apply [reductions](https://docs.estuary.dev/reference/reduction-strategies/) on top of existing documents, as well as gather information on whether certain keys already exist in the destination or not. In order to achieve this, it sends `Request.Load` messages which point to a binding index as well as the key of the document. The connector then must look for this document in the destination and return the full document as part of `Response.Loaded`. This process gathers information that is later provided back to the connector during `Request.Store`, explained below. One `Request.Load` is sent per document, expecting one `Response.Loaded` per document if the document is found (and if the document is not found, no `Response.Loaded` for that document should be emitted).
 
 ## Request.Flush
 
 Once all load requests are sent, the runtime sends `Request.Flush`.
 Once the connector receives `Request.Flush` *and* has sent all `Request.Loaded` documents, it sends `Request.Flushed` with a connector state.
-The use case for this message is quite niche, but explained below.
+The use case for this message is quite niche, but explained below as a hypothetical use case:
 
-Consider a store like materialize-elastic. Elastic is a document DB suited for point lookup and point update. It doesn’t provide a meaningful bulk query API for reads or write (its "batch" operations don’t scale to the degree we’d need), so the basic strategy is to stream out Load’d documents, and stream in Store’d documents. We throw our hands up and say "this connector is at-least-once".
+Consider a store like materialize-elastic. Elastic is a document DB suited for point lookup and point update. It doesn’t provide a meaningful bulk query API for reads or write (its "batch" operations don’t scale to the degree we’d need), so the basic strategy is to stream out Load’d documents, and stream in Store’d documents. We throw our hands up and say "this connector is at-least-once" (in an at-least-once connector, a transaction may fail part-way through and be restarted, causing its effects to be partially or fully replayed/re-applied).
 
 However, suppose you add in external stable storage, like an S3 bucket. Then the connector could:
 
@@ -176,7 +231,7 @@ These three messages are highly related, and depending on the various patterns f
 Before diving into the patterns, one general constraint that is largely what dictates the patterns must be explained: transactionality. Flow sends documents to materializations as part of a transaction, which must either all be committed, or none at all.
 
 Flow transactions can be thought of like so:
-1. Flow reads the recovery log for a materialization task to know which documents are pending to be materialized (where did the materialization leave off last time? continue from there)
+1. Flow reads the [Recovery Log](https://gazette.readthedocs.io/en/latest/consumers-concepts.html#recovery-logs) for a materialization task to know which documents are pending to be materialized (where did the materialization leave off last time? continue from there)
 2. A transaction starts with a set of documents sent to the connector
 3. These documents must then be _committed_ to the destination, meaning all these documents are persisted and updated in the destination
 4. The Flow Recovery Log persists a checkpoint, marking the end of the transaction, asserting that all the documents sent in this transaction were committed. This checkpoint includes the connector state (a JSON object emitted by the connector for the connector's bookkeeping)
