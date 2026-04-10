@@ -16,14 +16,14 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTest(t, newMaterialization, "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		boilerplate.RunMaterializationTestParallel(t, newMaterialization, "testdata/materialize.flow.yaml", makeResourceFn, nil)
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTest(t, &Driver{}, newMaterialization, "testdata/apply.flow.yaml", makeResourceFn)
+		boilerplate.RunApplyTestParallel(t, &Driver{}, newMaterialization, "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		boilerplate.RunMigrationTest(t, newMaterialization, "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		boilerplate.RunMigrationTestParallel(t, newMaterialization, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	})
 }
