@@ -1,0 +1,14 @@
+credentials:
+    credentials_title: Private App Credentials
+    access_token_sops: ENC[AES256_GCM,data:ZkesZ9lRtjF1t8pqbDS77qtZdMAqYwQpaj440sWV5NeOUks3IW3Qg48umz+hU9IhlPmK7knYRhd+6Bk7eY1l3PnWuPIQkpYcBHnWT6G+UJYdtp8dWz/P3JnvMZt0q08EWri23OxulMtkaVk9K+9cHHqbJvKCiCP+6gU36Jf+T+D03khTCrUhBbwGxubK3+Yx+qlt6EjKQ+IJ8umTM9O93Ppgk3bRVN3dDqbF+W68YfMxLWefktWiaptIfGNWBVAjfDx7f4ngddxEjdzT6yuiECmbiVWXJuU6nTyeVplxU5/sbGeneoWBuywi178e0INS6pt0CIhojAdCuvNad1Ye3St8enDeZq5Yu4VvIdqsIY4WRgA0GmimxFRtl5XzScbgvfbvAok91BC98l75MMQFOdWw6wLWZyf+VrzWSN9mqQbrjB9fg0p0AUNL6FZsZEDuyw3WpzJxARbDSYsYzI4mnosI7Czb/Ep45ou/rXrzjoJpiZwU1O6C5gQNGlXYBe6TafSOudmUtJ8c2CpQB/vYHYDWglslWueSfvQbtQivRPC7Pl/KhWMJ07KMJzsdzAgipjbTNcyjAoZTdRjwQal56LRSGp/swtLIBnlWo651nHhcDRlebMqf2/1/OLdIvJG8eCl8bPirKZyloO/nVNVkZ1tBiA81V+IQbawfvImsRZwUJINWFR1ussoSNg2z321j/R8=,iv:i8/dwVUNry5gCKe8SjaMi32NBJrmdzyy+9YeASg6HR4=,tag:dY9vL48vlumDS3r8VD28fA==,type:str]
+app_ids_sops: ENC[AES256_GCM,data:gmndTfAWMX2ghKjDBUtrqQ==,iv:lf2W1vINpzcgfbF7vrdaH7GWaeTK/rDtFLxNBldN+kk=,tag:QsLi+uHB+tVfJElt3TaMkg==,type:str]
+start_date: "2026-04-05T00:00:00Z"
+sops:
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2024-07-26T15:53:37Z"
+          enc: CiQAdmEdwpmP0/Kcv6L1SnM3nPbsYLywIaUeOL1mz7cZjFUwWt0SSQD5lVw43Of1YI96anxUVo7d7ALi0DYnCNvxTHCgHX5ZeDBPlfXwLNpmYb6y3hJSsHG7NupwDQT/qIpUvlqQnq5IVkgJEFHPU1s=
+    lastmodified: "2026-04-17T22:00:16Z"
+    mac: ENC[AES256_GCM,data:oUXiCPbmL84tL3+6Mz8rkI8tBVHlhUhEU4wI6QozsOJyKlrn+36p03S3Ykz617ocInPLMuAwR1ZMEUm5gOnU6+Grm39u9wC6SE+0GQhguV6lZ//wxr9U94yG9W43AgggnnQW6VUVpRvkkU0/zCQh+4C2NDGrUyqEL/0/OeBR+qY=,iv:Q/+saVbRXu2dwv+V05S9GTS8rwtM7oK3hZj2S9Y+IGI=,tag:xBx+hy788mOe27EwR94b8w==,type:str]
+    encrypted_suffix: _sops
+    version: 3.10.2
