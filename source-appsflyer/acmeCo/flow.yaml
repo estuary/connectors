@@ -1,0 +1,65 @@
+collections:
+  acmeCo/daily_geo_aggregate_report:
+    schema: daily_geo_aggregate_report.schema.yaml
+    key:
+    - /_meta/app_id
+    - /Date
+    - /Country
+    - /Media Source (pid)
+    - /Campaign (c)
+  acmeCo/in-app-event:
+    schema: in-app-event.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/install:
+    schema: install.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/install-in-app-event:
+    schema: install-in-app-event.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/organic-install:
+    schema: organic-install.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/organic-install-in-app-event:
+    schema: organic-install-in-app-event.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/organic-reinstall:
+    schema: organic-reinstall.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/postback:
+    schema: postback.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/postbacks-copy:
+    schema: postbacks-copy.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/re-attribution:
+    schema: re-attribution.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/re-attribution-in-app-event:
+    schema: re-attribution-in-app-event.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/re-download:
+    schema: re-download.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/re-engagement:
+    schema: re-engagement.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/re-engagement-in-app-event:
+    schema: re-engagement-in-app-event.schema.yaml
+    key:
+    - /_meta/estuary_id
+  acmeCo/reinstall:
+    schema: reinstall.schema.yaml
+    key:
+    - /_meta/estuary_id

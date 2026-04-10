@@ -1,0 +1,90 @@
+$defs:
+  JsonValue: {}
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+      webhookId:
+        title: Webhookid
+        type: string
+      receivedAt:
+        title: Receivedat
+        type: string
+      headers:
+        additionalProperties:
+          $ref: '#/$defs/JsonValue'
+        title: Headers
+        type: object
+      reqPath:
+        title: Reqpath
+        type: string
+      pathParams:
+        anyOf:
+        - additionalProperties:
+            type: string
+          type: object
+        - type: 'null'
+        default: null
+        title: Pathparams
+      queryParams:
+        anyOf:
+        - additionalProperties:
+            type: string
+          type: object
+        - type: 'null'
+        default: null
+        title: Queryparams
+      estuary_id:
+        default: ''
+        description: The surrogate key generated from characteristic fields
+        title: Estuary Id
+        type: string
+    required:
+    - headers
+    - reqPath
+    title: Meta
+    type: object
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  app_id:
+    title: App Id
+    type: string
+  appsflyer_id:
+    title: Appsflyer Id
+    type: string
+  event_name:
+    title: Event Name
+    type: string
+  event_time:
+    title: Event Time
+    type: string
+  event_value:
+    title: Event Value
+    type: string
+  api_version:
+    title: Api Version
+    type: string
+required:
+- app_id
+- appsflyer_id
+- event_name
+- event_time
+- event_value
+- api_version
+title: AppsFlyerWebhookDocument
+type: object
+x-infer-schema: true

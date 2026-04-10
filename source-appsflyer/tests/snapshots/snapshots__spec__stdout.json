@@ -1,0 +1,258 @@
+[
+  {
+    "protocol": 3032023,
+    "configSchema": {
+      "$defs": {
+        "AccessToken": {
+          "properties": {
+            "credentials_title": {
+              "const": "Private App Credentials",
+              "default": "Private App Credentials",
+              "title": "Credentials Title",
+              "type": "string"
+            },
+            "access_token": {
+              "secret": true,
+              "title": "Access Token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "access_token"
+          ],
+          "title": "AccessToken",
+          "type": "object"
+        },
+        "Advanced": {
+          "properties": {
+            "window_size": {
+              "default": "P7D",
+              "description": "Window size for incremental streams in ISO 8601 format. ex: P30D means 30 days, PT6H means 6 hours.",
+              "format": "duration",
+              "title": "Window Size",
+              "type": "string"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "app_ids": {
+          "description": "Comma-delimited list of AppsFlyer App IDs. Provide the unified app ID, which may include a platform specific prefix (ex: com.example.app, roku-4321, id121244). See https://dev.appsflyer.com/hc/reference/raw_data_pull_api_tokenv2-overview#path-parameters for more details.",
+          "order": 0,
+          "title": "App IDs",
+          "type": "string"
+        },
+        "start_date": {
+          "description": "Start date for historical data replication (UTC)",
+          "format": "date-time",
+          "order": 1,
+          "title": "Start Date",
+          "type": "string"
+        },
+        "credentials": {
+          "$ref": "#/$defs/AccessToken",
+          "discriminator": "credentials_title",
+          "order": 2,
+          "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "order": 3,
+          "title": "Advanced Config"
+        }
+      },
+      "required": [
+        "app_ids",
+        "start_date",
+        "credentials"
+      ],
+      "title": "EndpointConfig",
+      "type": "object"
+    },
+    "resourceConfigSchema": {
+      "$defs": {
+        "BodyMatch": {
+          "properties": {
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "key": {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*(\\.[A-Za-z_][A-Za-z0-9_]*)*$",
+              "title": "Key",
+              "type": "string"
+            },
+            "type": {
+              "const": "body",
+              "default": "body",
+              "title": "Type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "value",
+            "key"
+          ],
+          "title": "BodyMatch",
+          "type": "object"
+        },
+        "HeaderMatch": {
+          "properties": {
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "key": {
+              "title": "Key",
+              "type": "string"
+            },
+            "type": {
+              "const": "header",
+              "default": "header",
+              "title": "Type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "value",
+            "key"
+          ],
+          "title": "HeaderMatch",
+          "type": "object"
+        },
+        "PullApiResourceConfig": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Meta"
+            },
+            "name": {
+              "description": "Name of this resource",
+              "title": "Name",
+              "type": "string"
+            },
+            "interval": {
+              "default": "PT0S",
+              "description": "Interval between updates for this resource",
+              "format": "duration",
+              "title": "Interval",
+              "type": "string"
+            },
+            "type": {
+              "const": "pull",
+              "title": "Type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "type"
+          ],
+          "title": "PullApiResourceConfig",
+          "type": "object"
+        },
+        "UrlMatch": {
+          "properties": {
+            "value": {
+              "title": "Value",
+              "type": "string"
+            },
+            "type": {
+              "const": "url",
+              "default": "url",
+              "title": "Type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "value"
+          ],
+          "title": "UrlMatch",
+          "type": "object"
+        },
+        "WebhookResourceConfig": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Meta"
+            },
+            "type": {
+              "const": "webhook",
+              "title": "Type",
+              "type": "string"
+            },
+            "name": {
+              "description": "Name of this resource",
+              "title": "Name",
+              "type": "string"
+            },
+            "match_rule": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/UrlMatch"
+                },
+                {
+                  "$ref": "#/$defs/HeaderMatch"
+                },
+                {
+                  "$ref": "#/$defs/BodyMatch"
+                }
+              ],
+              "description": "Matching spec for routing incoming webhooks to this collection",
+              "title": "Match Rule"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "title": "WebhookResourceConfig",
+          "type": "object"
+        }
+      },
+      "discriminator": {
+        "mapping": {
+          "pull": "#/$defs/PullApiResourceConfig",
+          "webhook": "#/$defs/WebhookResourceConfig"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/PullApiResourceConfig"
+        },
+        {
+          "$ref": "#/$defs/WebhookResourceConfig"
+        }
+      ]
+    },
+    "documentationUrl": "https://go.estuary.dev/source-appsflyer",
+    "resourcePathPointers": [
+      "/name"
+    ]
+  }
+]
