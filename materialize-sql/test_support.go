@@ -429,5 +429,8 @@ func DumpTestTable(t *testing.T, db *stdsql.DB, qualifiedTableName string) (stri
 			b.WriteString(val.String())
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
 	return b.String(), nil
 }
