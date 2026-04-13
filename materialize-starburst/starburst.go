@@ -329,6 +329,9 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 				return err
 			}
 		}
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("iterating Load documents: %w", err)
+		}
 
 		if err := rows.Close(); err != nil {
 			return fmt.Errorf("closing rows: %w", err)

@@ -325,6 +325,9 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 			log.WithField("name", name).Warn("unexpected secret selected")
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating selected secrets: %w", err)
+	}
 
 	return db, err
 }

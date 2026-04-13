@@ -122,6 +122,9 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 		}
 		out = append(out, schema)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating rows: %w", err)
+	}
 
 	return out, nil
 }

@@ -45,6 +45,9 @@ func getCollation(ctx context.Context, db *stdsql.DB) (string, error) {
 
 		collations = append(collations, c)
 	}
+	if err := rows.Err(); err != nil {
+		return "", fmt.Errorf("iterating collations: %w", err)
+	}
 
 	sortCollations(collations)
 

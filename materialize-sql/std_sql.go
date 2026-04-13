@@ -223,6 +223,9 @@ func StdDumpTable(ctx context.Context, db *sql.DB, table Table) (string, error) 
 			b.WriteString(val.String())
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return "", err
+	}
 	return b.String(), nil
 }
 
@@ -438,6 +441,9 @@ func StdListSchemas(ctx context.Context, db *sql.DB) ([]string, error) {
 			return nil, fmt.Errorf("scanning row: %w", err)
 		}
 		out = append(out, schema)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating rows: %w", err)
 	}
 
 	return out, nil
