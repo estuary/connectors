@@ -46,6 +46,22 @@ ORDER BY (theKey)
 ;
 --- End `delta_updates-@你好-``-"especiál` createTargetTable ---
 
+--- Begin `key_value-@你好-``-"especiál` queryStoreTablesAllRangeKeys ---
+
+SELECT name FROM system.tables
+WHERE database = currentDatabase()
+  AND name LIKE 'flow_temp_store_%_key_value-@你好-`-"especiál'
+  AND match(name, '^flow_temp_store_[0-9a-f]+_key_value-@你好-`-"especiál$')
+--- End `key_value-@你好-``-"especiál` queryStoreTablesAllRangeKeys ---
+
+--- Begin `delta_updates-@你好-``-"especiál` queryStoreTablesAllRangeKeys ---
+
+SELECT name FROM system.tables
+WHERE database = currentDatabase()
+  AND name LIKE 'flow_temp_store_%_delta_updates-@你好-`-"especiál'
+  AND match(name, '^flow_temp_store_[0-9a-f]+_delta_updates-@你好-`-"especiál$')
+--- End `delta_updates-@你好-``-"especiál` queryStoreTablesAllRangeKeys ---
+
 --- Begin alter table add columns and drop not nulls ---
 
 ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN IF NOT EXISTS first_new_column Nullable(STRING);

@@ -41,6 +41,7 @@ func TestSQLGeneration(t *testing.T) {
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
 				testTemplates.createTargetTable,
+				testTemplates.queryStoreTablesAllRangeKeys,
 			},
 			TplAddColumns:    testTemplates.alterTargetColumns,
 			TplDropNotNulls:  testTemplates.alterTargetColumns,
@@ -131,6 +132,7 @@ func TestSQLGenerationQuotedTableNames(t *testing.T) {
 		sql.TestTemplates{
 			TableTemplates: []*template.Template{
 				testTemplates.createTargetTable,
+				testTemplates.queryStoreTablesAllRangeKeys,
 			},
 			TplAddColumns:    testTemplates.alterTargetColumns,
 			TplDropNotNulls:  testTemplates.alterTargetColumns,

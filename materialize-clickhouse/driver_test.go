@@ -365,6 +365,53 @@ func TestTruncateTable(t *testing.T) {
 	require.Equal(t, 0, count)
 }
 
+func TestDeleteTableDropsStoreTable(t *testing.T) {
+	var cfg = testConfig()
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: dialect}
+	var tableName = "test_delete_store"
+	var storeTableName = "flow_temp_store_0_" + tableName
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+
+	// Create target and store tables.
+	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(storeTableName)))
+	_, err := db.ExecContext(ctx, fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s (id String, flow_published_at DateTime64(6, 'UTC')) ENGINE = ReplacingMergeTree(flow_published_at) ORDER BY (id)",
+		dialect.Identifier(tableName),
+	))
+	require.NoError(t, err)
+	_, err = db.ExecContext(ctx, fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s AS %s",
+		dialect.Identifier(storeTableName), dialect.Identifier(tableName),
+	))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(storeTableName)))
+	})
+
+	c, err := newClient(ctx, "test", ep)
+	require.NoError(t, err)
+	defer c.Close()
+
+	desc, applyFn, err := c.DeleteTable(ctx, []string{tableName})
+	require.NoError(t, err)
+	require.Contains(t, desc, storeTableName)
+	require.NoError(t, applyFn(ctx))
+
+	// Both target and store tables should be gone.
+	var count int
+	require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf(
+		"SELECT count() FROM system.tables WHERE database = currentDatabase() AND name IN ('%s', '%s')",
+		tableName, storeTableName,
+	)).Scan(&count))
+	require.Equal(t, 0, count, "both tables should be dropped")
+}
+
 func TestOpenNativeConn(t *testing.T) {
 	var cfg = testConfig()
 	conn, err := clickhouse.Open(cfg.newClickhouseOptions())
@@ -1283,4 +1330,158 @@ func TestNoFlowDocumentNullValues(t *testing.T) {
 	// Non-nullable columns are still present.
 	require.JSONEq(t, `{"op":"c"}`, string(parsed["_meta"]))
 	require.Equal(t, `"1"`, string(parsed["score"]))
+}
+
+// TestAlterTableUpdatesStoreTable verifies that AlterTable applies schema
+// changes to both the target table and any existing store table.
+func TestAlterTableUpdatesStoreTable(t *testing.T) {
+	var cfg = testConfig()
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tableName = "test_alter_store"
+	var storeTableName = "flow_temp_store_0_" + tableName
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+
+	// Helper to check if a column exists on a table and return its type.
+	columnType := func(table, col string) (string, bool) {
+		var colType string
+		err := db.QueryRowContext(ctx, fmt.Sprintf(
+			"SELECT type FROM system.columns WHERE database = '%s' AND table = '%s' AND name = '%s'",
+			cfg.Database, table, col,
+		)).Scan(&colType)
+		if err != nil {
+			return "", false
+		}
+		return colType, true
+	}
+
+	setup := func(t *testing.T) {
+		t.Helper()
+		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+		_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(storeTableName)))
+
+		// Create target with a non-nullable required_val column.
+		_, err := db.ExecContext(ctx, fmt.Sprintf(
+			"CREATE TABLE IF NOT EXISTS %s (id String, required_val String, flow_published_at DateTime64(6, 'UTC')) ENGINE = ReplacingMergeTree(flow_published_at) ORDER BY (id)",
+			dialect.Identifier(tableName),
+		))
+		require.NoError(t, err)
+
+		// Clone into store table.
+		_, err = db.ExecContext(ctx, fmt.Sprintf(
+			"CREATE TABLE IF NOT EXISTS %s AS %s",
+			dialect.Identifier(storeTableName), dialect.Identifier(tableName),
+		))
+		require.NoError(t, err)
+
+		t.Cleanup(func() {
+			_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+			_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(storeTableName)))
+		})
+	}
+
+	var table = buildTestTable(t, dialect, tableName)
+	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: dialect}
+
+	t.Run("add columns", func(t *testing.T) {
+		setup(t)
+		c, err := newClient(ctx, "test", ep)
+		require.NoError(t, err)
+		defer c.Close()
+
+		desc, applyFn, err := c.AlterTable(ctx, sql.TableAlter{
+			Table: table,
+			AddColumns: []sql.Column{
+				{Identifier: "new_col", MappedType: sql.MappedType{NullableDDL: "String"}},
+			},
+		})
+		require.NoError(t, err)
+		require.Contains(t, desc, storeTableName)
+		require.NoError(t, applyFn(ctx))
+
+		// Column must exist on both target and store table.
+		_, ok := columnType(tableName, "new_col")
+		require.True(t, ok, "new_col should exist on target")
+		_, ok = columnType(storeTableName, "new_col")
+		require.True(t, ok, "new_col should exist on store table")
+	})
+
+	t.Run("drop not nulls", func(t *testing.T) {
+		setup(t)
+		c, err := newClient(ctx, "test", ep)
+		require.NoError(t, err)
+		defer c.Close()
+
+		// Verify required_val starts as non-nullable.
+		typ, ok := columnType(storeTableName, "required_val")
+		require.True(t, ok)
+		require.Equal(t, "String", typ, "should start non-nullable")
+
+		desc, applyFn, err := c.AlterTable(ctx, sql.TableAlter{
+			Table: table,
+			DropNotNulls: []boilerplate.ExistingField{
+				{Name: "required_val", Type: "String"},
+			},
+		})
+		require.NoError(t, err)
+		require.Contains(t, desc, storeTableName)
+		require.NoError(t, applyFn(ctx))
+
+		// Column must be nullable on both.
+		typ, ok = columnType(tableName, "required_val")
+		require.True(t, ok)
+		require.Equal(t, "Nullable(String)", typ, "target should be nullable")
+		typ, ok = columnType(storeTableName, "required_val")
+		require.True(t, ok)
+		require.Equal(t, "Nullable(String)", typ, "store table should be nullable")
+	})
+}
+
+// TestAlterTableNoStoreTable verifies that AlterTable works correctly when no
+// store table exists (the common case outside of active transactions).
+func TestAlterTableNoStoreTable(t *testing.T) {
+	var cfg = testConfig()
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tableName = "test_alter_no_store"
+
+	db := clickhouse.OpenDB(cfg.newClickhouseOptions())
+	defer db.Close()
+
+	_, _ = db.ExecContext(ctx, fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+	_, err := db.ExecContext(ctx, fmt.Sprintf(
+		"CREATE TABLE IF NOT EXISTS %s (id String, flow_published_at DateTime64(6, 'UTC')) ENGINE = ReplacingMergeTree(flow_published_at) ORDER BY (id)",
+		dialect.Identifier(tableName),
+	))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_, _ = db.ExecContext(context.Background(), fmt.Sprintf("DROP TABLE IF EXISTS %s", dialect.Identifier(tableName)))
+	})
+
+	var table = buildTestTable(t, dialect, tableName)
+	var ep = &sql.Endpoint[config]{Config: cfg, Dialect: dialect}
+	c, err := newClient(ctx, "test", ep)
+	require.NoError(t, err)
+	defer c.Close()
+
+	var ta = sql.TableAlter{
+		Table: table,
+		AddColumns: []sql.Column{
+			{Identifier: "new_col", MappedType: sql.MappedType{NullableDDL: "String"}},
+		},
+	}
+	desc, applyFn, err := c.AlterTable(ctx, ta)
+	require.NoError(t, err)
+	require.NotContains(t, desc, "flow_temp_store")
+	require.NoError(t, applyFn(ctx))
+
+	// Verify the new column exists on the target.
+	var count int
+	require.NoError(t, db.QueryRowContext(ctx, fmt.Sprintf(
+		"SELECT count() FROM system.columns WHERE database = '%s' AND table = '%s' AND name = 'new_col'",
+		cfg.Database, tableName,
+	)).Scan(&count))
+	require.Equal(t, 1, count)
 }

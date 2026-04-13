@@ -120,45 +120,80 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	return nil
 }
 
-func (c *client) DeleteTable(_ context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
-	var stmt = fmt.Sprintf("DROP TABLE IF EXISTS %s;", c.ep.Dialect.Identifier(path...))
-	return stmt, func(ctx context.Context) error {
-		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
-			return fmt.Errorf("executing delete table: %w", err)
+func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
+	storeNames, err := c.findStoreTableNames(ctx, path)
+	if err != nil {
+		return "", nil, err
+	}
+
+	var stmts []string
+	for _, name := range storeNames {
+		stmts = append(stmts, fmt.Sprintf("DROP TABLE IF EXISTS %s;", c.ep.Dialect.Identifier(name)))
+	}
+	stmts = append(stmts, fmt.Sprintf("DROP TABLE IF EXISTS %s;", c.ep.Dialect.Identifier(path...)))
+
+	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
+		for _, stmt := range stmts {
+			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("executing %q: %w", stmt, err)
+			}
 		}
 		return nil
 	}, nil
 }
 
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
+	var tpls = renderTemplates(c.ep.Dialect, c.ep.Config.HardDelete)
+
+	storeNames, err := c.findStoreTableNames(ctx, ta.Table.Path)
+	if err != nil {
+		return "", nil, err
+	}
+
+	var tables = []sql.Table{ta.Table}
+	for _, storeName := range storeNames {
+		var storeTable = ta.Table
+		storeTable.Identifier = c.ep.Dialect.Identifier(storeName)
+		storeTable.Path = sql.TablePath{storeName}
+		storeTable.InfoLocation = c.ep.Dialect.TableLocator(storeTable.Path)
+		tables = append(tables, storeTable)
+	}
+
 	var stmts []string
 
 	if len(ta.AddColumns) > 0 || len(ta.DropNotNulls) > 0 {
-		var alterStmtBuilder strings.Builder
-		if err := renderTemplates(c.ep.Dialect, c.ep.Config.HardDelete).alterTargetColumns.Execute(&alterStmtBuilder, ta); err != nil {
-			return "", nil, fmt.Errorf("rendering alter table statement: %w", err)
-		}
-		var alterStmt = alterStmtBuilder.String()
-		// The template generates separate ALTER statements per column.
-		for _, s := range strings.Split(alterStmt, ";") {
-			s = strings.TrimSpace(s)
-			if s != "" {
-				stmts = append(stmts, s+";")
+		for _, table := range tables {
+			var b strings.Builder
+			if err = tpls.alterTargetColumns.Execute(&b, sql.TableAlter{
+				Table:        table,
+				AddColumns:   ta.AddColumns,
+				DropNotNulls: ta.DropNotNulls,
+			}); err != nil {
+				return "", nil, fmt.Errorf("rendering alter table statement for %s: %w", table.Identifier, err)
+			}
+			// The template generates separate ALTER statements per column.
+			for _, s := range strings.Split(b.String(), ";") {
+				s = strings.TrimSpace(s)
+				if s != "" {
+					stmts = append(stmts, s+";")
+				}
 			}
 		}
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		var steps, err = sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges)
-		if err != nil {
-			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
+		for _, table := range tables {
+			var steps, err = sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, table, ta.ColumnTypeChanges)
+			if err != nil {
+				return "", nil, fmt.Errorf("rendering column migration steps for %s: %w", table.Identifier, err)
+			}
+			stmts = append(stmts, steps...)
 		}
-		stmts = append(stmts, steps...)
 	}
 
 	return strings.Join(stmts, "\n"), func(ctx context.Context) error {
 		for _, stmt := range stmts {
-			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+			if _, err = c.db.ExecContext(ctx, stmt); err != nil {
 				return fmt.Errorf("executing %q: %w", stmt, err)
 			}
 		}
@@ -174,6 +209,39 @@ func (c *client) TruncateTable(_ context.Context, path []string) (string, boiler
 		}
 		return nil
 	}, nil
+}
+
+// findStoreTableNames returns the names of any store tables that exist for the
+// given target table path. Store tables follow the naming convention
+// flow_temp_store_{hex_rangekey}_{tablename}.
+func (c *client) findStoreTableNames(ctx context.Context, path []string) ([]string, error) {
+	var tpls = renderTemplates(c.ep.Dialect, c.ep.Config.HardDelete)
+	var table = sql.Table{TableShape: sql.TableShape{Path: path}}
+
+	findSQL, err := sql.RenderTableTemplate(table, tpls.queryStoreTablesAllRangeKeys)
+	if err != nil {
+		return nil, fmt.Errorf("rendering queryStoreTablesAllRangeKeys: %w", err)
+	}
+
+	rows, err := c.db.QueryContext(ctx, findSQL)
+	if err != nil {
+		return nil, fmt.Errorf("querying for store tables: %w", err)
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var name string
+		if err = rows.Scan(&name); err != nil {
+			return nil, fmt.Errorf("scanning store table name: %w", err)
+		}
+		names = append(names, name)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterating store table rows: %w", err)
+	}
+
+	return names, nil
 }
 
 func (c *client) InstallFence(_ context.Context, _ sql.Table, _ sql.Fence) (sql.Fence, error) {

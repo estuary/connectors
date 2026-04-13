@@ -119,6 +119,7 @@ type templates struct {
 	queryStoreParts              *template.Template
 	moveStorePartition           *template.Template
 	existsStoreTable             *template.Template
+	queryStoreTablesAllRangeKeys *template.Template
 	dropStoreTable               *template.Template
 }
 
@@ -338,6 +339,14 @@ DROP TABLE IF EXISTS {{ template "loadTableName" . }};
 {{ printf "flow_temp_store_%s_%s" $.RangeKey (index $.Path 0) | Literal }}
 {{- end }}
 
+{{ define "storeTableAllRangeKeysPatternLike" -}}
+{{ printf "flow_temp_store_%%_%s" (index $.Path 0) | Literal }}
+{{- end }}
+
+{{ define "storeTableAllRangeKeysPatternRegexp" -}}
+{{ printf "^flow_temp_store_[0-9a-f]+_%s$" (index $.Path 0) | Literal }}
+{{- end }}
+
 {{ define "createStoreTable" }}
 CREATE OR REPLACE TABLE {{ template "storeTableNameIdentifier" . }}
 AS {{$.Identifier}};
@@ -371,6 +380,13 @@ WHERE database = currentDatabase()
   AND name = {{ template "storeTableNameString" . }};
 {{ end }}
 
+{{ define "queryStoreTablesAllRangeKeys" }}
+SELECT name FROM system.tables
+WHERE database = currentDatabase()
+  AND name LIKE {{ template "storeTableAllRangeKeysPatternLike" . }}
+  AND match(name, {{ template "storeTableAllRangeKeysPatternRegexp" . }})
+{{ end }}
+
 {{ define "dropStoreTable" }}
 DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
 {{ end }}
@@ -389,6 +405,7 @@ DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
 		queryStoreParts:              tplAll.Lookup("queryStoreParts"),
 		moveStorePartition:           tplAll.Lookup("moveStorePartition"),
 		existsStoreTable:             tplAll.Lookup("existsStoreTable"),
+		queryStoreTablesAllRangeKeys: tplAll.Lookup("queryStoreTablesAllRangeKeys"),
 		dropStoreTable:               tplAll.Lookup("dropStoreTable"),
 	}
 }

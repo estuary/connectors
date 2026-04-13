@@ -46,6 +46,22 @@ ORDER BY (theKey)
 ;
 --- End delta_updates createTargetTable ---
 
+--- Begin key_value queryStoreTablesAllRangeKeys ---
+
+SELECT name FROM system.tables
+WHERE database = currentDatabase()
+  AND name LIKE 'flow_temp_store_%_key_value'
+  AND match(name, '^flow_temp_store_[0-9a-f]+_key_value$')
+--- End key_value queryStoreTablesAllRangeKeys ---
+
+--- Begin delta_updates queryStoreTablesAllRangeKeys ---
+
+SELECT name FROM system.tables
+WHERE database = currentDatabase()
+  AND name LIKE 'flow_temp_store_%_delta_updates'
+  AND match(name, '^flow_temp_store_[0-9a-f]+_delta_updates$')
+--- End delta_updates queryStoreTablesAllRangeKeys ---
+
 --- Begin alter table add columns and drop not nulls ---
 
 ALTER TABLE key_value ADD COLUMN IF NOT EXISTS first_new_column Nullable(STRING);
