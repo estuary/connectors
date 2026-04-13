@@ -14,11 +14,9 @@ materializations:
       source: tests/simple
       fields:
         recommended: true
-    - resource:
-        table: not_simple
-      source: tests/not-simple
-      fields:
-        recommended: true
+    # tests/not-simple is skipped for REST (Polaris): its required unicode key
+    # field breaks Polaris table creation, and since it's a key it can't be
+    # dropped via field selection.
     - resource:
         table: data_types
       source: tests/data-types
@@ -37,11 +35,7 @@ materializations:
       source: tests/simple
       fields:
         recommended: true
-    - resource:
-        table: not_simple
-      source: tests/not-simple
-      fields:
-        recommended: true
+    # See note on the rest task above for why tests/not-simple is omitted.
     - resource:
         table: data_types
       source: tests/data-types

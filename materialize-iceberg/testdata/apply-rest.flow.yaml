@@ -1,0 +1,8 @@
+materializations:
+  acmeCo/tests/materialize-iceberg/rest:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.rest.yaml
+    bindings: []
