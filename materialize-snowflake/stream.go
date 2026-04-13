@@ -256,6 +256,10 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, decry
 			//
 			// This check can be removed once all tasks have written a checkpoint.
 			if decryptKey == "" {
+				log.WithFields(log.Fields{
+					"schema": schema,
+					"table":  table,
+				}).Warn("unknown encryption key for rewrite; using current")
 				decryptKey = thisChannel.EncryptionKey
 			}
 
