@@ -564,11 +564,12 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 	for stateKey, si := range t.state {
 		// Skip targets tables which do not have a binding anymore
 		// since these tables might be deleted already
-		if _, found := t.bindingForStateKey(stateKey); !found {
+		b, found := t.bindingForStateKey(stateKey)
+		if !found {
 			continue
 		}
 		if err := t.moveStorePartitionsToTarget(ctx, si); err != nil {
-			return nil, fmt.Errorf("moving stage to target: %w", err)
+			return nil, fmt.Errorf("moving stage to target %s: %w", b.target.Identifier, err)
 		}
 	}
 	t.recovery = false
