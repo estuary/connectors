@@ -262,8 +262,9 @@ SELECT {{ $.Table.Binding }}, TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Docume
 	) AS r
 	{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }}AND {{ else }}ON {{ end -}}
-	{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	({{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- if $bound.IsNull }} OR {{ $.Table.Identifier }}.{{ $bound.Identifier }} IS NULL{{ end }})
 	{{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
@@ -305,8 +306,9 @@ JOIN (
 ) AS r
 {{- range $ind, $bound := $.Bounds }}
 {{ if $ind }}AND {{ else }}ON {{ end -}}
-{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+({{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 {{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- if $bound.IsNull }} OR {{ $.Table.Identifier }}.{{ $bound.Identifier }} IS NULL{{ end }})
 {{- end }}
 {{ end }}
 
@@ -354,8 +356,9 @@ USING (
 ) AS r
 ON {{ range $ind, $bound := $.Bounds }}
 	{{ if $ind -}} AND {{ end -}}
-	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	(l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- if $bound.IsNull }} OR l.{{ $bound.Identifier }} IS NULL{{ end }})
 {{- end }}
 WHEN MATCHED AND r._flow_delete=true THEN
 	DELETE

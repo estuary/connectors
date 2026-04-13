@@ -142,9 +142,9 @@ UPDATE path.`to`.checkpoints
 MERGE INTO projectID.dataset.key_value AS l
 USING flow_temp_table_0 AS r
 ON 
-	l.key1 = r.c0 AND l.key1 >= 10 AND l.key1 <= 100
-	AND l.key2 = r.c1
-	AND l.key_binary = r.c2 AND l.key_binary >= 'aGVsbG8K' AND l.key_binary <= 'Z29vZGJ5ZQo='
+	(l.key1 = r.c0 AND l.key1 >= 10 AND l.key1 <= 100)
+	AND (l.key2 = r.c1)
+	AND (l.key_binary = r.c2 AND l.key_binary >= 'aGVsbG8K' AND l.key_binary <= 'Z29vZGJ5ZQo=')
 WHEN MATCHED AND r._flow_delete THEN
 	DELETE
 WHEN MATCHED THEN
@@ -158,9 +158,9 @@ WHEN NOT MATCHED AND NOT r._flow_delete THEN
 SELECT 0, l.flow_document
 	FROM projectID.dataset.key_value AS l
 	JOIN flow_temp_table_0 AS r
-		 ON l.key1 = r.c0 AND l.key1 >= 10 AND l.key1 <= 100
-		 AND l.key2 = r.c1
-		 AND l.key_binary = r.c2 AND l.key_binary >= 'aGVsbG8K' AND l.key_binary <= 'Z29vZGJ5ZQo='
+		 ON (l.key1 = r.c0 AND l.key1 >= 10 AND l.key1 <= 100)
+		 AND (l.key2 = r.c1)
+		 AND (l.key_binary = r.c2 AND l.key_binary >= 'aGVsbG8K' AND l.key_binary <= 'Z29vZGJ5ZQo=')
 --- End projectID.dataset.key_value loadQuery ---
 
 --- Begin projectID.dataset.key_value loadQueryNoFlowDocument ---
@@ -193,5 +193,61 @@ JOIN flow_temp_table_0 AS r
 	 AND l.key2 = r.c1
 	 AND l.key_binary = r.c2 AND l.key_binary >= 'aGVsbG8K' AND l.key_binary <= 'Z29vZGJ5ZQo='
 --- End projectID.dataset.key_value loadQueryNoFlowDocument ---
+
+--- Begin projectID.dataset.key_value storeUpdate (with null bounds) ---
+MERGE INTO projectID.dataset.key_value AS l
+USING flow_temp_table_0 AS r
+ON 
+	(l.key1 = r.c0 AND l.key1 >= 10 AND l.key1 <= 100 OR l.key1 IS NULL)
+	AND (l.key2 = r.c1)
+	AND (l.key_binary = r.c2 OR l.key_binary IS NULL)
+WHEN MATCHED AND r._flow_delete THEN
+	DELETE
+WHEN MATCHED THEN
+	UPDATE SET l.`array` = r.c3, l.binary = r.c4, l.boolean = r.c5, l.field_with_projection = r.c6, l.flow_published_at = r.c7, l.integer = r.c8, l.integerGt64Bit = r.c9, l.integerWithUserDDL = r.c10, l.multiple = r.c11, l.nonAscii_____ = r.c12, l.number = r.c13, l.numberCastToString = r.c14, l.object = r.c15, l.string = r.c16, l.stringInteger = r.c17, l.stringInteger39Chars = r.c18, l.stringInteger66Chars = r.c19, l.stringNumber = r.c20, l.flow_document = r.c21
+WHEN NOT MATCHED AND NOT r._flow_delete THEN
+	INSERT (key1, key2, key_binary, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, nonAscii_____, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
+	VALUES (r.c0, r.c1, r.c2, r.c3, r.c4, r.c5, r.c6, r.c7, r.c8, r.c9, r.c10, r.c11, r.c12, r.c13, r.c14, r.c15, r.c16, r.c17, r.c18, r.c19, r.c20, r.c21);
+--- End projectID.dataset.key_value storeUpdate (with null bounds) ---
+
+--- Begin projectID.dataset.key_value loadQuery (with null bounds) ---
+SELECT 0, l.flow_document
+	FROM projectID.dataset.key_value AS l
+	JOIN flow_temp_table_0 AS r
+		 ON (l.key1 = r.c0 AND l.key1 >= 10 AND l.key1 <= 100 OR l.key1 IS NULL)
+		 AND (l.key2 = r.c1)
+		 AND (l.key_binary = r.c2 OR l.key_binary IS NULL)
+--- End projectID.dataset.key_value loadQuery (with null bounds) ---
+
+--- Begin projectID.dataset.key_value loadQueryNoFlowDocument (with null bounds) ---
+SELECT 0,
+TO_JSON(STRUCT(
+	l.key1 AS key1, 
+	l.key2 AS key2, 
+	l.key_binary AS key!binary, 
+	l.`array` AS array, 
+	l.binary AS binary, 
+	l.boolean AS boolean, 
+	l.field_with_projection AS field_with_projection, 
+	l.integer AS integer, 
+	l.integerGt64Bit AS integerGt64Bit, 
+	l.integerWithUserDDL AS integerWithUserDDL, 
+	l.multiple AS multiple, 
+	l.nonAscii_____ AS nonAsciiκόσμε, 
+	l.number AS number, 
+	CAST(l.numberCastToString AS STRING) AS numberCastToString, 
+	l.object AS object, 
+	l.string AS string, 
+	CAST(l.stringInteger AS STRING) AS stringInteger, 
+	CAST(l.stringInteger39Chars AS STRING) AS stringInteger39Chars, 
+	CAST(l.stringInteger66Chars AS STRING) AS stringInteger66Chars, 
+	CAST(l.stringNumber AS STRING) AS stringNumber
+)) as flow_document
+FROM projectID.dataset.key_value AS l
+JOIN flow_temp_table_0 AS r
+	 ON l.key1 = r.c0 AND (l.key1 >= 10 AND l.key1 <= 100 OR l.key1 IS NULL)
+	 AND l.key2 = r.c1
+	 AND l.key_binary = r.c2 AND l.key_binary IS NULL
+--- End projectID.dataset.key_value loadQueryNoFlowDocument (with null bounds) ---
 
 

@@ -16,14 +16,19 @@ type mergeBound struct {
 	boilerplate.MappedProjection[mapped]
 	LiteralLower string
 	LiteralUpper string
+	// IsNull indicates that at least one observed key value for this column
+	// was nil during the transaction; the merge predicate must include the
+	// NULL key rows alongside any range bounds.
+	IsNull bool
 }
 
 type mergeBoundsBuilder struct {
 	keys      []boilerplate.MappedProjection[mapped]
 	literaler func(any) string
 
-	lower []any
-	upper []any
+	lower  []any
+	upper  []any
+	isNull []bool
 }
 
 func newMergeBoundsBuilder(keys []boilerplate.MappedProjection[mapped]) *mergeBoundsBuilder {
@@ -35,11 +40,21 @@ func newMergeBoundsBuilder(keys []boilerplate.MappedProjection[mapped]) *mergeBo
 
 func (b *mergeBoundsBuilder) nextKey(key []any) {
 	if b.lower == nil {
-		b.lower = append([]any(nil), key...)
-		b.upper = append([]any(nil), key...)
+		b.lower = make([]any, len(b.keys))
+		b.upper = make([]any, len(b.keys))
+		b.isNull = make([]bool, len(b.keys))
 	}
 
 	for idx, k := range key {
+		if k == nil {
+			b.isNull[idx] = true
+			continue
+		}
+		if b.lower[idx] == nil {
+			b.lower[idx] = k
+			b.upper[idx] = k
+			continue
+		}
 		b.lower[idx] = minKey(b.lower[idx], k)
 		b.upper[idx] = maxKey(b.upper[idx], k)
 	}
@@ -82,23 +97,29 @@ func maxKey(k1 any, k2 any) any {
 }
 
 func (b *mergeBoundsBuilder) build() []mergeBound {
-	conditions := make([]mergeBound, len(b.lower))
+	conditions := make([]mergeBound, len(b.keys))
 
 	for idx, p := range b.keys {
 		conditions[idx] = mergeBound{MappedProjection: p}
 
 		switch p.Mapped.type_.(type) {
 		case iceberg.BooleanType, iceberg.BinaryType:
+			// Type-based skip mirrors the upstream materialize-sql behavior:
+			// these key types are intentionally never bounded, even when null.
 			continue
 		}
 
-		conditions[idx].LiteralLower = b.literaler(b.lower[idx])
-		conditions[idx].LiteralUpper = b.literaler(b.upper[idx])
+		conditions[idx].IsNull = b.isNull[idx]
+		if b.lower[idx] != nil {
+			conditions[idx].LiteralLower = b.literaler(b.lower[idx])
+			conditions[idx].LiteralUpper = b.literaler(b.upper[idx])
+		}
 	}
 
 	// Reset for tracking the next transaction.
 	b.lower = nil
 	b.upper = nil
+	b.isNull = nil
 
 	return conditions
 }

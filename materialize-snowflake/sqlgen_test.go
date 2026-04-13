@@ -65,6 +65,51 @@ func TestSQLGeneration(t *testing.T) {
 		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
 
+	// Re-run the bound-aware templates with bounds that include observed null
+	// keys, to cover the IsNull paths in the templates.
+	for _, tpl := range []*template.Template{
+		testTemplates.loadQuery,
+		testTemplates.loadQueryNoFlowDocument,
+		testTemplates.mergeInto,
+	} {
+		tbl := tables[0]
+		var testcase = tbl.Identifier + " " + tpl.Name() + " (with null bounds)"
+
+		bounds := []sql.MergeBound{
+			{
+				// Range bound and null observed: must produce the
+				// parenthesized "(range OR IS NULL)" predicate.
+				Column:       tbl.Keys[0],
+				LiteralLower: testDialect.Literal(int64(10)),
+				LiteralUpper: testDialect.Literal(int64(100)),
+				IsNull:       true,
+			},
+			{
+				// Boolean key: the builder always emits an empty MergeBound
+				// for booleans (no literals, IsNull never set), regardless
+				// of observed values. Mirrored here so the snapshot reflects
+				// production-realistic input.
+				Column: tbl.Keys[1],
+			},
+			{
+				// Null observed but no literal bounds (e.g. all observed
+				// values for the column were null): emit a bare IS NULL.
+				Column: tbl.Keys[2],
+				IsNull: true,
+			},
+		}
+
+		tf := boundedQueryInput{
+			Table:  tbl,
+			File:   "test-file",
+			Bounds: bounds,
+		}
+
+		snap.WriteString("--- Begin " + testcase + " ---")
+		require.NoError(t, tpl.Execute(snap, &tf))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
+	}
+
 	for _, tpl := range []*template.Template{
 		testTemplates.copyInto,
 	} {

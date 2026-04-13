@@ -88,6 +88,9 @@ type MergeBound struct {
 	// LiteralUpper will also be an empty string if no condition should be
 	// used.
 	LiteralUpper string
+	// IsNull indicates whether null values should be included in the merge bound
+	// conditions.
+	IsNull bool
 }
 
 // MergeBoundsBuilder tracks and generates a MergeBound for each of a binding's
@@ -96,8 +99,9 @@ type MergeBoundsBuilder struct {
 	keyColumns []Column
 	literaler  func(any) string
 
-	lower []any
-	upper []any
+	lower  []any
+	upper  []any
+	isNull []bool
 }
 
 func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string) *MergeBoundsBuilder {
@@ -114,17 +118,27 @@ func (b *MergeBoundsBuilder) NextKey(key []any) {
 	}
 
 	if b.lower == nil {
-		// Initialize the tracked values if this is the first key observed for
-		// the transaction. A new array is allocated for both the tracked upper
-		// and lower values so that they can be updated separately based on the
-		// observed minimum and maximum keys for subsequent Stores. Note that
-		// b.lower and b.upper are set to `nil` on initialization of a
-		// MergeBoundsBuilder, and also after calls to `Build`.
-		b.lower = append([]any(nil), key...)
-		b.upper = append([]any(nil), key...)
+		b.lower = make([]any, len(b.keyColumns))
+		b.upper = make([]any, len(b.keyColumns))
+		b.isNull = make([]bool, len(b.keyColumns))
 	}
 
 	for idx, k := range key {
+		if k == nil {
+			b.isNull[idx] = true
+			continue
+		}
+		if b.lower[idx] == nil {
+			// Initialize the tracked values if this is the first non-null key observed for
+			// the transaction. A new array is allocated for both the tracked upper
+			// and lower values so that they can be updated separately based on the
+			// observed minimum and maximum keys for subsequent Stores. Note that
+			// b.lower and b.upper are set to `nil` on initialization of a
+			// MergeBoundsBuilder, and also after calls to `Build`.
+			b.lower[idx] = k
+			b.upper[idx] = k
+			continue
+		}
 		b.lower[idx] = minKey(b.lower[idx], k)
 		b.upper[idx] = maxKey(b.upper[idx], k)
 	}
@@ -192,8 +206,12 @@ func (b *MergeBoundsBuilder) Build() []MergeBound {
 			continue
 		}
 
-		conditions[idx].LiteralLower = b.literaler(b.lower[idx])
-		conditions[idx].LiteralUpper = b.literaler(b.upper[idx])
+		if b.lower[idx] != nil {
+			conditions[idx].LiteralLower = b.literaler(b.lower[idx])
+			conditions[idx].LiteralUpper = b.literaler(b.upper[idx])
+		}
+
+		conditions[idx].IsNull = b.isNull[idx]
 	}
 
 	// Reset for tracking the next transaction.
@@ -206,4 +224,5 @@ func (b *MergeBoundsBuilder) Build() []MergeBound {
 func (b *MergeBoundsBuilder) Reset() {
 	b.lower = nil
 	b.upper = nil
+	b.isNull = nil
 }

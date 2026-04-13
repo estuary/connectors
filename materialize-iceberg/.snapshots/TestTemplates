@@ -2,22 +2,43 @@
 SELECT 0, l.`flow_document`
 FROM `estuary`.`foo`.`bar` AS l
 JOIN load_view_0 AS r
-	 ON  l.`first-key` = r.`first-key` AND l.`first-key` >= 1 AND l.`first-key` <= 10
-	 AND l.`second-key` = UNBASE64(r.`second-key`)
-	 AND l.`third-key` = r.`third-key` AND l.`third-key` >= 'aaaSomeString' AND l.`third-key` <= 'zzzSomeString'
+	 ON  (l.`first-key` = r.`first-key` AND l.`first-key` >= 1 AND l.`first-key` <= 10)
+	 AND (l.`second-key` = UNBASE64(r.`second-key`))
+	 AND (l.`third-key` = r.`third-key` AND l.`third-key` >= 'aaaSomeString' AND l.`third-key` <= 'zzzSomeString')
 --- End load query ---
 
 --- Begin merge query ---
 MERGE INTO `estuary`.`foo`.`bar` AS l
 USING merge_view_0 AS r
 ON 
-	l.`first-key` = r.`first-key` AND l.`first-key` >= 1 AND l.`first-key` <= 10
-	AND l.`second-key` = UNBASE64(r.`second-key`)
-	AND l.`third-key` = r.`third-key` AND l.`third-key` >= 'aaaSomeString' AND l.`third-key` <= 'zzzSomeString'
+	(l.`first-key` = r.`first-key` AND l.`first-key` >= 1 AND l.`first-key` <= 10)
+	AND (l.`second-key` = UNBASE64(r.`second-key`))
+	AND (l.`third-key` = r.`third-key` AND l.`third-key` >= 'aaaSomeString' AND l.`third-key` <= 'zzzSomeString')
 WHEN MATCHED AND r.`flow_document` = '"delete"' THEN DELETE
 WHEN MATCHED THEN UPDATE SET l.`first-key` = r.`first-key`, l.`second-key` = UNBASE64(r.`second-key`), l.`third-key` = r.`third-key`, l.`first-val` = r.`first-val`, l.`second-val` = r.`second-val`, l.`third-val` = UNBASE64(r.`third-val`), l.`fourth-val` = r.`fourth-val`, l.`flow_document` = r.`flow_document`
 WHEN NOT MATCHED AND r.`flow_document` != '"delete"' THEN INSERT (`first-key`, `second-key`, `third-key`, `first-val`, `second-val`, `third-val`, `fourth-val`, `flow_document`) VALUES (r.`first-key`, UNBASE64(r.`second-key`), r.`third-key`, r.`first-val`, r.`second-val`, UNBASE64(r.`third-val`), r.`fourth-val`, r.`flow_document`)
 --- End merge query ---
+
+--- Begin load query (with null bounds) ---
+SELECT 0, l.`flow_document`
+FROM `estuary`.`foo`.`bar` AS l
+JOIN load_view_0 AS r
+	 ON  (l.`first-key` = r.`first-key` AND l.`first-key` >= 1 AND l.`first-key` <= 10 OR l.`first-key` IS NULL)
+	 AND (l.`second-key` = UNBASE64(r.`second-key`))
+	 AND (l.`third-key` = r.`third-key` OR l.`third-key` IS NULL)
+--- End load query (with null bounds) ---
+
+--- Begin merge query (with null bounds) ---
+MERGE INTO `estuary`.`foo`.`bar` AS l
+USING merge_view_0 AS r
+ON 
+	(l.`first-key` = r.`first-key` AND l.`first-key` >= 1 AND l.`first-key` <= 10 OR l.`first-key` IS NULL)
+	AND (l.`second-key` = UNBASE64(r.`second-key`))
+	AND (l.`third-key` = r.`third-key` OR l.`third-key` IS NULL)
+WHEN MATCHED AND r.`flow_document` = '"delete"' THEN DELETE
+WHEN MATCHED THEN UPDATE SET l.`first-key` = r.`first-key`, l.`second-key` = UNBASE64(r.`second-key`), l.`third-key` = r.`third-key`, l.`first-val` = r.`first-val`, l.`second-val` = r.`second-val`, l.`third-val` = UNBASE64(r.`third-val`), l.`fourth-val` = r.`fourth-val`, l.`flow_document` = r.`flow_document`
+WHEN NOT MATCHED AND r.`flow_document` != '"delete"' THEN INSERT (`first-key`, `second-key`, `third-key`, `first-val`, `second-val`, `third-val`, `fourth-val`, `flow_document`) VALUES (r.`first-key`, UNBASE64(r.`second-key`), r.`third-key`, r.`first-val`, r.`second-val`, UNBASE64(r.`third-val`), r.`fourth-val`, r.`flow_document`)
+--- End merge query (with null bounds) ---
 
 --- Begin migrate query ---
 UPDATE `estuary`.`some`.`table`

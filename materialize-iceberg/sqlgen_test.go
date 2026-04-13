@@ -99,6 +99,40 @@ func TestTemplates(t *testing.T) {
 
 	snap.WriteString("\n\n")
 
+	// Re-run load and merge with bounds that include observed null keys, to
+	// cover the IsNull paths in the templates.
+	nullBoundsInput := input
+	nullBoundsInput.Bounds = []mergeBound{
+		{
+			// Range bound and null observed: parenthesized "(range OR IS NULL)".
+			MappedProjection: keys[0],
+			LiteralLower:     "1",
+			LiteralUpper:     "10",
+			IsNull:           true,
+		},
+		{
+			// Binary key: builder skips bounds for binary regardless.
+			MappedProjection: keys[1],
+		},
+		{
+			// Null observed but no literal bounds: bare IS NULL.
+			MappedProjection: keys[2],
+			IsNull:           true,
+		},
+	}
+
+	snap.WriteString("--- Begin load query (with null bounds) ---\n")
+	require.NoError(t, templates.loadQuery.Execute(&snap, nullBoundsInput))
+	snap.WriteString("--- End load query (with null bounds) ---")
+
+	snap.WriteString("\n\n")
+
+	snap.WriteString("--- Begin merge query (with null bounds) ---\n")
+	require.NoError(t, templates.mergeQuery.Execute(&snap, nullBoundsInput))
+	snap.WriteString("--- End merge query (with null bounds) ---")
+
+	snap.WriteString("\n\n")
+
 	snap.WriteString("--- Begin migrate query ---\n")
 	require.NoError(t, templates.migrateQuery.Execute(&snap, mInput))
 	snap.WriteString("--- End migrate query ---")

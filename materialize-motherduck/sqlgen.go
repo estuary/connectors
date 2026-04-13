@@ -169,8 +169,9 @@ JOIN read_json(
 ) AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	(l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- if $bound.IsNull }} OR l.{{ $bound.Identifier }} IS NULL{{ end }})
 {{- end -}}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
@@ -199,8 +200,9 @@ USING read_json(
 ) AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} WHERE {{ end -}}
-	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	(l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- if $bound.IsNull }} OR l.{{ $bound.Identifier }} IS NULL{{ end }})
 {{- end }};
 {{ end }}
 
@@ -271,8 +273,9 @@ JOIN read_json(
 ) AS r                                                                                                                                                             
 {{- range $ind, $bound := $.Bounds }}                                                                                                                              
        {{ if $ind }} AND {{ else }} ON  {{ end -}}                                                                                                                 
-       l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}                                                                                                       
+       (l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
        {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+       {{- if $bound.IsNull }} OR l.{{ $bound.Identifier }} IS NULL{{ end }})
 {{- end -}}                                                                                                                                                        
 {{- end }}                                                                                                                                                         
 {{ end }} 

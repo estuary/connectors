@@ -242,8 +242,9 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 	JOIN {{ template "tempTableName" . }} AS r
 	{{- range $ind, $bound := $.Bounds }}
 		{{ if $ind }} AND {{ else }} ON {{ end -}}
-		l.{{ $bound.Identifier }} = r.c{{$ind}}
+		(l.{{ $bound.Identifier }} = r.c{{$ind}}
 		{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+		{{- if $bound.IsNull }} OR l.{{ $bound.Identifier }} IS NULL{{ end }})
 	{{- end }}
 {{- else -}}
 (SELECT -1, CAST(NULL AS {{ $.ObjectType }}) LIMIT 0) as nodoc
@@ -280,7 +281,7 @@ JOIN {{ template "tempTableName" . }} AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON {{ end -}}
 	l.{{ $bound.Identifier }} = r.c{{$ind}}
-	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- if and $bound.LiteralLower $bound.IsNull }} AND (l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }} OR l.{{ $bound.Identifier }} IS NULL){{ else if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ else if $bound.IsNull }} AND l.{{ $bound.Identifier }} IS NULL{{ end }}
 {{- end }}
 {{ end }}
 
@@ -306,8 +307,9 @@ MERGE INTO {{ $.Identifier }} AS l
 USING {{ template "tempTableName" . }} AS r
 ON {{ range $ind, $bound := $.Bounds }}
 	{{ if $ind -}} AND {{end -}}
-	l.{{$bound.Identifier}} = r.c{{$ind}}
+	(l.{{$bound.Identifier}} = r.c{{$ind}}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- if $bound.IsNull }} OR l.{{ $bound.Identifier }} IS NULL{{ end }})
 {{- end}}
 WHEN MATCHED AND r._flow_delete THEN
 	DELETE

@@ -248,8 +248,9 @@ FROM {{ template "temp_name_load" . }} AS l
 JOIN {{ $.Identifier}} AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
+	({{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- if $bound.IsNull }} OR r.{{ $bound.Identifier }} IS NULL{{ end }})
 {{- end }}
 {{ end }}
 
@@ -284,8 +285,9 @@ FROM {{ template "temp_name_load" . }} AS l
 JOIN {{ $.Identifier}} AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
+	({{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- if $bound.IsNull }} OR r.{{ $bound.Identifier }} IS NULL{{ end }})
 {{- end }}
 {{ end }}
 
@@ -326,8 +328,9 @@ FROM {{$.Identifier}} AS r
 INNER JOIN {{ template "temp_name_store" $ }} AS l
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	{{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
+	({{ template "maybe_unbase64_lhs" $bound }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- if $bound.IsNull }} OR r.{{ $bound.Identifier }} IS NULL{{ end }})
 {{- end }};
 
 INSERT INTO {{$.Identifier}} ({{- range $ind, $col := $.Columns }}{{- if $ind }}, {{ end }}{{$col.Identifier}}{{- end }})

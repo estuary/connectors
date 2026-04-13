@@ -66,6 +66,41 @@ func TestSQLGeneration(t *testing.T) {
 		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
 
+	// Re-run the bound-aware templates with bounds that include observed null
+	// keys, to cover the IsNull paths in the templates.
+	for _, tpl := range []*template.Template{
+		testTemplates.loadQuery,
+		testTemplates.loadQueryNoFlowDocument,
+		testTemplates.storeDeleteQuery,
+	} {
+		tbl := tables[0]
+		var testcase = tbl.Identifier + " " + tpl.Name() + " (with null bounds)"
+
+		bounds := []sql.MergeBound{
+			{
+				Column:       tbl.Keys[0],
+				LiteralLower: testDialect.Literal(int64(10)),
+				LiteralUpper: testDialect.Literal(int64(100)),
+				IsNull:       true,
+			},
+			{
+				Column: tbl.Keys[1],
+			},
+			{
+				Column: tbl.Keys[2],
+				IsNull: true,
+			},
+		}
+
+		snap.WriteString("--- Begin " + testcase + " ---")
+		require.NoError(t, tpl.Execute(snap, &queryParams{
+			Table:  tbl,
+			Bounds: bounds,
+			Files:  []string{"s3://bucket/file1", "s3://bucket/file2"},
+		}))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
+	}
+
 	{
 		// Delta updates only run stores, never loads or merges.
 		tpl := testTemplates.storeQuery

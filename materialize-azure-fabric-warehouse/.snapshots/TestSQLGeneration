@@ -166,9 +166,9 @@ WITH (
 SELECT 0, r.flow_document
 FROM flow_temp_table_load_0 AS l
 JOIN "a-warehouse"."a-schema".key_value AS r
-	 ON  l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100
-	 AND l.key2 = r.key2
-	 AND BASE64_DECODE(l."key!binary") = r."key!binary"
+	 ON  (l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100)
+	 AND (l.key2 = r.key2)
+	 AND (BASE64_DECODE(l."key!binary") = r."key!binary")
 --- End "a-warehouse"."a-schema".key_value loadQuery ---
 
 --- Begin "a-warehouse"."a-schema".key_value loadQueryNoFlowDocument ---
@@ -197,9 +197,9 @@ SELECT 0,
 	) as flow_document
 FROM flow_temp_table_load_0 AS l
 JOIN "a-warehouse"."a-schema".key_value AS r
-	 ON  l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100
-	 AND l.key2 = r.key2
-	 AND BASE64_DECODE(l."key!binary") = r."key!binary"
+	 ON  (l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100)
+	 AND (l.key2 = r.key2)
+	 AND (BASE64_DECODE(l."key!binary") = r."key!binary")
 --- End "a-warehouse"."a-schema".key_value loadQueryNoFlowDocument ---
 
 --- Begin "a-warehouse"."a-schema".key_value dropLoadTable ---
@@ -245,9 +245,9 @@ WITH (
 DELETE r
 FROM "a-warehouse"."a-schema".key_value AS r
 INNER JOIN flow_temp_table_store_0 AS l
-	 ON  l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100
-	 AND l.key2 = r.key2
-	 AND BASE64_DECODE(l."key!binary") = r."key!binary";
+	 ON  (l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100)
+	 AND (l.key2 = r.key2)
+	 AND (BASE64_DECODE(l."key!binary") = r."key!binary");
 
 INSERT INTO "a-warehouse"."a-schema".key_value (key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
 SELECT key1, key2, BASE64_DECODE("key!binary"), "array", BASE64_DECODE("binary"), "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
@@ -256,6 +256,98 @@ WHERE _flow_delete = 0;
 
 DROP TABLE flow_temp_table_store_0;
 --- End "a-warehouse"."a-schema".key_value storeMergeQuery ---
+
+--- Begin "a-warehouse"."a-schema".key_value loadQuery (with null bounds) ---
+SELECT 0, r.flow_document
+FROM flow_temp_table_load_0 AS l
+JOIN "a-warehouse"."a-schema".key_value AS r
+	 ON  (l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100 OR r.key1 IS NULL)
+	 AND (l.key2 = r.key2)
+	 AND (BASE64_DECODE(l."key!binary") = r."key!binary")
+--- End "a-warehouse"."a-schema".key_value loadQuery (with null bounds) ---
+
+--- Begin "a-warehouse"."a-schema".key_value loadQueryNoFlowDocument (with null bounds) ---
+SELECT 0, 
+	JSON_OBJECT(
+		'key1': r.key1,
+		'key2': r.key2,
+		'key!binary': r."key!binary",
+		'array': r."array",
+		'binary': r."binary",
+		'boolean': r."boolean",
+		'field_with_projection': r.field_with_projection,
+		'integer': r."integer",
+		'integerGt64Bit': r."integerGt64Bit",
+		'integerWithUserDDL': r."integerWithUserDDL",
+		'multiple': r.multiple,
+		'nonAsciiκόσμε': r."nonAsciiκόσμε",
+		'number': r.number,
+		'numberCastToString': CAST(r."numberCastToString" AS VARCHAR(MAX)),
+		'object': r."object",
+		'string': r.string,
+		'stringInteger': CAST(r."stringInteger" AS VARCHAR(MAX)),
+		'stringInteger39Chars': CAST(r."stringInteger39Chars" AS VARCHAR(MAX)),
+		'stringInteger66Chars': CAST(r."stringInteger66Chars" AS VARCHAR(MAX)),
+		'stringNumber': CAST(r."stringNumber" AS VARCHAR(MAX))
+	) as flow_document
+FROM flow_temp_table_load_0 AS l
+JOIN "a-warehouse"."a-schema".key_value AS r
+	 ON  (l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100 OR r.key1 IS NULL)
+	 AND (l.key2 = r.key2)
+	 AND (BASE64_DECODE(l."key!binary") = r."key!binary")
+--- End "a-warehouse"."a-schema".key_value loadQueryNoFlowDocument (with null bounds) ---
+
+--- Begin "a-warehouse"."a-schema".key_value storeMergeQuery (with null bounds) ---
+CREATE TABLE flow_temp_table_store_0 (
+	key1 BIGINT,
+	key2 BIT,
+	"key!binary" VARCHAR(MAX),
+	"array" VARCHAR(MAX),
+	"binary" VARCHAR(MAX),
+	"boolean" BIT,
+	field_with_projection VARCHAR(MAX),
+	flow_published_at DATETIME2(6),
+	"integer" BIGINT,
+	"integerGt64Bit" DECIMAL(38,0),
+	"integerWithUserDDL" DECIMAL(20),
+	multiple VARCHAR(MAX),
+	"nonAsciiκόσμε" VARCHAR(MAX),
+	number FLOAT,
+	"numberCastToString" VARCHAR(MAX),
+	"object" VARCHAR(MAX),
+	string VARCHAR(MAX),
+	"stringInteger" DECIMAL(38,0),
+	"stringInteger39Chars" VARCHAR(MAX),
+	"stringInteger66Chars" VARCHAR(MAX),
+	"stringNumber" FLOAT,
+	flow_document VARCHAR(MAX),
+	_flow_delete BIT
+);
+
+COPY INTO flow_temp_table_store_0
+(key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document, _flow_delete)
+FROM 'https://some/file1', 'https://some/file2'
+WITH (
+	FILE_TYPE = 'CSV',
+	COMPRESSION = 'Gzip',
+	FIELDQUOTE = '`',
+	CREDENTIAL = (IDENTITY='Storage Account Key', SECRET='some-storage-account-key')
+);
+
+DELETE r
+FROM "a-warehouse"."a-schema".key_value AS r
+INNER JOIN flow_temp_table_store_0 AS l
+	 ON  (l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100 OR r.key1 IS NULL)
+	 AND (l.key2 = r.key2)
+	 AND (BASE64_DECODE(l."key!binary") = r."key!binary");
+
+INSERT INTO "a-warehouse"."a-schema".key_value (key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
+SELECT key1, key2, BASE64_DECODE("key!binary"), "array", BASE64_DECODE("binary"), "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
+FROM flow_temp_table_store_0
+WHERE _flow_delete = 0;
+
+DROP TABLE flow_temp_table_store_0;
+--- End "a-warehouse"."a-schema".key_value storeMergeQuery (with null bounds) ---
 
 --- Begin createMigrationTable
 CREATE TABLE some_table_tmp AS SELECT

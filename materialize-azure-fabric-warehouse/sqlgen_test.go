@@ -79,6 +79,37 @@ func TestSQLGeneration(t *testing.T) {
 		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
 
+	// Re-run the bound-aware templates with bounds that include observed null
+	// keys, to cover the IsNull paths in the templates. Only Keys[0]
+	// (integer) realistically produces an IsNull bound — booleans and
+	// binaries are filtered out by the materialize-sql builder regardless.
+	for _, tpl := range []*template.Template{
+		testTemplates.loadQuery,
+		testTemplates.loadQueryNoFlowDocument,
+		testTemplates.storeMergeQuery,
+	} {
+		tbl := tables[0]
+		var testcase = tbl.Identifier + " " + tpl.Name() + " (with null bounds)"
+
+		snap.WriteString("--- Begin " + testcase + " ---")
+		require.NoError(t, tpl.Execute(snap, &queryParams{
+			Table:             tbl,
+			URIs:              []string{"https://some/file1", "https://some/file2"},
+			StorageAccountKey: "some-storage-account-key",
+			Bounds: []sql.MergeBound{
+				{
+					Column:       tbl.Keys[0],
+					LiteralLower: testDialect.Literal(int64(10)),
+					LiteralUpper: testDialect.Literal(int64(100)),
+					IsNull:       true,
+				},
+				{Column: tbl.Keys[1]}, // boolean key
+				{Column: tbl.Keys[2]}, // binary key
+			},
+		}))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
+	}
+
 	{
 		params := migrateParams{
 			SourceTable: "some_table",

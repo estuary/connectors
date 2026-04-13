@@ -114,7 +114,7 @@ func TestMergeBoundsBuilder(t *testing.T) {
 				{"c"},
 			},
 			want: []MergeBound{
-				{colA, literaler("a"), literaler("c")},
+				{Column: colA, LiteralLower: literaler("a"), LiteralUpper: literaler("c")},
 			},
 		},
 		{
@@ -126,9 +126,9 @@ func TestMergeBoundsBuilder(t *testing.T) {
 				{"c", true, int64(3)},
 			},
 			want: []MergeBound{
-				{colA, literaler("a"), literaler("c")},
-				{colB, "", ""},
-				{colC, literaler(int64(1)), literaler(int64(3))},
+				{Column: colA, LiteralLower: literaler("a"), LiteralUpper: literaler("c")},
+				{Column: colB},
+				{Column: colC, LiteralLower: literaler(int64(1)), LiteralUpper: literaler(int64(3))},
 			},
 		},
 		{
@@ -140,9 +140,86 @@ func TestMergeBoundsBuilder(t *testing.T) {
 				{"c", true, int64(2)},
 			},
 			want: []MergeBound{
-				{colA, literaler("a"), literaler("c")},
-				{colB, "", ""},
-				{colC, literaler(int64(1)), literaler(int64(3))},
+				{Column: colA, LiteralLower: literaler("a"), LiteralUpper: literaler("c")},
+				{Column: colB},
+				{Column: colC, LiteralLower: literaler(int64(1)), LiteralUpper: literaler(int64(3))},
+			},
+		},
+		{
+			name:       "single column all null",
+			keyColumns: []Column{colA},
+			keys: [][]any{
+				{nil},
+				{nil},
+			},
+			want: []MergeBound{
+				{Column: colA, IsNull: true},
+			},
+		},
+		{
+			name:       "single column mixed null and non-null",
+			keyColumns: []Column{colA},
+			keys: [][]any{
+				{"b"},
+				{nil},
+				{"a"},
+				{"c"},
+			},
+			want: []MergeBound{
+				{Column: colA, LiteralLower: literaler("a"), LiteralUpper: literaler("c"), IsNull: true},
+			},
+		},
+		{
+			name:       "null observed before any non-null for the same column",
+			keyColumns: []Column{colA},
+			keys: [][]any{
+				{nil},
+				{nil},
+				{"x"},
+				{"y"},
+			},
+			want: []MergeBound{
+				{Column: colA, LiteralLower: literaler("x"), LiteralUpper: literaler("y"), IsNull: true},
+			},
+		},
+		{
+			name:       "multi-column with independent null patterns",
+			keyColumns: []Column{colA, colC},
+			keys: [][]any{
+				{"a", nil},
+				{nil, int64(5)},
+				{"c", int64(2)},
+				{"b", nil},
+			},
+			want: []MergeBound{
+				{Column: colA, LiteralLower: literaler("a"), LiteralUpper: literaler("c"), IsNull: true},
+				{Column: colC, LiteralLower: literaler(int64(2)), LiteralUpper: literaler(int64(5)), IsNull: true},
+			},
+		},
+		{
+			name:       "every key entirely null across all columns",
+			keyColumns: []Column{colA, colC},
+			keys: [][]any{
+				{nil, nil},
+				{nil, nil},
+			},
+			want: []MergeBound{
+				{Column: colA, IsNull: true},
+				{Column: colC, IsNull: true},
+			},
+		},
+		{
+			name:       "boolean column is never bounded even when nulls are observed",
+			keyColumns: []Column{colB},
+			keys: [][]any{
+				{nil},
+				{true},
+				{false},
+			},
+			// colB is boolean: the type-based skip in Build leaves all fields
+			// zero — including IsNull — matching the pre-existing behavior.
+			want: []MergeBound{
+				{Column: colB},
 			},
 		},
 	} {
@@ -154,6 +231,25 @@ func TestMergeBoundsBuilder(t *testing.T) {
 			require.Equal(t, tt.want, b.Build())
 		})
 	}
+
+	// Verify that null-tracking state (b.isNull) does not leak across
+	// transactions: a transaction with null keys followed by one with only
+	// non-null keys must not report IsNull=true in the second Build.
+	t.Run("Build resets null state between transactions", func(t *testing.T) {
+		b := NewMergeBoundsBuilder([]Column{colA}, literaler)
+
+		b.NextKey([]any{nil})
+		b.NextKey([]any{"a"})
+		require.Equal(t, []MergeBound{
+			{Column: colA, LiteralLower: literaler("a"), LiteralUpper: literaler("a"), IsNull: true},
+		}, b.Build())
+
+		b.NextKey([]any{"x"})
+		b.NextKey([]any{"z"})
+		require.Equal(t, []MergeBound{
+			{Column: colA, LiteralLower: literaler("x"), LiteralUpper: literaler("z")},
+		}, b.Build())
+	})
 }
 
 func TestRootLevelColumns(t *testing.T) {

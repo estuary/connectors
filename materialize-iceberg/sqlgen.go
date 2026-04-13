@@ -77,8 +77,9 @@ FROM {{ TableFQN $.Mapped.ResourcePath }} AS l
 JOIN load_view_{{ $.Idx }} AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	l.{{ QuoteIdentifier $bound.Mapped.Name }} = {{ template "maybe_unbase64_rhs" $bound }}
+	(l.{{ QuoteIdentifier $bound.Mapped.Name }} = {{ template "maybe_unbase64_rhs" $bound }}
 	{{- if $bound.LiteralLower }} AND l.{{ QuoteIdentifier $bound.Mapped.Name }} >= {{ $bound.LiteralLower }} AND l.{{ QuoteIdentifier $bound.Mapped.Name }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- if $bound.IsNull }} OR l.{{ QuoteIdentifier $bound.Mapped.Name }} IS NULL{{ end }})
 {{- end }}
 {{ end }}
 
@@ -87,8 +88,9 @@ MERGE INTO {{ TableFQN $.Mapped.ResourcePath }} AS l
 USING merge_view_{{ $.Idx }} AS r
 ON {{ range $ind, $bound := $.Bounds }}
 	{{ if $ind -}} AND {{end -}}
-	l.{{ QuoteIdentifier $bound.Mapped.Name }} = {{ template "maybe_unbase64_rhs" $bound }}
+	(l.{{ QuoteIdentifier $bound.Mapped.Name }} = {{ template "maybe_unbase64_rhs" $bound }}
 	{{- if $bound.LiteralLower }} AND l.{{ QuoteIdentifier $bound.Mapped.Name }} >= {{ $bound.LiteralLower }} AND l.{{ QuoteIdentifier $bound.Mapped.Name }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- if $bound.IsNull }} OR l.{{ QuoteIdentifier $bound.Mapped.Name }} IS NULL{{ end }})
 {{- end}}
 WHEN MATCHED AND r.{{ QuoteIdentifier $.Mapped.Document.Mapped.Name }} = '"delete"' THEN DELETE
 WHEN MATCHED THEN UPDATE SET {{ range $ind, $proj := $.Mapped.SelectedProjections }}

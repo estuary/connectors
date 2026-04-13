@@ -186,8 +186,9 @@ SELECT {{ $.Table.Binding }}, {{ $.Table.Identifier }}.{{ $.Table.Document.Ident
 	) AS r
 	{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }}AND {{ else }}ON {{ end -}}
-	{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	({{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 	{{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+	{{- if $bound.IsNull }} OR {{ $.Table.Identifier }}.{{ $bound.Identifier }} IS NULL{{ end }})
 	{{- end }}
 {{ else -}}
 SELECT -1, ""
@@ -220,8 +221,9 @@ JOIN (
 ) AS r
 {{- range $ind, $bound := $.Bounds }}
 {{ if $ind }}AND {{ else }}ON {{ end -}}
-{{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+({{ $.Table.Identifier }}.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
 {{- if $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND {{ $.Table.Identifier }}.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+{{- if $bound.IsNull }} OR {{ $.Table.Identifier }}.{{ $bound.Identifier }} IS NULL{{ end }})
 {{- end }}
 {{ end }}
 
@@ -286,8 +288,9 @@ JOIN (
 	) AS r
   ON {{ range $ind, $bound := $.Bounds }}
     {{ if $ind -}} AND {{ end -}}
-    l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+    (l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
     {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
+    {{- if $bound.IsNull }} OR l.{{ $bound.Identifier }} IS NULL{{ end }})
   {{- end }}
 	WHEN MATCHED AND r._flow_delete THEN
 		DELETE
