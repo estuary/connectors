@@ -20,6 +20,7 @@ DEFAULT_SCHEDULE = "0 0 * * *"
 
 from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
+from .account_fetcher import fetch_connected_account_ids
 from .api import (
     API,
     fetch_backfill,
@@ -39,7 +40,6 @@ from .models import (
     Accounts,
     ConnectorState,
     EndpointConfig,
-    ListResult,
 )
 from .priority_capture import (
     open_binding_with_priority_queue,
@@ -75,31 +75,6 @@ async def check_accessibility(
         is_accessible = not is_permission_blocked and not is_disabled
 
     return is_accessible
-
-
-async def _fetch_connected_account_ids(
-    http: HTTPSession,
-    log: Logger,
-) -> list[str]:
-    account_ids: set[str] = set()
-
-    url = f"{API}/accounts"
-    params: dict[str, str | int] = {"limit": 100}
-
-    while True:
-        response = ListResult[Accounts].model_validate_json(
-            await http.request(log, url, params=params)
-        )
-
-        for account in response.data:
-            account_ids.add(account.id)
-
-        if not response.has_more:
-            break
-
-        params["starting_after"] = response.data[-1].id
-
-    return list(account_ids)
 
 
 async def _fetch_platform_account_id(
@@ -189,7 +164,7 @@ async def all_resources(
         log.info(
             "Fetching connected account IDs. This may take multiple minutes if there are many connected accounts."
         )
-        connected_account_ids = await _fetch_connected_account_ids(http, log)
+        connected_account_ids = await fetch_connected_account_ids(http, log)
         log.info(
             f"Found {len(connected_account_ids)} connected account IDs.",
             {
