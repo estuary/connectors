@@ -1,0 +1,16 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.migrate-base.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-iceberg/rest:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: config.rest.yaml
+    bindings:
+    - resource:
+        table: migrate
+      source: key/value
+      fields:
+        recommended: true
