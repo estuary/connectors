@@ -144,7 +144,13 @@ type binlogStatus struct {
 
 // queryBinlogStatus fetches the current binary logging position and configuration using
 // the SHOW MASTER STATUS / SHOW BINARY LOG STATUS query (depending on the server version).
+// In read-replica mode it uses SHOW REPLICA STATUS instead since the primary's binlog
+// status queries are not available on a read replica.
 func (db *mysqlDatabase) queryBinlogStatus() (*binlogStatus, error) {
+	if db.featureFlags["cluster_read_replica"] {
+		return db.queryReplicaBinlogStatus()
+	}
+
 	// The 'SHOW MASTER STATUS' query is the only form that works on MySQL <8.0.22, but
 	// support was dropped in MySQL 8.4.0 so we have to select the appropriate query for
 	// the server version we're connected to.
@@ -184,6 +190,53 @@ func (db *mysqlDatabase) queryBinlogStatus() (*binlogStatus, error) {
 			Pos:  offset,
 		},
 		Extra: extra,
+	}, nil
+}
+
+// queryReplicaBinlogStatus uses SHOW REPLICA STATUS to determine the current binlog
+// position on a cluster read replica. It reads the Source_Log_File and Read_Source_Log_Pos
+// columns, which represent the position in the source's binlog that the replica's I/O
+// thread has read up to.
+func (db *mysqlDatabase) queryReplicaBinlogStatus() (*binlogStatus, error) {
+	var statusQuery = "SHOW REPLICA STATUS;"
+
+	var results, err = db.conn.Execute(statusQuery)
+	if err != nil {
+		return nil, fmt.Errorf("error querying replica status: %w", err)
+	}
+	if len(results.Values) == 0 {
+		return nil, fmt.Errorf("error querying replica status: empty result set (is this a replica?)")
+	}
+	defer results.Close()
+
+	// Build a map of column name to index for easy lookup
+	var columnIndex = make(map[string]int)
+	for idx, field := range results.Fields {
+		columnIndex[string(field.Name)] = idx
+	}
+
+	var row = results.Values[0]
+	fileIdx, ok := columnIndex["Source_Log_File"]
+	if !ok {
+		return nil, fmt.Errorf("error querying replica status: column Source_Log_File not found")
+	}
+	posIdx, ok := columnIndex["Read_Source_Log_Pos"]
+	if !ok {
+		return nil, fmt.Errorf("error querying replica status: column Read_Source_Log_Pos not found")
+	}
+	var filename = string(row[fileIdx].AsString())
+	var offset = uint32(row[posIdx].AsInt64())
+
+	logrus.WithFields(logrus.Fields{
+		"file":   filename,
+		"offset": offset,
+	}).Info("queried replica binlog status")
+
+	return &binlogStatus{
+		Position: mysql.Position{
+			Name: filename,
+			Pos:  offset,
+		},
 	}, nil
 }
 

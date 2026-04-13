@@ -62,6 +62,10 @@ func (db *mysqlDatabase) prerequisiteVersion(_ context.Context) error {
 }
 
 func (db *mysqlDatabase) prerequisiteBinlogEnabled(ctx context.Context) error {
+	if db.featureFlags["cluster_read_replica"] {
+		logrus.Info("skipping log_bin check for cluster read replica")
+		return nil
+	}
 	var results, err = db.conn.Execute(`SHOW VARIABLES LIKE 'log_bin';`)
 	if err != nil {
 		return fmt.Errorf("unable to query 'log_bin' system variable: %w", err)
