@@ -1100,3 +1100,106 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	require.ErrorAs(t, moveErr, &exc)
 	require.EqualValues(t, chproto.ErrUnknownTable, exc.Code)
 }
+
+// TestNoFlowDocumentObjectColumns verifies that root-level OBJECT, ARRAY, and
+// MULTIPLE columns are correctly embedded as JSON objects/arrays (not
+// double-encoded as strings) when reconstructed by the
+// queryLoadTableNoFlowDocument template's toJSONString(map(...)).
+func TestNoFlowDocumentObjectColumns(t *testing.T) {
+	var cfg = testConfig()
+	cfg.Advanced.NoFlowDocument = true
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tableName = "test_no_flow_doc_object"
+
+	var shape = sql.TableShape{
+		Path:    sql.TablePath{tableName},
+		Binding: 0,
+		Keys: []sql.Projection{
+			{
+				Projection: pf.Projection{
+					Ptr:   "/id",
+					Field: "id",
+					Inference: pf.Inference{
+						Types:   []string{"string"},
+						Exists:  pf.Inference_MUST,
+						String_: &pf.Inference_String{},
+					},
+				},
+			},
+		},
+		Values: []sql.Projection{
+			{
+				Projection: pf.Projection{
+					Ptr:   "/_meta",
+					Field: "_meta",
+					Inference: pf.Inference{
+						Types:  []string{"object"},
+						Exists: pf.Inference_MUST,
+					},
+				},
+			},
+			{
+				Projection: pf.Projection{
+					Ptr:   "/tags",
+					Field: "tags",
+					Inference: pf.Inference{
+						Types:  []string{"array"},
+						Exists: pf.Inference_MUST,
+					},
+				},
+			},
+			{
+				Projection: pf.Projection{
+					Ptr:   "/extra",
+					Field: "extra",
+					Inference: pf.Inference{
+						Types:  []string{"integer", "object", "boolean"},
+						Exists: pf.Inference_MUST,
+					},
+				},
+			},
+			flowPublishedAtProjection,
+		},
+	}
+	shape.Values[3].Ptr = "/flow_published_at"
+
+	table, err := sql.ResolveTable(shape, dialect)
+	require.NoError(t, err)
+
+	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{
+		"k1",                         // id (key)
+		`{"op":"c","extra":"stuff"}`, // _meta (object → String)
+		`["tag1","tag2"]`,            // tags (array → String)
+		`{"nested":true}`,            // extra (multiple → String)
+		testTime,                     // flow_published_at
+	})
+
+	docs := loadDocuments(t, ctx, loadConn, b, []any{"k1"})
+	require.Len(t, docs, 1)
+
+	var parsed map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal([]byte(docs[0]), &parsed))
+
+	metaRaw := string(parsed["_meta"])
+	tagsRaw := string(parsed["tags"])
+	extraRaw := string(parsed["extra"])
+
+	// OBJECT columns must be embedded as JSON objects, not double-encoded strings.
+	require.Truef(t, metaRaw[0] == '{',
+		"expected _meta to be a JSON object, got: %s", metaRaw)
+	require.JSONEq(t, `{"op":"c","extra":"stuff"}`, metaRaw)
+
+	// ARRAY columns must be embedded as JSON arrays.
+	require.Truef(t, tagsRaw[0] == '[',
+		"expected tags to be a JSON array, got: %s", tagsRaw)
+	require.JSONEq(t, `["tag1","tag2"]`, tagsRaw)
+
+	// MULTIPLE columns must be embedded as their actual JSON type.
+	require.Truef(t, extraRaw[0] == '{',
+		"expected extra to be a JSON object, got: %s", extraRaw)
+	require.JSONEq(t, `{"nested":true}`, extraRaw)
+}

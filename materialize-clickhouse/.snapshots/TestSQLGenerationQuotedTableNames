@@ -108,34 +108,33 @@ SELECT 0::Int32, r.flow_document
 --- Begin `key_value-@你好-``-"especiál` queryLoadTableNoFlowDocument ---
 
 SELECT 0::Int32,
-toJSONString(map(
-	'key1', r.key1,
-	'key2', r.key2,
-	'key!binary', r.`key!binary`,
-	'array', r.`array`,
-	'binary', r.binary,
-	'boolean', r.boolean,
-	'field_with_projection', r.field_with_projection,
-	'integer', r.integer,
-	'integerGt64Bit', r.integerGt64Bit,
-	'integerWithUserDDL', r.integerWithUserDDL,
-	'multiple', r.multiple,
-	'nonAsciiκόσμε', r.`nonAsciiκόσμε`,
-	'number', r.number,
-	'numberCastToString', toString(r.numberCastToString),
-	'object', r.object,
-	'string', r.string,
-	'stringInteger', r.stringInteger,
-	'stringInteger39Chars', r.stringInteger39Chars,
-	'stringInteger66Chars', r.stringInteger66Chars,
-	'stringNumber', toString(r.stringNumber)
-)) AS flow_document
+concat('{',
+	toJSONString('key1'), ':', ifNull(toJSONString(r.key1), 'null'), ',', 
+	toJSONString('key2'), ':', ifNull(toJSONString(r.key2), 'null'), ',', 
+	toJSONString('key!binary'), ':', ifNull(toJSONString(r.`key!binary`), 'null'), ',', 
+	toJSONString('array'), ':', ifNull(r.`array`, 'null'), ',', 
+	toJSONString('binary'), ':', ifNull(toJSONString(r.binary), 'null'), ',', 
+	toJSONString('boolean'), ':', ifNull(toJSONString(r.boolean), 'null'), ',', 
+	toJSONString('field_with_projection'), ':', ifNull(toJSONString(r.field_with_projection), 'null'), ',', 
+	toJSONString('integer'), ':', ifNull(toJSONString(r.integer), 'null'), ',', 
+	toJSONString('integerGt64Bit'), ':', ifNull(toJSONString(r.integerGt64Bit), 'null'), ',', 
+	toJSONString('integerWithUserDDL'), ':', ifNull(toJSONString(r.integerWithUserDDL), 'null'), ',', 
+	toJSONString('multiple'), ':', ifNull(r.multiple, 'null'), ',', 
+	toJSONString('nonAsciiκόσμε'), ':', ifNull(toJSONString(r.`nonAsciiκόσμε`), 'null'), ',', 
+	toJSONString('number'), ':', ifNull(toJSONString(r.number), 'null'), ',', 
+	toJSONString('numberCastToString'), ':', ifNull(toJSONString(toString(r.numberCastToString)), 'null'), ',', 
+	toJSONString('object'), ':', ifNull(r.object, 'null'), ',', 
+	toJSONString('string'), ':', ifNull(toJSONString(r.string), 'null'), ',', 
+	toJSONString('stringInteger'), ':', ifNull(toJSONString(r.stringInteger), 'null'), ',', 
+	toJSONString('stringInteger39Chars'), ':', ifNull(toJSONString(r.stringInteger39Chars), 'null'), ',', 
+	toJSONString('stringInteger66Chars'), ':', ifNull(toJSONString(r.stringInteger66Chars), 'null'), ',', 
+	toJSONString('stringNumber'), ':', ifNull(toJSONString(toString(r.stringNumber)), 'null')
+, '}') AS flow_document
 	FROM `key_value-@你好-``-"especiál` AS r FINAL
 	JOIN `flow_temp_load_0_key_value-@你好-``-"especiál` AS l
 		 ON l.key1 = r.key1
 		 AND l.key2 = r.key2
 		 AND l.`key!binary` = r.`key!binary`
-SETTINGS use_variant_as_common_type = 1
 --- End `key_value-@你好-``-"especiál` queryLoadTableNoFlowDocument ---
 
 --- Begin `delta_updates-@你好-``-"especiál` queryLoadTableNoFlowDocument ---

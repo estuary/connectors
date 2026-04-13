@@ -257,44 +257,47 @@ SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
 {{ end -}}
 {{ end }}
 
--- Templated query for no_flow_document mode - reconstructs JSON from root-level columns
--- using toJSONString(map(...)) with SETTINGS use_variant_as_common_type = 1 to allow
--- mixed-type map values.
---
--- toJSONString(map(...)) handles most types correctly, including Nullable columns
--- (serialized as null). Four types need pre-processing before going into the map:
---   - DateTime64: toJSONString formats as "YYYY-MM-DD HH:MM:SS.ffffff" which isn't
---     RFC3339; we formatDateTime and append 'Z' to produce a proper string value.
---   - STRING_NUMBER: stored as Float64 but must appear as a JSON string; toString()
---     converts it so the map serializes it quoted.
+-- Templated query for no_flow_document mode - reconstructs JSON from root-level
+-- columns using concat(). Each column value is individually serialized:
+--   - OBJECT, ARRAY, MULTIPLE: stored as String containing valid JSON, embedded
+--     directly via ifNull(col, 'null') so they appear as proper JSON
+--     objects/arrays rather than double-encoded strings.
+--   - DateTime64: formatDateTime produces RFC3339, wrapped in toJSONString for
+--     proper quoting.
+--   - STRING_NUMBER: stored as Float64 but must appear as a JSON string;
+--     toString() converts before toJSONString quotes it.
+--   - All other types: toJSONString handles correct JSON serialization
+--     (quoting strings, bare numbers/bools).
+-- Nullable columns use ifNull(..., 'null') to emit JSON null.
 
-{{ define "mapValue" -}}
+{{ define "concatValue" -}}
 {{ $ident := printf "%s.%s" $.Alias $.Identifier }}
-{{- if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
-	formatDateTime({{ $ident }}, '%Y-%m-%dT%H:%i:%S.%f', 'UTC') || 'Z'
+{{- if or (eq $.AsFlatType "object") (eq $.AsFlatType "array") (eq $.AsFlatType "multiple") -}}
+	ifNull({{ $ident }}, 'null')
+{{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") -}}
+	ifNull(toJSONString(formatDateTime({{ $ident }}, '%Y-%m-%dT%H:%i:%S.%f', 'UTC') || 'Z'), 'null')
 {{- else if eq $.AsFlatType "string_number" -}}
-	toString({{ $ident }})
+	ifNull(toJSONString(toString({{ $ident }})), 'null')
 {{- else -}}
-	{{ $ident }}
+	ifNull(toJSONString({{ $ident }}), 'null')
 {{- end -}}
 {{- end }}
 
 {{ define "queryLoadTableNoFlowDocument" }}
 {{ if not $.DeltaUpdates -}}
 SELECT {{ $.Binding }}::Int32,
-toJSONString(map(
+concat('{',
 {{- range $i, $col := $.RootLevelColumns -}}
-	{{- if $i }},{{ end }}
-	{{ Literal $col.Field }}, {{ template "mapValue" (ColumnWithAlias $col "r") }}
+	{{- if $i }}, ',', {{ end }}
+	toJSONString({{ Literal $col.Field }}), ':', {{ template "concatValue" (ColumnWithAlias $col "r") }}
 {{- end }}
-)) AS flow_document
+, '}') AS flow_document
 	FROM {{$.Identifier}} AS r FINAL
 	JOIN {{ template "loadTableName" . }} AS l
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON {{ end -}}
 		l.{{$key.Identifier}} = r.{{$key.Identifier}}
 	{{- end }}
-SETTINGS use_variant_as_common_type = 1
 {{ else -}}
 SELECT * FROM (SELECT -1::Int32, ''::String LIMIT 0) as nodoc
 {{ end -}}
