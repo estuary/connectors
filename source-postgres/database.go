@@ -59,6 +59,9 @@ func listPublishedTables(ctx context.Context, conn *pgxpool.Pool, publicationNam
 		}
 		publicationStatus[sqlcapture.JoinStreamID(schema, table)] = true
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error listing tables in publication %q: %w", publicationName, err)
+	}
 	return publicationStatus, nil
 }
 

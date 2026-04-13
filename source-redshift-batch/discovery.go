@@ -304,6 +304,9 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 			Type:   tableType,
 		})
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered tables: %w", err)
+	}
 	return tables, nil
 }
 
@@ -464,6 +467,9 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 			DataType:   &dataType,
 		})
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered columns: %w", err)
+	}
 	return columns, nil
 }
 
@@ -522,6 +528,9 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 			Column: columnName,
 			Index:  ordinalPosition,
 		})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered primary keys: %w", err)
 	}
 	return keys, nil
 }

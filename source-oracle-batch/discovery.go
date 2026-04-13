@@ -239,6 +239,9 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 			Name:  tableName,
 		})
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered tables: %w", err)
+	}
 	return tables, nil
 }
 
@@ -336,6 +339,9 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 			DataType: dataType,
 		}
 		columns = append(columns, column)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered columns: %w", err)
 	}
 	return columns, nil
 }

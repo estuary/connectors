@@ -268,6 +268,9 @@ func getTables(ctx context.Context, conn *sql.DB, opts discoveryOptions) ([]*sql
 			ExtraDetails: &sqlserverTableDiscoveryDetails{},
 		})
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered tables: %w", err)
+	}
 	return tables, nil
 }
 
@@ -347,6 +350,9 @@ func getColumns(ctx context.Context, conn *sql.DB, opts discoveryOptions) ([]sql
 		}
 		columns = append(columns, ci)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered columns: %w", err)
+	}
 	return columns, nil
 }
 
@@ -420,6 +426,9 @@ func getPrimaryKeys(ctx context.Context, conn *sql.DB, opts discoveryOptions) (m
 			return nil, fmt.Errorf("primary key column %q (of table %q) appears out of order", columnName, streamID)
 		}
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered primary keys: %w", err)
+	}
 	return keys, nil
 }
 
@@ -472,7 +481,10 @@ func getSecondaryIndexes(ctx context.Context, conn *sql.DB, opts discoveryOption
 			return nil, fmt.Errorf("internal error: secondary index key ordering failure: index %q on stream %q: column %q appears out of order", indexName, streamID, columnName)
 		}
 	}
-	return streamIndexColumns, err
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered secondary indexes: %w", err)
+	}
+	return streamIndexColumns, nil
 }
 
 func queryDiscoverComputedColumns(opts discoveryOptions) string {
@@ -508,6 +520,9 @@ func getComputedColumns(ctx context.Context, conn *sql.DB, opts discoveryOptions
 		}
 		var streamID = sqlcapture.JoinStreamID(tableSchema, tableName)
 		computedColumns[streamID] = append(computedColumns[streamID], columnName)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered computed columns: %w", err)
 	}
 	return computedColumns, nil
 }
