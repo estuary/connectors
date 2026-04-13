@@ -208,7 +208,7 @@ func (sm *streamManager) flush(baseToken string) (map[int][]*blobMetadata, error
 // channel itself persists the last registered token, and this allows us to
 // filter out blobs that had previously been registered and don't need
 // registered again on a re-attempt of an Acknowledge.
-func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, recovery bool) error {
+func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata) error {
 	if err := validWriteBlobs(blobs); err != nil {
 		return fmt.Errorf("validWriteBlobs: %w", err)
 	}
@@ -247,19 +247,7 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, recov
 		blob.Chunks[0].Channels[0].ClientSequencer = thisChannel.ClientSequencer
 		blob.Chunks[0].Channels[0].RowSequencer = thisChannel.RowSequencer + 1
 
-		if recovery {
-			// Always use the rename and re-upload strategy during recovery
-			// commits. This prevents issues where blobs could be re-registered
-			// if the underlying channel has changed somehow, perhaps by being
-			// dropped out-of-band, or its last persisted token changed in some
-			// other way.
-			//
-			// This should be a relatively infrequent occurrence, so the
-			// performance impact + increased data transfer should be tolerable.
-			if err := sm.writeRenamed(ctx, thisChannel, blob); err != nil {
-				return fmt.Errorf("writeRenamed: %w", err)
-			}
-		} else if err := sm.c.write(ctx, blob); err != nil {
+		if err := sm.c.write(ctx, blob); err != nil {
 			var apiError *streamingApiError
 			if errors.As(err, &apiError) && apiError.Code == 38 {
 				// The "blob has wrong format or extension" error occurs if the
@@ -277,16 +265,27 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, recov
 				// rather than exclusively managed by our Acknowledge
 				// checkpoints. But it is still technically possible and so it
 				// is handled with this.
-				log.WithFields(log.Fields{
-					"name":   blob.Path,
-					"token":  blobToken,
-					"schema": blob.Chunks[0].Schema,
-					"table":  blob.Chunks[0].Table,
-				}).Warn("blob rejected for malformed name; will attempt to register by renaming")
-
-				if err := sm.writeRenamed(ctx, thisChannel, blob); err != nil {
-					return fmt.Errorf("writeRenamed: %w", err)
+				if err := sm.maybeInitializeBucket(ctx); err != nil {
+					return fmt.Errorf("initializing bucket to rename: %w", err)
 				}
+				nextName := sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
+
+				ll := log.WithFields(log.Fields{
+					"oldName": blob.Path,
+					"newName": nextName,
+					"token":   blobToken,
+				})
+				ll.Info("attempting to register blob with malformed name by renaming")
+
+				if err := sm.renameBlob(ctx, blob, thisChannel.EncryptionKey, nextName); err != nil {
+					return fmt.Errorf("renameBlob: %w", err)
+				}
+
+				if err := sm.c.write(ctx, blob); err != nil {
+					log.WithField("blob", blob).Warn("blob metadata")
+					return fmt.Errorf("failed to write renamed blob: %w", err)
+				}
+				ll.Info("successfully registered renamed blob")
 			} else {
 				return fmt.Errorf("write: %w", err)
 			}
@@ -309,34 +308,6 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, recov
 	); err != nil {
 		return fmt.Errorf("waitForTokenPersisted: %w", err)
 	}
-
-	return nil
-}
-
-func (sm *streamManager) writeRenamed(ctx context.Context, channel *channel, blob *blobMetadata) error {
-	if err := sm.maybeInitializeBucket(ctx); err != nil {
-		return fmt.Errorf("initializing bucket to rename: %w", err)
-	}
-	nextName := sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
-
-	ll := log.WithFields(log.Fields{
-		"oldName": blob.Path,
-		"newName": nextName,
-		"token":   blob.Chunks[0].Channels[0].OffsetToken,
-		"schema":  blob.Chunks[0].Schema,
-		"table":   blob.Chunks[0].Table,
-	})
-	ll.Info("attempting to register blob by renaming")
-
-	if err := sm.renameBlob(ctx, blob, channel.EncryptionKey, nextName); err != nil {
-		return fmt.Errorf("renameBlob: %w", err)
-	}
-
-	if err := sm.c.write(ctx, blob); err != nil {
-		ll.WithField("blob", blob).Warn("blob metadata")
-		return fmt.Errorf("failed to write renamed blob: %w", err)
-	}
-	ll.Info("successfully registered renamed blob")
 
 	return nil
 }

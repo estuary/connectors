@@ -96,7 +96,7 @@ func TestStreamManager(t *testing.T) {
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
 
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0]))
 
 		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
 			{"key1", "hello1", "world1"},
@@ -105,7 +105,7 @@ func TestStreamManager(t *testing.T) {
 		})
 
 		// Write the same token again, it is not added to the table.
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0]))
 
 		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
 			{"key1", "hello1", "world1"},
@@ -127,7 +127,7 @@ func TestStreamManager(t *testing.T) {
 		require.Equal(t, 1, len(blobs[0]))
 
 		// The original invocation will error and not write any data.
-		require.Error(t, sm.write(ctx, blobs[0], false))
+		require.Error(t, sm.write(ctx, blobs[0]))
 		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
 			{"key1", "hello1", "world1"},
 			{"key2", "hello2", "world2"},
@@ -143,7 +143,7 @@ func TestStreamManager(t *testing.T) {
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
 
-		require.NoError(t, ssm.write(ctx, blobs[0], false))
+		require.NoError(t, ssm.write(ctx, blobs[0]))
 
 		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
 			{"key1", "hello1", "world1"},
@@ -152,68 +152,6 @@ func TestStreamManager(t *testing.T) {
 			{"key4", "hello4", "world4"},
 			{"key5", "hello5", "world5"},
 			{"key6", "hello6", "world6"},
-		})
-	})
-
-	t.Run("upload with rename", func(t *testing.T) {
-		table := sql.Table{
-			TableShape: sql.TableShape{
-				Binding: 0,
-			},
-			Identifier: `STREAM_TEST`,
-			Keys:       []sql.Column{{Identifier: `key`}},
-			Values:     []sql.Column{{Identifier: `firstcol`}, {Identifier: `secondcol`}},
-			Document:   nil,
-		}
-
-		cleanup := func(t *testing.T) {
-			t.Helper()
-			_, err = db.ExecContext(ctx, "DROP TABLE IF EXISTS STREAM_TEST;")
-		}
-		defer cleanup(t)
-
-		cleanup(t)
-		_, err = db.ExecContext(ctx, `CREATE TABLE STREAM_TEST (key TEXT, firstcol TEXT, secondcol TEXT);`)
-		require.NoError(t, err)
-
-		sm, err := newStreamManager(&cfg, "testing", accountName, 0)
-		require.NoError(t, err)
-
-		require.NoError(t, sm.addBinding(ctx, cfg.Schema, table.Identifier, table))
-
-		require.NoError(t, sm.writeRow(ctx, 0, []any{"key1", "hello1", "world1"}))
-		require.NoError(t, sm.writeRow(ctx, 0, []any{"key2", "hello2", "world2"}))
-		require.NoError(t, sm.writeRow(ctx, 0, []any{"key3", "hello3", "world3"}))
-		blobs, err := sm.flush("the-token-1")
-		require.NoError(t, err)
-		require.Equal(t, 1, len(blobs))
-		require.Equal(t, 1, len(blobs[0]))
-
-		// Write blob normally.
-		require.NoError(t, sm.write(ctx, blobs[0], false))
-
-		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
-			{"key1", "hello1", "world1"},
-			{"key2", "hello2", "world2"},
-			{"key3", "hello3", "world3"},
-		})
-
-		// Attempt to register the same blob again, with the persisted channel
-		// token having been changed. This is simulated not by actually changing
-		// the channel token, but swapping out our desired offset token. Rather
-		// than registering the blob with the exact same file name (which will
-		// cause a Snowflake error / table corruption), this will re-name the
-		// blob and register it with the exact same data.
-		blobs[0][0].Chunks[0].Channels[0].OffsetToken = "a-new-token:0"
-		require.NoError(t, sm.write(ctx, blobs[0], true))
-
-		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
-			{"key1", "hello1", "world1"},
-			{"key1", "hello1", "world1"},
-			{"key2", "hello2", "world2"},
-			{"key2", "hello2", "world2"},
-			{"key3", "hello3", "world3"},
-			{"key3", "hello3", "world3"},
 		})
 	})
 
@@ -255,7 +193,7 @@ func TestStreamManager(t *testing.T) {
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 2, len(blobs[0]))
 
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0]))
 
 		verify(t, "SELECT * FROM STREAM_TEST ORDER BY key", [][]any{
 			{"key1", "hello1", "world1"},
@@ -323,7 +261,7 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0]))
 
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key4", "hello4", "world4"}))
 		require.NoError(t, sm.writeRow(ctx, 0, []any{"key5", "hello5", "world5"}))
@@ -339,7 +277,7 @@ func TestStreamManager(t *testing.T) {
 		require.Equal(t, 3, len(blobs))
 		for _, blob := range blobs {
 			require.Equal(t, 1, len(blob))
-			require.NoError(t, sm.write(ctx, blob, false))
+			require.NoError(t, sm.write(ctx, blob))
 		}
 
 		// Noop commit.
@@ -358,7 +296,7 @@ func TestStreamManager(t *testing.T) {
 		require.Equal(t, 2, len(blobs))
 		for _, blob := range blobs {
 			require.Equal(t, 1, len(blob))
-			require.NoError(t, sm.write(ctx, blob, false))
+			require.NoError(t, sm.write(ctx, blob))
 		}
 
 		verify(t, "SELECT * FROM "+tables[0].Identifier+" ORDER BY key", [][]any{
@@ -439,7 +377,7 @@ func TestStreamManager(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0]))
 
 		verify(t, "SELECT * FROM "+tbl.Identifier+" ORDER BY key", [][]any{
 			{nil, "key1", "hello1", nil, "goodbye1", "aloha1", nil},
@@ -487,7 +425,7 @@ func TestStreamManager(t *testing.T) {
 		require.Equal(t, 1, len(blobs))
 		require.Equal(t, 1, len(blobs[0]))
 
-		require.NoError(t, sm.write(ctx, blobs[0], false))
+		require.NoError(t, sm.write(ctx, blobs[0]))
 
 		var gotData string
 		require.NoError(t, db.QueryRowContext(ctx, "SELECT firstcol FROM STREAM_TEST").Scan(&gotData))
@@ -607,7 +545,7 @@ func TestStreamDatatypes(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, 1, len(blobs))
 			require.Equal(t, 1, len(blobs[0]))
-			require.NoError(t, sm.write(ctx, blobs[0], false))
+			require.NoError(t, sm.write(ctx, blobs[0]))
 
 			var snap strings.Builder
 			eps, err := json.Marshal(blobs[0][0].Chunks[0].EPS)
