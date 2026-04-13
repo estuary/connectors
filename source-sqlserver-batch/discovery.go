@@ -253,6 +253,9 @@ func discoverTables(ctx context.Context, db *sql.DB, discoverSchemas []string) (
 			Type:   tableType,
 		})
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered tables: %w", err)
+	}
 	return tables, nil
 }
 
@@ -411,6 +414,9 @@ func discoverColumns(ctx context.Context, db *sql.DB, discoverSchemas []string) 
 		}
 		columns = append(columns, column)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered columns: %w", err)
+	}
 	return columns, nil
 }
 
@@ -477,6 +483,9 @@ func discoverPrimaryKeys(ctx context.Context, db *sql.DB, discoverSchemas []stri
 		if ordinalPosition != len(keyInfo.Columns) {
 			return nil, fmt.Errorf("primary key column %q (of table %q) appears out of order", columnName, tableID)
 		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating discovered primary keys: %w", err)
 	}
 
 	var keys []*discoveredPrimaryKey

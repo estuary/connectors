@@ -297,6 +297,9 @@ func (db *oracleDatabase) fetchBackfillRowIDRange(ctx context.Context, schemaNam
 
 		db.backfillRowIDRanges[streamID] = append(db.backfillRowIDRanges[streamID], rowidStart)
 	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterating rowid ranges: %w", err)
+	}
 
 	var row = db.conn.QueryRowContext(ctx, fmt.Sprintf(`SELECT MAX(ROWID) FROM "%s"."%s"`, schemaName, tableName))
 	if err != nil {
@@ -515,6 +518,10 @@ func (db *oracleDatabase) explainQuery(ctx context.Context, streamID sqlcapture.
 		}
 
 		outputLines = append(outputLines, outputLine)
+	}
+	if err := rows.Err(); err != nil {
+		logrus.WithFields(logrus.Fields{"id": streamID, "err": err}).Error("error iterating explain output")
+		return
 	}
 
 	logrus.WithFields(logrus.Fields{

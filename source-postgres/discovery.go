@@ -798,6 +798,9 @@ func getGeneratedColumns(ctx context.Context, conn *pgxpool.Pool) (map[sqlcaptur
 		var streamID = sqlcapture.JoinStreamID(tableSchema, tableName)
 		generatedColumns[streamID] = append(generatedColumns[streamID], columnName)
 	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating generated columns: %w", err)
+	}
 	return generatedColumns, nil
 }
 

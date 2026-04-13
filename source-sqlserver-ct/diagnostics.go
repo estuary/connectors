@@ -42,6 +42,9 @@ func (db *sqlserverDatabase) ReplicationDiagnostics(ctx context.Context) error {
 			}
 			log.WithFields(logFields).Info("got diagnostic row")
 		}
+		if err := rows.Err(); err != nil {
+			logEntry.WithField("err", err).Error("error iterating diagnostic rows")
+		}
 		if numResults == 0 {
 			logEntry.Info("no results")
 		}

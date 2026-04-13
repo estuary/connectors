@@ -145,6 +145,9 @@ func (db *oracleDatabase) prerequisiteTableAndColumnNameLengths(ctx context.Cont
 				}).Warn("column names longer than 30 characters are not supported for capturing, column will be ignored.")
 			}
 		}
+		if err := rows.Err(); err != nil {
+			return fmt.Errorf("iterating columns for table %q.%q: %w", owner, tableName, err)
+		}
 	}
 
 	return nil
