@@ -115,8 +115,6 @@ func TestReencrypt(t *testing.T) {
 	input := make([]byte, 1024*1024+3)
 	_, err := rand.Read(input)
 	require.NoError(t, err)
-	copy(input, "PAR1")
-
 	encryptionKey := "aGVsbG8K"
 	oldFileName := blobFileName("old")
 	newFileName := blobFileName("new")
@@ -142,8 +140,7 @@ func TestReencrypt(t *testing.T) {
 	var in = bytes.NewReader(encrypted)
 	var out bytes.Buffer
 
-	err = reencrypt(in, &out, blob, encryptionKey, newFileName)
-	require.NoError(t, err)
+	require.NoError(t, reencrypt(in, &out, blob, encryptionKey, newFileName))
 
 	// The re-encrypted file matches the original input.
 	newKey, err := deriveKey(encryptionKey, newFileName)
