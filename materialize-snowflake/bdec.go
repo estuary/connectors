@@ -416,24 +416,22 @@ func getCipherStream(encryptionKey string, fileName blobFileName) (cipher.Stream
 	return cipher.NewCTR(block, make([]byte, aes.BlockSize)), nil
 }
 
-// reencrypt reads encrypted blob data from r, decrypts it using the
-// decryptKey and original file name, and then re-encrypts it using the
-// new file name and writes the output to w. The blob metadata is updated in
-// place.
+// reencrypt reads encrypted blob data from r, decrypts it using the encryption
+// key and original file name, and then re-encrypts it using the new file name
+// and writes the output to w. The blob metadata is updated in place.
 func reencrypt(
 	r io.Reader,
 	w io.Writer,
 	blob *blobMetadata,
-	decryptKey string,
-	channel *channel,
+	encryptionKey string,
 	newFileName blobFileName,
 ) error {
-	decryptStream, err := getCipherStream(decryptKey, blobFileName(blob.Path))
+	decryptStream, err := getCipherStream(encryptionKey, blobFileName(blob.Path))
 	if err != nil {
 		return fmt.Errorf("getting decryptStream: %w", err)
 	}
 
-	encryptStream, err := getCipherStream(channel.EncryptionKey, newFileName)
+	encryptStream, err := getCipherStream(encryptionKey, newFileName)
 	if err != nil {
 		return fmt.Errorf("getting encryptStream: %w", err)
 	}
@@ -481,6 +479,7 @@ func reencrypt(
 		if err != nil && !errors.Is(err, io.EOF) {
 			return fmt.Errorf("reading from r: %w", err)
 		}
+		fmt.Println(n, err)
 	}
 
 	downHash := hex.EncodeToString(downMd5.Sum(nil))
@@ -492,7 +491,6 @@ func reencrypt(
 	blob.Path = string(newFileName)
 	blob.MD5 = upHash
 	blob.Chunks[0].ChunkMD5 = upHash
-	blob.Chunks[0].EncryptionKeyID = channel.EncryptionKeyId
 
 	return nil
 }
