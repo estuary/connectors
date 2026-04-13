@@ -288,8 +288,8 @@ SELECT {{ $.Binding }}::Int32, r.{{$.Document.Identifier}}
 SELECT {{ $.Binding }}::Int32,
 concat('{',
 {{- range $i, $col := $.RootLevelColumns -}}
-	{{- if $i }}, ',', {{ end }}
-	toJSONString({{ Literal $col.Field }}), ':', {{ template "concatValue" (ColumnWithAlias $col "r") }}
+	{{- if $i }}, ',',{{ end }}
+	'"{{ $col.Field }}":', {{ template "concatValue" (ColumnWithAlias $col "r") }}
 {{- end }}
 , '}') AS flow_document
 	FROM {{$.Identifier}} AS r FINAL
