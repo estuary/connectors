@@ -1101,19 +1101,11 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	require.EqualValues(t, chproto.ErrUnknownTable, exc.Code)
 }
 
-// TestNoFlowDocumentObjectColumns verifies that root-level OBJECT, ARRAY, and
-// MULTIPLE columns are correctly embedded as JSON objects/arrays (not
-// double-encoded as strings) when reconstructed by the
-// queryLoadTableNoFlowDocument template's toJSONString(map(...)).
-func TestNoFlowDocumentObjectColumns(t *testing.T) {
-	var cfg = testConfig()
-	cfg.Advanced.NoFlowDocument = true
-	var ctx = t.Context()
-	var dialect = clickHouseDialect(cfg.Database)
-	var tpls = renderTemplates(dialect, cfg.HardDelete)
-	var tableName = "test_no_flow_doc_object"
-
-	var shape = sql.TableShape{
+// noFlowDocShape builds a TableShape for NoFlowDocument tests with a variety
+// of column types: a string key, nullable and non-nullable object/array/multiple
+// values, a nullable string, a date-time, and a string_number.
+func noFlowDocShape(tableName string) sql.TableShape {
+	return sql.TableShape{
 		Path:    sql.TablePath{tableName},
 		Binding: 0,
 		Keys: []sql.Projection{
@@ -1145,8 +1137,8 @@ func TestNoFlowDocumentObjectColumns(t *testing.T) {
 					Ptr:   "/tags",
 					Field: "tags",
 					Inference: pf.Inference{
-						Types:  []string{"array"},
-						Exists: pf.Inference_MUST,
+						Types:  []string{"array", "null"},
+						Exists: pf.Inference_MAY,
 					},
 				},
 			},
@@ -1155,27 +1147,74 @@ func TestNoFlowDocumentObjectColumns(t *testing.T) {
 					Ptr:   "/extra",
 					Field: "extra",
 					Inference: pf.Inference{
-						Types:  []string{"integer", "object", "boolean"},
-						Exists: pf.Inference_MUST,
+						Types:  []string{"integer", "object", "boolean", "null"},
+						Exists: pf.Inference_MAY,
 					},
 				},
 			},
-			flowPublishedAtProjection,
+			{
+				Projection: pf.Projection{
+					Ptr:   "/note",
+					Field: "note",
+					Inference: pf.Inference{
+						Types:   []string{"string", "null"},
+						Exists:  pf.Inference_MAY,
+						String_: &pf.Inference_String{},
+					},
+				},
+			},
+			{
+				Projection: pf.Projection{
+					Ptr:   "/score",
+					Field: "score",
+					Inference: pf.Inference{
+						Types:   []string{"number", "string"},
+						Exists:  pf.Inference_MUST,
+						String_: &pf.Inference_String{Format: "number"},
+					},
+				},
+			},
+			{
+				Projection: pf.Projection{
+					Ptr:   "/flow_published_at",
+					Field: "flow_published_at",
+					Inference: pf.Inference{
+						Types:   []string{"string"},
+						Exists:  pf.Inference_MUST,
+						String_: &pf.Inference_String{Format: "date-time"},
+					},
+				},
+			},
 		},
 	}
-	shape.Values[3].Ptr = "/flow_published_at"
+}
 
+// TestNoFlowDocumentObjectColumns verifies that root-level OBJECT, ARRAY, and
+// MULTIPLE columns are correctly embedded as JSON objects/arrays (not
+// double-encoded as strings) when reconstructed by the
+// queryLoadTableNoFlowDocument template.
+func TestNoFlowDocumentObjectColumns(t *testing.T) {
+	var cfg = testConfig()
+	cfg.Advanced.NoFlowDocument = true
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tableName = "test_no_flow_doc_object"
+
+	var shape = noFlowDocShape(tableName)
 	table, err := sql.ResolveTable(shape, dialect)
 	require.NoError(t, err)
 
 	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
 
 	storeRows(t, ctx, storeConn, b, cfg.Database, []any{
-		"k1",                         // id (key)
-		`{"op":"c","extra":"stuff"}`, // _meta (object → String)
-		`["tag1","tag2"]`,            // tags (array → String)
-		`{"nested":true}`,            // extra (multiple → String)
-		testTime,                     // flow_published_at
+		"k1",                         // id
+		`{"op":"c","extra":"stuff"}`, // _meta (object)
+		`["tag1","tag2"]`,            // tags (nullable array)
+		`{"nested":true}`,            // extra (nullable multiple)
+		"hello",                      // note (nullable string)
+		float64(3.14),                // score (string_number → Float64)
+		testTime,                     // flow_published_at (date-time)
 	})
 
 	docs := loadDocuments(t, ctx, loadConn, b, []any{"k1"})
@@ -1184,22 +1223,64 @@ func TestNoFlowDocumentObjectColumns(t *testing.T) {
 	var parsed map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal([]byte(docs[0]), &parsed))
 
-	metaRaw := string(parsed["_meta"])
-	tagsRaw := string(parsed["tags"])
-	extraRaw := string(parsed["extra"])
+	// OBJECT: embedded as JSON object.
+	require.JSONEq(t, `{"op":"c","extra":"stuff"}`, string(parsed["_meta"]))
 
-	// OBJECT columns must be embedded as JSON objects, not double-encoded strings.
-	require.Truef(t, metaRaw[0] == '{',
-		"expected _meta to be a JSON object, got: %s", metaRaw)
-	require.JSONEq(t, `{"op":"c","extra":"stuff"}`, metaRaw)
+	// ARRAY: embedded as JSON array.
+	require.JSONEq(t, `["tag1","tag2"]`, string(parsed["tags"]))
 
-	// ARRAY columns must be embedded as JSON arrays.
-	require.Truef(t, tagsRaw[0] == '[',
-		"expected tags to be a JSON array, got: %s", tagsRaw)
-	require.JSONEq(t, `["tag1","tag2"]`, tagsRaw)
+	// MULTIPLE: embedded as its actual JSON type.
+	require.JSONEq(t, `{"nested":true}`, string(parsed["extra"]))
 
-	// MULTIPLE columns must be embedded as their actual JSON type.
-	require.Truef(t, extraRaw[0] == '{',
-		"expected extra to be a JSON object, got: %s", extraRaw)
-	require.JSONEq(t, `{"nested":true}`, extraRaw)
+	// STRING: properly quoted.
+	require.Equal(t, `"hello"`, string(parsed["note"]))
+
+	// STRING_NUMBER: serialized as a JSON string (quoted), not a bare number.
+	require.Equal(t, `"3.14"`, string(parsed["score"]))
+
+	// DATE-TIME: RFC3339 string.
+	require.Equal(t, `"2024-01-01T00:00:00.000000Z"`, string(parsed["flow_published_at"]))
+}
+
+// TestNoFlowDocumentNullValues verifies that nullable columns serialize as JSON
+// null (not the string "null" or a missing key) when their value is NULL.
+func TestNoFlowDocumentNullValues(t *testing.T) {
+	var cfg = testConfig()
+	cfg.Advanced.NoFlowDocument = true
+	var ctx = t.Context()
+	var dialect = clickHouseDialect(cfg.Database)
+	var tpls = renderTemplates(dialect, cfg.HardDelete)
+	var tableName = "test_no_flow_doc_nulls"
+
+	var shape = noFlowDocShape(tableName)
+	table, err := sql.ResolveTable(shape, dialect)
+	require.NoError(t, err)
+
+	b, storeConn, loadConn := setupTable(t, ctx, cfg, dialect, tpls, table, tableName)
+
+	// Store a row where all nullable columns are NULL.
+	storeRows(t, ctx, storeConn, b, cfg.Database, []any{
+		"k1",         // id
+		`{"op":"c"}`, // _meta (non-nullable object)
+		nil,          // tags (nullable array → NULL)
+		nil,          // extra (nullable multiple → NULL)
+		nil,          // note (nullable string → NULL)
+		float64(1.0), // score (non-nullable string_number)
+		testTime,     // flow_published_at
+	})
+
+	docs := loadDocuments(t, ctx, loadConn, b, []any{"k1"})
+	require.Len(t, docs, 1)
+
+	var parsed map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal([]byte(docs[0]), &parsed))
+
+	// Nullable columns with NULL values must serialize as JSON null.
+	require.Equal(t, "null", string(parsed["tags"]))
+	require.Equal(t, "null", string(parsed["extra"]))
+	require.Equal(t, "null", string(parsed["note"]))
+
+	// Non-nullable columns are still present.
+	require.JSONEq(t, `{"op":"c"}`, string(parsed["_meta"]))
+	require.Equal(t, `"1"`, string(parsed["score"]))
 }
