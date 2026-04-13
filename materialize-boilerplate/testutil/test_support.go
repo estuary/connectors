@@ -42,6 +42,13 @@ func loadSpec(t *testing.T, path string) *pf.MaterializationSpec {
 
 const testItemIdentifier = "_flow_test_"
 
+// flowCheckpointsTableName is the name of the meta checkpoints table created
+// by SQL materialization connectors. It is intentionally never cleaned up
+// between test runs: keeping it around means subsequent Apply RPCs don't
+// re-create it (so it stays out of the action description and snapshots), and
+// avoids parallel test runs racing to delete a table they all share.
+const flowCheckpointsTableName = "flow_checkpoints_v1"
+
 func testdataPath(parts ...string) string {
 	_, filename, _, _ := runtime.Caller(0)
 	dir := filepath.Dir(filename)
@@ -963,6 +970,13 @@ func CleanupTestResources[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 }
 
 func shouldCleanup(t *testing.T, now time.Time, item string, suffix string) bool {
+	if item == flowCheckpointsTableName {
+		// Never cleanup the meta checkpoints table: leaving it in place keeps
+		// it out of the next run's Apply action description (so snapshots stay
+		// stable), and prevents parallel test runs sharing a database from
+		// racing to delete each other's checkpoints table.
+		return false
+	}
 	if !strings.Contains(item, testItemIdentifier) {
 		// Not created for testing.
 		return false

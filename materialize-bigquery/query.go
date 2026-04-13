@@ -257,6 +257,10 @@ func maybeRetry(ctx context.Context, err error, attempt int, delay time.Duration
 		if strings.Contains(err.Error(), "Transaction is aborted due to concurrent update against table") ||
 			strings.Contains(err.Error(), "Could not serialize access to table") ||
 			strings.Contains(err.Error(), "The job encountered an error during execution. Retrying the job may solve the problem.") ||
+			// Per-table metadata update rate limits surface as a 400
+			// "invalidQuery" with this message rather than a proper
+			// rateLimitExceeded reason, so match on the substring.
+			strings.Contains(err.Error(), "Exceeded rate limits") ||
 			(len(e.Errors) == 1 && e.Errors[0].Reason == "jobRateLimitExceeded") {
 			return doDelay()
 		}
