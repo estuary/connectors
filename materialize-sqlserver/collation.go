@@ -35,6 +35,7 @@ func getCollation(ctx context.Context, db *stdsql.DB) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("querying available collations: %w", err)
 	}
+	defer rows.Close()
 
 	var collations []string
 	for rows.Next() {
