@@ -3,6 +3,7 @@ package connector
 import (
 	"flag"
 	"os"
+	"regexp"
 	"testing"
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
@@ -25,6 +26,13 @@ func TestIntegration(t *testing.T) {
 		return resource{Table: table}
 	}
 
+	// Normalize S3 file paths that contain UUIDs which change on every run.
+	actionDescSanitizers := []func(string) string{
+		func(s string) string {
+			return regexp.MustCompile(`"s3://[^"]+\.csv\.gz"`).ReplaceAllString(s, `"s3://<bucket>/<uuid>.csv.gz"`)
+		},
+	}
+
 	all := *testAll || os.Getenv("ICEBERG_TEST_ALL") != ""
 
 	materializeSpec := "testdata/materialize-rest.flow.yaml"
@@ -37,7 +45,7 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTestParallel(t, newMaterialization, materializeSpec, makeResourceFn, nil)
+		boilerplate.RunMaterializationTestParallel(t, newMaterialization, materializeSpec, makeResourceFn, actionDescSanitizers)
 	})
 
 	t.Run("apply", func(t *testing.T) {
