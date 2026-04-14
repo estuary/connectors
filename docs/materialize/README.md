@@ -135,6 +135,8 @@ Below is a sequence diagram depicting the various messages exchanged between a m
 named in an imperative fashion (`Load`), while responses from the driver always
 have a past-tense name (`Loaded`):
 
+See the rendered chart [here](https://docs.estuary.dev/reference/Connectors/materialization-protocol/).
+
 <Mermaid chart={`
   sequenceDiagram
     Runtime->>Driver: Open{MaterializationSpec, driverCP}
