@@ -356,8 +356,8 @@ func (d *transactor) addBinding(ctx context.Context, target sql.Table, streaming
 	var b = new(binding)
 	b.target = target
 	b.nullFieldsToStrip = target.NullableFieldsToStrip()
-	b.load.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
-	b.store.mergeBounds = sql.NewMergeBoundsBuilder(target.Keys, d.ep.Dialect.Literal)
+	b.load.mergeBounds = sql.NewMergeBoundsBuilder(string(target.Source), target.Keys, d.ep.Dialect.Literal)
+	b.store.mergeBounds = sql.NewMergeBoundsBuilder(string(target.Source), target.Keys, d.ep.Dialect.Literal)
 
 	if b.target.DeltaUpdates && d.cfg.Credentials.AuthType == snowflake_auth.JWT && streamingEnabled {
 		loc := d.ep.Dialect.TableLocator(b.target.Path)

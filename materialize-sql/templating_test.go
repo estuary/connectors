@@ -147,7 +147,7 @@ func TestMergeBoundsBuilder(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			b := NewMergeBoundsBuilder(tt.keyColumns, literaler)
+			b := NewMergeBoundsBuilder("test/collection", tt.keyColumns, literaler)
 			for _, store := range tt.keys {
 				b.NextKey(store)
 			}

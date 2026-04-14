@@ -93,6 +93,7 @@ type MergeBound struct {
 // MergeBoundsBuilder tracks and generates a MergeBound for each of a binding's
 // key fields.
 type MergeBoundsBuilder struct {
+	source     string
 	keyColumns []Column
 	literaler  func(any) string
 
@@ -100,8 +101,9 @@ type MergeBoundsBuilder struct {
 	upper []any
 }
 
-func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string) *MergeBoundsBuilder {
+func NewMergeBoundsBuilder(source string, keyColumns []Column, literaler func(any) string) *MergeBoundsBuilder {
 	return &MergeBoundsBuilder{
+		source:     source,
 		keyColumns: keyColumns,
 		literaler:  literaler,
 	}
@@ -111,6 +113,22 @@ func NewMergeBoundsBuilder(keyColumns []Column, literaler func(any) string) *Mer
 func (b *MergeBoundsBuilder) NextKey(key []any) {
 	if len(key) != len(b.keyColumns) {
 		panic(fmt.Sprintf("application error: %d key fields vs. %d key columns for merge query bounds", len(key), len(b.keyColumns)))
+	}
+
+	for idx, k := range key {
+		if k == nil {
+			var fields []string
+			for _, col := range b.keyColumns {
+				fields = append(fields, col.Field)
+			}
+			log.WithFields(log.Fields{
+				"collection": b.source,
+				"keyFields":  fields,
+				"keyValues":  key,
+				"nilIndex":   idx,
+			}).Error("unexpected nil value in key for merge bounds")
+			break
+		}
 	}
 
 	if b.lower == nil {
