@@ -23,7 +23,7 @@ func TestGetNextFileName(t *testing.T) {
 
 	clientPrefix := "asdfasdf_1234"
 
-	sm := &streamManager{keyBegin: 5678}
+	sm := &streamManager{keyBegin: 5678, counter: -1}
 
 	for idx := range 5 {
 		require.Equal(t,
