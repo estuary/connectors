@@ -304,6 +304,23 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 				errs.Err(fmt.Errorf("no warehouse configured and default warehouse not set for user '%s': must set a value for 'Warehouse' in the endpoint configuration", cfg.Credentials.User))
 			}
 		}
+
+		// Check that QUOTED_IDENTIFIERS_IGNORE_CASE is not enabled. When this Snowflake parameter
+		// is enabled, quoted identifiers are returned uppercased regardless of how they were
+		// created. Estuary uses quoted identifiers for column names containing special characters
+		// (such as "_meta/op"), and requires that Snowflake preserve their case exactly as created.
+		var quotedIdentifiersIgnoreCase string
+		if err := db.QueryRowContext(ctx, "SELECT SYSTEM$GET_SESSION_PARAMETER('QUOTED_IDENTIFIERS_IGNORE_CASE');").Scan(&quotedIdentifiersIgnoreCase); err == nil {
+			if strings.EqualFold(quotedIdentifiersIgnoreCase, "true") {
+				errs.Err(fmt.Errorf(
+					"the Snowflake parameter QUOTED_IDENTIFIERS_IGNORE_CASE is enabled, which is incompatible with this connector: " +
+						"Estuary uses quoted identifiers for column names containing special characters (e.g. \"_meta/op\"), " +
+						"and requires Snowflake to preserve their case exactly as created. " +
+						"Disable this parameter for the Estuary user with: " +
+						"ALTER USER <estuary_user> SET QUOTED_IDENTIFIERS_IGNORE_CASE = FALSE",
+				))
+			}
+		}
 	}
 
 	return errs
