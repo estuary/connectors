@@ -1,9 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"testing"
 
 	sql "github.com/estuary/connectors/materialize-sql"
+	pf "github.com/estuary/flow/go/protocols/flow"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIntegration(t *testing.T) {
