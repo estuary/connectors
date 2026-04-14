@@ -8,6 +8,7 @@ from estuary_cdk.http import HTTPMixin
 
 from .models import (
     BaseTable,
+    ConnectorState,
     EndpointConfig,
     ResourceConfig,
     ResourceState,
@@ -44,7 +45,7 @@ def resources(
         log: Logger, config: EndpointConfig, adls_client: ADLSGen2Client, tables: list[type[BaseTable]],
 ) -> list[common.Resource]:
 
-    def open(
+    async def open(
         model: type[BaseTable],
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
@@ -52,6 +53,9 @@ def resources(
         task: Task,
         all_bindings,
     ):
+        task.sourced_schema(binding_index, model.sourced_schema(log))
+        await task.checkpoint(state=ConnectorState())
+
         common.open_binding(
             binding,
             binding_index,
