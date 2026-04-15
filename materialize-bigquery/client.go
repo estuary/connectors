@@ -33,7 +33,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 	return ep.Config.client(ctx, ep)
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	rpDatasets := make(map[string]struct{})
 	for _, p := range resourcePaths {
 		rpDatasets[c.ep.TableLocator(p).TableSchema] = struct{}{}

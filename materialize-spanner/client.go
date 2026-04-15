@@ -240,7 +240,7 @@ func (c *client) FlushDDL(ctx context.Context) error {
 	return nil
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	if len(resourcePaths) == 0 {
 		return nil
 	}

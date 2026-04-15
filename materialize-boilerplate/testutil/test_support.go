@@ -952,7 +952,7 @@ func CleanupTestResources[EC boilerplate.EndpointConfiger, FC boilerplate.FieldC
 	t.Helper()
 
 	is := boilerplate.InitInfoSchema(m.Config())
-	require.NoError(t, m.PopulateInfoSchema(ctx, is, paths, true))
+	require.NoError(t, m.PopulateInfoSchema(ctx, is, paths))
 	now := time.Now()
 
 	for _, r := range is.Resources() {
@@ -1046,7 +1046,7 @@ func dumpSchema[EC boilerplate.EndpointConfiger, FC boilerplate.FieldConfiger, R
 	require.NoError(t, err)
 
 	is := boilerplate.InitInfoSchema(m.Config())
-	require.NoError(t, m.PopulateInfoSchema(ctx, is, [][]string{path}, false))
+	require.NoError(t, m.PopulateInfoSchema(ctx, is, [][]string{path}))
 
 	type field struct {
 		Name     string

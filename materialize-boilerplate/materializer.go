@@ -233,10 +233,8 @@ type Materializer[
 	Config() MaterializeCfg
 
 	// PopulateInfoSchema adds existing resources and fields to the initialized
-	// InfoSchema. The boolean parameter indicates if the result should include
-	// all tables in all namespaces present in the list of paths, and is
-	// currently used for tests.
-	PopulateInfoSchema(context.Context, *InfoSchema, [][]string, bool) error
+	// InfoSchema.
+	PopulateInfoSchema(context.Context, *InfoSchema, [][]string) error
 
 	// CheckPrerequisites generally performs user input validation in terms of
 	// making sure the configured endpoint is reachable by pinging it, verifying
@@ -390,7 +388,7 @@ func RunValidate[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT
 	}
 
 	is := InitInfoSchema(mCfg)
-	if err := materializer.PopulateInfoSchema(ctx, is, paths, false); err != nil {
+	if err := materializer.PopulateInfoSchema(ctx, is, paths); err != nil {
 		return nil, err
 	}
 
@@ -450,7 +448,7 @@ func RunApply[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC], MT Ma
 	}
 
 	is := InitInfoSchema(mCfg)
-	if err := materializer.PopulateInfoSchema(ctx, is, paths, false); err != nil {
+	if err := materializer.PopulateInfoSchema(ctx, is, paths); err != nil {
 		return nil, err
 	}
 
@@ -738,7 +736,7 @@ func RunNewTransactor[EC EndpointConfiger, FC FieldConfiger, RC Resourcer[RC, EC
 	}
 
 	is := InitInfoSchema(mCfg)
-	if err := materializer.PopulateInfoSchema(ctx, is, paths, false); err != nil {
+	if err := materializer.PopulateInfoSchema(ctx, is, paths); err != nil {
 		return nil, nil, nil, err
 	}
 

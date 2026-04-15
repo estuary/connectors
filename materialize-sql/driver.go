@@ -245,7 +245,7 @@ func (s *sqlMaterialization[EC, RC]) NewConstraint(p pf.Projection, deltaUpdates
 	return constraint
 }
 
-func (s *sqlMaterialization[EC, RC]) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, paths [][]string, allTables bool) error {
+func (s *sqlMaterialization[EC, RC]) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, paths [][]string) error {
 	if s.endpoint.MetaCheckpoints != nil {
 		paths = append(paths, s.endpoint.MetaCheckpoints.Path)
 	}
@@ -260,7 +260,7 @@ func (s *sqlMaterialization[EC, RC]) PopulateInfoSchema(ctx context.Context, is 
 		}
 	}
 
-	return s.client.PopulateInfoSchema(ctx, is, paths, allTables)
+	return s.client.PopulateInfoSchema(ctx, is, paths)
 }
 
 func (s *sqlMaterialization[EC, RC]) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {

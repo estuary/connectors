@@ -49,7 +49,7 @@ func newClient(_ context.Context, materializationName string, ep *sql.Endpoint[c
 	}, nil
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	// Map the resource paths to an appropriate identifier for inclusion in the coming query.
 	schemas := []string{c.ep.Dialect.Literal(c.ep.Config.Schema)}
 	for _, p := range resourcePaths {

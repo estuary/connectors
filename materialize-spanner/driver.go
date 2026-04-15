@@ -955,7 +955,7 @@ func (t *transactor) Store(it *m.StoreIterator) (_ m.StartCommitFunc, err error)
 			log.WithFields(log.Fields{
 				"table":      b.target.Identifier,
 				"valueTypes": valueTypes,
-			}).Info("store: mutation value types")
+			}).Debug("store: mutation value types")
 
 			// Calculate actual byte size of the mutation values
 			mutationSize := calculateMutationByteSize(spannerValues)
