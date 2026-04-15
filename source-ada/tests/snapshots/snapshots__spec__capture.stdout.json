@@ -59,40 +59,106 @@
       "type": "object"
     },
     "resourceConfigSchema": {
-      "additionalProperties": false,
-      "description": "ResourceConfig is a common resource configuration shape.",
-      "properties": {
-        "_meta": {
-          "anyOf": [
-            {
-              "additionalProperties": true,
-              "type": "object"
+      "$defs": {
+        "PullResourceConfig": {
+          "additionalProperties": false,
+          "description": "PullResourceConfig is used for pull-based API resources.",
+          "properties": {
+            "_meta": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Meta"
             },
-            {
-              "type": "null"
+            "type": {
+              "const": "pull",
+              "title": "Type",
+              "type": "string"
+            },
+            "name": {
+              "description": "Name of this resource",
+              "title": "Name",
+              "type": "string"
+            },
+            "interval": {
+              "default": "PT0S",
+              "description": "Interval between updates for this resource",
+              "format": "duration",
+              "title": "Interval",
+              "type": "string"
             }
+          },
+          "required": [
+            "type",
+            "name"
           ],
-          "default": null,
-          "title": "Meta"
+          "title": "PullResourceConfig",
+          "type": "object"
         },
-        "name": {
-          "description": "Name of this resource",
-          "title": "Name",
-          "type": "string"
-        },
-        "interval": {
-          "default": "PT0S",
-          "description": "Interval between updates for this resource",
-          "format": "duration",
-          "title": "Interval",
-          "type": "string"
+        "WebhookResourceConfig": {
+          "additionalProperties": false,
+          "description": "WebhookResourceConfig is used for webhook-based resources.",
+          "properties": {
+            "_meta": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Meta"
+            },
+            "type": {
+              "const": "webhook",
+              "title": "Type",
+              "type": "string"
+            },
+            "name": {
+              "description": "Name of this resource",
+              "title": "Name",
+              "type": "string"
+            },
+            "webhook_path": {
+              "default": "/*",
+              "description": "URL path pattern for routing incoming webhooks to this collection",
+              "title": "Webhook Path",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "name"
+          ],
+          "title": "WebhookResourceConfig",
+          "type": "object"
         }
       },
-      "required": [
-        "name"
-      ],
-      "title": "ResourceConfig",
-      "type": "object"
+      "discriminator": {
+        "mapping": {
+          "pull": "#/$defs/PullResourceConfig",
+          "webhook": "#/$defs/WebhookResourceConfig"
+        },
+        "propertyName": "type"
+      },
+      "oneOf": [
+        {
+          "$ref": "#/$defs/PullResourceConfig"
+        },
+        {
+          "$ref": "#/$defs/WebhookResourceConfig"
+        }
+      ]
     },
     "documentationUrl": "https://go.estuary.dev/source-ada",
     "resourcePathPointers": [

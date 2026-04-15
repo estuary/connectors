@@ -1,9 +1,10 @@
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Annotated, ClassVar, Generic, TypeVar
+from typing import Annotated, ClassVar, Generic, Literal, TypeVar
 
 from estuary_cdk.capture.common import (
     BaseDocument,
+    BaseResourceConfig,
     ResourceConfig,
     ResourceState,
 )
@@ -14,7 +15,7 @@ from estuary_cdk.capture.common import (
 )
 from estuary_cdk.http import AccessToken
 
-from pydantic import AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field
+from pydantic import AwareDatetime, BaseModel, BeforeValidator, ConfigDict, Field, TypeAdapter
 
 
 _TZ_PATTERN = re.compile(r'(Z|[+-]\d{2}:?\d{2})$')
@@ -61,6 +62,46 @@ class EndpointConfig(BaseModel):
 
 
 ConnectorState = GenericConnectorState[ResourceState]
+
+
+# Mock discriminated union resource configs for testing oneOf UI rendering.
+class PullResourceConfig(BaseResourceConfig):
+    """PullResourceConfig is used for pull-based API resources."""
+
+    PATH_POINTERS: ClassVar[list[str]] = ["/name"]
+
+    type: Literal["pull"]
+    name: str = Field(description="Name of this resource")
+    interval: timedelta = Field(
+        default=timedelta(), description="Interval between updates for this resource"
+    )
+
+    def path(self) -> list[str]:
+        return [self.name]
+
+
+class WebhookResourceConfig(BaseResourceConfig):
+    """WebhookResourceConfig is used for webhook-based resources."""
+
+    PATH_POINTERS: ClassVar[list[str]] = ["/name"]
+
+    type: Literal["webhook"]
+    name: str = Field(description="Name of this resource")
+    webhook_path: str = Field(
+        default="/*",
+        description="URL path pattern for routing incoming webhooks to this collection",
+    )
+
+    def path(self) -> list[str]:
+        return [self.name]
+
+
+AnyResourceConfig = Annotated[
+    PullResourceConfig | WebhookResourceConfig,
+    Field(discriminator="type"),
+]
+
+AnyResourceConfigAdapter = TypeAdapter(AnyResourceConfig)
 
 
 class AdaResource(BaseDocument, extra="allow"):

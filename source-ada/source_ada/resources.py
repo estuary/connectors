@@ -8,28 +8,22 @@ from estuary_cdk.capture.common import BaseDocument, Resource, open_binding
 from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
 
 from .models import (
-    FULL_REFRESH_RESOURCES,
-    INCREMENTAL_EXPORT_RESOURCES,
-    AdaResource,
+    Articles,
     EndpointConfig,
-    ExportResource,
-    ResourceConfig,
+    PullResourceConfig,
     ResourceState,
     Tags,
+    WebhookResourceConfig,
 )
 from .api import (
-    EVENTUAL_CONSISTENCY_LAG,
     snapshot_resources,
-    fetch_export_resources,
-    backfill_export_resources,
 )
-
-from .shared import now
 
 
 async def validate_credentials(
         log: Logger, http: HTTPMixin, config: EndpointConfig
 ):
+    return
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
 
     try:
@@ -45,13 +39,12 @@ async def validate_credentials(
         raise ValidationError([msg])
 
 
-def full_refresh_resources(
+def pull_resource(
         log: Logger, http: HTTPMixin, config: EndpointConfig
-) -> list[Resource]:
+) -> Resource:
 
     def open(
-            stream: type[AdaResource],
-            binding: CaptureBinding[ResourceConfig],
+            binding: CaptureBinding[PullResourceConfig],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -66,35 +59,31 @@ def full_refresh_resources(
                 snapshot_resources,
                 http,
                 config.bot_handle,
-                stream,
+                Articles,
             ),
             tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d"))
         )
 
-    resources = [
-        Resource(
-            name=stream.name,
-            key=["/_meta/row_id"],
-            model=BaseDocument,
-            open=functools.partial(open, stream),
-            initial_state=ResourceState(),
-            initial_config=ResourceConfig(
-                name=stream.name, interval=timedelta(minutes=15)
-            ),
-            schema_inference=True,
-        )
-        for stream in FULL_REFRESH_RESOURCES
-    ]
-
-    return resources
+    return Resource(
+        name=Articles.name,
+        key=["/_meta/row_id"],
+        model=BaseDocument,
+        open=open,
+        initial_state=ResourceState(),
+        initial_config=PullResourceConfig(
+            type="pull", name=Articles.name, interval=timedelta(minutes=15)
+        ),
+        schema_inference=True,
+    )
 
 
-def incremental_export_resources(
+def webhook_resource(
         log: Logger, http: HTTPMixin, config: EndpointConfig
-) -> list[Resource]:
+) -> Resource:
+    """Mock webhook resource to test oneOf discriminator UI rendering."""
+
     def open(
-            stream: type[ExportResource],
-            binding: CaptureBinding[ResourceConfig],
+            binding: CaptureBinding[WebhookResourceConfig],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -105,42 +94,27 @@ def incremental_export_resources(
             binding_index,
             state,
             task,
-            fetch_changes=functools.partial(
-                fetch_export_resources,
+            fetch_snapshot=functools.partial(
+                snapshot_resources,
                 http,
                 config.bot_handle,
-                stream,
+                Tags,
             ),
-            fetch_page=functools.partial(
-                backfill_export_resources,
-                http,
-                config.bot_handle,
-                stream,
-                config.start_date,
-            )
+            tombstone=BaseDocument(_meta=BaseDocument.Meta(op="d"))
         )
 
-    cutoff = now() - EVENTUAL_CONSISTENCY_LAG
-
-    resources = [
-        Resource(
-            name=stream.name,
-            key=["/_id"],
-            model=ExportResource,
-            open=functools.partial(open, stream),
-            initial_state=ResourceState(
-                inc=ResourceState.Incremental(cursor=cutoff),
-                backfill=ResourceState.Backfill(next_page=None, cutoff=cutoff)
-            ),
-            initial_config=ResourceConfig(
-                name=stream.name, interval=timedelta(minutes=5)
-            ),
-            schema_inference=True,
-        )
-        for stream in INCREMENTAL_EXPORT_RESOURCES
-    ]
-
-    return resources
+    return Resource(
+        name="webhook_events",
+        key=["/_meta/row_id"],
+        model=BaseDocument,
+        open=open,
+        initial_state=ResourceState(),
+        initial_config=WebhookResourceConfig(
+            type="webhook", name="webhook_events",
+            webhook_path="/events/*",
+        ),
+        schema_inference=True,
+    )
 
 
 async def all_resources(
@@ -149,6 +123,6 @@ async def all_resources(
     http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
 
     return [
-        *full_refresh_resources(log, http, config),
-        *incremental_export_resources(log, http, config),
+        pull_resource(log, http, config),
+        webhook_resource(log, http, config),
     ]

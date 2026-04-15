@@ -15,37 +15,39 @@ from estuary_cdk.capture import (
 
 from .resources import all_resources, validate_credentials
 from .models import (
+    AnyResourceConfig,
+    AnyResourceConfigAdapter,
     ConnectorState,
     EndpointConfig,
-    ResourceConfig,
+    PullResourceConfig,
 )
 
 
 class Connector(
-    BaseCaptureConnector[EndpointConfig, ResourceConfig, ConnectorState],
+    BaseCaptureConnector[EndpointConfig, AnyResourceConfig, ConnectorState],
 ):
     def request_class(self):
-        return Request[EndpointConfig, ResourceConfig, ConnectorState]
+        return Request[EndpointConfig, AnyResourceConfig, ConnectorState]
 
     async def spec(self, log: Logger, _: request.Spec) -> ConnectorSpec:
         return ConnectorSpec(
             configSchema=EndpointConfig.model_json_schema(),
             oauth2=None,
             documentationUrl="https://go.estuary.dev/source-ada",
-            resourceConfigSchema=ResourceConfig.model_json_schema(),
-            resourcePathPointers=ResourceConfig.PATH_POINTERS,
+            resourceConfigSchema=AnyResourceConfigAdapter.json_schema(),
+            resourcePathPointers=PullResourceConfig.PATH_POINTERS,
         )
 
     async def discover(
         self, log: Logger, discover: request.Discover[EndpointConfig]
-    ) -> response.Discovered[ResourceConfig]:
+    ) -> response.Discovered[AnyResourceConfig]:
         resources = await all_resources(log, self, discover.config)
         return common.discovered(resources)
 
     async def validate(
         self,
         log: Logger,
-        validate: request.Validate[EndpointConfig, ResourceConfig],
+        validate: request.Validate[EndpointConfig, AnyResourceConfig],
     ) -> response.Validated:
         await validate_credentials(log, self, validate.config)
         resources = await all_resources(log, self, validate.config)
@@ -55,7 +57,7 @@ class Connector(
     async def open(
         self,
         log: Logger,
-        open: request.Open[EndpointConfig, ResourceConfig, ConnectorState],
+        open: request.Open[EndpointConfig, AnyResourceConfig, ConnectorState],
     ) -> tuple[response.Opened, Callable[[Task], Awaitable[None]]]:
         resources = await all_resources(log, self, open.capture.config)
         resolved = common.resolve_bindings(open.capture.bindings, resources)
