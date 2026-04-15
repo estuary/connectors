@@ -2,12 +2,8 @@ package main
 
 import (
 	"context"
-	stdsql "database/sql"
-	"encoding/json"
 	"fmt"
-	"slices"
 	"sort"
-	"strings"
 	"testing"
 	"time"
 
@@ -35,48 +31,6 @@ func testConfig() config {
 			FeatureFlags: "allow_existing_tables_for_new_bindings",
 		},
 	}
-}
-
-func clickHouseGetSchema(ctx context.Context, db *stdsql.DB, database string, table string) (string, error) {
-	rows, err := db.QueryContext(ctx, fmt.Sprintf(
-		"SELECT name, type FROM system.columns WHERE database = '%s' AND table = '%s' ORDER BY position",
-		database, table,
-	))
-	if err != nil {
-		return "", err
-	}
-	defer rows.Close()
-
-	type foundColumn struct {
-		Name string
-		Type string
-	}
-
-	cols := []foundColumn{}
-	for rows.Next() {
-		var c foundColumn
-		if err := rows.Scan(&c.Name, &c.Type); err != nil {
-			return "", err
-		}
-		cols = append(cols, c)
-	}
-	if err := rows.Err(); err != nil {
-		return "", err
-	}
-
-	slices.SortFunc(cols, func(a, b foundColumn) int {
-		return strings.Compare(a.Name, b.Name)
-	})
-
-	var out strings.Builder
-	enc := json.NewEncoder(&out)
-	for _, c := range cols {
-		if err := enc.Encode(c); err != nil {
-			return "", err
-		}
-	}
-
-	return out.String(), nil
 }
 
 func TestPrereqs(t *testing.T) {
