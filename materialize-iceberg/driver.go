@@ -166,7 +166,7 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 	}
 }
 
-func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
+func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	relevantPaths := make(map[string][]string)
 	for _, path := range resourcePaths {
 		relevantPaths[path[0]] = append(relevantPaths[path[0]], path[1])

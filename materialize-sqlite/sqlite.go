@@ -109,7 +109,7 @@ func newClient(ctx context.Context, materializationName string, ep *sql.Endpoint
 	return &client{db: db}, nil
 }
 
-func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
+func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	return nil
 }
 

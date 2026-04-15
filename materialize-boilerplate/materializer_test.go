@@ -274,7 +274,7 @@ func (m *testMaterializer) Config() MaterializeCfg {
 	return MaterializeCfg{}
 }
 
-func (m *testMaterializer) PopulateInfoSchema(ctx context.Context, is *InfoSchema, paths [][]string, allTables bool) error {
+func (m *testMaterializer) PopulateInfoSchema(ctx context.Context, is *InfoSchema, paths [][]string) error {
 	*is = *m.is
 	return nil
 }

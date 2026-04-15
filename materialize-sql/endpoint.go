@@ -20,7 +20,7 @@ type Client interface {
 	// resourcePaths. It doesn't necessarily need to include all tables in the
 	// entire destination system, but must include all tables in the relevant
 	// schemas.
-	PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error
+	PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error
 
 	// CreateTable creates a table in the destination system.
 	CreateTable(ctx context.Context, tc TableCreate) error

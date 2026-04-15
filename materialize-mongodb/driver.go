@@ -141,7 +141,7 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 	}
 }
 
-func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
+func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	db := d.client.Database(d.cfg.Database)
 	collections, err := db.ListCollectionSpecifications(ctx, bson.D{})
 	if err != nil {
@@ -198,12 +198,18 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 		// Explicitly create the collection so it is visible to PopulateInfoSchema.
 		err := d.client.Database(dbName).CreateCollection(ctx, collectionName)
 
-		mongoErr := mongo.CommandError{}
-		// Error code 48 is "Collection already exists", which we ignore
-		// this error is no longer emitted since Mongo 8, and we keep this code
-		// for backward compatibility with older Mongo versions
-		if errors.As(err, &mongoErr) && mongoErr.Code != 48 {
-			return err
+		if err != nil {
+			mongoErr := mongo.CommandError{}
+			// Error code 48 is "Collection already exists", which we ignore
+			// this error is no longer emitted since Mongo 8, and we keep this code
+			// for backward compatibility with older Mongo versions
+			if errors.As(err, &mongoErr) {
+				if mongoErr.Code != 48 {
+					return err
+				}
+			} else {
+				return err
+			}
 		}
 
 		return nil

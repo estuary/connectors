@@ -332,7 +332,7 @@ func (d *materialization) Config() boilerplate.MaterializeCfg {
 	}
 }
 
-func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string, allTables bool) error {
+func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
 	for _, p := range resourcePaths {
 		tableName := p[0]
 
