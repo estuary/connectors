@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"regexp"
 	"slices"
 	"strconv"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	sql "github.com/estuary/connectors/materialize-sql"
+	"github.com/estuary/flow/go/protocols/fdb/tuple"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -48,21 +50,59 @@ var clickHouseClampDatetime = sql.StringCastConverter(func(str string) (interfac
 	return parsed.UTC(), nil
 })
 
+var toBigInt = func(e tuple.TupleElement) (interface{}, error) {
+	if e == nil {
+		return nil, nil
+	}
+	var v big.Int
+	switch q := e.(type) {
+	case int64:
+		v.SetInt64(q)
+	case int:
+		v.SetInt64(int64(q))
+	case uint64:
+		v.SetUint64(q)
+	case uint:
+		v.SetUint64(uint64(q))
+	case float64:
+		big.NewFloat(q).Int(&v)
+	case big.Int:
+		v.Set(&q)
+	case *big.Int:
+		v.Set(q)
+	case string:
+		if _, ok := v.SetString(q, 10); !ok {
+			// Handle strings with decimal points like "1.0" by truncating.
+			var f big.Float
+			if _, ok := f.SetString(q); !ok {
+				return nil, fmt.Errorf("cannot parse %q as Int128", q)
+			}
+			f.Int(&v)
+		}
+	default:
+		return nil, fmt.Errorf("cannot convert %T to Int128", q)
+	}
+	return v, nil
+}
+
 var clickHouseDialect = func(database string) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("Int64"),
-				sql.MapStatic("String", sql.UsingConverter(sql.ToStr)),
+				sql.MapStatic("Int128", sql.UsingConverter(toBigInt)),
 			),
-			sql.NUMBER:         sql.MapStatic("Float64"),
-			sql.BOOLEAN:        sql.MapStatic("Bool"),
-			sql.OBJECT:         sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
-			sql.ARRAY:          sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
-			sql.BINARY:         sql.MapStatic("String"),
-			sql.MULTIPLE:       sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
-			sql.STRING_INTEGER: sql.MapStatic("String", sql.UsingConverter(sql.ToStr)),
-			sql.STRING_NUMBER:  sql.MapStatic("Float64", sql.UsingConverter(sql.StrToFloat(math.NaN(), math.Inf(1), math.Inf(-1)))),
+			sql.NUMBER:   sql.MapStatic("Float64"),
+			sql.BOOLEAN:  sql.MapStatic("Bool"),
+			sql.OBJECT:   sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
+			sql.ARRAY:    sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
+			sql.BINARY:   sql.MapStatic("String"),
+			sql.MULTIPLE: sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
+			sql.STRING_INTEGER: sql.MapStringMaxLen(
+				sql.MapStatic("Int128", sql.UsingConverter(toBigInt)),
+				sql.MapStatic("String", sql.UsingConverter(sql.ToStr)),
+				38),
+			sql.STRING_NUMBER: sql.MapStatic("Float64", sql.UsingConverter(sql.StrToFloat(math.NaN(), math.Inf(1), math.Inf(-1)))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("String"),
 				WithFormat: map[string]sql.MapProjectionFn{
