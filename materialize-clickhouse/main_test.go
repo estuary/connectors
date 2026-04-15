@@ -13,10 +13,13 @@ func TestMain(m *testing.M) {
 		if err := exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run(); err != nil {
 			panic("starting docker compose: " + err.Error())
 		}
-		defer exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	}
 
-	os.Exit(m.Run())
+	exitCode := m.Run()
+	if !isShortMode() {
+		_ = exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
+	}
+	os.Exit(exitCode)
 }
 
 // isShortMode checks os.Args for the -test.short flag since flag.Parse
