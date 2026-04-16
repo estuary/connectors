@@ -27,8 +27,10 @@ through a FIFO into `flowctl preview`, and writes per-run artifacts
 (spec, generator state, preview log, `results.json`) to
 `tests/benchmark/materialize/runs/<timestamp>-<connector>/`.
 
-For cloud-only endpoints (BigQuery, Snowflake, …) pass `--no-compose`
-and a `--config` pointing at a real credentials file.
+For cloud-only endpoints (BigQuery, Snowflake, …) pass a `--config`
+pointing at a real credentials file. If no `docker-compose.yaml` is
+found for the connector, the script assumes the endpoint is already
+reachable.
 
 ## Scenario file
 
@@ -95,7 +97,6 @@ Overlap rules:
 --docker               run connector as Docker image (default: local binary)
 --seed      N          fixture RNG seed; default: 0 (runs are byte-reproducible)
 --keep                 don't tear docker-compose down on exit
---no-compose           skip docker-compose entirely (cloud-hosted endpoints)
 --out-dir   DIR        output directory; default: runs/<ts>-<connector>
 ```
 

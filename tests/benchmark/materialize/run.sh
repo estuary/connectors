@@ -22,8 +22,6 @@
 #     [--docker]             # run connector as Docker image (default: local binary)
 #     [--seed N]             # default: 0
 #     [--keep]               # don't tear down docker-compose on exit
-#     [--no-compose]         # skip bringing up the docker-compose stack
-#                            #   (useful for cloud-hosted endpoints)
 #     [--out-dir DIR]        # default: tests/benchmark/materialize/runs/<ts>
 
 set -o errexit
@@ -38,7 +36,6 @@ SCENARIO=""
 CONFIG=""
 SEED=0
 KEEP=0
-NO_COMPOSE=0
 OUT_DIR=""
 DOCKER=0
 
@@ -50,10 +47,9 @@ while (($#)); do
     --seed)      SEED="$2";      shift 2 ;;
     --keep)      KEEP=1;         shift   ;;
     --docker)    DOCKER=1;       shift   ;;
-    --no-compose) NO_COMPOSE=1;  shift   ;;
     --out-dir)   OUT_DIR="$2";   shift 2 ;;
     -h|--help)
-      sed -n '2,28p' "$0"; exit 0 ;;
+      sed -n '2,26p' "$0"; exit 0 ;;
     *) echo "unknown flag: $1" >&2; exit 2 ;;
   esac
 done
@@ -83,13 +79,18 @@ fi
   exit 2
 }
 
-# When running as a local binary (default), ensure the connector binary
-# exists. Build it if missing.
-if (( ! DOCKER )); then
+# Ensure the connector is available in the selected mode.
+if (( DOCKER )); then
+  IMAGE="ghcr.io/estuary/${CONNECTOR}:local"
+  if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+    echo "image $IMAGE not found; building with build-local.sh"
+    (cd "$ROOT_DIR" && ./build-local.sh "$CONNECTOR")
+  fi
+else
   CONNECTOR_BIN="$ROOT_DIR/$CONNECTOR/connector"
   if [[ ! -x "$CONNECTOR_BIN" ]]; then
     echo "building connector binary: $CONNECTOR_BIN"
-    (cd "$ROOT_DIR" && go build -tags nozstd -o "$CONNECTOR_BIN" ./$CONNECTOR/...)
+    (cd "$ROOT_DIR" && go build -v -tags nozstd -o "$CONNECTOR_BIN" ./$CONNECTOR/...)
   fi
 fi
 
@@ -116,7 +117,7 @@ for cand in \
 do
   if [[ -f "$cand" ]]; then COMPOSE_FILE="$cand"; break; fi
 done
-if (( ! NO_COMPOSE )) && [[ -n "$COMPOSE_FILE" ]]; then
+if [[ -n "$COMPOSE_FILE" ]]; then
   echo "starting docker-compose: $COMPOSE_FILE"
   docker compose -f "$COMPOSE_FILE" up --wait
   cleanup() {
@@ -130,7 +131,7 @@ if (( ! NO_COMPOSE )) && [[ -n "$COMPOSE_FILE" ]]; then
   trap cleanup EXIT
   # Same grace period as tests/materialize/<connector>/setup.sh.
   sleep 5
-elif (( ! NO_COMPOSE )); then
+else
   echo "no docker-compose for $CONNECTOR; assuming endpoint is reachable"
 fi
 
