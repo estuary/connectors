@@ -32,11 +32,14 @@ go mod vendor
 ./build-local.sh $connector
 ```
 
+This is primarily a Go monorepo with YAML configs. When editing Go code, always run `go build ./...` and `go vet ./...` in the affected module after changes to catch import cycles, missing arguments, and unused imports before declaring a fix complete.
+
 ## Testing (Go)
 
 - Always provide `UPDATE_SNAPSHOTS=true` when running `go test -v ./$connector`
 - For connectors which have a corresponding folder in tests/ or tests/materialize/, also run integration tests using the following command: `CONNECTOR=materialize-mysql VERSION=local ./tests/materialize/run.sh`.
 - To run integration tests, must build the docker image locally.
+- 
 
 See [tests/README.md](tests/README.md) for test structure details.
 
@@ -54,6 +57,8 @@ See [tests/README.md](tests/README.md) for test structure details.
 - [source-boilerplate/](source-boilerplate/) — Common capture patterns
 
 ### Go Materializations
+
+For materialization connector work: each database (Snowflake, Spanner, BigQuery, ClickHouse, Redshift, etc.) has unique DDL limitations. Before implementing a fix, check the specific database's constraints (e.g., Spanner doesn't support RENAME COLUMN, Snowflake doesn't support nullable keys at DDL layer, Redshift encodes VARBYTE as hex).
 
 - [materialize-sql/](materialize-sql/) — SQL destination base library
 - [docs/materialize/README.md](docs/materialize/README.md) — Materialization patterns
@@ -88,3 +93,11 @@ All connector configurations use JSON Schema. See [config_schema_guidelines.md](
 - [materialize.proto](https://github.com/estuary/flow/blob/master/go/protocols/materialize/materialize.proto) — Materialization protocol
 
 See top-level [README.md](README.md) for transactional semantics and connector patterns.
+
+# Debugging
+ 
+When debugging CI test failures, always ask the user for complete CI logs before exploring the codebase extensively. Do not theorize about root causes from incomplete output — request the full logs first.
+
+# Insights
+
+When making changes that affect function signatures or shared interfaces, immediately grep for all callers and update them before running tests. Use `grep -rn 'FunctionName' --include='*.go'` to find all references.
