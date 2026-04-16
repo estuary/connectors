@@ -18,6 +18,23 @@ import (
 	"google.golang.org/api/option"
 )
 
+const (
+	logContextKey = "logContextKey"
+)
+
+// WithLogger adds the logger to the Context.
+func WithLogger(ctx context.Context, logger log.FieldLogger) context.Context {
+	return context.WithValue(ctx, logContextKey, logger)
+}
+
+// Logger retrieves any stored logger or if none found returns a new one.
+func Logger(ctx context.Context) log.FieldLogger {
+	if logger, ok := ctx.Value(logContextKey).(log.FieldLogger); ok {
+		return logger
+	}
+	return log.StandardLogger()
+}
+
 // channelName produces a reasonably readable channel name that is globally
 // unique per materialization and shard. Channels are specific to a table, so
 // there is no need to include the database or schema in the name, and they can
@@ -231,16 +248,20 @@ func (sm *streamManager) write(ctx context.Context, blobs []*blobMetadata, decry
 		return fmt.Errorf("unknown channel %s", channelName)
 	}
 
+	logger := log.WithFields(log.Fields{
+		"schema": schema,
+		"table":  table,
+	})
+	ctx = WithLogger(ctx, logger)
+
 	for _, blob := range blobs {
 		blobToken := blob.Chunks[0].Channels[0].OffsetToken
 		currentChannelToken := thisChannel.OffsetToken
-		log.WithFields(log.Fields{
-			"schema":              schema,
-			"table":               table,
+		logger.WithFields(log.Fields{
 			"currentChannelToken": thisChannel.OffsetToken,
 			"blobToken":           blobToken,
 		}).Info("evaluating blob registration")
-		if shouldWrite, err := shouldWriteNextToken(blobToken, currentChannelToken); err != nil {
+		if shouldWrite, err := shouldWriteNextToken(ctx, blobToken, currentChannelToken); err != nil {
 			return fmt.Errorf("shouldWriteNextToken: %w", err)
 		} else if !shouldWrite {
 			continue
@@ -312,7 +333,8 @@ func (sm *streamManager) writeRenamed(ctx context.Context, decryptKey string, ch
 	}
 	nextName := sm.getNextFileName(time.Now(), fmt.Sprintf("%s_%d", sm.prefix, sm.deploymentId))
 
-	ll := log.WithFields(log.Fields{
+	logger := Logger(ctx)
+	ll := logger.WithFields(log.Fields{
 		"oldName": blob.Path,
 		"newName": nextName,
 		"token":   blob.Chunks[0].Channels[0].OffsetToken,
@@ -473,12 +495,13 @@ func blobToken(baseToken string, n int) string {
 // written or not, based on the `current` persisted token. Generally this means
 // if the `n` value for `next` is exactly one larger than `current` (or there is
 // no `current`), the blob should be written.
-func shouldWriteNextToken(next string, current *string) (bool, error) {
+func shouldWriteNextToken(ctx context.Context, next string, current *string) (bool, error) {
+	logger := Logger(ctx)
 	if current == nil {
 		// Maybe this should be more strict and error out unless `next` is the
 		// first one in the sequence, but that would block cases where a user
 		// has manually dropped a table for some reason.
-		log.WithField("nextToken", next).Info("no current token persisted; blob will be registered")
+		logger.WithField("nextToken", next).Info("no current token persisted; blob will be registered")
 		return true, nil
 	}
 
@@ -492,7 +515,7 @@ func shouldWriteNextToken(next string, current *string) (bool, error) {
 		return false, err
 	}
 
-	ll := log.WithFields(log.Fields{
+	ll := logger.WithFields(log.Fields{
 		"nextToken":    next,
 		"currentToken": currentToken,
 		"currentBase":  currentBase,
