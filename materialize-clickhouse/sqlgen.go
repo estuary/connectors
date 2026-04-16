@@ -75,12 +75,12 @@ var toBigInt = func(e tuple.TupleElement) (interface{}, error) {
 			// Handle strings with decimal points like "1.0" by truncating.
 			var f big.Float
 			if _, ok := f.SetString(q); !ok {
-				return nil, fmt.Errorf("cannot parse %q as Int128", q)
+				return nil, fmt.Errorf("cannot parse %q as Int256", q)
 			}
 			f.Int(&v)
 		}
 	default:
-		return nil, fmt.Errorf("cannot convert %T to Int128", q)
+		return nil, fmt.Errorf("cannot convert %T to Int256", q)
 	}
 	return v, nil
 }
@@ -90,7 +90,7 @@ var clickHouseDialect = func(database string) sql.Dialect {
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("Int64"),
-				sql.MapStatic("Int128", sql.UsingConverter(toBigInt)),
+				sql.MapStatic("Int256", sql.UsingConverter(toBigInt)),
 			),
 			sql.NUMBER:   sql.MapStatic("Float64"),
 			sql.BOOLEAN:  sql.MapStatic("Bool"),
@@ -99,9 +99,9 @@ var clickHouseDialect = func(database string) sql.Dialect {
 			sql.BINARY:   sql.MapStatic("String"),
 			sql.MULTIPLE: sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
-				sql.MapStatic("Int128", sql.UsingConverter(toBigInt)),
+				sql.MapStatic("Int256", sql.UsingConverter(toBigInt)),
 				sql.MapStatic("String", sql.UsingConverter(sql.ToStr)),
-				38),
+				76),
 			sql.STRING_NUMBER: sql.MapStatic("Float64", sql.UsingConverter(sql.StrToFloat(math.NaN(), math.Inf(1), math.Inf(-1)))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("String"),
