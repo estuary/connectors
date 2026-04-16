@@ -70,7 +70,7 @@ class PullResourceConfig(BaseResourceConfig):
 
     PATH_POINTERS: ClassVar[list[str]] = ["/name"]
 
-    type: Literal["pull"]
+    type: Literal["pull"] = Field(json_schema_extra={"readOnly": True})
     name: str = Field(description="Name of this resource")
     interval: timedelta = Field(
         default=timedelta(), description="Interval between updates for this resource"
@@ -85,7 +85,7 @@ class WebhookResourceConfig(BaseResourceConfig):
 
     PATH_POINTERS: ClassVar[list[str]] = ["/name"]
 
-    type: Literal["webhook"]
+    type: Literal["webhook"] = Field(json_schema_extra={"readOnly": True})
     name: str = Field(description="Name of this resource")
     webhook_path: str = Field(
         default="/*",
