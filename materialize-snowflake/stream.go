@@ -6,6 +6,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -49,7 +50,7 @@ type streamManager struct {
 	bucket          blob.Bucket
 	bucketExpiresAt time.Time
 	bdecWriter      *bdecWriter
-	counter         int
+	counter         int64
 	lastBinding     int // bookkeeping for when to flush the writer when a new binding starts writing rows
 
 	blobStats map[int][]*blobStatsTracker
@@ -68,7 +69,7 @@ func newStreamManager(cfg *config, materialization string, account string, keyBe
 		channelName:  channelName(materialization, keyBegin),
 		lastBinding:  -1,
 		blobStats:    make(map[int][]*blobStatsTracker),
-		counter:      0,
+		counter:      -1,
 	}, nil
 }
 
@@ -448,17 +449,15 @@ func (sm *streamManager) getNextFileName(calendar time.Time, clientPrefix string
 		"_" +
 		strconv.Itoa(int(sm.keyBegin)) +
 		"_" +
-		strconv.Itoa(sm.getAndIncrementCounter()) +
+		strconv.FormatInt(sm.getAndIncrementCounter(), 10) +
 		"." +
 		BLOB_EXTENSION_TYPE
 
 	return blobFileName(year + "/" + month + "/" + day + "/" + hour + "/" + minute + "/" + blobShortName)
 }
 
-func (sm *streamManager) getAndIncrementCounter() int {
-	out := sm.counter
-	sm.counter++
-	return out
+func (sm *streamManager) getAndIncrementCounter() int64 {
+	return atomic.AddInt64(&sm.counter, 1)
 }
 
 // blobToken encodes `baseToken`, which is per-transaction, and the counter `n`
