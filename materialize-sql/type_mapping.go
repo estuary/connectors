@@ -18,6 +18,21 @@ import (
 type FlatType string
 
 // FlatType constants that are used by TypeMapper
+//
+// Guidelines for integer conversion:
+// - INTEGER:
+//   - Signed 64-bit integer, such as BIGINT
+//
+// - STRING_INTEGER:
+//   - A string representation, such as VARCHAR or TEXT
+//
+// - Wide INTEGER; more than 64 bits:
+//   - The widest available signed integer type, at least 128-bits wide, such as HUGEINT
+//   - The widest available fixed-point type, such as NUMERIC(x, 0) or DECIMAL(x, 0)
+//   - A string representation, such as VARCHAR or TEXT
+//
+// - Narrow STRING_INTEGER; up to the wide INTEGER size:
+//   - The wide INTEGER type
 const (
 	ARRAY          FlatType = "array"
 	BINARY         FlatType = "binary"
