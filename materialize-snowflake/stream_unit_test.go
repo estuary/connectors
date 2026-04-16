@@ -101,7 +101,7 @@ func TestShouldWriteNextToken(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := shouldWriteNextToken(tt.blobToken, tt.currentToken)
+			got, err := shouldWriteNextToken(t.Context(), tt.blobToken, tt.currentToken)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {

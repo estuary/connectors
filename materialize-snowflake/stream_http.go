@@ -250,6 +250,7 @@ func (s *streamClient) openChannel(ctx context.Context, schema, table, name stri
 }
 
 func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
+	logger := Logger(ctx)
 	type req struct {
 		Role  *string         `json:"role,omitempty"`
 		Blobs []*blobMetadata `json:"blobs"`
@@ -279,7 +280,7 @@ func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
 		}
 	}
 
-	log.WithFields(log.Fields{
+	logger.WithFields(log.Fields{
 		"path":               blob.Path,
 		"md5":                blob.MD5,
 		"rows":               blob.Chunks[0].EPS.Rows,
@@ -335,6 +336,7 @@ func (s *streamClient) channelStatus(ctx context.Context, clientSeq int, schema,
 }
 
 func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, clientSeq int, schema, table, name string) error {
+	logger := Logger(ctx)
 	maxBackoff := 1 * time.Second
 	backoff := 100 * time.Millisecond
 	ts := time.Now()
@@ -350,10 +352,8 @@ func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, 
 		}
 
 		if n > 10 {
-			log.WithFields(log.Fields{
+			logger.WithFields(log.Fields{
 				"attempt": n,
-				"schema":  schema,
-				"table":   table,
 				"token":   token,
 			}).Info("channel offset token not yet persisted")
 		}
@@ -362,11 +362,9 @@ func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, 
 		backoff = min(backoff*2, maxBackoff)
 	}
 
-	log.WithFields(log.Fields{
-		"schema": schema,
-		"table":  table,
-		"token":  token,
-		"took":   time.Since(ts).String(),
+	logger.WithFields(log.Fields{
+		"token": token,
+		"took":  time.Since(ts).String(),
 	}).Info("channel offset token persisted")
 
 	return nil
