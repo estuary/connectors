@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math"
+	"os"
 	"strings"
 	"text/template"
 	"time"
@@ -445,10 +446,18 @@ func newTransactor(
 
 	// Always query node count for partition calculation
 	// Partitions = nodes × 10 for parallel flushing
-	opts := []option.ClientOption{option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON))}
-	nodeCount, err := queryNodeCount(ctx, cfg.ProjectID, cfg.InstanceID, opts)
-	if err != nil {
-		return nil, fmt.Errorf("querying node count: %w", err)
+	var opts []option.ClientOption
+	if cfg.Credentials.ServiceAccountJSON != "" {
+		opts = append(opts, option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON)))
+	}
+	var nodeCount int
+	if os.Getenv("SPANNER_EMULATOR_HOST") != "" {
+		nodeCount = 1
+	} else {
+		nodeCount, err = queryNodeCount(ctx, cfg.ProjectID, cfg.InstanceID, opts)
+		if err != nil {
+			return nil, fmt.Errorf("querying node count: %w", err)
+		}
 	}
 	numPartitions := nodeCount * 10
 
