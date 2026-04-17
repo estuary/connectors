@@ -21,9 +21,10 @@ services:
       CLUSTER_ID: '4L6g3nShT-eMCtK--X86sw'
     healthcheck:
       test: /bin/kafka-cluster cluster-id --bootstrap-server localhost:9092
-      interval: 1s
-      timeout: 1s
+      interval: 5s
+      timeout: 10s
       retries: 60
+      start_period: 30s
     ports:
       - 9092:9092
     networks:
@@ -34,13 +35,20 @@ services:
     hostname: schema-registry
     container_name: schema-registry
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     ports:
       - "8081:8081"
     environment:
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'db:29092'
       SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    healthcheck:
+      test: curl -fsS http://localhost:8081/subjects || exit 1
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
     networks:
       - flow-test
 

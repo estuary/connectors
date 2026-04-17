@@ -83,6 +83,7 @@ func TestPrereqs(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	cfg := testConfig()
 
@@ -216,6 +217,7 @@ func TestInstallFence(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -233,6 +235,7 @@ func TestExecStatements(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -249,6 +252,7 @@ func TestTruncateTable(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -292,6 +296,7 @@ func TestOpenNativeConn(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	conn, err := clickhouse.Open(cfg.newClickhouseOptions())
@@ -305,6 +310,7 @@ func TestDestroy(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var tr = &transactor{}
@@ -325,6 +331,7 @@ func TestAddBinding(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -422,6 +429,7 @@ func TestStoreAndLoadDataPath(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	cfg.HardDelete = true
@@ -478,6 +486,7 @@ func TestPrepareNewTransactor(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -526,6 +535,7 @@ func TestHardDeleteTombstone(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	cfg.HardDelete = true
@@ -745,6 +755,7 @@ func TestLoadNonExistentKey(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -763,6 +774,7 @@ func TestLoadMultipleKeys(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -805,6 +817,7 @@ func TestCompositeKeyStoreAndLoad(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -851,6 +864,7 @@ func TestVersionDeduplication(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -887,6 +901,7 @@ func TestStoreBatchMultipleRows(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -913,6 +928,7 @@ func TestMultiBindingStoreAndLoad(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var ctx = t.Context()
@@ -990,6 +1006,7 @@ func TestCompositeKeyTombstone(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	cfg.HardDelete = true
@@ -1020,6 +1037,7 @@ func TestMovePartitionMissingTarget(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	var cfg = testConfig()
 	var ctx = t.Context()
