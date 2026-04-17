@@ -542,8 +542,9 @@ func TestHardDeleteTombstone(t *testing.T) {
 				Projection: pf.Projection{
 					Field: "required_int",
 					Inference: pf.Inference{
-						Types:  []string{"integer"},
-						Exists: pf.Inference_MUST,
+						Types:   []string{"integer"},
+						Exists:  pf.Inference_MUST,
+						Numeric: &pf.Inference_Numeric{},
 					},
 				},
 			},
@@ -659,8 +660,9 @@ func buildCompositeKeyTable(t *testing.T, dialect sql.Dialect, tableName string)
 				Projection: pf.Projection{
 					Field: "id",
 					Inference: pf.Inference{
-						Types:  []string{"integer"},
-						Exists: pf.Inference_MUST,
+						Types:   []string{"integer"},
+						Exists:  pf.Inference_MUST,
+						Numeric: &pf.Inference_Numeric{},
 					},
 				},
 			},

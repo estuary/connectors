@@ -85,24 +85,83 @@ var toBigInt = func(e tuple.TupleElement) (interface{}, error) {
 	return v, nil
 }
 
+// mapSignedIntegers uses an alternate mapping for numeric integer fields where
+// numeric inference is available, and the minimum or maximum of the inferred
+// range is outside the bounds of what will fit in a signed 64 bit integer.
+func mapSignedIntegers() sql.MapProjectionFn {
+	// Int128 spans [-2^127, 2^127 - 1]; Int256 spans [-2^255, 2^255 - 1].
+	// Convert through big.Int since these don't fit in int64 literals; float64
+	// precision is sufficient because inferred Numeric.Minimum/Maximum are
+	// themselves carried as float64 powers of 10.
+	halfInt128 := new(big.Int).Lsh(big.NewInt(1), 127)
+	maxInt128, _ := new(big.Int).Sub(halfInt128, big.NewInt(1)).Float64()
+	minInt128, _ := new(big.Int).Neg(halfInt128).Float64()
+	halfInt256 := new(big.Int).Lsh(big.NewInt(1), 255)
+	maxInt256, _ := new(big.Int).Sub(halfInt256, big.NewInt(1)).Float64()
+	minInt256, _ := new(big.Int).Neg(halfInt256).Float64()
+
+	fn64 := sql.MapStatic("Int64", sql.UsingConverter(sql.StrToInt))
+	fn128 := sql.MapStatic("Int128", sql.UsingConverter(toBigInt))
+	fn256 := sql.MapStatic("Int256", sql.UsingConverter(toBigInt))
+	fnString := sql.MapStatic("String", sql.UsingConverter(sql.ToStr))
+
+	return func(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
+		// STRING_INTEGER projections (format: "integer") route by declared
+		// maxLength — values arrive as JSON strings and can exceed the
+		// precision that Numeric.Minimum/Maximum can carry in float64.
+		// MaxLength == 0 means no length was declared; fall back to the
+		// widest bounded integer rather than the narrowest.
+		if p.Inference.String_ != nil && p.Inference.String_.Format == "integer" {
+			switch maxLen := p.Inference.String_.MaxLength; {
+			case maxLen == 0:
+				return fn256(p)
+			case maxLen <= 18:
+				return fn64(p)
+			case maxLen <= 38:
+				return fn128(p)
+			case maxLen <= 76:
+				return fn256(p)
+			default:
+				return fnString(p)
+			}
+		}
+
+		// INTEGER projections dispatch by the inferred numeric range.
+		// Numeric Minimum and Maximums are stated as powers of 10, so
+		// comparisons to exact integer values aren't precise, but this
+		// logic works out since 1e19 is the next power of 10 past int64
+		// max, 1e39 past int128, and 1e77 past int256.
+		if p.Inference.Numeric != nil {
+			switch {
+			case p.Inference.Numeric.Minimum >= math.MinInt64 && p.Inference.Numeric.Maximum <= math.MaxInt64:
+				return fn64(p)
+			case p.Inference.Numeric.Minimum >= minInt128 && p.Inference.Numeric.Maximum <= maxInt128:
+				return fn128(p)
+			case p.Inference.Numeric.Minimum >= minInt256 && p.Inference.Numeric.Maximum <= maxInt256:
+				return fn256(p)
+			default:
+				return fnString(p)
+			}
+		}
+
+		// No inference available — default to the narrowest integer type,
+		// matching the legacy MapSignedInt64 behavior.
+		return fn64(p)
+	}
+}
+
 var clickHouseDialect = func(database string) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
-			sql.INTEGER: sql.MapSignedInt64(
-				sql.MapStatic("Int64"),
-				sql.MapStatic("Int256", sql.UsingConverter(toBigInt)),
-			),
-			sql.NUMBER:   sql.MapStatic("Float64"),
-			sql.BOOLEAN:  sql.MapStatic("Bool"),
-			sql.OBJECT:   sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
-			sql.ARRAY:    sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
-			sql.BINARY:   sql.MapStatic("String"),
-			sql.MULTIPLE: sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
-			sql.STRING_INTEGER: sql.MapStringMaxLen(
-				sql.MapStatic("Int256", sql.UsingConverter(toBigInt)),
-				sql.MapStatic("String", sql.UsingConverter(sql.ToStr)),
-				76),
-			sql.STRING_NUMBER: sql.MapStatic("Float64", sql.UsingConverter(sql.StrToFloat(math.NaN(), math.Inf(1), math.Inf(-1)))),
+			sql.INTEGER:        mapSignedIntegers(),
+			sql.NUMBER:         sql.MapStatic("Float64"),
+			sql.BOOLEAN:        sql.MapStatic("Bool"),
+			sql.OBJECT:         sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
+			sql.ARRAY:          sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
+			sql.BINARY:         sql.MapStatic("String"),
+			sql.MULTIPLE:       sql.MapStatic("String", sql.UsingConverter(sql.ToJsonString)),
+			sql.STRING_INTEGER: mapSignedIntegers(),
+			sql.STRING_NUMBER:  sql.MapStatic("Float64", sql.UsingConverter(sql.StrToFloat(math.NaN(), math.Inf(1), math.Inf(-1)))),
 			sql.STRING: sql.MapString(sql.StringMappings{
 				Fallback: sql.MapStatic("String"),
 				WithFormat: map[string]sql.MapProjectionFn{
