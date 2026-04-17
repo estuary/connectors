@@ -75,12 +75,12 @@ var toBigInt = func(e tuple.TupleElement) (interface{}, error) {
 			// Handle strings with decimal points like "1.0" by truncating.
 			var f big.Float
 			if _, ok := f.SetString(q); !ok {
-				return nil, fmt.Errorf("cannot parse %q as Int256", q)
+				return nil, fmt.Errorf("cannot parse %q as big.Int or big.Float", q)
 			}
 			f.Int(&v)
 		}
 	default:
-		return nil, fmt.Errorf("cannot convert %T to Int256", q)
+		return nil, fmt.Errorf("cannot convert %T to big.Int", q)
 	}
 	return v, nil
 }
