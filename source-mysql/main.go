@@ -49,6 +49,12 @@ var featureFlagDefaults = map[string]bool{
 	//   - Recommended Collection Names
 	//   - Internal StreamIDs
 	"case_sensitive_table_names": false,
+
+	// When set, the connector will operate in a mode compatible with Aurora cluster
+	// reader instances. This skips the `log_bin = ON` prerequisite check and uses
+	// `SHOW REPLICA STATUS` to determine the current binlog position instead of
+	// `SHOW BINARY LOG STATUS` / `SHOW MASTER STATUS`.
+	"cluster_read_replica": false,
 }
 
 type sshForwarding struct {
