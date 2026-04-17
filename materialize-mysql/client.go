@@ -15,6 +15,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/go-sql-driver/mysql"
+	log "github.com/sirupsen/logrus"
 )
 
 type client struct {
@@ -221,8 +222,27 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
-	return err
+	var res tableConfig
+	if tc.Resource != nil {
+		res = tc.Resource.(tableConfig)
+	}
+
+	if _, err := c.db.ExecContext(ctx, tc.TableCreateSql); err != nil {
+		return fmt.Errorf("executing CREATE TABLE statement: %w", err)
+	}
+
+	if res.AdditionalSql != "" {
+		if _, err := c.db.ExecContext(ctx, res.AdditionalSql); err != nil {
+			return fmt.Errorf("executing additional SQL statement '%s': %w", res.AdditionalSql, err)
+		}
+
+		log.WithFields(log.Fields{
+			"table": tc.Identifier,
+			"query": res.AdditionalSql,
+		}).Info("executed AdditionalSql")
+	}
+
+	return nil
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {
