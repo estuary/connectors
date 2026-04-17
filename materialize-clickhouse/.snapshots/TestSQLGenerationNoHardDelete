@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS key_value (
 		field_with_projection Nullable(String),
 		flow_published_at DateTime64(6, 'UTC'),
 		integer Nullable(Int64),
+		integerGt128Bit Nullable(Int256),
+		integerGt256Bit Nullable(String),
 		integerGt64Bit Nullable(Int128),
 		integerWithUserDDL Nullable(DECIMAL(20)),
 		multiple Nullable(String),
@@ -19,8 +21,11 @@ CREATE TABLE IF NOT EXISTS key_value (
 		object Nullable(String),
 		string Nullable(String),
 		stringInteger Nullable(Int256),
+		stringInteger18Chars Nullable(Int64),
+		stringInteger38Chars Nullable(Int128),
 		stringInteger39Chars Nullable(Int256),
 		stringInteger66Chars Nullable(Int256),
+		stringInteger77Chars Nullable(String),
 		stringNumber Nullable(Float64),
 		flow_document String
 )
@@ -35,7 +40,7 @@ SETTINGS
 
 --- Begin key_value insertStoreTable ---
 
-INSERT INTO flow_temp_store_0_key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt64Bit, integerWithUserDDL, multiple, `nonAsciiκόσμε`, number, numberCastToString, object, string, stringInteger, stringInteger39Chars, stringInteger66Chars, stringNumber, flow_document)
+INSERT INTO flow_temp_store_0_key_value (key1, key2, `key!binary`, `array`, binary, boolean, field_with_projection, flow_published_at, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, `nonAsciiκόσμε`, number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document)
 --- End key_value insertStoreTable ---
 
 --- Begin delta_updates createTargetTable ---

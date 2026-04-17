@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS key_value (
 		field_with_projection TEXT,
 		flow_published_at TIMESTAMPTZ NOT NULL,
 		"integer" BIGINT,
+		"integerGt128Bit" NUMERIC,
+		"integerGt256Bit" NUMERIC,
 		"integerGt64Bit" NUMERIC,
 		"integerWithUserDDL" DECIMAL(20),
 		multiple JSON,
@@ -19,8 +21,11 @@ CREATE TABLE IF NOT EXISTS key_value (
 		object JSON,
 		string TEXT,
 		"stringInteger" NUMERIC,
+		"stringInteger18Chars" NUMERIC,
+		"stringInteger38Chars" NUMERIC,
 		"stringInteger39Chars" NUMERIC,
 		"stringInteger66Chars" NUMERIC,
+		"stringInteger77Chars" NUMERIC,
 		"stringNumber" DECIMAL,
 		flow_document JSON NOT NULL,
 
@@ -39,6 +44,8 @@ COMMENT ON COLUMN key_value.flow_published_at IS 'Flow Publication Time
 Flow publication date-time of this document
 auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
 COMMENT ON COLUMN key_value."integer" IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
+COMMENT ON COLUMN key_value."integerGt128Bit" IS 'auto-generated projection of JSON at: /integerGt128Bit with inferred types: [integer]';
+COMMENT ON COLUMN key_value."integerGt256Bit" IS 'auto-generated projection of JSON at: /integerGt256Bit with inferred types: [integer]';
 COMMENT ON COLUMN key_value."integerGt64Bit" IS 'auto-generated projection of JSON at: /integerGt64Bit with inferred types: [integer]';
 COMMENT ON COLUMN key_value."integerWithUserDDL" IS 'auto-generated projection of JSON at: /integerWithUserDDL with inferred types: [integer]';
 COMMENT ON COLUMN key_value.multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]';
@@ -48,8 +55,11 @@ COMMENT ON COLUMN key_value."numberCastToString" IS 'auto-generated projection o
 COMMENT ON COLUMN key_value.object IS 'auto-generated projection of JSON at: /object with inferred types: [object]';
 COMMENT ON COLUMN key_value.string IS 'auto-generated projection of JSON at: /string with inferred types: [string]';
 COMMENT ON COLUMN key_value."stringInteger" IS 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]';
+COMMENT ON COLUMN key_value."stringInteger18Chars" IS 'auto-generated projection of JSON at: /stringInteger18Chars with inferred types: [integer string]';
+COMMENT ON COLUMN key_value."stringInteger38Chars" IS 'auto-generated projection of JSON at: /stringInteger38Chars with inferred types: [integer string]';
 COMMENT ON COLUMN key_value."stringInteger39Chars" IS 'auto-generated projection of JSON at: /stringInteger39Chars with inferred types: [integer string]';
 COMMENT ON COLUMN key_value."stringInteger66Chars" IS 'auto-generated projection of JSON at: /stringInteger66Chars with inferred types: [integer string]';
+COMMENT ON COLUMN key_value."stringInteger77Chars" IS 'auto-generated projection of JSON at: /stringInteger77Chars with inferred types: [integer string]';
 COMMENT ON COLUMN key_value."stringNumber" IS 'auto-generated projection of JSON at: /stringNumber with inferred types: [number string]';
 COMMENT ON COLUMN key_value.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
 --- End key_value createTargetTable ---
@@ -128,6 +138,8 @@ SELECT 0,
 		'boolean', r."boolean",
 		'field_with_projection', r.field_with_projection,
 		'integer', r."integer",
+		'integerGt128Bit', r."integerGt128Bit",
+		'integerGt256Bit', r."integerGt256Bit",
 		'integerGt64Bit', r."integerGt64Bit",
 		'integerWithUserDDL', r."integerWithUserDDL",
 		'multiple', r.multiple,
@@ -137,8 +149,11 @@ SELECT 0,
 		'object', r.object,
 		'string', r.string,
 		'stringInteger', CAST(r."stringInteger" AS TEXT),
+		'stringInteger18Chars', CAST(r."stringInteger18Chars" AS TEXT),
+		'stringInteger38Chars', CAST(r."stringInteger38Chars" AS TEXT),
 		'stringInteger39Chars', CAST(r."stringInteger39Chars" AS TEXT),
 		'stringInteger66Chars', CAST(r."stringInteger66Chars" AS TEXT),
+		'stringInteger77Chars', CAST(r."stringInteger77Chars" AS TEXT),
 		'stringNumber', CAST(r."stringNumber" AS TEXT)
 	)
 ) as flow_document
@@ -168,6 +183,8 @@ INSERT INTO key_value (
 		field_with_projection,
 		flow_published_at,
 		"integer",
+		"integerGt128Bit",
+		"integerGt256Bit",
 		"integerGt64Bit",
 		"integerWithUserDDL",
 		multiple,
@@ -177,11 +194,14 @@ INSERT INTO key_value (
 		object,
 		string,
 		"stringInteger",
+		"stringInteger18Chars",
+		"stringInteger38Chars",
 		"stringInteger39Chars",
 		"stringInteger66Chars",
+		"stringInteger77Chars",
 		"stringNumber",
 		flow_document
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22);
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27);
 --- End key_value storeInsert ---
 
 --- Begin delta_updates storeInsert ---
@@ -202,19 +222,24 @@ UPDATE key_value SET
 		field_with_projection = $7,
 		flow_published_at = $8,
 		"integer" = $9,
-		"integerGt64Bit" = $10,
-		"integerWithUserDDL" = $11,
-		multiple = $12,
-		"nonAsciiκόσμε" = $13,
-		number = $14,
-		"numberCastToString" = $15,
-		object = $16,
-		string = $17,
-		"stringInteger" = $18,
-		"stringInteger39Chars" = $19,
-		"stringInteger66Chars" = $20,
-		"stringNumber" = $21,
-		flow_document = $22
+		"integerGt128Bit" = $10,
+		"integerGt256Bit" = $11,
+		"integerGt64Bit" = $12,
+		"integerWithUserDDL" = $13,
+		multiple = $14,
+		"nonAsciiκόσμε" = $15,
+		number = $16,
+		"numberCastToString" = $17,
+		object = $18,
+		string = $19,
+		"stringInteger" = $20,
+		"stringInteger18Chars" = $21,
+		"stringInteger38Chars" = $22,
+		"stringInteger39Chars" = $23,
+		"stringInteger66Chars" = $24,
+		"stringInteger77Chars" = $25,
+		"stringNumber" = $26,
+		flow_document = $27
 	 WHERE key1 = $1
 	 AND   key2 = $2
 	 AND   "key!binary" = $3;

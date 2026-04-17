@@ -14,9 +14,14 @@ collections:
         string: { type: string }
         integer: { type: integer }
         integerGt64Bit: { type: integer, maximum: 1e19 }
+        integerGt128Bit: { type: integer, maximum: 1e39 }
+        integerGt256Bit: { type: integer, maximum: 1e77 }
         stringInteger: { type: [integer, string], format: integer }
+        stringInteger18Chars : { type: [integer, string], format: integer, maxLength: 18 }
+        stringInteger38Chars : { type: [integer, string], format: integer, maxLength: 38 }
         stringInteger39Chars : { type: [integer, string], format: integer, maxLength: 39 }
         stringInteger66Chars : { type: [integer, string], format: integer, maxLength: 66 }
+        stringInteger77Chars : { type: [integer, string], format: integer, maxLength: 77 }
         number: { type: number }
         stringNumber: { type: [number, string], format: number }
         numberCastToString: { type: [number, string], format: number }

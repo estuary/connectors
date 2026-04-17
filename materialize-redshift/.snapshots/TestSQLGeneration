@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS "a-schema".key_value (
 	field_with_projection TEXT,
 	flow_published_at TIMESTAMPTZ,
 	integer BIGINT,
+	"integerGt128Bit" NUMERIC(38,0),
+	"integerGt256Bit" NUMERIC(38,0),
 	"integerGt64Bit" NUMERIC(38,0),
 	"integerWithUserDDL" DECIMAL(20),
 	multiple SUPER,
@@ -19,8 +21,11 @@ CREATE TABLE IF NOT EXISTS "a-schema".key_value (
 	object SUPER,
 	string TEXT,
 	"stringInteger" NUMERIC(38,0),
+	"stringInteger18Chars" NUMERIC(38,0),
+	"stringInteger38Chars" NUMERIC(38,0),
 	"stringInteger39Chars" TEXT,
 	"stringInteger66Chars" TEXT,
+	"stringInteger77Chars" TEXT,
 	"stringNumber" DOUBLE PRECISION,
 	flow_document SUPER
 );
@@ -37,6 +42,8 @@ COMMENT ON COLUMN "a-schema".key_value.flow_published_at IS 'Flow Publication Ti
 Flow publication date-time of this document
 auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
 COMMENT ON COLUMN "a-schema".key_value.integer IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value."integerGt128Bit" IS 'auto-generated projection of JSON at: /integerGt128Bit with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value."integerGt256Bit" IS 'auto-generated projection of JSON at: /integerGt256Bit with inferred types: [integer]';
 COMMENT ON COLUMN "a-schema".key_value."integerGt64Bit" IS 'auto-generated projection of JSON at: /integerGt64Bit with inferred types: [integer]';
 COMMENT ON COLUMN "a-schema".key_value."integerWithUserDDL" IS 'auto-generated projection of JSON at: /integerWithUserDDL with inferred types: [integer]';
 COMMENT ON COLUMN "a-schema".key_value.multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]';
@@ -46,8 +53,11 @@ COMMENT ON COLUMN "a-schema".key_value."numberCastToString" IS 'auto-generated p
 COMMENT ON COLUMN "a-schema".key_value.object IS 'auto-generated projection of JSON at: /object with inferred types: [object]';
 COMMENT ON COLUMN "a-schema".key_value.string IS 'auto-generated projection of JSON at: /string with inferred types: [string]';
 COMMENT ON COLUMN "a-schema".key_value."stringInteger" IS 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value."stringInteger18Chars" IS 'auto-generated projection of JSON at: /stringInteger18Chars with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value."stringInteger38Chars" IS 'auto-generated projection of JSON at: /stringInteger38Chars with inferred types: [integer string]';
 COMMENT ON COLUMN "a-schema".key_value."stringInteger39Chars" IS 'auto-generated projection of JSON at: /stringInteger39Chars with inferred types: [integer string]';
 COMMENT ON COLUMN "a-schema".key_value."stringInteger66Chars" IS 'auto-generated projection of JSON at: /stringInteger66Chars with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value."stringInteger77Chars" IS 'auto-generated projection of JSON at: /stringInteger77Chars with inferred types: [integer string]';
 COMMENT ON COLUMN "a-schema".key_value."stringNumber" IS 'auto-generated projection of JSON at: /stringNumber with inferred types: [number string]';
 COMMENT ON COLUMN "a-schema".key_value.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
 --- End "a-schema".key_value createTargetTable ---
@@ -89,10 +99,10 @@ MERGE INTO "a-schema".key_value
 USING flow_temp_table_0 AS r
 ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = r."key!binary"
 WHEN MATCHED THEN
-	UPDATE SET "array" = r."array", "binary" = r."binary", boolean = r.boolean, field_with_projection = r.field_with_projection, flow_published_at = r.flow_published_at, integer = r.integer, "integerGt64Bit" = r."integerGt64Bit", "integerWithUserDDL" = r."integerWithUserDDL", multiple = r.multiple, "nonAsciiκόσμε" = r."nonAsciiκόσμε", number = r.number, "numberCastToString" = r."numberCastToString", object = r.object, string = r.string, "stringInteger" = r."stringInteger", "stringInteger39Chars" = r."stringInteger39Chars", "stringInteger66Chars" = r."stringInteger66Chars", "stringNumber" = r."stringNumber", flow_document = r.flow_document
+	UPDATE SET "array" = r."array", "binary" = r."binary", boolean = r.boolean, field_with_projection = r.field_with_projection, flow_published_at = r.flow_published_at, integer = r.integer, "integerGt128Bit" = r."integerGt128Bit", "integerGt256Bit" = r."integerGt256Bit", "integerGt64Bit" = r."integerGt64Bit", "integerWithUserDDL" = r."integerWithUserDDL", multiple = r.multiple, "nonAsciiκόσμε" = r."nonAsciiκόσμε", number = r.number, "numberCastToString" = r."numberCastToString", object = r.object, string = r.string, "stringInteger" = r."stringInteger", "stringInteger18Chars" = r."stringInteger18Chars", "stringInteger38Chars" = r."stringInteger38Chars", "stringInteger39Chars" = r."stringInteger39Chars", "stringInteger66Chars" = r."stringInteger66Chars", "stringInteger77Chars" = r."stringInteger77Chars", "stringNumber" = r."stringNumber", flow_document = r.flow_document
 WHEN NOT MATCHED THEN
-	INSERT (key1, key2, "key!binary", "array", "binary", boolean, field_with_projection, flow_published_at, integer, "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", object, string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
-	VALUES (r.key1, r.key2, r."key!binary", r."array", r."binary", r.boolean, r.field_with_projection, r.flow_published_at, r.integer, r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r."nonAsciiκόσμε", r.number, r."numberCastToString", r.object, r.string, r."stringInteger", r."stringInteger39Chars", r."stringInteger66Chars", r."stringNumber", r.flow_document);
+	INSERT (key1, key2, "key!binary", "array", "binary", boolean, field_with_projection, flow_published_at, integer, "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", object, string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document)
+	VALUES (r.key1, r.key2, r."key!binary", r."array", r."binary", r.boolean, r.field_with_projection, r.flow_published_at, r.integer, r."integerGt128Bit", r."integerGt256Bit", r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r."nonAsciiκόσμε", r.number, r."numberCastToString", r.object, r.string, r."stringInteger", r."stringInteger18Chars", r."stringInteger38Chars", r."stringInteger39Chars", r."stringInteger66Chars", r."stringInteger77Chars", r."stringNumber", r.flow_document);
 --- End "a-schema".key_value mergeInto ---
 
 --- Begin "a-schema".delta_updates mergeInto ---
@@ -134,6 +144,8 @@ OBJECT(
 	'boolean', r.boolean,
 	'field_with_projection', r.field_with_projection,
 	'integer', r.integer,
+	'integerGt128Bit', r."integerGt128Bit",
+	'integerGt256Bit', r."integerGt256Bit",
 	'integerGt64Bit', r."integerGt64Bit",
 	'integerWithUserDDL', r."integerWithUserDDL",
 	'multiple', r.multiple,
@@ -143,8 +155,11 @@ OBJECT(
 	'object', r.object,
 	'string', r.string,
 	'stringInteger', CAST(r."stringInteger" AS VARCHAR),
+	'stringInteger18Chars', CAST(r."stringInteger18Chars" AS VARCHAR),
+	'stringInteger38Chars', CAST(r."stringInteger38Chars" AS VARCHAR),
 	'stringInteger39Chars', CAST(r."stringInteger39Chars" AS VARCHAR),
 	'stringInteger66Chars', CAST(r."stringInteger66Chars" AS VARCHAR),
+	'stringInteger77Chars', CAST(r."stringInteger77Chars" AS VARCHAR),
 	'stringNumber', CAST(r."stringNumber" AS VARCHAR)
 ) as flow_document
 FROM flow_temp_table_0 AS l
