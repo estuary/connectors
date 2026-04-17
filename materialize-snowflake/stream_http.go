@@ -337,7 +337,7 @@ func (s *streamClient) channelStatus(ctx context.Context, clientSeq int, schema,
 
 func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, clientSeq int, schema, table, name string) error {
 	logger := Logger(ctx)
-	maxBackoff := 1 * time.Second
+	maxBackoff := 2 * time.Second
 	backoff := 100 * time.Millisecond
 	ts := time.Now()
 	for n := 1; ; n++ {
@@ -345,6 +345,7 @@ func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, 
 			if !errors.Is(err, ErrTemporary) {
 				return err
 			}
+			logger.WithField("attempt", n).WithError(err).Info("temporary error getting channel status")
 		} else if len(status.Channels) != 1 {
 			return fmt.Errorf("expected 1 channel but got %d", len(status.Channels))
 		} else if status.Channels[0].PersistedOffsetToken == token {
@@ -356,6 +357,10 @@ func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, 
 				"attempt": n,
 				"token":   token,
 			}).Info("channel offset token not yet persisted")
+		}
+
+		if time.Since(ts) > 5*time.Minute {
+			return fmt.Errorf("channel offset token not persisted: max retries reached")
 		}
 
 		time.Sleep(backoff)
