@@ -11,6 +11,7 @@ use rdkafka::{
 };
 use serde_json::{json, Map};
 use std::collections::HashMap;
+use std::sync::Once;
 use time::{format_description, OffsetDateTime};
 
 const BOOTSTRAP_SERVERS: &str = "localhost:9092";
@@ -43,6 +44,7 @@ fn test_spec() {
 
 #[tokio::test]
 async fn test_materialization() {
+    ensure_services_up();
     drop_topics().await;
 
     for name in [
@@ -67,6 +69,31 @@ async fn test_materialization() {
     }
 
     insta::assert_snapshot!(snapshot_topics().await);
+}
+
+fn ensure_services_up() {
+    static ONCE: Once = Once::new();
+    ONCE.call_once(|| {
+        let _ = std::process::Command::new("docker")
+            .args(["network", "create", "flow-test"])
+            .output();
+
+        let status = std::process::Command::new("docker")
+            .args(["compose", "-f", "docker-compose.yaml", "up", "--wait"])
+            .status()
+            .expect("failed to invoke docker compose");
+        if !status.success() {
+            let logs = std::process::Command::new("docker")
+                .args(["compose", "-f", "docker-compose.yaml", "logs"])
+                .output();
+            if let Ok(logs) = logs {
+                eprintln!("--- docker compose logs ---");
+                eprintln!("{}", String::from_utf8_lossy(&logs.stdout));
+                eprintln!("{}", String::from_utf8_lossy(&logs.stderr));
+            }
+            panic!("docker compose up --wait failed");
+        }
+    });
 }
 
 async fn drop_topics() {
