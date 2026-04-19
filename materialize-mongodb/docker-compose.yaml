@@ -3,10 +3,15 @@ version: "3.7"
 services:
   mongo:
     image: 'mongo:latest'
-    environment: 
+    command: ["mongod", "--wiredTigerCacheSizeGB", "2"]
+    environment:
       MONGO_INITDB_ROOT_USERNAME: "flow"
       MONGO_INITDB_ROOT_PASSWORD: "flow"
       MONGO_INITDB_DATABASE: "test"
+    deploy:
+      resources:
+        limits:
+          memory: 4g
     healthcheck:
       test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
       interval: 1s

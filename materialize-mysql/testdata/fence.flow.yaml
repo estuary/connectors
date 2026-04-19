@@ -4,5 +4,5 @@ materializations:
       local:
         command: ["go", "run", "."]
         protobuf: true
-        config: config.local.mysql.yaml
+        config: config.local.yaml
     bindings: []

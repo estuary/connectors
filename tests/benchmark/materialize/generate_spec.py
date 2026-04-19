@@ -26,8 +26,10 @@ binding; otherwise we derive `{table: <basename>}` from the collection name.
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import re
+import subprocess
 import sys
 from typing import Any
 
@@ -37,6 +39,34 @@ import yaml
 def _table_name(collection_name: str) -> str:
     base = collection_name.rsplit("/", 1)[-1]
     return re.sub(r"[^A-Za-z0-9_]", "_", base)
+
+
+def _get_collection_name_field(connector: str) -> str:
+    """Query the connector's Spec RPC to find the resource config field
+    annotated with x-collection-name. Falls back to 'table'."""
+    connector_bin = os.path.join(
+        os.environ.get("ROOT_DIR", os.getcwd()), connector, "connector"
+    )
+    if not os.path.isfile(connector_bin):
+        return "table"
+    try:
+        result = subprocess.run(
+            [connector_bin],
+            input='{"spec":{}}\n',
+            capture_output=True,
+            text=True,
+            timeout=10,
+            env={**os.environ, "FLOW_RUNTIME_CODEC": "json"},
+        )
+        resp = json.loads(result.stdout)
+        raw = resp.get("spec", {}).get("resourceConfigSchema", {})
+        schema = json.loads(raw) if isinstance(raw, str) else raw
+        for prop, prop_schema in schema.get("properties", {}).items():
+            if prop_schema.get("x-collection-name"):
+                return prop
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError):
+        pass
+    return "table"
 
 
 def _load_yaml(path: str) -> Any:
@@ -88,6 +118,7 @@ def build_spec(
     tag: str | None = None,
     task: str | None = None,
     compose_file: str | None = None,
+    collection_name_field: str = "table",
 ) -> dict:
     scenario = _load_yaml(scenario_path)
 
@@ -103,7 +134,7 @@ def build_spec(
             "schema": c["schema"],
             "key": c["key"],
         }
-        resource = c.get("resource") or {"table": _table_name(name)}
+        resource = c.get("resource") or {collection_name_field: _table_name(name)}
         bindings_out.append({"source": name, "resource": resource})
 
     config = _load_yaml(config_path)
@@ -162,6 +193,8 @@ def main(argv: list[str] | None = None) -> int:
                 compose_file = cand
                 break
 
+    collection_name_field = _get_collection_name_field(args.connector)
+
     spec = build_spec(
         scenario_path=args.scenario,
         connector=args.connector,
@@ -171,6 +204,7 @@ def main(argv: list[str] | None = None) -> int:
         tag=args.tag,
         task=args.task,
         compose_file=compose_file,
+        collection_name_field=collection_name_field,
     )
 
     text = yaml.safe_dump(spec, sort_keys=False, default_flow_style=False)

@@ -1,0 +1,46 @@
+{
+  "connector": "materialize-spanner",
+  "scenario": "large-docs.yaml",
+  "seed": 0,
+  "preview_exit_code": 0,
+  "apply_seconds": 459.58617564,
+  "wall_seconds": 0.0,
+  "total_docs": 10000,
+  "total_bytes": 10485760000,
+  "docs_per_sec": null,
+  "mb_per_sec": null,
+  "transactions": [
+    {
+      "index": 0,
+      "collection": "bench/big",
+      "doc_count": 5000,
+      "doc_size": 1048576,
+      "bytes": 5242880000,
+      "fresh": {
+        "start": 0,
+        "count": 5000,
+        "op": "c"
+      },
+      "overlaps": []
+    },
+    {
+      "index": 1,
+      "collection": "bench/big",
+      "doc_count": 5000,
+      "doc_size": 1048576,
+      "bytes": 5242880000,
+      "fresh": {
+        "start": 5000,
+        "count": 3000,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 0,
+          "count": 2000
+        }
+      ]
+    }
+  ]
+}

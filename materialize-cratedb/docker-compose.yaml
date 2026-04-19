@@ -7,7 +7,11 @@ services:
     networks:
       - flow-test
     environment:
-      - CRATE_HEAP_SIZE=1g
+      - CRATE_HEAP_SIZE=2g
+    deploy:
+      resources:
+        limits:
+          memory: 4g
 networks:
   flow-test:
     name: flow-test

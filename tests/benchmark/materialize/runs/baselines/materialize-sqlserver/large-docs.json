@@ -1,0 +1,52 @@
+{
+  "connector": "materialize-sqlserver",
+  "scenario": "large-docs.yaml",
+  "seed": 0,
+  "preview_exit_code": 0,
+  "apply_seconds": 0.449996272,
+  "wall_seconds": 1192.53979828,
+  "total_docs": 10000,
+  "total_bytes": 10485760000,
+  "docs_per_sec": 8.385464379824471,
+  "mb_per_sec": 8.385464379824471,
+  "transactions": [
+    {
+      "index": 0,
+      "collection": "bench/big",
+      "doc_count": 5000,
+      "doc_size": 1048576,
+      "bytes": 5242880000,
+      "fresh": {
+        "start": 0,
+        "count": 5000,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 415.49531483,
+      "mb_per_sec": 12.033830037399461,
+      "docs_per_sec": 12.033830037399461
+    },
+    {
+      "index": 1,
+      "collection": "bench/big",
+      "doc_count": 5000,
+      "doc_size": 1048576,
+      "bytes": 5242880000,
+      "fresh": {
+        "start": 5000,
+        "count": 3000,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 0,
+          "count": 2000
+        }
+      ],
+      "wall_seconds": 534.453553913,
+      "mb_per_sec": 9.355349895968539,
+      "docs_per_sec": 9.355349895968539
+    }
+  ]
+}

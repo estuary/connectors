@@ -8,6 +8,10 @@ services:
       CLICKHOUSE_PASSWORD: flow
     networks:
       - flow-test
+    deploy:
+      resources:
+        limits:
+          memory: 4g
     healthcheck:
       test: ["CMD", "clickhouse-client", "--host", "127.0.0.1", "--user", "flow", "--password", "flow", "--query", "SHOW TABLES FROM flow"]
       interval: 1s

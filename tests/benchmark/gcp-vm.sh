@@ -37,7 +37,7 @@ ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 USER_LABEL="$(echo "${USER:-unknown}" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]/-/g')"
 VM_NAME="bench-${USER_LABEL}"
 ZONE="us-central1-a"
-MACHINE_TYPE="e2-standard-2"
+MACHINE_TYPE="c3-standard-4-lssd"
 PROJECT=""
 YES=0
 COMMAND=""
@@ -178,7 +178,7 @@ cmd_create() {
     --machine-type="$MACHINE_TYPE" \
     --image-family=ubuntu-2404-lts-amd64 \
     --image-project=ubuntu-os-cloud \
-    --boot-disk-size=300GB \
+    --boot-disk-size=100GB \
     --boot-disk-type=pd-ssd \
     --labels="purpose=bench,owner=${USER_LABEL}" \
     --tags=bench \

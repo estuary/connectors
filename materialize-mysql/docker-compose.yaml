@@ -4,11 +4,21 @@ services:
   mysql:
     image: 'mysql:5.7'
     platform: linux/amd64
+    command:
+      - "mysqld"
+      - "--innodb-buffer-pool-size=1G"
+      - "--innodb-log-file-size=512M"
+      - "--innodb-flush-method=O_DIRECT"
+      - "--innodb-flush-log-at-trx-commit=2"
     environment: {"MYSQL_DATABASE": "flow", "MYSQL_USER": "flow", "MYSQL_PASSWORD": "flow", "MYSQL_ROOT_PASSWORD": "flow"}
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
       - flow-test
+    deploy:
+      resources:
+        limits:
+          memory: 4g
     healthcheck:
       test: [ "CMD-SHELL", "mysql -h 127.0.0.1 -u $$MYSQL_USER --password=$$MYSQL_PASSWORD --port 3306 --execute 'SHOW DATABASES;'"]
       interval: 1s

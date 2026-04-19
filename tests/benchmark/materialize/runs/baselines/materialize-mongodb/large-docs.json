@@ -1,0 +1,52 @@
+{
+  "connector": "materialize-mongodb",
+  "scenario": "large-docs.yaml",
+  "seed": 0,
+  "preview_exit_code": 0,
+  "apply_seconds": 0.312890239,
+  "wall_seconds": 166.004752416,
+  "total_docs": 10000,
+  "total_bytes": 10485760000,
+  "docs_per_sec": 60.23923926551498,
+  "mb_per_sec": 60.23923926551498,
+  "transactions": [
+    {
+      "index": 0,
+      "collection": "bench/big",
+      "doc_count": 5000,
+      "doc_size": 1048576,
+      "bytes": 5242880000,
+      "fresh": {
+        "start": 0,
+        "count": 5000,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 78.369511036,
+      "mb_per_sec": 63.80032150134493,
+      "docs_per_sec": 63.80032150134493
+    },
+    {
+      "index": 1,
+      "collection": "bench/big",
+      "doc_count": 5000,
+      "doc_size": 1048576,
+      "bytes": 5242880000,
+      "fresh": {
+        "start": 5000,
+        "count": 3000,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 0,
+          "count": 2000
+        }
+      ],
+      "wall_seconds": 87.416461785,
+      "mb_per_sec": 57.197464847038255,
+      "docs_per_sec": 57.197464847038255
+    }
+  ]
+}

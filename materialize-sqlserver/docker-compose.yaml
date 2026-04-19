@@ -6,10 +6,15 @@ services:
     environment:
       SA_PASSWORD: '!Flow1234'
       ACCEPT_EULA: 'Y'
+      MSSQL_MEMORY_LIMIT_MB: '3072'
     volumes:
       - sqlserver_data:/var/opt/mssql/data
     networks:
       - flow-test
+    deploy:
+      resources:
+        limits:
+          memory: 4g
     healthcheck:
       test: "true"
       interval: 30s
