@@ -148,7 +148,7 @@ do_sync() {
   _rsync_transport
 
   info "syncing codebase to ${VM_NAME}"
-  rsync -az --delete \
+  rsync -az \
     --exclude='.git' \
     --filter=':- .gitignore' \
     -e "$RSYNC_TRANSPORT" \
@@ -178,7 +178,7 @@ cmd_create() {
     --machine-type="$MACHINE_TYPE" \
     --image-family=ubuntu-2404-lts-amd64 \
     --image-project=ubuntu-os-cloud \
-    --boot-disk-size=100GB \
+    --boot-disk-size=300GB \
     --boot-disk-type=pd-ssd \
     --labels="purpose=bench,owner=${USER_LABEL}" \
     --tags=bench \

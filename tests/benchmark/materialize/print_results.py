@@ -138,8 +138,11 @@ def print_results(data: dict) -> None:
 
     # Summary stats
     wall = data["wall_seconds"]
+    apply = data.get("apply_seconds")
+    apply_str = _human_duration(apply) if apply is not None else "N/A"
     print(
-        f"  {BOLD}Wall time{RESET}   {_human_duration(wall)}"
+        f"  {BOLD}Data wall{RESET}   {_human_duration(wall)}"
+        f"     {BOLD}Apply (DDL){RESET}  {DIM}{apply_str}{RESET}"
         f"     {BOLD}Total data{RESET}  {_human_bytes(data['total_bytes'])}"
         f"     {BOLD}Docs{RESET}  {_human_count(data['total_docs'])}"
     )
@@ -159,18 +162,24 @@ def print_results(data: dict) -> None:
         return
 
     # Build rows
-    headers = ["Tx", "Collection", "Docs", "Doc Size", "Total", "Fresh", "Overlaps"]
-    aligns  = ["r",  "l",          "r",    "r",        "r",     "r",     "l"]
+    headers = ["Tx", "Collection", "Docs", "Doc Size", "Total", "Wall", "MB/s", "Fresh", "Overlaps"]
+    aligns  = ["r",  "l",          "r",    "r",        "r",     "r",    "r",    "r",     "l"]
 
     rows: list[list[str]] = []
     for tx in txs:
         fresh = tx["fresh"]
+        tx_wall = tx.get("wall_seconds")
+        tx_mbs = tx.get("mb_per_sec")
+        wall_str = _human_duration(tx_wall) if tx_wall is not None else DIM + "—" + RESET
+        mbs_str = f"{tx_mbs:.1f}" if tx_mbs is not None else DIM + "—" + RESET
         rows.append([
             f'{BOLD}#{tx["index"]}{RESET}',
             f'{DIM}{tx["collection"]}{RESET}',
             _human_count(tx["doc_count"]),
             _human_bytes(tx["doc_size"]),
             _human_bytes(tx["bytes"]),
+            wall_str,
+            mbs_str,
             f'{GREEN}{_human_count(fresh["count"])}{fresh["op"]}{RESET}',
             _overlap_summary(tx["overlaps"]),
         ])
