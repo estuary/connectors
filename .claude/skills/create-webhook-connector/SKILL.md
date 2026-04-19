@@ -108,3 +108,14 @@ async def all_resources(log, http, config):
 Ask the user which discriminator strategy fits their webhook provider and whether event types can be discovered via API or need to be statically defined.
 
 If the provider also has pull API endpoints (not just webhooks), use `/classify-stream-types` to determine the appropriate stream type for each endpoint.
+
+## Dockerfile setup
+
+Webhook connectors need a `Dockerfile` symlink in their connector directory pointing to the shared webhook Dockerfile:
+
+```bash
+cd source-<name>
+ln -s ../estuary-cdk/webhook-capture.Dockerfile Dockerfile
+```
+
+CI and `build-local.sh` automatically detect connector-specific Dockerfiles
