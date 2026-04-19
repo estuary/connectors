@@ -180,13 +180,27 @@ if (( DOCKER )); then
   PREVIEW_ARGS+=(--network flow-test)
 fi
 
-START_NS=$(python3 -c "import time; print(time.monotonic_ns())")
+# Pipe preview stdout through a timestamper. Each connectorState line from
+# flowctl marks a commit boundary. The first is Apply (DDL/table creation),
+# subsequent ones are data transactions. The timestamper records monotonic
+# nanosecond timestamps so we can compute per-transaction wall times and
+# exclude Apply from the data throughput measurement.
+TIMESTAMPS="$OUT_DIR/timestamps.json"
 set +e
-flowctl preview "${PREVIEW_ARGS[@]}" >"$OUT_DIR/preview.stdout" 2>"$PREVIEW_LOG"
-PREVIEW_RC=$?
+flowctl preview "${PREVIEW_ARGS[@]}" 2>"$PREVIEW_LOG" \
+  | python3 -c "
+import sys, time, json
+ts = [time.monotonic_ns()]  # ts[0] = start (before any data)
+for line in sys.stdin:
+    sys.stdout.write(line)
+    sys.stdout.flush()
+    if '\"connectorState\"' in line:
+        ts.append(time.monotonic_ns())
+with open('$TIMESTAMPS', 'w') as f:
+    json.dump(ts, f)
+" >"$OUT_DIR/preview.stdout"
+PREVIEW_RC=${PIPESTATUS[0]}
 set -e
-END_NS=$(python3 -c "import time; print(time.monotonic_ns())")
-WALL_S=$(python3 -c "print(($END_NS - $START_NS) / 1e9)")
 
 # If the generator is still alive (e.g., preview died early), it's blocked
 # on writing to a FIFO no one reads. Kill it so we don't hang.
@@ -196,26 +210,38 @@ fi
 wait $GEN_PID 2>/dev/null || true
 
 echo "preview exit: $PREVIEW_RC"
-echo "wall time:    ${WALL_S}s"
 
-# Build a results.json from the state log + wall time. Per-transaction
-# timing requires parsing flowctl preview's stderr (which logs each
-# commit boundary); for now we report aggregate wall time and per-tx
-# planned bytes from the state log. Per-tx wall time is a follow-up.
-python3 - "$STATE_LOG" "$WALL_S" "$PREVIEW_RC" "$CONNECTOR" "$SCENARIO" "$SEED" >"$OUT_DIR/results.json" <<'PY'
+# Build results.json from state log + per-commit timestamps.
+# timestamps.json has one entry per connectorState line: the first is Apply
+# (DDL), the rest are data transactions.
+python3 - "$STATE_LOG" "$TIMESTAMPS" "$PREVIEW_RC" "$CONNECTOR" "$SCENARIO" "$SEED" >"$OUT_DIR/results.json" <<'PY'
 import json, sys, os
-state_path, wall, rc, connector, scenario, seed = sys.argv[1:7]
+state_path, ts_path, rc, connector, scenario, seed = sys.argv[1:7]
 with open(state_path) as f:
     state = json.load(f)
+try:
+    with open(ts_path) as f:
+        timestamps = json.load(f)
+except (FileNotFoundError, json.JSONDecodeError):
+    timestamps = []
+
+# timestamps[0] = preview start, timestamps[1] = end of Apply (DDL),
+# timestamps[2..N] = end of each data transaction.
+apply_seconds = None
+tx_boundaries = []  # (start_ns, end_ns) per data transaction
+if len(timestamps) >= 2:
+    apply_seconds = (timestamps[1] - timestamps[0]) / 1e9
+    for i in range(2, len(timestamps)):
+        tx_boundaries.append((timestamps[i - 1], timestamps[i]))
 
 txs = []
 total_docs = 0
 total_bytes = 0
-for tx in state["transactions"]:
+for i, tx in enumerate(state["transactions"]):
     bytes_ = tx["doc_count"] * tx["doc_size"]
     total_docs  += tx["doc_count"]
     total_bytes += bytes_
-    txs.append({
+    entry = {
         "index": tx["index"],
         "collection": tx["collection"],
         "doc_count": tx["doc_count"],
@@ -223,19 +249,32 @@ for tx in state["transactions"]:
         "bytes":     bytes_,
         "fresh":     tx["fresh"],
         "overlaps":  tx["overlaps"],
-    })
+    }
+    if i < len(tx_boundaries):
+        start_ns, end_ns = tx_boundaries[i]
+        wall_s = (end_ns - start_ns) / 1e9
+        entry["wall_seconds"] = wall_s
+        entry["mb_per_sec"] = (bytes_ / wall_s / (1024*1024)) if wall_s > 0 else None
+        entry["docs_per_sec"] = (tx["doc_count"] / wall_s) if wall_s > 0 else None
+    txs.append(entry)
 
-wall = float(wall)
+# Data wall = end of Apply to end of last data tx (excludes Apply).
+if len(timestamps) >= 3:
+    data_wall = (timestamps[-1] - timestamps[1]) / 1e9
+else:
+    data_wall = 0.0
+
 print(json.dumps({
     "connector": connector,
     "scenario":  os.path.basename(scenario),
     "seed":      int(seed),
     "preview_exit_code": int(rc),
-    "wall_seconds": wall,
+    "apply_seconds": apply_seconds,
+    "wall_seconds": data_wall,
     "total_docs":   total_docs,
     "total_bytes":  total_bytes,
-    "docs_per_sec": (total_docs  / wall) if wall > 0 else None,
-    "mb_per_sec":   (total_bytes / wall / (1024*1024)) if wall > 0 else None,
+    "docs_per_sec": (total_docs  / data_wall) if data_wall > 0 else None,
+    "mb_per_sec":   (total_bytes / data_wall / (1024*1024)) if data_wall > 0 else None,
     "transactions": txs,
 }, indent=2))
 PY
