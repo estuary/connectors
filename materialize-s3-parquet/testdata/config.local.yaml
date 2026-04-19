@@ -1,0 +1,7 @@
+bucket: test-bucket
+region: us-east-1
+awsAccessKeyId: test_key
+awsSecretAccessKey: test_secret
+uploadInterval: "1s"
+endpoint: http://localhost:9099
+use_path_style: true

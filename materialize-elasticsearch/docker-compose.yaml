@@ -13,6 +13,11 @@ services:
       # Disable disk-based shard allocation thresholds so tests work on machines
       # with limited free disk space.
       - "cluster.routing.allocation.disk.threshold_enabled=false"
+      - "ES_JAVA_OPTS=-Xms2g -Xmx2g"
+    deploy:
+      resources:
+        limits:
+          memory: 4g
     healthcheck:
       test: curl -u elastic:elastic -s http://localhost:9200 >/dev/null || exit 1
       interval: 1s

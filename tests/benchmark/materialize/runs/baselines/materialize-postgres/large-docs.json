@@ -1,0 +1,52 @@
+{
+  "connector": "materialize-postgres",
+  "scenario": "large-docs.yaml",
+  "seed": 0,
+  "preview_exit_code": 0,
+  "apply_seconds": 0.357502662,
+  "wall_seconds": 482.413732929,
+  "total_docs": 10000,
+  "total_bytes": 10485760000,
+  "docs_per_sec": 20.72909479438838,
+  "mb_per_sec": 20.72909479438838,
+  "transactions": [
+    {
+      "index": 0,
+      "collection": "bench/big",
+      "doc_count": 5000,
+      "doc_size": 1048576,
+      "bytes": 5242880000,
+      "fresh": {
+        "start": 0,
+        "count": 5000,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 229.914661945,
+      "mb_per_sec": 21.747199407387495,
+      "docs_per_sec": 21.747199407387495
+    },
+    {
+      "index": 1,
+      "collection": "bench/big",
+      "doc_count": 5000,
+      "doc_size": 1048576,
+      "bytes": 5242880000,
+      "fresh": {
+        "start": 5000,
+        "count": 3000,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 0,
+          "count": 2000
+        }
+      ],
+      "wall_seconds": 252.333909935,
+      "mb_per_sec": 19.815014166300422,
+      "docs_per_sec": 19.815014166300422
+    }
+  ]
+}

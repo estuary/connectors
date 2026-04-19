@@ -1,0 +1,52 @@
+{
+  "connector": "materialize-bigquery",
+  "scenario": "large-docs.yaml",
+  "seed": 0,
+  "preview_exit_code": 0,
+  "apply_seconds": 5.776244415,
+  "wall_seconds": 237.349829409,
+  "total_docs": 10000,
+  "total_bytes": 10485760000,
+  "docs_per_sec": 42.13190304328406,
+  "mb_per_sec": 42.13190304328406,
+  "transactions": [
+    {
+      "index": 0,
+      "collection": "bench/big",
+      "doc_count": 5000,
+      "doc_size": 1048576,
+      "bytes": 5242880000,
+      "fresh": {
+        "start": 0,
+        "count": 5000,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 75.075952285,
+      "mb_per_sec": 66.5992218256416,
+      "docs_per_sec": 66.5992218256416
+    },
+    {
+      "index": 1,
+      "collection": "bench/big",
+      "doc_count": 5000,
+      "doc_size": 1048576,
+      "bytes": 5242880000,
+      "fresh": {
+        "start": 5000,
+        "count": 3000,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 0,
+          "count": 2000
+        }
+      ],
+      "wall_seconds": 103.123261701,
+      "mb_per_sec": 48.48566577051465,
+      "docs_per_sec": 48.48566577051465
+    }
+  ]
+}
