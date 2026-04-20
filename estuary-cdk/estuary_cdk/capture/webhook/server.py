@@ -178,7 +178,15 @@ def start_webhook_server(
     Since non-webhook tasks can take minutes/hours to gracefully shut down,
     we want to wait until they are done to stop listening for webhooks.
     """
-    task.log.info("Starting webhook server")
+    task.log.info(
+        "Starting webhook server",
+        {
+            "bindings": [
+                {"index": idx, "name": rsc.initial_config.name}
+                for idx, rsc in binding_index_mapping.items()
+            ]
+        },
+    )
 
     async def run():
         async with asyncio.TaskGroup() as webhook_tg:

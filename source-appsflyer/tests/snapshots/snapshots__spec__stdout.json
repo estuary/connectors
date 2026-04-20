@@ -75,6 +75,63 @@
     },
     "resourceConfigSchema": {
       "$defs": {
+        "AppsFlyerWebhookResourceConfig": {
+          "additionalProperties": false,
+          "properties": {
+            "_meta": {
+              "anyOf": [
+                {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Meta"
+            },
+            "name": {
+              "description": "Name of this resource",
+              "title": "Name",
+              "type": "string"
+            },
+            "match_rule": {
+              "description": "Matching spec for routing incoming webhooks to this collection",
+              "discriminator": {
+                "mapping": {
+                  "body": "#/$defs/BodyMatch",
+                  "header": "#/$defs/HeaderMatch",
+                  "url": "#/$defs/UrlMatch"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/UrlMatch"
+                },
+                {
+                  "$ref": "#/$defs/HeaderMatch"
+                },
+                {
+                  "$ref": "#/$defs/BodyMatch"
+                }
+              ],
+              "title": "Match Rule"
+            },
+            "type": {
+              "const": "webhook",
+              "title": "Type",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "type"
+          ],
+          "title": "AppsFlyerWebhookResourceConfig",
+          "type": "object"
+        },
         "BodyMatch": {
           "properties": {
             "value": {
@@ -183,61 +240,12 @@
           ],
           "title": "UrlMatch",
           "type": "object"
-        },
-        "WebhookResourceConfig": {
-          "additionalProperties": false,
-          "properties": {
-            "_meta": {
-              "anyOf": [
-                {
-                  "additionalProperties": true,
-                  "type": "object"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "default": null,
-              "title": "Meta"
-            },
-            "type": {
-              "const": "webhook",
-              "title": "Type",
-              "type": "string"
-            },
-            "name": {
-              "description": "Name of this resource",
-              "title": "Name",
-              "type": "string"
-            },
-            "match_rule": {
-              "anyOf": [
-                {
-                  "$ref": "#/$defs/UrlMatch"
-                },
-                {
-                  "$ref": "#/$defs/HeaderMatch"
-                },
-                {
-                  "$ref": "#/$defs/BodyMatch"
-                }
-              ],
-              "description": "Matching spec for routing incoming webhooks to this collection",
-              "title": "Match Rule"
-            }
-          },
-          "required": [
-            "type",
-            "name"
-          ],
-          "title": "WebhookResourceConfig",
-          "type": "object"
         }
       },
       "discriminator": {
         "mapping": {
           "pull": "#/$defs/PullApiResourceConfig",
-          "webhook": "#/$defs/WebhookResourceConfig"
+          "webhook": "#/$defs/AppsFlyerWebhookResourceConfig"
         },
         "propertyName": "type"
       },
@@ -246,7 +254,7 @@
           "$ref": "#/$defs/PullApiResourceConfig"
         },
         {
-          "$ref": "#/$defs/WebhookResourceConfig"
+          "$ref": "#/$defs/AppsFlyerWebhookResourceConfig"
         }
       ]
     },

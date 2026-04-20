@@ -2,21 +2,19 @@ import asyncio
 import functools
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import Annotated, ClassVar, Literal, override
+from typing import Annotated, ClassVar, Literal
 
 from estuary_cdk.capture import common
 from estuary_cdk.capture.common import (
-    BaseResourceConfig,
     Resource,
     ResourceConfig,
     ResourceState,
 )
-from estuary_cdk.capture.webhook.match import (
-    BodyDiscriminator,
-    CollectionMatchingSpec,
-    UrlMatch,
+from estuary_cdk.capture.webhook.match import BodyDiscriminator
+from estuary_cdk.capture.webhook.resources import (
+    WebhookResourceConfig,
+    open_webhook_binding,
 )
-from estuary_cdk.capture.webhook.resources import open_webhook_binding
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPMixin, TokenSource
 from pydantic import Field, TypeAdapter
@@ -41,23 +39,14 @@ class PullApiResourceConfig(ResourceConfig):
     type: Literal["pull"]
 
 
-class WebhookResourceConfig(BaseResourceConfig):
+class AppsFlyerWebhookResourceConfig(WebhookResourceConfig):
     PATH_POINTERS: ClassVar[list[str]] = ["/name"]
 
     type: Literal["webhook"]
-    name: str = Field(description="Name of this resource")
-    match_rule: CollectionMatchingSpec = Field(
-        default_factory=lambda: UrlMatch(value="*"),
-        description="Matching spec for routing incoming webhooks to this collection",
-    )
-
-    @override
-    def path(self) -> list[str]:
-        return [self.name]
 
 
 AnyResourceConfig = Annotated[
-    PullApiResourceConfig | WebhookResourceConfig,
+    PullApiResourceConfig | AppsFlyerWebhookResourceConfig,
     Field(discriminator="type"),
 ]
 
@@ -176,7 +165,7 @@ async def all_resources(
             model=AppsFlyerWebhookDocument,
             open=open_webhook_binding,  # pyright: ignore[reportArgumentType]
             initial_state=ResourceState(),
-            initial_config=WebhookResourceConfig(
+            initial_config=AppsFlyerWebhookResourceConfig(
                 name=f"{rule.display_name}",
                 type="webhook",
                 match_rule=rule,
