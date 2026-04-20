@@ -52,5 +52,6 @@ ENV ENCRYPTION_URL=${ENCRYPTION_URL}
 ENV CONNECTOR_NAME=${CONNECTOR_NAME}
 
 EXPOSE 8080
+LABEL dev.estuary.port-public.8080=true
 
 CMD ["/bin/sh", "-c", "/opt/venv/bin/python -m $(echo \"$CONNECTOR_NAME\" | tr '-' '_')"]
