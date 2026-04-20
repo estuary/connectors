@@ -3,7 +3,7 @@
 # On-VM setup script for benchmark VMs.
 # Run by gcp-vm.sh during "create" — not intended to be called directly.
 #
-# Installs: Go 1.25, Python 3 + PyYAML, Docker, build tools.
+# Installs: Go 1.25, Python 3 + PyYAML, Docker, AWS CLI, build tools.
 
 set -o errexit
 set -o pipefail
@@ -27,6 +27,14 @@ curl -fsSL "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
 
 echo "==> installing PyYAML"
 pip3 install --break-system-packages -q pyyaml
+
+echo "==> installing AWS CLI v2"
+AWS_ARCH="$(uname -m)"
+curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${AWS_ARCH}.zip" -o /tmp/awscliv2.zip
+sudo apt-get install -y -qq unzip >/dev/null
+unzip -q -o /tmp/awscliv2.zip -d /tmp
+sudo /tmp/aws/install --update
+rm -rf /tmp/aws /tmp/awscliv2.zip
 
 echo "==> setting up local SSD for Docker"
 # On c3-*-lssd instances, find the local NVMe SSD by its serial number,
