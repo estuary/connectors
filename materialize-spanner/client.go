@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -47,7 +48,9 @@ func newSpannerClients(ctx context.Context, cfg config) (*spannerClients, error)
 		cfg.ProjectID, cfg.InstanceID, cfg.Database)
 
 	var opts []option.ClientOption
-	opts = append(opts, option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON)))
+	if cfg.Credentials.ServiceAccountJSON != "" {
+		opts = append(opts, option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON)))
+	}
 
 	adminClient, err := database.NewDatabaseAdminClient(ctx, opts...)
 	if err != nil {
@@ -98,8 +101,9 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 		cfg.ProjectID, cfg.InstanceID, cfg.Database)
 
 	var opts []option.ClientOption
-
-	opts = append(opts, option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON)))
+	if cfg.Credentials.ServiceAccountJSON != "" {
+		opts = append(opts, option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON)))
+	}
 
 	// Try to create a client to verify connectivity
 	client, err := spanner.NewClient(ctx, dbPath, opts...)
@@ -706,10 +710,48 @@ func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) er
 }
 
 func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	loc := c.ep.Dialect.TableLocator(path)
 	tableIdentifier := c.ep.Dialect.Identifier(path...)
+
+	// Snapshots must be deterministic. The Spanner service returns rows in
+	// primary-key order in practice, but the Cloud Spanner Emulator (which
+	// tests run against) does not. Public docs reserve the right not to
+	// guarantee ordering without an explicit ORDER BY. Look up this table's
+	// primary key columns and order by them so snapshots are stable across both
+	// backends.
+	pkStmt := spanner.Statement{
+		SQL: `SELECT column_name FROM information_schema.index_columns
+			WHERE table_schema = @schema AND table_name = @table AND index_type = 'PRIMARY_KEY'
+			ORDER BY ordinal_position`,
+		Params: map[string]any{
+			"schema": loc.TableSchema,
+			"table":  loc.TableName,
+		},
+	}
+	pkIter := c.dataClient.Single().Query(ctx, pkStmt)
+	defer pkIter.Stop()
+	var orderBy []string
+	for {
+		row, err := pkIter.Next()
+		if errors.Is(err, iterator.Done) {
+			break
+		}
+		if err != nil {
+			return nil, nil, fmt.Errorf("querying primary key of %s: %w", tableIdentifier, err)
+		}
+		var col string
+		if err = row.Columns(&col); err != nil {
+			return nil, nil, fmt.Errorf("scanning primary key column: %w", err)
+		}
+		orderBy = append(orderBy, c.ep.Dialect.Identifier(col))
+	}
+	pkIter.Stop()
 
 	stmt := spanner.Statement{
 		SQL: fmt.Sprintf("SELECT * FROM %s", tableIdentifier),
+	}
+	if len(orderBy) > 0 {
+		stmt.SQL += " ORDER BY " + strings.Join(orderBy, ", ")
 	}
 
 	iter := c.dataClient.Single().Query(ctx, stmt)

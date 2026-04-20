@@ -445,7 +445,10 @@ func newTransactor(
 
 	// Always query node count for partition calculation
 	// Partitions = nodes × 10 for parallel flushing
-	opts := []option.ClientOption{option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON))}
+	var opts []option.ClientOption
+	if cfg.Credentials.ServiceAccountJSON != "" {
+		opts = append(opts, option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON)))
+	}
 	nodeCount, err := queryNodeCount(ctx, cfg.ProjectID, cfg.InstanceID, opts)
 	if err != nil {
 		return nil, fmt.Errorf("querying node count: %w", err)

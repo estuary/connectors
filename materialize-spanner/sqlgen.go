@@ -179,16 +179,13 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 		{{- if $ind }},{{ end }}
 		{{$col.Identifier}} {{$col.DDL}}
 	{{- end }}
-	{{- if not $.DeltaUpdates }},
-
-		PRIMARY KEY (%s
+)
+{{- if not $.DeltaUpdates }} PRIMARY KEY (%s
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{end -}}
 		{{$key.Identifier}}
 	{{- end -}}
-	)
-	{{- end }}
-)
+){{- end }}
 {{ end }}
 
 -- Templated query which performs table alterations by adding columns and/or
@@ -212,14 +209,12 @@ CREATE TABLE {{ template "temp_name" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
 		{{ $key.Identifier }} {{ $key.DDL }}
-	{{- end }},
-
-	PRIMARY KEY (%s
+	{{- end }}
+) PRIMARY KEY (%s
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }}, {{end -}}
 		{{$key.Identifier}}
 	{{- end -}}
-	)
 )
 {{ end }}
 
