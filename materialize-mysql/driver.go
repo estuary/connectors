@@ -192,6 +192,7 @@ func (c config) ToURI() string {
 	mysqlCfg.Passwd = c.Password
 	mysqlCfg.DBName = c.Database
 	mysqlCfg.ClientFoundRows = true
+	mysqlCfg.MultiStatements = true
 
 	if c.Advanced.SSLMode != "" {
 		// see https://pkg.go.dev/github.com/go-sql-driver/mysql#section-readme
@@ -212,8 +213,9 @@ func (c config) ToURI() string {
 }
 
 type tableConfig struct {
-	Table string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
-	Delta bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
+	Table         string `json:"table" jsonschema:"title=Table,description=Name of the database table" jsonschema_extras:"x-collection-name=true"`
+	AdditionalSql string `json:"additional_table_create_sql,omitempty" jsonschema:"title=Additional Table Create SQL,description=Additional SQL statement(s) to be run after the table is created." jsonschema_extras:"multiline=true"`
+	Delta         bool   `json:"delta_updates,omitempty" jsonschema:"default=false,title=Delta Update,description=Should updates to this table be done via delta updates. Default is false." jsonschema_extras:"x-delta-updates=true"`
 }
 
 func (r tableConfig) Validate() error {

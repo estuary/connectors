@@ -188,10 +188,6 @@ jobs:
       - name: Start Dockerized test infrastructure
         if: |
           contains(fromJson('[
-            "materialize-clickhouse",
-            "materialize-dynamodb",
-            "materialize-elasticsearch",
-            "materialize-kafka",
             "source-db2-batch",
             "source-dynamodb",
             "source-kafka",

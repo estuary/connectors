@@ -27,8 +27,12 @@ fi
 
 # Detect Python vs Go/Rust connector and select Dockerfile
 if [[ -f "${SCRIPT_DIR}/${name}/pyproject.toml" ]]; then
-    # Python connector - use common Dockerfile
-    dockerfile="${SCRIPT_DIR}/estuary-cdk/common.Dockerfile"
+    # Python connector - use connector-specific Dockerfile if present, else common
+    if [[ -e "${SCRIPT_DIR}/${name}/Dockerfile" ]]; then
+        dockerfile="$(readlink -f "${SCRIPT_DIR}/${name}/Dockerfile")"
+    else
+        dockerfile="${SCRIPT_DIR}/estuary-cdk/common.Dockerfile"
+    fi
 else
     # Go connector - use connector-specific Dockerfile
     if [[ -z "$2" ]]; then

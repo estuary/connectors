@@ -64,6 +64,7 @@ on:
       - "source-gong/**"
       - "source-greenhouse-native/**"
       - "source-calendly/**"
+      - "source-appsflyer/**"
 
   pull_request:
     branches: [main]
@@ -129,6 +130,7 @@ on:
       - "source-gong/**"
       - "source-greenhouse-native/**"
       - "source-calendly/**"
+      - "source-appsflyer/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -380,6 +382,10 @@ jobs:
             type: capture
             version: v1
             usage_rate: "1.0"
+          - name: source-appsflyer
+            type: capture
+            version: v1
+            usage_rate: "1.0"
 
     steps:
       - uses: actions/checkout@v4
@@ -416,21 +422,20 @@ jobs:
           cd ..
           pytest ${{ matrix.connector.name }}
 
-      # Uncomment to allow each connector to have its own Dockerfile
-      #- name: Find Dockerfile for ${{ matrix.connector.name }}
-      #  id: dockerfile
-      #  run: |
-      #    DOCKERFILE_PATH="${PWD}/estuary-cdk/common.Dockerfile"
-      #    if [ -f "${{ matrix.connector.name }}/Dockerfile" ]; then
-      #      DOCKERFILE_PATH="${PWD}/${{ matrix.connector.name }}/Dockerfile"
-      #    fi
-      #    echo "path=${DOCKERFILE_PATH}" >> $GITHUB_OUTPUT
+      - name: Find Dockerfile for ${{ matrix.connector.name }}
+        id: dockerfile
+        run: |
+          DOCKERFILE_PATH="${PWD}/estuary-cdk/common.Dockerfile"
+          if [ -e "${{ matrix.connector.name }}/Dockerfile" ]; then
+            DOCKERFILE_PATH="$(readlink -f "${{ matrix.connector.name }}/Dockerfile")"
+          fi
+          echo "path=${DOCKERFILE_PATH}" >> $GITHUB_OUTPUT
 
       - name: Build ${{ matrix.connector.name }} Docker Image
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: estuary-cdk/common.Dockerfile
+          file: ${{ steps.dockerfile.outputs.path }}
           load: true
           build-args: |
             CONNECTOR_NAME=${{ matrix.connector.name }}

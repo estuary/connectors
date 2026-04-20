@@ -20,7 +20,7 @@ try:
     VERSION = "v2"
 
     # GenericModel was removed. It's just BaseModel now.
-    GenericModel : TypeAlias = pydantic.BaseModel
+    GenericModel: TypeAlias = pydantic.BaseModel
 
 except ImportError:
     VERSION = "v1"

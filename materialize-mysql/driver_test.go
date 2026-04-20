@@ -83,6 +83,57 @@ func TestIntegration(t *testing.T) {
 		)
 	})
 
+	t.Run("additional table create sql", func(t *testing.T) {
+		ctx := context.Background()
+		cfg := testConfig()
+
+		db, err := stdsql.Open("mysql", cfg.ToURI())
+		require.NoError(t, err)
+		defer db.Close()
+
+		c := &client{db: db}
+
+		tableName := "test_additional_sql"
+		indexName := "idx_extra"
+
+		cleanup := func() { db.ExecContext(ctx, fmt.Sprintf("DROP TABLE %s;", testDialect.Identifier(tableName))) }
+		cleanup()
+		t.Cleanup(cleanup)
+
+		tc := sql.TableCreate{
+			Table: sql.Table{Identifier: testDialect.Identifier(tableName)},
+			TableCreateSql: fmt.Sprintf(
+				"CREATE TABLE %s (id INT NOT NULL, val VARCHAR(64) NOT NULL);",
+				testDialect.Identifier(tableName),
+			),
+			Resource: tableConfig{
+				Table: tableName,
+				AdditionalSql: fmt.Sprintf(
+					"CREATE INDEX %s ON %s (val); ALTER TABLE %s COMMENT = 'extra';",
+					indexName,
+					testDialect.Identifier(tableName),
+					testDialect.Identifier(tableName),
+				),
+			},
+		}
+
+		require.NoError(t, c.CreateTable(ctx, tc))
+
+		var indexCount int
+		require.NoError(t, db.QueryRowContext(ctx,
+			"SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = ? AND table_name = ? AND index_name = ?",
+			cfg.Database, tableName, indexName,
+		).Scan(&indexCount))
+		require.Equal(t, 1, indexCount, "expected index created by AdditionalSql")
+
+		var tableComment string
+		require.NoError(t, db.QueryRowContext(ctx,
+			"SELECT table_comment FROM information_schema.tables WHERE table_schema = ? AND table_name = ?",
+			cfg.Database, tableName,
+		).Scan(&tableComment))
+		require.Equal(t, "extra", tableComment, "expected comment set by AdditionalSql")
+	})
+
 	t.Run("apply changes", func(t *testing.T) {
 		boilerplate.RunTestAllTasks(t, "testdata/apply-changes.flow.yaml", func(t *testing.T, _ []byte, taskName string, cfg config) {
 			t.Run(taskName, func(t *testing.T) {

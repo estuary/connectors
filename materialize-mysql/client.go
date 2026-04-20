@@ -15,6 +15,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/go-sql-driver/mysql"
+	log "github.com/sirupsen/logrus"
 )
 
 type client struct {
@@ -221,8 +222,41 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
-	_, err := c.db.ExecContext(ctx, tc.TableCreateSql)
-	return err
+	var res tableConfig
+	if tc.Resource != nil {
+		res = tc.Resource.(tableConfig)
+	}
+
+	// This CREATE TABLE statement is committed implicitly, whether part of a
+	// transaction or not, because MySQL DDL statements are atomic but not
+	// transactional. Hence, we do not bother with a transaction here.
+	// https://dev.mysql.com/doc/refman/8.4/en/atomic-ddl.html
+	if _, err := c.db.ExecContext(ctx, tc.TableCreateSql); err != nil {
+		return fmt.Errorf("executing CREATE TABLE statement: %w", err)
+	}
+
+	if res.AdditionalSql != "" {
+		// In case these user-provided SQL statements are transactional, we
+		// apply them in the context of a transaction.
+		tx, err := c.db.BeginTx(ctx, nil)
+		if err != nil {
+			return fmt.Errorf("beginning transaction for additional SQL statements: %w", err)
+		}
+		defer tx.Rollback()
+		if _, err = tx.ExecContext(ctx, res.AdditionalSql); err != nil {
+			return fmt.Errorf("executing additional SQL statement '%s': %w", res.AdditionalSql, err)
+		}
+		if err = tx.Commit(); err != nil {
+			return fmt.Errorf("committing transaction for additional SQL statements: %w", err)
+		}
+
+		log.WithFields(log.Fields{
+			"table": tc.Identifier,
+			"query": res.AdditionalSql,
+		}).Info("executed AdditionalSql")
+	}
+
+	return nil
 }
 
 func (c *client) DeleteTable(ctx context.Context, path []string) (string, boilerplate.ActionApplyFn, error) {

@@ -13,6 +13,7 @@ func TestIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	makeResourceFn := func(table string, delta bool) tableConfig {
 		return tableConfig{Table: table, Delta: delta}
@@ -125,6 +126,11 @@ func noFlowDocShape(tableName string) sql.TableShape {
 // double-encoded as strings) when reconstructed by the
 // queryLoadTableNoFlowDocument template.
 func TestNoFlowDocumentObjectColumns(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
 	var cfg = testConfig()
 	cfg.Advanced.NoFlowDocument = true
 	var ctx = t.Context()
@@ -176,6 +182,11 @@ func TestNoFlowDocumentObjectColumns(t *testing.T) {
 // TestNoFlowDocumentNullValues verifies that nullable columns serialize as JSON
 // null (not the string "null" or a missing key) when their value is NULL.
 func TestNoFlowDocumentNullValues(t *testing.T) {
+	if testing.Short() {
+		t.Skip()
+	}
+	ensureDockerUp(t)
+
 	var cfg = testConfig()
 	cfg.Advanced.NoFlowDocument = true
 	var ctx = t.Context()

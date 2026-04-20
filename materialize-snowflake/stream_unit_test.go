@@ -23,7 +23,7 @@ func TestGetNextFileName(t *testing.T) {
 
 	clientPrefix := "asdfasdf_1234"
 
-	sm := &streamManager{keyBegin: 5678}
+	sm := &streamManager{keyBegin: 5678, counter: -1}
 
 	for idx := range 5 {
 		require.Equal(t,
@@ -101,7 +101,7 @@ func TestShouldWriteNextToken(t *testing.T) {
 		},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := shouldWriteNextToken(tt.blobToken, tt.currentToken)
+			got, err := shouldWriteNextToken(t.Context(), tt.blobToken, tt.currentToken)
 			if tt.wantErr {
 				require.Error(t, err)
 			} else {

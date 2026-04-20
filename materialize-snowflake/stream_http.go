@@ -250,6 +250,7 @@ func (s *streamClient) openChannel(ctx context.Context, schema, table, name stri
 }
 
 func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
+	logger := Logger(ctx)
 	type req struct {
 		Role  *string         `json:"role,omitempty"`
 		Blobs []*blobMetadata `json:"blobs"`
@@ -279,7 +280,7 @@ func (s *streamClient) write(ctx context.Context, blob *blobMetadata) error {
 		}
 	}
 
-	log.WithFields(log.Fields{
+	logger.WithFields(log.Fields{
 		"path":               blob.Path,
 		"md5":                blob.MD5,
 		"rows":               blob.Chunks[0].EPS.Rows,
@@ -335,7 +336,8 @@ func (s *streamClient) channelStatus(ctx context.Context, clientSeq int, schema,
 }
 
 func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, clientSeq int, schema, table, name string) error {
-	maxBackoff := 1 * time.Second
+	logger := Logger(ctx)
+	maxBackoff := 2 * time.Second
 	backoff := 100 * time.Millisecond
 	ts := time.Now()
 	for n := 1; ; n++ {
@@ -343,6 +345,7 @@ func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, 
 			if !errors.Is(err, ErrTemporary) {
 				return err
 			}
+			logger.WithField("attempt", n).WithError(err).Info("temporary error getting channel status")
 		} else if len(status.Channels) != 1 {
 			return fmt.Errorf("expected 1 channel but got %d", len(status.Channels))
 		} else if status.Channels[0].PersistedOffsetToken == token {
@@ -350,23 +353,23 @@ func (s *streamClient) waitForTokenPersisted(ctx context.Context, token string, 
 		}
 
 		if n > 10 {
-			log.WithFields(log.Fields{
+			logger.WithFields(log.Fields{
 				"attempt": n,
-				"schema":  schema,
-				"table":   table,
 				"token":   token,
 			}).Info("channel offset token not yet persisted")
+		}
+
+		if time.Since(ts) > 5*time.Minute {
+			return fmt.Errorf("channel offset token not persisted: max retries reached")
 		}
 
 		time.Sleep(backoff)
 		backoff = min(backoff*2, maxBackoff)
 	}
 
-	log.WithFields(log.Fields{
-		"schema": schema,
-		"table":  table,
-		"token":  token,
-		"took":   time.Since(ts).String(),
+	logger.WithFields(log.Fields{
+		"token": token,
+		"took":  time.Since(ts).String(),
 	}).Info("channel offset token persisted")
 
 	return nil

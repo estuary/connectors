@@ -1,0 +1,88 @@
+import json
+import subprocess
+from pathlib import Path
+
+
+def test_dockerfile_exposes_8080(request):
+    dockerfile = Path(request.fspath.dirname).parent / "Dockerfile"
+    assert "EXPOSE 8080" in dockerfile.read_text()
+
+
+def test_capture(request, snapshot):
+    result = subprocess.run(
+        [
+            "flowctl",
+            "preview",
+            "--source",
+            request.fspath.dirname + "/../test.flow.yaml",
+            "--sessions",
+            "1",
+            "--delay",
+            "30s",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    assert result.returncode == 0
+    lines = [json.loads(l) for l in result.stdout.splitlines()]
+
+    FIELDS_TO_REDACT = [
+        "created_at",
+        "last_calculation",
+        "last_seen_at",
+        "pending_version",
+        "updated_at",
+        "version",
+    ]
+
+    for l in lines:
+        _collection, record = l[0], l[1]
+
+        for field in FIELDS_TO_REDACT:
+            if field in record:
+                record[field] = "redacted"
+
+    assert snapshot("stdout.json") == lines
+
+
+def test_discover(request, snapshot):
+    result = subprocess.run(
+        [
+            "flowctl",
+            "raw",
+            "discover",
+            "--source",
+            request.fspath.dirname + "/../test.flow.yaml",
+            "-o",
+            "json",
+            "--emit-raw",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    assert result.returncode == 0
+
+    lines = sorted(
+        [json.loads(l) for l in result.stdout.splitlines()],
+        key=lambda l: l["recommendedName"],
+    )
+
+    assert snapshot("stdout.json") == lines
+
+
+def test_spec(request, snapshot):
+    result = subprocess.run(
+        [
+            "flowctl",
+            "raw",
+            "spec",
+            "--source",
+            request.fspath.dirname + "/../test.flow.yaml",
+        ],
+        stdout=subprocess.PIPE,
+        text=True,
+    )
+    assert result.returncode == 0
+    lines = [json.loads(l) for l in result.stdout.splitlines()]
+
+    assert snapshot("stdout.json") == lines

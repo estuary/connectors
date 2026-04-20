@@ -1,43 +1,42 @@
 import abc
 import asyncio
 import functools
-from enum import Enum, StrEnum
+import inspect
+from collections.abc import AsyncGenerator, Awaitable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-import inspect
+from enum import Enum, StrEnum
+from itertools import combinations
 from logging import Logger
 from typing import (
     Any,
-    AsyncGenerator,
-    Awaitable,
     Callable,
-    cast,
     ClassVar,
     Generic,
-    Iterable,
     Literal,
     TypeVar,
+    cast,
 )
 
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
 from ..cron import next_fire
-from ..utils import json_merge_patch
 from ..flow import (
     AccessToken,
+    AuthorizationCodeFlowOAuth2Credentials,
     BaseOAuth2Credentials,
+    BasicAuth,
     CaptureBinding,
     ClientCredentialsOAuth2Credentials,
-    OAuth2TokenFlowSpec,
-    AuthorizationCodeFlowOAuth2Credentials,
     LongLivedClientCredentialsOAuth2Credentials,
+    OAuth2Spec,
+    OAuth2TokenFlowSpec,
     ResourceOwnerPasswordOAuth2Credentials,
     RotatingOAuth2Credentials,
-    OAuth2Spec,
     ValidationError,
-    BasicAuth,
 )
 from ..pydantic_polyfill import GenericModel
+from ..utils import json_merge_patch
 from . import Task, request, response
 
 LogCursor = tuple[str | int] | AwareDatetime | NonNegativeInt
@@ -113,9 +112,9 @@ None means "begin a new iteration" in a request context,
 and "no pages remain" in a response context.
 """
 
-
 class Triggers(Enum):
     BACKFILL = "BACKFILL"
+
 
 @dataclass
 class SourcedSchema:
@@ -279,7 +278,8 @@ class ResourceState(BaseResourceState, BaseModel, extra="forbid"):
     )
 
     is_connector_initiated: bool = Field(
-        default=False, description="Indicates if this backfill was initiated by the connector.",
+        default=False,
+        description="Indicates if this backfill was initiated by the connector.",
     )
 
 
@@ -530,10 +530,29 @@ def resolve_bindings(
     resources: list[Resource[Any, _BaseResourceConfig, Any]],
     resource_term="Resource",
 ) -> list[tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]]:
+
     resolved: list[
         tuple[_ResolvableBinding, Resource[Any, _BaseResourceConfig, Any]]
     ] = []
     errors: list[str] = []
+
+    # Check for routing conflicts between webhook match rules.
+    from .webhook.resources import WebhookResourceConfig
+
+    webhook_match_rules = [
+        resource.initial_config.match_rule
+        for resource in resources
+        if isinstance(resource.initial_config, WebhookResourceConfig)
+    ]
+    errors.extend(
+        filter(
+            bool,
+            (
+                rule.list_compatibility_errors(other)
+                for rule, other in combinations(webhook_match_rules, 2)
+            ),
+        )
+    )
 
     for binding in bindings:
         path = binding.resourceConfig.path()
@@ -698,11 +717,18 @@ def open(
             if inspect.iscoroutine(result):
                 await result
 
-
         if soonest_future_scheduled_initialization:
             # Gracefully exit to ensure relatively close adherence to any bindings'
             # re-initialization schedules.
-            asyncio.create_task(scheduled_stop(task, soonest_future_scheduled_initialization))
+            asyncio.create_task(
+                scheduled_stop(task, soonest_future_scheduled_initialization)
+            )
+
+        if task.stopping.webhook_task is not None:
+            # The webhook server runs outside the TaskGroup so it can outlive
+            # non-webhook tasks during two-phase shutdown. Block here so the
+            # TaskGroup stays alive until graceful shutdown begins.
+            await task.stopping.event.wait()
 
     return (response.Opened(explicitAcknowledgements=False), _run)
 

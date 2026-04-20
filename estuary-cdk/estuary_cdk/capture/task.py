@@ -1,18 +1,19 @@
-from dataclasses import dataclass
-import decimal
-from estuary_cdk.capture.connector_status import ConnectorStatus
-from pydantic import Field
-from typing import Generic, Awaitable, Any, BinaryIO, Callable
-import orjson
-import base64
-from logging import Logger
 import asyncio
+import base64
+import decimal
 import tempfile
 import traceback
-import xxhash
+from collections.abc import Awaitable
+from dataclasses import dataclass, field
+from logging import Logger
+from typing import Any, BinaryIO, Callable, Generic
 
-from . import request, response
-from ._emit import emit_from_buffer
+import orjson
+import xxhash
+from pydantic import Field
+
+from estuary_cdk.capture.connector_status import ConnectorStatus
+
 from ..flow import (
     ConnectorSpec,
     ConnectorState,
@@ -21,6 +22,8 @@ from ..flow import (
     ResourceConfig,
 )
 from ..pydantic_polyfill import GenericModel
+from . import request, response
+from ._emit import emit_from_buffer
 
 
 class Request(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
@@ -85,9 +88,15 @@ class Task:
         The Task's coroutine should monitor this event and exit when it's set AND
         it has no more immediate work to do (for example, no further documents are
         currently ready to be captured).
+
+        `webhook_event` is a separate event for the webhook server. It is set
+        after all non-webhook tasks have completed, signaling the webhook server
+        to reject new requests with 503 and clean up.
         """
 
-        event: asyncio.Event
+        event: asyncio.Event = field(default_factory=asyncio.Event)
+        webhook_event: asyncio.Event = field(default_factory=asyncio.Event)
+        webhook_task: asyncio.Task[None] | None = None
         first_error: Exception | None = None
         first_error_task: str | None = None
 
