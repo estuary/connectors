@@ -124,15 +124,22 @@ var toBigInt = func(e tuple.TupleElement) (interface{}, error) {
 // numeric inference is available, and the minimum or maximum of the inferred
 // range is outside the bounds of what will fit in a signed 64 bit integer.
 func mapSignedIntegers() sql.MapProjectionFn {
-	// Int128 spans [-2^127, 2^127 - 1]; Int256 spans [-2^255, 2^255 - 1].
-	// Convert through big.Int since these don't fit in int64 literals; float64
-	// precision is sufficient because inferred Numeric.Minimum/Maximum are
-	// themselves carried as float64 powers of 10.
+	// Integer limits defined as float64 via big.Int since they don't fit in
+	// int64 literals. Inferred Numeric.Minimum/Maximum are powers of 10,
+	// also typed float64.
+
+	// 2^127
 	halfInt128 := new(big.Int).Lsh(big.NewInt(1), 127)
+	// 2^127 - 1
 	maxInt128, _ := new(big.Int).Sub(halfInt128, big.NewInt(1)).Float64()
+	// -2^127
 	minInt128, _ := new(big.Int).Neg(halfInt128).Float64()
+
+	// 2^255
 	halfInt256 := new(big.Int).Lsh(big.NewInt(1), 255)
+	// 2^255 - 1
 	maxInt256, _ := new(big.Int).Sub(halfInt256, big.NewInt(1)).Float64()
+	// -2^255
 	minInt256, _ := new(big.Int).Neg(halfInt256).Float64()
 
 	fn64 := sql.MapStatic("Int64", sql.UsingConverter(toInt64))
