@@ -309,8 +309,12 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 		// is enabled, quoted identifiers are returned uppercased regardless of how they were
 		// created. Estuary uses quoted identifiers for column names containing special characters
 		// (such as "_meta/op"), and requires that Snowflake preserve their case exactly as created.
-		var quotedIdentifiersIgnoreCase string
-		if err := db.QueryRowContext(ctx, "SELECT SYSTEM$GET_SESSION_PARAMETER('QUOTED_IDENTIFIERS_IGNORE_CASE');").Scan(&quotedIdentifiersIgnoreCase); err == nil {
+		var key, value, default_, level, desc, type_ string
+		query := "SHOW PARAMETERS LIKE 'QUOTED_IDENTIFIERS_IGNORE_CASE' IN SESSION;"
+		err := db.QueryRowContext(ctx, query).Scan(&key, &value, &default_, &level, &desc, &type_)
+		if err != nil {
+			errs.Err(fmt.Errorf("checking for QUOTED_IDENTIFIERS_IGNORE_CASE: %w", err))
+		} else {
 			if strings.EqualFold(quotedIdentifiersIgnoreCase, "true") {
 				errs.Err(fmt.Errorf(
 					"the Snowflake parameter QUOTED_IDENTIFIERS_IGNORE_CASE is enabled, which is incompatible with this connector: " +
