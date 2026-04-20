@@ -315,7 +315,10 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 		if err != nil {
 			errs.Err(fmt.Errorf("checking for QUOTED_IDENTIFIERS_IGNORE_CASE: %w", err))
 		} else {
-			if strings.EqualFold(quotedIdentifiersIgnoreCase, "true") {
+			ignoreCase, err := strconv.ParseBool(value)
+			if err != nil {
+				errs.Err(fmt.Errorf("unable to parse QUOTED_IDENTIFIERS_IGNORE_CASE value: %w", err))
+			} else if ignoreCase {
 				errs.Err(fmt.Errorf(
 					"the Snowflake parameter QUOTED_IDENTIFIERS_IGNORE_CASE is enabled, which is incompatible with this connector: " +
 						"Estuary uses quoted identifiers for column names containing special characters (e.g. \"_meta/op\"), " +
