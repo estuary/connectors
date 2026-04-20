@@ -50,6 +50,41 @@ var clickHouseClampDatetime = sql.StringCastConverter(func(str string) (interfac
 	return parsed.UTC(), nil
 })
 
+var toInt64 = func(e tuple.TupleElement) (interface{}, error) {
+	if e == nil {
+		return nil, nil
+	}
+	var v int64
+	switch q := e.(type) {
+	case int64:
+		v = q
+	case int:
+		v = int64(q)
+	case uint64:
+		v = int64(q)
+	case uint:
+		v = int64(q)
+	case float64:
+		v = int64(q)
+	case big.Int:
+		v = q.Int64()
+	case *big.Int:
+		v = q.Int64()
+	case string:
+		if idx := strings.Index(q, "."); idx != -1 {
+			q = q[:idx]
+		}
+		var err error
+		v, err = strconv.ParseInt(q, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("cannot parse %q as int64: %w", q, err)
+		}
+	default:
+		return nil, fmt.Errorf("cannot convert %T to int64", q)
+	}
+	return v, nil
+}
+
 var toBigInt = func(e tuple.TupleElement) (interface{}, error) {
 	if e == nil {
 		return nil, nil
@@ -100,7 +135,7 @@ func mapSignedIntegers() sql.MapProjectionFn {
 	maxInt256, _ := new(big.Int).Sub(halfInt256, big.NewInt(1)).Float64()
 	minInt256, _ := new(big.Int).Neg(halfInt256).Float64()
 
-	fn64 := sql.MapStatic("Int64", sql.UsingConverter(sql.StrToInt))
+	fn64 := sql.MapStatic("Int64", sql.UsingConverter(toInt64))
 	fn128 := sql.MapStatic("Int128", sql.UsingConverter(toBigInt))
 	fn256 := sql.MapStatic("Int256", sql.UsingConverter(toBigInt))
 	fnString := sql.MapStatic("String", sql.UsingConverter(sql.ToStr))
@@ -109,30 +144,37 @@ func mapSignedIntegers() sql.MapProjectionFn {
 		// STRING_INTEGER projections (format: "integer") route by declared
 		// maxLength — values arrive as JSON strings and can exceed the
 		// precision that Numeric.Minimum/Maximum can carry in float64.
-		// MaxLength == 0 means no length was declared; fall back to the
-		// widest bounded integer rather than the narrowest.
+		// MaxLength == 0 means no length was declared; assume 64-bit integer.
 		if p.Inference.String_ != nil && p.Inference.String_.Format == "integer" {
 			switch maxLen := p.Inference.String_.MaxLength; {
 			case maxLen == 0:
-				return fn256(p)
+				// No length was declared, assume 64-bit integer
+				fallthrough
 			case maxLen <= 18:
+				// <= 64-bit integer
 				return fn64(p)
 			case maxLen <= 38:
+				// <= 128-bit integer
 				return fn128(p)
 			case maxLen <= 76:
+				// <= 256-bit integer
 				return fn256(p)
 			default:
 				return fnString(p)
 			}
 		}
 
-		// INTEGER projections dispatch by the inferred numeric range.
-		// Numeric Minimum and Maximums are stated as powers of 10, so
-		// comparisons to exact integer values aren't precise, but this
-		// logic works out since 1e19 is the next power of 10 past int64
-		// max, 1e39 past int128, and 1e77 past int256.
+		// INTEGER projections dispatch by the inferred numeric range. Numeric
+		// min/max ranges are stated as powers of 10, so comparisons to exact
+		// integer values aren't precise, but this logic works out since:
+		// - 10^19 is the next power of 10 past 2^63
+		// - 10^39 is the next power of 10 past 2^127
+		// - 10^77 is the next power of 10 past 2^255
 		if p.Inference.Numeric != nil {
 			switch {
+			case p.Inference.Numeric.Minimum == 0 && p.Inference.Numeric.Maximum == 0:
+				// No range was declared, assume 64-bit integer
+				fallthrough
 			case p.Inference.Numeric.Minimum >= math.MinInt64 && p.Inference.Numeric.Maximum <= math.MaxInt64:
 				return fn64(p)
 			case p.Inference.Numeric.Minimum >= minInt128 && p.Inference.Numeric.Maximum <= maxInt128:

@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS key_value (
 		numberCastToString Nullable(String),
 		object Nullable(String),
 		string Nullable(String),
-		stringInteger Nullable(Int256),
+		stringInteger Nullable(Int64),
 		stringInteger18Chars Nullable(Int64),
 		stringInteger38Chars Nullable(Int128),
 		stringInteger39Chars Nullable(Int256),
