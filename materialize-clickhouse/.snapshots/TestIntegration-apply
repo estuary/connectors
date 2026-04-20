@@ -98,7 +98,7 @@ Big Schema Changed Types Constraints:
 {"Field":"stringHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnEmailField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIdnHostnameField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringIntegerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringIntegerField","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringIntegerField' is already being materialized as endpoint type 'INT64' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"stringIpv4Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIpv6Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringIriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -110,8 +110,8 @@ Big Schema Changed Types Constraints:
 {"Field":"stringRegexField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringRelativeJsonPointerField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringTimeField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringUint32Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
-{"Field":"stringUint64Field","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"stringUint32Field","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringUint32Field' is already being materialized as endpoint type 'INT64' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
+{"Field":"stringUint64Field","Type":6,"TypeString":"INCOMPATIBLE","Reason":"Field 'stringUint64Field' is already being materialized as endpoint type 'INT64' but endpoint type 'STRING' is required by its schema '{ type: [string] }'"}
 {"Field":"stringUriField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriReferenceField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
 {"Field":"stringUriTemplateField","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
@@ -136,7 +136,7 @@ Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"stringHostnameField","Nullable":false,"Type":"String"}
 {"Name":"stringIdnEmailField","Nullable":false,"Type":"String"}
 {"Name":"stringIdnHostnameField","Nullable":false,"Type":"String"}
-{"Name":"stringIntegerField","Nullable":false,"Type":"String"}
+{"Name":"stringIntegerField","Nullable":false,"Type":"Int64"}
 {"Name":"stringIpv4Field","Nullable":false,"Type":"String"}
 {"Name":"stringIpv6Field","Nullable":false,"Type":"String"}
 {"Name":"stringIriField","Nullable":false,"Type":"String"}
@@ -148,8 +148,8 @@ Big Schema Materialized Resource Schema With All Fields Required:
 {"Name":"stringRegexField","Nullable":false,"Type":"String"}
 {"Name":"stringRelativeJsonPointerField","Nullable":false,"Type":"String"}
 {"Name":"stringTimeField","Nullable":false,"Type":"String"}
-{"Name":"stringUint32Field","Nullable":false,"Type":"String"}
-{"Name":"stringUint64Field","Nullable":false,"Type":"String"}
+{"Name":"stringUint32Field","Nullable":false,"Type":"Int64"}
+{"Name":"stringUint64Field","Nullable":false,"Type":"Int64"}
 {"Name":"stringUriField","Nullable":false,"Type":"String"}
 {"Name":"stringUriReferenceField","Nullable":false,"Type":"String"}
 {"Name":"stringUriTemplateField","Nullable":false,"Type":"String"}
@@ -174,7 +174,7 @@ Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"stringHostnameField","Nullable":true,"Type":"String"}
 {"Name":"stringIdnEmailField","Nullable":true,"Type":"String"}
 {"Name":"stringIdnHostnameField","Nullable":true,"Type":"String"}
-{"Name":"stringIntegerField","Nullable":true,"Type":"String"}
+{"Name":"stringIntegerField","Nullable":true,"Type":"Int64"}
 {"Name":"stringIpv4Field","Nullable":true,"Type":"String"}
 {"Name":"stringIpv6Field","Nullable":true,"Type":"String"}
 {"Name":"stringIriField","Nullable":true,"Type":"String"}
@@ -186,8 +186,8 @@ Big Schema Materialized Resource Schema With No Fields Required:
 {"Name":"stringRegexField","Nullable":true,"Type":"String"}
 {"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"String"}
 {"Name":"stringTimeField","Nullable":true,"Type":"String"}
-{"Name":"stringUint32Field","Nullable":true,"Type":"String"}
-{"Name":"stringUint64Field","Nullable":true,"Type":"String"}
+{"Name":"stringUint32Field","Nullable":true,"Type":"Int64"}
+{"Name":"stringUint64Field","Nullable":true,"Type":"Int64"}
 {"Name":"stringUriField","Nullable":true,"Type":"String"}
 {"Name":"stringUriReferenceField","Nullable":true,"Type":"String"}
 {"Name":"stringUriTemplateField","Nullable":true,"Type":"String"}

@@ -10,6 +10,8 @@ CREATE TABLE "a-warehouse"."a-schema".key_value (
 	field_with_projection VARCHAR(MAX),
 	flow_published_at DATETIME2(6),
 	"integer" BIGINT,
+	"integerGt128Bit" DECIMAL(38,0),
+	"integerGt256Bit" DECIMAL(38,0),
 	"integerGt64Bit" DECIMAL(38,0),
 	"integerWithUserDDL" DECIMAL(20),
 	multiple VARCHAR(MAX),
@@ -19,8 +21,11 @@ CREATE TABLE "a-warehouse"."a-schema".key_value (
 	"object" VARCHAR(MAX),
 	string VARCHAR(MAX),
 	"stringInteger" DECIMAL(38,0),
+	"stringInteger18Chars" DECIMAL(38,0),
+	"stringInteger38Chars" DECIMAL(38,0),
 	"stringInteger39Chars" VARCHAR(MAX),
 	"stringInteger66Chars" VARCHAR(MAX),
+	"stringInteger77Chars" VARCHAR(MAX),
 	"stringNumber" FLOAT,
 	flow_document VARCHAR(MAX)
 );
@@ -62,6 +67,8 @@ CREATE TABLE flow_temp_table_store_0 (
 	field_with_projection VARCHAR(MAX),
 	flow_published_at DATETIME2(6),
 	"integer" BIGINT,
+	"integerGt128Bit" DECIMAL(38,0),
+	"integerGt256Bit" DECIMAL(38,0),
 	"integerGt64Bit" DECIMAL(38,0),
 	"integerWithUserDDL" DECIMAL(20),
 	multiple VARCHAR(MAX),
@@ -71,15 +78,18 @@ CREATE TABLE flow_temp_table_store_0 (
 	"object" VARCHAR(MAX),
 	string VARCHAR(MAX),
 	"stringInteger" DECIMAL(38,0),
+	"stringInteger18Chars" DECIMAL(38,0),
+	"stringInteger38Chars" DECIMAL(38,0),
 	"stringInteger39Chars" VARCHAR(MAX),
 	"stringInteger66Chars" VARCHAR(MAX),
+	"stringInteger77Chars" VARCHAR(MAX),
 	"stringNumber" FLOAT,
 	flow_document VARCHAR(MAX),
 	_flow_delete BIT
 );
 
 COPY INTO flow_temp_table_store_0
-(key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document, _flow_delete)
+(key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document, _flow_delete)
 FROM 'https://some/file1', 'https://some/file2'
 WITH (
 	FILE_TYPE = 'CSV',
@@ -88,8 +98,8 @@ WITH (
 	CREDENTIAL = (IDENTITY='Storage Account Key', SECRET='some-storage-account-key')
 );
 
-INSERT INTO "a-warehouse"."a-schema".key_value (key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
-SELECT key1, key2, BASE64_DECODE("key!binary"), "array", BASE64_DECODE("binary"), "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
+INSERT INTO "a-warehouse"."a-schema".key_value (key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document)
+SELECT key1, key2, BASE64_DECODE("key!binary"), "array", BASE64_DECODE("binary"), "boolean", field_with_projection, flow_published_at, "integer", "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document
 FROM flow_temp_table_store_0;
 
 DROP TABLE flow_temp_table_store_0;
@@ -97,7 +107,7 @@ DROP TABLE flow_temp_table_store_0;
 
 --- Begin "a-warehouse"."a-schema".key_value storeCopyIntoDirectQuery ---
 COPY INTO "a-warehouse"."a-schema".key_value
-(key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
+(key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document)
 FROM 'https://some/file1', 'https://some/file2'
 WITH (
 	FILE_TYPE = 'CSV',
@@ -182,6 +192,8 @@ SELECT 0,
 		'boolean': r."boolean",
 		'field_with_projection': r.field_with_projection,
 		'integer': r."integer",
+		'integerGt128Bit': r."integerGt128Bit",
+		'integerGt256Bit': r."integerGt256Bit",
 		'integerGt64Bit': r."integerGt64Bit",
 		'integerWithUserDDL': r."integerWithUserDDL",
 		'multiple': r.multiple,
@@ -191,8 +203,11 @@ SELECT 0,
 		'object': r."object",
 		'string': r.string,
 		'stringInteger': CAST(r."stringInteger" AS VARCHAR(MAX)),
+		'stringInteger18Chars': CAST(r."stringInteger18Chars" AS VARCHAR(MAX)),
+		'stringInteger38Chars': CAST(r."stringInteger38Chars" AS VARCHAR(MAX)),
 		'stringInteger39Chars': CAST(r."stringInteger39Chars" AS VARCHAR(MAX)),
 		'stringInteger66Chars': CAST(r."stringInteger66Chars" AS VARCHAR(MAX)),
+		'stringInteger77Chars': CAST(r."stringInteger77Chars" AS VARCHAR(MAX)),
 		'stringNumber': CAST(r."stringNumber" AS VARCHAR(MAX))
 	) as flow_document
 FROM flow_temp_table_load_0 AS l
@@ -216,6 +231,8 @@ CREATE TABLE flow_temp_table_store_0 (
 	field_with_projection VARCHAR(MAX),
 	flow_published_at DATETIME2(6),
 	"integer" BIGINT,
+	"integerGt128Bit" DECIMAL(38,0),
+	"integerGt256Bit" DECIMAL(38,0),
 	"integerGt64Bit" DECIMAL(38,0),
 	"integerWithUserDDL" DECIMAL(20),
 	multiple VARCHAR(MAX),
@@ -225,15 +242,18 @@ CREATE TABLE flow_temp_table_store_0 (
 	"object" VARCHAR(MAX),
 	string VARCHAR(MAX),
 	"stringInteger" DECIMAL(38,0),
+	"stringInteger18Chars" DECIMAL(38,0),
+	"stringInteger38Chars" DECIMAL(38,0),
 	"stringInteger39Chars" VARCHAR(MAX),
 	"stringInteger66Chars" VARCHAR(MAX),
+	"stringInteger77Chars" VARCHAR(MAX),
 	"stringNumber" FLOAT,
 	flow_document VARCHAR(MAX),
 	_flow_delete BIT
 );
 
 COPY INTO flow_temp_table_store_0
-(key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document, _flow_delete)
+(key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document, _flow_delete)
 FROM 'https://some/file1', 'https://some/file2'
 WITH (
 	FILE_TYPE = 'CSV',
@@ -249,8 +269,8 @@ INNER JOIN flow_temp_table_store_0 AS l
 	 AND l.key2 = r.key2
 	 AND BASE64_DECODE(l."key!binary") = r."key!binary";
 
-INSERT INTO "a-warehouse"."a-schema".key_value (key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document)
-SELECT key1, key2, BASE64_DECODE("key!binary"), "array", BASE64_DECODE("binary"), "boolean", field_with_projection, flow_published_at, "integer", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger39Chars", "stringInteger66Chars", "stringNumber", flow_document
+INSERT INTO "a-warehouse"."a-schema".key_value (key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document)
+SELECT key1, key2, BASE64_DECODE("key!binary"), "array", BASE64_DECODE("binary"), "boolean", field_with_projection, flow_published_at, "integer", "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document
 FROM flow_temp_table_store_0
 WHERE _flow_delete = 0;
 

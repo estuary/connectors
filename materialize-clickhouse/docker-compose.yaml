@@ -9,7 +9,7 @@ services:
     networks:
       - flow-test
     healthcheck:
-      test: ["CMD", "clickhouse-client", "--host", "127.0.0.1", "--user", "flow", "--password", "flow", "--query", "SELECT 1"]
+      test: ["CMD", "clickhouse-client", "--host", "127.0.0.1", "--user", "flow", "--password", "flow", "--query", "SHOW TABLES FROM flow"]
       interval: 1s
       retries: 30
     ports:
