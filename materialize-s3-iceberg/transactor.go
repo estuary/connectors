@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"path"
-	"regexp"
 	"strings"
 	"time"
 
@@ -29,29 +28,8 @@ const (
 	fileSizeLimit = 512 * 1024 * 1024
 )
 
-var identifierSanitizerRegexp = regexp.MustCompile(`[^\-_0-9a-zA-Z]`)
-
-// sanitizeTable adapts a table name into a reasonably human-readable
-// representation, sanitizing problematic characters from the table name and
-// including a hash of the "original" value to guarantee uniqueness.
-// Alphanumerics, hyphens, and underscores are left as-is and others are
-// converted to underscores. S3 object names are actually very flexible in the
-// characters they allow but generally characters outside of these common ones
-// can cause issues with clients trying to read the named objects.
-func sanitizeTable(table string) string {
-	sanitized := identifierSanitizerRegexp.ReplaceAllString(table, "_")
-	if len(sanitized) > 64 {
-		// Limit the length of the "human readable" part of the table name to
-		// something reasonable.
-		sanitized = sanitized[:64]
-	}
-
-	hash := xxhash.Sum64String(table)
-	return fmt.Sprintf("%s_%016X", sanitized, hash)
-}
-
-func tablePath(bucket, prefix, namespace, table string) string {
-	return fmt.Sprintf("s3://%s/", path.Join(bucket, prefix, namespace, sanitizeTable(table)))
+func tablePath(bucket, prefix, namespace, table string, style LocationStyle) string {
+	return fmt.Sprintf("s3://%s/", path.Join(bucket, prefix, createLocationSuffix(namespace, table, style)))
 }
 
 // filePath returns path information for a new file, including both the object

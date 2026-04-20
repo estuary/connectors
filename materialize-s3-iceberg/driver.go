@@ -31,6 +31,13 @@ import (
 
 var featureFlagDefaults = map[string]bool{
 	"retain_existing_data_on_backfill": false,
+
+	// An alternate naming style for the Iceberg table data.  By default (when
+	// false), the naming is:
+	//   <base_location>/<namespace>/<table>_<hash>
+	// When this flag is enabled:
+	//   <base_location>/<namespace>/<table>.<hash>
+	"nested_dot_hash_location_style": false,
 }
 
 type catalogType string
@@ -264,7 +271,12 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 			cfg.Prefix = "__r2_data_catalog/" + cfg.Prefix
 		}
 	}
-	catalog := newCatalog(cfg)
+	locationStyle := NestedLocationStyle
+	if featureFlags["nested_dot_hash_location_style"] {
+		locationStyle = NestedDotHashLocationStyle
+	}
+
+	catalog := newCatalog(cfg, locationStyle)
 
 	return &materialization{
 		cfg:     cfg,
