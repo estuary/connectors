@@ -1,0 +1,52 @@
+{
+  "connector": "materialize-s3-parquet",
+  "scenario": "large-docs.yaml",
+  "seed": 0,
+  "preview_exit_code": 0,
+  "apply_seconds": 0.281659004,
+  "wall_seconds": 169.78436471,
+  "total_docs": 10000,
+  "total_bytes": 10485760000,
+  "docs_per_sec": 58.89823846312638,
+  "mb_per_sec": 58.89823846312638,
+  "transactions": [
+    {
+      "index": 0,
+      "collection": "bench/big",
+      "doc_count": 5000,
+      "doc_size": 1048576,
+      "bytes": 5242880000,
+      "fresh": {
+        "start": 0,
+        "count": 5000,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 83.059438524,
+      "mb_per_sec": 60.197854558759765,
+      "docs_per_sec": 60.197854558759765
+    },
+    {
+      "index": 1,
+      "collection": "bench/big",
+      "doc_count": 5000,
+      "doc_size": 1048576,
+      "bytes": 5242880000,
+      "fresh": {
+        "start": 5000,
+        "count": 3000,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 0,
+          "count": 2000
+        }
+      ],
+      "wall_seconds": 86.520506831,
+      "mb_per_sec": 57.78976780344653,
+      "docs_per_sec": 57.78976780344653
+    }
+  ]
+}

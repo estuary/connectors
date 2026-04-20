@@ -135,6 +135,15 @@ else
   echo "no docker-compose for $CONNECTOR; assuming endpoint is reachable"
 fi
 
+# Per-connector setup hook. Runs after docker-compose is up but before the
+# preview. Used for steps like creating an S3 bucket that the connector
+# expects to exist but does not create itself.
+SETUP_SCRIPT="$BENCH_DIR/setup/${CONNECTOR}.sh"
+if [[ -x "$SETUP_SCRIPT" ]]; then
+  echo "running setup hook: $SETUP_SCRIPT"
+  BENCH_CONFIG="$CONFIG" "$SETUP_SCRIPT"
+fi
+
 # Render the flow spec.
 SPEC="$OUT_DIR/flow.yaml"
 SPEC_ARGS=(
