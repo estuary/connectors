@@ -3,8 +3,9 @@ import asyncio
 import json
 import os
 import sys
+from collections.abc import Awaitable
 from datetime import UTC, datetime, timedelta
-from typing import Any, Awaitable, BinaryIO, Callable, Generic
+from typing import Any, BinaryIO, Callable, Generic
 
 from pydantic import BaseModel
 
@@ -36,6 +37,7 @@ ENCRYPTION_URL = os.getenv("ENCRYPTION_URL") or "https://config-encryption.estua
 PERIODIC_RESTART_INTERVAL = 24 * 60 * 60  # 24 hours
 GRACEFUL_SHUTDOWN_TIMEOUT = 30 * 60  # 30 minutes
 TASK_CANCELLATION_TIMEOUT = 5 * 60  # 5 minutes
+WEBHOOK_SHUTDOWN_TIMEOUT = 60  # 1 minute
 
 
 class TerminateTaskGroup(Exception):
@@ -52,6 +54,7 @@ class BaseCaptureConnector(
     BaseConnector[Request[EndpointConfig, ResourceConfig, _ConnectorState]],
     HTTPMixin,
     Generic[EndpointConfig, ResourceConfig, _ConnectorState],
+    metaclass=abc.ABCMeta,
 ):
     output: BinaryIO = sys.stdout.buffer
 
@@ -138,7 +141,7 @@ class BaseCaptureConnector(
             opened, capture = await self.open(log, open)
             await self._emit(Response(opened=opened))
 
-            stopping = Task.Stopping(asyncio.Event())
+            stopping = Task.Stopping()
 
             async def periodic_stop() -> None:
                 """Trigger graceful shutdown after 24 hours of continuous operation."""
@@ -152,7 +155,7 @@ class BaseCaptureConnector(
                 This handles shutdown triggered by any source: periodic_stop,
                 stream exceptions, or any other code that sets stopping.event.
                 """
-                await stopping.event.wait()
+                _ = await stopping.event.wait()
 
                 log.debug("Waiting for graceful exit.")
 
@@ -235,6 +238,20 @@ class BaseCaptureConnector(
                     await capture(task)
             except* TerminateTaskGroup:
                 pass  # Expected when enforce_shutdown terminates the task group
+
+            # TaskGroup exited = all non-webhook tasks done.
+            # Signal webhook server to drain and shut down.
+            if stopping.webhook_task:
+                stopping.webhook_event.set()
+                try:
+                    await asyncio.wait_for(
+                        stopping.webhook_task, timeout=WEBHOOK_SHUTDOWN_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    log.error(
+                        f"Webhook server did not shut down in {WEBHOOK_SHUTDOWN_TIMEOUT // 60} minutes. Forcing exit."
+                    )
+                    os._exit(1)
 
             # Cancel the background tasks if capture exited gracefully
             # before the shutdown timeout.

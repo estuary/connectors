@@ -1,0 +1,49 @@
+$defs:
+  Meta:
+    properties:
+      op:
+        default: u
+        description: 'Operation type (c: Create, u: Update, d: Delete)'
+        enum:
+        - c
+        - u
+        - d
+        title: Op
+        type: string
+      row_id:
+        default: -1
+        description: Row ID of the Document, counting up from zero, or -1 if not known
+        title: Row Id
+        type: integer
+      app_id:
+        default: ''
+        description: AppsFlyer App ID this row was fetched for
+        title: App Id
+        type: string
+    title: Meta
+    type: object
+additionalProperties: true
+properties:
+  _meta:
+    $ref: '#/$defs/Meta'
+    description: Document metadata
+  Date:
+    title: Date
+    type: string
+  Country:
+    title: Country
+    type: string
+  Media Source (pid):
+    title: Media Source (Pid)
+    type: string
+  Campaign (c):
+    title: Campaign (C)
+    type: string
+required:
+- Date
+- Country
+- Media Source (pid)
+- Campaign (c)
+title: AggGeoDailyReport
+type: object
+x-infer-schema: true

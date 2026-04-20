@@ -55,6 +55,8 @@ Study these for common patterns:
 | `source-salesforce-native/`    | OAuth authentication, complex resources  |
 | `source-google-sheets-native/` | Google OAuth, service accounts           |
 | `source-airtable-native/`      | Pagination, nested resources             |
+| `source-appsflyer/`            | Webhook + pull API (incremental)         |
+| `source-sentry/`               | Incremental + backfill, snapshot         |
 
 Note: The `-native` suffix indicates a first-party CDK connector that replaces an existing third-party connector with the same base name. Connectors without the suffix may also be first-party CDK connectors if there was no naming conflict.
 

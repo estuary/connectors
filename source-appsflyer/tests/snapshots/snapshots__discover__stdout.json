@@ -1,0 +1,2070 @@
+[
+  {
+    "recommendedName": "daily_geo_aggregate_report",
+    "resourceConfig": {
+      "name": "daily_geo_aggregate_report",
+      "interval": "PT4H",
+      "type": "pull"
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "app_id": {
+              "default": "",
+              "description": "AppsFlyer App ID this row was fetched for",
+              "title": "App Id",
+              "type": "string"
+            }
+          },
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "additionalProperties": true,
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "Date": {
+          "title": "Date",
+          "type": "string"
+        },
+        "Country": {
+          "title": "Country",
+          "type": "string"
+        },
+        "Media Source (pid)": {
+          "title": "Media Source (Pid)",
+          "type": "string"
+        },
+        "Campaign (c)": {
+          "title": "Campaign (C)",
+          "type": "string"
+        }
+      },
+      "required": [
+        "Date",
+        "Country",
+        "Media Source (pid)",
+        "Campaign (c)"
+      ],
+      "title": "AggGeoDailyReport",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/app_id",
+      "/Date",
+      "/Country",
+      "/Media Source (pid)",
+      "/Campaign (c)"
+    ]
+  },
+  {
+    "recommendedName": "in-app-event",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "in-app-event",
+      "match_rule": {
+        "value": "in-app-event",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "install",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "install",
+      "match_rule": {
+        "value": "install",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "install-in-app-event",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "install-in-app-event",
+      "match_rule": {
+        "value": "install-in-app-event",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "organic-install",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "organic-install",
+      "match_rule": {
+        "value": "organic-install",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "organic-install-in-app-event",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "organic-install-in-app-event",
+      "match_rule": {
+        "value": "organic-install-in-app-event",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "organic-reinstall",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "organic-reinstall",
+      "match_rule": {
+        "value": "organic-reinstall",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "postback",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "postback",
+      "match_rule": {
+        "value": "postback",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "postbacks-copy",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "postbacks-copy",
+      "match_rule": {
+        "value": "postbacks-copy",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "re-attribution",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "re-attribution",
+      "match_rule": {
+        "value": "re-attribution",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "re-attribution-in-app-event",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "re-attribution-in-app-event",
+      "match_rule": {
+        "value": "re-attribution-in-app-event",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "re-download",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "re-download",
+      "match_rule": {
+        "value": "re-download",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "re-engagement",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "re-engagement",
+      "match_rule": {
+        "value": "re-engagement",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "re-engagement-in-app-event",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "re-engagement-in-app-event",
+      "match_rule": {
+        "value": "re-engagement-in-app-event",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  },
+  {
+    "recommendedName": "reinstall",
+    "resourceConfig": {
+      "type": "webhook",
+      "name": "reinstall",
+      "match_rule": {
+        "value": "reinstall",
+        "key": "event_name",
+        "type": "body"
+      }
+    },
+    "documentSchema": {
+      "$defs": {
+        "Meta": {
+          "properties": {
+            "op": {
+              "default": "u",
+              "description": "Operation type (c: Create, u: Update, d: Delete)",
+              "enum": [
+                "c",
+                "u",
+                "d"
+              ],
+              "title": "Op",
+              "type": "string"
+            },
+            "row_id": {
+              "default": -1,
+              "description": "Row ID of the Document, counting up from zero, or -1 if not known",
+              "title": "Row Id",
+              "type": "integer"
+            },
+            "webhookId": {
+              "title": "Webhookid",
+              "type": "string"
+            },
+            "receivedAt": {
+              "title": "Receivedat",
+              "type": "string"
+            },
+            "headers": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "title": "Headers",
+              "type": "object"
+            },
+            "reqPath": {
+              "title": "Reqpath",
+              "type": "string"
+            },
+            "pathParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Pathparams"
+            },
+            "queryParams": {
+              "anyOf": [
+                {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "default": null,
+              "title": "Queryparams"
+            },
+            "estuary_id": {
+              "default": "",
+              "description": "The surrogate key generated from characteristic fields",
+              "title": "Estuary Id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "headers",
+            "reqPath"
+          ],
+          "title": "Meta",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "_meta": {
+          "$ref": "#/$defs/Meta",
+          "description": "Document metadata"
+        },
+        "app_id": {
+          "title": "App Id",
+          "type": "string"
+        },
+        "appsflyer_id": {
+          "title": "Appsflyer Id",
+          "type": "string"
+        },
+        "event_name": {
+          "title": "Event Name",
+          "type": "string"
+        },
+        "event_time": {
+          "title": "Event Time",
+          "type": "string"
+        },
+        "event_value": {
+          "title": "Event Value",
+          "type": "string"
+        },
+        "api_version": {
+          "title": "Api Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "app_id",
+        "appsflyer_id",
+        "event_name",
+        "event_time",
+        "event_value",
+        "api_version"
+      ],
+      "title": "AppsFlyerWebhookDocument",
+      "type": "object",
+      "x-infer-schema": true
+    },
+    "key": [
+      "/_meta/estuary_id"
+    ]
+  }
+]

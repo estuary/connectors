@@ -1,0 +1,129 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-appsflyer:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_appsflyer
+        config: config.yaml
+    bindings:
+    - resource:
+        type: webhook
+        name: in-app-event
+        match_rule:
+          value: in-app-event
+          key: event_name
+          type: body
+      target: acmeCo/in-app-event
+    - resource:
+        type: webhook
+        name: organic-install-in-app-event
+        match_rule:
+          value: organic-install-in-app-event
+          key: event_name
+          type: body
+      target: acmeCo/organic-install-in-app-event
+    - resource:
+        type: webhook
+        name: organic-reinstall
+        match_rule:
+          value: organic-reinstall
+          key: event_name
+          type: body
+      target: acmeCo/organic-reinstall
+    - resource:
+        type: webhook
+        name: organic-install
+        match_rule:
+          value: organic-install
+          key: event_name
+          type: body
+      target: acmeCo/organic-install
+    - resource:
+        type: webhook
+        name: re-download
+        match_rule:
+          value: re-download
+          key: event_name
+          type: body
+      target: acmeCo/re-download
+    - resource:
+        type: webhook
+        name: re-attribution-in-app-event
+        match_rule:
+          value: re-attribution-in-app-event
+          key: event_name
+          type: body
+      target: acmeCo/re-attribution-in-app-event
+    - resource:
+        type: webhook
+        name: re-attribution
+        match_rule:
+          value: re-attribution
+          key: event_name
+          type: body
+      target: acmeCo/re-attribution
+    - resource:
+        type: webhook
+        name: install
+        match_rule:
+          value: install
+          key: event_name
+          type: body
+      target: acmeCo/install
+    - resource:
+        type: webhook
+        name: install-in-app-event
+        match_rule:
+          value: install-in-app-event
+          key: event_name
+          type: body
+      target: acmeCo/install-in-app-event
+    - resource:
+        type: webhook
+        name: re-engagement-in-app-event
+        match_rule:
+          value: re-engagement-in-app-event
+          key: event_name
+          type: body
+      target: acmeCo/re-engagement-in-app-event
+    - resource:
+        type: webhook
+        name: postback
+        match_rule:
+          value: postback
+          key: event_name
+          type: body
+      target: acmeCo/postback
+    - resource:
+        type: webhook
+        name: reinstall
+        match_rule:
+          value: reinstall
+          key: event_name
+          type: body
+      target: acmeCo/reinstall
+    - resource:
+        type: webhook
+        name: re-engagement
+        match_rule:
+          value: re-engagement
+          key: event_name
+          type: body
+      target: acmeCo/re-engagement
+    - resource:
+        type: webhook
+        name: postbacks-copy
+        match_rule:
+          value: postbacks-copy
+          key: event_name
+          type: body
+      target: acmeCo/postbacks-copy
+    - resource:
+        name: daily_geo_aggregate_report
+        interval: PT4H
+        type: pull
+      target: acmeCo/daily_geo_aggregate_report
