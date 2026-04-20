@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"hash/fnv"
 	"math"
-	"os"
 	"strings"
 	"text/template"
 	"time"
@@ -450,14 +449,9 @@ func newTransactor(
 	if cfg.Credentials.ServiceAccountJSON != "" {
 		opts = append(opts, option.WithCredentialsJSON([]byte(cfg.Credentials.ServiceAccountJSON)))
 	}
-	var nodeCount int
-	if os.Getenv("SPANNER_EMULATOR_HOST") != "" {
-		nodeCount = 1
-	} else {
-		nodeCount, err = queryNodeCount(ctx, cfg.ProjectID, cfg.InstanceID, opts)
-		if err != nil {
-			return nil, fmt.Errorf("querying node count: %w", err)
-		}
+	nodeCount, err := queryNodeCount(ctx, cfg.ProjectID, cfg.InstanceID, opts)
+	if err != nil {
+		return nil, fmt.Errorf("querying node count: %w", err)
 	}
 	numPartitions := nodeCount * 10
 

@@ -39,6 +39,9 @@ func TestMain(m *testing.M) {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	}
 
+	// This env var is used by the Spanner client library.
+	// https://docs.cloud.google.com/spanner/docs/emulator#client-libraries
+	// https://pkg.go.dev/cloud.google.com/go/spanner#hdr-Creating_a_Client
 	os.Setenv("SPANNER_EMULATOR_HOST", emulatorAddr)
 
 	if err := bootstrapEmulator(); err != nil {
