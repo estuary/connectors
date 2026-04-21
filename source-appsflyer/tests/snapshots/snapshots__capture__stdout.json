@@ -1,1 +1,35 @@
-[]
+[
+  [
+    "acmeCo/daily_geo_aggregate_report",
+    {
+      "ARPU": "61.9500",
+      "Agency/PMD (af_prt)": "None",
+      "Average eCPI": "N/A",
+      "CTR": "N/A",
+      "Campaign (c)": "None",
+      "Clicks": "N/A",
+      "Conversion Rate": "N/A",
+      "Country": "None",
+      "Date": "2026-04-07",
+      "Impressions": "N/A",
+      "Installs": "1",
+      "Loyal Users": "0",
+      "Loyal Users/Installs": "0.0000",
+      "Media Source (pid)": "Organic",
+      "ROI": "N/A",
+      "Sessions": "0",
+      "Total Cost": "N/A",
+      "Total Revenue": "61.9500",
+      "_meta": {
+        "app_id": "nativepc-1313456",
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "af_purchase (Event counter)": "4",
+      "af_purchase (Sales in USD)": "51.96",
+      "af_purchase (Unique users)": "1",
+      "af_subscribe (Event counter)": "1",
+      "af_subscribe (Sales in USD)": "9.99",
+      "af_subscribe (Unique users)": "1"
+    }
+  ]
+]

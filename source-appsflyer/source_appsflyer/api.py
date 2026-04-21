@@ -234,7 +234,9 @@ async def _fetch_adaptive_window(
 
     Yields validated documents, then the actual window_end datetime as the final item.
     """
-    window_size = min(window_size, timedelta(days=1))
+    # TODO: Ideally, we'd detect when we hit the daily limit of requests
+    # asking for 3+ days of data then automatically resize the window to 2
+    # or fewer days as appropriate.
     while True:
         window_end = min(start_time + window_size, end_time)
 
