@@ -207,6 +207,16 @@ class Interviewers(GreenhouseResource):
     path: ClassVar[str] = "interviewers"
 
 
+class InterviewerTags(GreenhouseResource):
+    name: ClassVar[str] = "interviewer_tags"
+    path: ClassVar[str] = "interviewer_tags"
+
+
+class JobHiringManagers(GreenhouseResource):
+    name: ClassVar[str] = "job_hiring_managers"
+    path: ClassVar[str] = "job_hiring_managers"
+
+
 class JobNotes(GreenhouseResource):
     name: ClassVar[str] = "job_notes"
     path: ClassVar[str] = "job_notes"
@@ -250,6 +260,16 @@ class ProspectPools(GreenhouseResource):
 class ProspectPoolStages(GreenhouseResource):
     name: ClassVar[str] = "prospect_pool_stages"
     path: ClassVar[str] = "prospect_pool_stages"
+
+
+class Referrers(GreenhouseResource):
+    name: ClassVar[str] = "referrers"
+    path: ClassVar[str] = "referrers"
+
+
+class RejectionDetails(GreenhouseResource):
+    name: ClassVar[str] = "rejection_details"
+    path: ClassVar[str] = "rejection_details"
 
 
 class RejectionReasons(GreenhouseResource):
@@ -316,6 +336,8 @@ INCREMENTAL_RESOURCES: list[type[GreenhouseResource]] = [
     EmailTemplates,
     Interviews,
     Interviewers,
+    InterviewerTags,
+    JobHiringManagers,
     JobInterviewStages,
     JobNotes,
     JobPosts,
@@ -325,6 +347,8 @@ INCREMENTAL_RESOURCES: list[type[GreenhouseResource]] = [
     Openings,
     ProspectPools,
     ProspectPoolStages,
+    Referrers,
+    RejectionDetails,
     RejectionReasons,
     ScorecardQuestions,
     Scorecards,
