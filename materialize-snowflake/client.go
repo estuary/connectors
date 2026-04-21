@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -304,6 +305,24 @@ func preReqs(ctx context.Context, cfg config) *cerrors.PrereqErr {
 		} else {
 			if currentWarehouse == nil {
 				errs.Err(fmt.Errorf("no warehouse configured and default warehouse not set for user '%s': must set a value for 'Warehouse' in the endpoint configuration", cfg.Credentials.User))
+			}
+		}
+
+		// Check that QUOTED_IDENTIFIERS_IGNORE_CASE is not enabled. When this Snowflake parameter
+		// is enabled, quoted identifiers are returned uppercased regardless of how they were
+		// created. Estuary uses quoted identifiers for column names containing special characters
+		// (such as "_meta/op"), and requires that Snowflake preserve their case exactly as created.
+		var key, value, default_, level, desc, type_ string
+		query := "SHOW PARAMETERS LIKE 'QUOTED_IDENTIFIERS_IGNORE_CASE' IN SESSION;"
+		err := db.QueryRowContext(ctx, query).Scan(&key, &value, &default_, &level, &desc, &type_)
+		if err != nil {
+			errs.Err(fmt.Errorf("checking for QUOTED_IDENTIFIERS_IGNORE_CASE: %w", err))
+		} else {
+			ignoreCase, err := strconv.ParseBool(value)
+			if err != nil {
+				errs.Err(fmt.Errorf("unable to parse QUOTED_IDENTIFIERS_IGNORE_CASE value: %w", err))
+			} else if ignoreCase {
+				errs.Err(fmt.Errorf("QUOTED_IDENTIFIERS_IGNORE_CASE must be FALSE, see go.estuary.dev/mat-snow"))
 			}
 		}
 	}
