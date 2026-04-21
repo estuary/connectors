@@ -14,7 +14,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 
-	_ "github.com/duckdb/duckdb-go/v2"
+	_ "github.com/marcboeker/go-duckdb/v2"
 )
 
 var _ sql.SchemaManager = (*client)(nil)

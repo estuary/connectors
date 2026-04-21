@@ -8,7 +8,7 @@ import (
 
 	sql "github.com/estuary/connectors/materialize-sql"
 
-	_ "github.com/duckdb/duckdb-go/v2"
+	_ "github.com/marcboeker/go-duckdb/v2"
 )
 
 func TestIntegration(t *testing.T) {
@@ -52,3 +52,4 @@ func TestIntegration(t *testing.T) {
 		)
 	})
 }
+
