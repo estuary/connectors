@@ -1,9 +1,13 @@
 package writer
 
 import (
+	"bytes"
 	"os"
 	"testing"
 
+	"github.com/apache/arrow-go/v18/parquet"
+	"github.com/apache/arrow-go/v18/parquet/file"
+	"github.com/apache/arrow-go/v18/parquet/schema"
 	"github.com/bradleyjkemp/cupaloy"
 	"github.com/stretchr/testify/require"
 )
@@ -55,4 +59,54 @@ func TestParquetWriter(t *testing.T) {
 			cupaloy.SnapshotT(t, duckdbReadFile(t, sink.Name(), "JSON"))
 		})
 	}
+}
+
+// This is a regression test for a bug in arrow-go 18.5.2, added test so we
+// don't accidentally reintroduce it.  It appears to be fixed in
+// 3ad38d03dbc85283f61d60ba2bd8ae8492f0972a.
+func TestParquetEOFReadingByteArrayRegression(t *testing.T) {
+	field := schema.NewByteArrayNode("binaryField", parquet.Repetitions.Optional, -1)
+	root, err := schema.NewGroupNode("schema", parquet.Repetitions.Required, schema.FieldList{field}, -1)
+	require.NoError(t, err)
+	sc := schema.NewSchema(root)
+
+	writer := &bytes.Buffer{}
+
+	scratchOpts := []parquet.WriterProperty{
+		parquet.WithDictionaryDefault(false),
+		parquet.WithStats(false),
+	}
+	w := file.NewParquetWriter(writer, sc.Root(), file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
+	rg := w.AppendRowGroup()
+
+	col, err := rg.NextColumn()
+	require.NoError(t, err)
+
+	cw := col.(*file.ByteArrayColumnChunkWriter)
+
+	_, err = cw.WriteBatch(
+		[]parquet.ByteArray{
+			make([]byte, 1024*1023),
+			make([]byte, 1024*1024),
+		},
+		[]int16{1, 1},
+		nil,
+	)
+	require.NoError(t, err)
+
+	err = w.Close()
+	require.NoError(t, err)
+
+	reader := bytes.NewReader(writer.Bytes())
+	r, err := file.NewParquetReader(reader)
+	require.NoError(t, err)
+	rgReader := r.RowGroup(0)
+	cr, err := rgReader.Column(0)
+	require.NoError(t, err)
+
+	numRows := 2
+	vals := make([]parquet.ByteArray, numRows)
+	defLvls := make([]int16, numRows)
+	_, _, err = cr.(*file.ByteArrayColumnChunkReader).ReadBatch(int64(numRows), vals, defLvls, nil)
+	require.NoError(t, err)
 }
