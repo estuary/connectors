@@ -229,11 +229,11 @@ func (c *config) db(ctx context.Context) (*stdsql.DB, error) {
 	switch c.StagingBucket.StagingBucketType {
 	case stagingBucketTypeS3:
 		if c.StagingBucket.Endpoint != "" {
-			endpointURL, err := url.Parse(c.StagingBucket.Endpoint)
-			if err != nil {
-				return nil, err
-			}
-
+            endpointURL, err := url.Parse(c.StagingBucket.Endpoint)
+            if err != nil {
+                return nil, err
+            }
+			
 			// Custom endpoint for S3-compatible storage (e.g. Cloudflare R2).
 			// Use path-style URLs since most S3-compatible services require this.
 			createTempSecret = fmt.Sprintf(`CREATE SECRET IF NOT EXISTS (

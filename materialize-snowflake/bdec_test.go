@@ -19,7 +19,7 @@ import (
 	sql "github.com/estuary/connectors/materialize-sql"
 	"github.com/stretchr/testify/require"
 
-	_ "github.com/duckdb/duckdb-go/v2"
+	_ "github.com/marcboeker/go-duckdb/v2"
 )
 
 func TestBdecWriter(t *testing.T) {
