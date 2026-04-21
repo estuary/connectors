@@ -52,9 +52,8 @@ class EndpointConfig(BaseModel):
                 "Window size for incremental streams in ISO 8601 format. "
                 "ex: P30D means 30 days, PT6H means 6 hours."
             ),
-            default=timedelta(days=7),
+            default=timedelta(days=2),
             ge=timedelta(days=1),
-            le=timedelta(days=90),
         )
 
     advanced: Advanced = Field(

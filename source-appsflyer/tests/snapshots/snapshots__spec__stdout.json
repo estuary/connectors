@@ -26,7 +26,7 @@
         "Advanced": {
           "properties": {
             "window_size": {
-              "default": "P7D",
+              "default": "P2D",
               "description": "Window size for incremental streams in ISO 8601 format. ex: P30D means 30 days, PT6H means 6 hours.",
               "format": "duration",
               "title": "Window Size",
