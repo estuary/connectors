@@ -26,6 +26,12 @@ var (
 	// ErrTableNotFound may be returned when attempting to get metadata for a
 	// non-Iceberg table present in a Glue catalog.
 	ErrTableNotFound = fmt.Errorf("table not found")
+
+	// ErrAlreadyExists is returned when a POST to create a table or namespace
+	// returns 409 Conflict. Callers typically treat this as idempotent success
+	// because retries after a partial server success (e.g. a 5xx that
+	// actually created the resource) produce this response.
+	ErrAlreadyExists = fmt.Errorf("already exists")
 )
 
 // TODO(whb): This is a specific form a credential vending for REST catalogs. It
@@ -234,7 +240,23 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 
 	baseURL := parsedCatalogUrl.JoinPath("v1")
 	rc := &Catalog{
-		rHttp:      rHttp.SetBaseURL(baseURL.String()),
+		// Retries use resty's default conditions (429 and 5xx except 501).
+		// SetAllowNonIdempotentRetry covers POST requests, which we need
+		// because Snowflake Polaris has been observed returning transient
+		// 500s and 408s on table creation; an "already exists" response on
+		// retry is handled in CreateTable.
+		rHttp: rHttp.
+			SetBaseURL(baseURL.String()).
+			SetRetryCount(5).
+			SetRetryWaitTime(1 * time.Second).
+			SetRetryMaxWaitTime(30 * time.Second).
+			SetAllowNonIdempotentRetry(true).
+			// Default conditions cover 429 and 5xx except 501. Polaris has
+			// been observed returning 408 on createTable when its internal
+			// timeout elapses; that's also transient.
+			AddRetryConditions(func(r *resty.Response, _ error) bool {
+				return r != nil && r.StatusCode() == http.StatusRequestTimeout
+			}),
 		isS3tables: cfg.signingName == "s3tables",
 		tokenURL:   tokenURL,
 	}
@@ -313,6 +335,9 @@ func (c *Catalog) CreateNamespace(ctx context.Context, ns string) error {
 	if err := doPost(ctx, c, "/namespaces", map[string][]string{
 		"namespace": {ns},
 	}); err != nil {
+		if errors.Is(err, ErrAlreadyExists) {
+			return nil
+		}
 		return err
 	}
 
@@ -426,6 +451,15 @@ func (c *Catalog) CreateTable(ctx context.Context, ns string, name string, sch *
 	}
 
 	if err := doPost(ctx, c, fmt.Sprintf("/namespaces/%s/tables", ns), req); err != nil {
+		// A 409 on create can mean the request actually succeeded server-side
+		// but we retried after a transient 5xx and got "already exists" on
+		// the second attempt. Treat as idempotent success; the boilerplate
+		// has already confirmed the resource didn't exist before CreateTable
+		// was called, and any genuine schema mismatch will surface on the
+		// next info-schema read.
+		if errors.Is(err, ErrAlreadyExists) {
+			return nil
+		}
 		return err
 	}
 
@@ -508,11 +542,11 @@ func doGet[T any](ctx context.Context, client *Catalog, path string, params ...[
 	if got, err := req.SetResult(&res).Get(path); err != nil {
 		return nil, fmt.Errorf("failed to get %s: %w", path, err)
 	} else if !got.IsSuccess() {
-		if e := got.Error().(*errorResponse); e.Error.Type == "IcebergTableNotFoundException" {
+		e := got.Error().(*errorResponse)
+		if e.Error.Type == "IcebergTableNotFoundException" {
 			return nil, ErrTableNotFound
-		} else {
-			return nil, fmt.Errorf("failed to GET %s: %s %s", got.Request.URL, got.Status(), e)
 		}
+		return nil, fmt.Errorf("failed to GET %s: %s %s", got.Request.URL, got.Status(), e)
 	}
 
 	return &res, nil
@@ -522,6 +556,9 @@ func doPost(ctx context.Context, client *Catalog, path string, body any) error {
 	if got, err := client.baseReq(ctx).SetBody(body).Post(path); err != nil {
 		return fmt.Errorf("failed to post %s: %w", path, err)
 	} else if !got.IsSuccess() {
+		if got.StatusCode() == http.StatusConflict {
+			return ErrAlreadyExists
+		}
 		return fmt.Errorf("failed to POST %s: %s %s", got.Request.URL, got.Status(), got.Error().(*errorResponse))
 	}
 
