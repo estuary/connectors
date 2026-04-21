@@ -307,16 +307,18 @@ class BaseCRMObject(BaseDocument, extra="allow"):
 
     @model_validator(mode="after")
     def _post_init(self) -> Self:
-        # Clear properties and history which don't have current values.
+        # Coerce empty-string property values to None, and clear history entries without values.
         #
-        # Only remove properties that are empty strings. Hubspot sometimes returns empty strings 
-        # for formmatted string fields, like a date, number, or email. An empty string
-        # causes the inferred format to get dropped from the collection's inferred schema.
-        # We want to maintain those formats. Omitting properties that are empty strings
-        # is a little broad - we'd ideally only do so for string fields that have an expected
-        # format - but that more precise removal requires a larger effort than I'd like to
-        # take on right now.
-        self.properties = {k: v for k, v in self.properties.items() if v != ""}
+        # HubSpot returns "" both for cleared properties and for formatted string fields
+        # (dates, numbers, emails) that don't currently have a value. Leaving "" in place
+        # causes schema inference to drop the inferred format (e.g. date-time) from the
+        # collection schema. Stripping the key entirely would prevent merge reduction from
+        # propagating clearances to destinations; the absent key means "preserve LHS",
+        # so cleared values never reach the destination. Coercing to None threads both
+        # needles: null is ignored by format inference, and null overwrites the LHS value
+        # per the merge reduction strategy specified in the read schmea so cleared properties
+        # propagate correctly.
+        self.properties = {k: (None if v == "" else v) for k, v in self.properties.items()}
         if self.propertiesWithHistory:
             self.propertiesWithHistory = {
                 k: v for k, v in self.propertiesWithHistory.items() if len(v)
