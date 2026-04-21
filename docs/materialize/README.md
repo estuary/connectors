@@ -2,16 +2,16 @@
 
 Materialization [connectors] write Flow [collections] into a destination
 system, e.g. a database, warehouse, file storage, messaging queue, etc.
-Materializations are processed as cooperative transactions between the
-Estuary Runtime and a connector Driver, over a long-lived RPC through which
-the Runtime and Driver exchange messages.
+Materializations are processed as cooperative transactions between the Flow
+runtime and a connector, over a long-lived RPC through which the runtime and
+connector exchange messages.
 
-This RPC workflow maintains a materialized view of an Estuary collection in
-an external system.
+This RPC workflow maintains a materialized view of a Flow collection in an
+external system.
 It has distinct acknowledge, load, and store phases.
-Estuary's runtime and driver cooperatively maintain a fully reduced view of
-each document by loading current states from the store, reducing in a number
-of updates, and then storing updated documents and checkpoints.
+The Flow runtime and connector cooperatively maintain a fully reduced view of
+each document by loading current states from the store, reducing some number of
+updates, and then storing updated documents and checkpoints.
 
 This document's aim is to explain in as much detail as possible the
 materialization protocol. For example, how the Flow runtime (an overarching
@@ -234,40 +234,40 @@ See the rendered chart [here][materialization-protocol].
 
 <Mermaid chart={`
   sequenceDiagram
-    Runtime->>Driver: Open{MaterializationSpec, driverCP}
-    Note right of Driver: Connect to endpoint.<br/>Optionally fetch last-committed<br/>runtime checkpoint.
-    Driver->>Runtime: Opened{runtimeCP}
-    Note over Runtime, Driver: One-time initialization ☝️.<br/> 👇 Repeats for each transaction.
+    Runtime->>Connector: Open{MaterializationSpec, connectorCP}
+    Note right of Connector: Connect to endpoint.<br/>Optionally fetch last-committed<br/>runtime checkpoint.
+    Connector->>Runtime: Opened{runtimeCP}
+    Note over Runtime, Connector: One-time initialization ☝️.<br/> 👇 Repeats for each transaction.
     Note left of Runtime: Prior txn commits<br/>to recovery log.
-    Note right of Driver: Prior txn commits to DB<br/>(where applicable).
-    Runtime->>Driver: Acknowledge
+    Note right of Connector: Prior txn commits to DB<br/>(where applicable).
+    Runtime->>Connector: Acknowledge
     Note right of Runtime: Acknowledged MAY be sent<br/>before Acknowledge.
-    Note right of Driver: MAY perform an idempotent<br/>apply of last txn.
+    Note right of Connector: MAY perform an idempotent<br/>apply of last txn.
     Note left of Runtime: Runtime does NOT await<br/>Acknowledged before<br/>proceeding to send Load.
-    Driver->>Runtime: Acknowledged
+    Connector->>Runtime: Acknowledged
     Note left of Runtime: Runtime may now finalize<br/>a pipelined transaction.
-    Note over Runtime, Driver: End of Acknowledge phase.
-    Runtime->>Driver: Load<A>
+    Note over Runtime, Connector: End of Acknowledge phase.
+    Runtime->>Connector: Load<A>
     Note left of Runtime: Load keys may<br/> not exist (yet).
-    Runtime->>Driver: Load<B>
-    Note right of Driver: MAY evaluate Load immediately,<br/>or stage for deferred retrieval.
-    Driver->>Runtime: Loaded<A>
-    Runtime->>Driver: Load<C>
-    Runtime->>Driver: Flush
-    Driver->>Runtime: Loaded<C>
-    Note right of Driver: Omits Loaded for keys<br/>that don't exist.
-    Driver->>Runtime: Flushed
+    Runtime->>Connector: Load<B>
+    Note right of Connector: MAY evaluate Load immediately,<br/>or stage for deferred retrieval.
+    Connector->>Runtime: Loaded<A>
+    Runtime->>Connector: Load<C>
+    Runtime->>Connector: Flush
+    Connector->>Runtime: Loaded<C>
+    Note right of Connector: Omits Loaded for keys<br/>that don't exist.
+    Connector->>Runtime: Flushed
     Note left of Runtime: All existing keys<br/>have been retrieved.
-    Note over Runtime, Driver: End of Load phase.
-    Runtime->>Driver: Store<X>
-    Runtime->>Driver: Store<Y>
-    Runtime->>Driver: Store<Z>
-    Runtime->>Driver: StartCommit{runtimeCP}
-    Note right of Driver: * Completes all Store processing.<br/>* MAY include runtimeCP in DB txn.
-    Note right of Driver: Commit to DB<br/>now underway.
-    Driver->>Runtime: StartedCommit{driverCP}
+    Note over Runtime, Connector: End of Load phase.
+    Runtime->>Connector: Store<X>
+    Runtime->>Connector: Store<Y>
+    Runtime->>Connector: Store<Z>
+    Runtime->>Connector: StartCommit{runtimeCP}
+    Note right of Connector: * Completes all Store processing.<br/>* MAY include runtimeCP in DB txn.
+    Note right of Connector: Commit to DB<br/>now underway.
+    Connector->>Runtime: StartedCommit{connectorCP}
     Note left of Runtime: Begins commit to<br/> recovery log.
-    Note over Runtime, Driver: End of Store phase. Loops around<br/>to Acknowledge <=> Acknowledged.
+    Note over Runtime, Connector: End of Store phase. Loops around<br/>to Acknowledge <=> Acknowledged.
 `}/>
 
 
@@ -609,7 +609,7 @@ necessary until the changes are successfully committed to the destination.
 
 In this pattern, the runtime's Recovery Log persists the Flow checkpoint and
 handles fencing semantics.
-During the Load and Store phases, the driver directly manipulates a
+During the Load and Store phases, the connector directly manipulates a
 non-transactional store or API, such as a key/value store.
 
 Note that this pattern is at-least-once.
