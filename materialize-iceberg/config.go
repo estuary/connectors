@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"regexp"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -14,7 +13,6 @@ import (
 	emr "github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
-	"github.com/cespare/xxhash/v2"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/blob"
 	"github.com/estuary/connectors/go/dbt"
@@ -26,8 +24,11 @@ import (
 )
 
 var featureFlagDefaults = map[string]bool{
-	// An alternate naming style for the Iceberg tables:
-	//   <base_location>/<namespace>/<table>_<hash>
+	// An alternate naming style for the Iceberg table data.  By default (when
+	// false), the naming is:
+	//   <base_location>/<namespace>_<table>_<hash>
+	// When this flag is enabled:
+	//   <base_location>/<namespace>/<table>.<hash>
 	"nested_dot_hash_location_style": false,
 }
 
@@ -624,63 +625,4 @@ func (r resource) WithDefaults(cfg config) resource {
 
 func (r resource) Parameters() (path []string, deltaUpdates bool, err error) {
 	return sanitizePath(r.Namespace, r.Table), false, nil
-}
-
-type LocationStyle int
-
-const (
-	FlatLocationStyle LocationStyle = iota
-	NestedDotHashLocationStyle
-)
-
-// Iceberg catalogs are generally case-insensitive and do not allow dots in
-// namespace or table names. AWS Glue is also very picky about anything other
-// than alphanumerics or underscores in namespace or table names.
-var pathSanitizeRegex = regexp.MustCompile("(?i)[^a-z0-9_]")
-
-func sanitizePath(path ...string) []string {
-	out := []string{}
-	for _, p := range path {
-		out = append(out, strings.ToLower(pathSanitizeRegex.ReplaceAllString(p, "_")))
-	}
-
-	return out
-}
-
-// sanitizeAndAppendHash adapts an input into a reasonably human-readable
-// representation, sanitizing problematic characters and including a hash of the
-// "original" value to guarantee a unique (with respect to the input) and
-// deterministic output.
-func sanitizeAndAppendHash(in ...any) string {
-	strs := make([]string, 0, len(in))
-	for _, i := range in {
-		strs = append(strs, fmt.Sprintf("%v", i))
-	}
-
-	joined := strings.Join(strs, "_")
-	sanitized := pathSanitizeRegex.ReplaceAllString(joined, "_")
-	if len(sanitized) > 64 {
-		// Limit the length of the "human readable" part of the table name to
-		// something reasonable.
-		sanitized = sanitized[:64]
-	}
-
-	return fmt.Sprintf("%s_%016X", sanitized, xxhash.Sum64String(joined))
-}
-
-func createNestedDotHashLocation(namespace, table string) string {
-	sanitized := pathSanitizeRegex.ReplaceAllString(namespace, "_") +
-		"/" + pathSanitizeRegex.ReplaceAllString(table, "_")
-	return fmt.Sprintf("%s.%016X", sanitized, xxhash.Sum64String(sanitized))
-}
-
-func createLocationSuffix(namespace, table string, style LocationStyle) string {
-	switch style {
-	case FlatLocationStyle:
-		return sanitizeAndAppendHash(namespace + "_" + table)
-	case NestedDotHashLocationStyle:
-		return createNestedDotHashLocation(namespace, table)
-	default:
-		panic("unknown location style")
-	}
 }

@@ -12,11 +12,15 @@ import (
 )
 
 type catalog struct {
-	cfg *config
+	cfg           *config
+	locationStyle LocationStyle
 }
 
-func newCatalog(cfg config) *catalog {
-	return &catalog{cfg: &cfg}
+func newCatalog(cfg config, locationStyle LocationStyle) *catalog {
+	return &catalog{
+		cfg:           &cfg,
+		locationStyle: locationStyle,
+	}
 }
 
 func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSchema, resourcePaths [][]string) error {
@@ -106,7 +110,7 @@ func (c *catalog) createNamespace(ctx context.Context, namespace string) error {
 }
 
 func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_Binding) (string, boilerplate.ActionApplyFn, error) {
-	tc := tableCreate{Location: tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1])}
+	tc := tableCreate{Location: tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)}
 
 	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
 	if err != nil {
