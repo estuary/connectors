@@ -415,6 +415,7 @@ checkpoint, but not having the same set of documents.
 Consider the scenario below:
 
 An instance of `materialize-example` is running, we call it `A`.
+It writes documents to ExampleDB.
 
 During the task assignment process, for some reason, we end up with a second
 instance of `materialize-example` `B` before `A` can be shut down.
@@ -444,7 +445,7 @@ collection, and it is now:
 ```
 
 Now, `B` is given a smaller transaction than `A`, and commits before `A`, so
-the table in Clickhouse now has:
+the table in ExampleDB now has:
 
 ```
 {"id": 1, "counter": 2}
