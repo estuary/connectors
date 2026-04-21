@@ -8,10 +8,10 @@ connector exchange messages.
 
 This RPC workflow maintains a materialized view of a Flow collection in an
 external system.
-It has distinct acknowledge, load, and store phases.
+It has distinct Acknowledge, Load, and Store phases.
 The Flow runtime and connector cooperatively maintain a fully reduced view of
-each document by loading current states from the store, reducing some number of
-updates, and then storing updated documents and checkpoints.
+each document by loading current states from the destination, reducing some
+number of updates, and then storing updated documents and checkpoints.
 
 This document's aim is to explain in as much detail as possible the
 materialization protocol. For example, how the Flow runtime (an overarching
@@ -299,7 +299,7 @@ messages, it sends `Request.Flushed` with the connector state.
 The use case for this message is quite niche, but explained below with a
 hypothetical use case:
 
-Consider a store like `materialize-elastic`.
+Consider a destination like Elasticsearch, via `materialize-elastic`.
 Elastic is a document DB suited for point lookup and point update.
 It doesn’t provide a meaningful bulk query API for reads or writes (its "batch"
 operations don't scale to Flow's requirements), so the strategy is to stream
@@ -309,16 +309,16 @@ We throw our hands up and say "this connector is at-least-once" (in an
 at-least-once connector, a transaction may fail part-way through and be
 restarted, causing its effects to be partially or fully replayed/re-applied).
 
-However, suppose we add external stable storage, like an S3 bucket.
+However, suppose we add an external data container, like an S3 bucket.
 Then the connector could:
 
 - **Current**: Evaluate Load keys and stream out point lookups of Loaded
   documents
 - **New**: Append those Loaded documents, as they happen, to short-lived log
-  segments in stable storage
+  segments in the external data container
 - **New**: Send `Response.Flushed.state` updates which name those log segment
   file(s)
-  - This connector state update is stored durably before the first
+  - This connector state update is committed to the Recovery Log before the first
     `Request.Store` document is seen
 - **Current**: Evaluate Store documents and stream out point upserts
 
@@ -346,13 +346,13 @@ atomic — we can't fix that).
 The structure of documents in the connector is unchanged with respect to today.
 
 **Downsides**:
-It requires new, external, stable storage.
+It requires a new, external, data container.
 Costs increase due to frequent S3 file writes / deletes.
 More configuration, more complexity.
 
 **Alternative model**: Client-facing Multi-Version Concurrency Control (MVCC)
 
-Instead of using external stable storage, a connector could store multiple
+Instead of using an external data container, a connector could retain multiple
 versions of a document under its given key, distinguished by a version
 (e.g. a monotonic transaction counter T).
 
@@ -361,12 +361,12 @@ versions of a document under its given key, distinguished by a version
   - Prune older versions, keeping the current version and one older version.
 
 At query time, the client needs to know a committed-through T.
-It then scans the store and takes the largest version of each key <= T.
+It then scans the destination and takes the largest version of each key <= T.
 
 **Upsides**:
-No external storage.
-This write pattern is well suited to some column-family storage architectures
-(thinking about `materialize-bigtable` in particular).
+No external data container is required.
+This write pattern is well suited to some column-family architectures (thinking
+about `materialize-bigtable` in particular).
 
 **Downsides**:
 Much more complexity for the client.
@@ -398,8 +398,8 @@ Flow transactions can be thought of like this:
    This checkpoint includes the connector state (a JSON object emitted by
    the connector for the connector's bookkeeping)
 
-The Recovery Log is basically a bookkeeping store where Flow keeps track of
-transactions: which documents have been materialized.
+The Recovery Log is a durable commit log where Flow keeps track of transactions:
+which documents have been materialized.
 
 Ideally, each Flow transaction maps to exactly one transaction in the
 destination system; this is sometimes possible, but often it is not.
@@ -610,7 +610,7 @@ necessary until the changes are successfully committed to the destination.
 In this pattern, the runtime's Recovery Log persists the Flow checkpoint and
 handles fencing semantics.
 During the Load and Store phases, the connector directly manipulates a
-non-transactional store or API, such as a key/value store.
+non-transactional destination container or API, such as a key/value database.
 
 Note that this pattern is at-least-once.
 A transaction that fails part-way through is restarted, causing its effects to
@@ -630,8 +630,8 @@ through the use of derivations.
 Some systems, such as APIs, Webhooks, and messages brokers, are push-only in
 nature.
 Flow's materializations can run in a "delta updates" mode, where loads are
-skipped, and Flow does not store fully reduced documents.
-Instead, the runtime sends delta updates during the store phase, which reflect
+skipped, and Flow does not emit fully reduced documents.
+Instead, the runtime sends delta updates during the Store phase, which reflect
 the combined roll-up of collection documents processed only within this
 transaction.
 
@@ -640,15 +640,15 @@ simple counters, having a collection schema that uses a `sum` reduction
 strategy.
 
 Without delta updates, Flow would reduce documents `-1`, `3`, and `2` by `sum`
-to arrive at document `4`, which is stored.
+to arrive at document `4`, which is delivered to the destination.
 In the next transaction, document `4` is loaded and reduced with `6`, `-7`, and
-`-1` to arrive at a new stored document `2`.
+`-1` to arrive at a new document `2`, delivered to the destination.
 `2` represents the full reduction of the documents materialized thus far.
 
 Compare this to delta updates mode: Flow reduces documents `-1`, `3`, and `2`
-by `sum` to arrive at document `4`, which is stored.
+by `sum` to arrive at document `4`, which is delivered to the destination.
 The next transaction combines with `6`, `-7`, and `-1` to arrive at a new
-stored document `-2`.
+document `-2`, delivered to the destination.
 These delta updates are a windowed combine over documents seen in the
 current transaction only, and unlike before are not a full reduction of the
 document.
