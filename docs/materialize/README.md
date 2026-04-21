@@ -158,6 +158,9 @@ is required, optional, forbidden, or incompatible.
 The user can then decide whether they want to include optional fields
 (which are omitted by default).
 Forbidden fields are those the connector cannot materialize.
+A common example is a field that has only ever had `null` values, so its
+known type is `type: null`; most destinations require a non-null type, and
+so such fields cannot be materialized (e.g. PostgreSQL).
 Incompatible fields are those whose type has changed in a way that the
 connector cannot automatically migrate / mitigate, meaning that a backfill is
 necessary to materialize the binding.
