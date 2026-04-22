@@ -76,7 +76,7 @@ async def fetch_transactions(
         initial_end=min(
             log_cursor + timedelta(hours=window_size),
             datetime.now(tz=UTC) - LAG,
-        ),
+        ).replace(microsecond=0),
         log=log,
     )
 
@@ -144,7 +144,12 @@ async def backfill_transactions(
 
     start = _str_to_dt(page)
 
-    if start >= cutoff:
+    initial_end = min(
+        start + timedelta(hours=window_size),
+        cutoff,
+    ).replace(microsecond=0)
+
+    if start >= initial_end:
         return
 
     end = await determine_next_searchable_resource_window_end_by_field(
@@ -153,7 +158,7 @@ async def backfill_transactions(
         path=TRANSACTION_PATH_COMPONENT,
         field_name="created_at",
         start=start,
-        initial_end=min(start + timedelta(hours=window_size), cutoff),
+        initial_end=initial_end,
         log=log,
         search_limit=TRANSACTION_SEARCH_LIMIT,
     )
@@ -195,7 +200,7 @@ async def fetch_incremental_resources(
         initial_end=min(
             log_cursor + timedelta(hours=window_size),
             datetime.now(tz=UTC) - LAG,
-        ),
+        ).replace(microsecond=0),
         log=log,
     )
 
@@ -242,7 +247,12 @@ async def backfill_incremental_resources(
 
     start = _str_to_dt(page)
 
-    if start >= cutoff:
+    initial_end = min(
+        start + timedelta(hours=window_size),
+        cutoff,
+    ).replace(microsecond=0)
+
+    if start >= initial_end:
         return
 
     end = await determine_next_searchable_resource_window_end_by_field(
@@ -251,7 +261,7 @@ async def backfill_incremental_resources(
         path=path,
         field_name="created_at",
         start=start,
-        initial_end=min(start + timedelta(hours=window_size), cutoff),
+        initial_end=initial_end,
         log=log,
     )
 
@@ -316,11 +326,11 @@ async def backfill_disputes(
 
     start = _str_to_dt(page)
 
-    if start >= cutoff:
-        return
-
     window_end = start + timedelta(hours=max(window_size, MIN_DISPUTES_WINDOW_SIZE))
-    end = min(window_end, cutoff)
+    end = min(window_end, cutoff).replace(microsecond=0)
+
+    if start >= end:
+        return
 
     async for doc in fetch_disputes_between(
         http,
