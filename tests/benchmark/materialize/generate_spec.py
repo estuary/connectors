@@ -23,8 +23,6 @@ The scenario's `collections[].resource` (if present) is passed through to the
 binding; otherwise we derive `{table: <basename>}` from the collection name.
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import os
