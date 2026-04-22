@@ -19,17 +19,14 @@ Usage:
                 [--state path]         # optional: dump per-tx state JSON
 """
 
-from __future__ import annotations
-
 import argparse
 import json
 import random
 import string
-import struct
 import sys
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal, TextIO
 
 import yaml
 
@@ -41,12 +38,10 @@ import yaml
 _SUFFIXES = {"B": 1, "KB": 1024, "MB": 1024**2, "GB": 1024**3, "TB": 1024**4}
 
 
-def parse_size(value: Any) -> int:
+def parse_size(value: int | str) -> int:
     """Parse a size value: int (bytes) or string with B/KB/MB/GB/TB suffix."""
     if isinstance(value, int):
         return value
-    if not isinstance(value, str):
-        raise ValueError(f"size must be int or string, got {type(value).__name__}")
     s = value.strip().replace("_", "")
     for suffix in ("TB", "GB", "MB", "KB", "B"):
         if s.upper().endswith(suffix):
@@ -84,7 +79,7 @@ class CollectionSpec:
 class OverlapSpec:
     with_tx: int
     fraction: float
-    op: str  # "u" or "d"
+    op: Literal["u", "d"]
 
 
 @dataclass
@@ -231,7 +226,7 @@ _UUID_NAMESPACE = uuid.UUID("a3f2b8c1-7d4e-4f9a-b6c8-1e2d3f4a5b6c")
 def _int_key_to_uuid(key: int) -> str:
     """Deterministic UUID from an integer key. Uses UUID v5 (SHA-1 based)
     so the same key always produces the same UUID across runs."""
-    return str(uuid.uuid5(_UUID_NAMESPACE, struct.pack("<q", key)))
+    return str(uuid.uuid5(_UUID_NAMESPACE, key.to_bytes(8, "little", signed=True)))
 
 
 def _fixed_scalar(prop: str, schema: dict) -> Any:
@@ -446,10 +441,10 @@ def _resolve_op_plan(
 def emit(
     collections: dict[str, CollectionSpec],
     transactions: list[TxSpec],
-    out,
+    out: TextIO,
     seed: int = 0,
 ) -> dict:
-    """Write the fixture to `out` (a file-like in text mode). Returns a state dict."""
+    """Write the fixture to `out`. Returns a state dict."""
     states: dict[str, CollectionState] = {name: CollectionState() for name in collections}
     state_log: dict = {"transactions": []}
 
