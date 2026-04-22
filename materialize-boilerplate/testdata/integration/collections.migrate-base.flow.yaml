@@ -4,22 +4,27 @@ collections:
       type: object
       properties:
         id: { type: integer }
-        bigIntToNum: { type: integer }
-        bigIntToHugeInt: { type: integer }
-        hugeIntToNum: { type: integer, maximum: 18446744073709551615 }
+        int64ToNum: { type: integer }
+        int64ToInt128: { type: integer }
+        int64ToInt256: { type: integer }
+        int128ToNum: { type: integer, maximum: 18446744073709551615 }
+        int128ToInt256: { type: integer, maximum: 18446744073709551615 }
+        int256ToNum: { type: integer, maximum: 1e39 }
         arrayToMulti: { type: array }
         binaryToMulti: { type: string, contentEncoding: base64 }
         boolToMulti: { type: boolean }
-        intToMulti: { type: integer }
-        hugeIntToMulti: { type: integer, maximum: 18446744073709551615 }
-        intAndStringToMulti: { type: [integer, string], format: integer }
+        int64ToMulti: { type: integer }
+        int128ToMulti: { type: integer, maximum: 18446744073709551615 }
+        int256ToMulti: { type: integer, maximum: 1e39 }
+        int64AndStringToMulti: { type: [integer, string], format: integer }
         numToMulti: { type: number }
         numAndStringToMulti: { type: [number, string], format: number }
         objectToMulti: { type: object }
         stringToMulti: { type: string }
         binaryToString: { type: string, contentEncoding: base64 }
-        intToString: { type: string, format: integer }
-        hugeIntToString: { type: string, format: integer, maximum: 18446744073709551615, maxLength: 19 }
+        int64ToString: { type: string, format: integer }
+        int128ToString: { type: string, format: integer, maximum: 18446744073709551615, maxLength: 19 }
+        int256ToString: { type: string, format: integer, maxLength: 39 }
         numToString: { type: string, format: number }
         dateToString: { type: string, format: date }
         datetimeToString: { type: string, format: date-time }

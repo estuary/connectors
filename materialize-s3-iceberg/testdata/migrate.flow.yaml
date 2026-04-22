@@ -16,8 +16,8 @@ materializations:
       fields:
         recommended: true
         exclude:
-          - hugeIntToMulti
-          - hugeIntToNum
-          - hugeIntToString
-          - bigIntToHugeInt
+          - int128ToMulti
+          - int128ToNum
+          - int128ToString
+          - int64ToInt128
           - uint64ToString
