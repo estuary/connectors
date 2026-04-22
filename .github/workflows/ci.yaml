@@ -107,7 +107,6 @@ jobs:
           - materialize-azure-fabric-warehouse
           - materialize-bigquery
           - materialize-clickhouse
-          - materialize-cratedb
           - materialize-databricks
           - materialize-dynamodb
           - materialize-elasticsearch
