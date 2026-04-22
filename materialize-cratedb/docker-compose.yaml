@@ -1,6 +1,6 @@
 services:
   cratedb:
-    image: crate:latest
+    image: crate:6.2
     ports:
       - "4200:4200"
       - "5432:5432"
@@ -8,6 +8,11 @@ services:
       - flow-test
     environment:
       - CRATE_HEAP_SIZE=2g
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4200/"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
     deploy:
       resources:
         limits:
@@ -16,3 +21,4 @@ networks:
   flow-test:
     name: flow-test
     external: true
+

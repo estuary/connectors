@@ -2,8 +2,8 @@ package main
 
 import (
 	"context"
+	stdsql "database/sql"
 	"fmt"
-	"os/exec"
 	"strings"
 	"testing"
 
@@ -22,14 +22,34 @@ func testConfig() config {
 		Schema:   "doc",
 		Advanced: advancedConfig{
 			FeatureFlags: "allow_existing_tables_for_new_bindings",
+			SSLMode:      "disable",
 		},
 	}
+}
+
+// TestConnection proves the client can connect and run a query against CrateDB.
+// It intentionally avoids db.PingContext, which pgx reports as "bad connection"
+// against CrateDB even though normal Exec/Query calls work.
+func TestConnection(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping test in short mode")
+	}
+	ensureDockerUp(t)
+
+	db, err := stdsql.Open("pgx", testConfig().ToURI())
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+
+	var got int
+	require.NoError(t, db.QueryRowContext(context.Background(), "SELECT 1").Scan(&got))
+	require.Equal(t, 1, got)
 }
 
 func TestIntegration(t *testing.T) {
 	if testing.Short() {
 		t.Skip()
 	}
+	ensureDockerUp(t)
 
 	makeResourceFn := func(table string, delta bool) tableConfig {
 		return tableConfig{
@@ -37,11 +57,6 @@ func TestIntegration(t *testing.T) {
 			Delta: delta,
 		}
 	}
-
-	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
-	t.Cleanup(func() {
-		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
-	})
 
 	t.Run("materialize", func(t *testing.T) {
 		sql.RunMaterializationTest(t, newPostgresDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
@@ -77,6 +92,7 @@ func TestPrereqs(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping test in short mode")
 	}
+	ensureDockerUp(t)
 
 	cfg := testConfig()
 

@@ -1,0 +1,126 @@
+Task: acmeCo/tests/materialize-cratedb
+
+Resource: doc.simple_standard
+["applied.actionDescription", "\nCREATE TABLE IF NOT EXISTS doc.flow_checkpoints_v1 (\n\t\tmaterialization TEXT,\n\t\tkey_begin BIGINT,\n\t\tkey_end BIGINT,\n\t\tfence BIGINT,\n\t\tcheckpoint TEXT,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\n\n\n\nCREATE TABLE IF NOT EXISTS doc.simple_standard (\n\t\tid BIGINT,\n\t\t\"__meta/op\" TEXT,\n\t\tcanary TEXT,\n\t\tflow_published_at TIMESTAMP WITH TIME ZONE,\n\t\tval BIGINT,\n\t\tflow_document OBJECT,\n\n\t\tPRIMARY KEY (id)\n);\n\n\n\nCREATE TABLE IF NOT EXISTS doc.simple_delta (\n\t\tid BIGINT,\n\t\t\"__meta/op\" TEXT,\n\t\tcanary TEXT,\n\t\tflow_published_at TIMESTAMP WITH TIME ZONE,\n\t\tval BIGINT\n);\n\n\n\nCREATE TABLE IF NOT EXISTS doc.data_types (\n\t\tid BIGINT,\n\t\t\"arrayField\" TEXT,\n\t\t\"boolField\" BOOLEAN,\n\t\tflow_published_at TIMESTAMP WITH TIME ZONE,\n\t\t\"intField\" BIGINT,\n\t\t\"multipleField\" OBJECT,\n\t\t\"numField\" DOUBLE PRECISION,\n\t\t\"objField\" OBJECT,\n\t\t\"stringAndIntegerField\" NUMERIC(18, 0),\n\t\t\"stringAndNumberField\" DOUBLE PRECISION,\n\t\t\"stringDateField\" TIMESTAMP WITH TIME ZONE,\n\t\t\"stringDateTimeField\" TIMESTAMP WITH TIME ZONE,\n\t\t\"stringEmailField\" TEXT,\n\t\t\"stringField\" TEXT,\n\t\t\"stringHostnameField\" TEXT,\n\t\t\"stringIntegerField\" NUMERIC(18, 0),\n\t\t\"stringIpv4Field\" IP,\n\t\t\"stringIpv6Field\" IP,\n\t\t\"stringIriField\" TEXT,\n\t\t\"stringIriReferenceField\" TEXT,\n\t\t\"stringJsonPointerField\" TEXT,\n\t\t\"stringMacAddr8Field\" TEXT,\n\t\t\"stringMacAddrField\" TEXT,\n\t\t\"stringNumberField\" DOUBLE PRECISION,\n\t\t\"stringRegexField\" TEXT,\n\t\t\"stringRelativeJsonPointerField\" TEXT,\n\t\t\"stringTimeField\" TEXT,\n\t\t\"stringUint32Field\" NUMERIC(18, 0),\n\t\t\"stringUriField\" TEXT,\n\t\t\"stringUriReferenceField\" TEXT,\n\t\t\"stringUriTemplateField\" TEXT,\n\t\t\"stringUuidField\" TEXT,\n\t\tflow_document OBJECT,\n\n\t\tPRIMARY KEY (id)\n);\n\n"]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{"updated":{}}]
+
+{"Name":"__meta/op","Nullable":true,"Type":"text"}
+{"Name":"canary","Nullable":true,"Type":"text"}
+{"Name":"flow_document","Nullable":true,"Type":"object"}
+{"Name":"flow_document['_meta']","Nullable":true,"Type":"object"}
+{"Name":"flow_document['_meta']['op']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['_meta']['uuid']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['canary']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['id']","Nullable":true,"Type":"bigint"}
+{"Name":"flow_document['val']","Nullable":true,"Type":"bigint"}
+{"Name":"flow_published_at","Nullable":true,"Type":"timestamp with time zone"}
+{"Name":"id","Nullable":false,"Type":"bigint"}
+{"Name":"val","Nullable":true,"Type":"bigint"}
+
+Table Data:
+
+Resource: doc.simple_delta
+["applied.actionDescription", "\nCREATE TABLE IF NOT EXISTS doc.flow_checkpoints_v1 (\n\t\tmaterialization TEXT,\n\t\tkey_begin BIGINT,\n\t\tkey_end BIGINT,\n\t\tfence BIGINT,\n\t\tcheckpoint TEXT,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\n\n\n\nCREATE TABLE IF NOT EXISTS doc.simple_standard (\n\t\tid BIGINT,\n\t\t\"__meta/op\" TEXT,\n\t\tcanary TEXT,\n\t\tflow_published_at TIMESTAMP WITH TIME ZONE,\n\t\tval BIGINT,\n\t\tflow_document OBJECT,\n\n\t\tPRIMARY KEY (id)\n);\n\n\n\nCREATE TABLE IF NOT EXISTS doc.simple_delta (\n\t\tid BIGINT,\n\t\t\"__meta/op\" TEXT,\n\t\tcanary TEXT,\n\t\tflow_published_at TIMESTAMP WITH TIME ZONE,\n\t\tval BIGINT\n);\n\n\n\nCREATE TABLE IF NOT EXISTS doc.data_types (\n\t\tid BIGINT,\n\t\t\"arrayField\" TEXT,\n\t\t\"boolField\" BOOLEAN,\n\t\tflow_published_at TIMESTAMP WITH TIME ZONE,\n\t\t\"intField\" BIGINT,\n\t\t\"multipleField\" OBJECT,\n\t\t\"numField\" DOUBLE PRECISION,\n\t\t\"objField\" OBJECT,\n\t\t\"stringAndIntegerField\" NUMERIC(18, 0),\n\t\t\"stringAndNumberField\" DOUBLE PRECISION,\n\t\t\"stringDateField\" TIMESTAMP WITH TIME ZONE,\n\t\t\"stringDateTimeField\" TIMESTAMP WITH TIME ZONE,\n\t\t\"stringEmailField\" TEXT,\n\t\t\"stringField\" TEXT,\n\t\t\"stringHostnameField\" TEXT,\n\t\t\"stringIntegerField\" NUMERIC(18, 0),\n\t\t\"stringIpv4Field\" IP,\n\t\t\"stringIpv6Field\" IP,\n\t\t\"stringIriField\" TEXT,\n\t\t\"stringIriReferenceField\" TEXT,\n\t\t\"stringJsonPointerField\" TEXT,\n\t\t\"stringMacAddr8Field\" TEXT,\n\t\t\"stringMacAddrField\" TEXT,\n\t\t\"stringNumberField\" DOUBLE PRECISION,\n\t\t\"stringRegexField\" TEXT,\n\t\t\"stringRelativeJsonPointerField\" TEXT,\n\t\t\"stringTimeField\" TEXT,\n\t\t\"stringUint32Field\" NUMERIC(18, 0),\n\t\t\"stringUriField\" TEXT,\n\t\t\"stringUriReferenceField\" TEXT,\n\t\t\"stringUriTemplateField\" TEXT,\n\t\t\"stringUuidField\" TEXT,\n\t\tflow_document OBJECT,\n\n\t\tPRIMARY KEY (id)\n);\n\n"]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{"updated":{}}]
+
+{"Name":"__meta/op","Nullable":true,"Type":"text"}
+{"Name":"canary","Nullable":true,"Type":"text"}
+{"Name":"flow_published_at","Nullable":true,"Type":"timestamp with time zone"}
+{"Name":"id","Nullable":true,"Type":"bigint"}
+{"Name":"val","Nullable":true,"Type":"bigint"}
+
+Table Data:
+
+Resource: doc.data_types
+["applied.actionDescription", "\nCREATE TABLE IF NOT EXISTS doc.flow_checkpoints_v1 (\n\t\tmaterialization TEXT,\n\t\tkey_begin BIGINT,\n\t\tkey_end BIGINT,\n\t\tfence BIGINT,\n\t\tcheckpoint TEXT,\n\n\t\tPRIMARY KEY (materialization, key_begin, key_end)\n);\n\n\n\nCREATE TABLE IF NOT EXISTS doc.simple_standard (\n\t\tid BIGINT,\n\t\t\"__meta/op\" TEXT,\n\t\tcanary TEXT,\n\t\tflow_published_at TIMESTAMP WITH TIME ZONE,\n\t\tval BIGINT,\n\t\tflow_document OBJECT,\n\n\t\tPRIMARY KEY (id)\n);\n\n\n\nCREATE TABLE IF NOT EXISTS doc.simple_delta (\n\t\tid BIGINT,\n\t\t\"__meta/op\" TEXT,\n\t\tcanary TEXT,\n\t\tflow_published_at TIMESTAMP WITH TIME ZONE,\n\t\tval BIGINT\n);\n\n\n\nCREATE TABLE IF NOT EXISTS doc.data_types (\n\t\tid BIGINT,\n\t\t\"arrayField\" TEXT,\n\t\t\"boolField\" BOOLEAN,\n\t\tflow_published_at TIMESTAMP WITH TIME ZONE,\n\t\t\"intField\" BIGINT,\n\t\t\"multipleField\" OBJECT,\n\t\t\"numField\" DOUBLE PRECISION,\n\t\t\"objField\" OBJECT,\n\t\t\"stringAndIntegerField\" NUMERIC(18, 0),\n\t\t\"stringAndNumberField\" DOUBLE PRECISION,\n\t\t\"stringDateField\" TIMESTAMP WITH TIME ZONE,\n\t\t\"stringDateTimeField\" TIMESTAMP WITH TIME ZONE,\n\t\t\"stringEmailField\" TEXT,\n\t\t\"stringField\" TEXT,\n\t\t\"stringHostnameField\" TEXT,\n\t\t\"stringIntegerField\" NUMERIC(18, 0),\n\t\t\"stringIpv4Field\" IP,\n\t\t\"stringIpv6Field\" IP,\n\t\t\"stringIriField\" TEXT,\n\t\t\"stringIriReferenceField\" TEXT,\n\t\t\"stringJsonPointerField\" TEXT,\n\t\t\"stringMacAddr8Field\" TEXT,\n\t\t\"stringMacAddrField\" TEXT,\n\t\t\"stringNumberField\" DOUBLE PRECISION,\n\t\t\"stringRegexField\" TEXT,\n\t\t\"stringRelativeJsonPointerField\" TEXT,\n\t\t\"stringTimeField\" TEXT,\n\t\t\"stringUint32Field\" NUMERIC(18, 0),\n\t\t\"stringUriField\" TEXT,\n\t\t\"stringUriReferenceField\" TEXT,\n\t\t\"stringUriTemplateField\" TEXT,\n\t\t\"stringUuidField\" TEXT,\n\t\tflow_document OBJECT,\n\n\t\tPRIMARY KEY (id)\n);\n\n"]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{"updated":{}}]
+
+{"Name":"arrayField","Nullable":true,"Type":"text"}
+{"Name":"boolField","Nullable":true,"Type":"boolean"}
+{"Name":"flow_document","Nullable":true,"Type":"object"}
+{"Name":"flow_document['_meta']","Nullable":true,"Type":"object"}
+{"Name":"flow_document['_meta']['uuid']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['arrayField']","Nullable":true,"Type":"text_array"}
+{"Name":"flow_document['boolField']","Nullable":true,"Type":"boolean"}
+{"Name":"flow_document['id']","Nullable":true,"Type":"bigint"}
+{"Name":"flow_document['intField']","Nullable":true,"Type":"bigint"}
+{"Name":"flow_document['multipleField']","Nullable":true,"Type":"bigint"}
+{"Name":"flow_document['nullField']","Nullable":true,"Type":"undefined"}
+{"Name":"flow_document['numField']","Nullable":true,"Type":"bigint"}
+{"Name":"flow_document['objField']","Nullable":true,"Type":"object"}
+{"Name":"flow_document['objField']['timestamp']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['objField']['updated']","Nullable":true,"Type":"boolean"}
+{"Name":"flow_document['stringAndIntegerField']","Nullable":true,"Type":"double precision"}
+{"Name":"flow_document['stringAndNumberField']","Nullable":true,"Type":"double precision"}
+{"Name":"flow_document['stringDateField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringDateTimeField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringDurationField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringEmailField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringHostnameField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringIntegerField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringIpv4Field']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringIpv6Field']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringIriField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringIriReferenceField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringJsonPointerField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringMacAddr8Field']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringMacAddrField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringNumberField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringRegexField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringRelativeJsonPointerField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringTimeField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringUint32Field']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringUint64Field']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringUriField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringUriReferenceField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringUriTemplateField']","Nullable":true,"Type":"text"}
+{"Name":"flow_document['stringUuidField']","Nullable":true,"Type":"text"}
+{"Name":"flow_published_at","Nullable":true,"Type":"timestamp with time zone"}
+{"Name":"id","Nullable":false,"Type":"bigint"}
+{"Name":"intField","Nullable":true,"Type":"bigint"}
+{"Name":"multipleField","Nullable":true,"Type":"object"}
+{"Name":"numField","Nullable":true,"Type":"double precision"}
+{"Name":"objField","Nullable":true,"Type":"object"}
+{"Name":"objField['timestamp']","Nullable":true,"Type":"text"}
+{"Name":"objField['updated']","Nullable":true,"Type":"boolean"}
+{"Name":"stringAndIntegerField","Nullable":true,"Type":"numeric"}
+{"Name":"stringAndNumberField","Nullable":true,"Type":"double precision"}
+{"Name":"stringDateField","Nullable":true,"Type":"timestamp with time zone"}
+{"Name":"stringDateTimeField","Nullable":true,"Type":"timestamp with time zone"}
+{"Name":"stringEmailField","Nullable":true,"Type":"text"}
+{"Name":"stringField","Nullable":true,"Type":"text"}
+{"Name":"stringHostnameField","Nullable":true,"Type":"text"}
+{"Name":"stringIntegerField","Nullable":true,"Type":"numeric"}
+{"Name":"stringIpv4Field","Nullable":true,"Type":"ip"}
+{"Name":"stringIpv6Field","Nullable":true,"Type":"ip"}
+{"Name":"stringIriField","Nullable":true,"Type":"text"}
+{"Name":"stringIriReferenceField","Nullable":true,"Type":"text"}
+{"Name":"stringJsonPointerField","Nullable":true,"Type":"text"}
+{"Name":"stringMacAddr8Field","Nullable":true,"Type":"text"}
+{"Name":"stringMacAddrField","Nullable":true,"Type":"text"}
+{"Name":"stringNumberField","Nullable":true,"Type":"double precision"}
+{"Name":"stringRegexField","Nullable":true,"Type":"text"}
+{"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"text"}
+{"Name":"stringTimeField","Nullable":true,"Type":"text"}
+{"Name":"stringUint32Field","Nullable":true,"Type":"numeric"}
+{"Name":"stringUriField","Nullable":true,"Type":"text"}
+{"Name":"stringUriReferenceField","Nullable":true,"Type":"text"}
+{"Name":"stringUriTemplateField","Nullable":true,"Type":"text"}
+{"Name":"stringUuidField","Nullable":true,"Type":"text"}
+
+Table Data:
+
+
