@@ -1,2 +1,0 @@
-postgres://will:secret1234@example.com:5432/somedb?sslmode=verify-full
-config valid
