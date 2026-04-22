@@ -13,7 +13,7 @@ orjson = "^3.9.7"
 python = "<3.12,>=3.11"
 requests = "^2.31.0"
 types-requests = "^2.31"
-pytest = "^7.4.3"
+pytest = ">=7.4.3,<10.0.0"
 pydantic = "^1.10" # Airbyte depends on pydantic v1
 
 [build-system]
