@@ -105,6 +105,7 @@
           "card_types": [
             "AMERICAN_EXPRESS",
             "DISCOVER",
+            "JCB",
             "MASTERCARD",
             "VISA"
           ],
