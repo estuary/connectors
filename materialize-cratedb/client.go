@@ -53,17 +53,12 @@ func preReqs(ctx context.Context, conf config) *cerrors.PrereqErr {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
 
-	// Fixme (CrateDB - Ivan): We early return here on purpose to avoid the
-	// db.PingContext below, for some reason it quickly returns
-	// bad connection. We should probably look it up.
-	return errs
-
-	if err := db.PingContext(ctx); err != nil {
+	if _, err = db.ExecContext(ctx, "SELECT 1"); err != nil {
 		// Provide a more user-friendly representation of some common error causes.
 		var pgErr *pgconn.ConnectError
 		if errors.As(err, &pgErr) {
 			err = pgErr.Unwrap()
-			if errStr := err.Error(); strings.Contains(errStr, "(SQLSTATE 28P01)") {
+			if errStr := err.Error(); strings.Contains(errStr, "(SQLSTATE 28000)") {
 				err = fmt.Errorf("incorrect username or password")
 			} else if strings.Contains(errStr, "(SQLSTATE 3D000") {
 				err = fmt.Errorf("database %q does not exist", cfg.Database)
@@ -179,7 +174,28 @@ func (c *client) ListSchemas(ctx context.Context) ([]string, error) {
 }
 
 func (c *client) ExecStatements(ctx context.Context, statements []string) error {
-	return sql.StdSQLExecStatements(ctx, c.db, statements)
+	// Similar to sql.StdSQLExecStatements but pings with "SELECT 1" instead of
+	// conn.PingContext(), which pgx implements as comment-only query "-- ping".
+	var conn, err = c.db.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("connecting to DB: %w", err)
+	}
+	defer func() {
+		err = conn.Close()
+	}()
+
+	if _, err = conn.ExecContext(ctx, "SELECT 1"); err != nil {
+		return fmt.Errorf("ping DB: %w", err)
+	}
+
+	for _, statement := range statements {
+		if _, err := conn.ExecContext(ctx, statement); err != nil {
+			return fmt.Errorf("executing statement (%s): %w", statement, err)
+		}
+		log.WithField("sql", statement).Debug("executed statement")
+	}
+
+	return err
 }
 
 func (c *client) InstallFence(ctx context.Context, checkpoints sql.Table, fence sql.Fence) (sql.Fence, error) {

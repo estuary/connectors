@@ -6,3 +6,4 @@ schema: doc
 hardDelete: true
 advanced:
     feature_flags: allow_existing_tables_for_new_bindings
+    sslmode: disable

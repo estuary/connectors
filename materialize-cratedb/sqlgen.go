@@ -333,9 +333,10 @@ func extendPrefixBy(in string, prefix string, by int) string {
 // normalizeColumn Returns a normalized column name valid in CrateDB.
 // Current normalizations applied:
 // underscore: columns that start with an underscore are added an extra underscore: https://github.com/crate/cratedb-estuary/issues/13
+// dot: CrateDB rejects dots in column names even when quoted — replace with underscore.
 func normalizeColumn(column string) string {
 	column = extendPrefixBy(column, "_", 1)
-	// Apply more normalizations as needed here.
+	column = strings.ReplaceAll(column, ".", "_")
 	return column
 }
 
