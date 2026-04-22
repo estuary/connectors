@@ -111,7 +111,6 @@ jobs:
           - materialize-databricks
           - materialize-dynamodb
           - materialize-elasticsearch
-          - materialize-firebolt
           - materialize-gcs-csv
           - materialize-gcs-parquet
           - materialize-google-pubsub
@@ -328,7 +327,6 @@ jobs:
               "materialize-databricks",
               "materialize-dynamodb",
               "materialize-elasticsearch",
-              "materialize-firebolt",
               "materialize-google-sheets",
               "materialize-iceberg",
               "materialize-kafka",
