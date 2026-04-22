@@ -63,7 +63,7 @@ var crateDialect = func() sql.Dialect {
 				},
 			}),
 		},
-		//sql.WithNotNullText("NOT NULL"), CrateDB does not support dropping NOT NULL columns.
+		//sql.WithNotNullSuffix("NOT NULL"), CrateDB does not support dropping NOT NULL columns.
 	)
 
 	return sql.Dialect{

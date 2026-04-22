@@ -97,7 +97,7 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 				},
 			}),
 		},
-		sql.WithNotNullText("NOT NULL"),
+		sql.WithNotNullSuffix("NOT NULL"),
 	)
 
 	var nocast = sql.WithCastSQL(migrationIdentifier)
