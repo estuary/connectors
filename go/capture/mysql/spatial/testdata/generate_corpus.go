@@ -22,10 +22,10 @@ import (
 
 // TestCase represents a single test case in the corpus
 type TestCase struct {
-	InputWKT   string `json:"input_wkt"`
-	SRID       int    `json:"srid"`
+	InputWKT    string `json:"input_wkt"`
+	SRID        int    `json:"srid"`
 	InternalHex string `json:"internal_hex"`
-	OutputWKT  string `json:"output_wkt"`
+	OutputWKT   string `json:"output_wkt"`
 }
 
 func main() {
