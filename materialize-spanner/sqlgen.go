@@ -81,7 +81,7 @@ func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
 				},
 			}),
 		},
-		sql.WithNotNullText("NOT NULL"),
+		sql.WithNotNullSuffix("NOT NULL"),
 	)
 
 	return sql.Dialect{

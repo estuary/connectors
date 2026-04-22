@@ -140,7 +140,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 				},
 			}),
 		},
-		sql.WithNotNullText("NOT NULL"),
+		sql.WithNotNullSuffix("NOT NULL"),
 	)
 
 	var nocast = sql.WithCastSQL(migrationIdentifier)

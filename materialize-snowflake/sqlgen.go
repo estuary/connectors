@@ -111,7 +111,7 @@ var snowflakeDialect = func(configSchema string, timestampType snowflakeTimestam
 				},
 			}),
 		},
-		sql.WithNotNullText("NOT NULL"),
+		sql.WithNotNullSuffix("NOT NULL"),
 	)
 
 	translateIdentifier := func(in string) string {
