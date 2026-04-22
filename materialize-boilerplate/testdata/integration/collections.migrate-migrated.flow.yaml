@@ -5,27 +5,53 @@ collections:
       properties:
         id: { type: integer }
         int64ToNum: { type: number }
+        int64ToNumStr: { type: string, format: number }
         int64ToInt128: { type: integer, maximum: 18446744073709551615 }
         int64ToInt256: { type: integer, maximum: 1e39 }
+        int64ToIntStr64: { type: string, format: integer }
+        int64ToIntStr128: { type: string, format: integer, maximum: 18446744073709551615, maxLength: 19 }
+        int64ToIntStr256: { type: string, format: integer, maxLength: 39 }
         int128ToNum: { type: number }
+        int128ToNumStr: { type: string, format: number }
         int128ToInt256: { type: integer, maximum: 1e39 }
+        int128ToIntStr128: { type: string, format: integer, maximum: 18446744073709551615, maxLength: 19 }
+        int128ToIntStr256: { type: string, format: integer, maxLength: 39 }
         int256ToNum: { type: number }
+        int256ToNumStr: { type: string, format: number }
+        int256ToIntStr256: { type: string, format: integer, maxLength: 39 }
+        intStr64ToInt64: { type: integer }
+        intStr64ToInt128: { type: integer, maximum: 18446744073709551615 }
+        intStr64ToInt256: { type: integer, maximum: 1e39 }
+        intStr64ToIntStr128: { type: string, format: integer, maximum: 18446744073709551615, maxLength: 19 }
+        intStr64ToIntStr256: { type: string, format: integer, maxLength: 39 }
+        intStr64ToNum: { type: number }
+        intStr64ToNumStr: { type: string, format: number }
+        intStr128ToInt128: { type: integer, maximum: 18446744073709551615 }
+        intStr128ToInt256: { type: integer, maximum: 1e39 }
+        intStr128ToIntStr256: { type: string, format: integer, maxLength: 39 }
+        intStr128ToNum: { type: number }
+        intStr128ToNumStr: { type: string, format: number }
+        intStr256ToInt256: { type: integer, maximum: 1e39 }
+        intStr256ToNum: { type: number }
+        intStr256ToNumStr: { type: string, format: number }
+        numToNumStr: { type: string, format: number }
+        numStrToNum: { type: number }
         arrayToMulti: { type: [array, boolean] }
         binaryToMulti: { type: [string, boolean], contentEncoding: base64 }
         boolToMulti: { type: [boolean, string] }
         int64ToMulti: { type: [integer, boolean] }
         int128ToMulti: { type: [integer, boolean], maximum: 18446744073709551615 }
         int256ToMulti: { type: [integer, boolean], maximum: 1e39 }
-        int64AndStringToMulti: { type: [integer, string] }
+        intStr64UnionToMulti: { type: [integer, string] }
         numToMulti: { type: [number, boolean] }
-        numAndStringToMulti: { type: [number, string] }
+        numStrUnionToMulti: { type: [number, string] }
         objectToMulti: { type: [object, boolean] }
         stringToMulti: { type: [string, boolean] }
         binaryToString: { type: string }
-        int64ToString: { type: string }
-        int128ToString: { type: string, maxLength: 19 }
-        int256ToString: { type: string }
-        numToString: { type: string }
+        intStr64ToString: { type: string }
+        intStr128ToString: { type: string, maxLength: 19 }
+        intStr256ToString: { type: string }
+        numStrToString: { type: string }
         dateToString: { type: string }
         datetimeToString: { type: string }
         timeToString: { type: string }
@@ -39,7 +65,7 @@ collections:
         hostnameToString: { type: string }
         uriToString: { type: string }
         uriReferenceToString: { type: string }
-        uriTemplateToString: { type: string } 
+        uriTemplateToString: { type: string }
         jsonPointerToString: { type: string }
         relativeJsonPointerToString: { type: string }
         regexToString: { type: string }

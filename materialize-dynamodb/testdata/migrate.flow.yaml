@@ -14,3 +14,5 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        exclude:
+          - intStr256ToString

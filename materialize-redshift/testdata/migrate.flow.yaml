@@ -14,3 +14,18 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        exclude:
+          - intStr64ToInt64
+          - intStr64ToInt128
+          - intStr64ToInt256
+          - intStr64ToNum
+          - intStr128ToInt128
+          - intStr128ToInt256
+          - intStr128ToNum
+          - intStr256ToInt256
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - int64ToNumStr
+          - int128ToNumStr
+          - int256ToNumStr
+          - numToNumStr
