@@ -27,9 +27,10 @@ import (
 )
 
 type tableConfig struct {
-	Table  string `json:"table" jsonschema_extras:"x-collection-name=true"`
-	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
-	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings" jsonschema_extras:"x-delta-updates=true"`
+	Table      string `json:"table" jsonschema_extras:"x-collection-name=true"`
+	Schema     string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
+	Delta      bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings" jsonschema_extras:"x-delta-updates=true"`
+	Clustering bool   `json:"clustering,omitempty" jsonschema:"title=Automatic Clustering,description=Enable Snowflake Automatic Clustering on this table using the collection key columns as the clustering key. Recommended only for large tables queried with selective filters on key columns. Consumes additional Snowflake credits." jsonschema_extras:"advanced=true"`
 
 	// If the endpoint schema is the same as the resource schema, the resource path will be only the
 	// table name. This is to provide compatibility for materializations that were created prior to
@@ -321,6 +322,10 @@ func newTransactor(
 		if err = d.addBinding(ctx, binding, featureFlags["snowpipe_streaming"]); err != nil {
 			return nil, fmt.Errorf("adding binding for %s: %w", binding.Path, err)
 		}
+	}
+
+	if err := d.syncClustering(ctx, bindings, open); err != nil {
+		return nil, fmt.Errorf("syncing clustering keys: %w", err)
 	}
 
 	go func() {
@@ -1267,6 +1272,96 @@ func clusteringKeyExpr(keys []sql.Column) string {
 		parts[i] = k.Identifier
 	}
 	return "(" + strings.Join(parts, ", ") + ")"
+}
+
+// queryCurrentClusterBy returns the current CLUSTER BY expression for a table,
+// or an empty string if the table has no clustering key.
+func queryCurrentClusterBy(ctx context.Context, db *stdsql.DB, schema, table string) (string, error) {
+	// SHOW TABLES LIKE returns a row with a "cluster_by" column.
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("SHOW TABLES LIKE '%s' IN SCHEMA %q;", table, schema))
+	if err != nil {
+		return "", fmt.Errorf("querying table clustering state: %w", err)
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return "", fmt.Errorf("getting columns: %w", err)
+	}
+
+	clusterByIdx := -1
+	for i, col := range cols {
+		if strings.EqualFold(col, "cluster_by") {
+			clusterByIdx = i
+			break
+		}
+	}
+	if clusterByIdx == -1 {
+		return "", nil
+	}
+
+	if !rows.Next() {
+		return "", nil
+	}
+
+	vals := make([]any, len(cols))
+	ptrs := make([]any, len(cols))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+	if err := rows.Scan(ptrs...); err != nil {
+		return "", fmt.Errorf("scanning table row: %w", err)
+	}
+
+	if v, ok := vals[clusterByIdx].(string); ok {
+		return v, nil
+	}
+	return "", nil
+}
+
+func (d *transactor) syncClustering(ctx context.Context, bindings []sql.Table, open pm.Request_Open) error {
+	for i, table := range bindings {
+		var rc tableConfig
+		if err := json.Unmarshal(open.Materialization.Bindings[i].ResourceConfigJson, &rc); err != nil {
+			return fmt.Errorf("parsing resource config for %s: %w", table.Identifier, err)
+		}
+
+		if rc.Clustering && len(table.Keys) > 0 {
+			keyExpr := clusteringKeyExpr(table.Keys)
+			stmt := fmt.Sprintf("ALTER TABLE %s CLUSTER BY %s;", table.Identifier, keyExpr)
+			if _, err := d.db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("enabling clustering on %s: %w", table.Identifier, err)
+			}
+			log.WithFields(log.Fields{
+				"table":          table.Identifier,
+				"clustering_key": keyExpr,
+			}).Info("enabled automatic clustering")
+		} else if rc.Clustering && len(table.Keys) == 0 {
+			log.WithFields(log.Fields{
+				"table": table.Identifier,
+			}).Warn("clustering requested but table has no key columns; skipping")
+		} else if !rc.Clustering {
+			loc := d.ep.Dialect.TableLocator(table.Path)
+			currentClusterBy, err := queryCurrentClusterBy(ctx, d.db, loc.TableSchema, loc.TableName)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"table": table.Identifier,
+				}).WithError(err).Warn("could not check current clustering state")
+				continue
+			}
+			if currentClusterBy != "" {
+				stmt := fmt.Sprintf("ALTER TABLE %s DROP CLUSTERING KEY;", table.Identifier)
+				if _, err := d.db.ExecContext(ctx, stmt); err != nil {
+					return fmt.Errorf("dropping clustering key on %s: %w", table.Identifier, err)
+				}
+				log.WithFields(log.Fields{
+					"table":              table.Identifier,
+					"previous_cluster_by": currentClusterBy,
+				}).Info("dropped clustering key")
+			}
+		}
+	}
+	return nil
 }
 
 func (d *transactor) logAllClusteringInfo(ctx context.Context) {
