@@ -290,6 +290,12 @@
         "title": "Delta Updates",
         "description": "Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings",
         "x-delta-updates": true
+      },
+      "clustering": {
+        "type": "boolean",
+        "title": "Automatic Clustering",
+        "description": "Enable Snowflake Automatic Clustering on this table using the collection key columns as the clustering key. Recommended only for large tables queried with selective filters on key columns. Consumes additional Snowflake credits.",
+        "advanced": true
       }
     },
     "type": "object",
