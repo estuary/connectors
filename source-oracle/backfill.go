@@ -324,15 +324,16 @@ func (db *oracleDatabase) fetchBackfillRowIDRange(ctx context.Context, schemaNam
 	return nil
 }
 
-// The set of column types for which we need to specify `COLLATE BINARY` to get
+// The set of column types for which we need to use `NLSSORT` with binary sorting to get
 // proper ordering and comparison. Represented as a map[string]bool so that it can be
 // combined with the "is the column typename a string" check into one if statement.
-// See https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/COLLATE-Operator.html
+// See https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/NLSSORT.html
 var columnBinaryKeyComparison = map[string]bool{
-	"varchar2": true,
 	"char":     true,
-	"nvarchar": true,
 	"nchar":    true,
+	"nvarchar2": true,
+	"varchar": true,
+	"varchar2": true,
 }
 
 // render a "cast" expression for a column so that we can cast it to the
@@ -438,24 +439,31 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 	var pkey []string
 	var args []string
 	for idx, colName := range keyColumns {
-		var quotedName = quoteColumnName(colName)
+		quotedName := quoteColumnName(colName)
+		arg := fmt.Sprintf(":p%d", idx+1)
 		// If a precise backfill is requested *and* the column type requires binary ordering for precise
-		// backfill comparisons to work, add the 'COLLATE BINARY' qualifier to the column name.
-		if columnTypes[colName].JsonType == "string" && columnBinaryKeyComparison[colName] {
-			pkey = append(pkey, quotedName+" COLLATE BINARY")
+		// backfill comparisons to work, use NLSSORT with binary sorting so that comparisons
+		// and ordering are consistent regardless of database NLS settings. NLSSORT is used
+		// instead of the COLLATE operator for compatibility with Oracle 11g.
+		colType := strings.ToLower(columnTypes[colName].Original)
+		if columnTypes[colName].JsonType == "string" && columnBinaryKeyComparison[colType] {
+			pkey = append(pkey, fmt.Sprintf("NLSSORT(%s, 'NLS_SORT=BINARY')", quotedName))
+			arg = fmt.Sprintf("NLSSORT(%s, 'NLS_SORT=BINARY')", arg)
 		} else {
 			pkey = append(pkey, quotedName)
 		}
-		args = append(args, fmt.Sprintf(":p%d", idx+1))
+		args = append(args, arg)
 	}
 
-	// Construct the query itself
-	var query = new(strings.Builder)
+	// Construct the query itself. A ROWNUM wrapper is used instead of FETCH NEXT
+	// for compatibility with Oracle 11g. The subquery is important: ROWNUM is applied
+	// on the outer query so that the inner query's ORDER BY executes first.
+	query := new(strings.Builder)
 	var columnSelect []string
 	for _, col := range info.Columns {
 		columnSelect = append(columnSelect, castColumn(col))
 	}
-	fmt.Fprintf(query, `SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
+	fmt.Fprintf(query, `SELECT * FROM (SELECT ROWID, %s FROM "%s"."%s"`, strings.Join(columnSelect, ","), schemaName, tableName)
 	if !start {
 		for i := 0; i != len(pkey); i++ {
 			if i == 0 {
@@ -472,7 +480,7 @@ func (db *oracleDatabase) buildScanQuery(start bool, info *sqlcapture.DiscoveryI
 		fmt.Fprintf(query, ")")
 	}
 	fmt.Fprintf(query, " ORDER BY %s ASC", strings.Join(pkey, ", "))
-	fmt.Fprintf(query, ` FETCH NEXT %d ROWS ONLY`, db.config.Advanced.BackfillChunkSize)
+	fmt.Fprintf(query, `) WHERE ROWNUM <= %d`, db.config.Advanced.BackfillChunkSize)
 	return query.String()
 }
 
