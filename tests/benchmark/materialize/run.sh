@@ -79,19 +79,14 @@ fi
   exit 2
 }
 
-# Ensure the connector is available in the selected mode.
+# Always rebuild the connector so each run picks up the latest code.
 if (( DOCKER )); then
-  IMAGE="ghcr.io/estuary/${CONNECTOR}:local"
-  if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
-    echo "image $IMAGE not found; building with build-local.sh"
-    (cd "$ROOT_DIR" && ./build-local.sh "$CONNECTOR")
-  fi
+  echo "building docker image for $CONNECTOR"
+  (cd "$ROOT_DIR" && ./build-local.sh "$CONNECTOR")
 else
   CONNECTOR_BIN="$ROOT_DIR/$CONNECTOR/connector"
-  if [[ ! -x "$CONNECTOR_BIN" ]]; then
-    echo "building connector binary: $CONNECTOR_BIN"
-    (cd "$ROOT_DIR" && go build -v -tags nozstd -o "$CONNECTOR_BIN" ./$CONNECTOR/...)
-  fi
+  echo "building connector binary: $CONNECTOR_BIN"
+  (cd "$ROOT_DIR" && go build -v -tags nozstd -o "$CONNECTOR_BIN" ./$CONNECTOR/...)
 fi
 
 # Output directory.
