@@ -79,10 +79,15 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
 	}
 
+	binaryMapping := sql.MapStatic("STRING")
+	if featureFlags["native_binary_column_type"] {
+		binaryMapping = sql.MapStatic("BYTES")
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:   objAndArrayCol,
-			sql.BINARY:  sql.MapStatic("STRING"),
+			sql.BINARY:  binaryMapping,
 			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("INTEGER"),
@@ -262,6 +267,8 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 	CAST({{ $ident }} AS STRING)
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E*SZ', {{ $ident }}, 'UTC')
+{{- else if eq $.AsFlatType "binary" -}}
+	TO_BASE64({{ $ident }})
 {{- else -}}
 	{{ $ident }}
 {{- end -}}

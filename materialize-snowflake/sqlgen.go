@@ -88,10 +88,15 @@ var snowflakeDialect = func(configSchema string, timestampType snowflakeTimestam
 		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
 	}
 
+	binaryMapping := sql.MapStatic("TEXT")
+	if featureFlags["native_binary_column_type"] {
+		binaryMapping = sql.MapStatic("BINARY", sql.AlsoCompatibleWith("varbinary"))
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:    sql.MapStatic("VARIANT", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.BINARY:   sql.MapStatic("TEXT"),
+			sql.BINARY:   binaryMapping,
 			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
 			sql.INTEGER:  sql.MapStatic("INTEGER", sql.AlsoCompatibleWith("fixed")),
 			sql.NUMBER:   sql.MapStatic("FLOAT", sql.AlsoCompatibleWith("real")),
@@ -258,7 +263,7 @@ SELECT {{ $.Table.Binding }}, TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Docume
 	JOIN (
 		SELECT {{ range $ind, $bound := $.Bounds }}
 		{{- if $ind }}, {{ end -}}
-		$1[{{$ind}}] AS {{$bound.Identifier -}}
+		{{ if IsBinary $bound }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$bound.Identifier -}}
 		{{- end }}
 		FROM {{ $.File }}
 	) AS r
@@ -284,13 +289,15 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 	TO_VARCHAR({{ $ident }}, 'YYYY-MM-DD')
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	TO_VARCHAR(CONVERT_TIMEZONE('UTC', {{ $ident }}), 'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')
+{{- else if eq $.AsFlatType "binary" -}}
+	BASE64_ENCODE({{ $ident }})
 {{- else -}}
 	{{ $ident }}
 {{- end -}}
 {{- end }}
 
 {{ define "loadQueryNoFlowDocument" }}
-SELECT {{ $.Table.Binding }}, 
+SELECT {{ $.Table.Binding }},
 OBJECT_CONSTRUCT_KEEP_NULL(
 {{- range $i, $col := $.Table.RootLevelColumns}}
 	{{- if $i}},{{end}}
@@ -301,7 +308,7 @@ FROM {{ $.Table.Identifier }}
 JOIN (
 	SELECT {{ range $ind, $bound := $.Bounds }}
 	{{- if $ind }}, {{ end -}}
-	$1[{{$ind}}] AS {{$bound.Identifier -}}
+	{{ if IsBinary $bound }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$bound.Identifier -}}
 	{{- end }}
 	FROM {{ $.File }}
 ) AS r
@@ -323,7 +330,7 @@ CREATE PIPE {{ $.PipeName }}
 ) FROM (
 	SELECT {{ range $ind, $key := $.Table.Columns }}
 	{{- if $ind }}, {{ end -}}
-	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
+	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if IsBinary $key }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}
 	FROM @flow_v1
 );
@@ -338,7 +345,7 @@ COPY INTO {{ $.Table.Identifier }} (
 ) FROM (
 	SELECT {{ range $ind, $key := $.Table.Columns }}
 	{{- if $ind }}, {{ end -}}
-	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
+	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if IsBinary $key }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}
 	FROM {{ $.File }}
 );
@@ -350,7 +357,7 @@ MERGE INTO {{ $.Table.Identifier }} AS l
 USING (
 	SELECT {{ range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
-		{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
+		{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if IsBinary $key }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}, $1[{{ len $.Table.Columns }}] AS _flow_delete
 	FROM {{ $.File }}
 ) AS r

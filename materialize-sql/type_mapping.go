@@ -17,6 +17,23 @@ import (
 // * Hoisting JSON `null` out of the type representation and into a separate orthogonal concern.
 type FlatType string
 
+// BinaryContentMediaType is the JSON Schema contentMediaType annotation that, in
+// combination with contentEncoding=base64, marks a string field as raw binary.
+const BinaryContentMediaType = "application/octet-stream"
+
+// isBinaryInference reports whether a string inference describes a raw binary
+// field. A field is treated as binary iff contentEncoding is base64 and
+// contentMediaType is either absent or application/octet-stream. A string with
+// contentEncoding=base64 but a different contentMediaType (e.g. a serialized
+// proto message) stays mapped as a string and can be handled via
+// StringMappings.WithContentType.
+func isBinaryInference(s *pf.Inference_String) bool {
+	if s == nil || s.ContentEncoding != "base64" {
+		return false
+	}
+	return s.ContentType == "" || s.ContentType == BinaryContentMediaType
+}
+
 // FlatType constants that are used by TypeMapper
 const (
 	ARRAY          FlatType = "array"
@@ -103,8 +120,7 @@ func (p *Projection) AsFlatType() (_ FlatType, mustExist bool) {
 	for _, ty := range p.Inference.Types {
 		switch ty {
 		case "string":
-
-			if p.Inference.String_.ContentEncoding == "base64" {
+			if isBinaryInference(p.Inference.String_) {
 				types = append(types, BINARY)
 			} else {
 				types = append(types, STRING)
@@ -360,13 +376,18 @@ type StringMappings struct {
 	// "date" or "date-time".
 	WithFormat map[string]MapProjectionFn
 	// WithContentType provides a mapping function for string fields that have a
-	// matching Content-Type annotation. As an example, this is occasionally
-	// used by materializations for creating a special column type for the
-	// "checkpoints" column, since that field has a specific Content-Type set.
+	// matching Content-Type annotation (corresponds to JSON Schema's
+	// contentMediaType). As an example, this is occasionally used by
+	// materializations for creating a special column type for the "checkpoints"
+	// column, since that field has a specific Content-Type set.
 	//
-	// Content-Type is different than Content-Encoding. The only
-	// Content-Encoding that is currently handled is base64, and that will
-	// create a BINARY flat type that should be handled like other flat types.
+	// Content-Type is different than Content-Encoding. A field is routed to the
+	// BINARY flat type (not to this map) when contentEncoding=base64 AND
+	// contentMediaType is either empty or application/octet-stream. Content
+	// types registered here are expected to be something other than
+	// application/octet-stream; if both base64 encoding and a non-octet-stream
+	// media type are present, the field is still a string and flows through
+	// this map.
 	WithContentType map[string]MapProjectionFn
 }
 

@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -190,3 +191,24 @@ var ClampDate ElementConverter = StringCastConverter(func(str string) (interface
 	}
 	return str, nil
 })
+
+// Base64Decoder decodes a base64-encoded tuple element into raw bytes. It is
+// used by materializations that store binary fields in native byte-typed
+// columns and bind the decoded bytes directly to their driver, rather than
+// decoding via SQL on the server side.
+var Base64Decoder ElementConverter = func(te tuple.TupleElement) (any, error) {
+	switch v := te.(type) {
+	case nil:
+		return nil, nil
+	case []byte:
+		return base64.StdEncoding.DecodeString(string(v))
+	case string:
+		return base64.StdEncoding.DecodeString(v)
+	case json.RawMessage:
+		// A base64 value that arrives through a json.RawMessage is still
+		// wrapped in JSON string quotes.
+		return base64.StdEncoding.DecodeString(strings.Trim(string(v), `"`))
+	default:
+		return nil, fmt.Errorf("Base64Decoder: unexpected value type %T", te)
+	}
+}

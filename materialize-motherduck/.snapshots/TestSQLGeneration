@@ -3,9 +3,9 @@
 CREATE TABLE IF NOT EXISTS db."a-schema".key_value (
 	key1 BIGINT NOT NULL,
 	key2 BOOLEAN NOT NULL,
-	"key!binary" VARCHAR NOT NULL,
+	"key!binary" BLOB NOT NULL,
 	"array" JSON,
-	"binary" VARCHAR,
+	"binary" BLOB,
 	"boolean" BOOLEAN,
 	field_with_projection VARCHAR,
 	flow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -59,12 +59,12 @@ JOIN read_json(
 	columns={
 		key1: 'BIGINT NOT NULL',
 		key2: 'BOOLEAN NOT NULL',
-		"key!binary": 'VARCHAR NOT NULL'
+		"key!binary": 'VARCHAR'
 	}
 ) AS r
 	 ON  l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	 AND l.key2 = r.key2
-	 AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='
+	 AND l."key!binary" = FROM_BASE64(r."key!binary") AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='
 --- End db."a-schema".key_value loadQuery ---
 
 --- Begin db."a-schema".key_value loadQueryNoFlowDocument ---                                                                                                                             
@@ -72,9 +72,9 @@ SELECT 0 AS binding,
 json_object(                                                                                                                                        
        'key1', l.key1,                                                                                                                                         
        'key2', l.key2,                                                                                                                                         
-       'key!binary', l."key!binary",                                                                                                                                         
+       'key!binary', TO_BASE64(l."key!binary"),                                                                                                                                         
        'array', l."array",                                                                                                                                         
-       'binary', l."binary",                                                                                                                                         
+       'binary', TO_BASE64(l."binary"),                                                                                                                                         
        'boolean', l."boolean",                                                                                                                                         
        'field_with_projection', l.field_with_projection,                                                                                                                                         
        'integer', l."integer",                                                                                                                                         
@@ -104,12 +104,12 @@ JOIN read_json(
        columns={                                                                                                                            
                key1: 'BIGINT NOT NULL',                                                                                                                            
                key2: 'BOOLEAN NOT NULL',                                                                                                                            
-               "key!binary": 'VARCHAR NOT NULL'                                                                                                                                                  
+               "key!binary": 'VARCHAR'                                                                                                                                                  
        }                                                                                                                                                           
 ) AS r                                                                                                                              
         ON  l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100                                                                                                                              
         AND l.key2 = r.key2                                                                                                                              
-        AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='                                                                                                                                                         
+        AND l."key!binary" = FROM_BASE64(r."key!binary") AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='                                                                                                                                                         
 --- End db."a-schema".key_value loadQueryNoFlowDocument ---
 
 --- Begin db."a-schema".key_value storeDeleteQuery ---
@@ -122,7 +122,7 @@ USING read_json(
 	columns={
 		key1: 'BIGINT NOT NULL',
 		key2: 'BOOLEAN NOT NULL',
-		"key!binary": 'VARCHAR NOT NULL',
+		"key!binary": 'VARCHAR',
 		"array": 'JSON',
 		"binary": 'VARCHAR',
 		"boolean": 'BOOLEAN',
@@ -151,12 +151,41 @@ USING read_json(
 ) AS r
 	 WHERE l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	 AND l.key2 = r.key2
-	 AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo=';
+	 AND l."key!binary" = FROM_BASE64(r."key!binary") AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo=';
 --- End db."a-schema".key_value storeDeleteQuery ---
 
 --- Begin db."a-schema".key_value storeQuery ---
-INSERT INTO db."a-schema".key_value BY NAME
-SELECT * EXCLUDE (_flow_delete) FROM read_json(
+INSERT INTO db."a-schema".key_value (key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document
+)
+SELECT
+		key1, 
+		key2, 
+		FROM_BASE64("key!binary"), 
+		"array", 
+		FROM_BASE64("binary"), 
+		"boolean", 
+		field_with_projection, 
+		flow_published_at, 
+		"integer", 
+		"integerGt128Bit", 
+		"integerGt256Bit", 
+		"integerGt64Bit", 
+		"integerWithUserDDL", 
+		multiple, 
+		"nonAsciiκόσμε", 
+		number, 
+		"numberCastToString", 
+		"object", 
+		string, 
+		"stringInteger", 
+		"stringInteger18Chars", 
+		"stringInteger38Chars", 
+		"stringInteger39Chars", 
+		"stringInteger66Chars", 
+		"stringInteger77Chars", 
+		"stringNumber", 
+		flow_document
+FROM read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
 	compression='gzip',
@@ -164,7 +193,7 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	columns={
 		key1: 'BIGINT NOT NULL',
 		key2: 'BOOLEAN NOT NULL',
-		"key!binary": 'VARCHAR NOT NULL',
+		"key!binary": 'VARCHAR',
 		"array": 'JSON',
 		"binary": 'VARCHAR',
 		"boolean": 'BOOLEAN',
@@ -195,8 +224,13 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 --- End db."a-schema".key_value storeQuery ---
 
 --- Begin db."a-schema".delta_updates storeQuery ---
-INSERT INTO db."a-schema".delta_updates BY NAME
-SELECT * EXCLUDE (_flow_delete) FROM read_json(
+INSERT INTO db."a-schema".delta_updates ("theKey", "aValue", flow_published_at
+)
+SELECT
+		"theKey", 
+		"aValue", 
+		flow_published_at
+FROM read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
 	compression='gzip',

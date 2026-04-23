@@ -23,6 +23,7 @@ import (
 var featureFlagDefaults = map[string]bool{
 	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
+	"native_binary_column_type":        true,
 }
 
 type config struct {

@@ -23,6 +23,101 @@ func (c ColumnWithAlias) Format() string {
 	return c.Inference.String_.Format
 }
 
+// IsBinary is a template helper that reports whether a column's flat type is
+// BINARY. Connectors use this to decide whether to wrap a column reference in
+// a base64-decoding SQL function when the column is stored as native bytes.
+// It accepts either a Column or a *Column to match either of the two shapes
+// the templating layer exposes (Table.Keys is []Column, Table.Columns() is
+// []*Column).
+func IsBinary(c any) bool {
+	var col Column
+	switch v := c.(type) {
+	case Column:
+		col = v
+	case *Column:
+		if v == nil {
+			return false
+		}
+		col = *v
+	case MergeBound:
+		col = v.Column
+	case *MergeBound:
+		if v == nil {
+			return false
+		}
+		col = v.Column
+	case ColumnWithAlias:
+		col = v.Column
+	default:
+		return false
+	}
+	ft, _ := col.AsFlatType()
+	return ft == BINARY
+}
+
+func toColumns(cols any) []Column {
+	switch v := cols.(type) {
+	case []Column:
+		return v
+	case []*Column:
+		out := make([]Column, 0, len(v))
+		for _, c := range v {
+			if c != nil {
+				out = append(out, *c)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+// HasBinary reports whether any of the provided columns has the BINARY flat
+// type. Template helper used to short-circuit load/insert SET clauses when no
+// binary decoding is required.
+func HasBinary(cols any) bool {
+	for _, c := range toColumns(cols) {
+		if IsBinary(c) {
+			return true
+		}
+	}
+	return false
+}
+
+// BinaryColumns returns only the columns whose flat type is BINARY, in order.
+// Template helper used to emit a LOAD DATA SET clause that decodes base64
+// variables into the native byte columns.
+func BinaryColumns(cols any) []Column {
+	var out []Column
+	for _, c := range toColumns(cols) {
+		if IsBinary(c) {
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// IndexedColumn pairs a column with its original position in the input slice.
+// Used by templates that need to emit both the positional column (e.g., a
+// @v_<i> user variable in MySQL LOAD DATA) and the source column reference in
+// a paired SET clause.
+type IndexedColumn struct {
+	Index  int
+	Column Column
+}
+
+// IndexedBinaryColumns returns the subset of cols that have the BINARY flat
+// type, each paired with its original position in cols.
+func IndexedBinaryColumns(cols any) []IndexedColumn {
+	var out []IndexedColumn
+	for i, c := range toColumns(cols) {
+		if IsBinary(c) {
+			out = append(out, IndexedColumn{Index: i, Column: c})
+		}
+	}
+	return out
+}
+
 // MustParseTemplate is a convenience which parses the template `body` and
 // installs common functions for accessing Dialect behavior.
 func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
@@ -44,6 +139,10 @@ func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
 		"ColumnWithAlias": func(c Column, alias string) ColumnWithAlias {
 			return ColumnWithAlias{Column: c, Alias: alias}
 		},
+		"IsBinary":             IsBinary,
+		"HasBinary":            HasBinary,
+		"BinaryColumns":        BinaryColumns,
+		"IndexedBinaryColumns": IndexedBinaryColumns,
 		"ChunkColumns": func(cols []*Column, size int) [][]*Column {
 			if size <= 0 {
 				return [][]*Column{cols}

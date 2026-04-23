@@ -34,6 +34,11 @@ func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
 		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
 	}
 
+	binaryMapping := sql.MapStatic("VARCHAR")
+	if featureFlags["native_binary_column_type"] {
+		binaryMapping = sql.MapStatic("BLOB")
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -44,7 +49,7 @@ func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
 			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
 			sql.OBJECT:   sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.ARRAY:    sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.BINARY:   sql.MapStatic("VARCHAR"),
+			sql.BINARY:   binaryMapping,
 			sql.MULTIPLE: sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("HUGEINT", sql.UsingConverter(sql.StrToInt)),
@@ -163,13 +168,13 @@ JOIN read_json(
 	columns={
 	{{- range $ind, $bound := $.Bounds }}
 		{{- if $ind }},{{ end }}
-		{{$bound.Identifier}}: '{{$bound.DDL}}'
+		{{$bound.Identifier}}: '{{ if IsBinary $bound }}VARCHAR{{ else }}{{$bound.DDL}}{{ end }}'
 	{{- end }}
 	}
 ) AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	l.{{ $bound.Identifier }} = {{ if IsBinary $bound }}FROM_BASE64(r.{{ $bound.Identifier }}){{ else }}r.{{ $bound.Identifier }}{{ end }}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end -}}
 {{ else -}}
@@ -193,20 +198,30 @@ USING read_json(
 	columns={
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{$col.Identifier}}: '{{$col.DDL}}'
+		{{$col.Identifier}}: '{{ if IsBinary $col }}VARCHAR{{ else }}{{$col.DDL}}{{ end }}'
 	{{- end }}
 	}
 ) AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} WHERE {{ end -}}
-	l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+	l.{{ $bound.Identifier }} = {{ if IsBinary $bound }}FROM_BASE64(r.{{ $bound.Identifier }}){{ else }}r.{{ $bound.Identifier }}{{ end }}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }};
 {{ end }}
 
 {{ define "storeQuery" }}
-INSERT INTO {{$.Identifier}} BY NAME
-SELECT * EXCLUDE (_flow_delete) FROM read_json(
+INSERT INTO {{$.Identifier}} (
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }}, {{ end -}}
+		{{$col.Identifier}}
+	{{- end }}
+)
+SELECT
+	{{- range $ind, $col := $.Columns }}
+		{{- if $ind }}, {{ end }}
+		{{ if IsBinary $col }}FROM_BASE64({{$col.Identifier}}){{ else }}{{$col.Identifier}}{{ end }}
+	{{- end }}
+FROM read_json(
 	[
 	{{- range $ind, $f := $.Files }}
 	{{- if $ind }}, {{ end }}'{{ $f }}'
@@ -218,7 +233,7 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	columns={
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{$col.Identifier}}: '{{$col.DDL}}'
+		{{$col.Identifier}}: '{{ if IsBinary $col }}VARCHAR{{ else }}{{$col.DDL}}{{ end }}'
 	{{- end }}
 	, _flow_delete: 'BOOLEAN NOT NULL'
 	}
@@ -237,6 +252,8 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	strftime(timezone('UTC', {{ $ident }}), '%Y-%m-%dT%H:%M:%S.%fZ')
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	CAST({{ $ident }} AS VARCHAR)
+{{- else if eq $.AsFlatType "binary" -}}
+	TO_BASE64({{ $ident }})
 {{- else -}}
 	{{ $ident }}
 {{- end -}}
@@ -265,13 +282,13 @@ JOIN read_json(
        columns={                                                                                                                                                   
        {{- range $ind, $bound := $.Bounds }}                                                                                                                       
                {{- if $ind }},{{ end }}                                                                                                                            
-               {{$bound.Identifier}}: '{{$bound.DDL}}'                                                                                                             
+               {{$bound.Identifier}}: '{{ if IsBinary $bound }}VARCHAR{{ else }}{{$bound.DDL}}{{ end }}'
        {{- end }}                                                                                                                                                  
        }                                                                                                                                                           
 ) AS r                                                                                                                                                             
 {{- range $ind, $bound := $.Bounds }}                                                                                                                              
        {{ if $ind }} AND {{ else }} ON  {{ end -}}                                                                                                                 
-       l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}                                                                                                       
+       l.{{ $bound.Identifier }} = {{ if IsBinary $bound }}FROM_BASE64(r.{{ $bound.Identifier }}){{ else }}r.{{ $bound.Identifier }}{{ end }}
        {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end -}}                                                                                                                                                        
 {{- end }}                                                                                                                                                         

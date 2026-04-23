@@ -3,9 +3,9 @@
 CREATE TABLE IF NOT EXISTS key_value (
 		key1 BIGINT NOT NULL COMMENT 'auto-generated projection of JSON at: /key1 with inferred types: [integer]',
 		key2 BOOLEAN NOT NULL COMMENT 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]',
-		`key!binary` VARCHAR(256) NOT NULL COMMENT 'auto-generated projection of JSON at: /key!binary with inferred types: [string]',
+		`key!binary` VARBINARY(256) NOT NULL COMMENT 'auto-generated projection of JSON at: /key!binary with inferred types: [string]',
 		`array` JSON COMMENT 'auto-generated projection of JSON at: /array with inferred types: [array]',
-		`binary` LONGTEXT COMMENT 'auto-generated projection of JSON at: /binary with inferred types: [string]',
+		`binary` LONGBLOB COMMENT 'auto-generated projection of JSON at: /binary with inferred types: [string]',
 		`boolean` BOOLEAN COMMENT 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]',
 		field_with_projection LONGTEXT COMMENT 'user-provided projection of JSON at: /fieldWithProjection with inferred types: [string]',
 		flow_published_at DATETIME(6) NOT NULL COMMENT 'Flow Publication Time
@@ -52,7 +52,7 @@ auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
 CREATE TEMPORARY TABLE flow_temp_load_table_0 (
 		key1 BIGINT NOT NULL,
 		key2 BOOLEAN NOT NULL,
-		`key!binary` VARCHAR(256) NOT NULL
+		`key!binary` VARBINARY(256) NOT NULL
 	,
 		PRIMARY KEY (key1, key2, `key!binary`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
@@ -72,9 +72,9 @@ CREATE TEMPORARY TABLE flow_temp_load_table_1 (
 CREATE TEMPORARY TABLE flow_temp_update_table_0 (
 		key1 BIGINT NOT NULL,
 		key2 BOOLEAN NOT NULL,
-		`key!binary` VARCHAR(256) NOT NULL,
+		`key!binary` VARBINARY(256) NOT NULL,
 		`array` JSON,
-		`binary` LONGTEXT,
+		`binary` LONGBLOB,
 		`boolean` BOOLEAN,
 		field_with_projection LONGTEXT,
 		flow_published_at DATETIME(6) NOT NULL,
@@ -135,8 +135,10 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_
 (
 		key1,
 		key2,
-		`key!binary`
-);
+		@v_2
+)
+SET
+	`key!binary` = FROM_BASE64(@v_2);
 --- End key_value loadLoad ---
 
 --- Begin delta_updates loadLoad ---
@@ -225,9 +227,9 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE key_value CHA
 (
 		key1,
 		key2,
-		`key!binary`,
+		@v_2,
 		`array`,
-		`binary`,
+		@v_4,
 		`boolean`,
 		field_with_projection,
 		flow_published_at,
@@ -250,7 +252,10 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE key_value CHA
 		`stringInteger77Chars`,
 		`stringNumber`,
 		flow_document
-);
+)
+SET
+	`key!binary` = FROM_BASE64(@v_2),
+	`binary` = FROM_BASE64(@v_4);
 --- End key_value insertLoad ---
 
 --- Begin delta_updates insertLoad ---
@@ -281,9 +286,9 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_upd
 (
 		key1,
 		key2,
-		`key!binary`,
+		@v_2,
 		`array`,
-		`binary`,
+		@v_4,
 		`boolean`,
 		field_with_projection,
 		flow_published_at,
@@ -306,7 +311,10 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_upd
 		`stringInteger77Chars`,
 		`stringNumber`,
 		flow_document
-);
+)
+SET
+	`key!binary` = FROM_BASE64(@v_2),
+	`binary` = FROM_BASE64(@v_4);
 --- End key_value updateLoad ---
 
 --- Begin delta_updates updateLoad ---
@@ -441,8 +449,10 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_del
 (
 		key1,
 		key2,
-		`key!binary`
-);
+		@v_2
+)
+SET
+	`key!binary` = FROM_BASE64(@v_2);
 --- End key_value deleteLoad ---
 
 --- Begin delta_updates deleteLoad ---

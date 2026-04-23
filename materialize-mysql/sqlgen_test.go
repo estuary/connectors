@@ -112,10 +112,10 @@ func TestBinaryPKColumn(t *testing.T) {
 			},
 		},
 	}, sql.FieldConfig{})
-	require.Equal(t, "VARCHAR(256) NOT NULL", mapped.DDL)
+	require.Equal(t, "VARBINARY(256) NOT NULL", mapped.DDL)
 
 	var existing = boilerplate.ExistingField{
-		Type: "VARCHAR",
+		Type: "VARBINARY",
 	}
 	require.True(t, mapped.Compatible(existing))
 }

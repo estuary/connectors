@@ -20,6 +20,7 @@ import (
 
 var featureFlagDefaults = map[string]bool{
 	"retain_existing_data_on_backfill": false,
+	"native_binary_column_type":        true,
 }
 
 // config represents the endpoint configuration for starburst.
@@ -129,11 +130,12 @@ func newStarburstDriver() *sql.Driver[config, tableConfig] {
 				"schema":  cfg.Schema,
 			}).Info("opening Starburst")
 
-			var templates = renderTemplates(starburstTrinoDialect)
+			dialect := newStarburstTrinoDialect(featureFlags)
+			var templates = renderTemplates(dialect)
 
 			return &sql.Endpoint[config]{
 				Config:              cfg,
-				Dialect:             starburstTrinoDialect,
+				Dialect:             dialect,
 				NewClient:           newClient,
 				CreateTableTemplate: templates.createTargetTable,
 				NewTransactor:       newTransactor,
@@ -179,7 +181,7 @@ func newTransactor(
 ) (m.Transactor, error) {
 	var err error
 	var cfg = ep.Config
-	var templates = renderTemplates(starburstTrinoDialect)
+	var templates = renderTemplates(ep.Dialect)
 
 	var transactor = &transactor{
 		runtimeCheckpoint: fence.Checkpoint,
@@ -232,8 +234,9 @@ func (t *transactor) addBinding(ctx context.Context, materializationSpec *pf.Mat
 	var err error
 	d.target = target
 
-	tempTable, _ := sql.ResolveTable(target.TableShape, starburstHiveDialect)
-	templatesTemp := renderTemplates(starburstHiveDialect)
+	hiveDialect := newStarburstHiveDialect()
+	tempTable, _ := sql.ResolveTable(target.TableShape, hiveDialect)
+	templatesTemp := renderTemplates(hiveDialect)
 
 	if d.load.createTempTable, err = sql.RenderTableTemplate(tempTable, templatesTemp.createLoadTempTable); err != nil {
 		return fmt.Errorf("createLoadTempTable template: %w", err)

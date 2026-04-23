@@ -54,6 +54,19 @@
         "uuid_ptr": "/_meta/uuid",
         "projections": [
           {
+            "ptr": "/binary",
+            "field": "binary",
+            "inference": {
+              "types": [
+                "string"
+              ],
+              "string": {
+                "content_encoding": "base64"
+              },
+              "exists": 2
+            }
+          },
+          {
             "ptr": "/boolean",
             "field": "boolean",
             "inference": {
@@ -127,6 +140,20 @@
               "types": [
                 "boolean"
               ],
+              "exists": 1
+            }
+          },
+          {
+            "ptr": "/key_binary",
+            "field": "key_binary",
+            "is_primary_key": true,
+            "inference": {
+              "types": [
+                "string"
+              ],
+              "string": {
+                "content_encoding": "base64"
+              },
               "exists": 1
             }
           },
@@ -212,7 +239,8 @@
       "field_selection": {
         "keys": [
           "key1",
-          "key2"
+          "key2",
+          "key_binary"
         ],
         "values": [
           "boolean",
@@ -220,7 +248,8 @@
           "number",
           "string",
           "datetime",
-          "date"
+          "date",
+          "binary"
         ],
         "document": "flow_document"
       },

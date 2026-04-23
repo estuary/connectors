@@ -1,12 +1,39 @@
 package sql
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestBase64Decoder(t *testing.T) {
+	raw := []byte{0x00, 0x01, 0xff, 0xfe, 0x7f}
+	encoded := base64.StdEncoding.EncodeToString(raw)
+
+	for _, tc := range []struct {
+		name  string
+		input any
+	}{
+		{"string", encoded},
+		{"[]byte", []byte(encoded)},
+		{"json.RawMessage", json.RawMessage(`"` + encoded + `"`)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := Base64Decoder(tc.input)
+			require.NoError(t, err)
+			require.Equal(t, raw, got)
+		})
+	}
+
+	t.Run("nil", func(t *testing.T) {
+		got, err := Base64Decoder(nil)
+		require.NoError(t, err)
+		require.Nil(t, got)
+	})
+}
 
 func TestStdStrToInt(t *testing.T) {
 	for _, tt := range []struct {

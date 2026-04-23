@@ -21,6 +21,7 @@ var featureFlagDefaults = map[string]bool{
 	"snowpipe_streaming":               true,
 	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
+	"native_binary_column_type":        true,
 }
 
 // snowflakeTimestampType specifies how timestamp columns should be handled in Snowflake.

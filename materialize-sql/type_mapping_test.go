@@ -160,3 +160,60 @@ func TestMapType_NullabilityDDL(t *testing.T) {
 		})
 	}
 }
+
+func TestAsFlatType_Binary(t *testing.T) {
+	cases := []struct {
+		name            string
+		contentEncoding string
+		contentMediaTyp string
+		want            FlatType
+	}{
+		{
+			name:            "base64 without contentMediaType",
+			contentEncoding: "base64",
+			contentMediaTyp: "",
+			want:            BINARY,
+		},
+		{
+			name:            "base64 + application/octet-stream",
+			contentEncoding: "base64",
+			contentMediaTyp: "application/octet-stream",
+			want:            BINARY,
+		},
+		{
+			name:            "base64 + unrelated contentMediaType routes to string",
+			contentEncoding: "base64",
+			contentMediaTyp: "application/x-protobuf; proto=flow.MaterializationSpec",
+			want:            STRING,
+		},
+		{
+			name:            "no encoding",
+			contentEncoding: "",
+			contentMediaTyp: "",
+			want:            STRING,
+		},
+		{
+			name:            "octet-stream without base64 stays string",
+			contentEncoding: "",
+			contentMediaTyp: "application/octet-stream",
+			want:            STRING,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			p := &Projection{Projection: pf.Projection{
+				Inference: pf.Inference{
+					Types: []string{"string"},
+					String_: &pf.Inference_String{
+						ContentEncoding: tc.contentEncoding,
+						ContentType:     tc.contentMediaTyp,
+					},
+					Exists: pf.Inference_MAY,
+				},
+			}}
+			ft, _ := p.AsFlatType()
+			require.Equal(t, tc.want, ft)
+		})
+	}
+}
