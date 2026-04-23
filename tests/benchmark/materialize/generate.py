@@ -20,6 +20,7 @@ Usage:
 """
 
 import argparse
+import itertools
 import json
 import random
 import string
@@ -150,6 +151,23 @@ def load_scenario(path: str) -> tuple[dict[str, CollectionSpec], list[TxSpec]]:
             raise ValueError(
                 f"collection {spec.name}: payload_field '{spec.payload_field}' not in schema.properties"
             )
+        for prop_name, prop_schema in spec.schema.get("properties", {}).items():
+            if not isinstance(prop_schema, dict) or "enum" not in prop_schema:
+                continue
+            if prop_name in (spec.key_field, spec.payload_field):
+                raise ValueError(
+                    f"collection {spec.name}: enum not supported on key or payload field {prop_name!r}"
+                )
+            values = prop_schema["enum"]
+            if not isinstance(values, list) or not values:
+                raise ValueError(
+                    f"collection {spec.name}: property {prop_name!r} enum must be a non-empty list"
+                )
+            for v in values:
+                if v is not None and not isinstance(v, (str, int, float, bool)):
+                    raise ValueError(
+                        f"collection {spec.name}: property {prop_name!r} enum value {v!r} is not a JSON scalar"
+                    )
         collections[spec.name] = spec
 
     if not collections:
@@ -264,14 +282,21 @@ def _make_pool(seed: int, size: int) -> str:
 
 def _build_emit_template(
     col: CollectionSpec, op: str
-) -> tuple[str, str, str, int]:
-    """Return (prefix, middle, suffix, fixed_overhead) for one (collection, op).
+) -> list[tuple[str, str, str, int]]:
+    """Return a list of (prefix, middle, suffix, fixed_overhead) variants
+    for one (collection, op).
 
     Emitted line: prefix + str(key) + middle + payload_slice + suffix
     (suffix already includes the trailing newline).
 
     fixed_overhead = len(prefix) + len(middle) + len(suffix), so
-    payload_len = doc_size - fixed_overhead - len(str(key))."""
+    payload_len = doc_size - fixed_overhead - len(str(key)).
+
+    When a property has a JSON Schema `enum`, each enum value produces a
+    distinct variant. Variants span the cross-product of all enum fields,
+    so selecting by `key % len(variants)` at emit time spreads enum values
+    evenly across docs without per-doc RNG. When no field has an enum,
+    the returned list has exactly one tuple."""
     props = col.schema.get("properties", {})
     if col.key_field not in props:
         raise ValueError(f"collection {col.name}: key_field {col.key_field!r} not in schema.properties")
@@ -291,6 +316,8 @@ def _build_emit_template(
     doc_parts: list[str] = ["{"]
     key_slot: int = -1
     payload_slot: int = -1
+    # (values, slot_index) per enum field, in property order.
+    enum_slots: list[tuple[list[Any], int]] = []
     first = True
 
     key_is_string = col.key_type == "uuid"
@@ -313,6 +340,10 @@ def _build_emit_template(
             payload_slot = len(doc_parts)
             doc_parts.append("")  # filled with pool_slice at emit time
             doc_parts.append('"')
+        elif "enum" in props[name]:
+            doc_parts.append(f'{sep}"{name}":')
+            enum_slots.append((props[name]["enum"], len(doc_parts)))
+            doc_parts.append("")  # filled per variant below
         else:
             val = _fixed_scalar(name, props[name])
             doc_parts.append(f'{sep}"{name}":{json.dumps(val, separators=(",", ":"))}')
@@ -323,21 +354,38 @@ def _build_emit_template(
     doc_parts.append(f'{meta_sep}"_meta":{{"op":"{op}"}}')
     doc_parts.append("}")
 
-    doc_prefix = "".join(doc_parts[:key_slot])
-    doc_middle = "".join(doc_parts[key_slot + 1 : payload_slot])
-    doc_suffix = "".join(doc_parts[payload_slot + 1 :])
-    # `overhead` measures the doc's static bytes only -- so that
-    # payload_len = doc_size - overhead - len(str(key)) makes each
-    # emitted DOC exactly doc_size bytes (the fixture envelope is extra).
-    overhead = len(doc_prefix) + len(doc_middle) + len(doc_suffix)
-
     # Wrap the doc in the fixture envelope: ["<collection>",<doc>]\n.
     envelope_prefix = f'["{col.name}",'
     envelope_suffix = "]\n"
-    prefix = envelope_prefix + doc_prefix
-    middle = doc_middle
-    suffix = doc_suffix + envelope_suffix
-    return prefix, middle, suffix, overhead
+
+    # Expand the cross-product of enum values into a list of concrete
+    # variants. itertools.product() with no iterables yields a single
+    # empty tuple, which produces one variant (today's behavior).
+    value_lists = [values for values, _ in enum_slots]
+    slot_indices = [idx for _, idx in enum_slots]
+
+    variants: list[tuple[str, str, str, int]] = []
+    for combo in itertools.product(*value_lists):
+        parts = list(doc_parts)
+        for slot_idx, value in zip(slot_indices, combo):
+            parts[slot_idx] = json.dumps(value, separators=(",", ":"))
+
+        doc_prefix = "".join(parts[:key_slot])
+        doc_middle = "".join(parts[key_slot + 1 : payload_slot])
+        doc_suffix = "".join(parts[payload_slot + 1 :])
+        # `overhead` measures the doc's static bytes only -- so that
+        # payload_len = doc_size - overhead - len(str(key)) makes each
+        # emitted DOC exactly doc_size bytes (the fixture envelope is extra).
+        overhead = len(doc_prefix) + len(doc_middle) + len(doc_suffix)
+        variants.append(
+            (
+                envelope_prefix + doc_prefix,
+                doc_middle,
+                doc_suffix + envelope_suffix,
+                overhead,
+            )
+        )
+    return variants
 
 
 # ---------------------------------------------------------------------------
@@ -456,8 +504,10 @@ def emit(
     pool = _make_pool(seed, pool_size)
 
     # Precompute per-(collection, op) line templates. Computed once up front,
-    # then the emit loop just does string concatenation + writes.
-    templates: dict[tuple[str, str], tuple[str, str, str, int]] = {}
+    # then the emit loop just does string concatenation + writes. Each entry
+    # is a list of variants when the schema has enum fields (one per value
+    # combination), otherwise a single-element list.
+    templates: dict[tuple[str, str], list[tuple[str, str, str, int]]] = {}
     for tx in transactions:
         col = collections[tx.collection]
         for op in {tx.op} | {o.op for o in tx.overlaps}:
@@ -495,8 +545,10 @@ def emit(
         format_key = _int_key_to_uuid if col.key_type == "uuid" else str
 
         def _emit_run(keys, op: str) -> None:
-            prefix, middle, suffix, overhead = templates[(col.name, op)]
+            variants = templates[(col.name, op)]
+            n_variants = len(variants)
             for key in keys:
+                prefix, middle, suffix, overhead = variants[key % n_variants]
                 key_s = format_key(key)
                 pad = doc_size - overhead - len(key_s)
                 if pad < 0:
