@@ -127,7 +127,7 @@ func normalizeTime(str string) (any, error) {
 func bitToStringCast(m sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(
 		`CAST(CASE WHEN %s = 1 THEN 'true' WHEN %s = 0 THEN 'false' ELSE NULL END AS %s)`,
-		m.Identifier, m.Identifier, m.NullableDDL,
+		m.Identifier, m.Identifier, m.BareDDL,
 	)
 }
 
@@ -210,7 +210,7 @@ CREATE TABLE {{$.Identifier}} (
 ALTER TABLE {{$.Identifier}} ADD
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
-	{{$col.Identifier}} {{$col.NullableDDL}}
+	{{$col.Identifier}} {{$col.BareDDL}}
 {{- end }};
 {{ end }}
 

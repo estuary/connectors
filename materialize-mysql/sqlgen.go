@@ -354,7 +354,7 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
-	ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}}
+	ADD COLUMN {{$col.Identifier}} {{$col.BareDDL}}
 {{- end }}
 {{- if and $.DropNotNulls $.AddColumns}},{{ end }}
 {{- range $ind, $col := $.DropNotNulls }}

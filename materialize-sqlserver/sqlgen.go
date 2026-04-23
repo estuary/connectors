@@ -231,7 +231,7 @@ END;
 ALTER TABLE {{$.Identifier}} ADD
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
-	{{$col.Identifier}} {{$col.NullableDDL}}
+	{{$col.Identifier}} {{$col.BareDDL}}
 {{- end }};
 {{ end }}
 

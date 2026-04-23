@@ -137,9 +137,9 @@ func (c *client) AlterTable(_ context.Context, ta sql.TableAlter) (string, boile
 			type AlterTableTemplateParams struct {
 				TableIdentifier  string
 				ColumnIdentifier string
-				NullableDDL      string
+				BareDDL          string
 			}
-			alterColumnParams := AlterTableTemplateParams{ta.Identifier, col.Identifier, col.NullableDDL}
+			alterColumnParams := AlterTableTemplateParams{ta.Identifier, col.Identifier, col.BareDDL}
 			if err := c.templates.alterTableColumns.Execute(&addColumnsStmt, alterColumnParams); err != nil {
 				return "", nil, fmt.Errorf("rendering alter table columns statement failed: %w", err)
 			}

@@ -40,7 +40,7 @@ type MigrationTarget interface {
 type StringTarget string
 
 func (t StringTarget) CanMigrate(_ boilerplate.ExistingField, mapped MappedType) bool {
-	return strings.EqualFold(string(t), mapped.NullableDDL)
+	return strings.EqualFold(string(t), mapped.BareDDL)
 }
 
 type CastSQLFunc func(migration ColumnTypeMigration) string
@@ -58,7 +58,7 @@ func NewMigrationSpec(targetDDLs []string, opts ...MigrationSpecOption) Migratio
 	out := MigrationSpec{
 		targets: targets,
 		CastSQL: func(m ColumnTypeMigration) string {
-			return fmt.Sprintf("CAST(%s AS %s)", m.Identifier, m.NullableDDL)
+			return fmt.Sprintf("CAST(%s AS %s)", m.Identifier, m.BareDDL)
 		},
 	}
 
@@ -73,7 +73,7 @@ func NewMigrationSpecTarget(mt MigrationTarget, opts ...MigrationSpecOption) Mig
 	out := MigrationSpec{
 		targets: []MigrationTarget{mt},
 		CastSQL: func(m ColumnTypeMigration) string {
-			return fmt.Sprintf("CAST(%s AS %s)", m.Identifier, m.NullableDDL)
+			return fmt.Sprintf("CAST(%s AS %s)", m.Identifier, m.BareDDL)
 		},
 	}
 

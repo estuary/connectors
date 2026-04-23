@@ -469,6 +469,8 @@ var StdMigrationSteps = []ColumnMigrationStep{
 	func(dialect Dialect, table Table, instructions []MigrationInstruction) ([]string, error) {
 		var queries []string
 		for _, ins := range instructions {
+			// We create the temporary column as nullable so that it can start life as an
+			// empty column. If needed, we set the column to not null in the final step.
 			queries = append(
 				queries,
 				fmt.Sprintf("ALTER TABLE %s ADD COLUMN %s %s ",
@@ -530,6 +532,9 @@ var StdMigrationSteps = []ColumnMigrationStep{
 
 		for _, ins := range instructions {
 			if ins.TypeMigration.NullableDDL != ins.TypeMigration.DDL {
+				// The temporary column was created as nullable so it could be populated
+				// from empty, and the migration target is not nullable, so this
+				// step completes the migration process.
 				queries = append(
 					queries,
 					fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s SET NOT NULL",

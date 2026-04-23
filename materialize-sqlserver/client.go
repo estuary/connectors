@@ -98,7 +98,7 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 				fmt.Sprintf("ALTER TABLE %s ADD %s %s;",
 					table.Identifier,
 					ins.TempColumnIdentifier,
-					ins.TypeMigration.NullableDDL,
+					ins.TypeMigration.BareDDL,
 				),
 			)
 		}
@@ -141,7 +141,7 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 		var queries []string
 
 		for _, ins := range instructions {
-			if ins.TypeMigration.NullableDDL != ins.TypeMigration.DDL {
+			if ins.TypeMigration.BareDDL != ins.TypeMigration.DDL {
 				queries = append(
 					queries,
 					fmt.Sprintf(
@@ -189,7 +189,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 				return "", nil, fmt.Errorf("could not find column info for %q", dn.Name)
 			}
 
-			ddl, err := col.nullableDDL()
+			ddl, err := col.bareDDL()
 			if err != nil {
 				return "", nil, err
 			}
@@ -328,7 +328,7 @@ type foundColumn struct {
 	DatetimePrecision      stdsql.NullInt64
 }
 
-func (c foundColumn) nullableDDL() (string, error) {
+func (c foundColumn) bareDDL() (string, error) {
 	ddl := strings.ToUpper(c.Type)
 
 	intOrMax := func(i int64) string {

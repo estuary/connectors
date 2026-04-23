@@ -233,7 +233,7 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 ALTER TABLE {{$.Identifier}} ADD COLUMN
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
-	{{$col.Identifier}} {{$col.NullableDDL}}
+	{{$col.Identifier}} {{$col.BareDDL}}
 {{- end }};
 {{- end -}}
 {{- if $.DropNotNulls -}}

@@ -53,9 +53,9 @@ ORDER BY (theKey)
 
 --- Begin alter table add columns and drop not nulls ---
 
-ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN IF NOT EXISTS first_new_column Nullable(STRING);
+ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN first_new_column ;
 
-ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN IF NOT EXISTS second_new_column Nullable(BOOL);
+ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN second_new_column ;
 
 ALTER TABLE `key_value-@你好-``-"especiál` MODIFY COLUMN first_required_column Nullable(string);
 
@@ -64,9 +64,9 @@ ALTER TABLE `key_value-@你好-``-"especiál` MODIFY COLUMN second_required_colu
 
 --- Begin alter table add columns ---
 
-ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN IF NOT EXISTS first_new_column Nullable(STRING);
+ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN first_new_column ;
 
-ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN IF NOT EXISTS second_new_column Nullable(BOOL);
+ALTER TABLE `key_value-@你好-``-"especiál` ADD COLUMN second_new_column ;
 --- End alter table add columns ---
 
 --- Begin alter table drop not nulls ---

@@ -317,7 +317,7 @@ remove a single required field:
 add and remove many fields:
 {"Name":"_meta/flow_truncated","Nullable":false,"Type":"Bool"}
 {"Name":"addedOptionalString","Nullable":true,"Type":"String"}
-{"Name":"addedRequiredString","Nullable":true,"Type":"String"}
+{"Name":"addedRequiredString","Nullable":false,"Type":"String"}
 {"Name":"flow_document","Nullable":false,"Type":"String"}
 {"Name":"flow_published_at","Nullable":false,"Type":"DateTime64(6, 'UTC')"}
 {"Name":"key","Nullable":false,"Type":"String"}

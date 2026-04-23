@@ -161,7 +161,7 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 ALTER TABLE {{$.Identifier}} ADD COLUMN
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
-	{{$col.Identifier}} {{$col.NullableDDL}}
+	{{$col.Identifier}} {{$col.BareDDL}}
 {{- end }};
 {{ end }}
 

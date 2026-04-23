@@ -216,7 +216,7 @@ CLUSTER BY {{ range $ind, $key := $.Keys }}
 ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
-	ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}}
+	ADD COLUMN {{$col.Identifier}} {{$col.BareDDL}}
 {{- end }};
 {{- end -}}
 {{- if $.DropNotNulls -}}
