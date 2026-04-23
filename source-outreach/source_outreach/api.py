@@ -143,7 +143,7 @@ async def backfill_resources(
     for resource in response.data:
         resource_dt = _extract_resource_cursor(resource, cursor_field)
 
-        if resource_dt >= cutoff:
+        if resource_dt > cutoff:
             continue
 
         yield resource
