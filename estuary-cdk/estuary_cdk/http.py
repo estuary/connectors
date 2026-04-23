@@ -636,7 +636,10 @@ class HTTPMixin(Mixin, HTTPSession):
                     ):
                         log.warning(
                             "server internal error (will retry)",
-                            {"body": body.decode("utf-8")},
+                            {
+                                "status_code": resp.status,
+                                "body": body.decode("utf-8"),
+                            },
                         )
                     else:
                         raise HTTPError(
