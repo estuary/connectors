@@ -43,17 +43,35 @@ def _extract_page_cursor(links: OutreachResponse.Links | None) -> str | None:
     return cursor_list[0] if cursor_list else None
 
 
+def _is_502_bad_gateway_response(
+    status: int,
+    body: str,
+) -> bool:
+    return status == 502 and "Bad Gateway" in body
+
+
+def _is_500_network_client_error(
+    status: int,
+    body: str,
+) -> bool:
+    return status == 500 and "Network Client Error" in body
+
+
 def _should_retry_request(
     status: int,
     headers: Headers,
     body: bytes,
     attempt: int,
 ) -> bool:
-    # If the response has a 502 status code, that could mean that
+    # If the response is a specific 500 or 502 error, that could mean
     # too much data was requested and a timeout was reached before
     # the API server sent a response. To get around these timeouts,
     # the connector should make a new request for less data.
-    return status != 502
+    body_str = body.decode("utf-8")
+    return not (
+        _is_502_bad_gateway_response(status, body_str)
+        or _is_500_network_client_error(status, body_str)
+    )
 
 
 def _build_query_params(
@@ -101,10 +119,15 @@ async def _do_request(
                 await http.request(log, url, params=params, should_retry=_should_retry_request)
             )
         except HTTPError as err:
-            if err.code == 502 and "Bad Gateway" in err.message:
-                log.debug("Received 502 Bad Gateway response (will retry with a smaller page size).", {
+            if (
+                _is_502_bad_gateway_response(err.code, err.message)
+                or _is_500_network_client_error(err.code, err.message)
+            ):
+                log.debug(f"Received {err.code} response (will retry with a smaller page size).", {
                     "url": url,
                     "params": params,
+                    "err.status": err.code,
+                    "err.message": err.message,
                 })
                 page_size = page_size // 2
             else:
