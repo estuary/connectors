@@ -45,6 +45,24 @@ UUID_COLLECTION = {
     "key_type": "uuid",
 }
 
+# Uses enum values of *different* byte-lengths on purpose, so the exact
+# byte-size tests exercise the per-variant overhead bookkeeping.
+ENUM_VALUES = ["ck0", "ck1", "ck2", "ck3", "ck4", "ck5", "ck6", "ck7", "ck8", "ck9"]
+ENUM_COLLECTION = {
+    "name": "bench/enum",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "id": {"type": "integer"},
+            "val": {"type": "integer"},
+            "cluster_key": {"type": "string", "enum": ENUM_VALUES},
+            "payload": {"type": "string"},
+        },
+        "required": ["id"],
+    },
+    "key": ["/id"],
+}
+
 
 def _scenario(transactions: list[dict], collection: dict | None = None) -> dict:
     return {"collections": [collection or SIMPLE_COLLECTION], "transactions": transactions}
@@ -300,6 +318,81 @@ class TestUUIDKeys(unittest.TestCase):
         bad_collection = dict(UUID_COLLECTION, key_type="sha256")
         with self.assertRaises(ValueError):
             _run([{"doc_count": 1, "doc_size": 256}], collection=bad_collection)
+
+
+class TestEnumFields(unittest.TestCase):
+    def test_values_from_enum_set(self):
+        lines, _ = _run(
+            [{"doc_count": 200, "doc_size": 256}], collection=ENUM_COLLECTION
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        self.assertEqual(len(docs), 200)
+        for _, doc in docs:
+            self.assertIn(doc["cluster_key"], ENUM_VALUES)
+
+    def test_exact_byte_size_with_enum(self):
+        # With variable-length enum values, per-variant overhead must drive
+        # payload padding correctly so each doc still hits doc_size exactly.
+        lines, _ = _run(
+            [{"doc_count": 200, "doc_size": 256}], collection=ENUM_COLLECTION
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        for _, doc in docs:
+            encoded = json.dumps(doc, separators=(",", ":"))
+            self.assertEqual(len(encoded.encode("utf-8")), 256)
+
+    def test_distribution_covers_all_enum_values(self):
+        # Keys are allocated as [0, N), and variant selection is
+        # key % len(enum), so all values must appear when N >> len(enum).
+        lines, _ = _run(
+            [{"doc_count": 500, "doc_size": 256}], collection=ENUM_COLLECTION
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        seen = {d["cluster_key"] for _, d in docs}
+        self.assertEqual(seen, set(ENUM_VALUES))
+
+    def test_enum_deterministic(self):
+        a, _ = _run(
+            [{"doc_count": 100, "doc_size": 256}], seed=7, collection=ENUM_COLLECTION
+        )
+        b, _ = _run(
+            [{"doc_count": 100, "doc_size": 256}], seed=7, collection=ENUM_COLLECTION
+        )
+        self.assertEqual(a, b)
+
+    def test_empty_enum_rejected(self):
+        bad = {
+            "name": "bench/bad-enum",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "cluster_key": {"type": "string", "enum": []},
+                    "payload": {"type": "string"},
+                },
+                "required": ["id"],
+            },
+            "key": ["/id"],
+        }
+        with self.assertRaises(ValueError):
+            _run([{"doc_count": 1, "doc_size": 256}], collection=bad)
+
+    def test_non_scalar_enum_rejected(self):
+        bad = {
+            "name": "bench/bad-enum",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "cluster_key": {"enum": [{"nested": "object"}]},
+                    "payload": {"type": "string"},
+                },
+                "required": ["id"],
+            },
+            "key": ["/id"],
+        }
+        with self.assertRaises(ValueError):
+            _run([{"doc_count": 1, "doc_size": 256}], collection=bad)
 
 
 class TestDeterminism(unittest.TestCase):
