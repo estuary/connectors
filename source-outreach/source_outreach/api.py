@@ -23,6 +23,12 @@ MAX_PAGE_SIZE = 1000
 MIN_PAGE_SIZE = 1
 NEXT_PAGE_QUERY_PARAMETER = "page[after]"
 
+# MAX_WINDOW_SIZE bounds how far forward a single fetch_resources invocation
+# will advance. The Outreach API sometimes returns results unsorted within a
+# query, so we process records in explicit [lower, upper] date windows and
+# trust the set of records returned for that window rather than their order.
+MAX_WINDOW_SIZE = timedelta(days=1)
+
 def _dt_to_str(dt: datetime) -> str:
     return dt.strftime(DATETIME_STRING_FORMAT)
 
@@ -83,17 +89,6 @@ def _extract_resource_cursor(
     return _str_to_dt(getattr(resource, 'attributes')[cursor_field])
 
 
-# _raise_if_unordered performs a sanity check to confirm
-# the Outreach API returned sorted records.
-def _raise_if_unordered(
-    resource_id: int,
-    previous_dt: datetime | None,
-    resource_dt: datetime,
-) -> None:
-    if previous_dt and resource_dt < previous_dt:
-        raise RuntimeError(f"Outreach API returned records out of order for {resource_id} with {resource_dt} < {previous_dt}.")
-
-
 async def _do_request(
     http: HTTPSession,
     url: str,
@@ -137,7 +132,7 @@ async def backfill_resources(
 
     url = f"{API}/{path}"
 
-    params = _build_query_params(cursor_field, start_date, None, extra_params)
+    params = _build_query_params(cursor_field, start_date, cutoff, extra_params)
 
     if page is not None:
         assert isinstance(page, str)
@@ -145,17 +140,12 @@ async def backfill_resources(
 
     response = await _do_request(http, url, params, log)
 
-    previous_dt: datetime | None = None
-
     for resource in response.data:
         resource_dt = _extract_resource_cursor(resource, cursor_field)
 
-        _raise_if_unordered(resource.id, previous_dt, resource_dt)
-
         if resource_dt >= cutoff:
-            return
+            continue
 
-        previous_dt = resource_dt
         yield resource
 
     next_page_cursor = _extract_page_cursor(response.links)
@@ -175,38 +165,35 @@ async def fetch_resources(
 ) -> AsyncGenerator[OutreachResource | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    upper_bound = now() - horizon if horizon else now()
+    horizon_cutoff = now() - horizon if horizon else now()
 
-    if log_cursor >= upper_bound:
+    if log_cursor >= horizon_cutoff:
         return
 
-    url = f"{API}/{path}"
+    max_upper_bound = log_cursor + MAX_WINDOW_SIZE
+    upper_bound = min(max_upper_bound, horizon_cutoff)
 
+    url = f"{API}/{path}"
     params = _build_query_params(cursor_field, log_cursor, upper_bound, extra_params)
 
-    last_seen_dt = log_cursor
+    max_seen_dt = log_cursor
 
     while True:
         response = await _do_request(http, url, params, log)
 
-        if (
-            last_seen_dt > log_cursor
-            and response.data
-            and _extract_resource_cursor(response.data[0], cursor_field) > last_seen_dt
-        ):
-            yield last_seen_dt
-
         for resource in response.data:
             resource_dt = _extract_resource_cursor(resource, cursor_field)
 
-            _raise_if_unordered(resource.id, last_seen_dt, resource_dt)
-
+            # The API sometimes ignores the server-side upper-bound filter.
+            # Skip such records so they don't advance max_seen_dt past the
+            # queried window; the next invocation will fetch them in its
+            # own window.
             if resource_dt > upper_bound:
                 log.info(f"Outreach API returned record {resource.id} with {cursor_field}={resource_dt} beyond the requested upper bound {upper_bound}.")
                 continue
 
-            if resource_dt > last_seen_dt:
-                last_seen_dt = resource_dt
+            if resource_dt > max_seen_dt:
+                max_seen_dt = resource_dt
 
             if resource_dt > log_cursor and cache.should_yield(path, resource.id, resource_dt):
                 yield resource
@@ -214,8 +201,16 @@ async def fetch_resources(
         next_page_cursor = _extract_page_cursor(response.links)
 
         if not next_page_cursor:
-            if last_seen_dt > log_cursor:
-                yield last_seen_dt
             break
-        else:
-            params[NEXT_PAGE_QUERY_PARAMETER] = next_page_cursor
+
+        params[NEXT_PAGE_QUERY_PARAMETER] = next_page_cursor
+
+    # Were there any records within the date window? If so, yield the
+    # most recent datetime cursor from them.
+    if max_seen_dt > log_cursor:
+        yield max_seen_dt
+    # Otherwise, did we check a max-sized date window? If so, yield
+    # the upper bound to use as the lower bound next iteration to avoid
+    # repeatedly checking an empty, max-sized date window.
+    elif upper_bound >= max_upper_bound:
+        yield upper_bound
