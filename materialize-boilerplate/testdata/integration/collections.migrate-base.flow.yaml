@@ -11,14 +11,14 @@ collections:
         int64ToIntStr64: { type: integer }
         int64ToIntStr128: { type: integer }
         int64ToIntStr256: { type: integer }
-        int128ToNum: { type: integer, maximum: 1e38 }
-        int128ToNumStr: { type: integer, maximum: 1e38 }
-        int128ToInt256: { type: integer, maximum: 1e38 }
-        int128ToIntStr128: { type: integer, maximum: 1e38 }
-        int128ToIntStr256: { type: integer, maximum: 1e38 }
-        int256ToNum: { type: integer, maximum: 1e76 }
-        int256ToNumStr: { type: integer, maximum: 1e76 }
-        int256ToIntStr256: { type: integer, maximum: 1e76 }
+        int128ToNum: { type: integer, maximum: 170141183460469231731687303715884105727.0 }
+        int128ToNumStr: { type: integer, maximum: 170141183460469231731687303715884105727.0 }
+        int128ToInt256: { type: integer, maximum: 170141183460469231731687303715884105727.0 }
+        int128ToIntStr128: { type: integer, maximum: 170141183460469231731687303715884105727.0 }
+        int128ToIntStr256: { type: integer, maximum: 170141183460469231731687303715884105727.0 }
+        int256ToNum: { type: integer, maximum: 57896044618658097711785492504343953926634992332820282019728792003956564819967.0 }
+        int256ToNumStr: { type: integer, maximum: 57896044618658097711785492504343953926634992332820282019728792003956564819967.0 }
+        int256ToIntStr256: { type: integer, maximum: 57896044618658097711785492504343953926634992332820282019728792003956564819967.0 }
         intStr64ToInt64: { type: string, format: integer }
         intStr64ToInt128: { type: string, format: integer }
         intStr64ToInt256: { type: string, format: integer }
@@ -40,8 +40,8 @@ collections:
         binaryToMulti: { type: string, contentEncoding: base64 }
         boolToMulti: { type: boolean }
         int64ToMulti: { type: integer }
-        int128ToMulti: { type: integer, maximum: 1e38 }
-        int256ToMulti: { type: integer, maximum: 1e76 }
+        int128ToMulti: { type: integer, maximum: 170141183460469231731687303715884105727.0 }
+        int256ToMulti: { type: integer, maximum: 57896044618658097711785492504343953926634992332820282019728792003956564819967.0 }
         intStr64UnionToMulti: { type: [integer, string], format: integer }
         numToMulti: { type: number }
         numStrUnionToMulti: { type: [number, string], format: number }
