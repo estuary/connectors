@@ -5,23 +5,27 @@ SELECT
 		number,
 		string,
 		datetime,
-		date
+		date,
+		binary
 FROM "a-schema".target_table 
 WHERE
 		   key1 = ?
 		 AND key2 = ?
+		 AND key_binary = ?
 --- End "a-schema".target_table fetchVersionAndSpec ---
 
 --- Begin "a-schema".target_table createTargetTable ---
 CREATE TABLE IF NOT EXISTS "a-schema".target_table (
     key1 BIGINT,
     key2 BOOLEAN,
+    key_binary VARBINARY,
     boolean BOOLEAN,
     integer BIGINT,
     number DOUBLE,
     string VARCHAR,
     datetime TIMESTAMP(6) WITH TIME ZONE,
     date DATE,
+    binary VARBINARY,
     flow_document VARCHAR
 )
 COMMENT 'Generated for materialization test/sqlite of collection key/value'
@@ -31,25 +35,26 @@ COMMENT 'Generated for materialization test/sqlite of collection key/value'
 SELECT 0, flow_document
 	FROM "a-schema".target_table AS l
     JOIN "a-schema".target_table_load_temp AS r
-	ON l.key1 = r.key1 AND l.key2 = r.key2
+	ON l.key1 = r.key1 AND l.key2 = r.key2 AND l.key_binary = from_base64(r.key_binary)
 
 --- End "a-schema".target_table loadQuery ---
 
 --- Begin "a-schema".target_table mergeIntoTarget ---
 MERGE INTO "a-schema".target_table AS l
 	USING "a-schema".target_table_store_temp AS r
-	ON l.key1 = r.key1 AND l.key2 = r.key2
+	ON l.key1 = r.key1 AND l.key2 = r.key2 AND l.key_binary = from_base64(r.key_binary)
 	WHEN MATCHED THEN
-	UPDATE SET boolean = r.boolean, integer = r.integer, number = r.number, string = r.string, datetime = from_iso8601_timestamp_nanos(r.datetime), date = from_iso8601_date(r.date), flow_document = r.flow_document
+	UPDATE SET boolean = r.boolean, integer = r.integer, number = r.number, string = r.string, datetime = from_iso8601_timestamp_nanos(r.datetime), date = from_iso8601_date(r.date), binary = from_base64(r.binary), flow_document = r.flow_document
 	WHEN NOT MATCHED THEN
-	INSERT (key1, key2, boolean, integer, number, string, datetime, date, flow_document)
-	VALUES (r.key1, r.key2, r.boolean, r.integer, r.number, r.string, from_iso8601_timestamp_nanos(r.datetime), from_iso8601_date(r.date), r.flow_document)
+	INSERT (key1, key2, key_binary, boolean, integer, number, string, datetime, date, binary, flow_document)
+	VALUES (r.key1, r.key2, from_base64(r.key_binary), r.boolean, r.integer, r.number, r.string, from_iso8601_timestamp_nanos(r.datetime), from_iso8601_date(r.date), from_base64(r.binary), r.flow_document)
 --- End "a-schema".target_table mergeIntoTarget ---
 
 --- Begin "a-schema".target_table createLoadTempTable ---
 CREATE TABLE "a-schema".target_table_load_temp (
 	key1 BIGINT,
-	key2 BOOLEAN
+	key2 BOOLEAN,
+	key_binary VARCHAR
 )
 WITH (
    format = 'PARQUET',
@@ -66,12 +71,14 @@ DROP TABLE IF EXISTS "a-schema".target_table_load_temp
 CREATE TABLE "a-schema".target_table_store_temp (
     key1 BIGINT,
     key2 BOOLEAN,
+    key_binary VARCHAR,
     boolean BOOLEAN,
     integer BIGINT,
     number DOUBLE,
     string VARCHAR,
     datetime VARCHAR,
     date VARCHAR,
+    binary VARCHAR,
     flow_document VARCHAR
 )
 WITH (

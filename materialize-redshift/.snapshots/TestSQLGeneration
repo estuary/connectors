@@ -3,9 +3,9 @@
 CREATE TABLE IF NOT EXISTS "a-schema".key_value (
 	key1 BIGINT,
 	key2 BOOLEAN,
-	"key!binary" TEXT,
+	"key!binary" VARBYTE(1024000),
 	"array" SUPER,
-	"binary" TEXT,
+	"binary" VARBYTE(1024000),
 	boolean BOOLEAN,
 	field_with_projection TEXT,
 	flow_published_at TIMESTAMPTZ,
@@ -82,7 +82,33 @@ auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
 --- Begin "a-schema".key_value createStoreTable ---
 
 CREATE TEMPORARY TABLE flow_temp_table_0 (
-	LIKE "a-schema".key_value
+	key1 BIGINT,
+	key2 BOOLEAN,
+	"key!binary" VARCHAR(MAX),
+	"array" SUPER,
+	"binary" VARCHAR(MAX),
+	boolean BOOLEAN,
+	field_with_projection TEXT,
+	flow_published_at TIMESTAMPTZ,
+	integer BIGINT,
+	"integerGt128Bit" NUMERIC(38,0),
+	"integerGt256Bit" NUMERIC(38,0),
+	"integerGt64Bit" NUMERIC(38,0),
+	"integerWithUserDDL" DECIMAL(20),
+	multiple SUPER,
+	"nonAsciiκόσμε" TEXT,
+	number DOUBLE PRECISION,
+	"numberCastToString" TEXT,
+	object SUPER,
+	string TEXT,
+	"stringInteger" NUMERIC(38,0),
+	"stringInteger18Chars" NUMERIC(38,0),
+	"stringInteger38Chars" NUMERIC(38,0),
+	"stringInteger39Chars" TEXT,
+	"stringInteger66Chars" TEXT,
+	"stringInteger77Chars" TEXT,
+	"stringNumber" DOUBLE PRECISION,
+	flow_document SUPER
 );
 --- End "a-schema".key_value createStoreTable ---
 
@@ -97,12 +123,12 @@ CREATE TEMPORARY TABLE flow_temp_table_1 (
 
 MERGE INTO "a-schema".key_value
 USING flow_temp_table_0 AS r
-ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = r."key!binary"
+ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = TO_VARBYTE(r."key!binary", 'base64')
 WHEN MATCHED THEN
-	UPDATE SET "array" = r."array", "binary" = r."binary", boolean = r.boolean, field_with_projection = r.field_with_projection, flow_published_at = r.flow_published_at, integer = r.integer, "integerGt128Bit" = r."integerGt128Bit", "integerGt256Bit" = r."integerGt256Bit", "integerGt64Bit" = r."integerGt64Bit", "integerWithUserDDL" = r."integerWithUserDDL", multiple = r.multiple, "nonAsciiκόσμε" = r."nonAsciiκόσμε", number = r.number, "numberCastToString" = r."numberCastToString", object = r.object, string = r.string, "stringInteger" = r."stringInteger", "stringInteger18Chars" = r."stringInteger18Chars", "stringInteger38Chars" = r."stringInteger38Chars", "stringInteger39Chars" = r."stringInteger39Chars", "stringInteger66Chars" = r."stringInteger66Chars", "stringInteger77Chars" = r."stringInteger77Chars", "stringNumber" = r."stringNumber", flow_document = r.flow_document
+	UPDATE SET "array" = r."array", "binary" = TO_VARBYTE(r."binary", 'base64'), boolean = r.boolean, field_with_projection = r.field_with_projection, flow_published_at = r.flow_published_at, integer = r.integer, "integerGt128Bit" = r."integerGt128Bit", "integerGt256Bit" = r."integerGt256Bit", "integerGt64Bit" = r."integerGt64Bit", "integerWithUserDDL" = r."integerWithUserDDL", multiple = r.multiple, "nonAsciiκόσμε" = r."nonAsciiκόσμε", number = r.number, "numberCastToString" = r."numberCastToString", object = r.object, string = r.string, "stringInteger" = r."stringInteger", "stringInteger18Chars" = r."stringInteger18Chars", "stringInteger38Chars" = r."stringInteger38Chars", "stringInteger39Chars" = r."stringInteger39Chars", "stringInteger66Chars" = r."stringInteger66Chars", "stringInteger77Chars" = r."stringInteger77Chars", "stringNumber" = r."stringNumber", flow_document = r.flow_document
 WHEN NOT MATCHED THEN
 	INSERT (key1, key2, "key!binary", "array", "binary", boolean, field_with_projection, flow_published_at, integer, "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", object, string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document)
-	VALUES (r.key1, r.key2, r."key!binary", r."array", r."binary", r.boolean, r.field_with_projection, r.flow_published_at, r.integer, r."integerGt128Bit", r."integerGt256Bit", r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r."nonAsciiκόσμε", r.number, r."numberCastToString", r.object, r.string, r."stringInteger", r."stringInteger18Chars", r."stringInteger38Chars", r."stringInteger39Chars", r."stringInteger66Chars", r."stringInteger77Chars", r."stringNumber", r.flow_document);
+	VALUES (r.key1, r.key2, TO_VARBYTE(r."key!binary", 'base64'), r."array", TO_VARBYTE(r."binary", 'base64'), r.boolean, r.field_with_projection, r.flow_published_at, r.integer, r."integerGt128Bit", r."integerGt256Bit", r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r."nonAsciiκόσμε", r.number, r."numberCastToString", r.object, r.string, r."stringInteger", r."stringInteger18Chars", r."stringInteger38Chars", r."stringInteger39Chars", r."stringInteger66Chars", r."stringInteger77Chars", r."stringNumber", r.flow_document);
 --- End "a-schema".key_value mergeInto ---
 
 --- Begin "a-schema".delta_updates mergeInto ---
@@ -124,7 +150,7 @@ SELECT 0, r.flow_document
 	JOIN "a-schema".key_value AS r
 		 ON  l.key1 = r.key1
 		 AND l.key2 = r.key2
-		 AND l."key!binary" = r."key!binary"
+		 AND TO_VARBYTE(l."key!binary", 'base64') = r."key!binary"
 --- End "a-schema".key_value loadQuery ---
 
 --- Begin "a-schema".delta_updates loadQuery ---
@@ -134,13 +160,13 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 
 --- Begin "a-schema".key_value loadQueryNoFlowDocument ---
 
-SELECT 0, 
+SELECT 0,
 OBJECT(
 	'key1', r.key1,
 	'key2', r.key2,
-	'key!binary', r."key!binary",
+	'key!binary', FROM_VARBYTE(r."key!binary", 'base64'),
 	'array', r."array",
-	'binary', r."binary",
+	'binary', FROM_VARBYTE(r."binary", 'base64'),
 	'boolean', r.boolean,
 	'field_with_projection', r.field_with_projection,
 	'integer', r.integer,
@@ -166,7 +192,7 @@ FROM flow_temp_table_0 AS l
 JOIN "a-schema".key_value AS r
 	 ON  l.key1 = r.key1
 	 AND l.key2 = r.key2
-	 AND l."key!binary" = r."key!binary"
+	 AND TO_VARBYTE(l."key!binary", 'base64') = r."key!binary"
 
 --- End "a-schema".key_value loadQueryNoFlowDocument ---
 
@@ -181,7 +207,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 CREATE TEMPORARY TABLE flow_temp_table_0_deleted (
   key1 BIGINT,
   key2 BOOLEAN,
-  "key!binary" TEXT
+  "key!binary" VARCHAR(MAX)
 );
 --- End "a-schema".key_value createDeleteTable ---
 
@@ -196,7 +222,7 @@ CREATE TEMPORARY TABLE flow_temp_table_1_deleted (
 
 DELETE FROM "a-schema".key_value
 USING flow_temp_table_0_deleted AS r
-WHERE "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = r."key!binary"
+WHERE "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = TO_VARBYTE(r."key!binary", 'base64')
 --- End "a-schema".key_value deleteQuery ---
 
 --- Begin "a-schema".delta_updates deleteQuery ---
@@ -208,7 +234,7 @@ WHERE "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 	key1 BIGINT,
 	key2 BOOLEAN,
-	"key!binary" TEXT
+	"key!binary" VARCHAR(MAX)
 );
 --- End "a-schema".key_value createLoadTable (no varchar length) ---
 
@@ -222,7 +248,7 @@ CREATE TEMPORARY TABLE flow_temp_table_1 (
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 	key1 BIGINT,
 	key2 BOOLEAN,
-	"key!binary" VARCHAR(400)
+	"key!binary" VARCHAR(MAX)
 );
 --- End "a-schema".key_value createLoadTable (with varchar length) ---
 

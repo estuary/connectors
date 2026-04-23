@@ -11,7 +11,7 @@ var sqliteDialect = func() sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:          sql.MapStatic("TEXT"),
-			sql.BINARY:         sql.MapStatic("TEXT"),
+			sql.BINARY:         sql.MapStatic("BLOB", sql.UsingConverter(sql.Base64Decoder)),
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
 			sql.INTEGER:        sql.MapStatic("INTEGER"),
 			sql.NUMBER:         sql.MapStatic("REAL"),

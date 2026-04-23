@@ -98,6 +98,17 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
 	}
 
+	binaryMapping := sql.MapPrimaryKey(
+		sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar")),
+		sql.MapStatic("LONGTEXT"),
+	)
+	if featureFlags["native_binary_column_type"] {
+		binaryMapping = sql.MapPrimaryKey(
+			sql.MapStatic("VARBINARY(256)", sql.AlsoCompatibleWith("varbinary")),
+			sql.MapStatic("LONGBLOB"),
+		)
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -108,10 +119,7 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 			sql.BOOLEAN: sql.MapStatic("BOOLEAN", sql.AlsoCompatibleWith("tinyint")),
 			sql.OBJECT:  sql.MapStatic(jsonType),
 			sql.ARRAY:   sql.MapStatic(jsonType),
-			sql.BINARY: sql.MapPrimaryKey(
-				sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar")),
-				sql.MapStatic("LONGTEXT"),
-			),
+			sql.BINARY:  binaryMapping,
 			sql.MULTIPLE: jsonMapper,
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal"), sql.UsingConverter(sql.StrToInt)),
@@ -400,9 +408,20 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE {{ template "te
 (
 	{{- range $ind, $col := $.Keys }}
 		{{- if $ind }},{{ end }}
+		{{- if IsBinary $col }}
+		@v_{{$ind}}
+		{{- else }}
 		{{$col.Identifier}}
+		{{- end }}
 	{{- end }}
-);
+)
+{{- if HasBinary $.Keys }}
+SET
+	{{- range $i, $ic := IndexedBinaryColumns $.Keys }}
+		{{- if $i }},{{ end }}
+	{{$ic.Column.Identifier}} = FROM_BASE64(@v_{{$ic.Index}})
+	{{- end }}
+{{- end }};
 {{ end }}
 
 -- Templated query which joins keys from the load table with the target table, and returns values. It
@@ -473,9 +492,20 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE {{ $.Identifi
 (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
+		{{- if IsBinary $col }}
+		@v_{{$ind}}
+		{{- else }}
 		{{$col.Identifier}}
+		{{- end }}
 	{{- end }}
-);
+)
+{{- if HasBinary $.Columns }}
+SET
+	{{- range $i, $ic := IndexedBinaryColumns $.Columns }}
+		{{- if $i }},{{ end }}
+	{{$ic.Column.Identifier}} = FROM_BASE64(@v_{{$ic.Index}})
+	{{- end }}
+{{- end }};
 {{ end }}
 
 {{ define "createUpdateTable" }}
@@ -505,9 +535,20 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE {{ template "
 (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
+		{{- if IsBinary $col }}
+		@v_{{$ind}}
+		{{- else }}
 		{{$col.Identifier}}
+		{{- end }}
 	{{- end }}
-);
+)
+{{- if HasBinary $.Columns }}
+SET
+	{{- range $i, $ic := IndexedBinaryColumns $.Columns }}
+		{{- if $i }},{{ end }}
+	{{$ic.Column.Identifier}} = FROM_BASE64(@v_{{$ic.Index}})
+	{{- end }}
+{{- end }};
 {{ end }}
 
 {{ define "updateReplace" }}
@@ -559,9 +600,20 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE {{ template "
 (
 	{{- range $ind, $col := $.Keys }}
 		{{- if $ind }},{{ end }}
+		{{- if IsBinary $col }}
+		@v_{{$ind}}
+		{{- else }}
 		{{$col.Identifier}}
+		{{- end }}
 	{{- end }}
-);
+)
+{{- if HasBinary $.Keys }}
+SET
+	{{- range $i, $ic := IndexedBinaryColumns $.Keys }}
+		{{- if $i }},{{ end }}
+	{{$ic.Column.Identifier}} = FROM_BASE64(@v_{{$ic.Index}})
+	{{- end }}
+{{- end }};
 {{ end }}
 
 {{ define "deleteQuery" }}

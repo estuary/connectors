@@ -51,22 +51,28 @@ var timestampConverter sql.ElementConverter = func(te tuple.TupleElement) (inter
 	return timestamp, nil
 }
 
-// starburstTrinoDialect returns a representation of the Starburst Trino SQL dialect used for target table.
-var starburstTrinoDialect = func() sql.Dialect {
+// newStarburstTrinoDialect returns a representation of the Starburst Trino SQL dialect used for target table.
+func newStarburstTrinoDialect(featureFlags map[string]bool) sql.Dialect {
 	dateTimeMapper := sql.MapStatic("TIMESTAMP(6) WITH TIME ZONE", sql.UsingConverter(timestampConverter))
-	return starburstDialect(sql.MapStatic("DATE"), dateTimeMapper)
-}()
+	binaryMapper := sql.MapStatic("VARCHAR")
+	if featureFlags["native_binary_column_type"] {
+		binaryMapper = sql.MapStatic("VARBINARY")
+	}
+	return starburstDialect(sql.MapStatic("DATE"), dateTimeMapper, binaryMapper)
+}
 
-// starburstHiveDialect returns a representation of the Starburst Hive format SQL dialect used for temp table.
-var starburstHiveDialect = func() sql.Dialect {
-	return starburstDialect(sql.MapStatic("VARCHAR"), sql.MapStatic("VARCHAR"))
-}()
+// newStarburstHiveDialect returns a representation of the Starburst Hive format SQL dialect used for temp table.
+// The temp table always uses VARCHAR for binary columns so that base64-encoded
+// data can be staged as text and later decoded into VARBINARY during merge.
+func newStarburstHiveDialect() sql.Dialect {
+	return starburstDialect(sql.MapStatic("VARCHAR"), sql.MapStatic("VARCHAR"), sql.MapStatic("VARCHAR"))
+}
 
-var starburstDialect = func(dateMapper sql.MapProjectionFn, dateTimeMapper sql.MapProjectionFn) sql.Dialect {
+var starburstDialect = func(dateMapper sql.MapProjectionFn, dateTimeMapper sql.MapProjectionFn, binaryMapper sql.MapProjectionFn) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:          sql.MapStatic("VARCHAR", sql.UsingConverter(jsonConverter)),
-			sql.BINARY:         sql.MapStatic("VARCHAR"),
+			sql.BINARY:         binaryMapper,
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
 			sql.INTEGER:        sql.MapStatic("BIGINT"),
 			sql.NUMBER:         sql.MapStatic("DOUBLE", sql.UsingConverter(doubleConverter)),
@@ -188,7 +194,7 @@ SELECT {{ $.Binding }}, {{$.Document.Identifier}}
     JOIN {{$.Identifier}}_load_temp AS r
 	ON {{ range $ind, $key := $.Keys }}
 	{{- if $ind }} AND {{ end -}}
-    l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+    l.{{ $key.Identifier }} = {{ if IsBinary $key }}from_base64(r.{{ $key.Identifier }}){{ else }}r.{{ $key.Identifier }}{{ end }}
 	{{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
@@ -215,7 +221,7 @@ MERGE INTO {{ $.Identifier }} AS l
 	USING {{$.Identifier}}_store_temp AS r
 	ON {{ range $ind, $key := $.Keys }}
 	{{- if $ind }} AND {{ end -}}
-	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+	l.{{ $key.Identifier }} = {{ if IsBinary $key }}from_base64(r.{{ $key.Identifier }}){{ else }}r.{{ $key.Identifier }}{{ end }}
 	{{- end }}
 	WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
@@ -253,6 +259,8 @@ ALTER TABLE {{.TableIdentifier}} ADD COLUMN {{.ColumnIdentifier}} {{.NullableDDL
 	from_iso8601_date(r.{{ $.Identifier}})
 {{- else if Contains $.DDL  "TIMESTAMP" -}}
 	from_iso8601_timestamp_nanos(r.{{ $.Identifier}})
+{{- else if IsBinary $ -}}
+	from_base64(r.{{ $.Identifier }})
 {{- else -}}
 	r.{{ $.Identifier }}
 {{- end -}}

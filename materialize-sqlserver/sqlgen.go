@@ -56,6 +56,20 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
 	}
 
+	binaryMapping := sql.MapPrimaryKey(
+		sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)),
+		sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
+	)
+	if featureFlags["native_binary_column_type"] {
+		// SQL Server limits PK column sizes to 900 bytes. VARBINARY(MAX)
+		// cannot be used for indexed columns, so PKs fall back to
+		// VARBINARY(900).
+		binaryMapping = sql.MapPrimaryKey(
+			sql.MapStatic("VARBINARY(900)", sql.AlsoCompatibleWith("varbinary"), sql.UsingConverter(sql.Base64Decoder)),
+			sql.MapStatic("VARBINARY(MAX)", sql.AlsoCompatibleWith("varbinary"), sql.UsingConverter(sql.Base64Decoder)),
+		)
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -66,10 +80,7 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 			sql.BOOLEAN: sql.MapStatic("BIT"),
 			sql.OBJECT:  sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
 			sql.ARRAY:   sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
-			sql.BINARY: sql.MapPrimaryKey(
-				sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)),
-				sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
-			),
+			sql.BINARY:  binaryMapping,
 			sql.MULTIPLE: sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("BIGINT", sql.UsingConverter(strToInt)),
@@ -334,6 +345,8 @@ SELECT TOP 0 -1, NULL
 	FORMAT({{ $ident }} AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.FFFFFFF') + 'Z'
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	FORMAT({{ $ident }}, 'HH:mm:ss.FFFFFFF')
+{{- else if eq $.AsFlatType "binary" -}}
+	CAST(N'' AS XML).value('xs:base64Binary(sql:column("{{ $.Alias }}.{{ $.Identifier }}"))', 'VARCHAR(MAX)')
 {{- else -}}
 	{{ $ident }}
 {{- end -}}

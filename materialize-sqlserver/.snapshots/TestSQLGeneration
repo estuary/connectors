@@ -23,7 +23,7 @@ TRUNCATE TABLE #flow_temp_store_1;
 CREATE TABLE #flow_temp_load_0 (
 		key1 BIGINT NOT NULL,
 		key2 BIT NOT NULL,
-		"key!binary" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+		"key!binary" VARBINARY(900) NOT NULL,
 		PRIMARY KEY (key1, key2, "key!binary")
 );
 --- End key_value createLoadTable ---
@@ -41,9 +41,9 @@ CREATE TABLE #flow_temp_load_1 (
 CREATE TABLE #flow_temp_store_0 (
 		key1 BIGINT NOT NULL,
 		key2 BIT NOT NULL,
-		"key!binary" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+		"key!binary" VARBINARY(900) NOT NULL,
 		"array" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
-		"binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"binary" VARBINARY(MAX),
 		"boolean" BIT,
 		field_with_projection varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		flow_published_at DATETIME2 NOT NULL,
@@ -88,9 +88,9 @@ IF OBJECT_ID(N'key_value', 'U') IS NULL BEGIN
 CREATE TABLE key_value (
 		key1 BIGINT NOT NULL,
 		key2 BIT NOT NULL,
-		"key!binary" varchar(900) COLLATE Latin1_General_100_BIN2_UTF8 NOT NULL,
+		"key!binary" VARBINARY(900) NOT NULL,
 		"array" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
-		"binary" varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
+		"binary" VARBINARY(MAX),
 		"boolean" BIT,
 		field_with_projection varchar(MAX) COLLATE Latin1_General_100_BIN2_UTF8,
 		flow_published_at DATETIME2 NOT NULL,
@@ -220,9 +220,9 @@ SELECT 0,
 	SELECT
 		'key1' = r.key1,
 		'key2' = r.key2,
-		'key!binary' = r."key!binary",
+		'key!binary' = CAST(N'' AS XML).value('xs:base64Binary(sql:column("r."key!binary""))', 'VARCHAR(MAX)'),
 		'array' = r."array",
-		'binary' = r."binary",
+		'binary' = CAST(N'' AS XML).value('xs:base64Binary(sql:column("r."binary""))', 'VARCHAR(MAX)'),
 		'boolean' = r."boolean",
 		'field_with_projection' = r.field_with_projection,
 		'integer' = r."integer",

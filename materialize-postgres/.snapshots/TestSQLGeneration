@@ -3,9 +3,9 @@
 CREATE TABLE IF NOT EXISTS key_value (
 		key1 BIGINT NOT NULL,
 		key2 BOOLEAN NOT NULL,
-		"key!binary" TEXT NOT NULL,
+		"key!binary" BYTEA NOT NULL,
 		"array" JSON,
-		"binary" TEXT,
+		"binary" BYTEA,
 		"boolean" BOOLEAN,
 		field_with_projection TEXT,
 		flow_published_at TIMESTAMPTZ NOT NULL,
@@ -86,7 +86,7 @@ auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 		key1 BIGINT NOT NULL,
 		key2 BOOLEAN NOT NULL,
-		"key!binary" TEXT NOT NULL
+		"key!binary" BYTEA NOT NULL
 ) ON COMMIT DELETE ROWS;
 --- End key_value createLoadTable ---
 

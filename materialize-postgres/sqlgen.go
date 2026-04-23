@@ -29,6 +29,11 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
 	}
 
+	binaryMapping := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"))
+	if featureFlags["native_binary_column_type"] {
+		binaryMapping = sql.MapStatic("BYTEA", sql.UsingConverter(sql.Base64Decoder))
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -39,7 +44,7 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
 			sql.OBJECT:         sql.MapStatic("JSON"),
 			sql.ARRAY:          sql.MapStatic("JSON"),
-			sql.BINARY:         sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying")),
+			sql.BINARY:         binaryMapping,
 			sql.MULTIPLE:       sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.STRING_INTEGER: sql.MapStatic("NUMERIC"),
 			sql.STRING_NUMBER:  sql.MapStatic("DECIMAL", sql.AlsoCompatibleWith("numeric")),
