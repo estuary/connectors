@@ -23,11 +23,6 @@ MAX_PAGE_SIZE = 1000
 MIN_PAGE_SIZE = 1
 NEXT_PAGE_QUERY_PARAMETER = "page[after]"
 
-# MAX_WINDOW_SIZE bounds how far forward a single fetch_resources invocation
-# will advance. The Outreach API sometimes returns results unsorted within a
-# query, so we process records in explicit [lower, upper] date windows and
-# trust the set of records returned for that window rather than their order.
-MAX_WINDOW_SIZE = timedelta(days=1)
 
 def _dt_to_str(dt: datetime) -> str:
     return dt.strftime(DATETIME_STRING_FORMAT)
@@ -160,6 +155,7 @@ async def fetch_resources(
     extra_params: dict[str, str | int | bool] | None,
     cursor_field: CursorField,
     horizon: timedelta | None,
+    window_size: timedelta,
     log: Logger,
     log_cursor: LogCursor,
 ) -> AsyncGenerator[OutreachResource | LogCursor, None]:
@@ -170,7 +166,11 @@ async def fetch_resources(
     if log_cursor >= horizon_cutoff:
         return
 
-    max_upper_bound = log_cursor + MAX_WINDOW_SIZE
+    # window_size bounds how far forward a single invocation will advance.
+    # The Outreach API sometimes returns results unsorted within a query, so
+    # we process records in explicit [lower, upper] date windows and trust
+    # the set of records returned for that window rather than their order.
+    max_upper_bound = log_cursor + window_size
     upper_bound = min(max_upper_bound, horizon_cutoff)
 
     url = f"{API}/{path}"
