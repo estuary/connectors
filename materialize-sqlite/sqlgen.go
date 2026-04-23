@@ -21,7 +21,7 @@ var sqliteDialect = func() sql.Dialect {
 			sql.STRING_NUMBER:  sql.MapStatic("REAL"),
 			sql.STRING:         sql.MapStatic("TEXT"),
 		},
-		sql.WithNotNullText("NOT NULL"),
+		sql.WithNotNullSuffix("NOT NULL"),
 	)
 
 	return sql.Dialect{

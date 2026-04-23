@@ -219,13 +219,14 @@ type MapProjectionFn func(p *Projection) (DDLer, CompatibleColumnTypes, ElementC
 
 var _ TypeMapper = DDLMapper{}
 
-// DDLMapper completes the column definition from the column DDL, by adding the
-// "not null" and "nullable" text (if applicable), the comment for the column,
-// and handling any field configuration options.
+// DDLMapper completes the column definition from the column DDL, by applying
+// the dialect's "not null" and "nullable" transformations (if configured) to
+// the base type, the comment for the column, and handling any field
+// configuration options.
 type DDLMapper struct {
-	notNullText  string
-	nullableText string
-	m            map[FlatType]MapProjectionFn
+	notNullFn  func(ddl string) string
+	nullableFn func(ddl string) string
+	m          map[FlatType]MapProjectionFn
 }
 
 type FlatTypeMappings map[FlatType]MapProjectionFn
@@ -246,23 +247,41 @@ func NewDDLMapper(mappings FlatTypeMappings, opts ...DDLMapperOption) DDLMapper 
 
 type DDLMapperOption func(*DDLMapper)
 
-// WithNotNullText sets the "not null" DDL that will be used for columns with
-// fields that can never be NULL.
-func WithNotNullText(notNullText string) DDLMapperOption {
+// WithNotNullFn sets a transformation applied to the base DDL for columns with
+// fields that can never be NULL. Use WithNotNullSuffix for the common case of
+// appending a suffix token (e.g. "NOT NULL").
+func WithNotNullFn(fn func(ddl string) string) DDLMapperOption {
 	return func(m *DDLMapper) {
-		m.notNullText = notNullText
+		m.notNullFn = fn
 	}
 }
 
-// WithNullableText sets the "nullable" DDL that will be used for columns with
-// fields that can be NULL. Most databases will assume that a column may contain
-// null as long as it isn't declared with a NOT NULL constraint, but some
-// databases (e.g. ms sql server) make that behavior configurable, requiring the
-// DDL to explicitly declare a column with NULL if it may contain null values.
-func WithNullableText(nullableText string) DDLMapperOption {
+// WithNotNullSuffix is a convenience form of WithNotNullFn for dialects that
+// express non-nullability by appending a token after the base DDL (e.g. "NOT
+// NULL").
+func WithNotNullSuffix(suffix string) DDLMapperOption {
+	return WithNotNullFn(func(ddl string) string { return ddl + " " + suffix })
+}
+
+// WithNullableFn sets a transformation applied to the base DDL for columns with
+// fields that can be NULL. Use WithNullableSuffix for the common case of
+// appending a suffix token (e.g. "NULL"). Use WithNullableFn for dialects that
+// express nullability by wrapping the type (e.g. ClickHouse's "Nullable(T)").
+//
+// Most databases assume that a column may contain null as long as it isn't
+// declared with a NOT NULL constraint, but some databases (e.g. ms sql server)
+// make that behavior configurable, requiring the DDL to explicitly declare a
+// column with NULL if it may contain null values.
+func WithNullableFn(fn func(ddl string) string) DDLMapperOption {
 	return func(m *DDLMapper) {
-		m.nullableText = nullableText
+		m.nullableFn = fn
 	}
+}
+
+// WithNullableSuffix is a convenience form of WithNullableFn for dialects that
+// express nullability by appending a token after the base DDL (e.g. "NULL").
+func WithNullableSuffix(suffix string) DDLMapperOption {
+	return WithNullableFn(func(ddl string) string { return ddl + " " + suffix })
 }
 
 type mapStaticConfig struct {
@@ -452,10 +471,10 @@ func (d DDLMapper) MapType(p *Projection, fc FieldConfig) MappedType {
 		TargetType:            ddl,
 	}
 
-	if mustExist && d.notNullText != "" {
-		out.DDL += " " + d.notNullText
-	} else if d.nullableText != "" {
-		out.DDL += " " + d.nullableText
+	if mustExist && d.notNullFn != nil {
+		out.DDL = d.notNullFn(out.DDL)
+	} else if d.nullableFn != nil {
+		out.DDL = d.nullableFn(out.DDL)
 		out.NullableDDL = out.DDL
 	}
 

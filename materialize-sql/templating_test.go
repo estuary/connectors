@@ -30,7 +30,7 @@ func newTestDialect() Dialect {
 				},
 			}),
 		},
-		WithNotNullText("NOT NULL"),
+		WithNotNullSuffix("NOT NULL"),
 	)
 
 	return Dialect{

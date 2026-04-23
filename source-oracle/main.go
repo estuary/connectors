@@ -111,20 +111,40 @@ func connectOracle(ctx context.Context, name string, cfg json.RawMessage) (sqlca
 		return nil, err
 	}
 
-	var isContainerDatabase string
-	var row = db.conn.QueryRowContext(ctx, "SELECT CDB FROM V$DATABASE")
-	if err := row.Scan(&isContainerDatabase); err != nil {
-		return nil, fmt.Errorf("querying CDB status: %w", err)
+	var version string
+	var row = db.conn.QueryRowContext(ctx, "SELECT VERSION FROM V$INSTANCE")
+	if err := row.Scan(&version); err != nil {
+		return nil, fmt.Errorf("querying database version: %w", err)
+	}
+	log.WithField("version", version).Info("detected Oracle database version")
+
+	parts := strings.SplitN(version, ".", 2)
+	if len(parts) == 0 || parts[0] == "" {
+		return nil, fmt.Errorf("unexpected empty version string from V$INSTANCE")
+	}
+	majorVersion, err := strconv.Atoi(parts[0])
+	if err != nil {
+		return nil, fmt.Errorf("parsing major version from %q: %w", version, err)
 	}
 
-	if isContainerDatabase == "YES" {
-		var containerName string
-		var row = db.conn.QueryRowContext(ctx, "SELECT SYS_CONTEXT('USERENV', 'CON_NAME') AS CONTAINER_NAME FROM DUAL")
+	// Container Database (CDB) architecture was introduced in Oracle 12c.
+	// The CDB column in V$DATABASE does not exist in earlier versions.
+	if majorVersion >= 12 {
+		var isContainerDatabase string
+		var row = db.conn.QueryRowContext(ctx, "SELECT CDB FROM V$DATABASE")
+		if err := row.Scan(&isContainerDatabase); err != nil {
+			return nil, fmt.Errorf("querying CDB status: %w", err)
+		}
 
-		if err := row.Scan(&containerName); err != nil {
-			return nil, fmt.Errorf("querying current container name: %w", err)
-		} else if containerName != "CDB$ROOT" && containerName != "DATABASE" {
-			db.pdbName = containerName
+		if isContainerDatabase == "YES" {
+			var containerName string
+			var row = db.conn.QueryRowContext(ctx, "SELECT SYS_CONTEXT('USERENV', 'CON_NAME') AS CONTAINER_NAME FROM DUAL")
+
+			if err := row.Scan(&containerName); err != nil {
+				return nil, fmt.Errorf("querying current container name: %w", err)
+			} else if containerName != "CDB$ROOT" && containerName != "DATABASE" {
+				db.pdbName = containerName
+			}
 		}
 	}
 
