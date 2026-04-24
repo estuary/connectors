@@ -90,7 +90,7 @@ func TestSQLGeneration(t *testing.T) {
 				{Identifier: "migrated_boolean_column", CastSQL: bitToStringCast(sql.ColumnTypeMigration{
 					Column: sql.Column{
 						Identifier: "migrated_boolean_column",
-						MappedType: sql.MappedType{NullableDDL: "VARCHAR(MAX)"},
+						MappedType: sql.MappedType{BareDDL: "VARCHAR(MAX)"},
 					},
 				})},
 				{Identifier: "yet_another_not_migrated_column"},

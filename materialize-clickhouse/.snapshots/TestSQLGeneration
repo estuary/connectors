@@ -53,9 +53,9 @@ ORDER BY (theKey)
 
 --- Begin alter table add columns and drop not nulls ---
 
-ALTER TABLE key_value ADD COLUMN IF NOT EXISTS first_new_column Nullable(STRING);
+ALTER TABLE key_value ADD COLUMN first_new_column ;
 
-ALTER TABLE key_value ADD COLUMN IF NOT EXISTS second_new_column Nullable(BOOL);
+ALTER TABLE key_value ADD COLUMN second_new_column ;
 
 ALTER TABLE key_value MODIFY COLUMN first_required_column Nullable(string);
 
@@ -64,9 +64,9 @@ ALTER TABLE key_value MODIFY COLUMN second_required_column Nullable(bool);
 
 --- Begin alter table add columns ---
 
-ALTER TABLE key_value ADD COLUMN IF NOT EXISTS first_new_column Nullable(STRING);
+ALTER TABLE key_value ADD COLUMN first_new_column ;
 
-ALTER TABLE key_value ADD COLUMN IF NOT EXISTS second_new_column Nullable(BOOL);
+ALTER TABLE key_value ADD COLUMN second_new_column ;
 --- End alter table add columns ---
 
 --- Begin alter table drop not nulls ---

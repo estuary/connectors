@@ -1,7 +1,7 @@
 from datetime import datetime, UTC, timedelta
 from enum import StrEnum
 import json
-from typing import TYPE_CHECKING
+from typing import Annotated, TYPE_CHECKING
 from urllib import parse
 
 from estuary_cdk.capture.common import (
@@ -135,6 +135,21 @@ class EndpointConfig(BaseModel):
     credentials: OAuth2Credentials = Field(
         discriminator="credentials_title",
         title="Authentication",
+    )
+    class Advanced(BaseModel):
+        window_size: Annotated[timedelta, Field(
+            description="Date window size for incremental syncs in ISO 8601 format. ex: P1D means 1 day, PT6H means 6 hours.",
+            title="Window size",
+            default=timedelta(days=1),
+            ge=timedelta(seconds=5),
+            le=timedelta(days=365),
+        )]
+
+    advanced: Advanced = Field(
+        default_factory=Advanced, #type: ignore
+        title="Advanced Config",
+        description="Advanced settings for the connector.",
+        json_schema_extra={"advanced": True},
     )
 
 

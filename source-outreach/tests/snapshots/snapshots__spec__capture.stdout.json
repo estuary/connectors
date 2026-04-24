@@ -3,6 +3,19 @@
     "protocol": 3032023,
     "configSchema": {
       "$defs": {
+        "Advanced": {
+          "properties": {
+            "window_size": {
+              "default": "P1D",
+              "description": "Date window size for incremental syncs in ISO 8601 format. ex: P1D means 1 day, PT6H means 6 hours.",
+              "format": "duration",
+              "title": "Window size",
+              "type": "string"
+            }
+          },
+          "title": "Advanced",
+          "type": "object"
+        },
         "RotatingOAuth2Credentials": {
           "properties": {
             "credentials_title": {
@@ -69,6 +82,12 @@
             }
           ],
           "title": "Authentication"
+        },
+        "advanced": {
+          "$ref": "#/$defs/Advanced",
+          "advanced": true,
+          "description": "Advanced settings for the connector.",
+          "title": "Advanced Config"
         }
       },
       "required": [

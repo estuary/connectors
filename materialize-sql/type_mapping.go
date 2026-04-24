@@ -169,11 +169,14 @@ func (d StringDDL) DDL() string {
 }
 
 type MappedType struct {
-	// DDL is the "CREATE TABLE" DDL type for this mapping, suited for direct inclusion in raw SQL
-	// for new table creation.
+	// DDL is the "CREATE TABLE" DDL type for this mapping, suited for direct
+	// inclusion in raw SQL for new table creation. It may include nullability
+	// modifiers.
 	DDL string
-	// NullableDDL is DDL type for this mapping, always in its nullable form, to be used for
-	// existing table alterations.
+	// BareDDL is the DDL type for this mapping, without any nullability
+	// modifiers, to be used for existing table alterations.
+	BareDDL string
+	// NullableDDL is the DDL type for this mapping, always in its nullable form.
 	NullableDDL string
 	// Converter of tuple elements for this mapping, into SQL runtime values.
 	Converter ElementConverter `json:"-"`
@@ -192,7 +195,7 @@ type MappedType struct {
 }
 
 func (m MappedType) String() string {
-	return m.NullableDDL
+	return m.BareDDL
 }
 
 func (m MappedType) Compatible(existing boilerplate.ExistingField) bool {
@@ -232,7 +235,11 @@ type DDLMapper struct {
 type FlatTypeMappings map[FlatType]MapProjectionFn
 
 func NewDDLMapper(mappings FlatTypeMappings, opts ...DDLMapperOption) DDLMapper {
-	out := DDLMapper{m: make(map[FlatType]MapProjectionFn)}
+	out := DDLMapper{
+		notNullFn:  func(ddl string) string { return ddl },
+		nullableFn: func(ddl string) string { return ddl },
+		m:          make(map[FlatType]MapProjectionFn),
+	}
 
 	for _, o := range opts {
 		o(&out)
@@ -462,20 +469,21 @@ func (d DDLMapper) MapType(p *Projection, fc FieldConfig) MappedType {
 		ddl = StringDDL(fc.DDL)
 	}
 
+	bareDDL := ddl.DDL()
+	nullableDDL := d.nullableFn(bareDDL)
+	createDDL := nullableDDL
+	if mustExist {
+		createDDL = d.notNullFn(bareDDL)
+	}
+
 	out := MappedType{
-		DDL:                   ddl.DDL(),
-		NullableDDL:           ddl.DDL(),
+		DDL:                   createDDL,
+		BareDDL:               bareDDL,
+		NullableDDL:           nullableDDL,
 		Converter:             converter,
 		CompatibleColumnTypes: compatibleTypes,
 		UserDefinedDDL:        fc.DDL != "",
 		TargetType:            ddl,
-	}
-
-	if mustExist && d.notNullFn != nil {
-		out.DDL = d.notNullFn(out.DDL)
-	} else if d.nullableFn != nil {
-		out.DDL = d.nullableFn(out.DDL)
-		out.NullableDDL = out.DDL
 	}
 
 	return out

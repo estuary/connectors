@@ -76,6 +76,7 @@ def incremental_resources(
                     params,
                     cursor_field,
                     None,
+                    config.advanced.window_size,
                 ),
                 LOOKBACK: functools.partial(
                     fetch_resources,
@@ -84,6 +85,7 @@ def incremental_resources(
                     params,
                     cursor_field,
                     LOOKBACK_LAG,
+                    config.advanced.window_size,
                 ),
             },
             fetch_page=functools.partial(

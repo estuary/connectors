@@ -233,45 +233,43 @@ As a convention and to reduce ambiguity, message request types (sent by the
 runtime) are named in the imperative mood (`Load`), while response types (sent
 by the connector) are named in the perfect tense (`Loaded`):
 
-See the rendered chart [here][materialization-protocol].
-
-<Mermaid chart={`
-  sequenceDiagram
-    Runtime->>Connector: Open{MaterializationSpec, connectorCP}
-    Note right of Connector: Connect to endpoint.<br/>Optionally fetch last-committed<br/>runtime checkpoint.
-    Connector->>Runtime: Opened{runtimeCP}
-    Note over Runtime, Connector: One-time initialization ☝️.<br/> 👇 Repeats for each transaction.
-    Note left of Runtime: Prior txn commits<br/>to recovery log.
-    Note right of Connector: Prior txn commits to DB<br/>(where applicable).
-    Runtime->>Connector: Acknowledge
-    Note right of Runtime: Acknowledged MAY be sent<br/>before Acknowledge.
-    Note right of Connector: MAY perform an idempotent<br/>apply of last txn.
-    Note left of Runtime: Runtime does NOT await<br/>Acknowledged before<br/>proceeding to send Load.
-    Connector->>Runtime: Acknowledged
-    Note left of Runtime: Runtime may now finalize<br/>a pipelined transaction.
-    Note over Runtime, Connector: End of Acknowledge phase.
-    Runtime->>Connector: Load<A>
-    Note left of Runtime: Load keys may<br/> not exist (yet).
-    Runtime->>Connector: Load<B>
-    Note right of Connector: MAY evaluate Load immediately,<br/>or stage for deferred retrieval.
-    Connector->>Runtime: Loaded<A>
-    Runtime->>Connector: Load<C>
-    Runtime->>Connector: Flush
-    Connector->>Runtime: Loaded<C>
-    Note right of Connector: Omits Loaded for keys<br/>that don't exist.
-    Connector->>Runtime: Flushed
-    Note left of Runtime: All existing keys<br/>have been retrieved.
-    Note over Runtime, Connector: End of Load phase.
-    Runtime->>Connector: Store<X>
-    Runtime->>Connector: Store<Y>
-    Runtime->>Connector: Store<Z>
-    Runtime->>Connector: StartCommit{runtimeCP}
-    Note right of Connector: * Completes all Store processing.<br/>* MAY include runtimeCP in DB txn.
-    Note right of Connector: Commit to DB<br/>now underway.
-    Connector->>Runtime: StartedCommit{connectorCP}
-    Note left of Runtime: Begins commit to<br/> recovery log.
-    Note over Runtime, Connector: End of Store phase. Loops around<br/>to Acknowledge <=> Acknowledged.
-`}/>
+```mermaid
+sequenceDiagram
+  Runtime->>Connector: Open{MaterializationSpec, connectorCP}
+  Note right of Connector: Connect to endpoint.<br/>Optionally fetch last-committed<br/>runtime checkpoint.
+  Connector->>Runtime: Opened{runtimeCP}
+  Note over Runtime, Connector: One-time initialization ☝️.<br/> 👇 Repeats for each transaction.
+  Note left of Runtime: Prior txn commits<br/>to recovery log.
+  Note right of Connector: Prior txn commits to DB<br/>(where applicable).
+  Runtime->>Connector: Acknowledge
+  Note right of Runtime: Acknowledged MAY be sent<br/>before Acknowledge.
+  Note right of Connector: MAY perform an idempotent<br/>apply of last txn.
+  Note left of Runtime: Runtime does NOT await<br/>Acknowledged before<br/>proceeding to send Load.
+  Connector->>Runtime: Acknowledged
+  Note left of Runtime: Runtime may now finalize<br/>a pipelined transaction.
+  Note over Runtime, Connector: End of Acknowledge phase.
+  Runtime->>Connector: Load<A>
+  Note left of Runtime: Load keys may<br/> not exist (yet).
+  Runtime->>Connector: Load<B>
+  Note right of Connector: MAY evaluate Load immediately,<br/>or stage for deferred retrieval.
+  Connector->>Runtime: Loaded<A>
+  Runtime->>Connector: Load<C>
+  Runtime->>Connector: Flush
+  Connector->>Runtime: Loaded<C>
+  Note right of Connector: Omits Loaded for keys<br/>that don't exist.
+  Connector->>Runtime: Flushed
+  Note left of Runtime: All existing keys<br/>have been retrieved.
+  Note over Runtime, Connector: End of Load phase.
+  Runtime->>Connector: Store<X>
+  Runtime->>Connector: Store<Y>
+  Runtime->>Connector: Store<Z>
+  Runtime->>Connector: StartCommit{runtimeCP}
+  Note right of Connector: * Completes all Store processing.<br/>* MAY include runtimeCP in DB txn.
+  Note right of Connector: Commit to DB<br/>now underway.
+  Connector->>Runtime: StartedCommit{connectorCP}
+  Note left of Runtime: Begins commit to<br/> recovery log.
+  Note over Runtime, Connector: End of Store phase. Loops around<br/>to Acknowledge <=> Acknowledged.
+```
 
 
 The full cycle is:
@@ -668,6 +666,5 @@ This matches the behavior of Kafka Connect, for example.
 [collections]: https://docs.estuary.dev/concepts/collections/
 [protobuf]: https://github.com/estuary/flow/blob/master/go/protocols/materialize/materialize.proto
 [boilerplate]: ../../materialize-boilerplate
-[materialization-protocol]: https://docs.estuary.dev/reference/Connectors/materialization-protocol/
 [reduction-strategies]: https://docs.estuary.dev/reference/reduction-strategies/
 [recovery-log]: https://gazette.readthedocs.io/en/latest/consumers-concepts.html#recovery-logs
