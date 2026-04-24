@@ -174,7 +174,7 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 ALTER TABLE {{$.Identifier}}
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
-	ADD COLUMN {{$col.Identifier}} {{$col.BareDDL}}
+	ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}}
 {{- end }}
 {{- if and $.DropNotNulls $.AddColumns}},{{ end }}
 {{- range $ind, $col := $.DropNotNulls }}

@@ -341,6 +341,11 @@ SETTINGS
 ;
 {{ end }}
 
+-- ClickHouse permits adding non-nullable columns. The default value for a
+-- non-nullable column is the zero value (0, "", etc) for the column type.
+-- For that reason, this ALTER TABLE ... ADD COLUMN statement might look a bit
+-- strange compared to other SQL dialects.
+
 {{ define "alterTargetColumns" }}
 {{- range $ind, $col := $.AddColumns }}
 ALTER TABLE {{$.Identifier}} ADD COLUMN {{$col.Identifier}} {{$col.DDL}};

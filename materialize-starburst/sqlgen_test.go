@@ -64,7 +64,7 @@ func TestSQLGeneration(t *testing.T) {
 	type AlterTableTemplateParams struct {
 		TableIdentifier  string
 		ColumnIdentifier string
-		BareDDL          string
+		NullableDDL      string
 	}
 	require.NoError(t, targetTableTemplates.alterTableColumns.Execute(&snap,
 		AlterTableTemplateParams{targetTable.Identifier, "first_new_column", "STRING"}))

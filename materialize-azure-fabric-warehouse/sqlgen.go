@@ -210,7 +210,7 @@ CREATE TABLE {{$.Identifier}} (
 ALTER TABLE {{$.Identifier}} ADD
 {{- range $ind, $col := $.AddColumns }}
 	{{- if $ind }},{{ end }}
-	{{$col.Identifier}} {{$col.BareDDL}}
+	{{$col.Identifier}} {{$col.NullableDDL}}
 {{- end }};
 {{ end }}
 

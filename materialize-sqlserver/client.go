@@ -98,7 +98,7 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 				fmt.Sprintf("ALTER TABLE %s ADD %s %s;",
 					table.Identifier,
 					ins.TempColumnIdentifier,
-					ins.TypeMigration.BareDDL,
+					ins.TypeMigration.NullableDDL,
 				),
 			)
 		}
@@ -141,7 +141,7 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 		var queries []string
 
 		for _, ins := range instructions {
-			if ins.TypeMigration.BareDDL != ins.TypeMigration.DDL {
+			if ins.TypeMigration.NullableDDL != ins.TypeMigration.DDL {
 				queries = append(
 					queries,
 					fmt.Sprintf(

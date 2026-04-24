@@ -299,8 +299,8 @@ func RunSqlGenTests(
 	}
 
 	addCols := []Column{
-		{Identifier: "first_new_column", MappedType: MappedType{BareDDL: "STRING"}},
-		{Identifier: "second_new_column", MappedType: MappedType{BareDDL: "BOOL"}},
+		{Identifier: "first_new_column", MappedType: MappedType{BareDDL: "STRING", NullableDDL: "STRING"}},
+		{Identifier: "second_new_column", MappedType: MappedType{BareDDL: "BOOL", NullableDDL: "BOOL"}},
 	}
 	dropNotNulls := []boilerplate.ExistingField{
 		{

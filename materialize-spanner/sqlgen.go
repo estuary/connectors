@@ -194,7 +194,7 @@ CREATE TABLE IF NOT EXISTS {{$.Identifier}} (
 
 {{ define "alterTableColumns" }}
 {{- range $col := $.AddColumns }}
-ALTER TABLE {{$.Identifier}} ADD COLUMN {{$col.Identifier}} {{$col.BareDDL}};
+ALTER TABLE {{$.Identifier}} ADD COLUMN {{$col.Identifier}} {{$col.NullableDDL}};
 {{- end }}
 {{- range $col := $.DropNotNulls }}
 ALTER TABLE {{$.Identifier}} ALTER COLUMN {{ ColumnIdentifier $col.Name }} {{$col.Type}};

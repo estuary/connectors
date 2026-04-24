@@ -245,7 +245,7 @@ DROP TABLE IF EXISTS {{$.Identifier}}_store_temp
 {{ end }}
 
 {{ define "alterTableColumns" }}
-ALTER TABLE {{.TableIdentifier}} ADD COLUMN {{.ColumnIdentifier}} {{.BareDDL}}
+ALTER TABLE {{.TableIdentifier}} ADD COLUMN {{.ColumnIdentifier}} {{.NullableDDL}}
 {{ end }}
 
 {{ define "cast" }}
