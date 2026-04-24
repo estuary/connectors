@@ -134,7 +134,11 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(datetimeToSuperCast)),
 			},
 			"character varying": {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(jsonQuoteCast))},
-			"*":                 {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(toJsonCast))},
+			"binary varying": {
+				sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(varbyteToStringCast)),
+				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(varbyteToSuperCast)),
+			},
+			"*": {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -188,6 +192,19 @@ func datetimeToSuperCast(migration sql.ColumnTypeMigration) string {
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`CAST(%s as SUPER)`, migration.Identifier)
+}
+
+// varbyteToStringCast decodes a VARBYTE column's raw bytes as a base64 string,
+// which is the canonical textual representation of binary data in Flow.
+func varbyteToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`FROM_VARBYTE(%s, 'base64')`, migration.Identifier)
+}
+
+// varbyteToSuperCast converts a VARBYTE column into a SUPER value containing
+// the base64-encoded JSON string representation of the binary data. A direct
+// CAST from VARBYTE to SUPER is not supported by Redshift.
+func varbyteToSuperCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`json_parse('"' || FROM_VARBYTE(%s, 'base64') || '"')`, migration.Identifier)
 }
 
 func jsonQuoteCast(migration sql.ColumnTypeMigration) string {
