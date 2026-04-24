@@ -115,11 +115,11 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 				sql.MapStatic("BIGINT"),
 				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal")),
 			),
-			sql.NUMBER:  sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double")),
-			sql.BOOLEAN: sql.MapStatic("BOOLEAN", sql.AlsoCompatibleWith("tinyint")),
-			sql.OBJECT:  sql.MapStatic(jsonType),
-			sql.ARRAY:   sql.MapStatic(jsonType),
-			sql.BINARY:  binaryMapping,
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double")),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN", sql.AlsoCompatibleWith("tinyint")),
+			sql.OBJECT:   sql.MapStatic(jsonType),
+			sql.ARRAY:    sql.MapStatic(jsonType),
+			sql.BINARY:   binaryMapping,
 			sql.MULTIPLE: jsonMapper,
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal"), sql.UsingConverter(sql.StrToInt)),
@@ -316,9 +316,11 @@ type templates struct {
 func renderTemplates(dialect sql.Dialect, product string) templates {
 	var jsonBuildFunction = "JSON_OBJECT"
 	var tempTruncateCommand = "TRUNCATE"
+	var loadDataModifier = ""
 	if product == "singlestore" {
 		jsonBuildFunction = "JSON_BUILD_OBJECT"
 		tempTruncateCommand = "DELETE FROM "
+		loadDataModifier = " REPLACE"
 	}
 
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
@@ -398,7 +400,7 @@ CREATE TEMPORARY TABLE {{ template "temp_load_name" . }} (
 -- Templated load into the temporary load table:
 
 {{ define "loadLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE {{ template "temp_load_name" . }} CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load'`+loadDataModifier+` INTO TABLE {{ template "temp_load_name" . }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -482,7 +484,7 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 -- Template to load data into target table
 
 {{ define "insertLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE {{ $.Identifier }} CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert'`+loadDataModifier+` INTO TABLE {{ $.Identifier }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -525,7 +527,7 @@ CREATE TEMPORARY TABLE {{ template "temp_update_name" . }} (
 {{ end }}
 
 {{ define "updateLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE {{ template "temp_update_name" . }} CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update'`+loadDataModifier+` INTO TABLE {{ template "temp_update_name" . }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
@@ -590,7 +592,7 @@ CREATE TEMPORARY TABLE {{ template "temp_delete_name" . }} (
 {{ end }}
 
 {{ define "deleteLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE {{ template "temp_delete_name" . }} CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete'`+loadDataModifier+` INTO TABLE {{ template "temp_delete_name" . }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		OPTIONALLY ENCLOSED BY '"'
