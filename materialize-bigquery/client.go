@@ -153,8 +153,17 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		if err := renderTemplates(c.ep.Dialect).alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
 			return "", nil, fmt.Errorf("rendering alter table columns statement: %w", err)
 		}
-		alterColumnStmt := alterColumnStmtBuilder.String()
-		stmts = append(stmts, alterColumnStmt)
+		// The template can render both an ADD COLUMN and a DROP NOT NULL
+		// statement. Split them apart so each is submitted as its own query:
+		// running both in a single multi-statement script is not retry-safe,
+		// since the first statement may commit before the second's retry is
+		// issued.
+		for _, s := range strings.Split(alterColumnStmtBuilder.String(), ";") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				stmts = append(stmts, s+";\n")
+			}
+		}
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
