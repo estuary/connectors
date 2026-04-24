@@ -3,75 +3,231 @@ collections:
     schema:
       type: object
       properties:
+        int000: &int000 { type: integer }
+        int032: &int032 { type: integer, minimum: -2147483648, maximum: 2147483647 }
+        int064: &int064 { type: integer, minimum: -9223372036854775808, maximum: 9223372036854775807 }
+        int065: &int065 { type: integer, minimum: -18446744073709551616.0, maximum: 18446744073709549568.0 }
+        int128: &int128 { type: integer, minimum: -170141183460469231731687303715884105728.0, maximum: 170141183460469212842221372237303250944.0 }
+        int129: &int129 { type: integer, minimum: -340282366920938463463374607431768211456.0, maximum: 340282366920938425684442744474606501888.0 }
+        int256: &int256 { type: integer, minimum: -57896044618658097711785492504343953926634992332820282019728792003956564819968.0, maximum: 57896044618658091284033315468382851758786622968169871930916816872785223614464.0 }
+        int257: &int257 { type: integer, minimum: -115792089237316195423570985008687907853269984665640564039457584007913129639936.0, maximum: 115792089237316182568066630936765703517573245936339743861833633745570447228928.0 }
+        intStr000: &intStr000 { type: string, format: integer }
+        intStr064: &intStr064 { type: string, format: integer, maxLength: 18 }
+        intStr065: &intStr065 { type: string, format: integer, maxLength: 19 }
+        intStr128: &intStr128 { type: string, format: integer, maxLength: 38 }
+        intStr129: &intStr129 { type: string, format: integer, maxLength: 39 }
+        intStr256: &intStr256 { type: string, format: integer, maxLength: 76 }
+        intStr257: &intStr257 { type: string, format: integer, maxLength: 77 }
+        num: &num { type: number }
+        numStr: &numStr { type: string, format: number }
+        array: &array { type: array }
+        binary: &binary { type: string, contentEncoding: base64 }
+        bool: &bool { type: boolean }
+        object: &object { type: object }
+        string: &string { type: string }
+        date: &date { type: string, format: date }
+        datetime: &datetime { type: string, format: date-time }
+        time: &time { type: string, format: time }
+        duration: &duration { type: string, format: duration }
+        ipv4: &ipv4 { type: string, format: ipv4 }
+        ipv6: &ipv6 { type: string, format: ipv6 }
+        macaddr: &macaddr { type: string, format: macaddr }
+        macaddr8: &macaddr8 { type: string, format: macaddr8 }
+        uuid: &uuid { type: string, format: uuid }
+        email: &email { type: string, format: email }
+        hostname: &hostname { type: string, format: hostname }
+        uri: &uri { type: string, format: uri }
+        uriReference: &uriReference { type: string, format: uri-reference }
+        uriTemplate: &uriTemplate { type: string, format: uri-template }
+        jsonPointer: &jsonPointer { type: string, format: json-pointer }
+        relativeJsonPointer: &relativeJsonPointer { type: string, format: relative-json-pointer }
+        regex: &regex { type: string, format: regex }
+        uint32: &uint32 { type: string, format: uint32 }
+        uint64: &uint64 { type: string, format: uint64, maxLength: 20 }
+        iri: &iri { type: string, format: iri }
+        iriReference: &iriReference { type: string, format: iri-reference }
+
         id: { type: integer }
-        int64ToNum: { type: integer }
-        int64ToNumStr: { type: integer }
-        int64ToInt128: { type: integer }
-        int64ToInt256: { type: integer }
-        int64ToIntStr64: { type: integer }
-        int64ToIntStr128: { type: integer }
-        int64ToIntStr256: { type: integer }
-        int128ToNum: { type: integer, maximum: 170141183460469231731687303715884105727.0 }
-        int128ToNumStr: { type: integer, maximum: 170141183460469231731687303715884105727.0 }
-        int128ToInt256: { type: integer, maximum: 170141183460469231731687303715884105727.0 }
-        int128ToIntStr128: { type: integer, maximum: 170141183460469231731687303715884105727.0 }
-        int128ToIntStr256: { type: integer, maximum: 170141183460469231731687303715884105727.0 }
-        int256ToNum: { type: integer, maximum: 57896044618658097711785492504343953926634992332820282019728792003956564819967.0 }
-        int256ToNumStr: { type: integer, maximum: 57896044618658097711785492504343953926634992332820282019728792003956564819967.0 }
-        int256ToIntStr256: { type: integer, maximum: 57896044618658097711785492504343953926634992332820282019728792003956564819967.0 }
-        intStr64ToInt64: { type: string, format: integer }
-        intStr64ToInt128: { type: string, format: integer }
-        intStr64ToInt256: { type: string, format: integer }
-        intStr64ToIntStr128: { type: string, format: integer }
-        intStr64ToIntStr256: { type: string, format: integer }
-        intStr64ToNum: { type: string, format: integer }
-        intStr64ToNumStr: { type: string, format: integer }
-        intStr128ToInt128: { type: string, format: integer, maxLength: 38 }
-        intStr128ToInt256: { type: string, format: integer, maxLength: 38 }
-        intStr128ToIntStr256: { type: string, format: integer, maxLength: 38 }
-        intStr128ToNum: { type: string, format: integer, maxLength: 38 }
-        intStr128ToNumStr: { type: string, format: integer, maxLength: 38 }
-        intStr256ToInt256: { type: string, format: integer, maxLength: 76 }
-        intStr256ToNum: { type: string, format: integer, maxLength: 76 }
-        intStr256ToNumStr: { type: string, format: integer, maxLength: 76 }
-        numToNumStr: { type: number }
-        numStrToNum: { type: string, format: number }
-        arrayToMulti: { type: array }
-        binaryToMulti: { type: string, contentEncoding: base64 }
-        boolToMulti: { type: boolean }
-        int64ToMulti: { type: integer }
-        int128ToMulti: { type: integer, maximum: 170141183460469231731687303715884105727.0 }
-        int256ToMulti: { type: integer, maximum: 57896044618658097711785492504343953926634992332820282019728792003956564819967.0 }
+        int000ToNum: *int000
+        int000ToNumStr: *int000
+        int000ToInt032: *int000
+        int000ToInt064: *int000
+        int000ToInt065: *int000
+        int000ToInt128: *int000
+        int000ToInt129: *int000
+        int000ToInt256: *int000
+        int000ToInt257: *int000
+        int000ToIntStr000: *int000
+        int000ToIntStr064: *int000
+        int000ToIntStr065: *int000
+        int000ToIntStr128: *int000
+        int000ToIntStr129: *int000
+        int000ToIntStr256: *int000
+        int000ToIntStr257: *int000
+        int032ToNum: *int032
+        int032ToNumStr: *int032
+        int032ToInt064: *int032
+        int032ToInt065: *int032
+        int032ToInt128: *int032
+        int032ToInt129: *int032
+        int032ToInt256: *int032
+        int032ToInt257: *int032
+        int032ToIntStr064: *int032
+        int032ToIntStr065: *int032
+        int032ToIntStr128: *int032
+        int032ToIntStr129: *int032
+        int032ToIntStr256: *int032
+        int032ToIntStr257: *int032
+        int064ToNum: *int064
+        int064ToNumStr: *int064
+        int064ToInt065: *int064
+        int064ToInt128: *int064
+        int064ToInt129: *int064
+        int064ToInt256: *int064
+        int064ToInt257: *int064
+        int064ToIntStr064: *int064
+        int064ToIntStr065: *int064
+        int064ToIntStr128: *int064
+        int064ToIntStr129: *int064
+        int064ToIntStr256: *int064
+        int064ToIntStr257: *int064
+        int065ToNum: *int065
+        int065ToNumStr: *int065
+        int065ToInt128: *int065
+        int065ToInt129: *int065
+        int065ToInt256: *int065
+        int065ToInt257: *int065
+        int065ToIntStr065: *int065
+        int065ToIntStr128: *int065
+        int065ToIntStr129: *int065
+        int065ToIntStr256: *int065
+        int065ToIntStr257: *int065
+        int128ToNum: *int128
+        int128ToNumStr: *int128
+        int128ToInt129: *int128
+        int128ToInt256: *int128
+        int128ToInt257: *int128
+        int128ToIntStr128: *int128
+        int128ToIntStr129: *int128
+        int128ToIntStr256: *int128
+        int128ToIntStr257: *int128
+        int129ToNum: *int129
+        int129ToNumStr: *int129
+        int129ToInt256: *int129
+        int129ToInt257: *int129
+        int129ToIntStr129: *int129
+        int129ToIntStr256: *int129
+        int129ToIntStr257: *int129
+        int256ToNum: *int256
+        int256ToNumStr: *int256
+        int256ToInt257: *int256
+        int256ToIntStr256: *int256
+        int256ToIntStr257: *int256
+        int257ToNum: *int257
+        int257ToNumStr: *int257
+        int257ToIntStr257: *int257
+        intStr000ToInt000: *intStr000
+        intStr000ToInt032: *intStr000
+        intStr000ToInt064: *intStr000
+        intStr000ToInt065: *intStr000
+        intStr000ToInt128: *intStr000
+        intStr000ToInt129: *intStr000
+        intStr000ToInt256: *intStr000
+        intStr000ToInt257: *intStr000
+        intStr000ToIntStr064: *intStr000
+        intStr000ToIntStr065: *intStr000
+        intStr000ToIntStr128: *intStr000
+        intStr000ToIntStr129: *intStr000
+        intStr000ToIntStr256: *intStr000
+        intStr000ToIntStr257: *intStr000
+        intStr000ToNum: *intStr000
+        intStr000ToNumStr: *intStr000
+        intStr064ToInt064: *intStr064
+        intStr064ToInt065: *intStr064
+        intStr064ToInt128: *intStr064
+        intStr064ToInt129: *intStr064
+        intStr064ToInt256: *intStr064
+        intStr064ToInt257: *intStr064
+        intStr064ToIntStr065: *intStr064
+        intStr064ToIntStr128: *intStr064
+        intStr064ToIntStr129: *intStr064
+        intStr064ToIntStr256: *intStr064
+        intStr064ToIntStr257: *intStr064
+        intStr064ToNum: *intStr064
+        intStr064ToNumStr: *intStr064
+        intStr065ToInt065: *intStr065
+        intStr065ToInt128: *intStr065
+        intStr065ToInt129: *intStr065
+        intStr065ToInt256: *intStr065
+        intStr065ToInt257: *intStr065
+        intStr065ToIntStr128: *intStr065
+        intStr065ToIntStr129: *intStr065
+        intStr065ToIntStr256: *intStr065
+        intStr065ToIntStr257: *intStr065
+        intStr065ToNum: *intStr065
+        intStr065ToNumStr: *intStr065
+        intStr128ToInt128: *intStr128
+        intStr128ToInt129: *intStr128
+        intStr128ToInt256: *intStr128
+        intStr128ToInt257: *intStr128
+        intStr128ToIntStr129: *intStr128
+        intStr128ToIntStr256: *intStr128
+        intStr128ToIntStr257: *intStr128
+        intStr128ToNum: *intStr128
+        intStr128ToNumStr: *intStr128
+        intStr129ToInt129: *intStr129
+        intStr129ToInt256: *intStr129
+        intStr129ToInt257: *intStr129
+        intStr129ToIntStr256: *intStr129
+        intStr129ToIntStr257: *intStr129
+        intStr129ToNum: *intStr129
+        intStr129ToNumStr: *intStr129
+        intStr256ToInt256: *intStr256
+        intStr256ToInt257: *intStr256
+        intStr256ToIntStr257: *intStr256
+        intStr256ToNum: *intStr256
+        intStr256ToNumStr: *intStr256
+        intStr257ToInt257: *intStr257
+        intStr257ToNum: *intStr257
+        intStr257ToNumStr: *intStr257
+        numToNumStr: *num
+        numStrToNum: *numStr
+        arrayToMulti: *array
+        binaryToMulti: *binary
+        boolToMulti: *bool
+        int064ToMulti: *int064
+        int128ToMulti: *int128
+        int256ToMulti: *int256
         intStr64UnionToMulti: { type: [integer, string], format: integer }
-        numToMulti: { type: number }
+        numToMulti: *num
         numStrUnionToMulti: { type: [number, string], format: number }
-        objectToMulti: { type: object }
-        stringToMulti: { type: string }
-        binaryToString: { type: string, contentEncoding: base64 }
-        intStr64ToString: { type: string, format: integer }
-        intStr128ToString: { type: string, format: integer, maxLength: 38 }
-        intStr256ToString: { type: string, format: integer, maxLength: 76 }
-        numStrToString: { type: string, format: number }
-        dateToString: { type: string, format: date }
-        datetimeToString: { type: string, format: date-time }
-        timeToString: { type: string, format: time }
-        durationToString: { type: string, format: duration }
-        ipv4ToString: { type: string, format: ipv4 }
-        ipv6ToString: { type: string, format: ipv6 }
-        macaddrToString: { type: string, format: macaddr }
-        macaddr8ToString: { type: string, format: macaddr8 }
-        uuidToString: { type: string, format: uuid }
-        emailToString: { type: string, format: email }
-        hostnameToString: { type: string, format: hostname }
-        uriToString: { type: string, format: uri }
-        uriReferenceToString: { type: string, format: uri-reference }
-        uriTemplateToString: { type: string, format: uri-template }
-        jsonPointerToString: { type: string, format: json-pointer }
-        relativeJsonPointerToString: { type: string, format: relative-json-pointer }
-        regexToString: { type: string, format: regex }
-        uint32ToString: { type: string, format: uint32 }
-        uint64ToString: { type: string, format: uint64, maxLength: 20 }
-        iriToString: { type: string, format: iri }
-        iriReferenceToString: { type: string, format: iri-reference }
+        objectToMulti: *object
+        stringToMulti: *string
+        binaryToString: *binary
+        intStr064ToString: *intStr064
+        intStr128ToString: *intStr128
+        intStr256ToString: *intStr256
+        numStrToString: *numStr
+        dateToString: *date
+        datetimeToString: *datetime
+        timeToString: *time
+        durationToString: *duration
+        ipv4ToString: *ipv4
+        ipv6ToString: *ipv6
+        macaddrToString: *macaddr
+        macaddr8ToString: *macaddr8
+        uuidToString: *uuid
+        emailToString: *email
+        hostnameToString: *hostname
+        uriToString: *uri
+        uriReferenceToString: *uriReference
+        uriTemplateToString: *uriTemplate
+        jsonPointerToString: *jsonPointer
+        relativeJsonPointerToString: *relativeJsonPointer
+        regexToString: *regex
+        uint32ToString: *uint32
+        uint64ToString: *uint64
+        iriToString: *iri
+        iriReferenceToString: *iriReference
       required: [id]
     key: [/id]
