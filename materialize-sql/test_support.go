@@ -410,9 +410,15 @@ func DeleteCheckpointsEntry(ctx context.Context, db *stdsql.DB, tableIdentifier,
 }
 
 func SnapshotTestTable(ctx context.Context, db *stdsql.DB, tableIdentifier string) ([]string, [][]any, error) {
-	sql := fmt.Sprintf("select * from %s;", tableIdentifier)
+	return SnapshotTestTableQuery(ctx, db, tableIdentifier, fmt.Sprintf("select * from %s;", tableIdentifier))
+}
 
-	rows, err := db.QueryContext(ctx, sql)
+// SnapshotTestTableQuery runs an arbitrary SELECT query and formats its rows
+// using the same normalization as SnapshotTestTable. Useful when a connector
+// needs to apply dialect-specific casts (e.g. decoding VARBYTE values) in the
+// query itself. tableIdentifier is used for error messages only.
+func SnapshotTestTableQuery(ctx context.Context, db *stdsql.DB, tableIdentifier, query string) ([]string, [][]any, error) {
+	rows, err := db.QueryContext(ctx, query)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to query table %s: %w", tableIdentifier, err)
 	}
