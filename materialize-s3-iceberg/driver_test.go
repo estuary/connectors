@@ -183,7 +183,7 @@ func runTimestampOverflowRegression(t *testing.T, cfg config) {
 
 	s3client := s3.New(s3.Options{
 		Region:       cfg.Region,
-		Credentials:  credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, ""),
+		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
 		BaseEndpoint: aws.String(cfg.S3Endpoint),
 		UsePathStyle: true,
 	})
@@ -257,7 +257,7 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 
 	s3client := s3.New(s3.Options{
 		Region:       cfg.Region,
-		Credentials:  credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, ""),
+		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
 		BaseEndpoint: aws.String(cfg.S3Endpoint),
 		UsePathStyle: true,
 	})
@@ -298,7 +298,7 @@ func createTestBucket(t *testing.T, cfg config) {
 	ctx := context.Background()
 	client := s3.New(s3.Options{
 		Region:       cfg.Region,
-		Credentials:  credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, ""),
+		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
 		BaseEndpoint: aws.String(cfg.S3Endpoint),
 		UsePathStyle: true,
 	})
@@ -379,8 +379,8 @@ func createTestWarehouse(t *testing.T, cfg config) {
 			"properties": map[string]any{
 				"default-base-location": baseLocation,
 				"s3.endpoint":           cfg.S3Endpoint,
-				"s3.access-key-id":      cfg.AWSAccessKeyID,
-				"s3.secret-access-key":  cfg.AWSSecretAccessKey,
+				"s3.access-key-id":      cfg.Credentials.AWSAccessKeyID,
+				"s3.secret-access-key":  cfg.Credentials.AWSSecretAccessKey,
 				"s3.region":             cfg.Region,
 				"s3.path-style-access":  "true",
 			},

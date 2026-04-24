@@ -3,7 +3,7 @@ import json
 import sys
 import time
 import traceback
-from typing import Any, Literal, override
+from typing import Literal, override
 
 import click
 from click import Context
@@ -85,28 +85,28 @@ def run(
                     PY_IO_IMPL: "pyiceberg.io.fsspec.FsspecFileIO",  # use S3 file IO instead of Arrow
                 }
 
-                # When the (legacy) top-level S3 credentials are provided we
-                # use them directly with pyiceberg and disable catalog
-                # credential vending. This path is for local/S3-compatible
-                # setups where the catalog server cannot vend STS creds.
-                # Customers using the newer `credentials` field hit none of
-                # this and continue to receive vended credentials from the
-                # catalog as before.
+                # For local/S3-compatible setups the catalog server cannot vend STS creds,
+                # so we pass the user's access keys directly to pyiceberg and disable
+                # catalog credential vending. We key off `s3_endpoint` —
+                # production AWS users leave it blank and continue to receive
+                # vended credentials from the catalog as before.
                 direct_s3_creds = (
-                    cfg.aws_access_key_id
-                    and cfg.aws_secret_access_key
+                    cfg.s3_endpoint
+                    and cfg.credentials is not None
+                    and cfg.credentials.auth_type == "AWSAccessKey"
                     and cfg.region
                 )
 
                 if direct_s3_creds:
-                    properties["s3.access-key-id"] = cfg.aws_access_key_id
-                    properties["s3.secret-access-key"] = cfg.aws_secret_access_key
+                    properties["s3.access-key-id"] = cfg.credentials.aws_access_key_id
+                    properties["s3.secret-access-key"] = (
+                        cfg.credentials.aws_secret_access_key
+                    )
                     properties["s3.region"] = cfg.region
-                    if cfg.s3_endpoint:
-                        properties["s3.endpoint"] = cfg.s3_endpoint
+                    properties["s3.endpoint"] = cfg.s3_endpoint
                 catalog = RestCatalog(
                     "default",
-                    **{k:v for k, v in properties.items() if v is not None},
+                    **{k: v for k, v in properties.items() if v is not None},
                 )
 
                 if direct_s3_creds and hasattr(catalog, "_session"):
@@ -126,20 +126,12 @@ def run(
                     glue_props["glue.id"] = cfg.catalog.glue_id
 
                 if (
-                    cfg.aws_access_key_id is not None
-                    and cfg.aws_secret_access_key is not None
-                ):  # Legacy creds
-                    creds = {
-                        "client.access-key-id": cfg.aws_access_key_id,
-                        "client.secret-access-key": cfg.aws_secret_access_key,
-                    }
-                elif (
                     cfg.credentials is not None
                     and cfg.credentials.auth_type == "AWSAccessKey"
                 ):
                     creds = {
-                        "client.access-key-id": cfg.credentials.awsAccessKeyId,
-                        "client.secret-access-key": cfg.credentials.awsSecretAccessKey,
+                        "client.access-key-id": cfg.credentials.aws_access_key_id,
+                        "client.secret-access-key": cfg.credentials.aws_secret_access_key,
                     }
                 elif (
                     cfg.credentials is not None

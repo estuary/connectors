@@ -188,29 +188,6 @@
       }
     },
     "properties": {
-      "aws_access_key_id": {
-        "default": null,
-        "description": "Access Key ID for accessing AWS services (legacy).",
-        "order": 0,
-        "title": "AWS Access Key ID",
-        "type": [
-          "string",
-          "null"
-        ],
-        "x-hidden-field": true
-      },
-      "aws_secret_access_key": {
-        "default": null,
-        "description": "Secret Access Key for accessing AWS services (legacy).",
-        "order": 1,
-        "secret": true,
-        "title": "AWS Secret Access Key",
-        "type": [
-          "string",
-          "null"
-        ],
-        "x-hidden-field": true
-      },
       "credentials": {
         "default": {
           "auth_type": "AWSAccessKey"
@@ -311,6 +288,7 @@
       }
     },
     "required": [
+      "credentials",
       "bucket",
       "region",
       "namespace",
