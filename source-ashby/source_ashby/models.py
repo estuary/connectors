@@ -1,17 +1,17 @@
 from __future__ import annotations
 
+from abc import ABCMeta
 from typing import ClassVar
 
 from estuary_cdk.capture.common import (
     BaseDocument,
-    ResourceConfig,
     ResourceState,
 )
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
 from estuary_cdk.flow import AccessToken
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
 
 
 class EndpointConfig(BaseModel):
@@ -47,10 +47,11 @@ class ApiKeyInfoResponse(BaseModel, extra="allow"):
     errorInfo: ApiKeyInfoError | None = None
 
 
-class AshbyEntity(BaseDocument, extra="allow"):
+class AshbyEntity(BaseDocument, extra="allow", metaclass=ABCMeta):
     name: ClassVar[str]
     required_scope: ClassVar[str]
     path: ClassVar[str]
+    base_request_body: ClassVar[dict[str, JsonValue]] = {}
 
     id: str
 
@@ -67,16 +68,11 @@ class Approvals(AshbyEntity):
     path: ClassVar[str] = "approval.list"
 
 
-class ArchiveReasons(AshbyEntity):
-    name: ClassVar[str] = "archive_reasons"
-    required_scope: ClassVar[str] = "hiringProcessMetadata:read"
-    path: ClassVar[str] = "archiveReason.list"
-
-
 class CandidateTags(AshbyEntity):
     name: ClassVar[str] = "candidate_tags"
     required_scope: ClassVar[str] = "hiringProcessMetadata:read"
     path: ClassVar[str] = "candidateTag.list"
+    base_request_body: ClassVar[dict[str, JsonValue]] = {"includeArchived": True}
 
 
 class Candidates(AshbyEntity):
@@ -89,36 +85,28 @@ class CustomFields(AshbyEntity):
     name: ClassVar[str] = "custom_fields"
     required_scope: ClassVar[str] = "hiringProcessMetadata:read"
     path: ClassVar[str] = "customField.list"
+    base_request_body: ClassVar[dict[str, JsonValue]] = {"includeArchived": True}
 
 
 class Departments(AshbyEntity):
     name: ClassVar[str] = "departments"
     required_scope: ClassVar[str] = "organization:read"
     path: ClassVar[str] = "department.list"
+    base_request_body: ClassVar[dict[str, JsonValue]] = {"includeArchived": True}
 
 
 class FeedbackFormDefinitions(AshbyEntity):
     name: ClassVar[str] = "feedback_form_definitions"
     required_scope: ClassVar[str] = "hiringProcessMetadata:read"
     path: ClassVar[str] = "feedbackFormDefinition.list"
-
-
-class InterviewEvents(AshbyEntity):
-    name: ClassVar[str] = "interview_events"
-    required_scope: ClassVar[str] = "interviews:read"
-    path: ClassVar[str] = "interviewEvent.list"
-
-
-class InterviewerPools(AshbyEntity):
-    name: ClassVar[str] = "interviewer_pools"
-    required_scope: ClassVar[str] = "hiringProcessMetadata:read"
-    path: ClassVar[str] = "interviewerPool.list"
+    base_request_body: ClassVar[dict[str, JsonValue]] = {"includeArchived": True}
 
 
 class InterviewPlans(AshbyEntity):
     name: ClassVar[str] = "interview_plans"
     required_scope: ClassVar[str] = "interviews:read"
     path: ClassVar[str] = "interviewPlan.list"
+    base_request_body: ClassVar[dict[str, JsonValue]] = {"includeArchived": True}
 
 
 class InterviewSchedules(AshbyEntity):
@@ -127,28 +115,37 @@ class InterviewSchedules(AshbyEntity):
     path: ClassVar[str] = "interviewSchedule.list"
 
 
-class InterviewStages(AshbyEntity):
-    name: ClassVar[str] = "interview_stages"
+class ChildEntityMixin(metaclass=ABCMeta):
+    parent_entity: ClassVar[type[AshbyEntity]]
+    parent_id_field: ClassVar[str]
+
+
+class InterviewEvents(AshbyEntity, ChildEntityMixin):
+    name: ClassVar[str] = "interview_events"
     required_scope: ClassVar[str] = "interviews:read"
-    path: ClassVar[str] = "interviewStage.list"
+    path: ClassVar[str] = "interviewEvent.list"
+    parent_entity: ClassVar[type[AshbyEntity]] = InterviewSchedules
+    parent_id_field: ClassVar[str] = "interviewScheduleId"
+
+
+class InterviewerPools(AshbyEntity):
+    name: ClassVar[str] = "interviewer_pools"
+    required_scope: ClassVar[str] = "hiringProcessMetadata:read"
+    path: ClassVar[str] = "interviewerPool.list"
+    base_request_body: ClassVar[dict[str, JsonValue]] = {
+        "includeArchivedPools": True,
+        "includeArchivedTrainingStages": True,
+    }
 
 
 class Interviews(AshbyEntity):
     name: ClassVar[str] = "interviews"
     required_scope: ClassVar[str] = "interviews:read"
     path: ClassVar[str] = "interview.list"
-
-
-class JobPostings(AshbyEntity):
-    name: ClassVar[str] = "job_postings"
-    required_scope: ClassVar[str] = "jobs:read"
-    path: ClassVar[str] = "jobPosting.list"
-
-
-class Jobs(AshbyEntity):
-    name: ClassVar[str] = "jobs"
-    required_scope: ClassVar[str] = "jobs:read"
-    path: ClassVar[str] = "job.list"
+    base_request_body: ClassVar[dict[str, JsonValue]] = {
+        "includeArchived": True,
+        "includeNonSharedInterviews": True,
+    }
 
 
 class JobTemplates(AshbyEntity):
@@ -157,10 +154,23 @@ class JobTemplates(AshbyEntity):
     path: ClassVar[str] = "jobTemplate.list"
 
 
+class Jobs(AshbyEntity):
+    name: ClassVar[str] = "jobs"
+    required_scope: ClassVar[str] = "jobs:read"
+    path: ClassVar[str] = "job.list"
+    base_request_body: ClassVar[dict[str, JsonValue]] = {
+        "includeUnpublishedJobPostingsIds": True
+    }
+
+
 class Locations(AshbyEntity):
     name: ClassVar[str] = "locations"
     required_scope: ClassVar[str] = "organization:read"
     path: ClassVar[str] = "location.list"
+    base_request_body: ClassVar[dict[str, JsonValue]] = {
+        "includeArchived": True,
+        "includeLocationHierarchy": True,
+    }
 
 
 class Offers(AshbyEntity):
@@ -181,12 +191,6 @@ class Projects(AshbyEntity):
     path: ClassVar[str] = "project.list"
 
 
-class Sources(AshbyEntity):
-    name: ClassVar[str] = "sources"
-    required_scope: ClassVar[str] = "hiringProcessMetadata:read"
-    path: ClassVar[str] = "source.list"
-
-
 class SurveyFormDefinitions(AshbyEntity):
     name: ClassVar[str] = "survey_form_definitions"
     required_scope: ClassVar[str] = "hiringProcessMetadata:read"
@@ -197,31 +201,67 @@ class Users(AshbyEntity):
     name: ClassVar[str] = "users"
     required_scope: ClassVar[str] = "organization:read"
     path: ClassVar[str] = "user.list"
+    base_request_body: ClassVar[dict[str, JsonValue]] = {"includeDeactivated": True}
 
 
-ALL_STREAMS: list[type[AshbyEntity]] = [
+class AshbySnapshotEntity(AshbyEntity, metaclass=ABCMeta):
+    pass
+
+
+class ArchiveReasons(AshbySnapshotEntity):
+    name: ClassVar[str] = "archive_reasons"
+    required_scope: ClassVar[str] = "hiringProcessMetadata:read"
+    path: ClassVar[str] = "archiveReason.list"
+    base_request_body: ClassVar[dict[str, JsonValue]] = {"includeArchived": True}
+
+
+class JobPostings(AshbySnapshotEntity):
+    name: ClassVar[str] = "job_postings"
+    required_scope: ClassVar[str] = "jobs:read"
+    path: ClassVar[str] = "jobPosting.list"
+
+
+class Sources(AshbySnapshotEntity):
+    name: ClassVar[str] = "sources"
+    required_scope: ClassVar[str] = "hiringProcessMetadata:read"
+    path: ClassVar[str] = "source.list"
+    base_request_body: ClassVar[dict[str, JsonValue]] = {"includeArchived": True}
+
+
+class InterviewStages(AshbySnapshotEntity, ChildEntityMixin):
+    name: ClassVar[str] = "interview_stages"
+    required_scope: ClassVar[str] = "interviews:read"
+    path: ClassVar[str] = "interviewStage.list"
+    parent_entity: ClassVar[type[AshbyEntity]] = InterviewPlans
+    parent_id_field: ClassVar[str] = "interviewPlanId"
+
+
+INCREMENTAL_STREAMS: list[type[AshbyEntity]] = [
     Applications,
     Approvals,
-    ArchiveReasons,
     CandidateTags,
     Candidates,
     CustomFields,
     Departments,
     FeedbackFormDefinitions,
     InterviewEvents,
-    InterviewerPools,
     InterviewPlans,
     InterviewSchedules,
-    InterviewStages,
+    InterviewerPools,
     Interviews,
-    JobPostings,
-    Jobs,
     JobTemplates,
+    Jobs,
     Locations,
     Offers,
     Openings,
     Projects,
-    Sources,
     SurveyFormDefinitions,
     Users,
+]
+
+SNAPSHOT_STREAMS: list[type[AshbySnapshotEntity]] = [
+    ArchiveReasons,
+    InterviewStages,
+    JobPostings,
+    Sources,
 ]
