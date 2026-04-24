@@ -189,7 +189,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 				return "", nil, fmt.Errorf("could not find column info for %q", dn.Name)
 			}
 
-			ddl, err := col.bareDDL()
+			ddl, err := col.nullableDDL()
 			if err != nil {
 				return "", nil, err
 			}
@@ -328,7 +328,7 @@ type foundColumn struct {
 	DatetimePrecision      stdsql.NullInt64
 }
 
-func (c foundColumn) bareDDL() (string, error) {
+func (c foundColumn) nullableDDL() (string, error) {
 	ddl := strings.ToUpper(c.Type)
 
 	intOrMax := func(i int64) string {
