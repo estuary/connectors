@@ -69,16 +69,42 @@ initial_state = ResourceState(
 
 ### Snapshot
 
-Reference: `source-sentry/source_sentry/resources.py` — `open_full_refresh_bindings` function, and `source-front/source_front/resources.py` — `full_refresh_resources` function.
+**Use `SnapshotResource`, not the generic `Resource`.**
+Reference: `source-ashby/source_ashby/resources.py`
 
 ```python
-common.open_binding(
-    binding, binding_index, state, task,
-    fetch_snapshot=functools.partial(list_all, http, ...),
-    tombstone=MyDocument(_meta=MyDocument.Meta(op="d")),
+from estuary_cdk.capture.common import (
+    ResourceConfig,
+    ResourceState,
+    SnapshotResource,
+    Task,
+    open_binding,
 )
+from estuary_cdk.flow import CaptureBinding
 
-initial_state = ResourceState()  # No cursor needed
+def open(
+    binding: CaptureBinding[ResourceConfig],
+    binding_index: int,
+    state: ResourceState,
+    task: Task,
+    all_bindings,
+) -> None:
+    open_binding(
+        binding,
+        binding_index,
+        state,
+        task,
+        fetch_snapshot=functools.partial(list_all, http, ...),
+        tombstone=MyDocument(_meta=MyDocument.Meta(op="d")),
+    )
+
+resource = SnapshotResource(
+    name=MyDocument.name,
+    model=MyDocument,
+    open=open,
+    initial_config=ResourceConfig(name=MyDocument.name, interval=timedelta(minutes=5)),
+    schema_inference=True,
+)
 ```
 
 ### Webhook
