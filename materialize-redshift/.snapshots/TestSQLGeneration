@@ -123,12 +123,12 @@ CREATE TEMPORARY TABLE flow_temp_table_1 (
 
 MERGE INTO "a-schema".key_value
 USING flow_temp_table_0 AS r
-ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = TO_VARBYTE(r."key!binary", 'base64')
+ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = TO_VARBYTE(r."key!binary", 'hex')
 WHEN MATCHED THEN
-	UPDATE SET "array" = r."array", "binary" = TO_VARBYTE(r."binary", 'base64'), boolean = r.boolean, field_with_projection = r.field_with_projection, flow_published_at = r.flow_published_at, integer = r.integer, "integerGt128Bit" = r."integerGt128Bit", "integerGt256Bit" = r."integerGt256Bit", "integerGt64Bit" = r."integerGt64Bit", "integerWithUserDDL" = r."integerWithUserDDL", multiple = r.multiple, "nonAsciiκόσμε" = r."nonAsciiκόσμε", number = r.number, "numberCastToString" = r."numberCastToString", object = r.object, string = r.string, "stringInteger" = r."stringInteger", "stringInteger18Chars" = r."stringInteger18Chars", "stringInteger38Chars" = r."stringInteger38Chars", "stringInteger39Chars" = r."stringInteger39Chars", "stringInteger66Chars" = r."stringInteger66Chars", "stringInteger77Chars" = r."stringInteger77Chars", "stringNumber" = r."stringNumber", flow_document = r.flow_document
+	UPDATE SET "array" = r."array", "binary" = TO_VARBYTE(r."binary", 'hex'), boolean = r.boolean, field_with_projection = r.field_with_projection, flow_published_at = r.flow_published_at, integer = r.integer, "integerGt128Bit" = r."integerGt128Bit", "integerGt256Bit" = r."integerGt256Bit", "integerGt64Bit" = r."integerGt64Bit", "integerWithUserDDL" = r."integerWithUserDDL", multiple = r.multiple, "nonAsciiκόσμε" = r."nonAsciiκόσμε", number = r.number, "numberCastToString" = r."numberCastToString", object = r.object, string = r.string, "stringInteger" = r."stringInteger", "stringInteger18Chars" = r."stringInteger18Chars", "stringInteger38Chars" = r."stringInteger38Chars", "stringInteger39Chars" = r."stringInteger39Chars", "stringInteger66Chars" = r."stringInteger66Chars", "stringInteger77Chars" = r."stringInteger77Chars", "stringNumber" = r."stringNumber", flow_document = r.flow_document
 WHEN NOT MATCHED THEN
 	INSERT (key1, key2, "key!binary", "array", "binary", boolean, field_with_projection, flow_published_at, integer, "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", object, string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document)
-	VALUES (r.key1, r.key2, TO_VARBYTE(r."key!binary", 'base64'), r."array", TO_VARBYTE(r."binary", 'base64'), r.boolean, r.field_with_projection, r.flow_published_at, r.integer, r."integerGt128Bit", r."integerGt256Bit", r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r."nonAsciiκόσμε", r.number, r."numberCastToString", r.object, r.string, r."stringInteger", r."stringInteger18Chars", r."stringInteger38Chars", r."stringInteger39Chars", r."stringInteger66Chars", r."stringInteger77Chars", r."stringNumber", r.flow_document);
+	VALUES (r.key1, r.key2, TO_VARBYTE(r."key!binary", 'hex'), r."array", TO_VARBYTE(r."binary", 'hex'), r.boolean, r.field_with_projection, r.flow_published_at, r.integer, r."integerGt128Bit", r."integerGt256Bit", r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r."nonAsciiκόσμε", r.number, r."numberCastToString", r.object, r.string, r."stringInteger", r."stringInteger18Chars", r."stringInteger38Chars", r."stringInteger39Chars", r."stringInteger66Chars", r."stringInteger77Chars", r."stringNumber", r.flow_document);
 --- End "a-schema".key_value mergeInto ---
 
 --- Begin "a-schema".delta_updates mergeInto ---
@@ -150,7 +150,7 @@ SELECT 0, r.flow_document
 	JOIN "a-schema".key_value AS r
 		 ON  l.key1 = r.key1
 		 AND l.key2 = r.key2
-		 AND TO_VARBYTE(l."key!binary", 'base64') = r."key!binary"
+		 AND TO_VARBYTE(l."key!binary", 'hex') = r."key!binary"
 --- End "a-schema".key_value loadQuery ---
 
 --- Begin "a-schema".delta_updates loadQuery ---
@@ -192,7 +192,7 @@ FROM flow_temp_table_0 AS l
 JOIN "a-schema".key_value AS r
 	 ON  l.key1 = r.key1
 	 AND l.key2 = r.key2
-	 AND TO_VARBYTE(l."key!binary", 'base64') = r."key!binary"
+	 AND TO_VARBYTE(l."key!binary", 'hex') = r."key!binary"
 
 --- End "a-schema".key_value loadQueryNoFlowDocument ---
 
@@ -222,7 +222,7 @@ CREATE TEMPORARY TABLE flow_temp_table_1_deleted (
 
 DELETE FROM "a-schema".key_value
 USING flow_temp_table_0_deleted AS r
-WHERE "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = TO_VARBYTE(r."key!binary", 'base64')
+WHERE "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = TO_VARBYTE(r."key!binary", 'hex')
 --- End "a-schema".key_value deleteQuery ---
 
 --- Begin "a-schema".delta_updates deleteQuery ---

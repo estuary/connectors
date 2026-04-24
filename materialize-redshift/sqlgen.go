@@ -54,10 +54,15 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 
 	binaryMapping := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"))
 	if featureFlags["native_binary_column_type"] {
-		// VARBYTE's maximum size is 1,024,000 bytes. Base64-encoded binary
-		// fields up to that size are decoded via FROM_VARBYTE(col, 'base64')
-		// when merging from the staging table, which uses a VARCHAR column.
-		binaryMapping = sql.MapStatic("VARBYTE(1024000)", sql.AlsoCompatibleWith("varbyte"))
+		// VARBYTE's maximum size is 1,024,000 bytes. The element converter
+		// re-encodes base64 input as hex so the staged JSON files contain
+		// hex strings, which Redshift's COPY parses natively into VARBYTE
+		// (the default decoding for VARBYTE-from-JSON is hex). This lets the
+		// store path keep using the direct COPY-into-target shortcut for
+		// insert-only transactions; the merge path (when a row already
+		// exists) decodes via TO_VARBYTE(col, 'hex') from the VARCHAR
+		// staging column.
+		binaryMapping = sql.MapStatic("VARBYTE(1024000)", sql.AlsoCompatibleWith("varbyte"), sql.UsingConverter(sql.Base64ToHex))
 	}
 
 	mapper := sql.NewDDLMapper(
@@ -311,12 +316,12 @@ MERGE INTO {{ $.Identifier }}
 USING {{ template "temp_name" . }} AS r
 ON {{ range $ind, $key := $.Keys }}
 {{- if $ind }} AND {{end -}}
-	{{$.Identifier}}.{{$key.Identifier}} = {{ if IsBinary $key }}TO_VARBYTE(r.{{$key.Identifier}}, 'base64'){{ else }}r.{{$key.Identifier}}{{ end }}
+	{{$.Identifier}}.{{$key.Identifier}} = {{ if IsBinary $key }}TO_VARBYTE(r.{{$key.Identifier}}, 'hex'){{ else }}r.{{$key.Identifier}}{{ end }}
 {{- end}}
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{end -}}
-		{{$val.Identifier}} = {{ if IsBinary $val }}TO_VARBYTE(r.{{$val.Identifier}}, 'base64'){{ else }}r.{{$val.Identifier}}{{ end }}
+		{{$val.Identifier}} = {{ if IsBinary $val }}TO_VARBYTE(r.{{$val.Identifier}}, 'hex'){{ else }}r.{{$val.Identifier}}{{ end }}
 	{{- end}}
 	{{- if $.Document -}}
 		{{ if $.Values  }}, {{ end }}{{$.Document.Identifier}} = r.{{$.Document.Identifier}}
@@ -331,7 +336,7 @@ WHEN NOT MATCHED THEN
 	VALUES (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
-		{{ if IsBinary $col }}TO_VARBYTE(r.{{$col.Identifier}}, 'base64'){{ else }}r.{{$col.Identifier}}{{ end }}
+		{{ if IsBinary $col }}TO_VARBYTE(r.{{$col.Identifier}}, 'hex'){{ else }}r.{{$col.Identifier}}{{ end }}
 	{{- end -}}
 	);
 {{ end }}
@@ -342,7 +347,7 @@ DELETE FROM {{ $.Identifier }}
 USING {{ template "temp_name_deleted" . }} AS r
 WHERE {{ range $ind, $key := $.Keys }}
 {{- if $ind }} AND {{end -}}
-	{{$.Identifier}}.{{$key.Identifier}} = {{ if IsBinary $key }}TO_VARBYTE(r.{{$key.Identifier}}, 'base64'){{ else }}r.{{$key.Identifier}}{{ end }}
+	{{$.Identifier}}.{{$key.Identifier}} = {{ if IsBinary $key }}TO_VARBYTE(r.{{$key.Identifier}}, 'hex'){{ else }}r.{{$key.Identifier}}{{ end }}
 {{- end }}
 {{- end }}
 {{ end }}
@@ -357,7 +362,7 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 	JOIN {{ $.Identifier}} AS r
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON  {{ end -}}
-			{{ if IsBinary $key }}TO_VARBYTE(l.{{ $key.Identifier }}, 'base64'){{ else }}l.{{ $key.Identifier }}{{ end }} = r.{{ $key.Identifier }}
+			{{ if IsBinary $key }}TO_VARBYTE(l.{{ $key.Identifier }}, 'hex'){{ else }}l.{{ $key.Identifier }}{{ end }} = r.{{ $key.Identifier }}
 	{{- end }}
 {{- else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
@@ -396,7 +401,7 @@ FROM {{ template "temp_name" . }} AS l
 JOIN {{ $.Identifier}} AS r
 {{- range $ind, $key := $.Keys }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-		{{ if IsBinary $key }}TO_VARBYTE(l.{{ $key.Identifier }}, 'base64'){{ else }}l.{{ $key.Identifier }}{{ end }} = r.{{ $key.Identifier }}
+		{{ if IsBinary $key }}TO_VARBYTE(l.{{ $key.Identifier }}, 'hex'){{ else }}l.{{ $key.Identifier }}{{ end }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc

@@ -2,6 +2,7 @@ package sql
 
 import (
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -211,4 +212,30 @@ var Base64Decoder ElementConverter = func(te tuple.TupleElement) (any, error) {
 	default:
 		return nil, fmt.Errorf("Base64Decoder: unexpected value type %T", te)
 	}
+}
+
+// Base64ToHex re-encodes a base64-encoded tuple element as a lowercase hex
+// string. This is used by warehouses (e.g. Redshift) whose bulk loaders parse
+// VARBYTE/BINARY values from JSON or CSV staging files as hex by default. By
+// emitting hex from the connector, the loader can decode binary directly into
+// the native column without an intermediate staging step.
+var Base64ToHex ElementConverter = func(te tuple.TupleElement) (any, error) {
+	var raw []byte
+	var err error
+	switch v := te.(type) {
+	case nil:
+		return nil, nil
+	case []byte:
+		raw, err = base64.StdEncoding.DecodeString(string(v))
+	case string:
+		raw, err = base64.StdEncoding.DecodeString(v)
+	case json.RawMessage:
+		raw, err = base64.StdEncoding.DecodeString(strings.Trim(string(v), `"`))
+	default:
+		return nil, fmt.Errorf("Base64ToHex: unexpected value type %T", te)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return hex.EncodeToString(raw), nil
 }
