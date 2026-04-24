@@ -292,8 +292,17 @@ func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) er
 }
 
 func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
+	// varbyteColumns maps lower-cased column names to a bool indicating the
+	// column is a VARBYTE (binary varying) type. This is used to reinterpret
+	// the hex-encoded representation that the pgx driver returns for such
+	// columns into a consistent base64 representation for snapshots.
+	var varbyteColumns map[string]bool
 	if err := c.withDB(func(db *stdsql.DB) error {
 		var err error
+		varbyteColumns, err = listVarbyteColumns(ctx, db, path)
+		if err != nil {
+			return err
+		}
 		columnNames, rows, err = sql.SnapshotTestTable(ctx, db, c.ep.Dialect.Identifier(path...))
 		return err
 	}); err != nil {
@@ -305,40 +314,94 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 	// so the driver returns hex(utf8(base64(gzip(bytes)))). Decode this chain
 	// back to base64(bytes) so that snapshots match the common format used by
 	// other SQL materializations.
-	checkpointIdx := -1
 	for i, col := range columnNames {
 		if col == "checkpoint" {
-			checkpointIdx = i
-			break
+			for _, row := range rows {
+				s, ok := row[i].(string)
+				if !ok || s == "" {
+					continue
+				}
+				// Hex decode to get the UTF-8 bytes of the base64 string.
+				utf8Bytes, err := hex.DecodeString(s)
+				if err != nil {
+					continue
+				}
+				// Base64 decode to get the gzip-compressed bytes.
+				gzBytes, err := base64.StdEncoding.DecodeString(string(utf8Bytes))
+				if err != nil {
+					continue
+				}
+				// Decompress to get the original checkpoint bytes.
+				raw, err := maybeDecompressBytes(gzBytes)
+				if err != nil {
+					continue
+				}
+				// Re-encode as plain base64 for snapshot comparison.
+				row[i] = base64.StdEncoding.EncodeToString(raw)
+			}
+			continue
 		}
-	}
-	if checkpointIdx >= 0 {
+
+		if !varbyteColumns[strings.ToLower(col)] {
+			continue
+		}
+		// Decode each hex-encoded VARBYTE value back into base64. This
+		// produces the same textual form that Flow uses for binary data
+		// elsewhere, and avoids the situation where hex strings composed
+		// entirely of digits (or digits plus "e") would otherwise be
+		// interpreted as numbers by the JSON encoder.
 		for _, row := range rows {
-			s, ok := row[checkpointIdx].(string)
-			if !ok || s == "" {
+			s, ok := row[i].(string)
+			if !ok {
 				continue
 			}
-			// Hex decode to get the UTF-8 bytes of the base64 string.
-			utf8Bytes, err := hex.DecodeString(s)
+			raw, err := hex.DecodeString(s)
 			if err != nil {
 				continue
 			}
-			// Base64 decode to get the gzip-compressed bytes.
-			gzBytes, err := base64.StdEncoding.DecodeString(string(utf8Bytes))
-			if err != nil {
-				continue
-			}
-			// Decompress to get the original checkpoint bytes.
-			raw, err := maybeDecompressBytes(gzBytes)
-			if err != nil {
-				continue
-			}
-			// Re-encode as plain base64 for snapshot comparison.
-			row[checkpointIdx] = base64.StdEncoding.EncodeToString(raw)
+			row[i] = base64.StdEncoding.EncodeToString(raw)
 		}
 	}
 
 	return columnNames, rows, nil
+}
+
+// listVarbyteColumns returns the set of lower-cased column names of the
+// provided table which have type "binary varying" (Redshift VARBYTE).
+func listVarbyteColumns(ctx context.Context, db *stdsql.DB, path []string) (map[string]bool, error) {
+	var tableSchema, tableName string
+	switch len(path) {
+	case 1:
+		tableSchema = "public"
+		tableName = path[0]
+	case 2:
+		tableSchema = path[0]
+		tableName = path[1]
+	default:
+		return nil, fmt.Errorf("unexpected resource path length %d", len(path))
+	}
+
+	rows, err := db.QueryContext(
+		ctx,
+		`SELECT column_name FROM information_schema.columns
+			WHERE table_schema = $1 AND table_name = $2 AND data_type = 'binary varying';`,
+		strings.ToLower(tableSchema),
+		strings.ToLower(tableName),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("listing varbyte columns for %s.%s: %w", tableSchema, tableName, err)
+	}
+	defer rows.Close()
+
+	out := map[string]bool{}
+	for rows.Next() {
+		var col string
+		if err := rows.Scan(&col); err != nil {
+			return nil, err
+		}
+		out[strings.ToLower(col)] = true
+	}
+	return out, rows.Err()
 }
 
 func (c *client) Close() {
