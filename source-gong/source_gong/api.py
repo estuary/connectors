@@ -1,4 +1,5 @@
 import asyncio
+import re
 import time
 from collections import deque
 from datetime import UTC, datetime, timedelta
@@ -9,7 +10,7 @@ from estuary_cdk.capture.common import (
     LogCursor,
     PageCursor,
 )
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import HTTPError, HTTPSession
 
 from source_gong.models import (
     Call,
@@ -26,6 +27,16 @@ MIN_INCREMENTAL_INTERVAL = timedelta(minutes=1)
 
 # Lag to account for Gong API eventual consistency.
 LAG = timedelta(minutes=5)
+
+# Gong returns HTTP 404 with a body like
+#   {"errors":["No calls found corresponding to the provided filters"]}
+# when a filtered list query matches zero records, instead of the conventional
+# 200 with an empty array. This pattern matches the known error strings so we
+# can treat those 404s as empty results while still surfacing genuine 404s
+# (e.g. wrong region/URL) as fatal errors.
+_NO_RESULTS_404_PATTERN = re.compile(
+    r'"No [^"]*found[^"]*provided filters', re.IGNORECASE
+)
 
 
 def _dt_to_ts(dt: datetime) -> int:
@@ -122,6 +133,32 @@ async def _make_request(
             assert_never(unreachable)
 
 
+async def _request_items[T: IncrementalGongResource](
+    cls: type[T],
+    http: HTTPSession,
+    rate_limiter: GongRateLimiter,
+    base_url: str,
+    from_val: str,
+    to_val: str,
+    log: Logger,
+    cursor: str | None,
+) -> tuple[list[T], str | None]:
+    """
+    Fetch and parse a page of items, treating Gong's 404-on-empty-filter
+    responses as an empty page. Any 404 whose body does not match the
+    documented "No ... found ... provided filters" shape is re-raised.
+    """
+    try:
+        response = await _make_request(
+            cls, http, rate_limiter, base_url, from_val, to_val, log, cursor
+        )
+    except HTTPError as err:
+        if err.code == 404 and _NO_RESULTS_404_PATTERN.search(err.message):
+            return [], None
+        raise
+    return _parse_response(cls, cls.ITEMS_KEY, response)
+
+
 async def snapshot_resource(
     cls: type[GongResource],
     url_path: str,
@@ -167,10 +204,9 @@ async def fetch_page(
     from_val = _format_date(start_date, cls.DATE_FORMAT)
     to_val = _format_date(cutoff, cls.DATE_FORMAT)
 
-    response = await _make_request(
+    items, next_cursor = await _request_items(
         cls, http, rate_limiter, base_url, from_val, to_val, log, page
     )
-    items, next_cursor = _parse_response(cls, cls.ITEMS_KEY, response)
 
     for item in items:
         yield item
@@ -220,10 +256,9 @@ async def fetch_calls_changes(
         from_val = _format_date(start_date, Call.DATE_FORMAT)
         to_val = _format_date(end_date, Call.DATE_FORMAT)
 
-        response = await _make_request(
+        items, page_cursor = await _request_items(
             Call, http, rate_limiter, base_url, from_val, to_val, log, page_cursor
         )
-        items, page_cursor = _parse_response(Call, Call.ITEMS_KEY, response)
 
         if not items:
             break
@@ -262,10 +297,9 @@ async def fetch_changes(
         from_val = _format_date(start_date, cls.DATE_FORMAT)
         to_val = _format_date(end_date, cls.DATE_FORMAT)
 
-        response = await _make_request(
+        items, cursor = await _request_items(
             cls, http, rate_limiter, base_url, from_val, to_val, log, cursor
         )
-        items, cursor = _parse_response(cls, cls.ITEMS_KEY, response)
 
         if not items:
             break
