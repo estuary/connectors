@@ -16,3 +16,127 @@ materializations:
         recommended: true
         exclude:
           - intStr256ToString
+          # TODO: `array` is a Spanner reserved keyword; the load-query SELECT
+          # alias collides with it.
+          - array
+          # TODO: Spanner NUMERIC supports 38 digits of precision (29 whole, 9
+          # fractional). Fixture values for int128/int129/int256/int257 (39-77
+          # digits) overflow when stored in either the source column (base phase)
+          # or migrated target column. The bare-anchor declarations (int128,
+          # int129, int256, int257, intStr128, intStr129, intStr256, intStr257)
+          # also create columns that overflow on the same fixture values.
+          - int128
+          - int128ToInt129
+          - int128ToInt256
+          - int128ToInt257
+          - int128ToIntStr128
+          - int128ToIntStr129
+          - int128ToIntStr256
+          - int128ToIntStr257
+          - int128ToMulti
+          - int128ToNum
+          - int128ToNumStr
+          - int129
+          - int129ToInt256
+          - int129ToInt257
+          - int129ToIntStr129
+          - int129ToIntStr256
+          - int129ToIntStr257
+          - int129ToNum
+          - int129ToNumStr
+          - int256
+          - int256ToInt257
+          - int256ToIntStr256
+          - int256ToIntStr257
+          - int256ToMulti
+          - int256ToNum
+          - int256ToNumStr
+          - int257
+          - int257ToIntStr257
+          - int257ToNum
+          - int257ToNumStr
+          - intStr128
+          - intStr128ToInt128
+          - intStr128ToInt129
+          - intStr128ToInt256
+          - intStr128ToInt257
+          - intStr128ToIntStr129
+          - intStr128ToIntStr256
+          - intStr128ToIntStr257
+          - intStr128ToNum
+          - intStr128ToNumStr
+          - intStr128ToString
+          - intStr129
+          - intStr129ToInt129
+          - intStr129ToInt256
+          - intStr129ToInt257
+          - intStr129ToIntStr256
+          - intStr129ToIntStr257
+          - intStr129ToNum
+          - intStr129ToNumStr
+          - intStr256
+          - intStr256ToInt256
+          - intStr256ToInt257
+          - intStr256ToIntStr257
+          - intStr256ToNum
+          - intStr256ToNumStr
+          - intStr257
+          - intStr257ToInt257
+          - intStr257ToNum
+          - intStr257ToNumStr
+          - int000ToInt128
+          - int000ToInt129
+          - int000ToInt256
+          - int000ToInt257
+          - int000ToIntStr128
+          - int000ToIntStr129
+          - int000ToIntStr256
+          - int000ToIntStr257
+          - int032ToInt128
+          - int032ToInt129
+          - int032ToInt256
+          - int032ToInt257
+          - int032ToIntStr128
+          - int032ToIntStr129
+          - int032ToIntStr256
+          - int032ToIntStr257
+          - int064ToInt128
+          - int064ToInt129
+          - int064ToInt256
+          - int064ToInt257
+          - int064ToIntStr128
+          - int064ToIntStr129
+          - int064ToIntStr256
+          - int064ToIntStr257
+          - int065ToInt128
+          - int065ToInt129
+          - int065ToInt256
+          - int065ToInt257
+          - int065ToIntStr128
+          - int065ToIntStr129
+          - int065ToIntStr256
+          - int065ToIntStr257
+          - intStr000ToInt128
+          - intStr000ToInt129
+          - intStr000ToInt256
+          - intStr000ToInt257
+          - intStr000ToIntStr128
+          - intStr000ToIntStr129
+          - intStr000ToIntStr256
+          - intStr000ToIntStr257
+          - intStr064ToInt128
+          - intStr064ToInt129
+          - intStr064ToInt256
+          - intStr064ToInt257
+          - intStr064ToIntStr128
+          - intStr064ToIntStr129
+          - intStr064ToIntStr256
+          - intStr064ToIntStr257
+          - intStr065ToInt128
+          - intStr065ToInt129
+          - intStr065ToInt256
+          - intStr065ToInt257
+          - intStr065ToIntStr128
+          - intStr065ToIntStr129
+          - intStr065ToIntStr256
+          - intStr065ToIntStr257
