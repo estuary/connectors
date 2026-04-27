@@ -44,10 +44,10 @@ type transactor struct {
 	recovery            bool
 	materializationName string
 
-	be        *m.BindingEvents
-	cfg       config
-	bucket    blob.Bucket
-	emrClient *emrClient
+	be      *m.BindingEvents
+	cfg     config
+	bucket  blob.Bucket
+	compute computeRunner
 
 	templates  templates
 	bindings   []binding
@@ -138,7 +138,7 @@ func (t *transactor) Load(it *m.LoadIterator, loaded func(binding int, doc json.
 	defer cleanupResults()
 
 	t.be.StartedEvaluatingLoads()
-	if err := t.emrClient.runJob(ctx, loadInput, t.pyFiles.load, t.pyFiles.common, fmt.Sprintf("load for: %s", t.materializationName), outputPrefix); err != nil {
+	if err := t.compute.runJob(ctx, loadInput, t.pyFiles.load, t.pyFiles.common, fmt.Sprintf("load for: %s", t.materializationName), outputPrefix); err != nil {
 		return fmt.Errorf("load job failed: %w", err)
 	} else if err := t.loadFiles.CleanupCurrentTransaction(ctx); err != nil {
 		return fmt.Errorf("cleaning up load files: %w", err)
@@ -270,7 +270,7 @@ func (t *transactor) Acknowledge(ctx context.Context) (*pf.ConnectorState, error
 		cleanupStatus := cleanPrefixOnceFn(ctx, t.bucket, outputPrefix)
 		defer cleanupStatus()
 
-		if err := t.emrClient.runJob(ctx, mergeInput, t.pyFiles.merge, t.pyFiles.common, fmt.Sprintf("store for: %s", t.materializationName), outputPrefix); err != nil {
+		if err := t.compute.runJob(ctx, mergeInput, t.pyFiles.merge, t.pyFiles.common, fmt.Sprintf("store for: %s", t.materializationName), outputPrefix); err != nil {
 			return nil, fmt.Errorf("store merge job failed: %w", err)
 		} else if err := cleanupStatus(); err != nil {
 			return nil, fmt.Errorf("cleaning up generated job status file: %w", err)

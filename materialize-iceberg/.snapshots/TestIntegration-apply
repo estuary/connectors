@@ -1,4 +1,4 @@
-Task: acmeCo/tests/materialize-iceberg/rest
+Task: acmeCo/tests/materialize-iceberg/rest-local
 
 Big Schema Initial Constraints:
 {"Field":"_meta/flow_truncated","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"Metadata fields are able to be materialized"}

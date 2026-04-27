@@ -1,4 +1,4 @@
-import json
+from __future__ import annotations
 
 from common import (
     NestedField,
@@ -8,11 +8,8 @@ from common import (
     run_with_status,
 )
 
-args = common_args()
-spark = get_spark_session(args)
 
-
-def run(input):
+def run(spark, input):
     for binding in input["bindings"]:
         bindingIdx: int = binding["binding"]
         query: str = binding["query"]
@@ -33,4 +30,7 @@ def run(input):
             spark.catalog.dropTempView(f"merge_view_{bindingIdx}")
 
 
-run_with_status(args, run)
+if __name__ == "__main__":
+    args = common_args()
+    spark = get_spark_session(args)
+    run_with_status(args, lambda inp: run(spark, inp))

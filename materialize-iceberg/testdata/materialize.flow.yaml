@@ -2,6 +2,27 @@ import:
   - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
 
 materializations:
+  acmeCo/tests/materialize-iceberg/rest-local:
+    endpoint:
+      local:
+        command: ["go", "run", "./cmd/connector"]
+        protobuf: true
+        config: .local/config.rest-local.yaml
+    bindings:
+    - resource:
+        table: simple_standard
+      source: tests/simple
+      fields:
+        recommended: true
+    # tests/not-simple is omitted: Polaris rejects table creation when the key
+    # is a unicode character, and the key cannot be excluded via field
+    # selection.
+    - resource:
+        table: data_types
+      source: tests/data-types
+      fields:
+        recommended: true
+
   acmeCo/tests/materialize-iceberg/rest:
     endpoint:
       local:
