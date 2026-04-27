@@ -81,6 +81,12 @@ class OverlapSpec:
     with_tx: int
     fraction: float
     op: Literal["u", "d"]
+    # Sub-range of the source tx's key space to sample from, expressed as
+    # fractions in [0, 1]. Defaults to the full range. For example,
+    # (0.6, 1.0) restricts sampling to the last 40% of the source tx's keys
+    # — useful for modelling recency-biased update patterns.
+    range_lo: float = 0.0
+    range_hi: float = 1.0
 
 
 @dataclass
@@ -178,10 +184,32 @@ def load_scenario(path: str) -> tuple[dict[str, CollectionSpec], list[TxSpec]]:
     transactions: list[TxSpec] = []
     for i, t in enumerate(raw.get("transactions", [])):
         doc_count, doc_size = _resolve_sizing(t, i)
-        overlaps = [
-            OverlapSpec(with_tx=int(o["with"]), fraction=float(o["fraction"]), op=o["op"])
-            for o in t.get("overlaps", [])
-        ]
+        overlaps = []
+        for o in t.get("overlaps", []):
+            range_spec = o.get("range")
+            if range_spec is None:
+                rlo, rhi = 0.0, 1.0
+            else:
+                if not isinstance(range_spec, list) or len(range_spec) != 2:
+                    raise ValueError(
+                        f"transaction[{i}]: overlap.range must be a [lo, hi] list "
+                        f"(got {range_spec!r})"
+                    )
+                rlo, rhi = float(range_spec[0]), float(range_spec[1])
+                if not (0.0 <= rlo < rhi <= 1.0):
+                    raise ValueError(
+                        f"transaction[{i}]: overlap.range must satisfy "
+                        f"0 <= lo < hi <= 1 (got [{rlo}, {rhi}])"
+                    )
+            overlaps.append(
+                OverlapSpec(
+                    with_tx=int(o["with"]),
+                    fraction=float(o["fraction"]),
+                    op=o["op"],
+                    range_lo=rlo,
+                    range_hi=rhi,
+                )
+            )
         for o in overlaps:
             if o.op not in ("u", "d"):
                 raise ValueError(f"transaction[{i}]: overlap op must be 'u' or 'd' (got {o.op!r})")
@@ -412,27 +440,42 @@ class CollectionState:
         self.tx_ranges[tx_idx] = (start, count)
 
     def sample_from_tx(
-        self, tx_idx: int, n: int, exclude: set[int], rng: random.Random
+        self,
+        tx_idx: int,
+        n: int,
+        exclude: set[int],
+        rng: random.Random,
+        range_lo: float = 0.0,
+        range_hi: float = 1.0,
     ) -> list[int]:
-        """Sample n keys from tx_idx's key range, excluding `exclude`."""
+        """Sample n keys from tx_idx's key range, excluding `exclude`.
+
+        range_lo/range_hi restrict sampling to a sub-range of the source tx's
+        keys, expressed as fractions in [0, 1]. The defaults sample from the
+        full range (preserves prior behaviour).
+        """
         start, count = self.tx_ranges[tx_idx]
         if count == 0:
             raise ValueError(f"cannot overlap with tx {tx_idx}: it allocated no keys")
+        sub_start = start + int(count * range_lo)
+        sub_end = start + int(count * range_hi)
+        sub_count = sub_end - sub_start
         # Fast path: when exclude is empty we can sample directly from range().
         if not exclude:
-            if n > count:
+            if n > sub_count:
                 raise ValueError(
-                    f"overlap requests {n} keys from tx {tx_idx} which only has {count}"
+                    f"overlap requests {n} keys from tx {tx_idx} sub-range "
+                    f"[{range_lo}, {range_hi}) which only has {sub_count}"
                 )
-            return rng.sample(range(start, start + count), n)
+            return rng.sample(range(sub_start, sub_end), n)
         # With exclusions, fall back to building the candidate list. This
         # is acceptable because cross-overlap exclusions within one tx are
         # bounded by the tx's overlap size (not by total doc count).
-        candidates = [k for k in range(start, start + count) if k not in exclude]
+        candidates = [k for k in range(sub_start, sub_end) if k not in exclude]
         if n > len(candidates):
             raise ValueError(
-                f"overlap requests {n} keys from tx {tx_idx} after exclusions, "
-                f"only {len(candidates)} available"
+                f"overlap requests {n} keys from tx {tx_idx} sub-range "
+                f"[{range_lo}, {range_hi}) after exclusions, only {len(candidates)} available"
             )
         return rng.sample(candidates, n)
 
@@ -474,7 +517,9 @@ def _resolve_op_plan(
             plans.append(OverlapPlan(op=o.op, src_tx=o.with_tx, keys=[]))
             continue
         used = used_per_tx.setdefault(o.with_tx, set())
-        keys = state.sample_from_tx(o.with_tx, n, used, rng)
+        keys = state.sample_from_tx(
+            o.with_tx, n, used, rng, range_lo=o.range_lo, range_hi=o.range_hi
+        )
         used.update(keys)
         plans.append(OverlapPlan(op=o.op, src_tx=o.with_tx, keys=keys))
 
