@@ -63,6 +63,10 @@ transactions:
       - with: 0                # referenced earlier transaction's key range.
         fraction: 0.20         # 20% of this tx updates keys from tx 0.
         op: u
+        range: [0.6, 1.0]      # (optional) restrict sampling to the last 40%
+                               # of tx 0's keys. Models recency-biased updates
+                               # (newer records get updated more than old).
+                               # Defaults to [0.0, 1.0] (full range).
       - with: 0
         fraction: 0.10
         op: d                  # 10% of this tx deletes keys from tx 0.
@@ -86,6 +90,13 @@ Overlap rules:
   the remainder are fresh creates with new keys.
 * Within a single transaction, overlap key sets are pairwise disjoint
   (a key is never both updated and deleted in the same tx).
+* `overlap.range` (optional) is a `[lo, hi]` pair of fractions in `[0, 1]`
+  with `lo < hi`. Restricts sampling to a sub-range of the source tx's
+  keys: e.g. `[0.6, 1.0]` for the last 40% (recency-biased updates),
+  `[0.0, 0.1]` for the first 10% (cold-data updates). Each transaction
+  emits `fresh` keys sequentially, so a sub-range maps to a contiguous
+  slice of the id space — useful for exercising partition pruning on
+  destinations that cluster on the key column.
 
 ## CLI flags
 

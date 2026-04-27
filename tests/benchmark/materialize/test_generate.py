@@ -207,6 +207,82 @@ class TestOverlap(unittest.TestCase):
                 ]
             )
 
+    def test_overlap_range_restricts_to_tail(self):
+        """range: [0.6, 1.0] should sample only from the last 40% of the source tx."""
+        lines, state = _run(
+            [
+                {"doc_count": 100, "doc_size": 256},
+                {
+                    "doc_count": 100,
+                    "doc_size": 256,
+                    "overlaps": [
+                        {"with": 0, "fraction": 0.20, "op": "u", "range": [0.6, 1.0]},
+                    ],
+                },
+            ]
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        tx1_docs = docs[100:]
+        update_keys = [d["id"] for c, d in tx1_docs if d["_meta"]["op"] == "u"]
+        self.assertEqual(len(update_keys), 20)
+        # Tx 0 used keys [0, 100); the last 40% is [60, 100).
+        self.assertTrue(all(60 <= k < 100 for k in update_keys),
+                        f"expected all keys in [60, 100), got {sorted(update_keys)}")
+
+    def test_overlap_range_restricts_to_head(self):
+        lines, _ = _run(
+            [
+                {"doc_count": 100, "doc_size": 256},
+                {
+                    "doc_count": 100,
+                    "doc_size": 256,
+                    "overlaps": [
+                        {"with": 0, "fraction": 0.10, "op": "u", "range": [0.0, 0.25]},
+                    ],
+                },
+            ]
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        tx1_docs = docs[100:]
+        update_keys = [d["id"] for c, d in tx1_docs if d["_meta"]["op"] == "u"]
+        self.assertEqual(len(update_keys), 10)
+        # First 25% of tx 0 is [0, 25).
+        self.assertTrue(all(0 <= k < 25 for k in update_keys),
+                        f"expected all keys in [0, 25), got {sorted(update_keys)}")
+
+    def test_overlap_range_invalid_bounds(self):
+        for bad in ([0.5, 0.5], [0.7, 0.3], [-0.1, 0.5], [0.5, 1.1], [0.5]):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    _run(
+                        [
+                            {"doc_count": 10, "doc_size": 256},
+                            {
+                                "doc_count": 10,
+                                "doc_size": 256,
+                                "overlaps": [
+                                    {"with": 0, "fraction": 0.5, "op": "u", "range": bad},
+                                ],
+                            },
+                        ]
+                    )
+
+    def test_overlap_range_too_narrow_for_fraction(self):
+        # 50% of 10 docs = 5 keys, but range covers only 2 keys of source.
+        with self.assertRaises(ValueError):
+            _run(
+                [
+                    {"doc_count": 10, "doc_size": 256},
+                    {
+                        "doc_count": 10,
+                        "doc_size": 256,
+                        "overlaps": [
+                            {"with": 0, "fraction": 0.5, "op": "u", "range": [0.0, 0.2]},
+                        ],
+                    },
+                ]
+            )
+
 
 class TestManualLineAssembly(unittest.TestCase):
     """The fast path assembles the fixture line by string fragments rather

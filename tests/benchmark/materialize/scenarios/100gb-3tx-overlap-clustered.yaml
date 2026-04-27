@@ -10,10 +10,9 @@ collections:
       then:
         reduce: { delete: true, strategy: lastWriteWins }
       properties:
-        id:          { type: integer }
-        val:         { type: integer }
-        cluster_key: { type: string, enum: [ck0, ck1, ck2, ck3, ck4, ck5, ck6, ck7, ck8, ck9] }
-        payload:     { type: string }
+        id:      { type: integer }
+        val:     { type: integer }
+        payload: { type: string }
         _meta:
           type: object
           properties: { op: { type: string } }
@@ -22,7 +21,7 @@ collections:
     key: [/id]
     resource:
       table: wide
-      clustering: [cluster_key]
+      clustering: true
 
 transactions:
   - total_size: 33GB
