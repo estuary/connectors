@@ -195,11 +195,8 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		return err
 	}
 
-	if rc, ok := tc.Resource.(tableConfig); ok && len(rc.Clustering) > 0 {
-		keyExpr, err := clusteringKeyExpr(rc.Clustering, tc.Table)
-		if err != nil {
-			return fmt.Errorf("resolving clustering key for new table %s: %w", tc.Identifier, err)
-		}
+	if rc, ok := tc.Resource.(tableConfig); ok && rc.Clustering && len(tc.Keys) > 0 {
+		keyExpr := clusteringKeyExpr(tc.Keys)
 		stmt := fmt.Sprintf("ALTER TABLE %s CLUSTER BY %s;", tc.Identifier, keyExpr)
 		if _, err := c.db.ExecContext(ctx, stmt); err != nil {
 			return fmt.Errorf("enabling clustering on new table %s: %w", tc.Identifier, err)
