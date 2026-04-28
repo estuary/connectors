@@ -7,6 +7,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"path"
 	"slices"
 	"strings"
@@ -141,6 +142,9 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 	case computeTypeSparkStandalone:
 		compute = &sparkClient{
 			cfg: cfg.Compute.sparkConfig,
+			// No timeout: spark jobs can run for tens of seconds and the
+			// caller's context already carries the cancellation signal.
+			httpClient: &http.Client{},
 		}
 	default:
 		return nil, fmt.Errorf("unsupported compute type %q", cfg.Compute.ComputeType)

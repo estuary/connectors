@@ -33,7 +33,7 @@ func (s *sparkClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr)
 		errs.Err(fmt.Errorf("building daemon health request: %w", err))
 		return
 	}
-	resp, err := s.client().Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		errs.Err(fmt.Errorf("spark daemon at %s is unreachable: %w", s.cfg.DaemonURL, err))
 		return
@@ -84,7 +84,7 @@ func (s *sparkClient) runJob(ctx context.Context, input any, entryPointURI, _ st
 
 	log.WithFields(log.Fields{"job": jobName, "action": action}).Debug("submitting spark job to daemon")
 
-	resp, err := s.client().Do(req)
+	resp, err := s.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("spark job %q request failed: %w", jobName, err)
 	}
@@ -110,16 +110,6 @@ func (s *sparkClient) runJob(ctx context.Context, input any, entryPointURI, _ st
 	}
 
 	return nil
-}
-
-func (s *sparkClient) client() *http.Client {
-	if s.httpClient != nil {
-		return s.httpClient
-	}
-	// No timeout; jobs can run for tens of seconds and the connector's own
-	// context already carries the cancellation signal we care about.
-	s.httpClient = &http.Client{Timeout: 0}
-	return s.httpClient
 }
 
 // actionFromEntryPoint maps a python script URI (or local path) to the daemon
