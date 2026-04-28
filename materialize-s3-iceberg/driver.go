@@ -86,6 +86,9 @@ func (c config) s3StoreConfig() filesink.S3StoreConfig {
 		Bucket:   c.Bucket,
 		Region:   c.Region,
 		Endpoint: c.S3Endpoint,
+		// Custom S3 endpoints (R2, S3-compatible) typically require
+		// path-style addressing; AWS S3 still accepts it.
+		UsePathStyle: c.S3Endpoint != "",
 	}
 
 	if c.Credentials != nil {

@@ -84,10 +84,37 @@ def run(
                     "scope": cfg.catalog.scope,
                     PY_IO_IMPL: "pyiceberg.io.fsspec.FsspecFileIO",  # use S3 file IO instead of Arrow
                 }
-                ctx.obj["catalog"] = RestCatalog(
+
+                # When the (legacy) top-level S3 credentials are provided we
+                # use them directly with pyiceberg and disable catalog
+                # credential vending. This path is for local/S3-compatible
+                # setups where the catalog server cannot vend STS creds.
+                # Customers using the newer `credentials` field hit none of
+                # this and continue to receive vended credentials from the
+                # catalog as before.
+                direct_s3_creds = (
+                    cfg.aws_access_key_id
+                    and cfg.aws_secret_access_key
+                    and cfg.region
+                )
+
+                if direct_s3_creds:
+                    properties["s3.access-key-id"] = cfg.aws_access_key_id
+                    properties["s3.secret-access-key"] = cfg.aws_secret_access_key
+                    properties["s3.region"] = cfg.region
+                    if cfg.s3_endpoint:
+                        properties["s3.endpoint"] = cfg.s3_endpoint
+                catalog = RestCatalog(
                     "default",
                     **{k:v for k, v in properties.items() if v is not None},
                 )
+
+                if direct_s3_creds and hasattr(catalog, "_session"):
+                    # Some catalogs (e.g. Polaris) require a separate privilege
+                    # for *_WITH_WRITE_DELEGATION ops that we don't need when not
+                    # using vended credentials.
+                    catalog._session.headers.pop("X-Iceberg-Access-Delegation", None)
+                ctx.obj["catalog"] = catalog
 
             case GlueCatalogConfig():
                 glue_props = {
