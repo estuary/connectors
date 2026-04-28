@@ -1,4 +1,6 @@
-# Same workload as 100gb-3tx-overlap, but with automatic clustering enabled.
+# Same workload as 100gb-3tx-overlap, but with automatic clustering enabled
+# and materialized to a separate table (wide_clustered) so both variants can
+# coexist in the same Snowflake schema for side-by-side comparison.
 collections:
   - name: bench/wide
     schema:
@@ -20,7 +22,7 @@ collections:
       required: [id, _meta]
     key: [/id]
     resource:
-      table: wide
+      table: wide_clustered
       clustering: true
 
 transactions:
