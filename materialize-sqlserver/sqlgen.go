@@ -120,8 +120,14 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 			"date":      {sql.NewMigrationSpec([]string{textType}, nocast)},
 			"time":      {sql.NewMigrationSpec([]string{textType}, nocast)},
 			"datetime2": {sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(datetimeToStringCast))},
-			"varchar":   {sql.NewMigrationSpecTarget(&StringSizeMigrationTarget{}, nocast)},
-			"*":         {sql.NewMigrationSpec([]string{textType}, nocast)},
+			"varchar": {
+				sql.NewMigrationSpecTarget(&StringSizeMigrationTarget{}, nocast),
+				sql.NewMigrationSpec([]string{"varbinary(900)", "varbinary(max)"}, sql.WithCastSQL(stringToVarbinaryCast)),
+			},
+			"nvarchar": {
+				sql.NewMigrationSpec([]string{"varbinary(900)", "varbinary(max)"}, sql.WithCastSQL(stringToVarbinaryCast)),
+			},
+			"*": {sql.NewMigrationSpec([]string{textType}, nocast)},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -182,6 +188,15 @@ func rfc3339TimeToUTC() sql.ElementConverter {
 
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`FORMAT(%s AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.FFFFFFF') + 'Z'`, migration.Identifier)
+}
+
+// stringToVarbinaryCast decodes a base64-encoded VARCHAR/NVARCHAR column into
+// native VARBINARY bytes. SQL Server doesn't expose a direct base64 decoder,
+// so we go through the XML xs:base64Binary cast. Used when the
+// native_binary_column_type feature flag is enabled on a task that previously
+// stored binary fields as base64 text.
+func stringToVarbinaryCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`CAST(N'' AS XML).value('xs:base64Binary(sql:column("%s"))', 'VARBINARY(MAX)')`, migration.Identifier)
 }
 
 type templates struct {

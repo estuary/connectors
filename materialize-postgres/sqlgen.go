@@ -77,6 +77,8 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 			"date":                     {sql.NewMigrationSpec([]string{"text"})},
 			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},
 			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
+			"text":                     {sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast))},
+			"character varying":        {sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast))},
 			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -120,6 +122,13 @@ type loadTableColumns struct {
 
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`to_char(%s AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`, migration.Identifier)
+}
+
+// stringToByteaCast decodes a base64-encoded TEXT/VARCHAR column into native
+// BYTEA bytes. Used when the native_binary_column_type feature flag is enabled
+// on a task that previously stored binary fields as base64 text.
+func stringToByteaCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`decode(%s, 'base64')`, migration.Identifier)
 }
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
