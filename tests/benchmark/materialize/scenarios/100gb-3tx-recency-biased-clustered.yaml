@@ -3,9 +3,11 @@
 # previous tx's fresh range. Models a real-world workload where newer records
 # get updated more than old ones.
 #
-# This is the baseline (no clustering). Pair with
-# 100gb-3tx-recency-biased-clustered.yaml to compare against the variant with
-# automatic clustering enabled on the primary key.
+# This variant enables Snowflake automatic clustering on the primary key.
+# Pair with 100gb-3tx-recency-biased.yaml (same workload, no clustering) to
+# measure the impact of clustering on MERGE performance — recency-biased
+# updates produce contiguous source key ranges that allow Snowflake's
+# join-filter pushdown to prune old target partitions.
 #
 # Overlap math (1KB docs, ~34.6M docs per 33GB):
 #   tx1: 20% overlap of 34.6M = 6.9M keys, drawn from last 40% of tx0
@@ -32,6 +34,9 @@ collections:
           required: [op]
       required: [id, _meta]
     key: [/id]
+    resource:
+      table: wide_clustered
+      clustering: true
 
 transactions:
   - total_size: 33GB
