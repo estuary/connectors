@@ -30,6 +30,10 @@ materializations:
           - int128ToIntStr129
           - int128ToIntStr256
           - int128ToIntStr257
+          - int128ToString
+          - int129ToString
+          - int256ToString
+          - int257ToString
           - int129ToNum
           - int129ToNumStr
           - int129ToInt256

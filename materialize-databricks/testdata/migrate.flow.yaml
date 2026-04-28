@@ -29,6 +29,7 @@ materializations:
           - int128ToIntStr256
           - int128ToIntStr257
           - int128ToMulti
+          - int128ToString
           - int129ToNum
           - int129ToNumStr
           - int129ToInt256
@@ -36,15 +37,18 @@ materializations:
           - int129ToIntStr129
           - int129ToIntStr256
           - int129ToIntStr257
+          - int129ToString
           - int256ToNum
           - int256ToNumStr
           - int256ToInt257
           - int256ToIntStr256
           - int256ToIntStr257
           - int256ToMulti
+          - int256ToString
           - int257ToNum
           - int257ToNumStr
           - int257ToIntStr257
+          - int257ToString
           - int000ToInt128
           - int000ToInt129
           - int000ToInt256

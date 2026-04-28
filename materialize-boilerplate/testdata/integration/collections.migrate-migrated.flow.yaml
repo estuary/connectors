@@ -42,8 +42,8 @@ collections:
         jsonPointer: &jsonPointer { type: string, format: json-pointer }
         relativeJsonPointer: &relativeJsonPointer { type: string, format: relative-json-pointer }
         regex: &regex { type: string, format: regex }
-        uint32: &uint32 { type: string, format: uint32 }
-        uint64: &uint64 { type: string, format: uint64, maxLength: 20 }
+        uint032: &uint032 { type: string, format: uint32 }
+        uint064: &uint064 { type: string, format: uint64, maxLength: 20 }
         iri: &iri { type: string, format: iri }
         iriReference: &iriReference { type: string, format: iri-reference }
 
@@ -64,6 +64,7 @@ collections:
         int000ToIntStr129: *intStr129
         int000ToIntStr256: *intStr256
         int000ToIntStr257: *intStr257
+        int000ToString: *string
         int032ToNum: *num
         int032ToNumStr: *numStr
         int032ToInt064: *int064
@@ -78,6 +79,7 @@ collections:
         int032ToIntStr129: *intStr129
         int032ToIntStr256: *intStr256
         int032ToIntStr257: *intStr257
+        int032ToString: *string
         int064ToNum: *num
         int064ToNumStr: *numStr
         int064ToInt065: *int065
@@ -91,6 +93,7 @@ collections:
         int064ToIntStr129: *intStr129
         int064ToIntStr256: *intStr256
         int064ToIntStr257: *intStr257
+        int064ToString: *string
         int065ToNum: *num
         int065ToNumStr: *numStr
         int065ToInt128: *int128
@@ -102,6 +105,7 @@ collections:
         int065ToIntStr129: *intStr129
         int065ToIntStr256: *intStr256
         int065ToIntStr257: *intStr257
+        int065ToString: *string
         int128ToNum: *num
         int128ToNumStr: *numStr
         int128ToInt129: *int129
@@ -111,6 +115,7 @@ collections:
         int128ToIntStr129: *intStr129
         int128ToIntStr256: *intStr256
         int128ToIntStr257: *intStr257
+        int128ToString: *string
         int129ToNum: *num
         int129ToNumStr: *numStr
         int129ToInt256: *int256
@@ -118,14 +123,17 @@ collections:
         int129ToIntStr129: *intStr129
         int129ToIntStr256: *intStr256
         int129ToIntStr257: *intStr257
+        int129ToString: *string
         int256ToNum: *num
         int256ToNumStr: *numStr
         int256ToInt257: *int257
         int256ToIntStr256: *intStr256
         int256ToIntStr257: *intStr257
+        int256ToString: *string
         int257ToNum: *num
         int257ToNumStr: *numStr
         int257ToIntStr257: *intStr257
+        int257ToString: *string
         intStr000ToInt000: *int000
         intStr000ToInt032: *int032
         intStr000ToInt064: *int064
@@ -231,7 +239,7 @@ collections:
         jsonPointerToString: *string
         relativeJsonPointerToString: *string
         regexToString: *string
-        uint32ToString: *string
+        uint032ToString: *string
         uint064ToString: *string
         iriToString: *string
         iriReferenceToString: *string

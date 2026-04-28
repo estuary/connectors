@@ -18,6 +18,6 @@ materializations:
         exclude:
           - int128ToMulti
           - int128ToNum
-          - int64ToInt128
+          - int064ToInt128
           - intStr128ToString
-          - uint64ToString
+          - uint064ToString
