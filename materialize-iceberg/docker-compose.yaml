@@ -2,7 +2,7 @@ name: materialize-iceberg
 
 services:
   polaris:
-    image: apache/polaris:latest
+    image: apache/polaris:1.4.0
     networks:
       materialize-iceberg:
     depends_on:

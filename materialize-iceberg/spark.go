@@ -58,7 +58,7 @@ func (s *sparkClient) ensureSecret(ctx context.Context, wantCred string) error {
 // (load.py, merge.py, exec.py); pyFilesCommonURI and workingPrefix are part
 // of the EMR contract but unused here — the daemon imports the python modules
 // directly and returns status in the HTTP response body.
-func (s *sparkClient) runJob(ctx context.Context, input any, entryPointURI, _ string, jobName, _ string) error {
+func (s *sparkClient) runJob(ctx context.Context, input any, entryPointURI, pyFilesCommonURI, jobName, workingPrefix string) error {
 	action, err := actionFromEntryPoint(entryPointURI)
 	if err != nil {
 		return err

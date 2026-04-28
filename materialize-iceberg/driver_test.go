@@ -45,7 +45,6 @@ func ensureDockerUp(t *testing.T) {
 			t.Logf("docker compose setup failed: %v", err)
 			return
 		}
-		dockerUp = true
 	})
 	if !dockerUp {
 		t.Fatal("docker compose setup previously failed")
@@ -65,6 +64,7 @@ func composeUpAndBootstrap() error {
 	_ = os.Remove(credsPath)
 
 	upCmd := exec.Command("docker", "compose", "-f", composeFile, "-p", composeProject, "up", "--wait", "--wait-timeout", "180")
+	dockerUp = true
 	if out, err := upCmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("docker compose up failed: %s\n%s", err, out)
 	}

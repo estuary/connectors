@@ -11,7 +11,7 @@
 set -eu
 
 # Install runtime deps. The container image is alpine; both packages are tiny.
-apk add --no-cache curl jq >/dev/null 2>&1
+apk add --no-cache curl jq >/dev/null
 
 POLARIS_HOST="${POLARIS_HOST:-polaris}"
 POLARIS_PORT="${POLARIS_PORT:-8181}"
