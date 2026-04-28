@@ -180,6 +180,7 @@ func (db *sqlserverDatabase) ScanTableChunk(ctx context.Context, info *sqlcaptur
 				Operation: sqlcapture.InsertOp,
 				Source: sqlserverSourceInfoCDC{
 					SourceCommon: sqlcapture.SourceCommon{
+						Millis:   0, // Not known.
 						Schema:   schema,
 						Snapshot: true,
 						Table:    table,

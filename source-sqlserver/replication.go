@@ -1057,15 +1057,57 @@ type tablePollInfo struct {
 }
 
 func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *tablePollInfo) error {
-	//log.WithFields(log.Fields{
-	//	"stream":   info.StreamID,
-	//	"instance": info.InstanceName,
-	//	"fromLSN":  info.FromLSN,
-	//	"toLSN":    info.ToLSN,
-	//}).Trace("polling stream")
+	if !rs.cfg.Advanced.PopulateSourceTsMs {
+		return rs.pollTableRange(ctx, info, info.FromLSN, info.ToLSN, nil)
+	}
 
+	// Walk the polling cycle's LSN range in pages bounded by
+	// tranEndTimesPageSize so the prefetch never grows unbounded during a
+	// wide catch-up. Each iteration: one prefetch query against
+	// cdc.lsn_time_mapping, one TVF query over the same sub-range, emit
+	// each change row with its prefetched ts_ms.
+	var current = info.FromLSN
+	for bytes.Compare(current, info.ToLSN) < 0 {
+		tranEndTimes, pageEnd, err := rs.lookupTranEndTimesPage(ctx, current, info.ToLSN, tranEndTimesPageSize)
+		if err != nil {
+			// Best-effort: log once and emit the rest of the polling cycle
+			// without ts_ms so a transient lookup failure can't stall CDC.
+			log.WithFields(log.Fields{
+				"err":      err,
+				"instance": info.InstanceName,
+				"fromLSN":  fmt.Sprintf("%X", current),
+				"toLSN":    fmt.Sprintf("%X", info.ToLSN),
+			}).Warn("failed to prefetch transaction commit times; emitting remaining changes without ts_ms")
+			return rs.pollTableRange(ctx, info, current, info.ToLSN, nil)
+		}
+		log.WithFields(log.Fields{
+			"instance": info.InstanceName,
+			"fromLSN":  fmt.Sprintf("%X", current),
+			"toLSN":    fmt.Sprintf("%X", pageEnd),
+			"lsns":     len(tranEndTimes),
+		}).Debug("prefetched transaction commit times")
+		if err := rs.pollTableRange(ctx, info, current, pageEnd, tranEndTimes); err != nil {
+			return err
+		}
+		current = pageEnd
+	}
+	return nil
+}
+
+// pollTableRange scans the change-table TVF over the half-open LSN range
+// (fromLSN, toLSN] and emits each row as a change event. When tranEndTimes is
+// non-nil, every emitted event is enriched with its commit time as
+// _meta/source/ts_ms; when nil, events stream without ts_ms (the original
+// behavior, byte-identical to a flag-off capture).
+func (rs *sqlserverReplicationStream) pollTableRange(
+	ctx context.Context,
+	info *tablePollInfo,
+	fromLSN LSN,
+	toLSN LSN,
+	tranEndTimes map[string]time.Time,
+) error {
 	var query = fmt.Sprintf(`SELECT * FROM cdc.fn_cdc_get_all_changes_%s(@p1, @p2, N'all');`, info.InstanceName)
-	rows, err := rs.conn.QueryContext(ctx, query, info.FromLSN, info.ToLSN)
+	rows, err := rs.conn.QueryContext(ctx, query, fromLSN, toLSN)
 	if err != nil {
 		return fmt.Errorf("error requesting changes: %w", err)
 	}
@@ -1186,7 +1228,7 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 		if !ok || changeLSN == nil {
 			return fmt.Errorf("invalid '__$start_lsn' value (capture user may not have correct permissions): %v", changeLSN)
 		}
-		if bytes.Compare(changeLSN, info.FromLSN) <= 0 {
+		if bytes.Compare(changeLSN, fromLSN) <= 0 {
 			continue
 		}
 
@@ -1241,12 +1283,68 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 			RowKey: rowKey,
 			Values: vals,
 		}
+		if tranEndTimes != nil {
+			if t, ok := tranEndTimes[string(changeLSN)]; ok {
+				event.Meta.Source.Millis = t.UnixMilli()
+			}
+		}
 		if err := rs.emitEvent(ctx, event); err != nil {
 			return err
 		}
 	}
-
 	return rows.Err()
+}
+
+// tranEndTimesPageSize bounds the row count of a single
+// cdc.lsn_time_mapping prefetch. Tunable; lower values reduce per-page
+// memory at the cost of more queries during wide catch-up.
+const tranEndTimesPageSize = 100000
+
+// lookupTranEndTimesPage returns up to pageSize commit-time entries from
+// cdc.lsn_time_mapping for the half-open range (fromLSN, toLSN]. The second
+// return value is the upper bound of the returned page: when pageSize rows
+// were returned it is the last row's start_lsn (so the caller advances to
+// it as the next page's fromLSN); otherwise it is toLSN, signaling that the
+// entire requested range was consumed.
+//
+// LSNs not present in cdc.lsn_time_mapping (possible at retention
+// boundaries) and rows with a NULL tran_end_time are absent from the
+// returned map.
+func (rs *sqlserverReplicationStream) lookupTranEndTimesPage(ctx context.Context, fromLSN, toLSN LSN, pageSize int) (map[string]time.Time, LSN, error) {
+	const queryFmt = `SELECT TOP (@p3) start_lsn, tran_end_time
+	                    FROM cdc.lsn_time_mapping
+	                   WHERE start_lsn > @p1 AND start_lsn <= @p2
+	                   ORDER BY start_lsn`
+
+	rows, err := rs.conn.QueryContext(ctx, queryFmt, fromLSN, toLSN, pageSize)
+	if err != nil {
+		return nil, nil, fmt.Errorf("error prefetching cdc.lsn_time_mapping: %w", err)
+	}
+	defer rows.Close()
+
+	var result = make(map[string]time.Time)
+	var lastLSN LSN
+	var rowCount int
+	for rows.Next() {
+		var lsn LSN
+		var tranEndTime sql.NullTime
+		if err := rows.Scan(&lsn, &tranEndTime); err != nil {
+			return nil, nil, fmt.Errorf("error scanning cdc.lsn_time_mapping row: %w", err)
+		}
+		if tranEndTime.Valid {
+			result[string(lsn)] = tranEndTime.Time
+		}
+		lastLSN = lsn
+		rowCount++
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	if rowCount >= pageSize {
+		return result, lastLSN, nil
+	}
+	return result, toLSN, nil
 }
 
 func (rs *sqlserverReplicationStream) emitEvent(ctx context.Context, event sqlcapture.DatabaseEvent) error {
