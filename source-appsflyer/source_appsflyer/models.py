@@ -1,7 +1,7 @@
 from abc import ABCMeta
 from datetime import datetime, timedelta
 from functools import reduce
-from typing import Any, ClassVar, Self
+from typing import Any, ClassVar, Self, override
 from urllib.parse import urljoin
 
 import xxhash
@@ -93,26 +93,47 @@ class AppsFlyerWebhookDocument(WebhookDocument):
         description="Document metadata",
     )
 
+    pk_fields: ClassVar[list[str]] = [
+        "app_id",
+        "app_type",
+        "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
+        "event_name",
+        "event_time",
+        "event_value",
+    ]
+
     app_id: str
+    app_type: str
     appsflyer_id: str
+    campaign_type: str
+    conversion_type: str
     event_name: str
     event_time: str
     event_value: str
-    api_version: str
 
-    @model_validator(mode="after")
-    def inject_estuary_id(self) -> Self:
-        parts = [
-            self.app_id,
-            self.appsflyer_id,
-            self.event_name,
-            self.event_time,
-            self.event_value,
-            self.api_version,
-        ]
+    @model_validator(mode="before")
+    def ensure_pk_fields_present(cls, data: dict[str, str]):
+        assert isinstance(data, dict)
+
+        missing_keys = [key for key in cls.pk_fields if key not in data]
+        if missing_keys:
+            raise ValueError(
+                (
+                    "Received a push API document that did not contain the following"
+                    f" required field(s): {missing_keys}."
+                    " Please update your API export to include them"
+                )
+            )
+
+        return data
+
+    @override
+    def model_post_init(self, _: Any):  # pyright: ignore[reportExplicitAny]
+        parts = [getattr(self, key) for key in self.pk_fields]
+
         self.meta_.estuary_id = xxhash.xxh128("|".join(parts).encode()).hexdigest()
-
-        return self
 
 
 class PullApiDocument(BaseDocument, metaclass=ABCMeta):
