@@ -10,6 +10,9 @@
 
 set -eu
 
+# Install runtime deps. The container image is alpine; both packages are tiny.
+apk add --no-cache curl jq >/dev/null 2>&1
+
 POLARIS_HOST="${POLARIS_HOST:-polaris}"
 POLARIS_PORT="${POLARIS_PORT:-8181}"
 POLARIS_REALM="${POLARIS_REALM:-POLARIS}"
@@ -65,7 +68,7 @@ get_root_token() {
       --data-urlencode "client_secret=${ROOT_CLIENT_SECRET}" \
       --data-urlencode "scope=PRINCIPAL_ROLE:ALL" 2>/dev/null) || resp=""
     if [ -n "$resp" ]; then
-      token=$(echo "$resp" | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+      token=$(echo "$resp" | jq -r '.access_token // empty')
       if [ -n "$token" ]; then
         echo "$token"
         return 0
@@ -137,16 +140,16 @@ EOF
 
 log "creating principal ${PRINCIPAL_NAME}"
 principal_resp=$(mgmt_post "${MGMT}/principals" "{\"principal\": {\"name\": \"${PRINCIPAL_NAME}\"}}")
-client_id=$(echo "$principal_resp" | sed -n 's/.*"clientId":"\([^"]*\)".*/\1/p')
-client_secret=$(echo "$principal_resp" | sed -n 's/.*"clientSecret":"\([^"]*\)".*/\1/p')
+client_id=$(echo "$principal_resp" | jq -r '.credentials.clientId // empty')
+client_secret=$(echo "$principal_resp" | jq -r '.credentials.clientSecret // empty')
 
 if [ -z "$client_id" ] || [ -z "$client_secret" ]; then
   # Principal already existed (409). Rotate its credentials so we have a known
   # secret to hand back to the test harness.
   log "rotating credentials for existing principal ${PRINCIPAL_NAME}"
   rotate_resp=$(mgmt_post "${MGMT}/principals/${PRINCIPAL_NAME}/rotate" "{}")
-  client_id=$(echo "$rotate_resp" | sed -n 's/.*"clientId":"\([^"]*\)".*/\1/p')
-  client_secret=$(echo "$rotate_resp" | sed -n 's/.*"clientSecret":"\([^"]*\)".*/\1/p')
+  client_id=$(echo "$rotate_resp" | jq -r '.credentials.clientId // empty')
+  client_secret=$(echo "$rotate_resp" | jq -r '.credentials.clientSecret // empty')
 fi
 
 if [ -z "$client_id" ] || [ -z "$client_secret" ]; then

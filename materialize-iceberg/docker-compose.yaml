@@ -28,7 +28,10 @@ services:
     # Polaris's OAuth endpoint with 100ms intervals. This allows rustfs,
     # polaris, and spark-master to boot in parallel instead of serially,
     # reducing total startup time by ~50%.
-    image: apache/polaris:latest
+    #
+    # alpine:3.20 (~5MB) is used so we can `apk add curl jq` in the script;
+    # neither is preinstalled in apache/polaris:latest.
+    image: alpine:3.20
     networks:
       materialize-iceberg:
     user: "0:0"
