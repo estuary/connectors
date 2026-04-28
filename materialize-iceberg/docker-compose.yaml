@@ -69,33 +69,46 @@ services:
     stop_grace_period: 1s
 
   rustfs-init:
-    # No depends_on: curl retries every 50ms on connection failures, allowing
-    # parallel boot with rustfs. Simplifies dependency graph and reduces startup
-    # latency.
+    # No depends_on: curl retries every 100ms on connection failures, allowing
+    # parallel boot with rustfs. Downstream services that need the bucket
+    # (polaris, spark-daemon) gate on this container exiting 0.
     image: rustfs/rustfs:latest
     networks:
       materialize-iceberg:
     entrypoint: ["/bin/sh", "-c"]
-    # Create the warehouse and staging buckets with retries on connection failures.
-    # 200 (created), 409 (already exists), and 200-on-conflict variants are all accepted as success.
+    # Create the warehouse bucket. Retries on connection failures (rustfs may
+    # not be listening yet) and on transient HTTP errors. The script exits
+    # non-zero if creation never succeeds, so the depends_on chain blocks
+    # downstream startup rather than letting the test silently observe a
+    # bucketless RustFS.
     command:
       - |
-        for bucket in warehouse staging; do
-          i=0
-          while [ $$i -lt 100 ]; do
-            curl -fsS -o /dev/null \
-              --aws-sigv4 "aws:amz:us-east-1:s3" \
-              --user "flow:flow" \
-              -X PUT "http://rustfs:9000/$$bucket" \
-              -w "%{http_code} $$bucket\n" 2>/dev/null && exit 0
-            curl -sS -o /dev/null -w "%{http_code} $$bucket (already exists)\n" \
-              --aws-sigv4 "aws:amz:us-east-1:s3" \
-              --user "flow:flow" \
-              -I "http://rustfs:9000/$$bucket" 2>/dev/null && exit 0
-            i=$$((i + 1))
-            sleep 0.05
-          done
+        set -eu
+        bucket=warehouse
+        deadline=$$(( $$(date +%s) + 30 ))
+        while [ "$$(date +%s)" -lt "$$deadline" ]; do
+          # PUT returns 200 on create, or an XML 409 BucketAlreadyOwnedByYou on
+          # repeat invocations against the same RustFS instance. Either is success.
+          status=$$(curl -sS -o /dev/null -w "%{http_code}" \
+            --aws-sigv4 "aws:amz:us-east-1:s3" \
+            --user "flow:flow" \
+            -X PUT "http://rustfs:9000/$$bucket" 2>/dev/null || echo "000")
+          case "$$status" in
+            2*|409)
+              echo "$$status $$bucket"
+              exit 0
+              ;;
+            000)
+              # Connection failure (rustfs not listening yet); retry without log spam.
+              ;;
+            *)
+              echo "rustfs-init: unexpected $$status for PUT $$bucket; retrying" >&2
+              ;;
+          esac
+          sleep 0.1
         done
+        echo "rustfs-init: failed to create bucket $$bucket within 30s" >&2
+        exit 1
 
   spark-master:
     image: iceberg-spark:local
