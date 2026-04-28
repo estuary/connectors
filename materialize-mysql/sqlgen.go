@@ -170,6 +170,19 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		migrationSpecs["*"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"})}
 	}
 
+	// Allow migrating from text (base64) to native binary columns when the
+	// native_binary_column_type feature flag is turned on for an existing task.
+	migrationSpecs["varchar"] = append(
+		migrationSpecs["varchar"],
+		sql.NewMigrationSpec([]string{"varbinary(256)"}, sql.WithCastSQL(stringToBinaryCast)),
+		sql.NewMigrationSpec([]string{"longblob"}, sql.WithCastSQL(stringToBinaryCast)),
+	)
+	migrationSpecs["longtext"] = append(
+		migrationSpecs["longtext"],
+		sql.NewMigrationSpec([]string{"varbinary(256)"}, sql.WithCastSQL(stringToBinaryCast)),
+		sql.NewMigrationSpec([]string{"longblob"}, sql.WithCastSQL(stringToBinaryCast)),
+	)
+
 	var reservedWords = MYSQL_RESERVED_WORDS
 	if product == "singlestore" {
 		reservedWords = SINGLESTORE_RESERVED_WORDS
@@ -231,6 +244,14 @@ func jsonQuoteCast(product string) func(migration sql.ColumnTypeMigration) strin
 	return func(migration sql.ColumnTypeMigration) string {
 		return fmt.Sprintf(`JSON_QUOTE(%s)`, migration.Identifier)
 	}
+}
+
+// stringToBinaryCast decodes a base64-encoded VARCHAR/LONGTEXT column into
+// native VARBINARY/LONGBLOB bytes. Used when the native_binary_column_type
+// feature flag is enabled on a task that previously stored binary fields as
+// base64 text.
+func stringToBinaryCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`FROM_BASE64(%s)`, migration.Identifier)
 }
 
 func prepareDatetimeToStringCast(loc *time.Location) sql.CastSQLFunc {

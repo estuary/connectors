@@ -82,6 +82,7 @@ func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
 			"timestamp with time zone": {sql.NewMigrationSpec([]string{"varchar"}, sql.WithCastSQL(datetimeToStringCast))},
 			"time":                     {sql.NewMigrationSpec([]string{"varchar"})},
 			"uuid":                     {sql.NewMigrationSpec([]string{"varchar"})},
+			"varchar":                  {sql.NewMigrationSpec([]string{"blob"}, sql.WithCastSQL(stringToBlobCast))},
 			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -133,6 +134,13 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`to_json(%s)`, migration.Identifier)
+}
+
+// stringToBlobCast decodes a base64-encoded VARCHAR column into a native BLOB.
+// Used when the native_binary_column_type feature flag is enabled on a task
+// that previously stored binary fields as base64 text.
+func stringToBlobCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`from_base64(%s)`, migration.Identifier)
 }
 
 type queryParams struct {

@@ -133,6 +133,7 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 			"float":      {sql.NewMigrationSpec([]string{"string"})},
 			"date":       {sql.NewMigrationSpec([]string{"string"})},
 			"timestamp":  {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
+			"string":     {sql.NewMigrationSpec([]string{"bytes"}, sql.WithCastSQL(stringToBytesCast))},
 			"*":          {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -172,6 +173,13 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 
 func toBigNumericCast(m sql.ColumnTypeMigration) string {
 	return fmt.Sprintf("CAST(%s AS BIGNUMERIC)", m.Identifier)
+}
+
+// stringToBytesCast decodes a base64-encoded STRING column into native BYTES.
+// Used when the native_binary_column_type feature flag is enabled on a task
+// that previously stored binary fields as base64 text.
+func stringToBytesCast(m sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`FROM_BASE64(%s)`, m.Identifier)
 }
 
 type templates struct {

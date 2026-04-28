@@ -137,6 +137,7 @@ var snowflakeDialect = func(configSchema string, timestampType snowflakeTimestam
 			"timestamp_tz":  {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
 			"timestamp_ltz": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
 			"binary":        {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(binaryToStringCast))},
+			"text":          {sql.NewMigrationSpec([]string{"binary"}, sql.WithCastSQL(stringToBinaryCast))},
 			"*":             {sql.NewMigrationSpec([]string{"variant"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -187,6 +188,14 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 
 func binaryToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`BASE64_ENCODE(%s)`, migration.Identifier)
+}
+
+// stringToBinaryCast decodes a base64-encoded TEXT column into native BINARY
+// bytes. This is the inverse of binaryToStringCast and is used when the
+// native_binary_column_type feature flag is enabled on a task that previously
+// stored binary fields as base64 text.
+func stringToBinaryCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`BASE64_DECODE_BINARY(%s)`, migration.Identifier)
 }
 
 type templates struct {

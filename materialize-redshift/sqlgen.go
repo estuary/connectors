@@ -133,7 +133,10 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 				sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast)),
 				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(datetimeToSuperCast)),
 			},
-			"character varying": {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(jsonQuoteCast))},
+			"character varying": {
+				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(jsonQuoteCast)),
+				sql.NewMigrationSpec([]string{"varbyte(1024000)"}, sql.WithCastSQL(stringToVarbyteCast)),
+			},
 			"binary varying": {
 				sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(varbyteToStringCast)),
 				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(varbyteToSuperCast)),
@@ -198,6 +201,13 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 // which is the canonical textual representation of binary data in Flow.
 func varbyteToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`FROM_VARBYTE(%s, 'base64')`, migration.Identifier)
+}
+
+// stringToVarbyteCast decodes a base64-encoded VARCHAR/TEXT column into native
+// VARBYTE bytes. Used when the native_binary_column_type feature flag is
+// enabled on a task that previously stored binary fields as base64 text.
+func stringToVarbyteCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`FROM_BASE64(%s)`, migration.Identifier)
 }
 
 // varbyteToSuperCast converts a VARBYTE column into a SUPER value containing
