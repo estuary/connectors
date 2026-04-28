@@ -278,16 +278,29 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 		if p, ok := catalogCfg.Defaults["prefix"]; ok {
 			prefix = p
 		}
+		if u, ok := catalogCfg.Overrides["uri"]; ok {
+			uri, err := url.Parse(u)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse defaults.uri %q: %w", uri, err)
+			}
+			baseURL = uri.JoinPath("v1")
+		}
 	}
 	if catalogCfg.Overrides != nil {
 		if p, ok := catalogCfg.Overrides["prefix"]; ok {
 			prefix = p
-
+		}
+		if u, ok := catalogCfg.Overrides["uri"]; ok {
+			uri, err := url.Parse(u)
+			if err != nil {
+				return nil, fmt.Errorf("unable to parse overrides.uri %q: %w", uri, err)
+			}
+			baseURL = uri.JoinPath("v1")
 		}
 	}
-	if prefix != "" {
-		rc.rHttp = rc.rHttp.SetBaseURL(baseURL.JoinPath(prefix).String())
-	}
+
+	// Update the baseURL based on the CatalogConfig.
+	rc.rHttp = rc.rHttp.SetBaseURL(baseURL.JoinPath(prefix).String())
 
 	return rc, nil
 }
