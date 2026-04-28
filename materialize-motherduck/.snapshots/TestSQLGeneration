@@ -189,7 +189,7 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 		"stringInteger77Chars": 'VARCHAR',
 		"stringNumber": 'DOUBLE',
 		flow_document: 'JSON NOT NULL'
-	, _flow_delete: 'BOOLEAN'
+	, _flow_delete: 'BOOLEAN NOT NULL'
 	}
 ) WHERE NOT _flow_delete;
 --- End db."a-schema".key_value storeQuery ---
@@ -205,7 +205,7 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 		"theKey": 'VARCHAR NOT NULL',
 		"aValue": 'BIGINT',
 		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL'
-	, _flow_delete: 'BOOLEAN'
+	, _flow_delete: 'BOOLEAN NOT NULL'
 	}
 ) WHERE NOT _flow_delete;
 --- End db."a-schema".delta_updates storeQuery ---

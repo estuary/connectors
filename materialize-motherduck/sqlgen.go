@@ -220,7 +220,7 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 		{{- if $ind }},{{ end }}
 		{{$col.Identifier}}: '{{$col.DDL}}'
 	{{- end }}
-	, _flow_delete: 'BOOLEAN'
+	, _flow_delete: 'BOOLEAN NOT NULL'
 	}
 ) WHERE NOT _flow_delete;
 {{ end }}

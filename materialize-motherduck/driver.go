@@ -143,6 +143,7 @@ type binding struct {
 	target            sql.Table
 	nullFieldsToStrip []string
 	mustMerge         bool
+	expectedInserts   int
 	loadMergeBounds   *sql.MergeBoundsBuilder
 	storeMergeBounds  *sql.MergeBoundsBuilder
 }
@@ -314,6 +315,9 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		if it.Exists {
 			b.mustMerge = true
 		}
+		if !flowDelete {
+			b.expectedInserts++
+		}
 
 		if converted, err := b.target.ConvertAll(it.Key, it.Values, it.RawJSON); err != nil {
 			return nil, fmt.Errorf("converting store parameters: %w", err)
@@ -352,6 +356,10 @@ var retryableDuckdbErrors = []duckdb.ErrorType{
 type bindingCommit struct {
 	path    []string
 	queries []string
+	// expectedInserts is the number of rows we expect the final query
+	// (the INSERT) to affect. Verified after execution to catch silent
+	// row drops in the read_json → INSERT pipeline.
+	expectedInserts int
 }
 
 func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
@@ -386,12 +394,14 @@ func (d *transactor) commit(ctx context.Context, fenceUpdate string) error {
 			return err
 		}
 		commits = append(commits, bindingCommit{
-			path:    b.target.Path,
-			queries: append(queries, storeQuery.String()),
+			path:            b.target.Path,
+			queries:         append(queries, storeQuery.String()),
+			expectedInserts: b.expectedInserts,
 		})
 
 		// Reset for next round.
 		b.mustMerge = false
+		b.expectedInserts = 0
 	}
 
 	for attempt := 1; ; attempt++ {
@@ -433,9 +443,25 @@ func (d *transactor) commitBindings(ctx context.Context, bindings []bindingCommi
 
 	for _, b := range bindings {
 		d.be.StartedResourceCommit(b.path)
-		for _, query := range b.queries {
-			if _, err := txn.ExecContext(txnCtx, query); err != nil {
+		for i, query := range b.queries {
+			res, err := txn.ExecContext(txnCtx, query)
+			if err != nil {
 				return fmt.Errorf("executing store query for %s: %w", b.path, err)
+			}
+			// The final query is always the INSERT (storeQuery). Verify
+			// it affected exactly the expected number of rows so a silent
+			// drop between the staged JSON file and the INSERT (e.g., a
+			// row filtered by `WHERE NOT _flow_delete` due to a NULL or
+			// missing field) surfaces as an error rather than data loss.
+			if i != len(b.queries)-1 {
+				continue
+			}
+			rows, err := res.RowsAffected()
+			if err != nil {
+				return fmt.Errorf("getting rows affected for %s: %w", b.path, err)
+			}
+			if rows != int64(b.expectedInserts) {
+				return fmt.Errorf("expected %d rows inserted for %s, got %d", b.expectedInserts, b.path, rows)
 			}
 		}
 		d.be.FinishedResourceCommit(b.path)
