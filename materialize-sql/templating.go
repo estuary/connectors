@@ -28,37 +28,39 @@ func (c ColumnWithAlias) Format() string {
 // a base64-decoding SQL function when the column is stored as native bytes.
 // It accepts either a Column or a *Column to match either of the two shapes
 // the templating layer exposes (Table.Keys is []Column, Table.Columns() is
-// []*Column).
-func IsBinary(c any) bool {
+// []*Column), and also unwraps MergeBound and ColumnWithAlias. Any other
+// input type is an error so that template typos surface at render time
+// rather than silently rendering the non-binary branch.
+func IsBinary(c any) (bool, error) {
 	var col Column
 	switch v := c.(type) {
 	case Column:
 		col = v
 	case *Column:
 		if v == nil {
-			return false
+			return false, nil
 		}
 		col = *v
 	case MergeBound:
 		col = v.Column
 	case *MergeBound:
 		if v == nil {
-			return false
+			return false, nil
 		}
 		col = v.Column
 	case ColumnWithAlias:
 		col = v.Column
 	default:
-		return false
+		return false, fmt.Errorf("IsBinary: unsupported argument type %T", c)
 	}
 	ft, _ := col.AsFlatType()
-	return ft == BINARY
+	return ft == BINARY, nil
 }
 
-func toColumns(cols any) []Column {
+func toColumns(cols any) ([]Column, error) {
 	switch v := cols.(type) {
 	case []Column:
-		return v
+		return v, nil
 	case []*Column:
 		out := make([]Column, 0, len(v))
 		for _, c := range v {
@@ -66,35 +68,51 @@ func toColumns(cols any) []Column {
 				out = append(out, *c)
 			}
 		}
-		return out
+		return out, nil
 	default:
-		return nil
+		return nil, fmt.Errorf("expected []Column or []*Column, got %T", cols)
 	}
 }
 
 // HasBinary reports whether any of the provided columns has the BINARY flat
 // type. Template helper used to short-circuit load/insert SET clauses when no
 // binary decoding is required.
-func HasBinary(cols any) bool {
-	for _, c := range toColumns(cols) {
-		if IsBinary(c) {
-			return true
+func HasBinary(cols any) (bool, error) {
+	xs, err := toColumns(cols)
+	if err != nil {
+		return false, fmt.Errorf("HasBinary: %w", err)
+	}
+	for _, c := range xs {
+		isBin, err := IsBinary(c)
+		if err != nil {
+			return false, fmt.Errorf("HasBinary: %w", err)
+		}
+		if isBin {
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 // BinaryColumns returns only the columns whose flat type is BINARY, in order.
 // Template helper used to emit a LOAD DATA SET clause that decodes base64
 // variables into the native byte columns.
-func BinaryColumns(cols any) []Column {
+func BinaryColumns(cols any) ([]Column, error) {
+	xs, err := toColumns(cols)
+	if err != nil {
+		return nil, fmt.Errorf("BinaryColumns: %w", err)
+	}
 	var out []Column
-	for _, c := range toColumns(cols) {
-		if IsBinary(c) {
+	for _, c := range xs {
+		isBin, err := IsBinary(c)
+		if err != nil {
+			return nil, fmt.Errorf("BinaryColumns: %w", err)
+		}
+		if isBin {
 			out = append(out, c)
 		}
 	}
-	return out
+	return out, nil
 }
 
 // IndexedColumn pairs a column with its original position in the input slice.
@@ -108,14 +126,22 @@ type IndexedColumn struct {
 
 // IndexedBinaryColumns returns the subset of cols that have the BINARY flat
 // type, each paired with its original position in cols.
-func IndexedBinaryColumns(cols any) []IndexedColumn {
+func IndexedBinaryColumns(cols any) ([]IndexedColumn, error) {
+	xs, err := toColumns(cols)
+	if err != nil {
+		return nil, fmt.Errorf("IndexedBinaryColumns: %w", err)
+	}
 	var out []IndexedColumn
-	for i, c := range toColumns(cols) {
-		if IsBinary(c) {
+	for i, c := range xs {
+		isBin, err := IsBinary(c)
+		if err != nil {
+			return nil, fmt.Errorf("IndexedBinaryColumns: %w", err)
+		}
+		if isBin {
 			out = append(out, IndexedColumn{Index: i, Column: c})
 		}
 	}
-	return out
+	return out, nil
 }
 
 // MustParseTemplate is a convenience which parses the template `body` and
