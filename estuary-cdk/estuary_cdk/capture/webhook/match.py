@@ -4,6 +4,7 @@ import abc
 import re
 from abc import abstractmethod
 from collections.abc import Sequence
+from logging import Logger
 from typing import Any, Literal, override
 
 from aiohttp import web
@@ -38,7 +39,10 @@ class MatchRule(abc.ABC, BaseModel, frozen=True):
 
     @abstractmethod
     async def matches(
-        self, req: web.Request, raw_doc: dict[str, Any] | None = None
+        self,
+        req: web.Request,
+        failure_log: Logger,
+        raw_doc: dict[str, Any] | None = None,
     ) -> bool: ...
 
     @property
@@ -119,17 +123,28 @@ class UrlMatch(MatchRule, frozen=True):
 
     @override
     async def matches(
-        self, req: web.Request, raw_doc: dict[str, Any] | None = None
+        self,
+        req: web.Request,
+        failure_log: Logger,
+        raw_doc: dict[str, Any] | None = None,
     ) -> bool:
         if self.value == "*":
             return True
 
-        return (
+        is_match = (
             DynamicResource(self.value)._match(  # pyright: ignore[reportPrivateUsage]
                 req.path
             )
             is not None
         )
+
+        if not is_match:
+            failure_log.debug(
+                "URL path did not match",
+                extra={"path": req.path, "match_value": self.value},
+            )
+
+        return is_match
 
     @property
     @override
@@ -167,12 +182,29 @@ class HeaderMatch(_KeyValueMatch, frozen=True):
 
     @override
     async def matches(
-        self, req: web.Request, raw_doc: dict[str, Any] | None = None
+        self,
+        req: web.Request,
+        failure_log: Logger,
+        raw_doc: dict[str, Any] | None = None,
     ) -> bool:
         header_value = req.headers.get(self.key)
         if header_value is None:
+            failure_log.debug(
+                "Header not present on request",
+                extra={"header": self.key},
+            )
             return False
-        return header_value == self.value
+        if header_value != self.value:
+            failure_log.debug(
+                "Header value did not match",
+                extra={
+                    "header": self.key,
+                    "actual": header_value,
+                    "match_value": self.value,
+                },
+            )
+            return False
+        return True
 
     @property
     @override
@@ -186,7 +218,10 @@ class BodyMatch(_KeyValueMatch, frozen=True):
 
     @override
     async def matches(
-        self, req: web.Request, raw_doc: dict[str, Any] | None = None
+        self,
+        req: web.Request,
+        failure_log: Logger,
+        raw_doc: dict[str, Any] | None = None,
     ) -> bool:
         if raw_doc is None:
             parsed = await req.json()
@@ -206,12 +241,32 @@ class BodyMatch(_KeyValueMatch, frozen=True):
         for segment in segments[:-1]:
             nested = cursor.get(segment)
             if not isinstance(nested, dict):
+                failure_log.debug(
+                    "Body path segment missing or not an object",
+                    extra={"key": self.key, "segment": segment},
+                )
                 return False
 
             cursor = nested
 
         value = cursor.get(segments[-1])
-        return value is not None and str(value) == self.value
+        if value is None:
+            failure_log.debug(
+                "Body key not present",
+                extra={"key": self.key},
+            )
+            return False
+        if str(value) != self.value:
+            failure_log.debug(
+                "Body value did not match",
+                extra={
+                    "key": self.key,
+                    "actual": str(value),
+                    "match_value": self.value,
+                },
+            )
+            return False
+        return True
 
     @property
     @override
