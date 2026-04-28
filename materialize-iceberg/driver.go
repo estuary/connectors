@@ -140,14 +140,7 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 		}
 	case computeTypeSparkStandalone:
 		compute = &sparkClient{
-			cfg:                 cfg.Compute.sparkConfig,
-			emrCfg:              cfg.Compute.emrConfig,
-			catalogAuth:         *catalogAuth,
-			catalogURL:          cfg.URL,
-			warehouse:           cfg.Warehouse,
-			materializationName: materializationName,
-			bucket:              bucket,
-			tokenURL:            catalog.TokenURL(),
+			cfg: cfg.Compute.sparkConfig,
 		}
 	default:
 		return nil, fmt.Errorf("unsupported compute type %q", cfg.Compute.ComputeType)

@@ -9,7 +9,6 @@ import (
 	"path"
 	"strings"
 
-	"github.com/estuary/connectors/go/blob"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
@@ -23,15 +22,8 @@ import (
 // single SparkSession across submissions. Each runJob call is an HTTP POST
 // rather than a process spawn.
 type sparkClient struct {
-	cfg                 sparkConfig
-	emrCfg              emrConfig
-	catalogAuth         catalogAuthConfig
-	catalogURL          string
-	warehouse           string
-	materializationName string
-	bucket              blob.Bucket
-	tokenURL            string
-	httpClient          *http.Client
+	cfg        sparkConfig
+	httpClient *http.Client
 }
 
 func (s *sparkClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr) {
