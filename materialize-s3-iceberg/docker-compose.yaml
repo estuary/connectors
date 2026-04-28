@@ -1,65 +1,49 @@
 services:
-  server:
-    image: quay.io/hansetag/tip-catalog:v0.3
-    pull_policy: always
+  polaris:
+    image: apache/polaris:latest
     environment:
-      - ICEBERG_REST__BASE_URI=http://localhost:8090
-      # - ICEBERG_REST__BASE_URI=http://localhost:8090
-      - ICEBERG_REST__PG_ENCRYPTION_KEY=something
-      - ICEBERG_REST__PG_DATABASE_URL_READ=postgresql://postgres:postgres@db:5432/postgres
-      - ICEBERG_REST__PG_DATABASE_URL_WRITE=postgresql://postgres:postgres@db:5432/postgres
-      - ICEBERG_REST__DEFAULT_PROJECT_ID=00000000-0000-0000-0000-000000000000
-      - RUST_LOG=trace,axum=trace,sqlx=trace,iceberg-catalog=trace
-    command: [ "serve" ]
+      POLARIS_BOOTSTRAP_CREDENTIALS: POLARIS,root,s3cr3t
+      AWS_ACCESS_KEY_ID: flow
+      AWS_SECRET_ACCESS_KEY: flow
+      AWS_REGION: us-east-1
+      AWS_ENDPOINT_URL_S3: http://rustfs:9000
+      JAVA_OPTS_APPEND: "-Xms128m -Xmx128m -XX:TieredStopAtLevel=1"
     healthcheck:
-      test: [ "CMD", "/home/nonroot/iceberg-catalog", "healthcheck" ]
-      interval: 1s
+      test: [ "CMD", "curl", "-fsS", "http://localhost:8182/q/health" ]
+      interval: 2s
       timeout: 10s
-      retries: 3
-      start_period: 3s
+      retries: 5
+      start_period: 10s
     depends_on:
-      migrate:
-        condition: service_completed_successfully
-      db:
+      rustfs:
         condition: service_healthy
     networks:
-      flow-test:
+      materialize-s3-iceberg:
     ports:
-      - "8090:8080" # expose as port 8090 since gazette uses 8080 in a local stack
+      - "9700:8181" # catalog API
+      - "9701:8182" # management/health
 
-  migrate:
-    image: quay.io/hansetag/tip-catalog:v0.3
-    pull_policy: always
+  rustfs:
+    image: rustfs/rustfs:latest
     environment:
-      - ICEBERG_REST__PG_ENCRYPTION_KEY=something
-      - ICEBERG_REST__PG_DATABASE_URL_READ=postgresql://postgres:postgres@db:5432/postgres
-      - ICEBERG_REST__PG_DATABASE_URL_WRITE=postgresql://postgres:postgres@db:5432/postgres
-      - RUST_LOG=info
-    restart: "no"
-    entrypoint: [ "/home/nonroot/iceberg-catalog", "migrate" ]
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      flow-test:
-
-
-  db:
-    image: postgres:16
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=postgres
-      - PGUSER=postgres
+      RUSTFS_ACCESS_KEY: flow
+      RUSTFS_SECRET_KEY: flow
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: :9000
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U postgres -p 5432 -d postgres" ]
+      test:
+        [
+          "CMD", "sh", "-c",
+          "curl -f http://127.0.0.1:9000/health && curl -f http://127.0.0.1:9001/rustfs/console/health"
+        ]
       interval: 2s
       timeout: 10s
       retries: 2
-      start_period: 10s
+      start_period: 5s
     networks:
-      flow-test:
+      materialize-s3-iceberg:
+    ports:
+      - "9702:9000"
 
 networks:
-  flow-test:
-    external: true
+  materialize-s3-iceberg:
