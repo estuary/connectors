@@ -85,7 +85,7 @@
       "name": "in-app-event",
       "match_rule": {
         "value": "in-app-event",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -237,7 +237,7 @@
       "name": "install",
       "match_rule": {
         "value": "install",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -389,7 +389,7 @@
       "name": "install-in-app-event",
       "match_rule": {
         "value": "install-in-app-event",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -541,7 +541,7 @@
       "name": "organic-install",
       "match_rule": {
         "value": "organic-install",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -693,7 +693,7 @@
       "name": "organic-install-in-app-event",
       "match_rule": {
         "value": "organic-install-in-app-event",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -845,7 +845,7 @@
       "name": "organic-reinstall",
       "match_rule": {
         "value": "organic-reinstall",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -997,7 +997,7 @@
       "name": "postback",
       "match_rule": {
         "value": "postback",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -1149,7 +1149,7 @@
       "name": "postbacks-copy",
       "match_rule": {
         "value": "postbacks-copy",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -1301,7 +1301,7 @@
       "name": "re-attribution",
       "match_rule": {
         "value": "re-attribution",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -1453,7 +1453,7 @@
       "name": "re-attribution-in-app-event",
       "match_rule": {
         "value": "re-attribution-in-app-event",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -1605,7 +1605,7 @@
       "name": "re-download",
       "match_rule": {
         "value": "re-download",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -1757,7 +1757,7 @@
       "name": "re-engagement",
       "match_rule": {
         "value": "re-engagement",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -1909,7 +1909,7 @@
       "name": "re-engagement-in-app-event",
       "match_rule": {
         "value": "re-engagement-in-app-event",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"
@@ -2061,7 +2061,7 @@
       "name": "reinstall",
       "match_rule": {
         "value": "reinstall",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
       },
       "type": "webhook"

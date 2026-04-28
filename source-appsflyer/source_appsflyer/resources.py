@@ -157,7 +157,7 @@ async def all_resources(
         if ok:
             supported.setdefault(doc_type, []).append(app_id)
 
-    discriminator = BodyDiscriminator(key="event_name", known_values=event_types)
+    discriminator = BodyDiscriminator(key="event_type", known_values=event_types)
     webhook_resources = [
         Resource(
             name=f"{rule.display_name}",
