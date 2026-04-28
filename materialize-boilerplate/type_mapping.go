@@ -54,11 +54,14 @@ type FlatTypeString struct {
 // binary.
 const BinaryContentMediaType = "application/octet-stream"
 
-// isBinaryInference reports whether a string inference describes a raw binary
+// IsBinaryInference reports whether a string inference describes a raw binary
 // field. A field is treated as binary iff contentEncoding is base64 and
-// contentMediaType is either absent or application/octet-stream.
-func isBinaryInference(s pf.Inference_String) bool {
-	if s.ContentEncoding != "base64" {
+// contentMediaType is either absent or application/octet-stream. A string with
+// contentEncoding=base64 but a different contentMediaType (e.g. a serialized
+// proto message) stays mapped as a string and can be handled via
+// StringMappings.WithContentType.
+func IsBinaryInference(s *pf.Inference_String) bool {
+	if s == nil || s.ContentEncoding != "base64" {
 		return false
 	}
 	return s.ContentType == "" || s.ContentType == BinaryContentMediaType
@@ -197,7 +200,7 @@ func mapProjection(p pf.Projection, fc FieldConfiger) Projection {
 			flat.InferenceString = *inf
 		}
 
-		if isBinaryInference(flat.InferenceString) {
+		if IsBinaryInference(&flat.InferenceString) {
 			out.FlatType = FlatTypeBinary(flat)
 		} else {
 			out.FlatType = flat
