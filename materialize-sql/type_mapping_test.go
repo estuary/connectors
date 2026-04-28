@@ -165,37 +165,37 @@ func TestAsFlatType_Binary(t *testing.T) {
 	cases := []struct {
 		name            string
 		contentEncoding string
-		contentMediaTyp string
+		contentMediaType string
 		want            FlatType
 	}{
 		{
-			name:            "base64 without contentMediaType",
+			name:            "base64 without contentMediaTypee",
 			contentEncoding: "base64",
-			contentMediaTyp: "",
+			contentMediaType: "",
 			want:            BINARY,
 		},
 		{
 			name:            "base64 + application/octet-stream",
 			contentEncoding: "base64",
-			contentMediaTyp: "application/octet-stream",
+			contentMediaType: "application/octet-stream",
 			want:            BINARY,
 		},
 		{
-			name:            "base64 + unrelated contentMediaType routes to string",
+			name:            "base64 + unrelated contentMediaTypee routes to string",
 			contentEncoding: "base64",
-			contentMediaTyp: "application/x-protobuf; proto=flow.MaterializationSpec",
+			contentMediaType: "application/x-protobuf; proto=flow.MaterializationSpec",
 			want:            STRING,
 		},
 		{
 			name:            "no encoding",
 			contentEncoding: "",
-			contentMediaTyp: "",
+			contentMediaType: "",
 			want:            STRING,
 		},
 		{
 			name:            "octet-stream without base64 stays string",
 			contentEncoding: "",
-			contentMediaTyp: "application/octet-stream",
+			contentMediaType: "application/octet-stream",
 			want:            STRING,
 		},
 	}
@@ -207,7 +207,7 @@ func TestAsFlatType_Binary(t *testing.T) {
 					Types: []string{"string"},
 					String_: &pf.Inference_String{
 						ContentEncoding: tc.contentEncoding,
-						ContentType:     tc.contentMediaTyp,
+						ContentType:     tc.contentMediaType,
 					},
 					Exists: pf.Inference_MAY,
 				},
