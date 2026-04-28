@@ -60,7 +60,9 @@ def build_webhook_app(
                 (
                     (idx, rsc.model)
                     for idx, rsc in sorted_mapping.items()
-                    if await rsc.initial_config.match_rule.matches(req, raw_doc)
+                    if await rsc.initial_config.match_rule.matches(
+                        req, task.log, raw_doc
+                    )
                 ),
             )
             assert not isinstance(
