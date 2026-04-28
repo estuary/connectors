@@ -361,6 +361,12 @@ SELECT TOP 0 -1, NULL
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	FORMAT({{ $ident }}, 'HH:mm:ss.FFFFFFF')
 {{- else if eq $.AsFlatType "binary" -}}
+	{{- /* Encodes a VARBINARY column back to a base64 VARCHAR via the same
+	       xs:base64Binary XML cast used by stringToVarbinaryCast for migration.
+	       Direction is determined by the source column type and the cast target:
+	       here the source is VARBINARY and the target is VARCHAR(MAX), which
+	       base64-encodes; in the migration path the source is VARCHAR and the
+	       target is VARBINARY(MAX), which base64-decodes. */ -}}
 	CAST(N'' AS XML).value('xs:base64Binary(sql:column("{{ $.Alias }}.{{ $.Identifier }}"))', 'VARCHAR(MAX)')
 {{- else -}}
 	{{ $ident }}
