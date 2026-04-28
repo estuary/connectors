@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 import pytest
@@ -13,6 +14,8 @@ from estuary_cdk.capture.webhook.match import (
     UrlMatch,
 )
 from estuary_cdk.capture.webhook.resources import CATCH_ALL_DISCRIMINATOR
+
+_log = logging.getLogger(__name__)
 
 
 def _make_request(
@@ -90,7 +93,7 @@ class TestUrlMatch:
     @pytest.mark.asyncio
     async def test_matches(self, value: str, path: str, expected: str):
         req = _make_request(path=path)
-        assert await UrlMatch(value=value).matches(req) == expected
+        assert await UrlMatch(value=value).matches(req, _log) == expected
 
     @pytest.mark.parametrize(
         "a, b, has_error",
@@ -143,7 +146,7 @@ class TestHeaderMatch:
         self, key: str, value: str, headers: dict[str, str], expected: bool
     ):
         req = _make_request(headers=headers)
-        assert await HeaderMatch(key=key, value=value).matches(req) == expected
+        assert await HeaderMatch(key=key, value=value).matches(req, _log) == expected
 
     @pytest.mark.parametrize(
         "a_key, a_val, b_key, b_val, has_error",
@@ -225,7 +228,7 @@ class TestBodyMatch:
         expected: bool,
     ):
         req = _make_request()
-        assert await BodyMatch(key=dot_path, value=value).matches(req, body) == expected
+        assert await BodyMatch(key=dot_path, value=value).matches(req, _log, body) == expected
 
     @pytest.mark.parametrize(
         "a_key, a_val, b_key, b_val, has_error",
@@ -316,4 +319,4 @@ class TestDiscriminators:
     async def test_catch_all_matches_any_request(self):
         rule = CATCH_ALL_DISCRIMINATOR.create_match_rules()[0]
         req = _make_request(path="/anything/at/all")
-        assert await rule.matches(req) is True
+        assert await rule.matches(req, _log) is True
