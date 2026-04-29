@@ -93,7 +93,7 @@ class AppsFlyerWebhookDocument(WebhookDocument):
         description="Document metadata",
     )
 
-    pk_fields: ClassVar[list[str]] = [
+    required_pk_fields: ClassVar[list[str]] = [
         "app_id",
         "appsflyer_id",
         "campaign_type",
@@ -115,7 +115,7 @@ class AppsFlyerWebhookDocument(WebhookDocument):
     def ensure_pk_fields_present(cls, data: dict[str, str]):
         assert isinstance(data, dict)
 
-        missing_keys = [key for key in cls.pk_fields if key not in data]
+        missing_keys = [key for key in cls.required_pk_fields if key not in data]
         if missing_keys:
             raise ValueError(
                 (
@@ -129,7 +129,12 @@ class AppsFlyerWebhookDocument(WebhookDocument):
 
     @override
     def model_post_init(self, _: Any):  # pyright: ignore[reportExplicitAny]
-        parts = [getattr(self, key) for key in self.pk_fields]
+        parts = [getattr(self, key) for key in self.required_pk_fields]
+
+        # NOTE: the `app_type` field has only been observed in Apple app reports.
+        # It is included in all document PKs as a future proofing measure
+        # in case a different platform adopts it.
+        parts.append(getattr(self, "app_type", "estuary_missing_app_type"))
 
         self.meta_.estuary_id = xxhash.xxh128("|".join(parts).encode()).hexdigest()
 
