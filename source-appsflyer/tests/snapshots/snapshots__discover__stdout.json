@@ -82,13 +82,13 @@
   {
     "recommendedName": "in-app-event",
     "resourceConfig": {
-      "type": "webhook",
       "name": "in-app-event",
       "match_rule": {
         "value": "in-app-event",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -188,6 +188,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -199,19 +207,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -224,13 +229,13 @@
   {
     "recommendedName": "install",
     "resourceConfig": {
-      "type": "webhook",
       "name": "install",
       "match_rule": {
         "value": "install",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -330,6 +335,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -341,19 +354,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -366,13 +376,13 @@
   {
     "recommendedName": "install-in-app-event",
     "resourceConfig": {
-      "type": "webhook",
       "name": "install-in-app-event",
       "match_rule": {
         "value": "install-in-app-event",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -472,6 +482,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -483,19 +501,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -508,13 +523,13 @@
   {
     "recommendedName": "organic-install",
     "resourceConfig": {
-      "type": "webhook",
       "name": "organic-install",
       "match_rule": {
         "value": "organic-install",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -614,6 +629,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -625,19 +648,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -650,13 +670,13 @@
   {
     "recommendedName": "organic-install-in-app-event",
     "resourceConfig": {
-      "type": "webhook",
       "name": "organic-install-in-app-event",
       "match_rule": {
         "value": "organic-install-in-app-event",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -756,6 +776,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -767,19 +795,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -792,13 +817,13 @@
   {
     "recommendedName": "organic-reinstall",
     "resourceConfig": {
-      "type": "webhook",
       "name": "organic-reinstall",
       "match_rule": {
         "value": "organic-reinstall",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -898,6 +923,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -909,19 +942,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -934,13 +964,13 @@
   {
     "recommendedName": "postback",
     "resourceConfig": {
-      "type": "webhook",
       "name": "postback",
       "match_rule": {
         "value": "postback",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -1040,6 +1070,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -1051,19 +1089,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1076,13 +1111,13 @@
   {
     "recommendedName": "postbacks-copy",
     "resourceConfig": {
-      "type": "webhook",
       "name": "postbacks-copy",
       "match_rule": {
         "value": "postbacks-copy",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -1182,6 +1217,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -1193,19 +1236,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1218,13 +1258,13 @@
   {
     "recommendedName": "re-attribution",
     "resourceConfig": {
-      "type": "webhook",
       "name": "re-attribution",
       "match_rule": {
         "value": "re-attribution",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -1324,6 +1364,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -1335,19 +1383,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1360,13 +1405,13 @@
   {
     "recommendedName": "re-attribution-in-app-event",
     "resourceConfig": {
-      "type": "webhook",
       "name": "re-attribution-in-app-event",
       "match_rule": {
         "value": "re-attribution-in-app-event",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -1466,6 +1511,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -1477,19 +1530,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1502,13 +1552,13 @@
   {
     "recommendedName": "re-download",
     "resourceConfig": {
-      "type": "webhook",
       "name": "re-download",
       "match_rule": {
         "value": "re-download",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -1608,6 +1658,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -1619,19 +1677,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1644,13 +1699,13 @@
   {
     "recommendedName": "re-engagement",
     "resourceConfig": {
-      "type": "webhook",
       "name": "re-engagement",
       "match_rule": {
         "value": "re-engagement",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -1750,6 +1805,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -1761,19 +1824,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1786,13 +1846,13 @@
   {
     "recommendedName": "re-engagement-in-app-event",
     "resourceConfig": {
-      "type": "webhook",
       "name": "re-engagement-in-app-event",
       "match_rule": {
         "value": "re-engagement-in-app-event",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -1892,6 +1952,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -1903,19 +1971,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1928,13 +1993,13 @@
   {
     "recommendedName": "reinstall",
     "resourceConfig": {
-      "type": "webhook",
       "name": "reinstall",
       "match_rule": {
         "value": "reinstall",
-        "key": "event_name",
+        "key": "event_type",
         "type": "body"
-      }
+      },
+      "type": "webhook"
     },
     "documentSchema": {
       "$defs": {
@@ -2034,6 +2099,14 @@
           "title": "Appsflyer Id",
           "type": "string"
         },
+        "campaign_type": {
+          "title": "Campaign Type",
+          "type": "string"
+        },
+        "conversion_type": {
+          "title": "Conversion Type",
+          "type": "string"
+        },
         "event_name": {
           "title": "Event Name",
           "type": "string"
@@ -2045,19 +2118,16 @@
         "event_value": {
           "title": "Event Value",
           "type": "string"
-        },
-        "api_version": {
-          "title": "Api Version",
-          "type": "string"
         }
       },
       "required": [
         "app_id",
         "appsflyer_id",
+        "campaign_type",
+        "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
-        "api_version"
+        "event_value"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",

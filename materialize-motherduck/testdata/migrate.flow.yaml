@@ -14,3 +14,59 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        exclude:
+          # TODO: MotherDuck maps wide integers to HUGEINT (~1.7e38 max).
+          # Fixture values for int129/int256/int257 (3.4e38 to 1.16e77) overflow
+          # when stored in either the source column (base phase) or migrated
+          # target column.
+          - int257ToNum
+          - int257ToNumStr
+          - int257ToIntStr257
+          - int257ToString
+          - int256ToNum
+          - int256ToNumStr
+          - int256ToInt257
+          - int256ToIntStr256
+          - int256ToIntStr257
+          - int256ToString
+          - int129ToNum
+          - int129ToNumStr
+          - int129ToInt256
+          - int129ToInt257
+          - int129ToIntStr129
+          - int129ToIntStr256
+          - int129ToIntStr257
+          - int129ToString
+          - int000ToInt257
+          - int032ToInt257
+          - int064ToInt257
+          - int065ToInt257
+          - int128ToInt257
+          - intStr000ToInt257
+          - intStr064ToInt257
+          - intStr065ToInt257
+          - intStr128ToInt257
+          - intStr129ToInt257
+          - intStr256ToInt257
+          - intStr257ToInt257
+          - int000ToInt256
+          - int032ToInt256
+          - int064ToInt256
+          - int065ToInt256
+          - int128ToInt256
+          - intStr000ToInt256
+          - intStr064ToInt256
+          - intStr065ToInt256
+          - intStr128ToInt256
+          - intStr129ToInt256
+          - intStr256ToInt256
+          - int000ToInt129
+          - int032ToInt129
+          - int064ToInt129
+          - int065ToInt129
+          - int128ToInt129
+          - intStr000ToInt129
+          - intStr064ToInt129
+          - intStr065ToInt129
+          - intStr128ToInt129
+          - intStr129ToInt129

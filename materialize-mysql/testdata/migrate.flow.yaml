@@ -7,7 +7,7 @@ materializations:
       local:
         command: ["go", "run", "."]
         protobuf: true
-        config: config.local.yaml
+        config: config.mysql.yaml
     bindings: &bindings
     - resource:
         table: migrate
@@ -20,5 +20,5 @@ materializations:
       local:
         command: ["go", "run", "."]
         protobuf: true
-        config: config.local.mariadb.yaml
+        config: config.mariadb.yaml
     bindings: *bindings

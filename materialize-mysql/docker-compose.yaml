@@ -10,6 +10,7 @@ services:
       - "--innodb-log-file-size=512M"
       - "--innodb-flush-method=O_DIRECT"
       - "--innodb-flush-log-at-trx-commit=2"
+      - "--innodb-page-size=65536"
     environment: {"MYSQL_DATABASE": "flow", "MYSQL_USER": "flow", "MYSQL_PASSWORD": "flow", "MYSQL_ROOT_PASSWORD": "flow"}
     volumes:
       - mysql_data:/var/lib/mysql
@@ -41,6 +42,19 @@ services:
     ports:
       - "3305:3306"
 
+  singlestore:
+    image: 'ghcr.io/singlestore-labs/singlestoredb-dev:latest'
+    platform: linux/amd64
+    environment:
+      ROOT_PASSWORD: flow
+    volumes:
+      - singlestore_data:/data
+      - ./testdata/setup-singlestore.sql:/init.sql:ro
+    networks:
+      - flow-test
+    ports:
+      - "3307:3306"
+
 networks:
   flow-test:
     name: flow-test
@@ -49,3 +63,4 @@ networks:
 volumes:
   mysql_data: {}
   mariadb_data: {}
+  singlestore_data: {}
