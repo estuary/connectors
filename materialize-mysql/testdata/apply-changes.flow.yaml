@@ -13,7 +13,7 @@ materializations:
       local:
         command: ["go", "run", "."]
         protobuf: true
-        config: config.local.yaml
+        config: config.mysql.yaml
     bindings: &bindings
       - source: key/value
         resource: { table: testing }
@@ -25,5 +25,5 @@ materializations:
       local:
         command: ["go", "run", "."]
         protobuf: true
-        config: config.local.mariadb.yaml
+        config: config.mariadb.yaml
     bindings: *bindings

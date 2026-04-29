@@ -42,6 +42,19 @@ services:
     ports:
       - "3305:3306"
 
+  singlestore:
+    image: 'ghcr.io/singlestore-labs/singlestoredb-dev:latest'
+    platform: linux/amd64
+    environment:
+      ROOT_PASSWORD: flow
+    volumes:
+      - singlestore_data:/data
+      - ./testdata/setup-singlestore.sql:/init.sql:ro
+    networks:
+      - flow-test
+    ports:
+      - "3307:3306"
+
 networks:
   flow-test:
     name: flow-test
@@ -50,3 +63,4 @@ networks:
 volumes:
   mysql_data: {}
   mariadb_data: {}
+  singlestore_data: {}
