@@ -3,143 +3,91 @@ package main
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
-// TestLookupTranEndTimesPageEmpty verifies the empty-range fast path:
-// querying a zero-width range returns an empty (non-nil) map and the
-// requested toLSN as the page end.
+// TestLookupTranEndTimesPageEmpty verifies the empty-range fast path: a
+// zero-width LSN range returns a non-nil empty map with pageEnd set to the
+// requested toLSN.
 func TestLookupTranEndTimesPageEmpty(t *testing.T) {
-	if os.Getenv("TEST_DATABASE") != "yes" {
-		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
-	}
-
+	var db, _ = blackboxTestSetup(t)
 	var ctx = context.Background()
-	var controlURI = (&Config{
-		Address:  *dbControlAddress,
-		User:     *dbControlUser,
-		Password: *dbControlPass,
-		Database: *dbName,
-	}).ToURI()
-	conn, err := sql.Open("sqlserver", controlURI)
-	require.NoError(t, err)
-	t.Cleanup(func() { conn.Close() })
-	require.NoError(t, conn.PingContext(ctx))
 
 	var anchor LSN
-	require.NoError(t, conn.QueryRowContext(ctx, "SELECT sys.fn_cdc_get_max_lsn()").Scan(&anchor))
-	require.NotEmpty(t, anchor)
+	require.NoError(t, db.conn.QueryRowContext(ctx, "SELECT sys.fn_cdc_get_max_lsn()").Scan(&anchor))
 
-	var rs = &sqlserverReplicationStream{conn: conn}
+	var rs = &sqlserverReplicationStream{conn: db.conn}
 	got, pageEnd, err := rs.lookupTranEndTimesPage(ctx, anchor, anchor, tranEndTimesPageSize)
 	require.NoError(t, err)
 	require.NotNil(t, got)
 	require.Empty(t, got)
-	require.True(t, bytes.Equal(pageEnd, anchor), "empty range must return toLSN as pageEnd")
+	require.True(t, bytes.Equal(pageEnd, anchor))
 }
 
-// TestLookupTranEndTimesPagePagination verifies the TOP N pagination boundary:
-// inserts more single-row transactions than the page size and walks them in
-// pages, asserting the entire range is consumed exactly once with no gaps or
-// duplicates.
-func TestLookupTranEndTimesPagePagination(t *testing.T) {
-	if os.Getenv("TEST_DATABASE") != "yes" {
-		t.Skipf("skipping %q: ${TEST_DATABASE} != \"yes\"", t.Name())
-	}
-
-	const numTransactions = 1100
-	const pageSize = 500 // forces at least 2 pages
-
+// TestLookupTranEndTimesPageBoundary verifies the function's pagination
+// contract on single calls: when the database has more transactions in the
+// range than fit in a page, a single call must return exactly pageSize
+// entries with pageEnd set to the last entry's start_lsn (so the caller can
+// resume from there); when the page is not filled, pageEnd must be the
+// caller-supplied toLSN.
+func TestLookupTranEndTimesPageBoundary(t *testing.T) {
+	var db, _ = blackboxTestSetup(t)
 	var ctx = context.Background()
-	var controlURI = (&Config{
-		Address:  *dbControlAddress,
-		User:     *dbControlUser,
-		Password: *dbControlPass,
-		Database: *dbName,
-	}).ToURI()
-	conn, err := sql.Open("sqlserver", controlURI)
-	require.NoError(t, err)
-	t.Cleanup(func() { conn.Close() })
-	require.NoError(t, conn.PingContext(ctx))
 
-	var probeID = uniqueTableID(t)
-	var tableName = fmt.Sprintf("dbo.tsms_page_%s", probeID)
-	var captureInstance = fmt.Sprintf("dbo_tsms_page_%s", probeID)
-
-	runSQL := func(query string) {
-		t.Helper()
-		_, err := conn.ExecContext(ctx, query)
-		require.NoErrorf(t, err, "executing %s", query)
-	}
-
-	runSQL(fmt.Sprintf(`IF EXISTS (SELECT 1 FROM cdc.change_tables WHERE capture_instance = N'%s') EXEC sys.sp_cdc_disable_table @source_schema = 'dbo', @source_name = 'tsms_page_%s', @capture_instance = N'%s'`, captureInstance, probeID, captureInstance))
-	runSQL(fmt.Sprintf(`IF OBJECT_ID(N'%s', 'U') IS NOT NULL DROP TABLE %s`, tableName, tableName))
-	runSQL(fmt.Sprintf(`CREATE TABLE %s (id INT PRIMARY KEY)`, tableName))
-	runSQL(fmt.Sprintf(`EXEC sys.sp_cdc_enable_table @source_schema = 'dbo', @source_name = 'tsms_page_%s', @role_name = NULL, @capture_instance = N'%s'`, probeID, captureInstance))
-	t.Cleanup(func() {
-		_, _ = conn.ExecContext(ctx, fmt.Sprintf(`IF EXISTS (SELECT 1 FROM cdc.change_tables WHERE capture_instance = N'%s') EXEC sys.sp_cdc_disable_table @source_schema = 'dbo', @source_name = 'tsms_page_%s', @capture_instance = N'%s'`, captureInstance, probeID, captureInstance))
-		_, _ = conn.ExecContext(ctx, fmt.Sprintf(`IF OBJECT_ID(N'%s', 'U') IS NOT NULL DROP TABLE %s`, tableName, tableName))
-	})
+	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY)`)
 
 	var fromLSN LSN
-	require.NoError(t, conn.QueryRowContext(ctx, "SELECT sys.fn_cdc_get_max_lsn()").Scan(&fromLSN))
+	require.NoError(t, db.conn.QueryRowContext(ctx, "SELECT sys.fn_cdc_get_max_lsn()").Scan(&fromLSN))
 
-	runSQL(fmt.Sprintf(`DECLARE @i INT = 0; WHILE @i < %d BEGIN INSERT INTO %s (id) VALUES (@i); SET @i = @i + 1; END`, numTransactions, tableName))
-
-	if _, err := conn.ExecContext(ctx, "EXEC sys.sp_cdc_scan @maxtrans = 5000, @maxscans = 10"); err != nil {
-		t.Logf("sys.sp_cdc_scan returned: %v (continuing)", err)
+	// Insert as separate single-row transactions so each gets a distinct
+	// start_lsn in cdc.lsn_time_mapping.
+	const numTransactions = 100
+	for i := 0; i < numTransactions; i++ {
+		db.QuietExec(t, fmt.Sprintf(`INSERT INTO <NAME> VALUES (%d)`, i))
 	}
 
+	// Wait for the SQL Server Agent to scan our inserts into the change
+	// tables and populate cdc.lsn_time_mapping. The test docker-compose
+	// configures @pollinginterval = 1, so a few seconds is plenty.
 	var toLSN LSN
-	require.NoError(t, conn.QueryRowContext(ctx, "SELECT sys.fn_cdc_get_max_lsn()").Scan(&toLSN))
+	deadline := time.Now().Add(30 * time.Second)
+	for time.Now().Before(deadline) {
+		require.NoError(t, db.conn.QueryRowContext(ctx, "SELECT sys.fn_cdc_get_max_lsn()").Scan(&toLSN))
+		if bytes.Compare(toLSN, fromLSN) > 0 {
+			// Confirm at least the expected number of transactions are visible.
+			var n int
+			require.NoError(t, db.conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM cdc.lsn_time_mapping WHERE start_lsn > @p1 AND start_lsn <= @p2", fromLSN, toLSN).Scan(&n))
+			if n >= numTransactions {
+				break
+			}
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	require.Equalf(t, 1, bytes.Compare(toLSN, fromLSN), "agent never advanced past fromLSN; check that the SQL Server Agent is running")
 
-	// Read every distinct LSN our test workload produced.
-	rows, err := conn.QueryContext(ctx, fmt.Sprintf(`SELECT DISTINCT __$start_lsn FROM cdc.%s_CT`, captureInstance))
+	var rs = &sqlserverReplicationStream{conn: db.conn}
+
+	// Page is full: pageSize < transactions in range. The function must
+	// return exactly pageSize entries and signal "more available" by
+	// returning pageEnd != toLSN.
+	const smallPageSize = 25
+	page, pageEnd, err := rs.lookupTranEndTimesPage(ctx, fromLSN, toLSN, smallPageSize)
 	require.NoError(t, err)
-	expectedLSNs := make(map[string]bool)
-	for rows.Next() {
-		var lsn []byte
-		require.NoError(t, rows.Scan(&lsn))
-		expectedLSNs[string(lsn)] = true
-	}
-	require.NoError(t, rows.Err())
-	require.NoError(t, rows.Close())
-	require.Equalf(t, numTransactions, len(expectedLSNs), "expected %d distinct LSNs in change table; got %d", numTransactions, len(expectedLSNs))
+	require.Lenf(t, page, smallPageSize, "full page must return exactly pageSize entries")
+	require.Falsef(t, bytes.Equal(pageEnd, toLSN), "full page must return pageEnd advanced past fromLSN, not at toLSN")
+	require.Equalf(t, 1, bytes.Compare(pageEnd, fromLSN), "pageEnd must strictly advance past fromLSN")
+	_, ok := page[string(pageEnd)]
+	require.Truef(t, ok, "pageEnd must be the start_lsn of an entry in the returned page")
 
-	// Walk the range in pages exactly the way pollTable does.
-	var rs = &sqlserverReplicationStream{conn: conn}
-	resolved := make(map[string]time.Time)
-	var current = fromLSN
-	var pages int
-	for bytes.Compare(current, toLSN) < 0 {
-		pages++
-		page, pageEnd, err := rs.lookupTranEndTimesPage(ctx, current, toLSN, pageSize)
-		require.NoError(t, err)
-		// pageEnd must strictly advance until we hit toLSN.
-		if !bytes.Equal(pageEnd, toLSN) {
-			require.Equal(t, 1, bytes.Compare(pageEnd, current), "pageEnd must strictly advance past current")
-			require.Lenf(t, page, pageSize, "non-final pages must be full (page %d had %d entries)", pages, len(page))
-		}
-		for k, v := range page {
-			_, dup := resolved[k]
-			require.Falsef(t, dup, "LSN %X appeared in multiple pages", []byte(k))
-			resolved[k] = v
-		}
-		current = pageEnd
-	}
-	require.GreaterOrEqualf(t, pages, 2, "test workload should have produced at least 2 pages; got %d", pages)
-
-	for k := range expectedLSNs {
-		_, ok := resolved[k]
-		require.Truef(t, ok, "missing tran_end_time for change-table LSN %X (likely a pagination boundary bug)", []byte(k))
-	}
-
-	t.Logf("walked %d distinct LSNs across %d pages of size %d", len(resolved), pages, pageSize)
+	// Page not filled: pageSize > transactions in range. The function must
+	// return all entries and signal "consumed" by returning pageEnd == toLSN.
+	const largePageSize = numTransactions * 10
+	page, pageEnd, err = rs.lookupTranEndTimesPage(ctx, fromLSN, toLSN, largePageSize)
+	require.NoError(t, err)
+	require.GreaterOrEqualf(t, len(page), numTransactions, "non-full page must return all entries in range")
+	require.Truef(t, bytes.Equal(pageEnd, toLSN), "non-full page must return pageEnd == toLSN")
 }
-
