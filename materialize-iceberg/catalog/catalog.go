@@ -278,7 +278,7 @@ func New(ctx context.Context, catalogUrl string, warehouse string, opts ...Catal
 		if p, ok := catalogCfg.Defaults["prefix"]; ok {
 			prefix = p
 		}
-		if u, ok := catalogCfg.Overrides["uri"]; ok {
+		if u, ok := catalogCfg.Defaults["uri"]; ok {
 			uri, err := url.Parse(u)
 			if err != nil {
 				return nil, fmt.Errorf("unable to parse defaults.uri %q: %w", uri, err)
