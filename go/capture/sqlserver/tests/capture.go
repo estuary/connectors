@@ -197,4 +197,3 @@ func testSourceTag(t *testing.T, setup testSetupFunc) {
 	tc.Run("Replication", -1)
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
-
