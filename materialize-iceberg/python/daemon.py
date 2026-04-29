@@ -41,7 +41,7 @@ ACTIONS = {
 def init_session():
     global _session, _init_error
     try:
-        _session = get_spark_session_from_env()
+        _session = get_spark_session_from_env(shared_across_submissions=True)
         _ready.set()
         print("spark daemon: session ready", file=sys.stderr, flush=True)
     except Exception as e:

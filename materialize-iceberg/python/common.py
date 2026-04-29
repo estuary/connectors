@@ -167,15 +167,19 @@ def _build_session(c: dict) -> SparkSession:
         .config("spark.sql.catalog.estuary.type", "rest")
         .config("spark.sql.catalog.estuary.uri", c["catalog_url"])
         .config("spark.sql.catalog.estuary.warehouse", c["warehouse"])
-        # The long-lived daemon shares a SparkSession across submissions.
-        # Without this, Iceberg's REST catalog caches table metadata for
-        # 30s, masking schema changes the connector makes between jobs
-        # (notably the column migration's add-temp-columns step).
-        .config("spark.sql.catalog.estuary.cache-enabled", "false")
     )
 
     if c.get("spark_master_url"):
         builder = builder.master(c["spark_master_url"])
+
+    if c.get("disable_catalog_cache"):
+        # The long-lived daemon shares a SparkSession across submissions.
+        # Without this, Iceberg's REST catalog caches table metadata for
+        # 30s, masking schema changes the connector makes between jobs
+        # (notably the column migration's add-temp-columns step). EMR
+        # entrypoints get a fresh SparkSession per job, so they leave the
+        # cache enabled to avoid extra catalog round trips.
+        builder = builder.config("spark.sql.catalog.estuary.cache-enabled", "false")
 
     if not use_local_s3:
         # Production path: Polaris/Glue vend short-lived credentials per request.
@@ -280,13 +284,18 @@ def get_spark_session(args: argparse.Namespace) -> SparkSession:
     )
 
 
-def get_spark_session_from_env() -> SparkSession:
+def get_spark_session_from_env(shared_across_submissions: bool = False) -> SparkSession:
     """Build a SparkSession for the long-lived test-only daemon (daemon.py).
 
     Reads its config from environment variables prefixed `ICEBERG_`, with the
     OAuth client credential pulled from the JSON file at
     ICEBERG_CREDENTIALS_PATH (the file is written by the polaris-bootstrap
     container during compose startup).
+
+    Set `shared_across_submissions=True` if the resulting session will service
+    multiple back-to-back jobs that may include schema changes; this disables
+    the Iceberg REST catalog metadata cache so later jobs see schema changes
+    made by earlier ones.
     """
     creds_path = os.environ.get("ICEBERG_CREDENTIALS_PATH")
     credential = os.environ.get("ICEBERG_CREDENTIAL")
@@ -310,6 +319,7 @@ def get_spark_session_from_env() -> SparkSession:
             "s3_access_key": os.environ.get("ICEBERG_S3_ACCESS_KEY"),
             "s3_secret_key": os.environ.get("ICEBERG_S3_SECRET_KEY"),
             "spark_master_url": os.environ.get("SPARK_MASTER_URL"),
+            "disable_catalog_cache": shared_across_submissions,
         }
     )
 
