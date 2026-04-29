@@ -211,10 +211,10 @@ async def read_csvs_in_folder(
 
         for csv in csvs:
             async for row in client.stream_csv(csv.name, table_metadata.field_names):
-                yield transform_row(row, table_metadata.boolean_fields)
+                yield transform_row(row, table_metadata.boolean_fields, csv.name)
 
 
-def transform_row(row: dict[str, str], boolean_fields: frozenset[str]) -> dict[str, str | bool | dict[str, str]]:
+def transform_row(row: dict[str, str], boolean_fields: frozenset[str], csv_name: str) -> dict[str, str | bool | dict[str, str]]:
     """
     Apply Dynamics 365-specific transformations to a CSV row.
 
@@ -229,7 +229,10 @@ def transform_row(row: dict[str, str], boolean_fields: frozenset[str]) -> dict[s
         value = row.get(field_name)
         result[field_name] = value.lower() == "true" if value else False
 
-    result["_meta"] = {"op": "d" if result.get("IsDelete") else "u"}
+    result["_meta"] = {
+        "op": "d" if result.get("IsDelete") else "u",
+        "source_file": csv_name,
+    }
 
     return result
 
