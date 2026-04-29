@@ -95,7 +95,6 @@ class AppsFlyerWebhookDocument(WebhookDocument):
 
     pk_fields: ClassVar[list[str]] = [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -105,7 +104,6 @@ class AppsFlyerWebhookDocument(WebhookDocument):
     ]
 
     app_id: str
-    app_type: str
     appsflyer_id: str
     campaign_type: str
     conversion_type: str
