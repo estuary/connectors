@@ -34,7 +34,7 @@ func TestBaseURL(t *testing.T) {
 			},
 		},
 		{
-			name: "with prefix",
+			name: "with defaults prefix",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
@@ -53,7 +53,25 @@ func TestBaseURL(t *testing.T) {
 			},
 		},
 		{
-			name: "with uri",
+			name: "with defaults uri",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				respBody, err := json.Marshal(map[string]any{
+					"defaults": map[string]string{
+						"uri": "http://example.org/iceberg/",
+					},
+					"overrides": map[string]string{},
+				})
+				require.NoError(t, err)
+				w.Write(respBody)
+			},
+			check: func(catalogURL, baseURL *url.URL) {
+				require.Equal(t, baseURL.String(), "http://example.org/iceberg/v1")
+			},
+		},
+		{
+			name: "with overrides uri",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
@@ -71,7 +89,8 @@ func TestBaseURL(t *testing.T) {
 			},
 		},
 		{
-			name: "with prefix and uri",
+			// This case matches how Nessie reports a branch.
+			name: "with defaults prefix and overrides uri",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				w.WriteHeader(http.StatusOK)
