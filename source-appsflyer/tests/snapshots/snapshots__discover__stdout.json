@@ -204,8 +204,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -216,7 +216,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -351,8 +351,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -363,7 +363,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -498,8 +498,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -510,7 +510,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -645,8 +645,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -657,7 +657,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -792,8 +792,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -804,7 +804,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -939,8 +939,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -951,7 +951,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1086,8 +1086,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -1098,7 +1098,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1233,8 +1233,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -1245,7 +1245,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1380,8 +1380,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -1392,7 +1392,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1527,8 +1527,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -1539,7 +1539,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1674,8 +1674,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -1686,7 +1686,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1821,8 +1821,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -1833,7 +1833,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -1968,8 +1968,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -1980,7 +1980,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
@@ -2115,8 +2115,8 @@
           "title": "Event Time",
           "type": "string"
         },
-        "event_value": {
-          "title": "Event Value",
+        "event_type": {
+          "title": "Event Type",
           "type": "string"
         }
       },
@@ -2127,7 +2127,7 @@
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value"
+        "event_type"
       ],
       "title": "AppsFlyerWebhookDocument",
       "type": "object",
