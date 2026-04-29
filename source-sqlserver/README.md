@@ -35,13 +35,9 @@ cycle's LSN range and apply them as `_meta/source/ts_ms` on emitted change
 events. The lookup is one indexed range query per polling cycle, paginated
 when the range is wide enough to cross the prefetch page size. Backfill rows
 do not have a meaningful commit time and will not have `ts_ms` set, matching
-the behavior of the Postgres and MySQL connectors.
-
-The lookup is best-effort: if it fails for any reason, the rest of the
-polling cycle is emitted with `ts_ms` left unset and a warning is logged. The
-standard `GRANT SELECT ON SCHEMA :: cdc TO flow_capture` already grants the
-necessary permissions on `cdc.lsn_time_mapping`, so no additional setup is
-required.
+the behavior of the Postgres and MySQL connectors. The standard
+`GRANT SELECT ON SCHEMA :: cdc TO flow_capture` already grants the necessary
+permissions on `cdc.lsn_time_mapping`, so no additional setup is required.
 
 ### Developing
 

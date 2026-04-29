@@ -1070,22 +1070,8 @@ func (rs *sqlserverReplicationStream) pollTable(ctx context.Context, info *table
 	for bytes.Compare(current, info.ToLSN) < 0 {
 		tranEndTimes, pageEnd, err := rs.lookupTranEndTimesPage(ctx, current, info.ToLSN, tranEndTimesPageSize)
 		if err != nil {
-			// Best-effort: log once and emit the rest of the polling cycle
-			// without ts_ms so a transient lookup failure can't stall CDC.
-			log.WithFields(log.Fields{
-				"err":      err,
-				"instance": info.InstanceName,
-				"fromLSN":  fmt.Sprintf("%X", current),
-				"toLSN":    fmt.Sprintf("%X", info.ToLSN),
-			}).Warn("failed to prefetch transaction commit times; emitting remaining changes without ts_ms")
-			return rs.pollTableRange(ctx, info, current, info.ToLSN, nil)
+			return fmt.Errorf("error prefetching commit times: %w", err)
 		}
-		log.WithFields(log.Fields{
-			"instance": info.InstanceName,
-			"fromLSN":  fmt.Sprintf("%X", current),
-			"toLSN":    fmt.Sprintf("%X", pageEnd),
-			"lsns":     len(tranEndTimes),
-		}).Debug("prefetched transaction commit times")
 		if err := rs.pollTableRange(ctx, info, current, pageEnd, tranEndTimes); err != nil {
 			return err
 		}
