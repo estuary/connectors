@@ -13,6 +13,7 @@ import (
 	emrTypes "github.com/aws/aws-sdk-go-v2/service/emrserverless/types"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	ssmTypes "github.com/aws/aws-sdk-go-v2/service/ssm/types"
+	"github.com/aws/smithy-go"
 	"github.com/estuary/connectors/go/blob"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/materialize-iceberg/python"
@@ -31,6 +32,12 @@ type emrClient struct {
 	bucket              blob.Bucket
 	ssmClient           *ssm.Client
 	tokenURL            string
+
+	// Set after StartJobRun fails with an access-denied error while passing
+	// Tags. Subsequent runs in this process will skip tagging to avoid
+	// repeating the failure. Customers can grant `emr-serverless:TagResource`
+	// to enable tagging.
+	tagsDisabled bool
 }
 
 func (e *emrClient) checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr) {
@@ -138,7 +145,7 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 		args = append(args, "--signing-name", signingName)
 	}
 
-	start, err := e.c.StartJobRun(ctx, &emr.StartJobRunInput{
+	startInput := &emr.StartJobRunInput{
 		ApplicationId:    aws.String(e.cfg.ApplicationId),
 		ClientToken:      aws.String(uuid.NewString()),
 		ExecutionRoleArn: aws.String(e.cfg.ExecutionRoleArn),
@@ -150,9 +157,27 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 			},
 		},
 		Name: aws.String(jobName),
-	})
+	}
+	if !e.tagsDisabled {
+		startInput.Tags = map[string]string{"estuary:materialization": e.materializationName}
+	}
+
+	start, err := e.c.StartJobRun(ctx, startInput)
 	if err != nil {
-		return err
+		// AccessDenied likely means the execution role lacks
+		// `emr-serverless:TagResource`. Disable tagging for the lifetime of
+		// this client and retry without tags so the materialization can keep
+		// running on existing IAM policies.
+		if startInput.Tags != nil && isAccessDeniedErr(err) {
+			log.WithError(err).Warn("StartJobRun denied while passing tags; retrying without tags. Grant 'emr-serverless:TagResource' to the execution role to enable cost-allocation tagging.")
+			e.tagsDisabled = true
+			startInput.Tags = nil
+			startInput.ClientToken = aws.String(uuid.NewString())
+			start, err = e.c.StartJobRun(ctx, startInput)
+		}
+		if err != nil {
+			return err
+		}
 	}
 
 	var runDetails string
@@ -219,6 +244,18 @@ func ssmPutParameterWithRetry(ctx context.Context, client *ssm.Client, name, val
 		log.WithField("attempt", attempt+1).Warn("SSM PutParameter TooManyUpdates, retrying")
 	}
 	return err
+}
+
+func isAccessDeniedErr(err error) bool {
+	var apiErr smithy.APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	switch apiErr.ErrorCode() {
+	case "AccessDeniedException", "AccessDenied":
+		return true
+	}
+	return false
 }
 
 func encodeInput(in any) ([]byte, error) {
