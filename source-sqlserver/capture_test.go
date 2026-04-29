@@ -392,7 +392,7 @@ func TestPopulateSourceTimestamps(t *testing.T) {
 	// asserted programmatically below against the raw capture output.
 	tc.DocumentSanitizers = append(tc.DocumentSanitizers, blackbox.JSONSanitizer{
 		Matcher:     regexp.MustCompile(`"ts_ms":\d+`),
-		Replacement: `"ts_ms":REDACTED`,
+		Replacement: `"ts_ms":0`,
 	})
 
 	// Backfill (flag off): no ts_ms expected.
