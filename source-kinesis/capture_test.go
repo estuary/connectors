@@ -29,6 +29,9 @@ func useRealAWS() bool {
 
 func testConfig(t *testing.T) Config {
 	t.Helper()
+	if testing.Short() {
+		t.Skipf("skipping %q in short mode: integration tests require LocalStack or real AWS", t.Name())
+	}
 	if os.Getenv("TEST_DATABASE") != "yes" {
 		t.Skipf("skipping %q capture: ${TEST_DATABASE} != \"yes\"", t.Name())
 	}
