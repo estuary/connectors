@@ -14,3 +14,13 @@ materializations:
       source: key/value
       fields:
         recommended: true
+        exclude:
+          # ClickHouse's largest signed integer is Int256, so Int257 fixture
+          # values are stored as String. Migrating String → Float64 is not
+          # supported by the connector (logs "existing field type mismatch
+          # without migration support"), so the post-migration insert of
+          # Float64 values into the unchanged String columns fails.
+          - int257ToNum
+          - int257ToNumStr
+          - intStr257ToNum
+          - intStr257ToNumStr

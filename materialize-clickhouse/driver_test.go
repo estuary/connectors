@@ -27,10 +27,9 @@ func TestIntegration(t *testing.T) {
 		sql.RunApplyTest(t, newClickHouseDriver(), "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
-	// TODO: enable once MigratableTypes is defined for the ClickHouse dialect.
-	// t.Run("migrate", func(t *testing.T) {
-	// 	sql.RunMigrationTest(t, newClickHouseDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
-	// })
+	t.Run("migrate", func(t *testing.T) {
+		sql.RunMigrationTest(t, newClickHouseDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+	})
 }
 
 // noFlowDocShape builds a TableShape for NoFlowDocument tests with a variety

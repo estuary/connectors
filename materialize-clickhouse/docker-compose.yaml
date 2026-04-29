@@ -17,7 +17,7 @@ services:
       interval: 1s
       retries: 30
     ports:
-      - "9000:9000"
+      - "9900:9000"
       - "8123:8123"
 
 networks:
