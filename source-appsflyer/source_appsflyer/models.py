@@ -77,6 +77,13 @@ class EventTypesResponse(BaseModel):
     event_types: list[str]
 
 
+KNOWN_STREAMS_WITH_EVENT_VALUE_FIELD = frozenset({
+    "organic-install-in-app-event",
+    "re-attribution-in-app-event",
+    "re-engagement-in-app-event",
+})
+
+
 class AppsFlyerWebhookDocument(WebhookDocument):
     class Meta(WebhookDocument.Meta):
         model_config = ConfigDict(  # pyright: ignore[reportUnannotatedClassAttribute]
@@ -100,7 +107,7 @@ class AppsFlyerWebhookDocument(WebhookDocument):
         "conversion_type",
         "event_name",
         "event_time",
-        "event_value",
+        "event_type",
     ]
 
     app_id: str
@@ -109,13 +116,26 @@ class AppsFlyerWebhookDocument(WebhookDocument):
     conversion_type: str
     event_name: str
     event_time: str
-    event_value: str
+    event_type: str
 
     @model_validator(mode="before")
     def ensure_pk_fields_present(cls, data: dict[str, str]):
         assert isinstance(data, dict)
 
-        missing_keys = [key for key in cls.required_pk_fields if key not in data]
+        required = list(cls.required_pk_fields)
+        # Event values have been observed in all Android streams but only a
+        # handful of iOS ones (AppsFlyer prefixes iOS unified app IDs with
+        # "id"). We tolerate their absence only when the app_id signals iOS
+        # AND the stream isn't one of the few that always carry the field
+        # across every platform.
+        is_ios_app = data.get("app_id", "").startswith("id")
+        always_carries_event_value = (
+            data.get("event_type", "") in KNOWN_STREAMS_WITH_EVENT_VALUE_FIELD
+        )
+        if not is_ios_app or always_carries_event_value:
+            required.append("event_value")
+
+        missing_keys = [key for key in required if key not in data]
         if missing_keys:
             raise ValueError(
                 (
@@ -135,6 +155,9 @@ class AppsFlyerWebhookDocument(WebhookDocument):
         # It is included in all document PKs as a future proofing measure
         # in case a different platform adopts it.
         parts.append(getattr(self, "app_type", "estuary_missing_app_type"))
+
+        # Event values have been observed in all Android streams but only a handful in iOS
+        parts.append(getattr(self, "event_value", "estuary_missing_event_value"))
 
         self.meta_.estuary_id = xxhash.xxh128("|".join(parts).encode()).hexdigest()
 
