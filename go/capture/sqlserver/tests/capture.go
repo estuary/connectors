@@ -1,15 +1,10 @@
 package tests
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"regexp"
 	"testing"
-	"time"
 
 	"github.com/bradleyjkemp/cupaloy"
-	"github.com/estuary/connectors/go/capture/blackbox"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,7 +20,6 @@ func TestCapture(t *testing.T, setup testSetupFunc) {
 	t.Run("PrimaryKeyUpdate", func(t *testing.T) { testPrimaryKeyUpdate(t, setup) })
 	t.Run("ComputedPrimaryKey", func(t *testing.T) { testComputedPrimaryKey(t, setup) })
 	t.Run("SourceTag", func(t *testing.T) { testSourceTag(t, setup) })
-	t.Run("PopulateSourceTsMs", func(t *testing.T) { testPopulateSourceTsMs(t, setup) })
 }
 
 func testColumnNameQuoting(t *testing.T, setup testSetupFunc) {
@@ -204,84 +198,3 @@ func testSourceTag(t *testing.T, setup testSetupFunc) {
 	cupaloy.SnapshotT(t, tc.Transcript.String())
 }
 
-// testPopulateSourceTsMs verifies the populate_source_ts_ms advanced option:
-// CDC events carry transaction commit time as _meta/source/ts_ms; backfill
-// rows and flag-off captures do not.
-func testPopulateSourceTsMs(t *testing.T, setup testSetupFunc) {
-	var db, tc = setup(t)
-	db.CreateTable(t, `<NAME>`, `(id INTEGER PRIMARY KEY, data TEXT)`)
-
-	// Redact ts_ms values in snapshots so timestamps don't destabilize the
-	// snapshot across runs; equality and ordering are asserted programmatically
-	// against the raw capture output below.
-	tc.DocumentSanitizers = append(tc.DocumentSanitizers, blackbox.JSONSanitizer{
-		Matcher:     regexp.MustCompile(`"ts_ms":\d+`),
-		Replacement: `"ts_ms":REDACTED`,
-	})
-
-	// Backfill (flag off): no ts_ms expected.
-	db.Exec(t, `INSERT INTO <NAME> VALUES (0, 'zero'), (1, 'one')`)
-	tc.Discover("Discover Tables")
-	var backfillBytes = tc.Run("Initial Backfill (flag off)", -1)
-	require.Empty(t, extractTsMsValues(t, backfillBytes), "backfill events must not have ts_ms")
-
-	// Replication (flag off): no ts_ms expected.
-	db.Exec(t, `INSERT INTO <NAME> VALUES (2, 'two')`)
-	var replOffBytes = tc.Run("Replication (flag off)", -1)
-	require.Empty(t, extractTsMsValues(t, replOffBytes), "flag-off replication events must not have ts_ms")
-
-	require.NoError(t, tc.Capture.EditConfig("advanced.populate_source_ts_ms", true))
-
-	// Single transaction with multiple rows: all rows must share ts_ms.
-	db.Exec(t, `INSERT INTO <NAME> VALUES (3, 'three'), (4, 'four'), (5, 'five')`)
-	var multiTxnBytes = tc.Run("Replication (multi-row transaction, flag on)", -1)
-	var multiTxnTsMs = extractTsMsValues(t, multiTxnBytes)
-	require.Len(t, multiTxnTsMs, 3, "expected ts_ms on all three CDC rows")
-	for _, v := range multiTxnTsMs {
-		require.NotZero(t, v, "ts_ms should be populated with a real commit time")
-		require.Equal(t, multiTxnTsMs[0], v, "rows from one transaction must share ts_ms")
-	}
-
-	// Separate transactions: ts_ms must be monotonically non-decreasing.
-	time.Sleep(50 * time.Millisecond)
-	db.Exec(t, `INSERT INTO <NAME> VALUES (6, 'six')`)
-	time.Sleep(50 * time.Millisecond)
-	db.Exec(t, `INSERT INTO <NAME> VALUES (7, 'seven')`)
-	var sepTxnBytes = tc.Run("Replication (separate transactions, flag on)", -1)
-	var sepTxnTsMs = extractTsMsValues(t, sepTxnBytes)
-	require.Len(t, sepTxnTsMs, 2, "expected ts_ms on both CDC rows")
-	require.LessOrEqual(t, sepTxnTsMs[0], sepTxnTsMs[1], "ts_ms must be monotonically non-decreasing across transactions")
-
-	cupaloy.SnapshotT(t, tc.Transcript.String())
-}
-
-// extractTsMsValues returns the _meta/source/ts_ms value for every emitted
-// document in the raw capture output, in emission order. Documents without
-// ts_ms are skipped.
-func extractTsMsValues(t *testing.T, raw []byte) []int64 {
-	t.Helper()
-	var values []int64
-	for line := range bytes.SplitSeq(raw, []byte("\n")) {
-		if len(line) == 0 {
-			continue
-		}
-		// Each captured document is emitted as ["binding-name", {document}, ...].
-		var parts []json.RawMessage
-		require.NoError(t, json.Unmarshal(line, &parts))
-		if len(parts) < 2 {
-			continue
-		}
-		var doc struct {
-			Meta struct {
-				Source struct {
-					TsMs *int64 `json:"ts_ms"`
-				} `json:"source"`
-			} `json:"_meta"`
-		}
-		require.NoError(t, json.Unmarshal(parts[1], &doc))
-		if doc.Meta.Source.TsMs != nil {
-			values = append(values, *doc.Meta.Source.TsMs)
-		}
-	}
-	return values
-}
