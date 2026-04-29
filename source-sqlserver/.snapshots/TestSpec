@@ -94,8 +94,8 @@
           },
           "populate_source_ts_ms": {
             "type": "boolean",
-            "title": "Populate Source ts_ms",
-            "description": "When set the connector will populate the '_meta/source/ts_ms' property of CDC events with the transaction commit time. The commit time is looked up from cdc.lsn_time_mapping after each polling cycle. This adds one extra query per change batch and is therefore opt-in. Backfill rows do not have a meaningful commit time so ts_ms will not be set on them.",
+            "title": "Populate Source Timestamps",
+            "description": "When set the connector will populate the source timestamp on CDC change events with the transaction commit time. The commit time is looked up from cdc.lsn_time_mapping after each polling cycle. This adds one extra query per change batch and is therefore opt-in. Backfill rows do not have a meaningful commit time so the source timestamp will not be set on them.",
             "default": false
           },
           "feature_flags": {
