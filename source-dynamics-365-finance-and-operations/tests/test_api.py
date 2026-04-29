@@ -1,6 +1,9 @@
 from source_dynamics_365_finance_and_operations.api import transform_row
 
 
+CSV_NAME = "2026-01-01T00:00:00.000Z/Table/data.csv"
+
+
 class TestTransformRow:
     """Tests for the transform_row helper function."""
 
@@ -9,7 +12,7 @@ class TestTransformRow:
         row = {"IsActive": "true", "Name": "Test"}
         boolean_fields = frozenset({"IsActive"})
 
-        result = transform_row(row, boolean_fields)
+        result = transform_row(row, boolean_fields, CSV_NAME)
 
         assert result["IsActive"] is True
         assert result["Name"] == "Test"
@@ -19,7 +22,7 @@ class TestTransformRow:
         row = {"IsActive": "false", "Name": "Test"}
         boolean_fields = frozenset({"IsActive"})
 
-        result = transform_row(row, boolean_fields)
+        result = transform_row(row, boolean_fields, CSV_NAME)
 
         assert result["IsActive"] is False
 
@@ -28,7 +31,7 @@ class TestTransformRow:
         row = {"IsActive": "TRUE", "IsEnabled": "False", "IsValid": "TrUe"}
         boolean_fields = frozenset({"IsActive", "IsEnabled", "IsValid"})
 
-        result = transform_row(row, boolean_fields)
+        result = transform_row(row, boolean_fields, CSV_NAME)
 
         assert result["IsActive"] is True
         assert result["IsEnabled"] is False
@@ -39,7 +42,7 @@ class TestTransformRow:
         row = {"IsActive": None, "Name": "Test"}
         boolean_fields = frozenset({"IsActive"})
 
-        result = transform_row(row, boolean_fields)
+        result = transform_row(row, boolean_fields, CSV_NAME)
 
         assert result["IsActive"] is False
 
@@ -48,7 +51,7 @@ class TestTransformRow:
         row = {"IsActive": "true", "IsDeleted": "false", "IsEnabled": "true"}
         boolean_fields = frozenset({"IsActive", "IsDeleted", "IsEnabled"})
 
-        result = transform_row(row, boolean_fields)
+        result = transform_row(row, boolean_fields, CSV_NAME)
 
         assert result["IsActive"] is True
         assert result["IsDeleted"] is False
@@ -59,35 +62,35 @@ class TestTransformRow:
         row = {"IsDelete": "True", "Name": "Test"}
         boolean_fields = frozenset()
 
-        result = transform_row(row, boolean_fields)
+        result = transform_row(row, boolean_fields, CSV_NAME)
 
-        assert result["_meta"] == {"op": "d"}
+        assert result["_meta"] == {"op": "d", "source_file": CSV_NAME}
 
     def test_meta_op_update_when_isdelete_empty(self):
         """_meta.op should be 'u' when IsDelete is empty string."""
         row = {"IsDelete": "", "Name": "Test"}
         boolean_fields = frozenset()
 
-        result = transform_row(row, boolean_fields)
+        result = transform_row(row, boolean_fields, CSV_NAME)
 
-        assert result["_meta"] == {"op": "u"}
+        assert result["_meta"] == {"op": "u", "source_file": CSV_NAME}
 
     def test_meta_op_update_when_isdelete_false(self):
         """_meta.op should be 'u' when IsDelete is 'False' and converted to bool."""
         row = {"IsDelete": "False", "Name": "Test"}
         boolean_fields = frozenset({"IsDelete"})
 
-        result = transform_row(row, boolean_fields)
+        result = transform_row(row, boolean_fields, CSV_NAME)
 
         assert result["IsDelete"] is False
-        assert result["_meta"] == {"op": "u"}
+        assert result["_meta"] == {"op": "u", "source_file": CSV_NAME}
 
     def test_mutates_row_in_place(self):
         """transform_row should mutate the row in place and return it."""
         row = {"IsActive": "true"}
         boolean_fields = frozenset({"IsActive"})
 
-        result = transform_row(row, boolean_fields)
+        result = transform_row(row, boolean_fields, CSV_NAME)
 
         assert result is row
         assert row["IsActive"] is True
