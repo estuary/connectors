@@ -184,10 +184,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -215,7 +211,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -336,10 +331,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -367,7 +358,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -488,10 +478,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -519,7 +505,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -640,10 +625,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -671,7 +652,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -792,10 +772,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -823,7 +799,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -944,10 +919,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -975,7 +946,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -1096,10 +1066,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -1127,7 +1093,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -1248,10 +1213,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -1279,7 +1240,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -1400,10 +1360,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -1431,7 +1387,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -1552,10 +1507,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -1583,7 +1534,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -1704,10 +1654,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -1735,7 +1681,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -1856,10 +1801,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -1887,7 +1828,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -2008,10 +1948,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -2039,7 +1975,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
@@ -2160,10 +2095,6 @@
           "title": "App Id",
           "type": "string"
         },
-        "app_type": {
-          "title": "App Type",
-          "type": "string"
-        },
         "appsflyer_id": {
           "title": "Appsflyer Id",
           "type": "string"
@@ -2191,7 +2122,6 @@
       },
       "required": [
         "app_id",
-        "app_type",
         "appsflyer_id",
         "campaign_type",
         "conversion_type",
