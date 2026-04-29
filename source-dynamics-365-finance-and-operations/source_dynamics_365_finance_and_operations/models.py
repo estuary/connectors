@@ -70,6 +70,13 @@ class BaseTable(BaseCSVRow, extra="allow"):
 
     Id: str
     IsDelete: bool | None
+    # Monotonically increasing commit sequence number from the source system.
+    # Authoritative ordering primitive for changes within a folder.
+    versionnumber: str
+    # Timestamp at which the change was committed to the data lake. Used
+    # only as a defensive tiebreaker when two rows for the same Id share
+    # a versionnumber.
+    SinkModifiedOn: str
 
 
 def model_from_entity(entity: ModelDotJson.Entity) -> type[BaseTable]:

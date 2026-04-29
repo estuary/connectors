@@ -38,6 +38,13 @@ CACHE_TTL = MINIMUM_AZURE_SYNAPSE_LINK_EXPORT_INTERVAL / 5   # 1 minute
 # other streams for CPU time and can finish processing the contents
 # of a timestamp folder in a reasonable amount of time.
 FOLDER_PROCESSING_SEMAPHORE = asyncio.Semaphore(5)
+# A transformed CSV row. Keys are the standard Synapse Link metadata
+# columns (Id, IsDelete, versionnumber, SinkModifiedOn, _meta) plus
+# arbitrary table-specific columns.
+TransformedRow = dict[str, str | bool | None | dict[str, str]]
+# SinkModifiedOn arrives as a US-locale string like "4/29/2026 9:01:26 PM".
+# We parse it only internally as a tiebreaker for order_key.
+_SINK_MODIFIED_ON_FORMAT = "%m/%d/%Y %I:%M:%S %p"
 
 
 class ModelFormat(StrEnum):
@@ -181,12 +188,101 @@ async def get_folder_contents_for_table(
     return metadata
 
 
+def order_key(row: TransformedRow) -> tuple[int, datetime]:
+    """
+    Build the comparison key used by the per-folder ordering state machine.
+
+    versionnumber is the source-of-truth ordering primitive. SinkModifiedOn
+    is a defensive tiebreaker for the unexpected case where two rows for
+    the same Id share a versionnumber.
+
+    Both fields are required on every Synapse Link CSV row.
+    """
+    # versionnumber and SinkModifiedOn pass straight through transform_row,
+    # so values here are guaranteed to be str | None from client.stream_csv.
+    version = cast(str | None, row["versionnumber"])
+    sink_modified_on = cast(str | None, row["SinkModifiedOn"])
+    if version is None or sink_modified_on is None:
+        raise ValueError(
+            f"Row is missing required ordering fields "
+            f"(versionnumber={version!r}, SinkModifiedOn={sink_modified_on!r}). "
+        )
+    return (int(version), datetime.strptime(sink_modified_on, _SINK_MODIFIED_ON_FORMAT))
+
+
+async def defer_deletes(rows: AsyncGenerator[TransformedRow, None]) -> AsyncGenerator[TransformedRow, None]:
+    """
+    Buffer deletes from a single (folder, table) pair and emit them after
+    all upserts, so the destination ends up with the correct latest state
+    for each Id.
+
+    Rows in a folder don't arrive in versionnumber order. CSVs are sorted
+    by file modification time, which only loosely tracks the source commit
+    sequence. A delete might appear in an earlier-modified file than the
+    upsert that should follow it. So we can't just emit rows as they come.
+
+    For each Id we track two things:
+
+      - The highest versionnumber of any upsert we've already emitted for
+        this Id in this folder.
+      - The highest-versionnumber delete we've seen for this Id, held
+        until the end of the folder.
+
+    Upserts emit immediately, unless an upsert with a higher versionnumber
+    for the same Id has already gone out (in which case the incoming one
+    is stale). Deletes are buffered. At end-of-folder, a buffered delete
+    emits only if no upsert with a higher versionnumber for that Id was
+    seen during streaming.
+
+    State is reset per call. A delete in folder N+1 against an upsert from
+    folder N must still emit, and starting each call with empty maps
+    ensures it does. (Synapse Link gives us monotonically-increasing
+    versionnumbers across folders, so this is safe.)
+
+    Tradeoff: if a delete and a later recreate for the same Id appear in
+    the same folder, the delete is coalesced away. The destination ends
+    up in the right state, but the connector does not produce a faithful
+    event log.
+    """
+    # latest_upsert_key tracks the highest order_key for non-deletion events.
+    latest_upsert_key: dict[str, tuple[int, datetime]] = {}
+    # pending_deletes buffers all deletions. It gets drained after yielding
+    # all non-deletions.
+    pending_deletes: dict[str, TransformedRow] = {}
+
+    # Yield all non-deletions as they're read.
+    async for row in rows:
+        row_id = cast(str, row["Id"])
+        row_key = order_key(row)
+
+        # Defer yielding deletions until all non-deletions have been yielded.
+        if row["IsDelete"] is True:
+            prior_delete = pending_deletes.get(row_id)
+            if prior_delete is None or row_key > order_key(prior_delete):
+                pending_deletes[row_id] = row
+            continue
+
+        prior_key = latest_upsert_key.get(row_id)
+        if prior_key is not None and prior_key >= row_key:
+            # Drop stale upserts so the cache stays an accurate high-water mark.
+            continue
+
+        yield row
+        latest_upsert_key[row_id] = row_key
+
+    for row_id, delete_row in pending_deletes.items():
+        prior_key = latest_upsert_key.get(row_id)
+        if prior_key is not None and prior_key >= order_key(delete_row):
+            continue
+        yield delete_row
+
+
 async def read_csvs_in_folder(
     folder: str,
     table_name: str,
     client: ADLSGen2Client,
     log: Logger,
-) -> AsyncGenerator[dict, None]:
+) -> AsyncGenerator[TransformedRow, None]:
     folder_contents = await get_folder_contents_for_table(folder, table_name, client)
 
     csvs: list[ADLSPathMetadata] = []
@@ -199,22 +295,33 @@ async def read_csvs_in_folder(
         ):
             csvs.append(metadata)
 
-    if csvs:
-        table_metadata = await get_table_metadata(
-            timestamp=folder,
-            table_name=table_name,
-            client=client,
-            log=log,
-        )
+    if not csvs:
+        return
 
-        csvs.sort(key=lambda c: c.last_modified_datetime)
+    table_metadata = await get_table_metadata(
+        timestamp=folder,
+        table_name=table_name,
+        client=client,
+        log=log,
+    )
 
+    # Sorting by last_modified_datetime should ensure that all create/update events
+    # are sorted in modification order. But deletions live in separate files whose last_modified_datetime can
+    # precede the files containing creates/updates, so a delete might come up before
+    # the upsert it should follow. defer_deletes defers emitting deletions until
+    # we've processed all non-deletions in this folder.
+    csvs.sort(key=lambda c: c.last_modified_datetime)
+
+    async def transformed_rows() -> AsyncGenerator[TransformedRow, None]:
         for csv in csvs:
-            async for row in client.stream_csv(csv.name, table_metadata.field_names):
-                yield transform_row(row, table_metadata.boolean_fields, csv.name)
+            async for raw_row in client.stream_csv(csv.name, table_metadata.field_names):
+                yield transform_row(raw_row, table_metadata.boolean_fields, csv.name)
+
+    async for row in defer_deletes(transformed_rows()):
+        yield row
 
 
-def transform_row(row: dict[str, str], boolean_fields: frozenset[str], csv_name: str) -> dict[str, str | bool | dict[str, str]]:
+def transform_row(row: dict[str, str | None], boolean_fields: frozenset[str], csv_name: str) -> TransformedRow:
     """
     Apply Dynamics 365-specific transformations to a CSV row.
 
@@ -223,7 +330,7 @@ def transform_row(row: dict[str, str], boolean_fields: frozenset[str], csv_name:
     - Add _meta field with operation type based on IsDelete field
       (IsDelete is "True" for deletions, "" otherwise)
     """
-    result = cast(dict[str, str | bool | dict[str, str]], row)
+    result = cast(TransformedRow, row)
 
     for field_name in boolean_fields:
         value = row.get(field_name)
