@@ -19,7 +19,7 @@ var testAll = flag.Bool("iceberg.test-all", false, "run integration tests agains
 
 func TestIntegration(t *testing.T) {
 	if testing.Short() {
-		t.Skip()
+		t.Skip("skipping test in short mode.")
 	}
 
 	makeResourceFn := func(table string, delta bool) resource {
