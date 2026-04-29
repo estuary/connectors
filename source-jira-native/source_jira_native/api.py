@@ -377,7 +377,7 @@ async def snapshot_filter_sharing(
             filter_ids.append(filter_id)
 
     for id in filter_ids:
-        path = f"{Filters.path}/{id}/{stream.path}"
+        path = f"filter/{id}/{stream.path}"
         try:
             async for record in _fetch_non_paginated_arrayed_resources(http, domain, stream.api, path, stream.extra_headers, stream.extra_params, log):
                 record["filterId"] = id
