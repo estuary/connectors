@@ -22,3 +22,6 @@ materializations:
           - macaddr8ToString
           - macaddrToString
           - uuidToString
+          - int000ToNumStr
+          - int064ToNumStr
+          - int032ToNumStr

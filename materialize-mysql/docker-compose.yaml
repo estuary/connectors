@@ -10,6 +10,7 @@ services:
       - "--innodb-log-file-size=512M"
       - "--innodb-flush-method=O_DIRECT"
       - "--innodb-flush-log-at-trx-commit=2"
+      - "--innodb-page-size=65536"
     environment: {"MYSQL_DATABASE": "flow", "MYSQL_USER": "flow", "MYSQL_PASSWORD": "flow", "MYSQL_ROOT_PASSWORD": "flow"}
     volumes:
       - mysql_data:/var/lib/mysql
