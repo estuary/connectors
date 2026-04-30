@@ -104,8 +104,8 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 	)
 	if featureFlags["native_binary_column_type"] {
 		binaryMapping = sql.MapPrimaryKey(
-			sql.MapStatic("VARBINARY(256)", sql.AlsoCompatibleWith("varbinary")),
-			sql.MapStatic("LONGBLOB"),
+			sql.MapStatic("VARBINARY(256)", sql.AlsoCompatibleWith("varbinary"), sql.UsingConverter(sql.Base64Decoder)),
+			sql.MapStatic("LONGBLOB", sql.UsingConverter(sql.Base64Decoder)),
 		)
 	}
 
@@ -395,22 +395,12 @@ ALTER TABLE {{$.Identifier}}
 {{ end }}
 
 -- Templated creation of a temporary load table.
---
--- Binary columns are staged as base64 text (VARCHAR for primary keys, LONGTEXT
--- for non-keys) and decoded with FROM_BASE64 during JOIN/INSERT against the
--- target table. Storing them as native VARBINARY in the staging table doesn't
--- work on SingleStore: the LOAD DATA SET clause that would decode @v_i runs
--- after the row's NOT NULL constraint is enforced, which fails because the
--- binary column is part of the primary key.
---
--- The VARCHAR(256) sizing matches the prior text-based key limit, before the
--- native_binary_column_type feature flag was introduced.
 
 {{ define "createLoadTable" }}
 CREATE TEMPORARY TABLE {{ template "temp_load_name" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
-		{{ $key.Identifier }} {{ if IsBinary $key }}VARCHAR(256) NOT NULL{{ else }}{{ $key.DDL }}{{ end }}
+		{{ $key.Identifier }} {{ $key.DDL }}
 	{{- end }}
 	,
 		PRIMARY KEY (
@@ -455,7 +445,7 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 	JOIN {{ $.Identifier}} AS r
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON  {{ end -}}
-		{{ if IsBinary $key }}FROM_BASE64(l.{{ $key.Identifier }}){{ else }}l.{{ $key.Identifier }}{{ end }} = r.{{ $key.Identifier }}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
@@ -495,7 +485,7 @@ FROM {{ $.Identifier}} AS r
 JOIN {{ template "temp_load_name" . }} AS l
 {{- range $ind, $key := $.Keys }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	{{ if IsBinary $key }}FROM_BASE64(l.{{ $key.Identifier }}){{ else }}l.{{ $key.Identifier }}{{ end }} = r.{{ $key.Identifier }}
+	l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
@@ -514,27 +504,16 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert'`+loadDataModifier+` INTO
 (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{- if IsBinary $col }}
-		@v_{{$ind}}
-		{{- else }}
 		{{$col.Identifier}}
-		{{- end }}
 	{{- end }}
-)
-{{- if HasBinary $.Columns }}
-SET
-	{{- range $i, $ic := IndexedBinaryColumns $.Columns }}
-		{{- if $i }},{{ end }}
-	{{$ic.Column.Identifier}} = FROM_BASE64(@v_{{$ic.Index}})
-	{{- end }}
-{{- end }};
+);
 {{ end }}
 
 {{ define "createUpdateTable" }}
 CREATE TEMPORARY TABLE {{ template "temp_update_name" . }} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{$col.Identifier}} {{ if IsBinary $col }}{{ if $col.IsPrimaryKey }}VARCHAR(256) NOT NULL{{ else }}LONGTEXT{{ end }}{{ else }}{{$col.DDL}}{{ end }}
+		{{$col.Identifier}} {{$col.DDL}}
 	{{- end }}
 	,
 	PRIMARY KEY (
@@ -572,7 +551,7 @@ REPLACE INTO {{ $.Identifier }}
 SELECT
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{ if IsBinary $col }}FROM_BASE64({{$col.Identifier}}){{ else }}{{$col.Identifier}}{{ end }}
+		{{$col.Identifier}}
 	{{- end }}
 FROM {{ template "temp_update_name" . }};
 {{ end }}
@@ -587,7 +566,7 @@ FROM {{ template "temp_update_name" . }};
 CREATE TEMPORARY TABLE {{ template "temp_delete_name" . }} (
 	{{- range $ind, $col := $.Keys }}
 		{{- if $ind }},{{ end }}
-		{{$col.Identifier}} {{ if IsBinary $col }}VARCHAR(256) NOT NULL{{ else }}{{$col.DDL}}{{ end }}
+		{{$col.Identifier}} {{$col.DDL}}
 	{{- end }}
 	,
 	PRIMARY KEY (
@@ -619,7 +598,7 @@ DELETE original FROM {{ $.Identifier }} original, {{ template "temp_delete_name"
 WHERE
 	{{- range $ind, $col := $.Keys }}
 		{{- if $ind }} AND {{ end }}
-		original.{{$col.Identifier}} = {{ if IsBinary $col }}FROM_BASE64(temp.{{$col.Identifier}}){{ else }}temp.{{$col.Identifier}}{{ end }}
+		original.{{$col.Identifier}} = temp.{{$col.Identifier}}
 	{{- end -}}
 ;
 {{ end }}
