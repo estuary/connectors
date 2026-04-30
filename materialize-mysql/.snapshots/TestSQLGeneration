@@ -52,7 +52,7 @@ auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
 CREATE TEMPORARY TABLE flow_temp_load_table_0 (
 		key1 BIGINT NOT NULL,
 		key2 BOOLEAN NOT NULL,
-		`key!binary` VARCHAR(256) NOT NULL
+		`key!binary` VARBINARY(256) NOT NULL
 	,
 		PRIMARY KEY (key1, key2, `key!binary`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
@@ -72,9 +72,9 @@ CREATE TEMPORARY TABLE flow_temp_load_table_1 (
 CREATE TEMPORARY TABLE flow_temp_update_table_0 (
 		key1 BIGINT NOT NULL,
 		key2 BOOLEAN NOT NULL,
-		`key!binary` VARCHAR(256) NOT NULL,
+		`key!binary` VARBINARY(256) NOT NULL,
 		`array` JSON,
-		`binary` LONGTEXT,
+		`binary` LONGBLOB,
 		`boolean` BOOLEAN,
 		field_with_projection LONGTEXT,
 		flow_published_at DATETIME(6) NOT NULL,
@@ -158,7 +158,7 @@ SELECT 0, r.flow_document
 	JOIN key_value AS r
 		 ON  l.key1 = r.key1
 		 AND l.key2 = r.key2
-		 AND FROM_BASE64(l.`key!binary`) = r.`key!binary`
+		 AND l.`key!binary` = r.`key!binary`
 
 --- End key_value loadQuery ---
 
@@ -201,7 +201,7 @@ FROM key_value AS r
 JOIN flow_temp_load_table_0 AS l
 	 ON  l.key1 = r.key1
 	 AND l.key2 = r.key2
-	 AND FROM_BASE64(l.`key!binary`) = r.`key!binary`
+	 AND l.`key!binary` = r.`key!binary`
 
 --- End key_value loadQueryNoFlowDocument ---
 
@@ -222,9 +222,9 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE key_value CHA
 (
 		key1,
 		key2,
-		@v_2,
+		`key!binary`,
 		`array`,
-		@v_4,
+		`binary`,
 		`boolean`,
 		field_with_projection,
 		flow_published_at,
@@ -247,10 +247,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE key_value CHA
 		`stringInteger77Chars`,
 		`stringNumber`,
 		flow_document
-)
-SET
-	`key!binary` = FROM_BASE64(@v_2),
-	`binary` = FROM_BASE64(@v_4);
+);
 --- End key_value insertLoad ---
 
 --- Begin delta_updates insertLoad ---
@@ -357,9 +354,9 @@ REPLACE INTO key_value
 SELECT
 		key1,
 		key2,
-		FROM_BASE64(`key!binary`),
+		`key!binary`,
 		`array`,
-		FROM_BASE64(`binary`),
+		`binary`,
 		`boolean`,
 		field_with_projection,
 		flow_published_at,
@@ -416,7 +413,7 @@ DELETE original FROM key_value original, flow_temp_delete_table_0 temp
 WHERE
 		original.key1 = temp.key1 AND 
 		original.key2 = temp.key2 AND 
-		original.`key!binary` = FROM_BASE64(temp.`key!binary`);
+		original.`key!binary` = temp.`key!binary`;
 --- End key_value deleteQuery ---
 
 --- Begin delta_updates deleteQuery ---
