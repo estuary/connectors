@@ -503,8 +503,29 @@ def discovered(
         if resource.schema_inference:
             schema["x-infer-schema"] = True
 
+        # Materializations require this if/then/else conditional to support
+        # hard deletes. It tells Flow to use a top-level merge reduction
+        # strategy for deletions and mark them with `delete: True` so materializations
+        # know to issue DELETEs to destinations.
+        #
+        # `_meta` and `_meta.op` are both `required` in the `if` clause because
+        # JSON Schema's `properties` keyword passes when a key is absent.
+        # Without these `required` assertions, a document missing `_meta`
+        # or `_meta.op` would still match the `if` and get marked as a
+        # delete. The `required` clauses force the `if` to match only when
+        # `_meta.op` is present and equals `"d"`.
+        schema["if"] = {
+            "required": ["_meta"],
+            "properties": {
+                "_meta": {
+                    "required": ["op"],
+                    "properties": {"op": {"const": "d"}},
+                }
+            },
+        }
+        schema["then"] = {"reduce": {"strategy": "merge", "delete": True}}
         if resource.reduction_strategy:
-            schema["reduce"] = {"strategy": resource.reduction_strategy}
+            schema["else"] = {"reduce": {"strategy": resource.reduction_strategy}}
 
         bindings.append(
             response.DiscoveredBinding(

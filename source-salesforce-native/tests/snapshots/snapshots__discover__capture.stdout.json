@@ -49,8 +49,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -107,8 +132,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -165,8 +215,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -223,8 +298,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -281,8 +381,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -339,8 +464,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -397,8 +547,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -455,8 +630,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -513,8 +713,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -571,8 +796,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -629,8 +879,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -687,8 +962,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -745,8 +1045,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -803,8 +1128,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -861,8 +1211,33 @@
       "title": "SalesforceResource",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
