@@ -1,23 +1,16 @@
-aws_access_key_id: ENC[AES256_GCM,data:xQGPcz95/aWokIkFtxrGfV/IuS4=,iv:+K+JYnKiyQOORSw9sUj/cT4p3Lk45870cjUyhwYWxsM=,tag:PJo2mfz10smBF82uai43qg==,type:str]
-aws_secret_access_key: ENC[AES256_GCM,data:hGuw+uV8sEY9nQxrl8FlqRGbsBIB+6BTKSsTcTFlUCI/5XPDRmMVOQ==,iv:CR1g10dnajFLRQ49ZKG+FtODeq+l1+MsqvNzM+erBDg=,tag:Xry85c4YktmSS4BpywUSxg==,type:str]
-bucket: ENC[AES256_GCM,data:SyJDQJTpot+Sm5RdwbtPwxit4tHwjvaVdu0M3zc=,iv:oQjoUYTChpfbMAzDrSuvlbEb5wqVKakH5cBKFaqn52A=,tag:fOC0mCBYGAebK00lVx54Ew==,type:str]
-region: ENC[AES256_GCM,data:iLh7I1a89LUb,iv:jb0ZdJZ0PWZ6yUBrvnGZ+5JGBMikdNmupaeZ9MAk9rw=,tag:6b8IempUk1kLYu4zOb91Tg==,type:str]
-prefix: ENC[AES256_GCM,data:FhKYFA14EIAT,iv:RVJWpDT7fgj1ZHLgzMDdCGRYSlc9Ht7/bXGbHRbavsE=,tag:G8ekz1c+Y4UhHJ4Lx4xPTg==,type:str]
-namespace: ENC[AES256_GCM,data:JrMuwAwRFUYjRsz/,iv:bNqORzgZ1n5Gzt4S1/r2tTw8d/kwWwJxIF+vYeYtXwI=,tag:T7K22fkowaBrjaN8mP7j5A==,type:str]
-upload_interval: ENC[AES256_GCM,data:s6ankA==,iv:ygtwwyIKoVcrevPdVp1cueFzP8AeaTi85wEPh5lPLKs=,tag:8rnULeRlNz+36P+j2I2AMQ==,type:str]
+aws_access_key_id: flow
+aws_secret_access_key: flow
+bucket: test-warehouse
+region: us-east-1
+prefix: warehouse
+namespace: tests
+upload_interval: PT1S
+s3_endpoint: http://localhost:9702
 catalog:
-    catalog_type: ENC[AES256_GCM,data:rgdI6WtqT2VtYEZLuAmLLuvCWQ==,iv:XuhAXRnV2paXfsKGMMPGqahM/98SDVMkO07PXSpLh7A=,tag:zRL5dOTccckj1ntA9bnxEQ==,type:str]
-    uri: ENC[AES256_GCM,data:BFbB4B65IbNiA38mtlDbSr14MMLYYnOV32tgQSg=,iv:dtNQAc3y5stDV/2oKzI7/ne9dWMxKCKi+LKXkIkI40w=,tag:Xe+718K5j5nF0AOr5Dwb0w==,type:str]
-    token: ENC[AES256_GCM,data:5Z2I7l3iv8FedQ==,iv:v6I2ICw9F7Lxi+H1OnqHgt/u2+mKwyFS3Ilq0gVlluU=,tag:Jwg/0EkHarB11lPjeOA38g==,type:str]
-    warehouse: ENC[AES256_GCM,data:5OitV6m1OzxA9ZOv3zk=,iv:jOORTUVcVL0T9/56t9i1bzEvqHFCjwxFt8eoYwwKVxA=,tag:l1RjyD7OpHFm0zfMOd/P5A==,type:str]
+    catalog_type: Iceberg REST Server
+    uri: http://localhost:9700/api/catalog
+    credential: root:s3cr3t
+    warehouse: test_warehouse
+    scope: PRINCIPAL_ROLE:ALL
 advanced:
-    feature_flags: ENC[AES256_GCM,data:nPucUC7CqgeFipeHzTryJZ6x2vGMECQcyTrQSS5+HYCOyP+swq8=,iv:LZ8lATloIulKG0K2QfsNuDoDqayuf301blhklSmNRIQ=,tag:6/5ws2riT7nLwErhhh6WXg==,type:str]
-sops:
-    gcp_kms:
-        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
-          created_at: "2026-04-08T10:21:54Z"
-          enc: CiUAdmEdwqfPe8fDzBUodJ4EvDbTLnVQgCkfvdJz94A82x9tjLhrEkkAJFAC3Y9l/4NRnua1S/4ZxNEOTwrRUZ7TXDBoLOY4a6sCIYn3+uSe0qAYu+SkQNmxo2QYPWNcE+qolAIzUb2Etz1dCoIDMjgG
-    lastmodified: "2026-04-08T10:35:18Z"
-    mac: ENC[AES256_GCM,data:fr0JjxnSfqFq50avnPKHnxIC2rJzY0zwWleLvgyEEXtlLVZ7A2828LsDk9UTYfbnI7QFVDClRb9Kcz1EEQqFPwj4aNeztzCroF4MOQvCbZWFYBBYD1o939q1on5zRzMEYOtK8y65qJ518FXUdHGm74/FFJyTdn2jnJkbPaEQpoI=,iv:ERJ+Anoydufonb16w5CzIk/FAwUUpS1jPb7xABjRxHk=,tag:U4DyyrI6HukTDnT6pcbhdg==,type:str]
-    unencrypted_suffix: _unencrypted
-    version: 3.10.2
+    feature_flags: allow_existing_tables_for_new_bindings

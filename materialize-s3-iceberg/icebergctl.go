@@ -12,14 +12,14 @@ import (
 // When running tests locally, PYTHON_PATH should should be the path to the virtualenv python, or
 // just "python" (the default if unset) if you are running the test from an "activated" virtual
 // environment. The docker image for the connector must set this path accordingly.
-var pythonPath = func() string {
-	p, ok := os.LookupEnv("PYTHON_PATH")
-	if !ok {
-		return "python"
+//
+// Evaluated per call so tests can resolve the venv in TestMain (after package init).
+func pythonPath() string {
+	if p, ok := os.LookupEnv("PYTHON_PATH"); ok {
+		return p
 	}
-
-	return p
-}()
+	return "python"
+}
 
 // These structs are for serializing the inputs for iceberg-ctl, and have correspond pydantic models
 // for deserializing them.
@@ -42,7 +42,7 @@ type tableAlter struct {
 // Run a command with iceberg-ctl. The config is required for every command other than
 // `print-config-schema`, currently.
 func runIcebergctl(ctx context.Context, cfg *config, args ...string) ([]byte, error) {
-	cmd := exec.CommandContext(ctx, pythonPath, append([]string{"iceberg-ctl/iceberg_ctl"}, args...)...)
+	cmd := exec.CommandContext(ctx, pythonPath(), append([]string{"iceberg-ctl/iceberg_ctl"}, args...)...)
 
 	if cfg != nil {
 		configJson, err := json.Marshal(cfg)
