@@ -1,6 +1,11 @@
 package main
 
 // Ref: https://docs.aws.amazon.com/redshift/latest/dg/r_pg_keywords.html
+//
+// In addition to the official reserved words, this list also includes
+// non-reserved type-category words that the Redshift parser still treats
+// specially in expression contexts (e.g. inside a SELECT list), so they must
+// be quoted to be safely usable as column identifiers.
 
 var REDSHIFT_RESERVED_WORDS = []string{
 	"aes128",
@@ -37,6 +42,8 @@ var REDSHIFT_RESERVED_WORDS = []string{
 	"current_timestamp",
 	"current_user",
 	"current_user_id",
+	"date",
+	"datetime",
 	"default",
 	"deferrable",
 	"deflate",
@@ -142,7 +149,10 @@ var REDSHIFT_RESERVED_WORDS = []string{
 	"text255",
 	"text32k",
 	"then",
+	"time",
 	"timestamp",
+	"timestamptz",
+	"timetz",
 	"to",
 	"top",
 	"trailing",
