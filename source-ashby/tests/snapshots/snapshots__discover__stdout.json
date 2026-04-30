@@ -47,7 +47,30 @@
       ],
       "title": "Applications",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -101,7 +124,30 @@
       ],
       "title": "Approvals",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -155,7 +201,30 @@
       ],
       "title": "ArchiveReasons",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -209,7 +278,30 @@
       ],
       "title": "CandidateTags",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -263,7 +355,30 @@
       ],
       "title": "Candidates",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -317,7 +432,30 @@
       ],
       "title": "CustomFields",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -371,7 +509,30 @@
       ],
       "title": "Departments",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -425,7 +586,30 @@
       ],
       "title": "FeedbackFormDefinitions",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -479,7 +663,30 @@
       ],
       "title": "InterviewEvents",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -533,7 +740,30 @@
       ],
       "title": "InterviewPlans",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -587,7 +817,30 @@
       ],
       "title": "InterviewSchedules",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -641,7 +894,30 @@
       ],
       "title": "InterviewStages",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -695,7 +971,30 @@
       ],
       "title": "InterviewerPools",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -749,7 +1048,30 @@
       ],
       "title": "Interviews",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -803,7 +1125,30 @@
       ],
       "title": "JobPostings",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -857,7 +1202,30 @@
       ],
       "title": "JobTemplates",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -911,7 +1279,30 @@
       ],
       "title": "Jobs",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -965,7 +1356,30 @@
       ],
       "title": "Locations",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -1019,7 +1433,30 @@
       ],
       "title": "Offers",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -1073,7 +1510,30 @@
       ],
       "title": "Openings",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -1127,7 +1587,30 @@
       ],
       "title": "Projects",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -1181,7 +1664,30 @@
       ],
       "title": "Sources",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -1235,7 +1741,30 @@
       ],
       "title": "SurveyFormDefinitions",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -1289,7 +1818,30 @@
       ],
       "title": "Users",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"

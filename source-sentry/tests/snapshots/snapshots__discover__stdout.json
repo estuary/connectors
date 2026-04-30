@@ -40,7 +40,30 @@
       },
       "title": "Environment",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -100,7 +123,30 @@
       ],
       "title": "Issue",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -165,7 +211,30 @@
       ],
       "title": "Project",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -212,7 +281,30 @@
       },
       "title": "Release",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -269,7 +361,30 @@
       ],
       "title": "Team",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"

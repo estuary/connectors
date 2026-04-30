@@ -68,7 +68,30 @@
       ],
       "title": "Activities",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/object_id",
@@ -118,7 +141,30 @@
       },
       "title": "BaseDocument",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -164,7 +210,30 @@
       },
       "title": "BaseDocument",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -219,7 +288,30 @@
       ],
       "title": "AdSets",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -274,7 +366,30 @@
       ],
       "title": "Ads",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -338,7 +453,30 @@
       ],
       "title": "AdsInsights",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/account_id",
@@ -404,7 +542,30 @@
       ],
       "title": "AdsInsightsActionType",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/account_id",
@@ -480,7 +641,30 @@
       ],
       "title": "AdsInsightsAgeAndGender",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/account_id",
@@ -553,7 +737,30 @@
       ],
       "title": "AdsInsightsCountry",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/account_id",
@@ -625,7 +832,30 @@
       ],
       "title": "AdsInsightsDma",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/account_id",
@@ -707,7 +937,30 @@
       ],
       "title": "AdsInsightsPlatformAndDevice",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/account_id",
@@ -781,7 +1034,30 @@
       ],
       "title": "AdsInsightsRegion",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/account_id",
@@ -838,7 +1114,30 @@
       ],
       "title": "Campaigns",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -884,7 +1183,30 @@
       },
       "title": "BaseDocument",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -960,7 +1282,30 @@
       ],
       "title": "AdsInsightsPublisherPlatform",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/account_id",
@@ -1018,7 +1363,30 @@
       ],
       "title": "Images",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
@@ -1073,7 +1441,30 @@
       ],
       "title": "Videos",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"

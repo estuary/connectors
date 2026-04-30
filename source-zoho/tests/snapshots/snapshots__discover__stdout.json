@@ -55,8 +55,33 @@
       "title": "Accounts",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -119,8 +144,33 @@
       "title": "Calls",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -183,8 +233,33 @@
       "title": "Campaigns",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -247,8 +322,33 @@
       "title": "Contacts",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -311,8 +411,33 @@
       "title": "DealHistory",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -375,8 +500,33 @@
       "title": "Deals",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -439,8 +589,33 @@
       "title": "Events",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -503,8 +678,33 @@
       "title": "File_Upload_1__s",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -567,8 +767,33 @@
       "title": "Leads",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [
@@ -631,8 +856,33 @@
       "title": "Tasks",
       "type": "object",
       "x-infer-schema": true,
-      "reduce": {
-        "strategy": "merge"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      },
+      "else": {
+        "reduce": {
+          "strategy": "merge"
+        }
       }
     },
     "key": [

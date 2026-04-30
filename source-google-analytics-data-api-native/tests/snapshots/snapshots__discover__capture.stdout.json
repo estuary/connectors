@@ -57,7 +57,30 @@
       ],
       "title": "daily_active_users",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
@@ -138,7 +161,30 @@
       ],
       "title": "devices",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
@@ -207,7 +253,30 @@
       ],
       "title": "four_weekly_active_users",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
@@ -288,7 +357,30 @@
       ],
       "title": "locations",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
@@ -362,7 +454,30 @@
       ],
       "title": "my_custom_report_with_a_filter",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
@@ -439,7 +554,30 @@
       ],
       "title": "pages",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
@@ -517,7 +655,30 @@
       ],
       "title": "traffic_sources",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
@@ -585,7 +746,30 @@
       ],
       "title": "website_overview",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",
@@ -651,7 +835,30 @@
       ],
       "title": "weekly_active_users",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/property_id",

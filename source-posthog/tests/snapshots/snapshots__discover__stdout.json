@@ -48,7 +48,30 @@
       ],
       "title": "Annotation",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -103,7 +126,30 @@
       ],
       "title": "Cohort",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -170,7 +216,30 @@
       ],
       "title": "Event",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/project_id",
@@ -238,7 +307,30 @@
       ],
       "title": "FeatureFlag",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/project_id",
@@ -299,7 +391,30 @@
       ],
       "title": "Organization",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
@@ -379,7 +494,30 @@
       ],
       "title": "Person",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/project_id",
@@ -435,7 +573,30 @@
       ],
       "title": "Project",
       "type": "object",
-      "x-infer-schema": true
+      "x-infer-schema": true,
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/_meta/row_id"
