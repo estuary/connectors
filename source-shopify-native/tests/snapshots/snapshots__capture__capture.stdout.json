@@ -444,7 +444,8 @@
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
       "app": {
-        "id": "gid://shopify/App/1354745"
+        "id": "gid://shopify/App/1354745",
+        "name": "Draft Orders"
       },
       "billingAddress": null,
       "cancelReason": null,
