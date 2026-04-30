@@ -1,0 +1,25 @@
+url: http://localhost:9802/api/catalog
+warehouse: quickstart_catalog
+namespace: flow
+base_location: s3://warehouse/
+hard_delete: true
+credentials:
+    auth_type: "OAuth 2.0 Client Credentials"
+    oauth2_server_uri: "v1/oauth/tokens"
+    credential: "CREDENTIAL_PLACEHOLDER"
+    scope: "PRINCIPAL_ROLE:flow_user_role"
+advanced:
+    # Polaris enforces that tables live under the namespace's base location
+    # (e.g. s3://warehouse/flow/), so the table location must start with
+    # s3://warehouse/flow/ rather than s3://warehouse/flow_<table>_<hash>.
+    feature_flags: nested_dot_hash_location_style,allow_existing_tables_for_new_bindings
+compute:
+    compute_type: "Spark Standalone"
+    aws_access_key_id: "flow"
+    aws_secret_access_key: "flow"
+    region: "us-east-1"
+    bucket: "warehouse"
+    bucket_path: "staging/"
+    daemon_url: "http://localhost:9806"
+    s3_endpoint: "http://localhost:9800"
+    s3_path_style: true

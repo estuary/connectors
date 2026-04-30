@@ -1,0 +1,223 @@
+name: materialize-iceberg
+
+services:
+  polaris:
+    image: apache/polaris:1.4.0
+    networks:
+      materialize-iceberg:
+    depends_on:
+      rustfs-init:
+        condition: service_completed_successfully
+    ports:
+      - "9802:8181" # Catalog/management API
+      - "9803:8182" # Health/metrics
+    environment:
+      POLARIS_BOOTSTRAP_CREDENTIALS: POLARIS,root,s3cr3t
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: flow
+      AWS_SECRET_ACCESS_KEY: flow
+      JAVA_OPTS_APPEND: "-Xms128m -Xmx128m -XX:TieredStopAtLevel=1"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8182/q/health"]
+      interval: 500ms
+      timeout: 1s
+      retries: 8
+
+  polaris-bootstrap:
+    # No depends_on: the bootstrap script has built-in retry logic that polls
+    # Polaris's OAuth endpoint with 100ms intervals. This allows rustfs,
+    # polaris, and spark-master to boot in parallel instead of serially,
+    # reducing total startup time by ~50%.
+    #
+    # alpine:3.20 (~5MB) is used so we can `apk add curl jq` in the script;
+    # neither is preinstalled in apache/polaris:latest.
+    image: alpine:3.20
+    networks:
+      materialize-iceberg:
+    user: "0:0"
+    volumes:
+      - ./testdata/.local:/shared
+      - ./scripts/polaris-bootstrap.sh:/bootstrap.sh:ro
+    environment:
+      POLARIS_HOST: polaris
+      S3_ENDPOINT_HOST: http://rustfs:9000
+      S3_ENDPOINT_INTERNAL: http://rustfs:9000
+    entrypoint: ["/bin/sh", "/bootstrap.sh"]
+
+  rustfs:
+    image: rustfs/rustfs:latest
+    networks:
+      materialize-iceberg:
+    # Host ports are remapped into a 9800+ range so this stack can run
+    # alongside other connector tests that use the conventional defaults
+    # (e.g. materialize-clickhouse on 9000, materialize-dynamodb on 8000).
+    ports:
+      - "9800:9000" # S3 API
+      - "9801:9001" # Web console
+    environment:
+      RUSTFS_ACCESS_KEY: flow
+      RUSTFS_SECRET_KEY: flow
+      RUSTFS_VOLUMES: /data
+      RUSTFS_ADDRESS: :9000
+    healthcheck:
+      test:
+        [
+          "CMD", "sh", "-c",
+          "curl -f http://127.0.0.1:9000/health && curl -f http://127.0.0.1:9001/rustfs/console/health"
+        ]
+      interval: 500ms
+      timeout: 1s
+      retries: 2
+      start_period: 500ms
+    stop_grace_period: 1s
+
+  rustfs-init:
+    # No depends_on: curl retries every 100ms on connection failures, allowing
+    # parallel boot with rustfs. Downstream services that need the bucket
+    # (polaris, spark-daemon) gate on this container exiting 0.
+    image: rustfs/rustfs:latest
+    networks:
+      materialize-iceberg:
+    entrypoint: ["/bin/sh", "-c"]
+    # Create the warehouse bucket. Retries on connection failures (rustfs may
+    # not be listening yet) and on transient HTTP errors. The script exits
+    # non-zero if creation never succeeds, so the depends_on chain blocks
+    # downstream startup rather than letting the test silently observe a
+    # bucketless RustFS.
+    command:
+      - |
+        set -eu
+        bucket=warehouse
+        deadline=$$(( $$(date +%s) + 30 ))
+        while [ "$$(date +%s)" -lt "$$deadline" ]; do
+          # PUT returns 200 on create, or an XML 409 BucketAlreadyOwnedByYou on
+          # repeat invocations against the same RustFS instance. Either is success.
+          status=$$(curl -sS -o /dev/null -w "%{http_code}" \
+            --aws-sigv4 "aws:amz:us-east-1:s3" \
+            --user "flow:flow" \
+            -X PUT "http://rustfs:9000/$$bucket" 2>/dev/null || echo "000")
+          case "$$status" in
+            2*|409)
+              echo "$$status $$bucket"
+              exit 0
+              ;;
+            000)
+              # Connection failure (rustfs not listening yet); retry without log spam.
+              ;;
+            *)
+              echo "rustfs-init: unexpected $$status for PUT $$bucket; retrying" >&2
+              ;;
+          esac
+          sleep 0.1
+        done
+        echo "rustfs-init: failed to create bucket $$bucket within 30s" >&2
+        exit 1
+
+  spark-master:
+    image: iceberg-spark:local
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.spark
+    networks:
+      materialize-iceberg:
+    depends_on:
+      polaris-bootstrap:
+        condition: service_completed_successfully
+    ports:
+      - "9804:7077" # Cluster manager
+      - "9805:8080" # Web UI
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_MASTER_OPTS: "-Dspark.master.rest.enabled=false"
+    volumes:
+      - ./python:/opt/jobs:ro
+    command:
+      - /bin/bash
+      - -lc
+      - /opt/spark/sbin/start-master.sh -h spark-master --webui-port 8080
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080 >/dev/null || exit 1"]
+      interval: 500ms
+      timeout: 1s
+      retries: 2
+      start_period: 500ms
+    stop_grace_period: 1s
+
+  spark-worker:
+    image: iceberg-spark:local
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.spark
+    networks:
+      materialize-iceberg:
+    depends_on:
+      spark-master:
+        condition: service_healthy
+    environment:
+      SPARK_NO_DAEMONIZE: "true"
+      SPARK_WORKER_MEMORY: "2G"
+    volumes:
+      - ./python:/opt/jobs:ro
+    command:
+      - /bin/bash
+      - -lc
+      - /opt/spark/sbin/start-worker.sh spark://spark-master:7077
+    stop_grace_period: 1s
+
+  # Long-lived PySpark process holding a single SparkSession that's
+  # preconfigured with the Iceberg catalog and S3 endpoint. The connector
+  # POSTs job submissions to /run on this service instead of running a
+  # fresh spark-submit per job, eliminating ~10s of JVM startup per job.
+  spark-daemon:
+    image: iceberg-spark:local
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile.spark
+    networks:
+      materialize-iceberg:
+    depends_on:
+      spark-master:
+        condition: service_healthy
+      spark-worker:
+        condition: service_started
+      polaris-bootstrap:
+        condition: service_completed_successfully
+      rustfs-init:
+        condition: service_completed_successfully
+    ports:
+      - "9806:9806"
+    environment:
+      SPARK_DAEMON_PORT: "9806"
+      SPARK_MASTER_URL: spark://spark-master:7077
+      ICEBERG_CATALOG_URL: http://polaris:8181/api/catalog
+      ICEBERG_WAREHOUSE: quickstart_catalog
+      ICEBERG_REGION: us-east-1
+      ICEBERG_SCOPE: PRINCIPAL_ROLE:flow_user_role
+      ICEBERG_OAUTH2_SERVER_URI: http://polaris:8181/api/catalog/v1/oauth/tokens
+      ICEBERG_CREDENTIALS_PATH: /shared/polaris-creds.json
+      ICEBERG_S3_ENDPOINT: http://rustfs:9000
+      ICEBERG_S3_PATH_STYLE: "true"
+      ICEBERG_S3_ACCESS_KEY: flow
+      ICEBERG_S3_SECRET_KEY: flow
+    volumes:
+      - ./python:/opt/jobs:ro
+      - ./testdata/.local:/shared:ro
+    working_dir: /opt/jobs
+    # Run via spark-submit (rather than plain python3) so the apache/spark
+    # image's PYTHONPATH wiring resolves the `pyspark` module. The script
+    # is the driver program; SparkSession.builder.getOrCreate() inherits
+    # the master URL from the spark-submit args.
+    command:
+      - /bin/bash
+      - -lc
+      - /opt/spark/bin/spark-submit --master spark://spark-master:7077 /opt/jobs/daemon.py
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9806/health || exit 1"]
+      interval: 500ms
+      timeout: 1s
+      retries: 2
+      start_period: 500ms
+    stop_grace_period: 1s
+
+networks:
+  materialize-iceberg:

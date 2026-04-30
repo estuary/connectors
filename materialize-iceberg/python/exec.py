@@ -1,14 +1,9 @@
-from common import (
-    common_args,
-    get_spark_session,
-    run_with_status,
-)
+from __future__ import annotations
 
-args = common_args()
-spark = get_spark_session(args)
+from common import common_args, get_spark_session, run_with_status
 
 
-def run(input):
+def run(spark, input):
     query = input["query"]
 
     try:
@@ -19,4 +14,7 @@ def run(input):
         ) from e
 
 
-run_with_status(args, run)
+if __name__ == "__main__":
+    args = common_args()
+    spark = get_spark_session(args)
+    run_with_status(args, lambda inp: run(spark, inp))

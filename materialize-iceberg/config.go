@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	emr "github.com/aws/aws-sdk-go-v2/service/emrserverless"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/estuary/connectors/go/auth/iam"
 	"github.com/estuary/connectors/go/blob"
@@ -320,28 +321,73 @@ func (c catalogAuthSigV4Config) Validate() error {
 type computeType string
 
 const (
-	computeTypeEmrServerless computeType = "AWS EMR Serverless"
+	computeTypeEmrServerless   computeType = "AWS EMR Serverless"
+	computeTypeSparkStandalone computeType = "Spark Standalone"
 )
 
 type computeConfig struct {
 	ComputeType computeType `json:"compute_type"`
 
-	// There is only one option for now, but more may be added in the future.
 	emrConfig
+	sparkConfig
 }
 
 func (c computeConfig) Validate() error {
 	switch c.ComputeType {
 	case computeTypeEmrServerless:
 		return c.emrConfig.Validate()
+	case computeTypeSparkStandalone:
+		return c.sparkConfig.Validate(c.emrConfig)
 	}
 	return fmt.Errorf("invalid compute type %q", c.ComputeType)
 }
 
 func (computeConfig) JSONSchema() *jsonschema.Schema {
+	// Spark Standalone is intentionally excluded from the public schema. It is
+	// used only by docker-compose-based integration tests.
 	return schemagen.OneOfSchema("Compute", "Compute Configuration", "compute_type", string(computeTypeEmrServerless),
 		schemagen.OneOfSubSchema("AWS EMR Serverless", emrConfig{}, string(computeTypeEmrServerless)),
 	)
+}
+
+// sparkConfig is the test-only compute variant. Connector binaries do not
+// surface these fields in the published JSON schema; they are populated only
+// by the integration test harness which boots a Spark cluster via
+// docker-compose alongside Polaris and an S3-compatible store.
+//
+// All Iceberg/catalog/S3-internal configuration lives inside the spark-daemon
+// container as environment variables; the connector only needs to know how
+// to reach the daemon (DaemonURL, host-facing) and how to reach the
+// S3-compatible store from the host (S3Endpoint, S3PathStyle). The remaining
+// emrConfig fields (Bucket, BucketPath, Region, AWS keys) are reused for
+// the connector's own S3 client.
+type sparkConfig struct {
+	DaemonURL   string `json:"daemon_url,omitempty" jsonschema:"-"`
+	S3Endpoint  string `json:"s3_endpoint,omitempty" jsonschema:"-"`
+	S3PathStyle bool   `json:"s3_path_style,omitempty" jsonschema:"-"`
+}
+
+func (c sparkConfig) Validate(emr emrConfig) error {
+	var requiredProperties = [][]string{
+		{"daemon_url", c.DaemonURL},
+		{"region", emr.Region},
+		{"bucket", emr.Bucket},
+	}
+	for _, req := range requiredProperties {
+		if req[1] == "" {
+			return fmt.Errorf("missing '%s'", req[0])
+		}
+	}
+	if emr.AWSAccessKeyID == "" {
+		return errors.New("missing 'aws_access_key_id'")
+	}
+	if emr.AWSSecretAccessKey == "" {
+		return errors.New("missing 'aws_secret_access_key'")
+	}
+	if emr.BucketPath != "" && strings.HasPrefix(emr.BucketPath, "/") {
+		return fmt.Errorf("bucket path %q cannot start with /", emr.BucketPath)
+	}
+	return nil
 }
 
 type emrAuthType string
@@ -539,7 +585,22 @@ func (c config) toBucket(ctx context.Context) (blob.Bucket, error) {
 		return nil, err
 	}
 
-	return blob.NewS3Bucket(ctx, c.Compute.Bucket, awsCfg.Credentials)
+	var clientOpts []func(*s3.Options)
+	if c.Compute.S3Endpoint != "" {
+		// Test-only path: target an S3-compatible store (e.g. RustFS) at a
+		// fixed endpoint with path-style addressing. Setting Region here also
+		// short-circuits the region probe in blob.NewS3Bucket which would
+		// otherwise try to reach s3.amazonaws.com.
+		endpoint := c.Compute.S3Endpoint
+		region := c.Compute.Region
+		clientOpts = append(clientOpts, func(o *s3.Options) {
+			o.BaseEndpoint = &endpoint
+			o.UsePathStyle = c.Compute.S3PathStyle
+			o.Region = region
+		})
+	}
+
+	return blob.NewS3Bucket(ctx, c.Compute.Bucket, awsCfg.Credentials, clientOpts...)
 }
 
 func (c config) toEmrClient(ctx context.Context) (*emr.Client, error) {

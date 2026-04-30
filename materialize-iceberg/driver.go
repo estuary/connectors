@@ -7,6 +7,7 @@ import (
 	"embed"
 	"errors"
 	"fmt"
+	"net/http"
 	"path"
 	"slices"
 	"strings"
@@ -15,7 +16,6 @@ import (
 
 	"github.com/apache/iceberg-go"
 	"github.com/apache/iceberg-go/table"
-	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/estuary/connectors/go/blob"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
@@ -48,6 +48,16 @@ const (
 	statusFile = "status.json"
 )
 
+// computeRunner abstracts the execution backend that runs the materialization's
+// PySpark jobs. emrClient submits to AWS EMR Serverless for production
+// deployments; sparkClient shells out to a local Spark standalone cluster
+// running in docker-compose for integration tests.
+type computeRunner interface {
+	runJob(ctx context.Context, input any, entryPointURI, pyFilesCommonURI, jobName, workingPrefix string) error
+	checkPrereqs(ctx context.Context, errs *cerrors.PrereqErr)
+	ensureSecret(ctx context.Context, wantCred string) error
+}
+
 type Driver struct{}
 
 var _ boilerplate.Connector = &Driver{}
@@ -79,14 +89,14 @@ func (Driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.Bind
 }
 
 type materialization struct {
-	cfg           config
-	catalog       *catalog.Catalog
-	bucket        blob.Bucket
-	ssmClient     *ssm.Client
-	emrClient     *emrClient
-	templates     templates
-	pyFiles       *pyFileURIs // populated in Setup and NewTransactor
-	locationStyle LocationStyle
+	cfg                 config
+	materializationName string
+	catalog             *catalog.Catalog
+	bucket              blob.Bucket
+	compute             computeRunner
+	templates           templates
+	pyFiles             *pyFileURIs // populated in Setup and NewTransactor
+	locationStyle       LocationStyle
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, mapped] = &materialization{}
@@ -102,31 +112,23 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 		return nil, fmt.Errorf("creating bucket: %w", err)
 	}
 
-	ssmClient, err := cfg.toSsmClient(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("creating EMR client: %w", err)
-	}
-
-	emr, err := cfg.toEmrClient(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("creating EMR client: %w", err)
-	}
-
 	catalogAuth, err := cfg.CatalogAuthConfig()
 	if err != nil {
 		return nil, err
 	}
 
-	locationStyle := FlatLocationStyle
-	if featureFlags["nested_dot_hash_location_style"] {
-		locationStyle = NestedDotHashLocationStyle
-	}
-
-	return &materialization{
-		cfg:     cfg,
-		catalog: catalog,
-		bucket:  bucket,
-		emrClient: &emrClient{
+	var compute computeRunner
+	switch cfg.Compute.ComputeType {
+	case computeTypeEmrServerless:
+		ssmClient, err := cfg.toSsmClient(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("creating SSM client: %w", err)
+		}
+		emr, err := cfg.toEmrClient(ctx)
+		if err != nil {
+			return nil, fmt.Errorf("creating EMR client: %w", err)
+		}
+		compute = &emrClient{
 			cfg:                 cfg.Compute.emrConfig,
 			catalogAuth:         *catalogAuth,
 			catalogURL:          cfg.URL,
@@ -136,10 +138,31 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 			bucket:              bucket,
 			ssmClient:           ssmClient,
 			tokenURL:            catalog.TokenURL(),
-		},
-		ssmClient:     ssmClient,
-		templates:     parseTemplates(),
-		locationStyle: locationStyle,
+		}
+	case computeTypeSparkStandalone:
+		compute = &sparkClient{
+			cfg: cfg.Compute.sparkConfig,
+			// No timeout: spark jobs can run for tens of seconds and the
+			// caller's context already carries the cancellation signal.
+			httpClient: &http.Client{},
+		}
+	default:
+		return nil, fmt.Errorf("unsupported compute type %q", cfg.Compute.ComputeType)
+	}
+
+	locationStyle := FlatLocationStyle
+	if featureFlags["nested_dot_hash_location_style"] {
+		locationStyle = NestedDotHashLocationStyle
+	}
+
+	return &materialization{
+		cfg:                 cfg,
+		materializationName: materializationName,
+		catalog:             catalog,
+		bucket:              bucket,
+		compute:             compute,
+		templates:           parseTemplates(),
+		locationStyle:       locationStyle,
 	}, nil
 }
 
@@ -243,7 +266,7 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
 	errs := &cerrors.PrereqErr{}
 
-	d.emrClient.checkPrereqs(ctx, errs)
+	d.compute.checkPrereqs(ctx, errs)
 
 	if err := d.bucket.CheckPermissions(ctx, blob.CheckPermissionsConfig{
 		Prefix: d.cfg.Compute.BucketPath,
@@ -307,7 +330,7 @@ func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema)
 	}
 
 	if catalogAuth.AuthType == catalogAuthTypeClientCredential {
-		if err := d.emrClient.ensureSecret(ctx, catalogAuth.Credential); err != nil {
+		if err := d.compute.ensureSecret(ctx, catalogAuth.Credential); err != nil {
 			return "", err
 		}
 	}
@@ -476,7 +499,7 @@ func (d *materialization) UpdateResource(
 				return err
 			}
 
-			outputPrefix := path.Join(d.emrClient.cfg.BucketPath, uuid.NewString())
+			outputPrefix := path.Join(d.cfg.Compute.BucketPath, uuid.NewString())
 			defer func() {
 				if err := cleanPrefixOnceFn(ctx, d.bucket, outputPrefix)(); err != nil {
 					log.WithError(err).Warn("failed to clean up status file after running a column migration job")
@@ -489,12 +512,12 @@ func (d *materialization) UpdateResource(
 			})
 			ll.Info("running column migration job")
 			ts := time.Now()
-			if err := d.emrClient.runJob(
+			if err := d.compute.runJob(
 				ctx,
 				python.ExecInput{Query: q.String()},
 				d.pyFiles.exec,
 				d.pyFiles.common,
-				fmt.Sprintf("column migration for: %s", d.emrClient.materializationName),
+				fmt.Sprintf("column migration for: %s", d.materializationName),
 				outputPrefix,
 			); err != nil {
 				return fmt.Errorf("failed to run column migration job: %w", err)
@@ -534,15 +557,15 @@ func (d *materialization) NewTransactor(
 	}
 
 	t := &transactor{
-		materializationName: d.emrClient.materializationName,
+		materializationName: d.materializationName,
 		be:                  be,
 		cfg:                 d.cfg,
 		bucket:              d.bucket,
-		emrClient:           d.emrClient,
+		compute:             d.compute,
 		templates:           d.templates,
 		bindings:            make([]binding, 0, len(mappedBindings)),
-		loadFiles:           boilerplate.NewStagedFiles(stagedFileClient{}, d.bucket, fileSizeLimit, d.cfg.Compute.emrConfig.BucketPath, false, false),
-		storeFiles:          boilerplate.NewStagedFiles(stagedFileClient{}, d.bucket, fileSizeLimit, d.cfg.Compute.emrConfig.BucketPath, true, true),
+		loadFiles:           boilerplate.NewStagedFiles(stagedFileClient{}, d.bucket, fileSizeLimit, d.cfg.Compute.BucketPath, false, false),
+		storeFiles:          boilerplate.NewStagedFiles(stagedFileClient{}, d.bucket, fileSizeLimit, d.cfg.Compute.BucketPath, true, true),
 		pyFiles:             *pyFiles,
 	}
 
@@ -609,6 +632,20 @@ type pyFileURIs struct {
 // this is not expected to happen very often so the number of excessive files
 // should be minimal.
 func (d *materialization) putPyFiles(ctx context.Context) (*pyFileURIs, error) {
+	if d.cfg.Compute.ComputeType == computeTypeSparkStandalone {
+		// In Spark Standalone mode the compose stack bind-mounts the python/
+		// directory of this package into the master and worker containers, so
+		// the scripts are already present at known local:// paths.
+		out := pyFileURIs{
+			common: "local:///opt/jobs/common.py",
+			exec:   "local:///opt/jobs/exec.py",
+			load:   "local:///opt/jobs/load.py",
+			merge:  "local:///opt/jobs/merge.py",
+		}
+		d.pyFiles = &out
+		return d.pyFiles, nil
+	}
+
 	var out pyFileURIs
 
 	pyFiles := []struct {

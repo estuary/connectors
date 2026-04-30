@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from common import (
     NestedField,
     common_args,
@@ -6,11 +8,8 @@ from common import (
     run_with_status,
 )
 
-args = common_args()
-spark = get_spark_session(args)
 
-
-def run(input):
+def run(spark, input):
     query = input["query"]
     bindings = input["bindings"]
     output_location = input["output_location"]
@@ -29,8 +28,8 @@ def run(input):
         mode="error",
         header=False,
         compression="gzip",
-        sep="\u0000",
-        quote="\u0000",
+        sep=chr(0),
+        quote=chr(0),
     )
 
     for binding in bindings:
@@ -38,4 +37,7 @@ def run(input):
         spark.catalog.dropTempView(f"load_view_{bindingIdx}")
 
 
-run_with_status(args, run)
+if __name__ == "__main__":
+    args = common_args()
+    spark = get_spark_session(args)
+    run_with_status(args, lambda inp: run(spark, inp))
