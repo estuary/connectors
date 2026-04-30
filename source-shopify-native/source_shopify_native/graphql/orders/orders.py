@@ -15,6 +15,7 @@ class Orders(ShopifyGraphQLResource):
     QUERY = """
     app {
         id
+        name
     }
     billingAddress {
         id
@@ -146,7 +147,25 @@ class Orders(ShopifyGraphQLResource):
                 index
                 targetSelection
                 targetType
-                value
+                value {
+                    __typename
+                    ... on MoneyV2 {
+                        amount
+                        currencyCode
+                    }
+                    ... on PricingPercentageValue {
+                        percentage
+                    }
+                }
+                ... on AutomaticDiscountApplication {
+                    title
+                }
+                ... on ManualDiscountApplication {
+                    title
+                }
+                ... on ScriptDiscountApplication {
+                    title
+                }
             }
         }
     }
