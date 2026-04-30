@@ -26,6 +26,7 @@ import (
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
 	"github.com/google/uuid"
+	"github.com/invopop/jsonschema"
 	iso8601 "github.com/senseyeio/duration"
 )
 
@@ -47,20 +48,37 @@ const (
 	catalogTypeRest catalogType = "Iceberg REST Server"
 )
 
-// There is an equivalent pydantic model in iceberg-ctl, and the config schema is generated from
-// that. The fields of this struct must be compatible with that model.
+// Field ordering preserves the layout of the prior pydantic-generated schema
+// (legacy aws_* keys first, bucket/prefix/region/namespace next) so existing
+// users do not see fields rearranged on next view.
+//
+// TODO: AWSAccessKeyID, AWSSecretAccessKey, and advancedConfig.FeatureFlags are
+// *string so the generated schema emits "type": ["string", "null"] for
+// backwards-compatibility with any prod config that stores literal null in
+// these fields. Convert back to plain `string` + `omitempty` (the convention
+// used by materialize-bigquery / materialize-snowflake / etc.) once we are
+// confident no live config depends on the union-with-null shape, and remove
+// the deref sites in Validate / s3StoreConfig / FeatureFlags / catalog.go.
 type config struct {
-	Bucket             string                      `json:"bucket"`
-	AWSAccessKeyID     string                      `json:"aws_access_key_id,omitempty"`
-	AWSSecretAccessKey string                      `json:"aws_secret_access_key,omitempty"`
-	Credentials        *filesink.CredentialsConfig `json:"credentials,omitempty"`
-	Namespace          string                      `json:"namespace"`
-	Region             string                      `json:"region"`
-	UploadInterval     string                      `json:"upload_interval"`
-	Prefix             string                      `json:"prefix,omitempty"`
-	S3Endpoint         string                      `json:"s3_endpoint,omitempty"`
-	Catalog            catalogConfig               `json:"catalog"`
-	Advanced           advancedConfig              `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+	AWSAccessKeyID     *string                     `json:"aws_access_key_id,omitempty" jsonschema:"title=AWS Access Key ID,description=Access Key ID for accessing AWS services (legacy).,nullable" jsonschema_extras:"order=0,x-hidden-field=true"`
+	AWSSecretAccessKey *string                     `json:"aws_secret_access_key,omitempty" jsonschema:"title=AWS Secret Access Key,description=Secret Access Key for accessing AWS services (legacy).,nullable" jsonschema_extras:"order=1,secret=true,x-hidden-field=true"`
+	Credentials        *filesink.CredentialsConfig `json:"credentials,omitempty" jsonschema:"title=Authentication" jsonschema_extras:"order=2,x-iam-auth=true"`
+	Bucket             string                      `json:"bucket" jsonschema:"title=Bucket,description=The S3 bucket to write data files to." jsonschema_extras:"order=3"`
+	Prefix             string                      `json:"prefix,omitempty" jsonschema:"title=Prefix,description=Optional prefix that will be used to store objects." jsonschema_extras:"order=4"`
+	Region             string                      `json:"region" jsonschema:"title=Region,description=AWS region." jsonschema_extras:"order=5"`
+	Namespace          string                      `json:"namespace" jsonschema:"title=Namespace,description=Namespace for bound collection tables (unless overridden within the binding resource configuration)." jsonschema_extras:"order=6,pattern=^[^.]*$"`
+	UploadInterval     string                      `json:"upload_interval" jsonschema:"title=Upload Interval,description=Frequency at which files will be uploaded. Must be a valid ISO8601 duration string no greater than 4 hours.,default=PT5M" jsonschema_extras:"order=7"`
+	S3Endpoint         string                      `json:"s3_endpoint,omitempty" jsonschema:"title=S3 Endpoint,description=Custom S3 endpoint URL. The default AWS S3 endpoint for the specified region is used if not provided." jsonschema_extras:"order=8"`
+	Catalog            catalogConfig               `json:"catalog" jsonschema:"title=Catalog" jsonschema_extras:"order=9"`
+	Advanced           advancedConfig              `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true,order=10"`
+}
+
+// strVal dereferences an optional string config field, returning "" when nil.
+func strVal(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }
 
 type catalogConfig struct {
@@ -77,8 +95,35 @@ type catalogConfig struct {
 	Scope      string `json:"scope,omitempty"`
 }
 
+// restCatalogProps and glueCatalogProps drive ONLY schema generation via
+// catalogConfig.JSONSchema. JSON-decoded REST/Glue config values land in
+// catalogConfig (above), so the optional *string fields here only affect the
+// emitted JSON Schema (they preserve the prior ["string","null"] type union).
+// See the TODO on `config` above.
+type restCatalogProps struct {
+	URI        string  `json:"uri" jsonschema:"title=URI,description=URI identifying the REST catalog. Format: 'https://yourserver.com/catalog'." jsonschema_extras:"order=1"`
+	Credential *string `json:"credential,omitempty" jsonschema:"title=Credential,description=Credential for connecting to the catalog.,nullable" jsonschema_extras:"order=2,secret=true"`
+	Token      *string `json:"token,omitempty" jsonschema:"title=Token,description=Token for connecting to the catalog.,nullable" jsonschema_extras:"order=3,secret=true"`
+	Warehouse  string  `json:"warehouse" jsonschema:"title=Warehouse,description=Warehouse to connect to." jsonschema_extras:"order=4"`
+	Scope      *string `json:"scope,omitempty" jsonschema:"title=Scope,description=Desired scope of the requested security token.,nullable" jsonschema_extras:"order=5"`
+}
+
+type glueCatalogProps struct {
+	GlueID *string `json:"glue_id,omitempty" jsonschema:"title=Glue Catalog ID,description=Glue Catalog ID to use. Defaults to the account ID of the configured credentials when not set.,nullable" jsonschema_extras:"order=1"`
+}
+
+// JSONSchema returns the catalog discriminator schema. Struct tags on
+// catalogConfig itself are NOT consulted — the schema is built entirely from
+// restCatalogProps and glueCatalogProps via OneOfSchema.
+func (catalogConfig) JSONSchema() *jsonschema.Schema {
+	return schemagen.OneOfSchema("Catalog", "", "catalog_type", string(catalogTypeRest),
+		schemagen.OneOfSubSchema("REST", restCatalogProps{}, string(catalogTypeRest)),
+		schemagen.OneOfSubSchema("AWS Glue", glueCatalogProps{}, string(catalogTypeGlue)),
+	)
+}
+
 type advancedConfig struct {
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags *string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.,nullable"`
 }
 
 func (c config) s3StoreConfig() filesink.S3StoreConfig {
@@ -94,8 +139,8 @@ func (c config) s3StoreConfig() filesink.S3StoreConfig {
 	if c.Credentials != nil {
 		cfg.Credentials = c.Credentials
 	} else {
-		cfg.AWSAccessKeyID = c.AWSAccessKeyID
-		cfg.AWSSecretAccessKey = c.AWSSecretAccessKey
+		cfg.AWSAccessKeyID = strVal(c.AWSAccessKeyID)
+		cfg.AWSSecretAccessKey = strVal(c.AWSSecretAccessKey)
 	}
 
 	return cfg
@@ -114,7 +159,9 @@ func (c config) Validate() error {
 		}
 	}
 
-	hasLegacy := c.AWSAccessKeyID != "" || c.AWSSecretAccessKey != ""
+	legacyAccessKey := strVal(c.AWSAccessKeyID)
+	legacySecretKey := strVal(c.AWSSecretAccessKey)
+	hasLegacy := legacyAccessKey != "" || legacySecretKey != ""
 	hasNew := c.Credentials != nil
 
 	if hasLegacy && hasNew {
@@ -122,10 +169,10 @@ func (c config) Validate() error {
 	} else if !hasLegacy && !hasNew {
 		return fmt.Errorf("must provide either credentials or aws_access_key_id/aws_secret_access_key")
 	} else if hasLegacy {
-		if c.AWSAccessKeyID == "" {
+		if legacyAccessKey == "" {
 			return fmt.Errorf("missing 'aws_access_key_id'")
 		}
-		if c.AWSSecretAccessKey == "" {
+		if legacySecretKey == "" {
 			return fmt.Errorf("missing 'aws_secret_access_key'")
 		}
 	} else if err := c.Credentials.Validate(); err != nil {
@@ -168,7 +215,7 @@ func (c config) DefaultNamespace() string {
 }
 
 func (c config) FeatureFlags() (string, map[string]bool) {
-	return c.Advanced.FeatureFlags, featureFlagDefaults
+	return strVal(c.Advanced.FeatureFlags), featureFlagDefaults
 }
 
 func parse8601(in string) (time.Duration, error) {
@@ -236,7 +283,7 @@ type driver struct{}
 var _ boilerplate.Connector = &driver{}
 
 func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
-	endpointSchema, err := runIcebergctl(ctx, nil, "print-config-schema")
+	endpointSchema, err := schemagen.GenerateSchema("EndpointConfig", &config{}).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
@@ -279,7 +326,10 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 		locationStyle = NestedDotHashLocationStyle
 	}
 
-	catalog := newCatalog(cfg, locationStyle)
+	catalog, err := newCatalog(ctx, cfg, locationStyle)
+	if err != nil {
+		return nil, fmt.Errorf("creating iceberg catalog: %w", err)
+	}
 
 	return &materialization{
 		cfg:     cfg,
@@ -509,27 +559,12 @@ func (d *materialization) CleanupTestTask(ctx context.Context, taskName string) 
 }
 
 func (d *materialization) SnapshotTestResource(ctx context.Context, path []string) ([]string, [][]any, error) {
-	namespace := path[0]
-	table := path[1]
-
-	// Use iceberg-ctl's table-paths to find the data location.
-	fqn := namespace + "." + table
-	tableNamesJson, err := json.Marshal([]string{fqn})
+	tablePaths, err := d.catalog.tablePaths(ctx, [][]string{path})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, fmt.Errorf("getting table path for %s.%s: %w", path[0], path[1], err)
 	}
 
-	b, err := runIcebergctl(ctx, &d.cfg, "table-paths", string(tableNamesJson))
-	if err != nil {
-		return nil, nil, fmt.Errorf("getting table path for %s: %w", fqn, err)
-	}
-
-	fqnToPath := make(map[string]string)
-	if err := json.Unmarshal(b, &fqnToPath); err != nil {
-		return nil, nil, fmt.Errorf("parsing table paths: %w", err)
-	}
-
-	tableLocation := fqnToPath[fqn]
+	tableLocation := tablePaths[0]
 	if tableLocation == "" {
 		return nil, nil, nil
 	}

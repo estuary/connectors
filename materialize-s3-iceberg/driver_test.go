@@ -7,7 +7,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -31,23 +30,6 @@ const (
 	polarisClientID      = "root"
 	polarisClientSecret  = "s3cr3t"
 )
-
-// TestMain resolves PYTHON_PATH from the iceberg-ctl Poetry venv if it isn't
-// already set, so `go test` works without extra env wrangling. The Docker
-// image sets PYTHON_PATH explicitly; this is just for local runs.
-func TestMain(m *testing.M) {
-	if _, ok := os.LookupEnv("PYTHON_PATH"); !ok {
-		cmd := exec.Command("poetry", "env", "info", "--path")
-		cmd.Dir = "iceberg-ctl"
-		if out, err := cmd.Output(); err == nil {
-			venv := strings.TrimSpace(string(out))
-			if venv != "" {
-				os.Setenv("PYTHON_PATH", venv+"/bin/python")
-			}
-		}
-	}
-	os.Exit(m.Run())
-}
 
 func TestSpec(t *testing.T) {
 	if testing.Short() {
@@ -136,7 +118,7 @@ func createTestBucket(t *testing.T, cfg config) {
 	ctx := context.Background()
 	client := s3.New(s3.Options{
 		Region:       cfg.Region,
-		Credentials:  credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, ""),
+		Credentials:  credentials.NewStaticCredentialsProvider(strVal(cfg.AWSAccessKeyID), strVal(cfg.AWSSecretAccessKey), ""),
 		BaseEndpoint: aws.String(cfg.S3Endpoint),
 		UsePathStyle: true,
 	})

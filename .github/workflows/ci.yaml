@@ -305,12 +305,6 @@ jobs:
         with:
           version: v1.3.1
 
-      - name: Install iceberg-ctl Python dependencies
-        if: matrix.connector == 'materialize-s3-iceberg'
-        run: |
-          pip install --break-system-packages poetry
-          cd materialize-s3-iceberg/iceberg-ctl && poetry config virtualenvs.in-project true && poetry install
-
       - name: Install system dependencies for Rust connectors
         if: matrix.connector == 'materialize-kafka'
         run: |
@@ -343,9 +337,6 @@ jobs:
             ]'), matrix.connector)
 
         run: |
-          if [ "${{ matrix.connector }}" = "materialize-s3-iceberg" ]; then
-            export PYTHON_PATH=$(pwd)/materialize-s3-iceberg/iceberg-ctl/.venv/bin/python
-          fi
           CONNECTOR=${{ matrix.connector }} VERSION=local tests/materialize/run.sh;
 
       - name: Push ${{ matrix.connector }} image(s) with commit SHA tag
