@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/apache/iceberg-go"
@@ -309,9 +310,13 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 			return fmt.Errorf("marshaling name mapping: %w", err)
 		}
 		props := iceberg.Properties{
-			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
+			icebergtable.DefaultNameMappingKey:               string(nameMappingJSON),
+			icebergtable.MetadataCompressionKey:              icebergtable.MetadataCompressionCodecGzip,
+			icebergtable.MetadataDeleteAfterCommitEnabledKey: "true",
+			icebergtable.MetadataPreviousVersionsMaxKey:      "10",
+			"history.expire.min-snapshots-to-keep":           "1",
+			"history.expire.max-snapshot-age-ms":             strconv.Itoa(int((24 * time.Hour).Milliseconds())),
 		}
-		// TODO properties to support https://github.com/estuary/connectors/issues/3984
 
 		if _, err := c.cat.CreateTable(ctx, b.ResourcePath, schema,
 			icebergcatalog.WithLocation(location),
