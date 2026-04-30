@@ -1124,9 +1124,9 @@
         "store": "estuary-alex-testing",
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
-      "canDeactivate": false,
+      "canDeactivate": true,
       "createdAt": "2025-01-14T15:10:14Z",
-      "deactivationAlert": "Can't unstock from this location because it has committed inventory.",
+      "deactivationAlert": null,
       "id": "gid://shopify/InventoryLevel/108219858989?inventory_item_id=45258934976557",
       "item": {
         "id": "gid://shopify/InventoryItem/45258934976557",
