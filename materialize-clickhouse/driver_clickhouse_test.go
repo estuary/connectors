@@ -20,7 +20,7 @@ import (
 
 func testConfig() config {
 	return config{
-		Address: "localhost:9000",
+		Address: "localhost:9900",
 		Credentials: credentialConfig{
 			AuthType:         UserPass,
 			usernamePassword: usernamePassword{Username: "flow", Password: "flow"},

@@ -130,6 +130,67 @@ func (c *client) DeleteTable(_ context.Context, path []string) (string, boilerpl
 	}, nil
 }
 
+var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
+
+	// Step 0: Add new columns using temporary names.
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		d := struct {
+			Table        sql.Table
+			Instructions []sql.MigrationInstruction
+		}{
+			Table:        table,
+			Instructions: instructions,
+		}
+
+		var alterStmt strings.Builder
+		if err := renderTemplates(dialect, false).alterTargetMigrateAddColumn.Execute(&alterStmt, d); err != nil {
+			return nil, fmt.Errorf("executing alter target migrate add column: %w", err)
+		}
+		stmts := make([]string, 0, len(instructions))
+		for _, s := range strings.Split(alterStmt.String(), ";") {
+			if s = strings.TrimSpace(s); s != "" {
+				stmts = append(stmts, s+";")
+			}
+		}
+		return stmts, nil
+	},
+
+	// Step 1: Populate the temporary columns
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		d := struct {
+			Table        sql.Table
+			Instructions []sql.MigrationInstruction
+		}{
+			Table:        table,
+			Instructions: instructions,
+		}
+
+		var alterStmt strings.Builder
+		if err := renderTemplates(dialect, false).alterTargetMigratePopulateColumn.Execute(&alterStmt, d); err != nil {
+			return nil, fmt.Errorf("executing alter target migrate populate column: %w", err)
+		}
+		stmts := make([]string, 0, len(instructions))
+		for _, s := range strings.Split(alterStmt.String(), ";") {
+			if s = strings.TrimSpace(s); s != "" {
+				stmts = append(stmts, s+";")
+			}
+		}
+		return stmts, nil
+	},
+
+	// Step 2: Drop the old columns
+	sql.StdMigrationSteps[2],
+
+	// Step 3: Rename the temporary columns
+	sql.StdMigrationSteps[3],
+
+	// Step 4: No-op. ClickHouse non-nullable columns are not required, so the
+	// new columns' ultimate nullability was set in step 0.
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		return nil, nil
+	},
+}
+
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var stmts []string
 
@@ -140,7 +201,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 		var alterStmt = alterStmtBuilder.String()
 		// The template generates separate ALTER statements per column.
-		for _, s := range strings.Split(alterStmt, ";") {
+		for _, s := range strings.Split(alterStmt, ";\n") {
 			s = strings.TrimSpace(s)
 			if s != "" {
 				stmts = append(stmts, s+";")
@@ -149,7 +210,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		var steps, err = sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges)
+		var steps, err = sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, clickHouseMigrationSteps...)
 		if err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		}

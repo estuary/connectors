@@ -199,6 +199,15 @@ func mapSignedIntegers() sql.MapProjectionFn {
 	}
 }
 
+// datetimeToStringCast formats a DateTime64 column as an RFC3339 string during
+// type migration, preserving the exact timestamp representation that Flow expects.
+var datetimeToStringCast = func(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(
+		"concat(formatDateTime(%s, '%%Y-%%m-%%dT%%H:%%i:%%S.%%f', 'UTC'), 'Z')",
+		migration.Identifier,
+	)
+}
+
 var clickHouseDialect = func(database string) sql.Dialect {
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
@@ -251,23 +260,35 @@ var clickHouseDialect = func(database string) sql.Dialect {
 		Placeholderer:       sql.PlaceholderFn(func(index int) string { return "?" }),
 		TypeMapper:          mapper,
 		MaxColumnCharLength: 256,
+		MigratableTypes: sql.MigrationSpecs{
+			"int64":                {sql.NewMigrationSpec([]string{"float64", "int128", "int256", "string"})},
+			"int128":               {sql.NewMigrationSpec([]string{"float64", "int256", "string"})},
+			"int256":               {sql.NewMigrationSpec([]string{"float64", "string"})},
+			"float64":              {sql.NewMigrationSpec([]string{"string"})},
+			"bool":                 {sql.NewMigrationSpec([]string{"string"})},
+			"date32":               {sql.NewMigrationSpec([]string{"string"})},
+			"datetime64(6, 'utc')": {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
+			"*":                    {sql.NewMigrationSpec([]string{"string"})},
+		},
 	}
 }
 
 type templates struct {
-	createTargetTable            *template.Template
-	alterTargetColumns           *template.Template
-	createLoadTable              *template.Template
-	insertLoadTable              *template.Template
-	queryLoadTable               *template.Template
-	queryLoadTableNoFlowDocument *template.Template
-	dropLoadTable                *template.Template
-	createStoreTable             *template.Template
-	insertStoreTable             *template.Template
-	queryStoreParts              *template.Template
-	moveStorePartition           *template.Template
-	existsStoreTable             *template.Template
-	dropStoreTable               *template.Template
+	createTargetTable                *template.Template
+	alterTargetColumns               *template.Template
+	alterTargetMigrateAddColumn      *template.Template
+	alterTargetMigratePopulateColumn *template.Template
+	createLoadTable                  *template.Template
+	insertLoadTable                  *template.Template
+	queryLoadTable                   *template.Template
+	queryLoadTableNoFlowDocument     *template.Template
+	dropLoadTable                    *template.Template
+	createStoreTable                 *template.Template
+	insertStoreTable                 *template.Template
+	queryStoreParts                  *template.Template
+	moveStorePartition               *template.Template
+	existsStoreTable                 *template.Template
+	dropStoreTable                   *template.Template
 }
 
 func renderTemplates(dialect sql.Dialect, hardDelete bool) templates {
@@ -352,6 +373,31 @@ ALTER TABLE {{$.Identifier}} ADD COLUMN {{$col.Identifier}} {{$col.DDL}};
 {{ end -}}
 {{- range $ind, $col := $.DropNotNulls }}
 ALTER TABLE {{$.Identifier}} MODIFY COLUMN {{ ColumnIdentifier $col.Name }} Nullable({{$col.Type}});
+{{ end -}}
+{{ end }}
+
+-- ClickHouse columns are not nullable unless declared Nullable().
+-- This means that missing values are 0 (numeric), "" (string), etc,
+-- but does not mean the column is "required" as with other DBMS.
+
+{{ define "alterTargetMigrateAddColumn" }}
+{{- range $ins := $.Instructions }}
+ALTER TABLE {{$.Table.Identifier}}
+ADD COLUMN {{ $ins.TempColumnIdentifier }} {{ $ins.TypeMigration.DDL }};
+{{ end -}}
+{{ end }}
+
+-- ClickHouse has a special syntax for this operation, which normally
+-- runs as a background process like merges. The mutations_sync=1
+-- setting causes statement execution to block until the process is
+-- complete. The WHERE true clause is required syntax.
+
+{{ define "alterTargetMigratePopulateColumn" }}
+{{- range $ins := $.Instructions }}
+ALTER TABLE {{$.Table.Identifier}}
+UPDATE {{ $ins.TempColumnIdentifier }} = if({{ $ins.TypeMigration.Identifier }} IS NULL, NULL, {{ call $ins.TypeMigration.CastSQL $ins.TypeMigration }})
+WHERE true
+SETTINGS mutations_sync = 1;
 {{ end -}}
 {{ end }}
 
@@ -530,19 +576,21 @@ DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
 `)
 
 	return templates{
-		createTargetTable:            tplAll.Lookup("createTargetTable"),
-		alterTargetColumns:           tplAll.Lookup("alterTargetColumns"),
-		createLoadTable:              tplAll.Lookup("createLoadTable"),
-		insertLoadTable:              tplAll.Lookup("insertLoadTable"),
-		queryLoadTable:               tplAll.Lookup("queryLoadTable"),
-		queryLoadTableNoFlowDocument: tplAll.Lookup("queryLoadTableNoFlowDocument"),
-		dropLoadTable:                tplAll.Lookup("dropLoadTable"),
-		createStoreTable:             tplAll.Lookup("createStoreTable"),
-		insertStoreTable:             tplAll.Lookup("insertStoreTable"),
-		queryStoreParts:              tplAll.Lookup("queryStoreParts"),
-		moveStorePartition:           tplAll.Lookup("moveStorePartition"),
-		existsStoreTable:             tplAll.Lookup("existsStoreTable"),
-		dropStoreTable:               tplAll.Lookup("dropStoreTable"),
+		createTargetTable:                tplAll.Lookup("createTargetTable"),
+		alterTargetColumns:               tplAll.Lookup("alterTargetColumns"),
+		alterTargetMigrateAddColumn:      tplAll.Lookup("alterTargetMigrateAddColumn"),
+		alterTargetMigratePopulateColumn: tplAll.Lookup("alterTargetMigratePopulateColumn"),
+		createLoadTable:                  tplAll.Lookup("createLoadTable"),
+		insertLoadTable:                  tplAll.Lookup("insertLoadTable"),
+		queryLoadTable:                   tplAll.Lookup("queryLoadTable"),
+		queryLoadTableNoFlowDocument:     tplAll.Lookup("queryLoadTableNoFlowDocument"),
+		dropLoadTable:                    tplAll.Lookup("dropLoadTable"),
+		createStoreTable:                 tplAll.Lookup("createStoreTable"),
+		insertStoreTable:                 tplAll.Lookup("insertStoreTable"),
+		queryStoreParts:                  tplAll.Lookup("queryStoreParts"),
+		moveStorePartition:               tplAll.Lookup("moveStorePartition"),
+		existsStoreTable:                 tplAll.Lookup("existsStoreTable"),
+		dropStoreTable:                   tplAll.Lookup("dropStoreTable"),
 	}
 }
 
