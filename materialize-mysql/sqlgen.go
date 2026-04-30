@@ -402,12 +402,15 @@ ALTER TABLE {{$.Identifier}}
 -- work on SingleStore: the LOAD DATA SET clause that would decode @v_i runs
 -- after the row's NOT NULL constraint is enforced, which fails because the
 -- binary column is part of the primary key.
+--
+-- The VARCHAR(256) sizing matches the prior text-based key limit, before the
+-- native_binary_column_type feature flag was introduced.
 
 {{ define "createLoadTable" }}
 CREATE TEMPORARY TABLE {{ template "temp_load_name" . }} (
 	{{- range $ind, $key := $.Keys }}
 		{{- if $ind }},{{ end }}
-		{{ $key.Identifier }} {{ if IsBinary $key }}VARCHAR(384) NOT NULL{{ else }}{{ $key.DDL }}{{ end }}
+		{{ $key.Identifier }} {{ if IsBinary $key }}VARCHAR(256) NOT NULL{{ else }}{{ $key.DDL }}{{ end }}
 	{{- end }}
 	,
 		PRIMARY KEY (
@@ -531,7 +534,7 @@ SET
 CREATE TEMPORARY TABLE {{ template "temp_update_name" . }} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{$col.Identifier}} {{ if IsBinary $col }}{{ if $col.IsPrimaryKey }}VARCHAR(384) NOT NULL{{ else }}LONGTEXT{{ end }}{{ else }}{{$col.DDL}}{{ end }}
+		{{$col.Identifier}} {{ if IsBinary $col }}{{ if $col.IsPrimaryKey }}VARCHAR(256) NOT NULL{{ else }}LONGTEXT{{ end }}{{ else }}{{$col.DDL}}{{ end }}
 	{{- end }}
 	,
 	PRIMARY KEY (
@@ -584,7 +587,7 @@ FROM {{ template "temp_update_name" . }};
 CREATE TEMPORARY TABLE {{ template "temp_delete_name" . }} (
 	{{- range $ind, $col := $.Keys }}
 		{{- if $ind }},{{ end }}
-		{{$col.Identifier}} {{ if IsBinary $col }}VARCHAR(384) NOT NULL{{ else }}{{$col.DDL}}{{ end }}
+		{{$col.Identifier}} {{ if IsBinary $col }}VARCHAR(256) NOT NULL{{ else }}{{$col.DDL}}{{ end }}
 	{{- end }}
 	,
 	PRIMARY KEY (

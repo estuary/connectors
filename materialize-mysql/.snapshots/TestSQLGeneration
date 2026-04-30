@@ -52,7 +52,7 @@ auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
 CREATE TEMPORARY TABLE flow_temp_load_table_0 (
 		key1 BIGINT NOT NULL,
 		key2 BOOLEAN NOT NULL,
-		`key!binary` VARCHAR(384) NOT NULL
+		`key!binary` VARCHAR(256) NOT NULL
 	,
 		PRIMARY KEY (key1, key2, `key!binary`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
@@ -72,7 +72,7 @@ CREATE TEMPORARY TABLE flow_temp_load_table_1 (
 CREATE TEMPORARY TABLE flow_temp_update_table_0 (
 		key1 BIGINT NOT NULL,
 		key2 BOOLEAN NOT NULL,
-		`key!binary` VARCHAR(384) NOT NULL,
+		`key!binary` VARCHAR(256) NOT NULL,
 		`array` JSON,
 		`binary` LONGTEXT,
 		`boolean` BOOLEAN,

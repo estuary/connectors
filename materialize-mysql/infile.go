@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/go-sql-driver/mysql"
 )
@@ -111,26 +112,17 @@ func writeInfileField(buf *bytes.Buffer, v any) error {
 	}
 }
 
-// writeEscapedField writes a string field, escaping characters that the
-// LOAD DATA parser would otherwise interpret as separators or NULL markers.
+// infileFieldReplacer escapes characters that the LOAD DATA parser would
+// otherwise interpret as separators or NULL markers.
+var infileFieldReplacer = strings.NewReplacer(
+	`\`, `\\`,
+	"\n", `\n`,
+	"\r", `\r`,
+	"\t", `\t`,
+	"\x00", `\0`,
+	",", `\,`,
+)
+
 func writeEscapedField(buf *bytes.Buffer, s string) {
-	for j := 0; j < len(s); j++ {
-		c := s[j]
-		switch c {
-		case '\\':
-			buf.WriteString(`\\`)
-		case '\n':
-			buf.WriteString(`\n`)
-		case '\r':
-			buf.WriteString(`\r`)
-		case '\t':
-			buf.WriteString(`\t`)
-		case 0:
-			buf.WriteString(`\0`)
-		case ',':
-			buf.WriteString(`\,`)
-		default:
-			buf.WriteByte(c)
-		}
-	}
+	infileFieldReplacer.WriteString(buf, s)
 }

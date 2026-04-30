@@ -207,7 +207,7 @@ func varbyteToStringCast(migration sql.ColumnTypeMigration) string {
 // VARBYTE bytes. Used when the native_binary_column_type feature flag is
 // enabled on a task that previously stored binary fields as base64 text.
 func stringToVarbyteCast(migration sql.ColumnTypeMigration) string {
-	return fmt.Sprintf(`FROM_BASE64(%s)`, migration.Identifier)
+	return fmt.Sprintf(`TO_VARBYTE(%s, 'base64')`, migration.Identifier)
 }
 
 // varbyteToSuperCast converts a VARBYTE column into a SUPER value containing
