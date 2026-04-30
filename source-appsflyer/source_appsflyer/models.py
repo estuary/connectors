@@ -117,22 +117,23 @@ class AppsFlyerWebhookDocument(WebhookDocument):
     event_name: str
     event_time: str
     event_type: str
-
+    
     @model_validator(mode="before")
     def ensure_pk_fields_present(cls, data: dict[str, str]):
         assert isinstance(data, dict)
 
         required = list(cls.required_pk_fields)
-        # Event values have been observed in all Android streams but only a
-        # handful of iOS ones (AppsFlyer prefixes iOS unified app IDs with
-        # "id"). We tolerate their absence only when the app_id signals iOS
-        # AND the stream isn't one of the few that always carry the field
-        # across every platform.
+
+        # The "id" prefix is how AppsFlyer labels Apple platform apps in their
+        # unified app id naming system
         is_ios_app = data.get("app_id", "").startswith("id")
+        if is_ios_app:
+            required.append("app_type")
+
         always_carries_event_value = (
             data.get("event_type", "") in KNOWN_STREAMS_WITH_EVENT_VALUE_FIELD
         )
-        if not is_ios_app or always_carries_event_value:
+        if always_carries_event_value:
             required.append("event_value")
 
         missing_keys = [key for key in required if key not in data]
