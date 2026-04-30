@@ -1,6 +1,7 @@
 package sql
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
@@ -202,13 +203,13 @@ var Base64Decoder ElementConverter = func(te tuple.TupleElement) (any, error) {
 	case nil:
 		return nil, nil
 	case []byte:
-		return base64.StdEncoding.DecodeString(string(v))
+		return base64.StdEncoding.AppendDecode(nil, v)
 	case string:
 		return base64.StdEncoding.DecodeString(v)
 	case json.RawMessage:
 		// A base64 value that arrives through a json.RawMessage is still
 		// wrapped in JSON string quotes.
-		return base64.StdEncoding.DecodeString(strings.Trim(string(v), `"`))
+		return base64.StdEncoding.AppendDecode(nil, bytes.Trim(v, `"`))
 	default:
 		return nil, fmt.Errorf("Base64Decoder: unexpected value type %T", te)
 	}
@@ -226,11 +227,11 @@ var Base64ToHex ElementConverter = func(te tuple.TupleElement) (any, error) {
 	case nil:
 		return nil, nil
 	case []byte:
-		raw, err = base64.StdEncoding.DecodeString(string(v))
+		raw, err = base64.StdEncoding.AppendDecode(nil, v)
 	case string:
 		raw, err = base64.StdEncoding.DecodeString(v)
 	case json.RawMessage:
-		raw, err = base64.StdEncoding.DecodeString(strings.Trim(string(v), `"`))
+		raw, err = base64.StdEncoding.AppendDecode(nil, bytes.Trim(v, `"`))
 	default:
 		return nil, fmt.Errorf("Base64ToHex: unexpected value type %T", te)
 	}
