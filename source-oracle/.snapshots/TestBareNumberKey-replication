@@ -1,0 +1,9 @@
+# ================================
+# Collection "acmeCo/test/c__flow_test_logminer/t98744120": 1 Documents
+# ================================
+{"ID":"12345","_meta":{"op":"c","source":{"ts_ms":1111111111111,"schema":"C##FLOW_TEST_LOGMINER","table":"T98744120","scn":11111111,"row_id":"AAAAAAAAAAAAAAAAAA","rs_id":"111111111111111111","ssn":111}}}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"C%23%23FLOW_TEST_LOGMINER%2FT98744120":{"backfilled":4,"key_columns":["ID"],"mode":"Active"}},"cursor":{"PendingTransactions":{},"SCN":111111111"}}
+
