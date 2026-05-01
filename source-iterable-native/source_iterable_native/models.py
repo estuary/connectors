@@ -66,7 +66,6 @@ class EndpointConfig(BaseModel):
             title="list_users Request Timeout",
             default_factory=lambda: timedelta(minutes=30),
             ge=timedelta(minutes=5),
-            le=timedelta(hours=4),
         )]
 
     advanced: Advanced = Field(
