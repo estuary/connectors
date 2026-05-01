@@ -168,11 +168,34 @@ async def _fetch_users_in_list(
                     {
                         "list_id": list_id,
                         "attempt": attempt,
-                        "error": str(e),
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
                     },
                 )
             else:
-                raise
+                # Iterable's /lists/getUsers endpoint can be persistently unable
+                # to deliver a complete response for a specific list, surfacing
+                # as transport-layer failures rather than HTTP errors. We skip
+                # the list after exhausting retries so one bad list can't block the
+                # entire backfill. The `list_users` binding defaults to re-backfilling
+                # per a configurable schedule, so the next backfill cycle will retry fetching
+                # users for any lists that we skip here.
+                #
+                # NOTE: Any documents that were already captured before reaching this else branch
+                # will be emitted and checkpointed into the associated collection. This means we'll
+                # have captured only partial data for the set of list users, which usually isn't ideal,
+                # but given the fickleness of the /lists/getUsers endpoint, partial data seems better than
+                # the alternative of no data if we were to not emit already captured docs or blocking
+                # the backfill on a specific list.
+                log.info(
+                    f"Iterable API consistently failed to stream users of list {list_id}. Checkpointing data captured for this list so far and moving on to the next list.",
+                    {
+                        "list_id": list_id,
+                        "error_type": type(e).__name__,
+                        "error_message": str(e),
+                    },
+                )
+                return
         except HTTPError as e:
             if (
                 e.code == 500 and
