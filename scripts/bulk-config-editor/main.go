@@ -81,32 +81,42 @@ func performEdits(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("error listing config files: %w", err)
 	}
-	if len(configFiles) == 0 {
-		return fmt.Errorf("no files named '*.config.yaml' under the current directory")
-	}
-	if len(taskDirs) > len(configFiles) {
-		// Find the directory which doesn't have a corresponding config file
-		for _, taskDir := range taskDirs {
-			var found bool
-			for _, configFile := range configFiles {
-				if strings.HasPrefix(configFile, taskDir) {
-					found = true
-					break
-				}
-			}
-			if !found {
-				fmt.Printf("task dir %q has no corresponding config file\n", taskDir)
+
+	// Task directories without a corresponding *.config.yaml have their endpoint
+	// config inline in flow.yaml. This happens when 'flowctl catalog pull-specs'
+	// decides the config is short enough (typically <512 bytes plaintext) to keep
+	// in-place. We handle these by editing the inline config inside flow.yaml.
+	var inlineFlowFiles []string
+	for _, taskDir := range taskDirs {
+		var found bool
+		for _, configFile := range configFiles {
+			if strings.HasPrefix(configFile, taskDir+"/") {
+				found = true
+				break
 			}
 		}
-		return fmt.Errorf("found %d task directories but only %d endpoint configs", len(taskDirs), len(configFiles))
+		if !found {
+			inlineFlowFiles = append(inlineFlowFiles, filepath.Join(taskDir, "flow.yaml"))
+		}
 	}
 
-	// Compute edits for each config file
-	log.WithField("count", len(configFiles)).Info("editing config files")
+	if len(configFiles) == 0 && len(inlineFlowFiles) == 0 {
+		return fmt.Errorf("no '*.config.yaml' files and no inline configs found under the current directory")
+	}
+
+	log.WithFields(log.Fields{
+		"configs": len(configFiles),
+		"inline":  len(inlineFlowFiles),
+	}).Info("editing configs")
 	var errs []error
 	for _, configFile := range configFiles {
 		if err := editConfigFile(ctx, configFile); err != nil {
 			errs = append(errs, fmt.Errorf("error editing config %q: %w", configFile, err))
+		}
+	}
+	for _, flowFile := range inlineFlowFiles {
+		if err := editInlineConfigFile(flowFile); err != nil {
+			errs = append(errs, fmt.Errorf("error editing inline config %q: %w", flowFile, err))
 		}
 	}
 	if len(errs) > 0 {
@@ -115,8 +125,87 @@ func performEdits(ctx context.Context) error {
 			fmt.Printf("%s\n", err.Error())
 		}
 	}
-	var successCount = len(configFiles) - len(errs)
-	fmt.Printf("edited %d/%d configs\n", successCount, len(configFiles))
+	var totalCount = len(configFiles) + len(inlineFlowFiles)
+	var successCount = totalCount - len(errs)
+	fmt.Printf("edited %d/%d configs\n", successCount, totalCount)
+	return nil
+}
+
+// editInlineConfigFile applies the configured edits to an endpoint config that
+// is inlined inside a flow.yaml file (rather than broken out into a separate
+// *.config.yaml). Inline configs are always plaintext, since an encrypted config
+// includes a SOPS stanza that pushes it well past the size threshold which would
+// have caused flowctl to break it out into a separate file in the first place.
+func editInlineConfigFile(flowFile string) error {
+	var originalBytes, err = os.ReadFile(flowFile)
+	if err != nil {
+		return fmt.Errorf("error reading file: %w", err)
+	}
+	var originalDoc any
+	if err := yaml.Unmarshal(originalBytes, &originalDoc); err != nil {
+		return fmt.Errorf("error parsing file: %w", err)
+	}
+	// Re-parse a separate copy to mutate so the diff against the original is clean.
+	var modifiedDoc any
+	if err := yaml.Unmarshal(originalBytes, &modifiedDoc); err != nil {
+		return fmt.Errorf("error re-parsing file: %w", err)
+	}
+
+	var editedAny bool
+	for _, taskType := range []string{"materializations", "captures"} {
+		tasks, ok := indexPath(modifiedDoc, taskType)
+		if !ok {
+			continue
+		}
+		tasksMap, ok := tasks.(map[string]any)
+		if !ok {
+			continue
+		}
+		for taskName, task := range tasksMap {
+			cfg, ok := indexPath(task, "endpoint", "connector", "config")
+			if !ok {
+				continue
+			}
+			cfgMap, ok := cfg.(map[string]any)
+			if !ok {
+				// String value: config is in a separate file, not inline.
+				continue
+			}
+			if _, ok := cfgMap["sops"]; ok {
+				return fmt.Errorf("inline config for task %q is SOPS-encrypted, which is not supported", taskName)
+			}
+			edits, err := computeEdits(cfgMap)
+			if err != nil {
+				return fmt.Errorf("error computing edits for task %q: %w", taskName, err)
+			}
+			// editPlaintextTaskConfig mutates cfgMap in place via setAtPath, so the
+			// changes propagate up through modifiedDoc without further wiring.
+			if _, err := editPlaintextTaskConfig(cfgMap, edits); err != nil {
+				return fmt.Errorf("error applying edits for task %q: %w", taskName, err)
+			}
+			editedAny = true
+		}
+	}
+	if !editedAny {
+		return fmt.Errorf("no inline endpoint config found in %q", flowFile)
+	}
+
+	bs, err := yaml.Marshal(modifiedDoc)
+	if err != nil {
+		return fmt.Errorf("error marshalling modified file: %w", err)
+	}
+	if err := os.WriteFile(flowFile, bs, 0664); err != nil {
+		return fmt.Errorf("error writing modified file: %w", err)
+	}
+
+	// Pace inline edits the same as plaintext separate-config edits so the diffs
+	// scroll by at a watchable rate.
+	time.Sleep(500 * time.Millisecond)
+
+	log.WithField("name", flowFile).Debug("edited inline config")
+	if err := printYAMLDiff(originalDoc, modifiedDoc, flowFile, true); err != nil {
+		return fmt.Errorf("error diffing config: %w", err)
+	}
 	return nil
 }
 
