@@ -2,7 +2,10 @@ version: "3.7"
 
 services:
   db:
-    image: 'localstack/localstack:latest'
+    # Pinned to v3: LocalStack 4.x requires LOCALSTACK_AUTH_TOKEN even for community services
+    # (kinesis/glue here) and exits with code 55 on startup otherwise. v3 (last 3.8.1) is the
+    # final auth-free release.
+    image: 'localstack/localstack:3'
     environment:
       - SERVICES=kinesis,glue
       - KINESIS_ERROR_PROBABILITY=0 # This option is interesting, but will likely cause test flakes.

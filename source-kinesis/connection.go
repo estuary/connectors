@@ -60,14 +60,15 @@ func getAwsCfg(ctx context.Context, cfg *Config) (*aws.Config, error) {
 		),
 		awsConfig.WithRegion(cfg.Region),
 		awsConfig.WithRetryer(func() aws.Retryer {
-			// Bump up the number of retry maximum attempts from the default of 3. The maximum retry
-			// duration is 20 seconds, so this gives us around 5 minutes of retrying retryable
-			// errors before giving up and crashing the connector.
+			// 5 attempts (vs the SDK default of 3) is a small bump for resilience against
+			// transient throttling/network blips while staying well under the test alarm
+			// when the endpoint is unreachable: 5 × ~30s dial timeout from the SDK's
+			// default BuildableClient ≈ 2.5 minutes worst case.
 			//
 			// Ref: https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/retries-timeouts/
 			return retry.NewStandard(func(o *retry.StandardOptions) {
 				o.RateLimiter = ratelimit.None // rely on the standard error backoff for rate limiting
-				o.MaxAttempts = 20
+				o.MaxAttempts = 5
 			})
 		}),
 	}
