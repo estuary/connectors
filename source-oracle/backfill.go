@@ -329,11 +329,11 @@ func (db *oracleDatabase) fetchBackfillRowIDRange(ctx context.Context, schemaNam
 // combined with the "is the column typename a string" check into one if statement.
 // See https://docs.oracle.com/en/database/oracle/oracle-database/19/sqlrf/NLSSORT.html
 var columnBinaryKeyComparison = map[string]bool{
-	"char":     true,
-	"nchar":    true,
+	"char":      true,
+	"nchar":     true,
 	"nvarchar2": true,
-	"varchar": true,
-	"varchar2": true,
+	"varchar":   true,
+	"varchar2":  true,
 }
 
 // render a "cast" expression for a column so that we can cast it to the
