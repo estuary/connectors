@@ -4,12 +4,9 @@ import (
 	"cmp"
 	"context"
 	"fmt"
-	"net"
-	"net/http"
 	"os"
 	"slices"
 	"sync"
-	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/ratelimit"
@@ -54,24 +51,6 @@ func getAwsCfg(ctx context.Context, cfg *Config) (*aws.Config, error) {
 		return nil, fmt.Errorf("invalid config: %w", err)
 	}
 
-	// Bounded HTTP client so an unreachable endpoint fails per-attempt in seconds rather
-	// than blocking the SDK retry loop for minutes (Go's default http.Transport has no
-	// dial/read deadlines).
-	httpClient := &http.Client{
-		Timeout: 30 * time.Second,
-		Transport: &http.Transport{
-			DialContext: (&net.Dialer{
-				Timeout:   10 * time.Second,
-				KeepAlive: 30 * time.Second,
-			}).DialContext,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ResponseHeaderTimeout: 20 * time.Second,
-			IdleConnTimeout:       90 * time.Second,
-			MaxIdleConns:          100,
-			MaxIdleConnsPerHost:   10,
-		},
-	}
-
 	// Session token can be provided via environment variable for testing with temporary credentials
 	sessionToken := os.Getenv("AWS_SESSION_TOKEN")
 
@@ -80,16 +59,16 @@ func getAwsCfg(ctx context.Context, cfg *Config) (*aws.Config, error) {
 			credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, sessionToken),
 		),
 		awsConfig.WithRegion(cfg.Region),
-		awsConfig.WithHTTPClient(httpClient),
 		awsConfig.WithRetryer(func() aws.Retryer {
-			// Bump up the number of retry maximum attempts from the default of 3. The maximum retry
-			// duration is 20 seconds, so this gives us around 5 minutes of retrying retryable
-			// errors before giving up and crashing the connector.
+			// 5 attempts (vs the SDK default of 3) is a small bump for resilience against
+			// transient throttling/network blips while staying well under the test alarm
+			// when the endpoint is unreachable: 5 × ~30s dial timeout from the SDK's
+			// default BuildableClient ≈ 2.5 minutes worst case.
 			//
 			// Ref: https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/retries-timeouts/
 			return retry.NewStandard(func(o *retry.StandardOptions) {
 				o.RateLimiter = ratelimit.None // rely on the standard error backoff for rate limiting
-				o.MaxAttempts = 20
+				o.MaxAttempts = 5
 			})
 		}),
 	}
