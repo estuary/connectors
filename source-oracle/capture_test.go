@@ -135,6 +135,27 @@ func TestIntegerKey(t *testing.T) {
 	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
 }
 
+func TestBareNumberKey(t *testing.T) {
+	var unique = "98744120"
+	var tb, ctx = oracleTestBackend(t), context.Background()
+	var tableName = tb.CreateTable(ctx, t, unique, "(id NUMBER PRIMARY KEY)")
+
+	tb.Insert(ctx, t, tableName, [][]any{{99}, {100}, {9999}, {10000}})
+
+	// Discover the catalog and verify that the table schemas looks correct
+	t.Run("discover", func(t *testing.T) {
+		tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(unique))
+	})
+
+	// Perform an initial backfill
+	var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(unique))
+	t.Run("backfill", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+
+	// Add more data and read it via replication
+	tb.Insert(ctx, t, tableName, [][]any{{12345}})
+	t.Run("replication", func(t *testing.T) { tests.VerifiedCapture(ctx, t, cs) })
+}
+
 func TestNullValues(t *testing.T) {
 	var unique = "18110541"
 	var tb, ctx = oracleTestBackend(t), context.Background()
