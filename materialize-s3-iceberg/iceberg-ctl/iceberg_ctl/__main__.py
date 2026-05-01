@@ -337,7 +337,12 @@ def create_table(
     schema = Schema(*columns)
     catalog.create_table(table, schema, table_create.location,
         properties={
-            TableProperties.DEFAULT_NAME_MAPPING: schema.name_mapping.model_dump_json()
+            TableProperties.DEFAULT_NAME_MAPPING: schema.name_mapping.model_dump_json(),
+            "write.metadata.compression-codec": "gzip",
+            "write.metadata.delete-after-commit.enabled": "true",
+            "write.metadata.previous-versions-max": "10",
+            "history.expire.min-snapshots-to-keep": "1",
+            "history.expire.max-snapshot-age-ms": str(24 * 60 * 60 * 1000),
         },
     )
     log(f"create_table: created table {table}")
