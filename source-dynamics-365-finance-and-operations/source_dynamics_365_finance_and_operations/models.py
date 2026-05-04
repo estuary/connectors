@@ -113,6 +113,37 @@ class BaseTable(BaseCSVRow, extra="allow"):
             "required": [],
         }
 
+        # Add the _meta field.
+        meta_schema = {
+            "additionalProperties": False,
+            "type": "object",
+            "properties": {
+                "op": {
+                    "type": "string",
+                    "maxLength": 1,
+                },
+                "uuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "minLength": 36,
+                    "maxLength": 36,
+                },
+                "source_file": {
+                    "type": "string",
+                    "maxLength": 1,
+                }
+            },
+            "required": [
+                "op",
+                "source_file",
+                "uuid",
+            ]
+        }
+
+        schema["properties"]["_meta"] = meta_schema
+        schema["required"].append("_meta")
+
+        # Add fields defined in model.json.
         for attr in cls.attributes:
             match attr.dataType:
                 case AttributeDataType.STRING:
