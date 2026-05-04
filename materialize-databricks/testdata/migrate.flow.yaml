@@ -15,8 +15,6 @@ materializations:
       fields:
         recommended: true
         exclude:
-          # Databricks has no migration spec for STRING → BINARY.
-          - stringToBinary
           # TODO: Databricks NUMERIC(38,0) overflows on int128/int129/int256/int257
           # values (39+ digits). The JSON reader parses them as DOUBLE and the
           # staging cast fails in ANSI mode with NUMERIC_VALUE_OUT_OF_RANGE,

@@ -17,7 +17,6 @@ materializations:
         exclude:
           - binaryToMulti
           - binaryToString
-          - stringToBinary
           # TODO: Azure Fabric Warehouse maxes out at DECIMAL(38,0). Fixture values
           # for int128/int129/int256/int257 (39+ digits) overflow when stored in
           # either the source column (base phase) or migrated target column.
