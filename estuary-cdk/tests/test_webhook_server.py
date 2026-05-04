@@ -4,7 +4,7 @@ import json
 import logging
 from collections.abc import AsyncGenerator, Mapping
 from contextlib import asynccontextmanager
-from typing import Any, NamedTuple
+from typing import Any, BinaryIO, NamedTuple
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -15,17 +15,17 @@ from pydantic import model_validator
 from estuary_cdk.capture.common import (
     Resource,
     ResourceState,
+    WebhookResourceConfig,
 )
 from estuary_cdk.capture.task import Task
+from estuary_cdk.capture.transactor import Transactor
 from estuary_cdk.capture.webhook.match import (
     BodyMatch,
-    CollectionMatchingSpec,
     HeaderMatch,
     UrlMatch,
 )
 from estuary_cdk.capture.webhook.resources import (
     WebhookDocument,
-    WebhookResourceConfig,
     open_webhook_binding,
 )
 from estuary_cdk.capture.webhook.server import (
@@ -33,26 +33,7 @@ from estuary_cdk.capture.webhook.server import (
     build_webhook_app,
     start_webhook_server,
 )
-
-
-def _make_resource(
-    name: str,
-    match_rule: CollectionMatchingSpec | None = None,
-) -> Resource[WebhookDocument, WebhookResourceConfig, ResourceState]:
-    if match_rule is None:
-        match_rule = UrlMatch(value="*")
-    return Resource(
-        name=name,
-        key=["/_meta/webhookId"],
-        model=WebhookDocument,
-        open=open_webhook_binding,  # pyright: ignore[reportArgumentType]
-        initial_state=ResourceState(),
-        initial_config=WebhookResourceConfig(
-            name=name,
-            match_rule=match_rule,
-        ),
-        schema_inference=True,
-    )
+from tests.utils import make_webhook_resource
 
 
 class ServerContext(NamedTuple):
@@ -69,6 +50,7 @@ async def run_server(
 ) -> AsyncGenerator[ServerContext, None]:
     output = io.BytesIO()
     stopping = Task.Stopping()
+    transactor = Transactor(output, requires_explicit_acks=True)
 
     task = Task(
         log=logging.getLogger("test-webhook"),
@@ -77,28 +59,43 @@ async def run_server(
         output=output,
         stopping=stopping,
         tg=MagicMock(),
+        transactor=transactor,
+        requires_ack=True,
     )
 
-    app = build_webhook_app(binding_index_mapping, task)
-    async with TestClient(TestServer(app)) as client:
-        yield ServerContext(task, client, app)
+    async def auto_ack() -> None:
+        """Drain pending checkpoints continuously so handlers awaiting ACK
+        unblock without a real Flow runtime."""
+        while True:
+            if transactor._pending:  # pyright: ignore[reportPrivateUsage]
+                transactor.deliver_ack(
+                    len(transactor._pending)  # pyright: ignore[reportPrivateUsage]
+                )
+            await asyncio.sleep(0)
+
+    ack_task = asyncio.create_task(auto_ack())
+    try:
+        app = build_webhook_app(binding_index_mapping, task)
+        async with TestClient(TestServer(app)) as client:
+            yield ServerContext(task, client, app)
+    finally:
+        _ = ack_task.cancel()
+        try:
+            await ack_task
+        except asyncio.CancelledError:
+            pass
 
 
-def _read_output(task: Task) -> list[dict[str, Any]]:
-    _ = task._output.seek(0)  # pyright: ignore[reportPrivateUsage]
-    lines = (
-        task._output.read()  # pyright: ignore[reportPrivateUsage]
-        .decode()
-        .strip()
-        .splitlines()
-    )
-    return [json.loads(line) for line in lines if line]
+def read_emitted_records(output: BinaryIO) -> list[dict[str, Any]]:
+    """Rewind `output` and parse the JSON-lines a Task has emitted to it."""
+    _ = output.seek(0)
+    return [json.loads(line) for line in output.read().decode().splitlines() if line]
 
 
 class TestWebhookHandler:
     @pytest.mark.asyncio
     async def test_successful_post(self):
-        resource = _make_resource("catch-all")
+        resource = make_webhook_resource("catch-all")
         async with run_server({0: resource}) as ctx:
             resp = await ctx.client.post("/hook", json={"foo": "bar"})
             assert resp.status == 200
@@ -106,12 +103,14 @@ class TestWebhookHandler:
 
     @pytest.mark.asyncio
     async def test_meta_enrichment(self):
-        resource = _make_resource("catch-all")
+        resource = make_webhook_resource("catch-all")
         async with run_server({0: resource}) as ctx:
             resp = await ctx.client.post("/hook", json={"data": 1})
             assert resp.status == 200
 
-            output = _read_output(ctx.task)
+            output = read_emitted_records(
+                ctx.task._output  # pyright: ignore[reportPrivateUsage]
+            )
             assert len(output) >= 1
 
             captured = output[0]["captured"]
@@ -130,20 +129,24 @@ class TestWebhookHandler:
 
     @pytest.mark.asyncio
     async def test_multiple_posts_capture_separately(self):
-        resource = _make_resource("catch-all")
+        resource = make_webhook_resource("catch-all")
         async with run_server({0: resource}) as ctx:
             resp1 = await ctx.client.post("/hook", json={"n": 1})
             resp2 = await ctx.client.post("/hook", json={"n": 2})
             assert resp1.status == 200
             assert resp2.status == 200
 
-            output = _read_output(ctx.task)
+            output = read_emitted_records(
+                ctx.task._output  # pyright: ignore[reportPrivateUsage]
+            )
             captured_lines = [line for line in output if "captured" in line]
             assert len(captured_lines) >= 2
 
     @pytest.mark.asyncio
     async def test_404_no_matching_binding(self):
-        resource = _make_resource("specific", match_rule=UrlMatch(value="/specific"))
+        resource = make_webhook_resource(
+            "specific", match_rule=UrlMatch(value="/specific")
+        )
         async with run_server({0: resource}) as ctx:
             resp = await ctx.client.post("/other", json={"x": 1})
             assert resp.status == 404
@@ -151,7 +154,7 @@ class TestWebhookHandler:
 
     @pytest.mark.asyncio
     async def test_503_when_rejecting(self):
-        resource = _make_resource("catch-all")
+        resource = make_webhook_resource("catch-all")
         async with run_server({0: resource}) as ctx:
             ctx.app[_rejecting_key] = True
             resp = await ctx.client.post("/hook", json={"x": 1})
@@ -160,7 +163,7 @@ class TestWebhookHandler:
 
     @pytest.mark.asyncio
     async def test_non_json_body(self):
-        resource = _make_resource("catch-all")
+        resource = make_webhook_resource("catch-all")
         async with run_server({0: resource}) as ctx:
             resp = await ctx.client.post(
                 "/hook",
@@ -171,19 +174,21 @@ class TestWebhookHandler:
 
     @pytest.mark.asyncio
     async def test_array_body_publishes_all(self):
-        resource = _make_resource("catch-all")
+        resource = make_webhook_resource("catch-all")
         async with run_server({0: resource}) as ctx:
             resp = await ctx.client.post("/hook", json=[{"a": 1}, {"b": 2}, {"c": 3}])
             assert resp.status == 200
             assert await resp.json() == {"published": 3}
 
-            output = _read_output(ctx.task)
+            output = read_emitted_records(
+                ctx.task._output  # pyright: ignore[reportPrivateUsage]
+            )
             captured_lines = [line for line in output if "captured" in line]
             assert len(captured_lines) == 3
 
     @pytest.mark.asyncio
     async def test_array_body_single_element(self):
-        resource = _make_resource("catch-all")
+        resource = make_webhook_resource("catch-all")
         async with run_server({0: resource}) as ctx:
             resp = await ctx.client.post("/hook", json=[{"x": 1}])
             assert resp.status == 200
@@ -191,7 +196,7 @@ class TestWebhookHandler:
 
     @pytest.mark.asyncio
     async def test_non_dict_in_array_rejected(self):
-        resource = _make_resource("catch-all")
+        resource = make_webhook_resource("catch-all")
         async with run_server({0: resource}) as ctx:
             resp = await ctx.client.post("/hook", json=[{"ok": 1}, "bad"])
             assert resp.status == 400
@@ -222,13 +227,15 @@ class TestWebhookHandler:
             resp = await ctx.client.post("/hook", json={"name": "hello"})
             assert resp.status == 200
 
-            output = _read_output(ctx.task)
+            output = read_emitted_records(
+                ctx.task._output  # pyright: ignore[reportPrivateUsage]
+            )
             doc = output[0]["captured"]["doc"]
             assert doc["name"] == "HELLO"
 
     @pytest.mark.asyncio
     async def test_non_dict_scalar_body_rejected(self):
-        resource = _make_resource("catch-all")
+        resource = make_webhook_resource("catch-all")
         async with run_server({0: resource}) as ctx:
             resp = await ctx.client.post(
                 "/hook",
@@ -241,10 +248,12 @@ class TestWebhookHandler:
 class TestRequestRouting:
     @pytest.mark.asyncio
     async def test_header_match_priority_over_url(self):
-        header_resource = _make_resource(
+        header_resource = make_webhook_resource(
             "header", match_rule=HeaderMatch(key="X-Event", value="push")
         )
-        url_resource = _make_resource("catch-all", match_rule=UrlMatch(value="*"))
+        url_resource = make_webhook_resource(
+            "catch-all", match_rule=UrlMatch(value="*")
+        )
         async with run_server({0: header_resource, 1: url_resource}) as ctx:
             resp = await ctx.client.post(
                 "/hook",
@@ -253,7 +262,9 @@ class TestRequestRouting:
             )
             assert resp.status == 200
 
-            output = _read_output(ctx.task)
+            output = read_emitted_records(
+                ctx.task._output  # pyright: ignore[reportPrivateUsage]
+            )
 
             first_line = output[0]
             assert isinstance(first_line, dict)
@@ -264,15 +275,19 @@ class TestRequestRouting:
 
     @pytest.mark.asyncio
     async def test_body_match_priority_over_url(self):
-        body_resource = _make_resource(
+        body_resource = make_webhook_resource(
             "body", match_rule=BodyMatch(key="event", value="push")
         )
-        url_resource = _make_resource("catch-all", match_rule=UrlMatch(value="*"))
+        url_resource = make_webhook_resource(
+            "catch-all", match_rule=UrlMatch(value="*")
+        )
         async with run_server({0: body_resource, 1: url_resource}) as ctx:
             resp = await ctx.client.post("/hook", json={"event": "push"})
             assert resp.status == 200
 
-            output = _read_output(ctx.task)
+            output = read_emitted_records(
+                ctx.task._output  # pyright: ignore[reportPrivateUsage]
+            )
 
             first_line = output[0]
             assert isinstance(first_line, dict)
@@ -283,15 +298,21 @@ class TestRequestRouting:
 
     @pytest.mark.asyncio
     async def test_more_specific_url_first(self):
-        specific = _make_resource("specific", match_rule=UrlMatch(value="/foo/bar"))
-        parametric = _make_resource("parametric", match_rule=UrlMatch(value="/foo/{x}"))
-        wildcard = _make_resource("wildcard", match_rule=UrlMatch(value="*"))
+        specific = make_webhook_resource(
+            "specific", match_rule=UrlMatch(value="/foo/bar")
+        )
+        parametric = make_webhook_resource(
+            "parametric", match_rule=UrlMatch(value="/foo/{x}")
+        )
+        wildcard = make_webhook_resource("wildcard", match_rule=UrlMatch(value="*"))
 
         async with run_server({0: specific, 1: parametric, 2: wildcard}) as ctx:
             resp = await ctx.client.post("/foo/bar", json={"x": 1})
             assert resp.status == 200
 
-            output = _read_output(ctx.task)
+            output = read_emitted_records(
+                ctx.task._output  # pyright: ignore[reportPrivateUsage]
+            )
 
             first_line = output[0]
             assert isinstance(first_line, dict)
@@ -302,13 +323,17 @@ class TestRequestRouting:
 
     @pytest.mark.asyncio
     async def test_wildcard_catches_unmatched(self):
-        specific = _make_resource("specific", match_rule=UrlMatch(value="/specific"))
-        wildcard = _make_resource("wildcard", match_rule=UrlMatch(value="*"))
+        specific = make_webhook_resource(
+            "specific", match_rule=UrlMatch(value="/specific")
+        )
+        wildcard = make_webhook_resource("wildcard", match_rule=UrlMatch(value="*"))
         async with run_server({0: specific, 1: wildcard}) as ctx:
             resp = await ctx.client.post("/something-else", json={"x": 1})
             assert resp.status == 200
 
-            output = _read_output(ctx.task)
+            output = read_emitted_records(
+                ctx.task._output  # pyright: ignore[reportPrivateUsage]
+            )
 
             first_line = output[0]
             assert isinstance(first_line, dict)
@@ -319,14 +344,55 @@ class TestRequestRouting:
 
 
 def _make_task() -> Task:
+    output = io.BytesIO()
     return Task(
         log=logging.getLogger("test-webhook"),
         connector_status=MagicMock(),
         name="test-webhook",
-        output=io.BytesIO(),
+        output=output,
         stopping=Task.Stopping(),
         tg=MagicMock(),
+        transactor=Transactor(output, requires_explicit_acks=True),
+        requires_ack=True,
     )
+
+
+class TestWebhookAckBlocking:
+    @pytest.mark.asyncio
+    async def test_handler_blocks_until_ack(self):
+        output = io.BytesIO()
+        stopping = Task.Stopping()
+        transactor = Transactor(output, requires_explicit_acks=True)
+
+        task = Task(
+            log=logging.getLogger("test-webhook-ack"),
+            connector_status=MagicMock(),
+            name="test-webhook-ack",
+            output=output,
+            stopping=stopping,
+            tg=MagicMock(),
+            transactor=transactor,
+            requires_ack=True,
+        )
+
+        app = build_webhook_app({0: make_webhook_resource("catch-all")}, task)
+        async with TestClient(TestServer(app)) as client:
+            request_task = asyncio.create_task(client.post("/hook", json={"x": 1}))
+
+            # Give the handler time to enter checkpoint() and start awaiting the ACK.
+            await asyncio.sleep(0.1)
+            assert (
+                len(transactor._pending) == 1  # pyright: ignore[reportPrivateUsage]
+            ), "Handler did not register a pending checkpoint slot"
+            assert (
+                not request_task.done()
+            ), "Webhook handler returned before ACK was delivered"
+
+            transactor.deliver_ack(1)
+
+            resp = await asyncio.wait_for(request_task, timeout=1.0)
+            assert resp.status == 200
+            assert await resp.json() == {"published": 1}
 
 
 class TestWebhookServerLifecycle:
@@ -334,7 +400,7 @@ class TestWebhookServerLifecycle:
     async def test_start_sets_webhook_task(self):
         task = _make_task()
 
-        resource = _make_resource("catch-all")
+        resource = make_webhook_resource("catch-all")
         start_webhook_server({0: resource}, task)
 
         webhook_task = task.stopping.webhook_task
@@ -346,7 +412,7 @@ class TestWebhookServerLifecycle:
     @pytest.mark.asyncio
     async def test_webhook_event_triggers_shutdown(self):
         task = _make_task()
-        resource = _make_resource("catch-all")
+        resource = make_webhook_resource("catch-all")
         start_webhook_server({0: resource}, task)
 
         # Give server time to bind
@@ -362,7 +428,7 @@ class TestWebhookServerLifecycle:
     @pytest.mark.asyncio
     async def test_startup_failure_propagates_error(self):
         task = _make_task()
-        resource = _make_resource("catch-all")
+        resource = make_webhook_resource("catch-all")
 
         with patch(
             "aiohttp.web.TCPSite.start", side_effect=OSError("Address already in use")

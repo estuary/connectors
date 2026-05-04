@@ -1,12 +1,14 @@
+from unittest.mock import MagicMock
+
+from estuary_cdk.capture import common
+from estuary_cdk.capture.common import WebhookResourceConfig
 from estuary_cdk.capture.webhook.match import (
     HeaderDiscriminator,
     HeaderMatch,
     UrlMatch,
 )
-from estuary_cdk.capture.webhook.resources import (
-    WebhookCaptureSpec,
-    WebhookResourceConfig,
-)
+from estuary_cdk.capture.webhook.resources import WebhookCaptureSpec
+from tests.utils import make_pull_resource, make_webhook_resource
 
 
 class TestWebhookResourceConfig:
@@ -47,3 +49,26 @@ class TestWebhookCaptureSpec:
             assert r.schema_inference is True
             assert isinstance(r.initial_config.match_rule, HeaderMatch)
             assert r.initial_config.match_rule.key == "X-Event"
+
+
+class TestExplicitAcknowledgements:
+    def test_no_webhook_bindings_disables_explicit_acks(self):
+        opened, _ = common.open(
+            MagicMock(),
+            [(MagicMock(), make_pull_resource())],
+        )
+        assert opened.explicitAcknowledgements is False
+
+    def test_at_least_one_webhook_binding_enables_explicit_acks(self):
+        opened, _ = common.open(
+            MagicMock(),
+            [
+                (MagicMock(), make_pull_resource()),
+                (MagicMock(), make_webhook_resource("hook")),
+            ],
+        )
+        assert opened.explicitAcknowledgements is True
+
+    def test_empty_bindings_disables_explicit_acks(self):
+        opened, _ = common.open(MagicMock(), [])
+        assert opened.explicitAcknowledgements is False

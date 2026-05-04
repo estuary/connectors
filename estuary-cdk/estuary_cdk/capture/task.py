@@ -23,7 +23,7 @@ from ..flow import (
 )
 from ..pydantic_polyfill import GenericModel
 from . import request, response
-from ._emit import emit_from_buffer
+from .transactor import Transactor
 
 
 class Request(GenericModel, Generic[EndpointConfig, ResourceConfig, ConnectorState]):
@@ -102,6 +102,13 @@ class Task:
 
     stopping: Stopping
 
+    transactor: Transactor
+    """Shared Transactor that coordinates stdout writes and Acknowledge pairing."""
+
+    requires_ack: bool
+    """When True, checkpoint() blocks until Flow ACKs the emitted checkpoint.
+    Inherited by children via spawn_child."""
+
     _buffer: tempfile.SpooledTemporaryFile
     _hasher: xxhash.xxh3_128
     _name: str
@@ -120,6 +127,8 @@ class Task:
         output: BinaryIO,
         stopping: Stopping,
         tg: asyncio.TaskGroup,
+        transactor: Transactor,
+        requires_ack: bool = False,
     ):
         self._buffer = tempfile.SpooledTemporaryFile(max_size=self.MAX_BUFFER_MEM)
         self._hasher = xxhash.xxh3_128()
@@ -129,6 +138,8 @@ class Task:
         self.log = log
         self.connector_status = connector_status
         self.stopping = stopping
+        self.transactor = transactor
+        self.requires_ack = requires_ack
 
     def captured(self, binding: int, document: Any):
         """Enqueue the document to be captured under the given binding.
@@ -168,15 +179,53 @@ class Task:
         self._buffer.write(b)
         self._buffer.write(b"\n")
 
-    async def checkpoint(self, state: ConnectorState, merge_patch: bool = True):
-        """Emit previously-queued, captured documents followed by a checkpoint."""
-        await self._emit(
-            Response[Any, Any, ConnectorState](
-                checkpoint=response.Checkpoint(
-                    state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
-                )
+    async def _emit_checkpoint(
+        self, state: ConnectorState, merge_patch: bool = True
+    ) -> asyncio.Future[None] | None:
+        checkpoint = Response[Any, Any, ConnectorState](
+            checkpoint=response.Checkpoint(
+                state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
             )
         )
+        self._buffer.write(
+            checkpoint.model_dump_json(by_alias=True, exclude_unset=True).encode()
+        )
+        self._buffer.write(b"\n")
+
+        completion = await self.transactor.commit(
+            self._buffer, wait_for_ack=self.requires_ack
+        )
+        self.reset()
+
+        return completion
+
+    async def checkpoint(self, state: ConnectorState, merge_patch: bool = True):
+        """Emit previously-queued, captured documents followed by a checkpoint.
+
+        When this Task's `requires_ack` is True, the call blocks on Flow's
+        Acknowledge for the emitted checkpoint before returning.
+
+        Captures are at-least-once: once the buffer has been written to stdout
+        the documents may be durable, regardless of whether this coroutine
+        returns. Cancellation between the write and the ACK can therefore
+        produce a duplicate when the sender retries on the resulting failure."""
+
+        completion = await self._emit_checkpoint(state, merge_patch)
+
+        if completion is None:
+            return
+
+        try:
+            await completion
+        except asyncio.CancelledError:
+            self.log.warning(
+                (
+                    "checkpoint cancelled while awaiting ACK;"
+                    " documents may be durable but caller will see failure"
+                ),
+                {"task": self._name},
+            )
+            raise
 
     def reset(self):
         """Discard any captured documents, resetting to an empty state."""
@@ -205,6 +254,8 @@ class Task:
                         parent._output,
                         parent.stopping,
                         child_tg,
+                        parent.transactor,
+                        parent.requires_ack,
                     )
                     await child(t)
                 except Exception as exc:
@@ -219,12 +270,3 @@ class Task:
         task = self._tg.create_task(run_task(self))
         task.set_name(child_name)
         return task
-
-    async def _emit(self, response: Response[EndpointConfig, ResourceConfig, ConnectorState]):
-        self._buffer.write(
-            response.model_dump_json(by_alias=True, exclude_unset=True).encode()
-        )
-        self._buffer.write(b"\n")
-        self._buffer.seek(0)
-        await emit_from_buffer(self._buffer, self._output)
-        self.reset()
