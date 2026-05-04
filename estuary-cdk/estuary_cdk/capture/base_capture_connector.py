@@ -28,6 +28,7 @@ from ..utils import format_error_message, get_running_tasks_info, sort_dict
 from . import Request, Response, Task, request, response
 from ._emit import emit_bytes
 from .common import _ConnectorState
+from .transactor import Transactor
 
 # Default encryption service URL, can be overridden via ENCRYPTION_URL environment variable
 # for local testing with docker gateway addresses like http://172.18.0.1:port
@@ -57,6 +58,12 @@ class BaseCaptureConnector(
     metaclass=abc.ABCMeta,
 ):
     output: BinaryIO = sys.stdout.buffer
+
+    _transactor: Transactor
+    """Constructed during `open`. Coordinates stdout writes for every Task and,
+    when the capture has at least one binding requiring Flow's explicit
+    Acknowledge protocol, lets ACK-requiring Tasks block their checkpoints
+    until Flow confirms persistence."""
 
     @abc.abstractmethod
     async def spec(self, log: FlowLogger, _: request.Spec) -> ConnectorSpec:
@@ -108,7 +115,7 @@ class BaseCaptureConnector(
         return None # No-op by default.
 
     async def acknowledge(self, acknowledge: request.Acknowledge) -> None:
-        return None  # No-op.
+        self._transactor.deliver_ack(acknowledge.checkpoints)
 
     async def handle(
         self,
@@ -140,6 +147,11 @@ class BaseCaptureConnector(
 
             opened, capture = await self.open(log, open)
             await self._emit(Response(opened=opened))
+
+            self._transactor = Transactor(
+                self.output,
+                requires_explicit_acks=opened.explicitAcknowledgements,
+            )
 
             stopping = Task.Stopping()
 
@@ -233,6 +245,7 @@ class BaseCaptureConnector(
                         self.output,
                         stopping,
                         tg,
+                        self._transactor,
                     )
                     log.event.status("Capture started")
                     await capture(task)
