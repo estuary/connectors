@@ -738,6 +738,12 @@
                 "string"
               ]
             },
+            "hs_excluded_from_cross_account_data_mirroring": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_ideal_customer_profile": {
               "type": [
                 "null",
@@ -745,6 +751,12 @@
               ]
             },
             "hs_industry_group": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_inferred_domain": {
               "type": [
                 "null",
                 "string"
@@ -861,6 +873,18 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_latest_prospecting_agent_monitoring_date": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_latest_suggested_contact_timestamp": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_lead_status": {
@@ -1119,6 +1143,12 @@
               ]
             },
             "hs_task_label": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_tax_id": {
               "type": [
                 "null",
                 "string"
@@ -2112,6 +2142,25 @@
                 "string"
               ]
             },
+            "hs_chat_assistant_iql_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_chat_assistant_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_chat_assistant_summary": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_clicked_linkedin_ad": {
               "type": [
                 "null",
@@ -2438,6 +2487,12 @@
                 "boolean"
               ]
             },
+            "hs_excluded_from_cross_account_data_mirroring": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_facebook_ad_clicked": {
               "type": [
                 "null",
@@ -2484,6 +2539,42 @@
               ]
             },
             "hs_full_name_or_email": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_geohash_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_geohash_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_geohash_3": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_geohash_4": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_geohash_5": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_geohash_6": {
               "type": [
                 "null",
                 "string"
@@ -3030,6 +3121,18 @@
               ]
             },
             "hs_testrollback": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_tiktok_ad_clicked": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hs_tiktok_click_id": {
               "type": [
                 "null",
                 "string"
@@ -4170,6 +4273,12 @@
                 "boolean"
               ]
             },
+            "hs_has_last_conversation_follow_ups": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_is_closed": {
               "type": [
                 "null",
@@ -4204,6 +4313,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_last_conversation_with_followups_object_coordinates": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_last_gs_shared_message": {
@@ -4559,6 +4674,13 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_primary_quote_data_updated_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_priority": {
@@ -5166,6 +5288,12 @@
                 "boolean"
               ]
             },
+            "hs_has_last_conversation_follow_ups": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_is_closed": {
               "type": [
                 "null",
@@ -5200,6 +5328,12 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_last_conversation_with_followups_object_coordinates": {
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_last_gs_shared_message": {
@@ -5555,6 +5689,13 @@
               "type": [
                 "null",
                 "number"
+              ]
+            },
+            "hs_primary_quote_data_updated_at": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
               ]
             },
             "hs_priority": {
@@ -7396,18 +7537,6 @@
                 "boolean"
               ]
             },
-            "hs_shared_team_ids": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_shared_user_ids": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
             "hs_timestamp": {
               "format": "date-time",
               "type": [
@@ -8239,18 +8368,6 @@
                 "number"
               ]
             },
-            "hs_shared_team_ids": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_shared_user_ids": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
             "hs_template_id": {
               "type": [
                 "null",
@@ -8526,6 +8643,12 @@
               ]
             },
             "hs_campaign_guid": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_campaign_guids": {
               "type": [
                 "null",
                 "string"
@@ -8915,18 +9038,6 @@
                 "string"
               ]
             },
-            "hs_shared_team_ids": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_shared_user_ids": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
             "hs_time_to_book_meeting_from_first_contact": {
               "type": [
                 "null",
@@ -9162,6 +9273,12 @@
                 "string"
               ]
             },
+            "hs_attachment_from_form_submission": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_attachment_ids": {
               "type": [
                 "null",
@@ -9348,18 +9465,6 @@
               "type": [
                 "null",
                 "boolean"
-              ]
-            },
-            "hs_shared_team_ids": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_shared_user_ids": {
-              "type": [
-                "null",
-                "string"
               ]
             },
             "hs_timestamp": {
@@ -9900,20 +10005,14 @@
                 "string"
               ]
             },
-            "hs_shared_team_ids": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_shared_user_ids": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
             "hs_start_date": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_task_assigned_by_user_id": {
               "type": [
                 "null",
                 "string"
@@ -10010,6 +10109,12 @@
                 "boolean"
               ]
             },
+            "hs_task_is_sub_task": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_task_last_contact_outreach": {
               "format": "date-time",
               "type": [
@@ -10037,6 +10142,24 @@
               ]
             },
             "hs_task_ms_teams_payload": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_task_parent_task_associated_objects": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_task_parent_task_id": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_task_parent_task_owner_ids": {
               "type": [
                 "null",
                 "string"
@@ -10084,6 +10207,12 @@
                 "boolean"
               ]
             },
+            "hs_task_sequence_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_task_sequence_step_enrollment_contact_id": {
               "type": [
                 "null",
@@ -10108,6 +10237,24 @@
                 "string"
               ]
             },
+            "hs_task_sub_task_at_mentioned_owner_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_task_sub_task_ids": {
+              "type": [
+                "null",
+                "number"
+              ]
+            },
+            "hs_task_sub_task_owner_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_task_subject": {
               "type": [
                 "null",
@@ -10124,6 +10271,12 @@
               "type": [
                 "null",
                 "string"
+              ]
+            },
+            "hs_task_uncompleted_sub_task_ids": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_time_in_60b5c368_04c4_4d32_9b4a_457e159f49b7_13292096": {
@@ -11334,6 +11487,12 @@
                 "string"
               ]
             },
+            "hs_parent_object_type_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_pinned_engagement_id": {
               "type": [
                 "null",
@@ -11380,6 +11539,12 @@
               "type": [
                 "null",
                 "boolean"
+              ]
+            },
+            "hs_recurring_billing_day_of_month": {
+              "type": [
+                "null",
+                "number"
               ]
             },
             "hs_recurring_billing_end_date": {
@@ -12538,6 +12703,25 @@
                 "string"
               ]
             },
+            "hs_chat_assistant_iql_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_chat_assistant_source": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_chat_assistant_summary": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_clicked_linkedin_ad": {
               "type": [
                 "null",
@@ -12864,6 +13048,12 @@
                 "boolean"
               ]
             },
+            "hs_excluded_from_cross_account_data_mirroring": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_facebook_ad_clicked": {
               "type": [
                 "null",
@@ -12910,6 +13100,42 @@
               ]
             },
             "hs_full_name_or_email": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_geohash_1": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_geohash_2": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_geohash_3": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_geohash_4": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_geohash_5": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_geohash_6": {
               "type": [
                 "null",
                 "string"
@@ -13456,6 +13682,18 @@
               ]
             },
             "hs_testrollback": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_tiktok_ad_clicked": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
+            "hs_tiktok_click_id": {
               "type": [
                 "null",
                 "string"
@@ -14346,6 +14584,12 @@
                 "string"
               ]
             },
+            "hs_current_generic_channel_id": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_custom_inbox": {
               "type": [
                 "null",
@@ -14360,62 +14604,6 @@
               ]
             },
             "hs_customer_agent_ticket_status": {
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_date_entered_1": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_date_entered_2": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_date_entered_3": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_date_entered_4": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_date_exited_1": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_date_exited_2": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_date_exited_3": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            },
-            "hs_date_exited_4": {
-              "format": "date-time",
               "type": [
                 "null",
                 "string"
@@ -14521,6 +14709,25 @@
             },
             "hs_last_closed_date": {
               "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_last_csat_comment": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_last_csat_date": {
+              "format": "date-time",
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_last_csat_rating": {
               "type": [
                 "null",
                 "string"
@@ -14635,7 +14842,19 @@
                 "string"
               ]
             },
+            "hs_mentioned_note_user_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
             "hs_mentions_resolved_user_ids": {
+              "type": [
+                "null",
+                "string"
+              ]
+            },
+            "hs_mentions_user_ids": {
               "type": [
                 "null",
                 "string"
@@ -14866,6 +15085,12 @@
                 "string"
               ]
             },
+            "hs_snoozed_for_portal": {
+              "type": [
+                "null",
+                "boolean"
+              ]
+            },
             "hs_source_object_id": {
               "type": [
                 "null",
@@ -14907,30 +15132,6 @@
               "type": [
                 "null",
                 "string"
-              ]
-            },
-            "hs_time_in_1": {
-              "type": [
-                "null",
-                "number"
-              ]
-            },
-            "hs_time_in_2": {
-              "type": [
-                "null",
-                "number"
-              ]
-            },
-            "hs_time_in_3": {
-              "type": [
-                "null",
-                "number"
-              ]
-            },
-            "hs_time_in_4": {
-              "type": [
-                "null",
-                "number"
               ]
             },
             "hs_time_to_close_in_operating_hours": {

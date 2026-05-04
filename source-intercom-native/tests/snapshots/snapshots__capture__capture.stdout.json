@@ -587,22 +587,7 @@
       "read": false,
       "sla_applied": null,
       "snoozed_until": null,
-      "source": {
-        "attachments": [],
-        "author": {
-          "email": "operator+s3r1c48t@intercom.io",
-          "id": "7939622",
-          "name": "Fin",
-          "type": "admin"
-        },
-        "body": "",
-        "delivered_as": "admin_initiated",
-        "id": "1",
-        "redacted": false,
-        "subject": "",
-        "type": "admin_initiated",
-        "url": null
-      },
+      "source": null,
       "state": "open",
       "statistics": {
         "count_assignments": 0,

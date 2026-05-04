@@ -379,6 +379,7 @@
       "id": 28835714573076,
       "key": null,
       "position": 1,
+      "raw_agent_description": null,
       "raw_description": "",
       "raw_title": "Subject",
       "raw_title_in_portal": "Subject",
@@ -493,6 +494,10 @@
           {
             "id": 43010621832468,
             "value": null
+          },
+          {
+            "id": 48494958189844,
+            "value": null
           }
         ],
         "custom_status_id": 28835714727188,
@@ -513,6 +518,10 @@
           },
           {
             "id": 43010621832468,
+            "value": null
+          },
+          {
+            "id": 48494958189844,
             "value": null
           }
         ],
@@ -588,6 +597,10 @@
         {
           "id": 43010621832468,
           "value": null
+        },
+        {
+          "id": 48494958189844,
+          "value": null
         }
       ],
       "custom_status_id": 28835714727188,
@@ -607,6 +620,10 @@
         },
         {
           "id": 43010621832468,
+          "value": null
+        },
+        {
+          "id": 48494958189844,
           "value": null
         }
       ],
@@ -690,10 +707,11 @@
       "shared_phone_number": null,
       "signature": null,
       "suspended": false,
+      "suspension_details": null,
       "tags": [],
       "ticket_restriction": null,
       "time_zone": "America/New_York",
-      "two_factor_auth_enabled": null,
+      "two_factor_auth_enabled": false,
       "updated_at": "redacted",
       "url": "https://d3v-estuary.zendesk.com/api/v2/users/28835702984212.json",
       "user_fields": {},
@@ -740,6 +758,7 @@
         "assign_agent_statuses": false,
         "assign_tickets_to_any_brand": false,
         "assign_tickets_to_any_group": false,
+        "capacity_rules_access": "none",
         "chat_access": false,
         "custom_objects": {},
         "end_user_list_access": "full",
@@ -779,14 +798,17 @@
         "manage_skills": false,
         "manage_slas": false,
         "manage_suspended_tickets": false,
+        "manage_team_members": "readonly",
         "manage_ticket_fields": false,
         "manage_ticket_forms": false,
+        "manage_ticket_settings": false,
         "manage_triggers": false,
         "manage_user_fields": false,
         "manage_user_own_contacts": false,
         "manage_user_own_forwarding_numbers": false,
         "manage_user_own_photo": false,
         "moderate_forums": false,
+        "modify_closed_tickets": false,
         "organization_editing": false,
         "organization_notes_editing": false,
         "read_macro_content_suggestions": false,
