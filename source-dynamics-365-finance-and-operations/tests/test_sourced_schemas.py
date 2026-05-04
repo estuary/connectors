@@ -120,7 +120,32 @@ class TestSourcedSchema:
         assert schema["additionalProperties"] is False
         assert schema["type"] == "object"
         assert "properties" in schema
-        assert schema["required"] == ["Name"]
+        assert schema["required"] == ["Name", "_meta"]
+        assert schema["properties"]["_meta"] == {
+            "additionalProperties": False,
+            "type": "object",
+            "properties": {
+                "op": {
+                    "type": "string",
+                    "maxLength": 1,
+                },
+                "uuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "minLength": 36,
+                    "maxLength": 36,
+                },
+                "source_file": {
+                    "type": "string",
+                    "maxLength": 1,
+                }
+            },
+            "required": [
+                "op",
+                "source_file",
+                "uuid",
+            ]
+        }
 
     def test_all_types_together(self):
         entity = make_entity("test", [
@@ -138,8 +163,8 @@ class TestSourcedSchema:
 
         schema = model.sourced_schema(log)
 
-        assert len(schema["properties"]) == 9
-        assert len(schema["required"]) == 9
+        assert len(schema["properties"]) == 10
+        assert len(schema["required"]) == 10
         assert schema["properties"]["Id"]["format"] == "uuid"
         assert schema["properties"]["SinkCreatedOn"] == {"type": "string", "minLength": 19, "maxLength": 22}
         assert schema["properties"]["SinkModifiedOn"] == {"type": "string", "minLength": 19, "maxLength": 22}
