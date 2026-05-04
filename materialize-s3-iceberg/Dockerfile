@@ -1,29 +1,8 @@
-FROM python:3.12-slim-bookworm AS base
+ARG BASE_IMAGE=ghcr.io/estuary/base-image:v1
 
-# Python build stage
+# Build Stage
 ################################################################################
-FROM base AS pybuilder
-
-RUN apt-get update && \
-    apt install -y --no-install-recommends \
-    build-essential \
-    python3-dev \
-    python3-poetry
-
-RUN python -m venv /opt/venv
-ENV VIRTUAL_ENV=/opt/venv
-
-WORKDIR /opt/iceberg-ctl
-
-COPY materialize-s3-iceberg/iceberg-ctl/poetry.lock /opt/iceberg-ctl/poetry.lock
-COPY materialize-s3-iceberg/iceberg-ctl/pyproject.toml /opt/iceberg-ctl/pyproject.toml
-RUN poetry install --no-root
-COPY materialize-s3-iceberg/iceberg-ctl/iceberg_ctl /opt/iceberg-ctl/iceberg_ctl
-RUN poetry install
-
-# Go build stage
-################################################################################
-FROM --platform=linux/amd64 golang:1.25-bookworm AS gobuilder
+FROM --platform=linux/amd64 golang:1.25-bookworm AS builder
 
 WORKDIR /builder
 
@@ -43,20 +22,22 @@ RUN go test -short -v ./materialize-s3-iceberg/...
 
 RUN go build -o ./connector -v ./materialize-s3-iceberg
 
-# Runtime stage
+# Runtime Stage
 ################################################################################
+FROM ${BASE_IMAGE}
 
-FROM base AS runner
+RUN apt-get update -y \
+     && apt-get install --no-install-recommends -y \
+     ca-certificates \
+     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=pybuilder /opt/venv /opt/venv
-COPY --from=pybuilder /opt/iceberg-ctl /opt/iceberg-ctl
-COPY --from=gobuilder /builder/connector /opt/materialize-s3-iceberg
+USER nonroot:nonroot
 
-ENV GOMEMLIMIT=900MiB
-ENV PYTHON_PATH=/opt/venv/bin/python
+WORKDIR /connector
+ENV PATH="/connector:$PATH"
+
+COPY --from=builder /builder/connector ./materialize-s3-iceberg
 
 LABEL FLOW_RUNTIME_PROTOCOL=materialize
 
-WORKDIR /opt
-
-ENTRYPOINT ["/opt/materialize-s3-iceberg"]
+ENTRYPOINT ["/connector/materialize-s3-iceberg"]
