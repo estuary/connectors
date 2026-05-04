@@ -30,8 +30,9 @@ type existingIcebergColumn struct {
 }
 
 type tableCreate struct {
-	Fields   []existingIcebergColumn `json:"fields"`
-	Location string                  `json:"location"`
+	Fields     []existingIcebergColumn `json:"fields"`
+	Location   string                  `json:"location"`
+	Properties map[string]string       `json:"properties,omitempty"`
 }
 
 type tableAlter struct {

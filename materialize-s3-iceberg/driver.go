@@ -190,9 +190,10 @@ func parse8601(in string) (time.Duration, error) {
 }
 
 type resource struct {
-	Table     string `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
-	Namespace string `json:"namespace,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative namespace for this table (optional)."`
-	Delta     *bool  `json:"delta_updates,omitempty" jsonschema:"default=true,title=Delta Update,description=Should updates to this table be done via delta updates. Currently this connector only supports delta updates."`
+	Table                     string            `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
+	Namespace                 string            `json:"namespace,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative namespace for this table (optional)."`
+	Delta                     *bool             `json:"delta_updates,omitempty" jsonschema:"default=true,title=Delta Update,description=Should updates to this table be done via delta updates. Currently this connector only supports delta updates."`
+	AdditionalTableProperties map[string]string `json:"additional_table_properties,omitempty" jsonschema:"title=Additional Table Properties,description=Additional Iceberg table properties to set when the table is created. These are set only at creation time and cannot be changed afterwards. Example: {'write.parquet.compression-codec': 'zstd'}"`
 }
 
 func pathToFQN(p []string) string {
@@ -427,7 +428,7 @@ func (d *materialization) CreateNamespace(ctx context.Context, ns string) (strin
 }
 
 func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
-	return d.catalog.CreateResource(ctx, &res.MaterializationSpec_Binding)
+	return d.catalog.CreateResource(ctx, &res.MaterializationSpec_Binding, res.Config)
 }
 
 func (d *materialization) DeleteResource(ctx context.Context, resourcePath []string) (string, boilerplate.ActionApplyFn, error) {

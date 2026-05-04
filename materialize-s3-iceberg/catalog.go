@@ -109,8 +109,11 @@ func (c *catalog) createNamespace(ctx context.Context, namespace string) error {
 	return err
 }
 
-func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_Binding) (string, boilerplate.ActionApplyFn, error) {
-	tc := tableCreate{Location: tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)}
+func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_Binding, res resource) (string, boilerplate.ActionApplyFn, error) {
+	tc := tableCreate{
+		Location:   tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle),
+		Properties: res.AdditionalTableProperties,
+	}
 
 	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
 	if err != nil {
