@@ -212,6 +212,7 @@ collections:
         objectToMulti: *object
         stringToMulti: *string
         binaryToString: *binary
+        stringToBinary: *string
         intStr064ToString: *intStr064
         intStr128ToString: *intStr128
         intStr256ToString: *intStr256

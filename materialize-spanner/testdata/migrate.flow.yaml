@@ -15,6 +15,8 @@ materializations:
       fields:
         recommended: true
         exclude:
+          # Spanner has no migration spec for STRING(MAX) → BYTES(MAX).
+          - stringToBinary
           - intStr256ToString
           # TODO: `array` is a Spanner reserved keyword; the load-query SELECT
           # alias collides with it.
