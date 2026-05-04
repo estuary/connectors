@@ -169,7 +169,9 @@ func runTimestampOverflowRegression(t *testing.T, cfg config) {
 	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
 		{Name: "ts", DataType: writer.LogicalTypeTimestamp, Required: false},
 	}, writer.WithParquetCompression(writer.Snappy))
-	require.NoError(t, pqw.Write([]any{"9999-12-31T23:59:59-14:00"}))
+	clamped, ok := clampTimestamp("9999-12-31T23:59:59-14:00")
+	require.True(t, ok, "test value should require clamping")
+	require.NoError(t, pqw.Write([]any{clamped}))
 	require.NoError(t, pqw.Close())
 
 	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
@@ -241,7 +243,9 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
 		{Name: "d", DataType: writer.LogicalTypeDate, Required: false},
 	}, writer.WithParquetCompression(writer.Snappy))
-	require.NoError(t, pqw.Write([]any{"10000-01-01"}))
+	clamped, ok := clampDate("10000-01-01")
+	require.True(t, ok, "test value should require clamping")
+	require.NoError(t, pqw.Write([]any{clamped}))
 	require.NoError(t, pqw.Close())
 
 	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"

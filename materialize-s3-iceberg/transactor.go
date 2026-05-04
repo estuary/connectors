@@ -174,6 +174,25 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			row = append(row, it.RawJSON)
 		}
 
+		// Clamp out-of-range timestamps/dates so pyiceberg.add_files can
+		// read the parquet column stats without overflowing Python datetime.
+		for i, v := range row {
+			s, ok := v.(string)
+			if !ok {
+				continue
+			}
+			switch b.pqSchema[i].DataType {
+			case writer.LogicalTypeTimestamp:
+				if clamped, ok := clampTimestamp(s); ok {
+					row[i] = clamped
+				}
+			case writer.LogicalTypeDate:
+				if clamped, ok := clampDate(s); ok {
+					row[i] = clamped
+				}
+			}
+		}
+
 		if err := pqw.Write(row); err != nil {
 			return nil, fmt.Errorf("writing row: %w", err)
 		}
