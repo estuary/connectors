@@ -20,8 +20,10 @@ Usage:
 """
 
 import argparse
+import heapq
 import itertools
 import json
+import math
 import random
 import string
 import sys
@@ -87,6 +89,17 @@ class OverlapSpec:
     # — useful for modelling recency-biased update patterns.
     range_lo: float = 0.0
     range_hi: float = 1.0
+    # Sampling distribution within the (sub-)range:
+    # - "uniform" (default): each key equally likely.
+    # - "zipfian": each key drawn with probability ∝ 1/rank^s with rank=1
+    #   sitting at the biased end (zipf_bias). Models hot-spot workloads
+    #   where a small set of keys near one end of the range gets the bulk
+    #   of activity, with a long tail across the rest. Real-world updates
+    #   often concentrate on the most recent rows but occasionally reach
+    #   back into older ones — that's the shape this captures.
+    distribution: Literal["uniform", "zipfian"] = "uniform"
+    zipf_s: float = 1.0
+    zipf_bias: Literal["tail", "head"] = "tail"
 
 
 @dataclass
@@ -201,6 +214,23 @@ def load_scenario(path: str) -> tuple[dict[str, CollectionSpec], list[TxSpec]]:
                         f"transaction[{i}]: overlap.range must satisfy "
                         f"0 <= lo < hi <= 1 (got [{rlo}, {rhi}])"
                     )
+            distribution = o.get("distribution", "uniform")
+            if distribution not in ("uniform", "zipfian"):
+                raise ValueError(
+                    f"transaction[{i}]: overlap.distribution must be "
+                    f"'uniform' or 'zipfian' (got {distribution!r})"
+                )
+            zipf_s = float(o.get("zipf_s", 1.0))
+            if zipf_s <= 0:
+                raise ValueError(
+                    f"transaction[{i}]: overlap.zipf_s must be > 0 (got {zipf_s})"
+                )
+            zipf_bias = o.get("zipf_bias", "tail")
+            if zipf_bias not in ("tail", "head"):
+                raise ValueError(
+                    f"transaction[{i}]: overlap.zipf_bias must be "
+                    f"'tail' or 'head' (got {zipf_bias!r})"
+                )
             overlaps.append(
                 OverlapSpec(
                     with_tx=int(o["with"]),
@@ -208,6 +238,9 @@ def load_scenario(path: str) -> tuple[dict[str, CollectionSpec], list[TxSpec]]:
                     op=o["op"],
                     range_lo=rlo,
                     range_hi=rhi,
+                    distribution=distribution,
+                    zipf_s=zipf_s,
+                    zipf_bias=zipf_bias,
                 )
             )
         for o in overlaps:
@@ -447,12 +480,19 @@ class CollectionState:
         rng: random.Random,
         range_lo: float = 0.0,
         range_hi: float = 1.0,
+        distribution: str = "uniform",
+        zipf_s: float = 1.0,
+        zipf_bias: str = "tail",
     ) -> list[int]:
         """Sample n keys from tx_idx's key range, excluding `exclude`.
 
         range_lo/range_hi restrict sampling to a sub-range of the source tx's
         keys, expressed as fractions in [0, 1]. The defaults sample from the
         full range (preserves prior behaviour).
+
+        distribution selects the sampling distribution within the sub-range:
+        "uniform" (each key equally likely) or "zipfian" (probability
+        ∝ 1/rank^s with rank=1 at zipf_bias's end of the sub-range).
         """
         start, count = self.tx_ranges[tx_idx]
         if count == 0:
@@ -460,6 +500,20 @@ class CollectionState:
         sub_start = start + int(count * range_lo)
         sub_end = start + int(count * range_hi)
         sub_count = sub_end - sub_start
+
+        if distribution == "zipfian":
+            available = sub_count - (
+                sum(1 for k in exclude if sub_start <= k < sub_end) if exclude else 0
+            )
+            if n > available:
+                raise ValueError(
+                    f"overlap requests {n} keys from tx {tx_idx} sub-range "
+                    f"[{range_lo}, {range_hi}) after exclusions, only {available} available"
+                )
+            return _sample_zipfian(
+                sub_start, sub_end, n, exclude, rng, zipf_s, zipf_bias
+            )
+
         # Fast path: when exclude is empty we can sample directly from range().
         if not exclude:
             if n > sub_count:
@@ -478,6 +532,42 @@ class CollectionState:
                 f"[{range_lo}, {range_hi}) after exclusions, only {len(candidates)} available"
             )
         return rng.sample(candidates, n)
+
+
+def _sample_zipfian(
+    sub_start: int,
+    sub_end: int,
+    n: int,
+    exclude: set[int],
+    rng: random.Random,
+    s: float,
+    bias: str,
+) -> list[int]:
+    """Weighted sample without replacement using the Efraimidis-Spirakis
+    A-Res reservoir trick. Each key i gets weight 1/rank(i)^s with rank=1
+    at the biased end of [sub_start, sub_end); we assign each key a
+    priority log(u)/weight = log(u) * rank^s and keep the top-n priorities
+    (closest to zero, since both factors push priority negative).
+
+    Heavy mass on a few keys near the bias end, with a long tail decaying
+    over the rest of the sub-range. O(N log n) time, O(n) heap space —
+    fine at fixture-generation sizes.
+    """
+    heap: list[tuple[float, int]] = []
+    for i in range(sub_start, sub_end):
+        if i in exclude:
+            continue
+        if bias == "tail":
+            rank = sub_end - i  # rank 1 at sub_end - 1 (the tail).
+        else:
+            rank = i - sub_start + 1  # rank 1 at sub_start (the head).
+        u = rng.random() or 1e-300  # guard against log(0).
+        priority = math.log(u) * (rank ** s)
+        if len(heap) < n:
+            heapq.heappush(heap, (priority, i))
+        elif priority > heap[0][0]:
+            heapq.heapreplace(heap, (priority, i))
+    return [i for _, i in heap]
 
 
 # ---------------------------------------------------------------------------
@@ -518,7 +608,15 @@ def _resolve_op_plan(
             continue
         used = used_per_tx.setdefault(o.with_tx, set())
         keys = state.sample_from_tx(
-            o.with_tx, n, used, rng, range_lo=o.range_lo, range_hi=o.range_hi
+            o.with_tx,
+            n,
+            used,
+            rng,
+            range_lo=o.range_lo,
+            range_hi=o.range_hi,
+            distribution=o.distribution,
+            zipf_s=o.zipf_s,
+            zipf_bias=o.zipf_bias,
         )
         used.update(keys)
         plans.append(OverlapPlan(op=o.op, src_tx=o.with_tx, keys=keys))
