@@ -194,9 +194,10 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 // native VARBINARY bytes. SQL Server doesn't expose a direct base64 decoder,
 // so we go through the XML xs:base64Binary cast. Used when the
 // native_binary_column_type feature flag is enabled on a task that previously
-// stored binary fields as base64 text.
+// stored binary fields as base64 text. The column name inside sql:column() is
+// the unquoted Field — XQuery's "..." delimiters are not SQL identifier quotes.
 func stringToVarbinaryCast(migration sql.ColumnTypeMigration) string {
-	return fmt.Sprintf(`CAST(N'' AS XML).value('xs:base64Binary(sql:column("%s"))', 'VARBINARY(MAX)')`, migration.Identifier)
+	return fmt.Sprintf(`CAST(N'' AS XML).value('xs:base64Binary(sql:column("%s"))', 'VARBINARY(MAX)')`, migration.Field)
 }
 
 type templates struct {
