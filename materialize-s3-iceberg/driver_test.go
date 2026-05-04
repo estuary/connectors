@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -18,9 +19,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/bradleyjkemp/cupaloy"
+	"github.com/estuary/connectors/go/writer"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
@@ -108,12 +111,167 @@ func TestIntegration(t *testing.T) {
 		boilerplate.RunApplyTest(t, &driver{}, newMaterialization, "testdata/apply.flow.yaml", makeResourceFn)
 	})
 
+	t.Run("ts-overflow-regression", func(t *testing.T) {
+		runTimestampOverflowRegression(t, cfg)
+	})
+
+	t.Run("date-overflow-regression", func(t *testing.T) {
+		runDateOverflowRegression(t, cfg)
+	})
+
 	// Migration test is skipped because Iceberg does not support the type
 	// migrations exercised by the test (e.g. long→string). pyiceberg rejects
 	// schema mismatches when appending files with migrated types.
 	//t.Run("migrate", func(t *testing.T) {
 	//	boilerplate.RunMigrationTest(t, newMaterialization, "testdata/migrate.flow.yaml", makeResourceFn, nil)
 	//})
+}
+
+// runTimestampOverflowRegression reproduces the deel/prod/.../profile failure
+// where iceberg_ctl `append_files` aborts with `OverflowError: date value out
+// of range`: pyiceberg reads the parquet column's min/max stats through
+// pyarrow, which materializes a Python `datetime` capped at MAXYEAR=9999.
+// Iceberg's INT64-micros encoding admits much wider years; the input value
+// here normalizes to UTC year 10000.
+func runTimestampOverflowRegression(t *testing.T, cfg config) {
+	ctx := context.Background()
+
+	const (
+		namespace = "tests"
+		table     = "ts_overflow_regression"
+	)
+	fqn := namespace + "." + table
+
+	// Tolerate leftovers from a prior run.
+	_, _ = runIcebergctl(ctx, &cfg, "drop-table", fqn)
+	if _, err := runIcebergctl(ctx, &cfg, "create-namespace", namespace); err != nil &&
+		!strings.Contains(err.Error(), "already exists") &&
+		!strings.Contains(err.Error(), "AlreadyExists") {
+		t.Fatalf("create-namespace: %v", err)
+	}
+
+	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
+
+	tcJson, err := json.Marshal(tableCreate{
+		Location: tblLocation,
+		Fields: []existingIcebergColumn{
+			{Name: "ts", Nullable: true, Type: icebergTypeTimestamptz},
+		},
+	})
+	require.NoError(t, err)
+	_, err = runIcebergctl(ctx, &cfg, "create-table", fqn, string(tcJson))
+	require.NoError(t, err)
+
+	// "9999-12-31T23:59:59-14:00" normalizes to UTC year 10000.
+	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
+	parquetFile, err := os.Create(parquetPath)
+	require.NoError(t, err)
+	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
+		{Name: "ts", DataType: writer.LogicalTypeTimestamp, Required: false},
+	}, writer.WithParquetCompression(writer.Snappy))
+	require.NoError(t, pqw.Write([]any{"9999-12-31T23:59:59-14:00"}))
+	require.NoError(t, pqw.Close())
+
+	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
+	s3Key := strings.TrimPrefix(s3Path, "s3://"+cfg.Bucket+"/")
+
+	uploadFile, err := os.Open(parquetPath)
+	require.NoError(t, err)
+	defer uploadFile.Close()
+
+	s3client := s3.New(s3.Options{
+		Region:       cfg.Region,
+		Credentials:  credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, ""),
+		BaseEndpoint: aws.String(cfg.S3Endpoint),
+		UsePathStyle: true,
+	})
+	_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(cfg.Bucket),
+		Key:    aws.String(s3Key),
+		Body:   uploadFile,
+	})
+	require.NoError(t, err)
+
+	_, err = runIcebergctl(ctx, &cfg, "append-files",
+		"acmeCo/tests/regression",
+		fqn,
+		"",
+		"deadbeefdeadbeef",
+		s3Path,
+	)
+	require.NoError(t, err, "append-files should accept a timestamp within Iceberg's range")
+}
+
+// runDateOverflowRegression is the date analog of
+// runTimestampOverflowRegression. Parquet DATE is INT32 days-since-epoch;
+// year > 9999 fits the spec but overflows pyarrow's Date32Scalar.as_py.
+// getDateVal rejects > 4-digit years at parse time today, so the failure
+// surfaces earlier than the pyiceberg call.
+func runDateOverflowRegression(t *testing.T, cfg config) {
+	ctx := context.Background()
+
+	const (
+		namespace = "tests"
+		table     = "date_overflow_regression"
+	)
+	fqn := namespace + "." + table
+
+	_, _ = runIcebergctl(ctx, &cfg, "drop-table", fqn)
+	if _, err := runIcebergctl(ctx, &cfg, "create-namespace", namespace); err != nil &&
+		!strings.Contains(err.Error(), "already exists") &&
+		!strings.Contains(err.Error(), "AlreadyExists") {
+		t.Fatalf("create-namespace: %v", err)
+	}
+
+	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
+
+	tcJson, err := json.Marshal(tableCreate{
+		Location: tblLocation,
+		Fields: []existingIcebergColumn{
+			{Name: "d", Nullable: true, Type: icebergTypeDate},
+		},
+	})
+	require.NoError(t, err)
+	_, err = runIcebergctl(ctx, &cfg, "create-table", fqn, string(tcJson))
+	require.NoError(t, err)
+
+	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
+	parquetFile, err := os.Create(parquetPath)
+	require.NoError(t, err)
+	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
+		{Name: "d", DataType: writer.LogicalTypeDate, Required: false},
+	}, writer.WithParquetCompression(writer.Snappy))
+	require.NoError(t, pqw.Write([]any{"10000-01-01"}))
+	require.NoError(t, pqw.Close())
+
+	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
+	s3Key := strings.TrimPrefix(s3Path, "s3://"+cfg.Bucket+"/")
+
+	uploadFile, err := os.Open(parquetPath)
+	require.NoError(t, err)
+	defer uploadFile.Close()
+
+	s3client := s3.New(s3.Options{
+		Region:       cfg.Region,
+		Credentials:  credentials.NewStaticCredentialsProvider(cfg.AWSAccessKeyID, cfg.AWSSecretAccessKey, ""),
+		BaseEndpoint: aws.String(cfg.S3Endpoint),
+		UsePathStyle: true,
+	})
+	_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(cfg.Bucket),
+		Key:    aws.String(s3Key),
+		Body:   uploadFile,
+	})
+	require.NoError(t, err)
+
+	_, err = runIcebergctl(ctx, &cfg, "append-files",
+		"acmeCo/tests/regression",
+		fqn,
+		"",
+		"deadbeefdeadbeef",
+		s3Path,
+	)
+	require.NoError(t, err, "append-files should accept a date within Iceberg's range")
 }
 
 func loadTestConfig(t *testing.T) config {
