@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/big"
 	"os"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -758,16 +759,35 @@ func getUuidVal(val any) (got parquet.FixedLenByteArray, err error) {
 	return
 }
 
+// dateLikeRe matches date strings with any number of year digits. Used as a
+// fallback when time.Parse rejects > 4-digit years.
+var dateLikeRe = regexp.MustCompile(`^(\d+)-(\d{2})-(\d{2})$`)
+
 func getDateVal(val any) (got int32, err error) {
 	switch v := val.(type) {
 	case string:
-		if d, parseErr := time.Parse(time.DateOnly, v); parseErr != nil {
-			err = fmt.Errorf("unable to parse string %q as time.DateOnly: %w", v, parseErr)
-		} else {
-			unixSeconds := d.Unix()
-			unixDays := unixSeconds / 60 / 60 / 24
-			got = int32(unixDays)
+		d, parseErr := time.Parse(time.DateOnly, v)
+		if parseErr != nil {
+			m := dateLikeRe.FindStringSubmatch(v)
+			if m == nil {
+				err = fmt.Errorf("unable to parse string %q as date: %w", v, parseErr)
+				return
+			}
+			year, _ := strconv.Atoi(m[1])
+			month, _ := strconv.Atoi(m[2])
+			day, _ := strconv.Atoi(m[3])
+			d = time.Date(year, time.Month(month), day, 0, 0, 0, 0, time.UTC)
 		}
+		unixSeconds := d.Unix()
+		unixDays := unixSeconds / 60 / 60 / 24
+		if unixDays > math.MaxInt32 {
+			log.WithField("date", v).Warn("date exceeds Iceberg INT32 max; clamping to representable maximum")
+			unixDays = math.MaxInt32
+		} else if unixDays < math.MinInt32 {
+			log.WithField("date", v).Warn("date precedes Iceberg INT32 min; clamping to representable minimum")
+			unixDays = math.MinInt32
+		}
+		got = int32(unixDays)
 	default:
 		err = fmt.Errorf("getDateVal unhandled type: %T", v)
 	}
