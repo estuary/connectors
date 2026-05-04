@@ -1,0 +1,8 @@
+project_id: test-project
+instance_id: test-instance
+credentials:
+  auth_type: CredentialsJSON
+  credentials_json: "{}"
+advanced:
+  endpoint: localhost:8086
+  feature_flags: allow_existing_tables_for_new_bindings
