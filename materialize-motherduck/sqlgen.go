@@ -176,7 +176,7 @@ JOIN read_json(
 	columns={
 	{{- range $ind, $bound := $.Bounds }}
 		{{- if $ind }},{{ end }}
-		{{$bound.Identifier}}: '{{ if IsBinary $bound }}VARCHAR{{ else }}{{$bound.DDL}}{{ end }}'
+		{{$bound.Identifier}}: '{{ if IsBinary $bound }}VARCHAR{{ if $bound.MustExist }} NOT NULL{{ end }}{{ else }}{{$bound.DDL}}{{ end }}'
 	{{- end }}
 	}
 ) AS r
@@ -206,7 +206,7 @@ USING read_json(
 	columns={
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{$col.Identifier}}: '{{ if IsBinary $col }}VARCHAR{{ else }}{{$col.DDL}}{{ end }}'
+		{{$col.Identifier}}: '{{ if IsBinary $col }}VARCHAR{{ if $col.MustExist }} NOT NULL{{ end }}{{ else }}{{$col.DDL}}{{ end }}'
 	{{- end }}
 	}
 ) AS r
@@ -241,7 +241,7 @@ FROM read_json(
 	columns={
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{$col.Identifier}}: '{{ if IsBinary $col }}VARCHAR{{ else }}{{$col.DDL}}{{ end }}'
+		{{$col.Identifier}}: '{{ if IsBinary $col }}VARCHAR{{ if $col.MustExist }} NOT NULL{{ end }}{{ else }}{{$col.DDL}}{{ end }}'
 	{{- end }}
 	, _flow_delete: 'BOOLEAN NOT NULL'
 	}
@@ -290,7 +290,7 @@ JOIN read_json(
        columns={                                                                                                                                                   
        {{- range $ind, $bound := $.Bounds }}                                                                                                                       
                {{- if $ind }},{{ end }}                                                                                                                            
-               {{$bound.Identifier}}: '{{ if IsBinary $bound }}VARCHAR{{ else }}{{$bound.DDL}}{{ end }}'
+               {{$bound.Identifier}}: '{{ if IsBinary $bound }}VARCHAR{{ if $bound.MustExist }} NOT NULL{{ end }}{{ else }}{{$bound.DDL}}{{ end }}'
        {{- end }}                                                                                                                                                  
        }                                                                                                                                                           
 ) AS r                                                                                                                                                             
