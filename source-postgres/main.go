@@ -225,6 +225,13 @@ var featureFlagDefaults = map[string]bool{
 	// This is the default, but advanced users could set `no_create_replication_slot` if they want
 	// to manage their replication slots manually instead.
 	"create_replication_slot": true,
+
+	// When true, all prerequisite checks (both global and per-table) are skipped. This is intended
+	// as an escape hatch for situations where the checks themselves are buggy or do not apply.
+	"skip_prerequisites": false,
+
+	// When true, per-table prerequisite checks are skipped. Implied by `skip_prerequisites`.
+	"skip_table_prerequisites": false,
 }
 
 // Validate checks that the configuration possesses all required properties.
