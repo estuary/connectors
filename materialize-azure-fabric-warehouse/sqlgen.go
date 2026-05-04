@@ -95,6 +95,7 @@ func createDialect(featureFlags map[string]bool, caseInsensitiveResources bool) 
 			"date":      {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
 			"datetime2": {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
 			"time":      {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
+			"varchar":   {sql.NewMigrationSpec([]string{"VARBINARY(MAX)"}, sql.WithCastSQL(stringToVarbinaryCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
@@ -129,6 +130,13 @@ func bitToStringCast(m sql.ColumnTypeMigration) string {
 		`CAST(CASE WHEN %s = 1 THEN 'true' WHEN %s = 0 THEN 'false' ELSE NULL END AS %s)`,
 		m.Identifier, m.Identifier, m.BareDDL,
 	)
+}
+
+// stringToVarbinaryCast decodes a base64-encoded VARCHAR column into native
+// VARBINARY bytes. Used when the native_binary_column_type feature flag is
+// enabled on a task that previously stored binary fields as base64 text.
+func stringToVarbinaryCast(m sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`BASE64_DECODE(%s)`, m.Identifier)
 }
 
 type queryParams struct {

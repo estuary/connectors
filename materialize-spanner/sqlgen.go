@@ -86,12 +86,13 @@ func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"numeric":   {sql.NewMigrationSpec([]string{"float64"}), sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
-			"int64":     {sql.NewMigrationSpec([]string{"float64", "numeric"}), sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
-			"float64":   {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
-			"date":      {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
-			"timestamp": {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(timestampToStringCast))},
-			"*":         {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			"numeric":     {sql.NewMigrationSpec([]string{"float64"}), sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
+			"int64":       {sql.NewMigrationSpec([]string{"float64", "numeric"}), sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
+			"float64":     {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
+			"date":        {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
+			"timestamp":   {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(timestampToStringCast))},
+			"string(max)": {sql.NewMigrationSpec([]string{"bytes(max)"}, sql.WithCastSQL(stringToBytesCast))},
+			"*":           {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 2 {
@@ -141,6 +142,13 @@ func timestampToStringCast(migration sql.ColumnTypeMigration) string {
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`TO_JSON(%s)`, migration.Identifier)
+}
+
+// stringToBytesCast decodes a base64-encoded STRING(MAX) column into native
+// BYTES. Used when the native_binary_column_type feature flag is enabled on a
+// task that previously stored binary fields as base64 text.
+func stringToBytesCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`FROM_BASE64(%s)`, migration.Identifier)
 }
 
 type templates struct {
