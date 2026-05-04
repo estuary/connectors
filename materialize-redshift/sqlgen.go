@@ -303,7 +303,6 @@ CREATE TEMPORARY TABLE {{ template "temp_name" $.Target }} (
 -- Idempotent creation of the store table for staging new records.
 
 {{ define "createStoreTable" }}
-{{- if HasBinary $.Columns }}
 CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 {{- range $ind, $col := $.Columns }}
 	{{- if $ind }},{{ end }}
@@ -314,11 +313,6 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 	{{- end }}
 {{- end }}
 );
-{{- else }}
-CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
-	LIKE {{$.Identifier}}
-);
-{{- end }}
 {{ end }}
 
 {{ define "createDeleteTable" }}
