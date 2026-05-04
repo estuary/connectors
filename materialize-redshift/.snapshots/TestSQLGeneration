@@ -115,7 +115,9 @@ CREATE TEMPORARY TABLE flow_temp_table_0 (
 --- Begin "a-schema".delta_updates createStoreTable ---
 
 CREATE TEMPORARY TABLE flow_temp_table_1 (
-	LIKE "a-schema".delta_updates
+	"theKey" TEXT,
+	"aValue" BIGINT,
+	flow_published_at TIMESTAMPTZ
 );
 --- End "a-schema".delta_updates createStoreTable ---
 
