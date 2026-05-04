@@ -56,6 +56,7 @@ JOIN read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
 	compression='gzip',
+	ignore_errors=false,
 	columns={
 		key1: 'BIGINT NOT NULL',
 		key2: 'BOOLEAN NOT NULL',
@@ -97,10 +98,11 @@ json_object(
        'stringNumber', CAST(l."stringNumber" AS VARCHAR)                                                                                                                                                          
 ) as doc                                                                                                                                                           
 FROM db."a-schema".key_value AS l                                                                                                                                       
-JOIN read_json(                                                                                                                                                    
-       ['s3://bucket/file1', 's3://bucket/file2'],                                                                                                                                                          
-       format='newline_delimited',                                                                                                                                 
-       compression='gzip',                                                                                                                                         
+JOIN read_json(
+       ['s3://bucket/file1', 's3://bucket/file2'],
+       format='newline_delimited',
+       compression='gzip',
+       ignore_errors=false,
        columns={                                                                                                                            
                key1: 'BIGINT NOT NULL',                                                                                                                            
                key2: 'BOOLEAN NOT NULL',                                                                                                                            
@@ -118,6 +120,7 @@ USING read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
 	compression='gzip',
+	ignore_errors=false,
 	maximum_object_size=67108864,
 	columns={
 		key1: 'BIGINT NOT NULL',
@@ -160,6 +163,7 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
 	compression='gzip',
+	ignore_errors=false,
 	maximum_object_size=67108864,
 	columns={
 		key1: 'BIGINT NOT NULL',
@@ -200,6 +204,7 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	['s3://bucket/file1', 's3://bucket/file2'],
 	format='newline_delimited',
 	compression='gzip',
+	ignore_errors=false,
 	maximum_object_size=67108864,
 	columns={
 		"theKey": 'VARCHAR NOT NULL',

@@ -160,6 +160,7 @@ JOIN read_json(
 	],
 	format='newline_delimited',
 	compression='gzip',
+	ignore_errors=false,
 	columns={
 	{{- range $ind, $bound := $.Bounds }}
 		{{- if $ind }},{{ end }}
@@ -189,6 +190,7 @@ USING read_json(
 	],
 	format='newline_delimited',
 	compression='gzip',
+	ignore_errors=false,
 	maximum_object_size=` + strconv.FormatUint(MAX_OBJECT_BYTES, 10) + `,
 	columns={
 	{{- range $ind, $col := $.Columns }}
@@ -214,6 +216,7 @@ SELECT * EXCLUDE (_flow_delete) FROM read_json(
 	],
 	format='newline_delimited',
 	compression='gzip',
+	ignore_errors=false,
 	maximum_object_size=` + strconv.FormatUint(MAX_OBJECT_BYTES, 10) + `,
 	columns={
 	{{- range $ind, $col := $.Columns }}
@@ -254,15 +257,16 @@ json_object(
 {{- end}}                                                                                                                                                          
 ) as doc                                                                                                                                                           
 FROM {{ $.Identifier }} AS l                                                                                                                                       
-JOIN read_json(                                                                                                                                                    
-       [                                                                                                                                                           
-       {{- range $ind, $f := $.Files }}                                                                                                                            
-       {{- if $ind }}, {{ end }}'{{ $f }}'                                                                                                                         
-       {{- end -}}                                                                                                                                                 
-       ],                                                                                                                                                          
-       format='newline_delimited',                                                                                                                                 
-       compression='gzip',                                                                                                                                         
-       columns={                                                                                                                                                   
+JOIN read_json(
+       [
+       {{- range $ind, $f := $.Files }}
+       {{- if $ind }}, {{ end }}'{{ $f }}'
+       {{- end -}}
+       ],
+       format='newline_delimited',
+       compression='gzip',
+       ignore_errors=false,
+       columns={
        {{- range $ind, $bound := $.Bounds }}                                                                                                                       
                {{- if $ind }},{{ end }}                                                                                                                            
                {{$bound.Identifier}}: '{{$bound.DDL}}'                                                                                                             
