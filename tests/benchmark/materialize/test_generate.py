@@ -284,6 +284,179 @@ class TestOverlap(unittest.TestCase):
             )
 
 
+class TestZipfianDistribution(unittest.TestCase):
+    """Zipfian-weighted overlap sampling: biases overlap keys towards one
+    end of the source tx's (sub-)range with a long-tail decay. Useful for
+    modelling real-world hot-spot updates."""
+
+    def _zipf_update_keys(self, distribution_kwargs: dict, seed: int = 0):
+        lines, _ = _run(
+            [
+                {"doc_count": 1000, "doc_size": 256},
+                {
+                    "doc_count": 1000,
+                    "doc_size": 256,
+                    "overlaps": [
+                        {"with": 0, "fraction": 0.20, "op": "u", **distribution_kwargs},
+                    ],
+                },
+            ],
+            seed=seed,
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        return [d["id"] for _, d in docs[1000:] if d["_meta"]["op"] == "u"]
+
+    def test_zipfian_biases_to_tail(self):
+        keys = self._zipf_update_keys({"distribution": "zipfian", "zipf_s": 1.5})
+        self.assertEqual(len(keys), 200)
+        # Tx 0 spans [0, 1000). With heavy tail bias, mass should sit
+        # well above the midpoint. Median > 700 is a stable threshold for
+        # s=1.5: empirically the median floats around 850.
+        median = sorted(keys)[len(keys) // 2]
+        self.assertGreater(median, 700, f"expected median key > 700, got {median}")
+        # And the top decile should contain a disproportionate share of picks.
+        top_decile_share = sum(1 for k in keys if k >= 900) / len(keys)
+        self.assertGreater(top_decile_share, 0.30,
+                           f"top 10% of range should hold >30% of picks, got {top_decile_share:.2%}")
+
+    def test_zipfian_biases_to_head(self):
+        keys = self._zipf_update_keys(
+            {"distribution": "zipfian", "zipf_s": 1.5, "zipf_bias": "head"}
+        )
+        median = sorted(keys)[len(keys) // 2]
+        self.assertLess(median, 300, f"expected median key < 300, got {median}")
+
+    def test_zipfian_no_replacement(self):
+        keys = self._zipf_update_keys({"distribution": "zipfian", "zipf_s": 1.5})
+        self.assertEqual(len(keys), len(set(keys)),
+                         "zipfian sampling must not produce duplicate keys")
+
+    def test_zipfian_deterministic(self):
+        a = self._zipf_update_keys({"distribution": "zipfian", "zipf_s": 1.2}, seed=11)
+        b = self._zipf_update_keys({"distribution": "zipfian", "zipf_s": 1.2}, seed=11)
+        self.assertEqual(a, b)
+        c = self._zipf_update_keys({"distribution": "zipfian", "zipf_s": 1.2}, seed=12)
+        self.assertNotEqual(sorted(a), sorted(c))
+
+    def test_zipfian_with_subrange(self):
+        # Combine zipfian-tail with a [0.6, 1.0] sub-range: keys must lie in
+        # the last 40% of tx 0, AND skew towards the upper edge of THAT.
+        lines, _ = _run(
+            [
+                {"doc_count": 1000, "doc_size": 256},
+                {
+                    "doc_count": 1000,
+                    "doc_size": 256,
+                    "overlaps": [
+                        {
+                            "with": 0,
+                            "fraction": 0.10,
+                            "op": "u",
+                            "range": [0.6, 1.0],
+                            "distribution": "zipfian",
+                            "zipf_s": 1.5,
+                        },
+                    ],
+                },
+            ]
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        keys = [d["id"] for _, d in docs[1000:] if d["_meta"]["op"] == "u"]
+        self.assertEqual(len(keys), 100)
+        # All keys in the [0.6, 1.0] sub-range = [600, 1000).
+        self.assertTrue(all(600 <= k < 1000 for k in keys),
+                        f"expected all keys in [600, 1000), got min={min(keys)} max={max(keys)}")
+        # Tail bias: median should still skew above the sub-range midpoint (800).
+        median = sorted(keys)[len(keys) // 2]
+        self.assertGreater(median, 800, f"expected median > 800, got {median}")
+
+    def test_zipfian_disjoint_with_exclusions(self):
+        # Two overlap entries against the same source tx must produce
+        # disjoint key sets (existing invariant) under zipfian too.
+        lines, _ = _run(
+            [
+                {"doc_count": 1000, "doc_size": 256},
+                {
+                    "doc_count": 1000,
+                    "doc_size": 256,
+                    "overlaps": [
+                        {"with": 0, "fraction": 0.20, "op": "u",
+                         "distribution": "zipfian", "zipf_s": 1.5},
+                        {"with": 0, "fraction": 0.10, "op": "d",
+                         "distribution": "zipfian", "zipf_s": 1.5},
+                    ],
+                },
+            ]
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        tx1_docs = docs[1000:]
+        update_keys = {d["id"] for _, d in tx1_docs if d["_meta"]["op"] == "u"}
+        delete_keys = {d["id"] for _, d in tx1_docs if d["_meta"]["op"] == "d"}
+        self.assertEqual(len(update_keys), 200)
+        self.assertEqual(len(delete_keys), 100)
+        self.assertTrue(update_keys.isdisjoint(delete_keys))
+
+    def test_zipfian_sub_s_approaches_uniform(self):
+        # s=0.01 (almost flat) should look roughly uniform over the range.
+        keys = self._zipf_update_keys(
+            {"distribution": "zipfian", "zipf_s": 0.01}, seed=3,
+        )
+        # Mean within a generous band around the uniform mean of 499.5.
+        mean = sum(keys) / len(keys)
+        self.assertGreater(mean, 350)
+        self.assertLess(mean, 650)
+
+    def test_invalid_distribution_rejected(self):
+        with self.assertRaises(ValueError):
+            _run(
+                [
+                    {"doc_count": 100, "doc_size": 256},
+                    {
+                        "doc_count": 100,
+                        "doc_size": 256,
+                        "overlaps": [
+                            {"with": 0, "fraction": 0.2, "op": "u",
+                             "distribution": "lognormal"},
+                        ],
+                    },
+                ]
+            )
+
+    def test_invalid_zipf_s_rejected(self):
+        for bad in (0, -1.0):
+            with self.subTest(s=bad):
+                with self.assertRaises(ValueError):
+                    _run(
+                        [
+                            {"doc_count": 100, "doc_size": 256},
+                            {
+                                "doc_count": 100,
+                                "doc_size": 256,
+                                "overlaps": [
+                                    {"with": 0, "fraction": 0.2, "op": "u",
+                                     "distribution": "zipfian", "zipf_s": bad},
+                                ],
+                            },
+                        ]
+                    )
+
+    def test_invalid_zipf_bias_rejected(self):
+        with self.assertRaises(ValueError):
+            _run(
+                [
+                    {"doc_count": 100, "doc_size": 256},
+                    {
+                        "doc_count": 100,
+                        "doc_size": 256,
+                        "overlaps": [
+                            {"with": 0, "fraction": 0.2, "op": "u",
+                             "distribution": "zipfian", "zipf_bias": "middle"},
+                        ],
+                    },
+                ]
+            )
+
+
 class TestManualLineAssembly(unittest.TestCase):
     """The fast path assembles the fixture line by string fragments rather
     than calling json.dumps per doc. These tests verify that the output

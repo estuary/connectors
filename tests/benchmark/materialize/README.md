@@ -67,6 +67,18 @@ transactions:
                                # of tx 0's keys. Models recency-biased updates
                                # (newer records get updated more than old).
                                # Defaults to [0.0, 1.0] (full range).
+        distribution: zipfian  # (optional) sampling distribution within the
+                               # (sub-)range. "uniform" (default) or "zipfian".
+                               # Zipfian concentrates picks on a few keys near
+                               # zipf_bias's end with a long tail decaying
+                               # across the rest -- a closer match to many
+                               # real workloads (a hot recent set + occasional
+                               # touches of older rows) than pure uniform.
+        zipf_s: 1.0            # (optional) Zipfian skew exponent; default 1.0.
+                               # Larger s = more concentrated. s ~ 0 ≈ uniform.
+        zipf_bias: tail        # (optional) "tail" (default) or "head" --
+                               # which end of the (sub-)range gets rank 1
+                               # (the highest-weight key).
       - with: 0
         fraction: 0.10
         op: d                  # 10% of this tx deletes keys from tx 0.
@@ -97,6 +109,18 @@ Overlap rules:
   emits `fresh` keys sequentially, so a sub-range maps to a contiguous
   slice of the id space — useful for exercising partition pruning on
   destinations that cluster on the key column.
+* `overlap.distribution` (optional) is `uniform` (default) or `zipfian`.
+  `zipfian` weights each key in the (sub-)range by `1/rank^s` so a small
+  set of keys near `zipf_bias` (default `tail`) gets the bulk of the
+  picks, with a long tail trailing across the rest. This is closer to
+  many production workloads than pure uniform: most updates land on the
+  newest rows, but a few reach back into older history. Composes with
+  `range` — e.g. `range: [0.0, 1.0]` + `distribution: zipfian` says
+  "pull from anywhere in the prior tx, but mostly from the tail",
+  whereas `range: [0.6, 1.0]` + `distribution: zipfian` further
+  restricts the candidate window. Tunables: `zipf_s` (skew exponent,
+  default `1.0`; larger = more concentrated; `~0` ≈ uniform) and
+  `zipf_bias` (`tail` or `head`).
 
 ## CLI flags
 
