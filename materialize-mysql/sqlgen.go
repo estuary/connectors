@@ -160,28 +160,17 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		"date":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
 		"time":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
 		"datetime": {sql.NewMigrationSpec([]string{"varchar", "longtext"}, sql.WithCastSQL(prepareDatetimeToStringCast(tzLocation)))},
+		"varchar": {sql.NewMigrationSpec([]string{"varbinary(256)"}, sql.WithCastSQL(stringToBinaryCast)),
+			sql.NewMigrationSpec([]string{"longblob"}, sql.WithCastSQL(stringToBinaryCast))},
 	}
 
 	// MariaDB uses longtext for JSON type, so migrating to JSON on MariaDB is not distinguishable from migrating
 	// to a normal longtext
 	if product != "mariadb" {
-		migrationSpecs["varchar"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast(product)))}
-		migrationSpecs["longtext"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast(product)))}
+		migrationSpecs["varchar"] = append(migrationSpecs["varchar"], sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast(product))))
+		migrationSpecs["longtext"] = append(migrationSpecs["longtext"], sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast(product))))
 		migrationSpecs["*"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"})}
 	}
-
-	// Allow migrating from text (base64) to native binary columns when the
-	// native_binary_column_type feature flag is turned on for an existing task.
-	migrationSpecs["varchar"] = append(
-		migrationSpecs["varchar"],
-		sql.NewMigrationSpec([]string{"varbinary(256)"}, sql.WithCastSQL(stringToBinaryCast)),
-		sql.NewMigrationSpec([]string{"longblob"}, sql.WithCastSQL(stringToBinaryCast)),
-	)
-	migrationSpecs["longtext"] = append(
-		migrationSpecs["longtext"],
-		sql.NewMigrationSpec([]string{"varbinary(256)"}, sql.WithCastSQL(stringToBinaryCast)),
-		sql.NewMigrationSpec([]string{"longblob"}, sql.WithCastSQL(stringToBinaryCast)),
-	)
 
 	var reservedWords = MYSQL_RESERVED_WORDS
 	if product == "singlestore" {
