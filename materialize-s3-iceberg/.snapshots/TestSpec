@@ -339,6 +339,14 @@
         "title": "Delta Update",
         "description": "Should updates to this table be done via delta updates. Currently this connector only supports delta updates.",
         "default": true
+      },
+      "additional_table_properties": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "type": "object",
+        "title": "Additional Table Properties",
+        "description": "Additional Iceberg table properties to set when the table is created. These are set only at creation time and cannot be changed afterwards. Example: {'write.parquet.compression-codec': 'zstd'}"
       }
     },
     "type": "object",

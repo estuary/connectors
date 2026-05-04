@@ -307,6 +307,7 @@ def list_namespaces(ctx: Context):
 class TableCreate(BaseModel, extra="forbid"):
     location: str
     fields: list[IcebergColumn]
+    properties: dict[str, str] | None = None
 
 
 @run.command()
@@ -335,11 +336,14 @@ def create_table(
     ]
 
     schema = Schema(*columns)
-    catalog.create_table(table, schema, table_create.location,
-        properties={
-            TableProperties.DEFAULT_NAME_MAPPING: schema.name_mapping.model_dump_json()
-        },
-    )
+    properties = {TableProperties.DEFAULT_NAME_MAPPING: schema.name_mapping.model_dump_json()}
+    if table_create.properties:
+        for k, v in table_create.properties.items():
+            # Never let a user-supplied key override the name mapping.
+            if k == TableProperties.DEFAULT_NAME_MAPPING:
+                continue
+            properties[k] = v
+    catalog.create_table(table, schema, table_create.location, properties=properties)
     log(f"create_table: created table {table}")
 
 
