@@ -1,0 +1,16 @@
+materializations:
+  acmeCo/tests/materialize-eventbridge/local:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.yaml
+    bindings: []
+
+  acmeCo/tests/materialize-eventbridge/aws:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.aws.yaml
+    bindings: []
