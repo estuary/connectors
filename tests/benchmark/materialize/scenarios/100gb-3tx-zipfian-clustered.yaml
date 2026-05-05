@@ -40,7 +40,7 @@ collections:
     key: [/id]
     resource:
       table: wide_zipfian_clustered
-      clustering: true
+      clustering: id
 
 transactions:
   - total_size: 33GB
