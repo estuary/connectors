@@ -53,7 +53,7 @@ def resources(
         task: Task,
         all_bindings,
     ):
-        task.sourced_schema(binding_index, model.sourced_schema(log))
+        await task.sourced_schema(binding_index, model.sourced_schema(log))
         await task.checkpoint(state=ConnectorState())
 
         common.open_binding(

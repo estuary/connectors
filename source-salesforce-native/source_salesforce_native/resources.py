@@ -89,7 +89,7 @@ def full_refresh_resource(
 
         model_cls = create_salesforce_model(name, fields)
 
-        task.sourced_schema(binding_index, model_cls.sourced_schema())
+        await task.sourced_schema(binding_index, model_cls.sourced_schema())
         await task.checkpoint(state=ConnectorState())
 
         common.open_binding(
@@ -152,7 +152,7 @@ def incremental_resource(
 
         model_cls = create_salesforce_model(name, fields)
 
-        task.sourced_schema(binding_index, model_cls.sourced_schema())
+        await task.sourced_schema(binding_index, model_cls.sourced_schema())
         await task.checkpoint(state=ConnectorState())
 
         common.open_binding(

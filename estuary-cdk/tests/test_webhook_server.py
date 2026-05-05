@@ -395,6 +395,71 @@ class TestWebhookAckBlocking:
             assert await resp.json() == {"published": 1}
 
 
+class TestConcurrentBuffer:
+    """
+    Verify the Task's underlying ConcurrentBuffer protects against the
+    interleaving hazards that motivated this design: concurrent same-binding
+    requests must not corrupt the buffer or drop captured documents, and
+    array-body requests must dispatch documents to the matched bindings.
+    """
+
+    @pytest.mark.asyncio
+    async def test_array_body_dispatches_across_bindings(self):
+        rsc_a = make_webhook_resource("a", match_rule=BodyMatch(key="kind", value="a"))
+        rsc_b = make_webhook_resource("b", match_rule=BodyMatch(key="kind", value="b"))
+
+        async with run_server({0: rsc_a, 1: rsc_b}) as ctx:
+            resp = await ctx.client.post("/hook", json=[{"kind": "a"}, {"kind": "b"}])
+            assert resp.status == 200
+            assert await resp.json() == {"published": 2}
+
+            output = read_emitted_records(
+                ctx.task._output  # pyright: ignore[reportPrivateUsage]
+            )
+            captured_bindings = sorted(
+                line["captured"]["binding"] for line in output if "captured" in line
+            )
+            assert captured_bindings == [0, 1]
+
+            # One checkpoint per request — captureds + checkpoint are written
+            # as a single transaction via ConcurrentBuffer.drain().
+            checkpoint_lines = [line for line in output if "checkpoint" in line]
+            assert len(checkpoint_lines) == 1
+
+    @pytest.mark.asyncio
+    async def test_concurrent_same_binding_requests_preserve_all_docs(self):
+        """N concurrent POSTs against a single binding. The previous
+        single-buffer design could lose docs or produce torn JSON when
+        captured() and checkpoint()'s drain raced. With ConcurrentBuffer
+        we should see N captureds, N checkpoints, and every emitted line
+        must parse cleanly (read_emitted_records JSON-decodes every line,
+        so torn writes would surface as a JSONDecodeError)."""
+        rsc = make_webhook_resource("catch-all")
+
+        n = 25
+        async with run_server({0: rsc}) as ctx:
+            responses = await asyncio.gather(
+                *(ctx.client.post("/hook", json={}) for _ in range(n))
+            )
+            for resp in responses:
+                assert resp.status == 200
+                assert await resp.json() == {"published": 1}
+
+            output = read_emitted_records(
+                ctx.task._output  # pyright: ignore[reportPrivateUsage]
+            )
+
+            captured_lines = [line for line in output if "captured" in line]
+            assert len(captured_lines) == n, (
+                "expected one captured emission per request"
+            )
+
+            checkpoint_lines = [line for line in output if "checkpoint" in line]
+            assert len(checkpoint_lines) == n, (
+                "expected one checkpoint per request"
+            )
+
+
 class TestWebhookServerLifecycle:
     @pytest.mark.asyncio
     async def test_start_sets_webhook_task(self):

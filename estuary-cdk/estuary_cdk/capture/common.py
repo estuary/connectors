@@ -980,10 +980,10 @@ async def _binding_snapshot_task(
                 doc.meta_ = BaseDocument.Meta(
                     op="u" if count < state.last_count else "c", row_id=count
                 )
-            task.captured(binding_index, doc)
+            await task.captured(binding_index, doc)
             count += 1
 
-        digest = task.pending_digest()
+        digest = await task.pending_digest()
         task.log.debug(
             "polled snapshot",
             {
@@ -997,13 +997,13 @@ async def _binding_snapshot_task(
         if digest != state.last_digest:
             for del_id in range(count, state.last_count):
                 tombstone.meta_ = BaseDocument.Meta(op="d", row_id=del_id)
-                task.captured(binding_index, tombstone)
+                await task.captured(binding_index, tombstone)
 
             state.last_count = count
             state.last_digest = digest
         else:
             # Suppress all captured documents, as they're unchanged.
-            task.reset()
+            await task.reset()
 
         await task.checkpoint(connector_state)
 
@@ -1062,10 +1062,10 @@ async def _binding_backfill_task(
             if isinstance(item, BaseDocument) or (
                 isinstance(item, dict) and not is_cursor_dict(item)
             ):
-                task.captured(binding_index, item)
+                await task.captured(binding_index, item)
                 done = True
             elif isinstance(item, AssociatedDocument):
-                task.captured(item.binding, item.doc)
+                await task.captured(item.binding, item.doc)
                 done = True
             elif item is None:
                 raise RuntimeError(
@@ -1193,10 +1193,10 @@ async def _binding_incremental_task(
 
         async for item in fetch_changes(task.log, state.cursor):
             if isinstance(item, BaseDocument) or isinstance(item, dict):
-                task.captured(binding_index, item)
+                await task.captured(binding_index, item)
                 pending = True
             elif isinstance(item, AssociatedDocument):
-                task.captured(item.binding, item.doc)
+                await task.captured(item.binding, item.doc)
                 pending = True
             elif item == Triggers.BACKFILL:
                 task.log.info(

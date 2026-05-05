@@ -290,7 +290,7 @@ def full_refresh_resource(
         use_sourced_schemas: bool,
     ):
         if use_sourced_schemas and hasattr(model, 'sourced_schema'):
-            task.sourced_schema(binding_index, model.sourced_schema())
+            await task.sourced_schema(binding_index, model.sourced_schema())
             await task.checkpoint(state=ConnectorState())
 
         open_binding(

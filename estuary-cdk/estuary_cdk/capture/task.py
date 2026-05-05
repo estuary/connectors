@@ -1,7 +1,6 @@
 import asyncio
 import base64
 import decimal
-import tempfile
 import traceback
 from collections.abc import Awaitable
 from dataclasses import dataclass, field
@@ -9,7 +8,6 @@ from logging import Logger
 from typing import Any, BinaryIO, Callable, Generic
 
 import orjson
-import xxhash
 from pydantic import Field
 
 from estuary_cdk.capture.connector_status import ConnectorStatus
@@ -23,6 +21,7 @@ from ..flow import (
 )
 from ..pydantic_polyfill import GenericModel
 from . import request, response
+from .buffer import ConcurrentBuffer
 from .transactor import Transactor
 
 
@@ -109,8 +108,7 @@ class Task:
     """When True, checkpoint() blocks until Flow ACKs the emitted checkpoint.
     Inherited by children via spawn_child."""
 
-    _buffer: tempfile.SpooledTemporaryFile
-    _hasher: xxhash.xxh3_128
+    _buffer: ConcurrentBuffer
     _name: str
     _output: BinaryIO
     _tg: asyncio.TaskGroup
@@ -130,8 +128,7 @@ class Task:
         transactor: Transactor,
         requires_ack: bool = False,
     ):
-        self._buffer = tempfile.SpooledTemporaryFile(max_size=self.MAX_BUFFER_MEM)
-        self._hasher = xxhash.xxh3_128()
+        self._buffer = ConcurrentBuffer(max_size=self.MAX_BUFFER_MEM)
         self._name = name
         self._output = output
         self._tg = tg
@@ -141,7 +138,7 @@ class Task:
         self.transactor = transactor
         self.requires_ack = requires_ack
 
-    def captured(self, binding: int, document: Any):
+    async def captured(self, binding: int, document: Any):
         """Enqueue the document to be captured under the given binding.
         Documents are not actually captured until checkpoint() is called.
         Or, reset() will discard any queued documents."""
@@ -158,17 +155,15 @@ class Task:
                 captured=response.Captured(binding=binding, doc=document)
             ).model_dump_json(by_alias=True, exclude_unset=True).encode()
 
-        self._buffer.write(b)
-        self._buffer.write(b"\n")
-        self._hasher.update(b)
+        await self._buffer.append(b + b"\n")
 
-    def pending_digest(self) -> str:
+    async def pending_digest(self) -> str:
         """pending_digest returns the digest of captured() documents
         since the last checkpoint() or reset()"""
 
-        return self._hasher.digest().hex()
+        return await self._buffer.digest_hex()
 
-    def sourced_schema(self, binding_index: int, schema: dict[str, Any]):
+    async def sourced_schema(self, binding_index: int, schema: dict[str, Any]):
         """Write a SourcedSchema message for the given binding to the buffer.
         SourcedSchema messages won't be emitted until checkpoint() is called."""
 
@@ -176,8 +171,7 @@ class Task:
             sourcedSchema=response.SourcedSchema(binding=binding_index, schema_json=schema)
         ).model_dump_json(by_alias=True, exclude_unset=True).encode()
 
-        self._buffer.write(b)
-        self._buffer.write(b"\n")
+        await self._buffer.append(b + b"\n")
 
     async def _emit_checkpoint(
         self, state: ConnectorState, merge_patch: bool = True
@@ -187,17 +181,10 @@ class Task:
                 state=ConnectorStateUpdate(updated=state, mergePatch=merge_patch)
             )
         )
-        self._buffer.write(
-            checkpoint.model_dump_json(by_alias=True, exclude_unset=True).encode()
-        )
-        self._buffer.write(b"\n")
+        marker = checkpoint.model_dump_json(by_alias=True, exclude_unset=True).encode() + b"\n"
 
-        completion = await self.transactor.commit(
-            self._buffer, wait_for_ack=self.requires_ack
-        )
-        self.reset()
-
-        return completion
+        async with self._buffer.drain(suffix=marker) as file:
+            return await self.transactor.commit(file, wait_for_ack=self.requires_ack)
 
     async def checkpoint(self, state: ConnectorState, merge_patch: bool = True):
         """Emit previously-queued, captured documents followed by a checkpoint.
@@ -227,11 +214,9 @@ class Task:
             )
             raise
 
-    def reset(self):
+    async def reset(self):
         """Discard any captured documents, resetting to an empty state."""
-        self._buffer.truncate(0)
-        self._buffer.seek(0)
-        self._hasher.reset()
+        await self._buffer.reset()
 
     def spawn_child(
         self, name_suffix: str, child: Callable[["Task"], Awaitable[None]]

@@ -63,7 +63,7 @@ async def incremental_resource(
         task: Task,
         all_bindings,
     ):
-        task.sourced_schema(binding_index, model.sourced_schema())
+        await task.sourced_schema(binding_index, model.sourced_schema())
         await task.checkpoint(state=ConnectorState())
 
         common.open_binding(
@@ -134,7 +134,7 @@ async def snapshot_resource(sage: Sage, obj: str) -> common.Resource:
         task: Task,
         all_bindings,
     ):
-        task.sourced_schema(binding_index, model.sourced_schema())
+        await task.sourced_schema(binding_index, model.sourced_schema())
         await task.checkpoint(state=ConnectorState())
 
         common.open_binding(

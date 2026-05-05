@@ -553,10 +553,10 @@ async def _binding_incremental_task_with_work_item(
 
         async for item in fetch_changes(task.log, state.cursor):
             if isinstance(item, BaseDocument) or isinstance(item, dict):
-                task.captured(binding_index, item)
+                await task.captured(binding_index, item)
                 pending = True
             elif isinstance(item, AssociatedDocument):
-                task.captured(item.binding, item.doc)
+                await task.captured(item.binding, item.doc)
                 pending = True
             elif item == Triggers.BACKFILL:
                 task.log.info(
@@ -672,10 +672,10 @@ async def _binding_backfill_task_with_work_item(
 
         async for item in pages:
             if isinstance(item, BaseDocument) or isinstance(item, dict):
-                task.captured(binding_index, item)
+                await task.captured(binding_index, item)
                 done = True
             elif isinstance(item, AssociatedDocument):
-                task.captured(item.binding, item.doc)
+                await task.captured(item.binding, item.doc)
                 done = True
             elif item is None:
                 raise RuntimeError(

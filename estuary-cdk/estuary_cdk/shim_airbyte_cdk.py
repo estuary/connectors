@@ -371,7 +371,7 @@ class CaptureShim(BaseCaptureConnector):
                 # Recursively set additionalProperties to false for all nested objects
                 schema = set_additional_properties_false(schema)
 
-                task.sourced_schema(
+                await task.sourced_schema(
                     binding_index=binding_idx,
                     schema=schema,
                 )
@@ -434,7 +434,7 @@ class CaptureShim(BaseCaptureConnector):
                 doc.meta_ = Document.Meta(op="u", row_id=entry[1].rowId)
                 entry[1].rowId += 1
 
-                task.captured(entry[0], doc)
+                await task.captured(entry[0], doc)
 
             elif state_msg := message.state:
 

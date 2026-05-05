@@ -96,46 +96,6 @@ def build_webhook_app(
             binding=binding_idx,
         )
 
-    # QUICK FIX: serialize the capture + checkpoint path across all concurrent
-    # webhook_handler invocations.
-    #
-    # aiohttp runs request handlers concurrently, but every invocation of
-    # webhook_handler shares the same Task, and therefore the same underlying
-    # buffer (Task._buffer) and hasher. task.captured() writes to that buffer
-    # synchronously, and task.checkpoint() awaits an emit that seeks to 0,
-    # reads the buffer from a worker thread, then truncates it. Without this
-    # lock, two concurrent requests can corrupt each other in at least two
-    # ways:
-    #
-    #   1. Silent data loss. R1 enqueues docs and awaits checkpoint(); while
-    #      R1 is inside _emit, R2 enqueues its own docs via captured(). When
-    #      R1's emit finishes and calls reset(), R2's queued docs are
-    #      truncated away. R2 then checkpoints an empty buffer, returns 200
-    #      to the webhook sender, and Flow never sees those documents.
-    #
-    #   2. Corrupt stdout. While _copy_buffer is reading the buffer from a
-    #      worker thread (after seek(0)), another request's captured() call
-    #      writes to the same file object from the event-loop thread.
-    #      SpooledTemporaryFile has a single shared file position and is not
-    #      thread-safe, so this can produce partial/interleaved JSON on
-    #      stdout. The Flow runtime consumes that stream, and invalid JSON
-    #      there has blast radius beyond a single capture task.
-    #
-    # Holding a lock around captured() + checkpoint() serializes only the
-    # emit path; JSON parsing, match-rule evaluation, and document enrichment
-    # above still run concurrently across requests. That is fine for typical
-    # webhook loads but will bottleneck sustained high-throughput workloads.
-    #
-    # PROPER FIX: mirror how pull-API bindings work (see _binding_incremental_task
-    # et al. in common.py) — give each webhook binding its own child Task via
-    # task.spawn_child, each with its own buffer. webhook_handler would group
-    # enriched_docs by doc.binding, hand each group to that binding's child
-    # Task, and checkpoint each touched binding under a per-binding lock.
-    # Requests targeting different bindings would then emit concurrently
-    # without ever sharing a buffer, removing this class of bug structurally
-    # instead of patching it. We should fix this whenever we touch this code next.
-    emit_lock = asyncio.Lock()
-
     async def webhook_handler(req: web.Request) -> web.Response:
         if req.app.get(_rejecting_key, False):
             return web.Response(status=503, text="Server shutting down")
@@ -152,11 +112,9 @@ def build_webhook_app(
 
         enriched_docs = [await _enrich_doc(raw_doc, req) for raw_doc in all_docs]
 
-        async with emit_lock:
-            for doc in enriched_docs:
-                task.captured(doc.binding, doc.doc)
-
-            await task.checkpoint(state=ConnectorState())
+        for doc in enriched_docs:
+            await task.captured(doc.binding, doc.doc)
+        await task.checkpoint(state=ConnectorState())
 
         return web.json_response({"published": len(enriched_docs)})
 
