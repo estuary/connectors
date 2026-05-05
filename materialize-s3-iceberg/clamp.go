@@ -34,7 +34,7 @@ func clampTimestamp(v tuple.TupleElement) (any, error) {
 
 	t, err := time.Parse(time.RFC3339Nano, strings.Replace(s, "z", "Z", 1))
 	if err != nil {
-		return s, nil
+		return nil, fmt.Errorf("could not parse %q as RFC3339 timestamp: %w", s, err)
 	}
 	// UTC year is what reaches pyarrow: "9999-12-31T23:59:59-14:00" looks
 	// like 9999 locally but materializes as 10000 in UTC.
@@ -57,12 +57,9 @@ func clampDate(v tuple.TupleElement) (any, error) {
 
 	m := dateLikeRe.FindStringSubmatch(s)
 	if m == nil {
-		return s, nil
+		return nil, fmt.Errorf("could not parse %q as simple date", s)
 	}
-	year, err := strconv.Atoi(m[1])
-	if err != nil {
-		return s, nil
-	}
+	year, _ := strconv.Atoi(m[1])
 	switch {
 	case year > pyMaxYear:
 		return fmt.Sprintf("%04d-12-31", pyMaxYear), nil
