@@ -44,7 +44,7 @@ type state struct {
 	// CommittedTimestamp is the last successfully committed cell timestamp;
 	// the timestamp stamped on writes for the in-progress transaction is
 	// always `CommittedTimestamp + 1`.
-	CommittedTimestamp uint64 `json:"committed_timestamp"`
+	CommittedTimestamp int64 `json:"committed_timestamp"`
 }
 
 type transactor struct {
@@ -283,7 +283,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	}
 	close(batches)
 
-	t.state.CommittedTimestamp = uint64(ts)
+	t.state.CommittedTimestamp = int64(ts)
 	newState, err := json.Marshal(t.state)
 	if err != nil {
 		return nil, fmt.Errorf("marshalling state: %w", err)

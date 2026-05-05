@@ -6,11 +6,3 @@ materializations:
         protobuf: true
         config: config.local.yaml
     bindings: []
-
-  acmeCo/tests/materialize-bigtable-gcp:
-    endpoint:
-      local:
-        command: ["go", "run", "."]
-        protobuf: true
-        config: config.gcp.yaml
-    bindings: []
