@@ -10,6 +10,8 @@ import (
 	"strings"
 
 	"cloud.google.com/go/bigquery"
+	bqclient "github.com/estuary/connectors/go/capture/bigquery/client"
+	"github.com/estuary/connectors/go/capture/bigquery/datatypes"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/invopop/jsonschema"
@@ -125,7 +127,7 @@ func generateCollectionSchema(cfg *Config, table *discoveredTable, fullWriteSche
 	if table.key != nil {
 		keyColumns = table.key.Columns
 	}
-	var columnTypes = make(map[string]columnType)
+	var columnTypes = make(map[string]datatypes.ColumnType)
 	for _, column := range table.columns {
 		columnTypes[column.Name] = column.DataType
 	}
@@ -230,7 +232,7 @@ type discoveredTable struct {
 }
 
 func discoverTables(ctx context.Context, db *bigquery.Client, dataset string) ([]*discoveredTable, error) {
-	var rows, err = db.Query(fmt.Sprintf(queryDiscoverTables, quoteIdentifier(dataset))).Read(ctx)
+	var rows, err = db.Query(fmt.Sprintf(queryDiscoverTables, bqclient.QuoteIdentifier(dataset))).Read(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error discovering tables: %w", err)
 	}
@@ -253,61 +255,12 @@ func discoverTables(ctx context.Context, db *bigquery.Client, dataset string) ([
 }
 
 type discoveredColumn struct {
-	Schema      string     // The schema in which the table resides
-	Table       string     // The name of the table with this column
-	Name        string     // The name of the column
-	Index       int        // The ordinal position of the column within a row
-	DataType    columnType // The datatype of the column
-	Description *string    // The description of the column, if present and known
-}
-
-type columnType interface {
-	IsNullable() bool
-	JSONSchema() *jsonschema.Schema
-}
-
-type basicColumnType struct {
-	jsonTypes       []string
-	contentEncoding string
-	format          string
-	nullable        bool
-	description     string
-	minLength       *uint64
-	maxLength       *uint64
-}
-
-func (ct *basicColumnType) IsNullable() bool {
-	return ct.nullable
-}
-
-func (ct *basicColumnType) JSONSchema() *jsonschema.Schema {
-	var sch = &jsonschema.Schema{
-		Format:      ct.format,
-		Extras:      make(map[string]interface{}),
-		Description: ct.description,
-	}
-
-	if ct.contentEncoding != "" {
-		sch.Extras["contentEncoding"] = ct.contentEncoding // New in 2019-09.
-	}
-
-	if ct.jsonTypes != nil {
-		var types = append([]string(nil), ct.jsonTypes...)
-		if ct.nullable {
-			types = append(types, "null")
-		}
-		if len(types) == 1 {
-			sch.Type = types[0]
-		} else {
-			sch.Extras["type"] = types
-		}
-	}
-
-	// Copy the min/max lengths if present
-	sch.MinLength = ct.minLength
-	sch.MaxLength = ct.maxLength
-
-	return sch
+	Schema      string              // The schema in which the table resides
+	Table       string              // The name of the table with this column
+	Name        string              // The name of the column
+	Index       int                 // The ordinal position of the column within a row
+	DataType    datatypes.ColumnType // The datatype of the column
+	Description *string             // The description of the column, if present and known
 }
 
 const queryDiscoverColumns = `
@@ -316,7 +269,7 @@ SELECT table_schema, table_name, column_name, ordinal_position, is_nullable, dat
   ORDER BY table_schema, table_name, ordinal_position;`
 
 func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) ([]*discoveredColumn, error) {
-	var rows, err = db.Query(fmt.Sprintf(queryDiscoverColumns, quoteIdentifier(dataset))).Read(ctx)
+	var rows, err = db.Query(fmt.Sprintf(queryDiscoverColumns, bqclient.QuoteIdentifier(dataset))).Read(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error discovering columns: %w", err)
 	}
@@ -359,11 +312,11 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 			typeName = strings.Split(typeName, "<")[0]
 		}
 
-		var dataType, ok = databaseTypeToJSON[typeName]
+		var dataType, ok = datatypes.LookupType(typeName)
 		if !ok {
-			dataType = basicColumnType{description: "using catch-all schema"}
+			dataType = datatypes.BasicColumnType{Description: "using catch-all schema"}
 		}
-		dataType.nullable = isNullable
+		dataType.Nullable = isNullable
 
 		// Add length constraints for STRING and BYTES types with defined lengths
 		if typeIntParam > 0 {
@@ -371,24 +324,24 @@ func discoverColumns(ctx context.Context, db *bigquery.Client, dataset string) (
 			case "STRING":
 				// STRING(n) has a maximum character length
 				var length = uint64(typeIntParam)
-				dataType.maxLength = &length
+				dataType.MaxLength = &length
 			case "BYTES":
 				// BYTES(n) has a maximum byte length, base64 encoded
 				// Binary data is base64 encoded: every 3 bytes becomes 4 characters
 				var base64Length = uint64((typeIntParam + 2) / 3 * 4)
-				dataType.maxLength = &base64Length
+				dataType.MaxLength = &base64Length
 			}
 		}
 
 		// Append source type information to the description
-		if dataType.description != "" {
-			dataType.description += " "
+		if dataType.Description != "" {
+			dataType.Description += " "
 		}
 		var nullabilityDescription = ""
 		if !isNullable {
 			nullabilityDescription = "non-nullable "
 		}
-		dataType.description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, fullType)
+		dataType.Description += fmt.Sprintf("(source type: %s%s)", nullabilityDescription, fullType)
 
 		var column = &discoveredColumn{
 			Schema:   tableSchema,
@@ -425,7 +378,7 @@ type discoveredPrimaryKey struct {
 }
 
 func discoverPrimaryKeys(ctx context.Context, db *bigquery.Client, dataset string) ([]*discoveredPrimaryKey, error) {
-	var rows, err = db.Query(fmt.Sprintf(queryDiscoverPrimaryKeys, quoteIdentifier(dataset))).Read(ctx)
+	var rows, err = db.Query(fmt.Sprintf(queryDiscoverPrimaryKeys, bqclient.QuoteIdentifier(dataset))).Read(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("error discovering primary keys: %w", err)
 	}
@@ -461,30 +414,6 @@ func discoverPrimaryKeys(ctx context.Context, db *bigquery.Client, dataset strin
 		keys = append(keys, key)
 	}
 	return keys, nil
-}
-
-var databaseTypeToJSON = map[string]basicColumnType{
-	"BOOL": {jsonTypes: []string{"boolean"}},
-
-	"INT64": {jsonTypes: []string{"integer"}},
-
-	"NUMERIC":    {jsonTypes: []string{"string"}, format: "number"},
-	"BIGNUMERIC": {jsonTypes: []string{"string"}, format: "number"},
-	"FLOAT64":    {jsonTypes: []string{"number", "string"}, format: "number"},
-
-	"STRING": {jsonTypes: []string{"string"}},
-
-	"BYTES": {jsonTypes: []string{"string"}, contentEncoding: "base64"},
-
-	"DATE":      {jsonTypes: []string{"string"}, format: "date"},
-	"DATETIME":  {jsonTypes: []string{"string"}}, // Not RFC3339 date-time because it lacks a timezone suffix
-	"TIME":      {jsonTypes: []string{"string"}}, // Not RFC3339 full-time because it lacks a timezone suffix
-	"TIMESTAMP": {jsonTypes: []string{"string"}, format: "date-time"},
-
-	"JSON": {},
-
-	"STRUCT": {jsonTypes: []string{"object"}},
-	"ARRAY":  {jsonTypes: []string{"array"}},
 }
 
 var catalogNameSanitizerRe = regexp.MustCompile(`(?i)[^a-z0-9\-_.]`)

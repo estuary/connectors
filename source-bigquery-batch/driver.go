@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"cloud.google.com/go/bigquery"
+	bqclient "github.com/estuary/connectors/go/capture/bigquery/client"
+	"github.com/estuary/connectors/go/capture/bigquery/datatypes"
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
@@ -461,7 +463,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 
 	var quotedCursorNames []string
 	for _, cursorName := range cursorNames {
-		quotedCursorNames = append(quotedCursorNames, quoteIdentifier(cursorName))
+		quotedCursorNames = append(quotedCursorNames, bqclient.QuoteIdentifier(cursorName))
 	}
 	var templateArg = map[string]any{
 		"IsFirstQuery": len(cursorValues) == 0,
@@ -580,7 +582,7 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 		rowValues[0] = metadata
 
 		for idx, val := range row {
-			var translatedValue, err = translateBigQueryValue(val, rows.Schema[idx])
+			var translatedValue, err = datatypes.TranslateValue(val, rows.Schema[idx])
 			if err != nil {
 				return fmt.Errorf("error translating column %q value: %w", string(rows.Schema[idx].Name), err)
 			}
