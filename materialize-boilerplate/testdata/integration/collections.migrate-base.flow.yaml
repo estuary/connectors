@@ -213,6 +213,11 @@ collections:
         stringToMulti: *string
         binaryToString: *binary
         stringToBinary: *string
+        # Quoted-name fields exercise identifier escaping in dialects that
+        # embed column names inside string contexts (e.g. SQL Server's XQuery
+        # sql:column()).
+        'binary"With"Quote': *binary
+        'stringToBinary"With"Quote': *string
         intStr064ToString: *intStr064
         intStr128ToString: *intStr128
         intStr256ToString: *intStr256

@@ -219,6 +219,8 @@ collections:
         stringToMulti: { type: [string, boolean] }
         binaryToString: *string
         stringToBinary: *binary
+        'binary"With"Quote': *binary
+        'stringToBinary"With"Quote': *binary
         intStr064ToString: *string
         intStr128ToString: *string
         intStr256ToString: *string

@@ -29,6 +29,7 @@ materializations:
         recommended: true
         exclude:
           - stringToBinary
+          - stringToBinary"With"Quote
 
   acmeCo/tests/materialize-iceberg/rest-deprecated:
     endpoint:
@@ -44,6 +45,7 @@ materializations:
         recommended: true
         exclude:
           - stringToBinary
+          - stringToBinary"With"Quote
 
   acmeCo/tests/materialize-iceberg/glue:
     endpoint:
@@ -59,6 +61,7 @@ materializations:
         recommended: true
         exclude:
           - stringToBinary
+          - stringToBinary"With"Quote
 
   acmeCo/tests/materialize-iceberg/glue-deprecated:
     endpoint:
@@ -74,6 +77,7 @@ materializations:
         recommended: true
         exclude:
           - stringToBinary
+          - stringToBinary"With"Quote
 
   acmeCo/tests/materialize-iceberg/glue-optimized:
     endpoint:
@@ -89,6 +93,7 @@ materializations:
         recommended: true
         exclude:
           - stringToBinary
+          - stringToBinary"With"Quote
 
   acmeCo/tests/materialize-iceberg/glue-catalog-auth:
     endpoint:
@@ -104,6 +109,7 @@ materializations:
         recommended: true
         exclude:
           - stringToBinary
+          - stringToBinary"With"Quote
 
   acmeCo/tests/materialize-iceberg/s3tables:
     endpoint:
@@ -119,6 +125,7 @@ materializations:
         recommended: true
         exclude:
           - stringToBinary
+          - stringToBinary"With"Quote
 
   acmeCo/tests/materialize-iceberg/s3tables-deprecated:
     endpoint:
@@ -134,6 +141,7 @@ materializations:
         recommended: true
         exclude:
           - stringToBinary
+          - stringToBinary"With"Quote
 
   acmeCo/tests/materialize-iceberg/s3tables-catalog-auth:
     endpoint:
@@ -149,3 +157,4 @@ materializations:
         recommended: true
         exclude:
           - stringToBinary
+          - stringToBinary"With"Quote

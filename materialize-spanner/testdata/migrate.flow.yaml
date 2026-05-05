@@ -19,6 +19,12 @@ materializations:
           # TODO: `array` is a Spanner reserved keyword; the load-query SELECT
           # alias collides with it.
           - array
+          # TODO: TO_JSON(STRUCT(... AS field)) in loadQueryNoFlowDocument uses
+          # the raw projection name as the alias, so projection names with
+          # characters that aren't valid Spanner identifiers (without backtick
+          # quoting) fail to parse.
+          - binary"With"Quote
+          - stringToBinary"With"Quote
           # TODO: Spanner NUMERIC supports 38 digits of precision (29 whole, 9
           # fractional). Fixture values for int128/int129/int256/int257 (39-77
           # digits) overflow when stored in either the source column (base phase)

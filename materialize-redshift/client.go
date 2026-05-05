@@ -376,7 +376,10 @@ func snapshotTestTable(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, 
 		}
 		ident := dialect.Identifier(name)
 		if dataType == "binary varying" {
-			selectExprs = append(selectExprs, fmt.Sprintf("FROM_VARBYTE(%s, 'base64') AS %s", ident, ident))
+			// FROM_VARBYTE may insert line breaks for large base64 outputs.
+			// Strip them so snapshots and downstream base64 decoders see a
+			// single contiguous string. CHR(10) is LF, CHR(13) is CR.
+			selectExprs = append(selectExprs, fmt.Sprintf("REPLACE(REPLACE(FROM_VARBYTE(%s, 'base64'), CHR(10), ''), CHR(13), '') AS %s", ident, ident))
 		} else {
 			selectExprs = append(selectExprs, ident)
 		}

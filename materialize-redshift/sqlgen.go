@@ -212,9 +212,12 @@ func stringToVarbyteCast(migration sql.ColumnTypeMigration) string {
 
 // varbyteToSuperCast converts a VARBYTE column into a SUPER value containing
 // the base64-encoded JSON string representation of the binary data. A direct
-// CAST from VARBYTE to SUPER is not supported by Redshift.
+// CAST from VARBYTE to SUPER is not supported by Redshift. FROM_VARBYTE may
+// emit base64 with embedded line breaks for large inputs, which would produce
+// invalid JSON when wrapped in a string literal, so the line breaks are
+// stripped before json_parse. CHR(10) is LF and CHR(13) is CR.
 func varbyteToSuperCast(migration sql.ColumnTypeMigration) string {
-	return fmt.Sprintf(`json_parse('"' || FROM_VARBYTE(%s, 'base64') || '"')`, migration.Identifier)
+	return fmt.Sprintf(`json_parse('"' || REPLACE(REPLACE(FROM_VARBYTE(%s, 'base64'), CHR(10), ''), CHR(13), '') || '"')`, migration.Identifier)
 }
 
 func jsonQuoteCast(migration sql.ColumnTypeMigration) string {
