@@ -44,6 +44,63 @@ func TestSQLGeneration(t *testing.T) {
 	cupaloy.SnapshotT(t, snap.String())
 }
 
+func TestXQueryColumnRef(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		alias string
+		field string
+		want  string
+	}{
+		{"simple field", "", "col", "[col]"},
+		{"simple aliased", "r", "col", "r.[col]"},
+		{"field with double quote", "", `a"b`, `[a""b]`},
+		{"field with bracket", "", "a]b", "[a]]b]"},
+		{"field with bracket and quote", "r", `a"b]c`, `r.[a""b]]c]`},
+		{"field with apostrophe is left to caller", "", "a'b", "[a'b]"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, xqueryColumnRef(tc.alias, tc.field))
+		})
+	}
+}
+
+func TestStringToVarbinaryCast_QuotedField(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		field string
+		want  string
+	}{
+		{
+			name:  "simple",
+			field: "col",
+			want:  `CAST(N'' AS XML).value('xs:base64Binary(sql:column("[col]"))', 'VARBINARY(MAX)')`,
+		},
+		{
+			name:  "double quotes in name",
+			field: `a"b"c`,
+			want:  `CAST(N'' AS XML).value('xs:base64Binary(sql:column("[a""b""c]"))', 'VARBINARY(MAX)')`,
+		},
+		{
+			name:  "apostrophe in name",
+			field: "a'b",
+			// Apostrophe doubles for the outer T-SQL '...' literal.
+			want: `CAST(N'' AS XML).value('xs:base64Binary(sql:column("[a''b]"))', 'VARBINARY(MAX)')`,
+		},
+		{
+			name:  "bracket in name",
+			field: "a]b",
+			want:  `CAST(N'' AS XML).value('xs:base64Binary(sql:column("[a]]b]"))', 'VARBINARY(MAX)')`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := stringToVarbinaryCast(sql.ColumnTypeMigration{
+				Column: sql.Column{Projection: sql.Projection{Projection: pf.Projection{Field: tc.field}}},
+			})
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestDateTimeColumn(t *testing.T) {
 	var dialect = testDialect
 	var mapped = dialect.MapType(&sql.Projection{

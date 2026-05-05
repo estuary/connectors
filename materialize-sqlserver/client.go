@@ -123,14 +123,22 @@ var columnMigrationSteps = []sql.ColumnMigrationStep{
 		var queries []string
 
 		for _, ins := range instructions {
-			var tempColumn = ins.TypeMigration.Field + sql.ColumnMigrationTemporarySuffix
+			// sp_rename's first argument is parsed as a multi-part identifier,
+			// so the temp column name has to be wrapped in [...] to safely
+			// carry characters like " or other punctuation that might appear
+			// in a Flow projection name. The second argument is the bare new
+			// column name; both arguments are inside T-SQL '...' literals, so
+			// any apostrophe needs to be doubled.
+			tempColumn := ins.TypeMigration.Field + sql.ColumnMigrationTemporarySuffix
+			tempBracketed := "[" + strings.ReplaceAll(tempColumn, "]", "]]") + "]"
+			src := strings.ReplaceAll(table.Identifier+"."+tempBracketed, "'", "''")
+			newName := strings.ReplaceAll(ins.TypeMigration.Field, "'", "''")
 			queries = append(
 				queries,
 				fmt.Sprintf(
-					"EXEC sp_rename '%s.%s', '%s', 'COLUMN';",
-					table.Identifier,
-					tempColumn,
-					ins.TypeMigration.Field,
+					"EXEC sp_rename '%s', '%s', 'COLUMN';",
+					src,
+					newName,
 				),
 			)
 		}
