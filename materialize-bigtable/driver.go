@@ -152,7 +152,8 @@ func (c config) dataClient(ctx context.Context) (*bigtable.Client, error) {
 		return nil, err
 	}
 
-	client, err := bigtable.NewClient(ctx, c.ProjectID, c.InstanceID, opts...)
+	cfg := bigtable.ClientConfig{MetricsProvider: bigtable.NoopMetricsProvider{}}
+	client, err := bigtable.NewClientWithConfig(ctx, c.ProjectID, c.InstanceID, cfg, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("creating bigtable data client: %w", err)
 	}

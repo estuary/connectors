@@ -6,3 +6,14 @@ materializations:
         protobuf: true
         config: config.local.yaml
     bindings: []
+
+  # See README.md for instructions on running against a real Cloud Bigtable
+  # instance.
+
+  # acmeCo/tests/materialize-bigtable-gcp:
+  #   endpoint:
+  #     local:
+  #       command: ["go", "run", "."]
+  #       protobuf: true
+  #       config: config.gcp.yaml
+  #   bindings: []

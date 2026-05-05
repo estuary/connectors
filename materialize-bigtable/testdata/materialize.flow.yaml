@@ -8,19 +8,30 @@ materializations:
         command: ["go", "run", "."]
         protobuf: true
         config: config.local.yaml
-    bindings:
-    - resource:
-        table: simple_standard
-      source: tests/simple
-      fields:
-        recommended: true
-    - resource:
-        table: not_simple
-      source: tests/not-simple
-      fields:
-        recommended: true
-    - resource:
-        table: data_types
-      source: tests/data-types
-      fields:
-        recommended: true
+    bindings: &bindings
+      - resource:
+          table: simple_standard
+        source: tests/simple
+        fields:
+          recommended: true
+      - resource:
+          table: not_simple
+        source: tests/not-simple
+        fields:
+          recommended: true
+      - resource:
+          table: data_types
+        source: tests/data-types
+        fields:
+          recommended: true
+
+  # See README.md for instructions on running against a real Cloud Bigtable
+  # instance.
+
+  # acmeCo/tests/materialize-bigtable-gcp:
+  #   endpoint:
+  #     local:
+  #       command: ["go", "run", "."]
+  #       protobuf: true
+  #       config: config.gcp.yaml
+  #   bindings: *bindings
