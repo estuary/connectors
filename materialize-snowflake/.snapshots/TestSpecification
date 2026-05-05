@@ -292,9 +292,9 @@
         "x-delta-updates": true
       },
       "clustering": {
-        "type": "boolean",
-        "title": "Automatic Clustering",
-        "description": "Enable Snowflake Automatic Clustering on this table using the collection key columns as the clustering key. Recommended only for large tables queried with selective filters on key columns. Consumes additional Snowflake credits.",
+        "type": "string",
+        "title": "Clustering Keys",
+        "description": "Comma-separated list of column names to use as the clustering key for Snowflake Automatic Clustering. Leave empty to disable clustering. Recommended only for large tables queried with selective filters on the chosen columns. Consumes additional Snowflake credits.",
         "advanced": true
       }
     },

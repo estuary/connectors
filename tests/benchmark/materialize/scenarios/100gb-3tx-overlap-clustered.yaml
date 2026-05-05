@@ -23,7 +23,7 @@ collections:
     key: [/id]
     resource:
       table: wide_clustered
-      clustering: true
+      clustering: id
 
 transactions:
   - total_size: 33GB

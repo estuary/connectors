@@ -30,7 +30,7 @@ type tableConfig struct {
 	Table      string `json:"table" jsonschema_extras:"x-collection-name=true"`
 	Schema     string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
 	Delta      bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings" jsonschema_extras:"x-delta-updates=true"`
-	Clustering bool   `json:"clustering,omitempty" jsonschema:"title=Automatic Clustering,description=Enable Snowflake Automatic Clustering on this table using the collection key columns as the clustering key. Recommended only for large tables queried with selective filters on key columns. Consumes additional Snowflake credits." jsonschema_extras:"advanced=true"`
+	Clustering string `json:"clustering,omitempty" jsonschema:"title=Clustering Keys,description=Comma-separated list of column names to use as the clustering key for Snowflake Automatic Clustering. Leave empty to disable clustering. Recommended only for large tables queried with selective filters on the chosen columns. Consumes additional Snowflake credits." jsonschema_extras:"advanced=true"`
 
 	// If the endpoint schema is the same as the resource schema, the resource path will be only the
 	// table name. This is to provide compatibility for materializations that were created prior to
@@ -53,6 +53,22 @@ func (c tableConfig) Validate() error {
 		return fmt.Errorf("expected table")
 	}
 	return nil
+}
+
+// ClusteringColumns parses the comma-separated clustering column list, trimming
+// whitespace and ignoring empty entries.
+func (c tableConfig) ClusteringColumns() []string {
+	if c.Clustering == "" {
+		return nil
+	}
+	parts := strings.Split(c.Clustering, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func schemasEqual(s1 string, s2 string) bool {
@@ -340,6 +356,9 @@ type binding struct {
 
 	streaming bool
 	pipeName  string
+	// clusteringExpr is the parenthesized CLUSTER BY expression for this
+	// binding, or empty if clustering is not configured.
+	clusteringExpr string
 	// Variables exclusively used by Load.
 	load struct {
 		loadQuery   string
@@ -1266,12 +1285,25 @@ func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr
 	}).Info("clustering information")
 }
 
-func clusteringKeyExpr(keys []sql.Column) string {
-	parts := make([]string, len(keys))
-	for i, k := range keys {
-		parts[i] = k.Identifier
+// clusteringKeyExpr builds a Snowflake CLUSTER BY expression from the given
+// collection field names by resolving each one to its quoted column identifier
+// in the table.
+func clusteringKeyExpr(table sql.Table, fieldNames []string) (string, error) {
+	parts := make([]string, len(fieldNames))
+	for i, name := range fieldNames {
+		var ident string
+		for _, col := range table.Columns() {
+			if col.Field == name {
+				ident = col.Identifier
+				break
+			}
+		}
+		if ident == "" {
+			return "", fmt.Errorf("clustering column %q not found in materialized fields of %s", name, table.Identifier)
+		}
+		parts[i] = ident
 	}
-	return "(" + strings.Join(parts, ", ") + ")"
+	return "(" + strings.Join(parts, ", ") + ")", nil
 }
 
 // queryCurrentClusterBy returns the current CLUSTER BY expression for a table,
@@ -1326,8 +1358,12 @@ func (d *transactor) syncClustering(ctx context.Context, bindings []sql.Table, o
 			return fmt.Errorf("parsing resource config for %s: %w", table.Identifier, err)
 		}
 
-		if rc.Clustering && len(table.Keys) > 0 {
-			keyExpr := clusteringKeyExpr(table.Keys)
+		fields := rc.ClusteringColumns()
+		if len(fields) > 0 {
+			keyExpr, err := clusteringKeyExpr(table, fields)
+			if err != nil {
+				return err
+			}
 			stmt := fmt.Sprintf("ALTER TABLE %s CLUSTER BY %s;", table.Identifier, keyExpr)
 			if _, err := d.db.ExecContext(ctx, stmt); err != nil {
 				return fmt.Errorf("enabling clustering on %s: %w", table.Identifier, err)
@@ -1336,11 +1372,8 @@ func (d *transactor) syncClustering(ctx context.Context, bindings []sql.Table, o
 				"table":          table.Identifier,
 				"clustering_key": keyExpr,
 			}).Info("enabled automatic clustering")
-		} else if rc.Clustering && len(table.Keys) == 0 {
-			log.WithFields(log.Fields{
-				"table": table.Identifier,
-			}).Warn("clustering requested but table has no key columns; skipping")
-		} else if !rc.Clustering {
+			d.bindings[i].clusteringExpr = keyExpr
+		} else {
 			loc := d.ep.Dialect.TableLocator(table.Path)
 			currentClusterBy, err := queryCurrentClusterBy(ctx, d.db, loc.TableSchema, loc.TableName)
 			if err != nil {
@@ -1355,7 +1388,7 @@ func (d *transactor) syncClustering(ctx context.Context, bindings []sql.Table, o
 					return fmt.Errorf("dropping clustering key on %s: %w", table.Identifier, err)
 				}
 				log.WithFields(log.Fields{
-					"table":              table.Identifier,
+					"table":               table.Identifier,
 					"previous_cluster_by": currentClusterBy,
 				}).Info("dropped clustering key")
 			}
@@ -1366,10 +1399,10 @@ func (d *transactor) syncClustering(ctx context.Context, bindings []sql.Table, o
 
 func (d *transactor) logAllClusteringInfo(ctx context.Context) {
 	for _, b := range d.bindings {
-		if len(b.target.Keys) == 0 {
+		if b.clusteringExpr == "" {
 			continue
 		}
-		logClusteringInfo(ctx, d.db, b.target.Identifier, clusteringKeyExpr(b.target.Keys))
+		logClusteringInfo(ctx, d.db, b.target.Identifier, b.clusteringExpr)
 	}
 }
 
