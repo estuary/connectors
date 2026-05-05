@@ -17,7 +17,7 @@ from estuary_cdk.capture.common import (
     ResourceState,
     WebhookResourceConfig,
 )
-from estuary_cdk.capture.task import Task
+from estuary_cdk.capture.task import MultipleWritersTask, Task
 from estuary_cdk.capture.transactor import Transactor
 from estuary_cdk.capture.webhook.match import (
     BodyMatch,
@@ -393,6 +393,136 @@ class TestWebhookAckBlocking:
             resp = await asyncio.wait_for(request_task, timeout=1.0)
             assert resp.status == 200
             assert await resp.json() == {"published": 1}
+
+
+class TestSharedWebhookTask:
+    """
+    Verify that a single webhook request whose documents fan out across
+    multiple bindings emits exactly one checkpoint — the shared
+    MultipleWritersTask coalesces them under one transaction.
+    """
+
+    @pytest.mark.asyncio
+    async def test_array_body_splits_across_bindings(self):
+        rsc_a = make_webhook_resource("a", match_rule=BodyMatch(key="kind", value="a"))
+        rsc_b = make_webhook_resource("b", match_rule=BodyMatch(key="kind", value="b"))
+
+        async with run_server({0: rsc_a, 1: rsc_b}) as ctx:
+            resp = await ctx.client.post("/hook", json=[{"kind": "a"}, {"kind": "b"}])
+            assert resp.status == 200
+            assert await resp.json() == {"published": 2}
+
+            output = read_emitted_records(
+                ctx.task._output  # pyright: ignore[reportPrivateUsage]
+            )
+            captured_bindings = [
+                line["captured"]["binding"] for line in output if "captured" in line
+            ]
+            assert captured_bindings == [
+                0,
+                1,
+            ], "Bindings must be captured in input order, not coalesced"
+
+            checkpoint_lines = [line for line in output if "checkpoint" in line]
+            assert len(checkpoint_lines) == 1
+
+    @pytest.mark.asyncio
+    async def test_concurrent_requests_pipeline_without_interleaving(self):
+        """Two requests in flight at once must both reach the transactor
+        before either ACK is delivered (the lock releases after stdout
+        flush, not after ACK), and their output must not interleave."""
+
+        output = io.BytesIO()
+        stopping = Task.Stopping()
+        transactor = Transactor(output, requires_explicit_acks=True)
+
+        task = Task(
+            log=logging.getLogger("test-webhook-pipeline"),
+            connector_status=MagicMock(),
+            name="test-webhook-pipeline",
+            output=output,
+            stopping=stopping,
+            tg=MagicMock(),
+            transactor=transactor,
+            requires_ack=True,
+        )
+
+        app = build_webhook_app({0: make_webhook_resource("catch-all")}, task)
+        async with TestClient(TestServer(app)) as client:
+            req_a = asyncio.create_task(client.post("/hook/A", json={}))
+            req_b = asyncio.create_task(client.post("/hook/B", json={}))
+
+            for _ in range(100):
+                await asyncio.sleep(0.01)
+                if len(transactor._pending) == 2:  # pyright: ignore[reportPrivateUsage]
+                    break
+            assert (
+                len(transactor._pending) == 2  # pyright: ignore[reportPrivateUsage]
+            ), "Both requests should be awaiting ACK concurrently"
+            assert not req_a.done() and not req_b.done()
+
+            transactor.deliver_ack(2)
+            resp_a = await asyncio.wait_for(req_a, timeout=1.0)
+            resp_b = await asyncio.wait_for(req_b, timeout=1.0)
+            assert resp_a.status == 200
+            assert resp_b.status == 200
+
+            records = read_emitted_records(output)
+            kinds = [
+                "captured" if "captured" in line else "checkpoint" for line in records
+            ]
+            assert kinds == [
+                "captured",
+                "checkpoint",
+                "captured",
+                "checkpoint",
+            ], f"Output interleaved across requests: {kinds}"
+
+            req_paths = [
+                line["captured"]["doc"]["_meta"]["reqPath"]
+                for line in records
+                if "captured" in line
+            ]
+            assert sorted(req_paths) == ["/hook/A", "/hook/B"]
+
+    @pytest.mark.asyncio
+    async def test_emit_failure_discards_partial_buffer(self):
+        """If checkpoint flush raises, the next request must not inherit the
+        failed batch's documents in its own checkpoint."""
+
+        async with run_server({0: make_webhook_resource("catch-all")}) as ctx:
+            real_emit_checkpoint = (
+                MultipleWritersTask._emit_checkpoint  # pyright: ignore[reportPrivateUsage]
+            )
+            calls = {"n": 0}
+
+            async def fail_first(self: MultipleWritersTask, *args: Any, **kwargs: Any):
+                calls["n"] += 1
+                if calls["n"] == 1:
+                    raise RuntimeError("simulated flush failure")
+                return await real_emit_checkpoint(self, *args, **kwargs)
+
+            with patch.object(MultipleWritersTask, "_emit_checkpoint", fail_first):
+                resp_fail = await ctx.client.post("/hook/doomed", json={})
+                assert resp_fail.status == 500
+
+                resp_ok = await ctx.client.post("/hook/survivor", json={})
+                assert resp_ok.status == 200
+
+            records = read_emitted_records(
+                ctx.task._output  # pyright: ignore[reportPrivateUsage]
+            )
+            captured_paths = [
+                line["captured"]["doc"]["_meta"]["reqPath"]
+                for line in records
+                if "captured" in line
+            ]
+            assert captured_paths == [
+                "/hook/survivor"
+            ], "Failed batch's documents leaked into the next checkpoint"
+
+            checkpoint_lines = [line for line in records if "checkpoint" in line]
+            assert len(checkpoint_lines) == 1
 
 
 class TestWebhookServerLifecycle:

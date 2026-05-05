@@ -3,7 +3,7 @@ import base64
 import decimal
 import tempfile
 import traceback
-from collections.abc import Awaitable
+from collections.abc import Awaitable, Iterable
 from dataclasses import dataclass, field
 from logging import Logger
 from typing import Any, BinaryIO, Callable, Generic
@@ -13,6 +13,7 @@ import xxhash
 from pydantic import Field
 
 from estuary_cdk.capture.connector_status import ConnectorStatus
+from estuary_cdk.capture.document import AssociatedDocument
 
 from ..flow import (
     ConnectorSpec,
@@ -59,18 +60,17 @@ def orjson_default(obj):
     raise TypeError
 
 
-@dataclass
-class Task:
+class _BaseTask:
     """
-    Task bundles a capture coroutine and its associated context.
+    Shared state and helpers for capture tasks.
 
     It facilitates the task in queuing any number of captured documents and
-    emitting them upon a checkpoint. Each instance of Task manages an independent
+    emitting them upon a checkpoint. Each instance manages an independent
     internal buffer (backed by memory or disk) which is only written to the
     connector's output upon a call to checkpoint(). This allows concurrent
-    Tasks to capture consistent checkpoints without trampling one another.
+    tasks to capture consistent checkpoints without trampling one another.
 
-    Task also facilitates logging and graceful stop of a capture coroutine.
+    _BaseTask also facilitates logging and graceful stop of a capture coroutine.
     """
 
     log: Logger
@@ -141,11 +141,7 @@ class Task:
         self.transactor = transactor
         self.requires_ack = requires_ack
 
-    def captured(self, binding: int, document: Any):
-        """Enqueue the document to be captured under the given binding.
-        Documents are not actually captured until checkpoint() is called.
-        Or, reset() will discard any queued documents."""
-
+    def _captured(self, binding: int, document: Any):
         if isinstance(document, dict):
             b = orjson.dumps(
                 {
@@ -167,16 +163,10 @@ class Task:
         self._buffer.write(b"\n")
         self._hasher.update(b)
 
-    def pending_digest(self) -> str:
-        """pending_digest returns the digest of captured() documents
-        since the last checkpoint() or reset()"""
-
+    def _pending_digest(self) -> str:
         return self._hasher.digest().hex()
 
-    def sourced_schema(self, binding_index: int, schema: dict[str, Any]):
-        """Write a SourcedSchema message for the given binding to the buffer.
-        SourcedSchema messages won't be emitted until checkpoint() is called."""
-
+    def _sourced_schema(self, binding_index: int, schema: dict[str, Any]):
         b = (
             Response(
                 sourcedSchema=response.SourcedSchema(
@@ -189,6 +179,11 @@ class Task:
 
         self._buffer.write(b)
         self._buffer.write(b"\n")
+
+    def _reset(self):
+        self._buffer.truncate(0)
+        self._buffer.seek(0)
+        self._hasher.reset()
 
     async def _emit_checkpoint(
         self, state: ConnectorState, merge_patch: bool = True
@@ -206,9 +201,41 @@ class Task:
         completion = await self.transactor.commit(
             self._buffer, wait_for_ack=self.requires_ack
         )
-        self.reset()
+        self._reset()
 
         return completion
+
+
+class Task(_BaseTask):
+    """
+    Single-writer capture task.
+
+    Bundles a capture coroutine with its scoped logger, buffer, and the
+    shared connector context. Operations on this class are not safe to
+    invoke concurrently against the same instance — each Task is expected
+    to be driven by a single coroutine. Use `spawn_child` to fan out work
+    across multiple independent Tasks.
+    """
+
+    def captured(self, binding: int, document: Any):
+        """Enqueue the document to be captured under the given binding.
+        Documents are not actually captured until checkpoint() is called.
+        Or, reset() will discard any queued documents."""
+        self._captured(binding, document)
+
+    def pending_digest(self) -> str:
+        """pending_digest returns the digest of captured() documents
+        since the last checkpoint() or reset()"""
+        return self._pending_digest()
+
+    def sourced_schema(self, binding_index: int, schema: dict[str, Any]):
+        """Write a SourcedSchema message for the given binding to the buffer.
+        SourcedSchema messages won't be emitted until checkpoint() is called."""
+        self._sourced_schema(binding_index, schema)
+
+    def reset(self):
+        """Discard any captured documents, resetting to an empty state."""
+        self._reset()
 
     async def checkpoint(self, state: ConnectorState, merge_patch: bool = True):
         """Emit previously-queued, captured documents followed by a checkpoint.
@@ -237,12 +264,6 @@ class Task:
                 {"task": self._name},
             )
             raise
-
-    def reset(self):
-        """Discard any captured documents, resetting to an empty state."""
-        self._buffer.truncate(0)
-        self._buffer.seek(0)
-        self._hasher.reset()
 
     def spawn_child(
         self, name_suffix: str, child: Callable[["Task"], Awaitable[None]]
@@ -281,3 +302,80 @@ class Task:
         task = self._tg.create_task(run_task(self))
         task.set_name(child_name)
         return task
+
+
+class MultipleWritersTask(_BaseTask):
+    """Task variant safe for multiple concurrent producers on a single instance.
+
+    emit() captures a batch of items and writes one checkpoint under an
+    internal lock, so overlapping calls cannot interleave partial
+    transactions — the transactor sees each batch as one atomic unit and
+    can track durable persistence per batch.
+
+    The per-step `captured`/`checkpoint` surface from `Task` is intentionally
+    not exposed: it cannot be called safely from multiple coroutines on the
+    same buffer.
+    """
+
+    _buffer_lock: asyncio.Lock
+
+    def __init__(
+        self,
+        log: Logger,
+        connector_status: ConnectorStatus,
+        name: str,
+        output: BinaryIO,
+        stopping: _BaseTask.Stopping,
+        tg: asyncio.TaskGroup,
+        transactor: Transactor,
+        requires_ack: bool = False,
+    ):
+        super().__init__(
+            log=log,
+            connector_status=connector_status,
+            name=name,
+            output=output,
+            stopping=stopping,
+            tg=tg,
+            transactor=transactor,
+            requires_ack=requires_ack,
+        )
+        self._buffer_lock = asyncio.Lock()
+
+    async def emit(
+        self,
+        items: Iterable[AssociatedDocument],
+        state: ConnectorState,
+    ) -> None:
+        """Capture each item against its binding and write one checkpoint.
+
+        The buffer lock is held only while filling the buffer and flushing
+        it to stdout. The ACK wait, when `requires_ack` is True, happens
+        after the lock is released so concurrent emit() callers can pipeline
+        their writes instead of serializing on round-trip latency.
+        """
+
+        completion: asyncio.Future[None] | None = None
+        async with self._buffer_lock:
+            try:
+                for item in items:
+                    self._captured(item.binding, item.doc)
+                completion = await self._emit_checkpoint(state)
+            except BaseException as exc:
+                self.log.error(
+                    "MultipleWritersTask emit failed; discarding partial buffer",
+                    {"task": self._name, "error": str(exc)},
+                )
+                self._reset()
+                raise
+
+        if completion is None:
+            return
+        try:
+            await completion
+        except asyncio.CancelledError:
+            self.log.warning(
+                "MultipleWritersTask emit cancelled while awaiting ACK",
+                {"task": self._name},
+            )
+            raise
