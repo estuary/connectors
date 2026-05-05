@@ -238,9 +238,11 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	// behavior which expresses how deletions work. We don't want that in a SourcedSchema update.
 	if fullWriteSchema {
 		metadataSchema.If = &jsonschema.Schema{
+			Required: []string{"_meta"},
 			Extras: map[string]any{
 				"properties": map[string]*jsonschema.Schema{
 					"_meta": {
+						Required: []string{"op"},
 						Extras: map[string]any{
 							"properties": map[string]*jsonschema.Schema{
 								"op": {

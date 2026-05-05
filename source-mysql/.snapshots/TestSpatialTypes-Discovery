@@ -52,8 +52,14 @@ Binding 0:
       "allOf": [
         {
           "if": {
+            "required": [
+              "_meta"
+            ],
             "properties": {
               "_meta": {
+                "required": [
+                  "op"
+                ],
                 "properties": {
                   "op": {
                     "const": "d"
