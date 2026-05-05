@@ -169,8 +169,8 @@ func runTimestampOverflowRegression(t *testing.T, cfg config) {
 	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
 		{Name: "ts", DataType: writer.LogicalTypeTimestamp, Required: false},
 	}, writer.WithParquetCompression(writer.Snappy))
-	clamped, ok := clampTimestamp("9999-12-31T23:59:59-14:00")
-	require.True(t, ok, "test value should require clamping")
+	clamped, err := clampTimestamp("9999-12-31T23:59:59-14:00")
+	require.NoError(t, err)
 	require.NoError(t, pqw.Write([]any{clamped}))
 	require.NoError(t, pqw.Close())
 
@@ -243,8 +243,8 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
 		{Name: "d", DataType: writer.LogicalTypeDate, Required: false},
 	}, writer.WithParquetCompression(writer.Snappy))
-	clamped, ok := clampDate("10000-01-01")
-	require.True(t, ok, "test value should require clamping")
+	clamped, err := clampDate("10000-01-01")
+	require.NoError(t, err)
 	require.NoError(t, pqw.Write([]any{clamped}))
 	require.NoError(t, pqw.Close())
 

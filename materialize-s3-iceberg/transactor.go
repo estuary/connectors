@@ -13,6 +13,7 @@ import (
 	"github.com/estuary/connectors/filesink"
 	m "github.com/estuary/connectors/go/materialize"
 	"github.com/estuary/connectors/go/writer"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	log "github.com/sirupsen/logrus"
@@ -45,9 +46,9 @@ func filePath(catalogTablePath string) (fileKey string, s3Path string) {
 type binding struct {
 	path             []string
 	pqSchema         writer.ParquetSchema
-	includeDoc       bool
 	stateKey         string
 	catalogTablePath string
+	mapped           *boilerplate.MappedBinding[config, resource, mappedType]
 }
 
 type connectorState struct {
@@ -167,30 +168,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			startFile(b)
 		}
 
-		row := make([]any, 0, len(it.Key)+len(it.Values)+1)
-		row = append(row, it.Key.ToInterface()...)
-		row = append(row, it.Values.ToInterface()...)
-		if b.includeDoc {
-			row = append(row, it.RawJSON)
-		}
-
-		// Clamp out-of-range timestamps/dates so pyiceberg.add_files can
-		// read the parquet column stats without overflowing Python datetime.
-		for i, v := range row {
-			s, ok := v.(string)
-			if !ok {
-				continue
-			}
-			switch b.pqSchema[i].DataType {
-			case writer.LogicalTypeTimestamp:
-				if clamped, ok := clampTimestamp(s); ok {
-					row[i] = clamped
-				}
-			case writer.LogicalTypeDate:
-				if clamped, ok := clampDate(s); ok {
-					row[i] = clamped
-				}
-			}
+		row, err := b.mapped.ConvertAll(it.Key, it.Values, it.RawJSON)
+		if err != nil {
+			return nil, fmt.Errorf("converting row: %w", err)
 		}
 
 		if err := pqw.Write(row); err != nil {
