@@ -16,7 +16,16 @@ var testDialect = mysqlDialect(time.UTC, "flow", "mysql", featureFlagDefaults)
 var testTemplates = renderTemplates(testDialect, "mysql")
 
 func TestSQLGeneration(t *testing.T) {
+	runSQLGen(t, testDialect, testTemplates)
+}
 
+func TestSQLGeneration_Singlestore(t *testing.T) {
+	dialect := mysqlDialect(time.UTC, "flow", "singlestore", featureFlagDefaults)
+	tpls := renderTemplates(dialect, "singlestore")
+	runSQLGen(t, dialect, tpls)
+}
+
+func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 	snap, _ := sql.RunSqlGenTests(
 		t,
 		testDialect,

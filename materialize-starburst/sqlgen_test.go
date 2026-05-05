@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"strings"
 	"testing"
@@ -17,7 +18,21 @@ import (
 var targetTableDialect = newStarburstTrinoDialect(featureFlagDefaults)
 var tempTableDialect = newStarburstHiveDialect()
 
+func flagsWithoutNativeBinary() map[string]bool {
+	out := maps.Clone(featureFlagDefaults)
+	out["native_binary_column_type"] = false
+	return out
+}
+
 func TestSQLGeneration(t *testing.T) {
+	runSQLGen(t, targetTableDialect)
+}
+
+func TestSQLGeneration_NoNativeBinaryColumnType(t *testing.T) {
+	runSQLGen(t, newStarburstTrinoDialect(flagsWithoutNativeBinary()))
+}
+
+func runSQLGen(t *testing.T, targetTableDialect sql.Dialect) {
 	var spec *pf.MaterializationSpec
 	var specJson, err = os.ReadFile("testdata/spec.json")
 	require.NoError(t, err)

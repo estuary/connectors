@@ -1,0 +1,210 @@
+--- Begin "a-schema".key_value createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS "a-schema".key_value (
+	key1 INTEGER NOT NULL,
+	key2 BOOLEAN NOT NULL,
+	"key!binary" TEXT NOT NULL,
+	array VARIANT,
+	binary TEXT,
+	boolean BOOLEAN,
+	field_with_projection TEXT,
+	flow_published_at TIMESTAMP_LTZ NOT NULL,
+	integer INTEGER,
+	integerGt128Bit INTEGER,
+	integerGt256Bit INTEGER,
+	integerGt64Bit INTEGER,
+	integerWithUserDDL DECIMAL(20),
+	multiple VARIANT,
+	"nonAsciiκόσμε" TEXT,
+	number FLOAT,
+	numberCastToString TEXT,
+	object VARIANT,
+	string TEXT,
+	stringInteger INTEGER,
+	stringInteger18Chars INTEGER,
+	stringInteger38Chars INTEGER,
+	stringInteger39Chars TEXT,
+	stringInteger66Chars TEXT,
+	stringInteger77Chars TEXT,
+	stringNumber FLOAT,
+	flow_document VARIANT NOT NULL,
+
+	PRIMARY KEY (key1, key2, "key!binary")
+)
+DEFAULT_DDL_COLLATION = '';
+
+COMMENT ON TABLE "a-schema".key_value IS 'Generated for materialization test/sqlite of collection key/value';
+COMMENT ON COLUMN "a-schema".key_value.key1 IS 'auto-generated projection of JSON at: /key1 with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.key2 IS 'auto-generated projection of JSON at: /key2 with inferred types: [boolean]';
+COMMENT ON COLUMN "a-schema".key_value."key!binary" IS 'auto-generated projection of JSON at: /key!binary with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value.array IS 'auto-generated projection of JSON at: /array with inferred types: [array]';
+COMMENT ON COLUMN "a-schema".key_value.binary IS 'auto-generated projection of JSON at: /binary with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value.boolean IS 'auto-generated projection of JSON at: /boolean with inferred types: [boolean]';
+COMMENT ON COLUMN "a-schema".key_value.field_with_projection IS 'user-provided projection of JSON at: /fieldWithProjection with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value.flow_published_at IS 'Flow Publication Time
+Flow publication date-time of this document
+auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value.integer IS 'auto-generated projection of JSON at: /integer with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.integerGt128Bit IS 'auto-generated projection of JSON at: /integerGt128Bit with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.integerGt256Bit IS 'auto-generated projection of JSON at: /integerGt256Bit with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.integerGt64Bit IS 'auto-generated projection of JSON at: /integerGt64Bit with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.integerWithUserDDL IS 'auto-generated projection of JSON at: /integerWithUserDDL with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".key_value.multiple IS 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]';
+COMMENT ON COLUMN "a-schema".key_value."nonAsciiκόσμε" IS 'auto-generated projection of JSON at: /nonAsciiκόσμε with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value.number IS 'auto-generated projection of JSON at: /number with inferred types: [number]';
+COMMENT ON COLUMN "a-schema".key_value.numberCastToString IS 'auto-generated projection of JSON at: /numberCastToString with inferred types: [number string]';
+COMMENT ON COLUMN "a-schema".key_value.object IS 'auto-generated projection of JSON at: /object with inferred types: [object]';
+COMMENT ON COLUMN "a-schema".key_value.string IS 'auto-generated projection of JSON at: /string with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".key_value.stringInteger IS 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value.stringInteger18Chars IS 'auto-generated projection of JSON at: /stringInteger18Chars with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value.stringInteger38Chars IS 'auto-generated projection of JSON at: /stringInteger38Chars with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value.stringInteger39Chars IS 'auto-generated projection of JSON at: /stringInteger39Chars with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value.stringInteger66Chars IS 'auto-generated projection of JSON at: /stringInteger66Chars with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value.stringInteger77Chars IS 'auto-generated projection of JSON at: /stringInteger77Chars with inferred types: [integer string]';
+COMMENT ON COLUMN "a-schema".key_value.stringNumber IS 'auto-generated projection of JSON at: /stringNumber with inferred types: [number string]';
+COMMENT ON COLUMN "a-schema".key_value.flow_document IS 'auto-generated projection of JSON at:  with inferred types: [object]';
+--- End "a-schema".key_value createTargetTable ---
+
+--- Begin "a-schema".delta_updates createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS "a-schema".delta_updates (
+	theKey TEXT NOT NULL,
+	aValue INTEGER,
+	flow_published_at TIMESTAMP_LTZ NOT NULL
+)
+DEFAULT_DDL_COLLATION = '';
+
+COMMENT ON TABLE "a-schema".delta_updates IS 'Generated for materialization test/sqlite of collection delta/updates';
+COMMENT ON COLUMN "a-schema".delta_updates.theKey IS 'auto-generated projection of JSON at: /theKey with inferred types: [string]';
+COMMENT ON COLUMN "a-schema".delta_updates.aValue IS 'A super-awesome value.
+auto-generated projection of JSON at: /aValue with inferred types: [integer]';
+COMMENT ON COLUMN "a-schema".delta_updates.flow_published_at IS 'Flow Publication Time
+Flow publication date-time of this document
+auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]';
+--- End "a-schema".delta_updates createTargetTable ---
+
+--- Begin alter table add columns and drop not nulls ---
+
+ALTER TABLE "a-schema".key_value ADD COLUMN
+	first_new_column STRING,
+	second_new_column BOOL;
+
+ALTER TABLE "a-schema".key_value ALTER COLUMN
+	first_required_column DROP NOT NULL,
+	second_required_column DROP NOT NULL;
+--- End alter table add columns and drop not nulls ---
+
+--- Begin alter table add columns ---
+
+ALTER TABLE "a-schema".key_value ADD COLUMN
+	first_new_column STRING,
+	second_new_column BOOL;
+--- End alter table add columns ---
+
+--- Begin alter table drop not nulls ---
+
+ALTER TABLE "a-schema".key_value ALTER COLUMN
+	first_required_column DROP NOT NULL,
+	second_required_column DROP NOT NULL;
+--- End alter table drop not nulls ---
+
+--- Begin "a-schema".key_value loadQuery ---
+SELECT 0, TO_JSON("a-schema".key_value.flow_document)
+	FROM "a-schema".key_value
+	JOIN (
+		SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary"
+		FROM test-file
+	) AS r
+	ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key1 >= 10 AND "a-schema".key_value.key1 <= 100
+	AND "a-schema".key_value.key2 = r.key2
+	AND "a-schema".key_value."key!binary" = r."key!binary" AND "a-schema".key_value."key!binary" >= 'aGVsbG8K' AND "a-schema".key_value."key!binary" <= 'Z29vZGJ5ZQo='
+--- End "a-schema".key_value loadQuery ---
+
+--- Begin "a-schema".key_value loadQueryNoFlowDocument ---
+SELECT 0,
+OBJECT_CONSTRUCT_KEEP_NULL(
+	'key1', "a-schema".key_value.key1,
+	'key2', "a-schema".key_value.key2,
+	'key!binary', "a-schema".key_value."key!binary",
+	'array', "a-schema".key_value.array,
+	'binary', "a-schema".key_value.binary,
+	'boolean', "a-schema".key_value.boolean,
+	'field_with_projection', "a-schema".key_value.field_with_projection,
+	'integer', "a-schema".key_value.integer,
+	'integerGt128Bit', "a-schema".key_value.integerGt128Bit,
+	'integerGt256Bit', "a-schema".key_value.integerGt256Bit,
+	'integerGt64Bit', "a-schema".key_value.integerGt64Bit,
+	'integerWithUserDDL', "a-schema".key_value.integerWithUserDDL,
+	'multiple', "a-schema".key_value.multiple,
+	'nonAsciiκόσμε', "a-schema".key_value."nonAsciiκόσμε",
+	'number', "a-schema".key_value.number,
+	'numberCastToString', TO_VARCHAR("a-schema".key_value.numberCastToString),
+	'object', "a-schema".key_value.object,
+	'string', "a-schema".key_value.string,
+	'stringInteger', TO_VARCHAR("a-schema".key_value.stringInteger),
+	'stringInteger18Chars', TO_VARCHAR("a-schema".key_value.stringInteger18Chars),
+	'stringInteger38Chars', TO_VARCHAR("a-schema".key_value.stringInteger38Chars),
+	'stringInteger39Chars', TO_VARCHAR("a-schema".key_value.stringInteger39Chars),
+	'stringInteger66Chars', TO_VARCHAR("a-schema".key_value.stringInteger66Chars),
+	'stringInteger77Chars', TO_VARCHAR("a-schema".key_value.stringInteger77Chars),
+	'stringNumber', TO_VARCHAR("a-schema".key_value.stringNumber)
+) as flow_document
+FROM "a-schema".key_value
+JOIN (
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary"
+	FROM test-file
+) AS r
+ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key1 >= 10 AND "a-schema".key_value.key1 <= 100
+AND "a-schema".key_value.key2 = r.key2
+AND "a-schema".key_value."key!binary" = r."key!binary" AND "a-schema".key_value."key!binary" >= 'aGVsbG8K' AND "a-schema".key_value."key!binary" <= 'Z29vZGJ5ZQo='
+--- End "a-schema".key_value loadQueryNoFlowDocument ---
+
+--- Begin "a-schema".key_value mergeInto ---
+MERGE INTO "a-schema".key_value AS l
+USING (
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS field_with_projection, $1[7] AS flow_published_at, $1[8] AS integer, $1[9] AS integerGt128Bit, $1[10] AS integerGt256Bit, $1[11] AS integerGt64Bit, $1[12] AS integerWithUserDDL, NULLIF($1[13], PARSE_JSON('null')) AS multiple, $1[14] AS "nonAsciiκόσμε", $1[15] AS number, $1[16] AS numberCastToString, NULLIF($1[17], PARSE_JSON('null')) AS object, $1[18] AS string, $1[19] AS stringInteger, $1[20] AS stringInteger18Chars, $1[21] AS stringInteger38Chars, $1[22] AS stringInteger39Chars, $1[23] AS stringInteger66Chars, $1[24] AS stringInteger77Chars, $1[25] AS stringNumber, $1[26] AS flow_document, $1[27] AS _flow_delete
+	FROM test-file
+) AS r
+ON 
+	l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+	AND l.key2 = r.key2
+	AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='
+WHEN MATCHED AND r._flow_delete=true THEN
+	DELETE
+WHEN MATCHED THEN
+	UPDATE SET l.array = r.array, l.binary = r.binary, l.boolean = r.boolean, l.field_with_projection = r.field_with_projection, l.flow_published_at = r.flow_published_at, l.integer = r.integer, l.integerGt128Bit = r.integerGt128Bit, l.integerGt256Bit = r.integerGt256Bit, l.integerGt64Bit = r.integerGt64Bit, l.integerWithUserDDL = r.integerWithUserDDL, l.multiple = r.multiple, l."nonAsciiκόσμε" = r."nonAsciiκόσμε", l.number = r.number, l.numberCastToString = r.numberCastToString, l.object = r.object, l.string = r.string, l.stringInteger = r.stringInteger, l.stringInteger18Chars = r.stringInteger18Chars, l.stringInteger38Chars = r.stringInteger38Chars, l.stringInteger39Chars = r.stringInteger39Chars, l.stringInteger66Chars = r.stringInteger66Chars, l.stringInteger77Chars = r.stringInteger77Chars, l.stringNumber = r.stringNumber, l.flow_document = r.flow_document
+WHEN NOT MATCHED AND r._flow_delete=false THEN
+	INSERT (key1, key2, "key!binary", array, binary, boolean, field_with_projection, flow_published_at, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, "nonAsciiκόσμε", number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document)
+	VALUES (r.key1, r.key2, r."key!binary", r.array, r.binary, r.boolean, r.field_with_projection, r.flow_published_at, r.integer, r.integerGt128Bit, r.integerGt256Bit, r.integerGt64Bit, r.integerWithUserDDL, r.multiple, r."nonAsciiκόσμε", r.number, r.numberCastToString, r.object, r.string, r.stringInteger, r.stringInteger18Chars, r.stringInteger38Chars, r.stringInteger39Chars, r.stringInteger66Chars, r.stringInteger77Chars, r.stringNumber, r.flow_document);
+--- End "a-schema".key_value mergeInto ---
+
+--- Begin "a-schema".key_value copyInto ---
+COPY INTO "a-schema".key_value (
+	key1, key2, "key!binary", array, binary, boolean, field_with_projection, flow_published_at, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, "nonAsciiκόσμε", number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document
+) FROM (
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS field_with_projection, $1[7] AS flow_published_at, $1[8] AS integer, $1[9] AS integerGt128Bit, $1[10] AS integerGt256Bit, $1[11] AS integerGt64Bit, $1[12] AS integerWithUserDDL, NULLIF($1[13], PARSE_JSON('null')) AS multiple, $1[14] AS "nonAsciiκόσμε", $1[15] AS number, $1[16] AS numberCastToString, NULLIF($1[17], PARSE_JSON('null')) AS object, $1[18] AS string, $1[19] AS stringInteger, $1[20] AS stringInteger18Chars, $1[21] AS stringInteger38Chars, $1[22] AS stringInteger39Chars, $1[23] AS stringInteger66Chars, $1[24] AS stringInteger77Chars, $1[25] AS stringNumber, $1[26] AS flow_document
+	FROM test-file
+);
+--- End "a-schema".key_value copyInto ---
+
+--- Begin "a-schema".delta_updates copyInto ---
+COPY INTO "a-schema".delta_updates (
+	theKey, aValue, flow_published_at
+) FROM (
+	SELECT $1[0] AS theKey, $1[1] AS aValue, $1[2] AS flow_published_at
+	FROM test-file
+);
+--- End "a-schema".delta_updates copyInto ---
+
+--- Begin "a-schema".key_value createPipe ---
+CREATE PIPE db.schema.flow_pipe_0_tableName_00000000_0
+  COMMENT = 'Pipe for table [a-schema key_value]'
+  AS COPY INTO "a-schema".key_value (
+	key1, key2, "key!binary", array, binary, boolean, field_with_projection, flow_published_at, integer, integerGt128Bit, integerGt256Bit, integerGt64Bit, integerWithUserDDL, multiple, "nonAsciiκόσμε", number, numberCastToString, object, string, stringInteger, stringInteger18Chars, stringInteger38Chars, stringInteger39Chars, stringInteger66Chars, stringInteger77Chars, stringNumber, flow_document
+) FROM (
+	SELECT $1[0] AS key1, $1[1] AS key2, $1[2] AS "key!binary", NULLIF($1[3], PARSE_JSON('null')) AS array, $1[4] AS binary, $1[5] AS boolean, $1[6] AS field_with_projection, $1[7] AS flow_published_at, $1[8] AS integer, $1[9] AS integerGt128Bit, $1[10] AS integerGt256Bit, $1[11] AS integerGt64Bit, $1[12] AS integerWithUserDDL, NULLIF($1[13], PARSE_JSON('null')) AS multiple, $1[14] AS "nonAsciiκόσμε", $1[15] AS number, $1[16] AS numberCastToString, NULLIF($1[17], PARSE_JSON('null')) AS object, $1[18] AS string, $1[19] AS stringInteger, $1[20] AS stringInteger18Chars, $1[21] AS stringInteger38Chars, $1[22] AS stringInteger39Chars, $1[23] AS stringInteger66Chars, $1[24] AS stringInteger77Chars, $1[25] AS stringNumber, $1[26] AS flow_document
+	FROM @flow_v1
+);
+--- End "a-schema".key_value createPipe ---
+
+

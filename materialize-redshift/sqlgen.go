@@ -289,7 +289,7 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 CREATE TEMPORARY TABLE {{ template "temp_name" $.Target }} (
 {{- range $ind, $key := $.Target.Keys }}
 	{{- if $ind }},{{ end }}
-	{{ $key.Identifier }} {{ if IsBinary $key -}}
+	{{ $key.Identifier }} {{ if eq $key.BareDDL "VARBYTE(1024000)" -}}
 		VARCHAR(MAX)
 	{{- else if and (eq $key.DDL "TEXT") (not (eq $.VarCharLength 0)) -}}
 		VARCHAR({{ $.VarCharLength }})
@@ -306,7 +306,7 @@ CREATE TEMPORARY TABLE {{ template "temp_name" $.Target }} (
 CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 {{- range $ind, $col := $.Columns }}
 	{{- if $ind }},{{ end }}
-	{{ $col.Identifier }} {{ if IsBinary $col -}}
+	{{ $col.Identifier }} {{ if eq $col.BareDDL "VARBYTE(1024000)" -}}
 		VARCHAR(MAX)
 	{{- else -}}
 		{{ $col.DDL }}
@@ -319,7 +319,7 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 CREATE TEMPORARY TABLE {{ template "temp_name_deleted" . }} (
 {{- range $ind, $key := $.Keys }}
 	{{- if $ind }},{{ end }}
-  {{ $key.Identifier }} {{ if IsBinary $key -}}
+  {{ $key.Identifier }} {{ if eq $key.BareDDL "VARBYTE(1024000)" -}}
 	VARCHAR(MAX)
   {{- else -}}
 	{{ $key.DDL }}
@@ -337,12 +337,12 @@ MERGE INTO {{ $.Identifier }}
 USING {{ template "temp_name" . }} AS r
 ON {{ range $ind, $key := $.Keys }}
 {{- if $ind }} AND {{end -}}
-	{{$.Identifier}}.{{$key.Identifier}} = {{ if IsBinary $key }}TO_VARBYTE(r.{{$key.Identifier}}, 'hex'){{ else }}r.{{$key.Identifier}}{{ end }}
+	{{$.Identifier}}.{{$key.Identifier}} = {{ if eq $key.BareDDL "VARBYTE(1024000)" }}TO_VARBYTE(r.{{$key.Identifier}}, 'hex'){{ else }}r.{{$key.Identifier}}{{ end }}
 {{- end}}
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{end -}}
-		{{$val.Identifier}} = {{ if IsBinary $val }}TO_VARBYTE(r.{{$val.Identifier}}, 'hex'){{ else }}r.{{$val.Identifier}}{{ end }}
+		{{$val.Identifier}} = {{ if eq $val.BareDDL "VARBYTE(1024000)" }}TO_VARBYTE(r.{{$val.Identifier}}, 'hex'){{ else }}r.{{$val.Identifier}}{{ end }}
 	{{- end}}
 	{{- if $.Document -}}
 		{{ if $.Values  }}, {{ end }}{{$.Document.Identifier}} = r.{{$.Document.Identifier}}
@@ -357,7 +357,7 @@ WHEN NOT MATCHED THEN
 	VALUES (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
-		{{ if IsBinary $col }}TO_VARBYTE(r.{{$col.Identifier}}, 'hex'){{ else }}r.{{$col.Identifier}}{{ end }}
+		{{ if eq $col.BareDDL "VARBYTE(1024000)" }}TO_VARBYTE(r.{{$col.Identifier}}, 'hex'){{ else }}r.{{$col.Identifier}}{{ end }}
 	{{- end -}}
 	);
 {{ end }}
@@ -368,7 +368,7 @@ DELETE FROM {{ $.Identifier }}
 USING {{ template "temp_name_deleted" . }} AS r
 WHERE {{ range $ind, $key := $.Keys }}
 {{- if $ind }} AND {{end -}}
-	{{$.Identifier}}.{{$key.Identifier}} = {{ if IsBinary $key }}TO_VARBYTE(r.{{$key.Identifier}}, 'hex'){{ else }}r.{{$key.Identifier}}{{ end }}
+	{{$.Identifier}}.{{$key.Identifier}} = {{ if eq $key.BareDDL "VARBYTE(1024000)" }}TO_VARBYTE(r.{{$key.Identifier}}, 'hex'){{ else }}r.{{$key.Identifier}}{{ end }}
 {{- end }}
 {{- end }}
 {{ end }}
@@ -383,7 +383,7 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 	JOIN {{ $.Identifier}} AS r
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON  {{ end -}}
-			{{ if IsBinary $key }}TO_VARBYTE(l.{{ $key.Identifier }}, 'hex'){{ else }}l.{{ $key.Identifier }}{{ end }} = r.{{ $key.Identifier }}
+			{{ if eq $key.BareDDL "VARBYTE(1024000)" }}TO_VARBYTE(l.{{ $key.Identifier }}, 'hex'){{ else }}l.{{ $key.Identifier }}{{ end }} = r.{{ $key.Identifier }}
 	{{- end }}
 {{- else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
@@ -402,7 +402,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 	TO_CHAR({{ $ident }}, 'YYYY-MM-DD')
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	TO_CHAR({{ $ident }} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
-{{- else if eq $.AsFlatType "binary" -}}
+{{- else if eq $.BareDDL "VARBYTE(1024000)" -}}
 	FROM_VARBYTE({{ $ident }}, 'base64')
 {{- else -}}
 	{{ $ident }}
@@ -422,7 +422,7 @@ FROM {{ template "temp_name" . }} AS l
 JOIN {{ $.Identifier}} AS r
 {{- range $ind, $key := $.Keys }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-		{{ if IsBinary $key }}TO_VARBYTE(l.{{ $key.Identifier }}, 'hex'){{ else }}l.{{ $key.Identifier }}{{ end }} = r.{{ $key.Identifier }}
+		{{ if eq $key.BareDDL "VARBYTE(1024000)" }}TO_VARBYTE(l.{{ $key.Identifier }}, 'hex'){{ else }}l.{{ $key.Identifier }}{{ end }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc

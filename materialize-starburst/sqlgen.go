@@ -194,7 +194,7 @@ SELECT {{ $.Binding }}, {{$.Document.Identifier}}
     JOIN {{$.Identifier}}_load_temp AS r
 	ON {{ range $ind, $key := $.Keys }}
 	{{- if $ind }} AND {{ end -}}
-    l.{{ $key.Identifier }} = {{ if IsBinary $key }}from_base64(r.{{ $key.Identifier }}){{ else }}r.{{ $key.Identifier }}{{ end }}
+    l.{{ $key.Identifier }} = {{ if eq $key.BareDDL "VARBINARY" }}from_base64(r.{{ $key.Identifier }}){{ else }}r.{{ $key.Identifier }}{{ end }}
 	{{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
@@ -221,7 +221,7 @@ MERGE INTO {{ $.Identifier }} AS l
 	USING {{$.Identifier}}_store_temp AS r
 	ON {{ range $ind, $key := $.Keys }}
 	{{- if $ind }} AND {{ end -}}
-	l.{{ $key.Identifier }} = {{ if IsBinary $key }}from_base64(r.{{ $key.Identifier }}){{ else }}r.{{ $key.Identifier }}{{ end }}
+	l.{{ $key.Identifier }} = {{ if eq $key.BareDDL "VARBINARY" }}from_base64(r.{{ $key.Identifier }}){{ else }}r.{{ $key.Identifier }}{{ end }}
 	{{- end }}
 	WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
@@ -259,7 +259,7 @@ ALTER TABLE {{.TableIdentifier}} ADD COLUMN {{.ColumnIdentifier}} {{.NullableDDL
 	from_iso8601_date(r.{{ $.Identifier}})
 {{- else if Contains $.DDL  "TIMESTAMP" -}}
 	from_iso8601_timestamp_nanos(r.{{ $.Identifier}})
-{{- else if IsBinary $ -}}
+{{- else if eq $.BareDDL "VARBINARY" -}}
 	from_base64(r.{{ $.Identifier }})
 {{- else -}}
 	r.{{ $.Identifier }}

@@ -277,7 +277,7 @@ SELECT {{ $.Table.Binding }}, TO_JSON({{ $.Table.Identifier }}.{{ $.Table.Docume
 	JOIN (
 		SELECT {{ range $ind, $bound := $.Bounds }}
 		{{- if $ind }}, {{ end -}}
-		{{ if IsBinary $bound }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$bound.Identifier -}}
+		{{ if eq $bound.BareDDL "BINARY" }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$bound.Identifier -}}
 		{{- end }}
 		FROM {{ $.File }}
 	) AS r
@@ -303,7 +303,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS VARIANT) LIMIT 0) as nodoc
 	TO_VARCHAR({{ $ident }}, 'YYYY-MM-DD')
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	TO_VARCHAR(CONVERT_TIMEZONE('UTC', {{ $ident }}), 'YYYY-MM-DD"T"HH24:MI:SS.FF9"Z"')
-{{- else if eq $.AsFlatType "binary" -}}
+{{- else if eq $.BareDDL "BINARY" -}}
 	BASE64_ENCODE({{ $ident }})
 {{- else -}}
 	{{ $ident }}
@@ -322,7 +322,7 @@ FROM {{ $.Table.Identifier }}
 JOIN (
 	SELECT {{ range $ind, $bound := $.Bounds }}
 	{{- if $ind }}, {{ end -}}
-	{{ if IsBinary $bound }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$bound.Identifier -}}
+	{{ if eq $bound.BareDDL "BINARY" }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$bound.Identifier -}}
 	{{- end }}
 	FROM {{ $.File }}
 ) AS r
@@ -344,7 +344,7 @@ CREATE PIPE {{ $.PipeName }}
 ) FROM (
 	SELECT {{ range $ind, $key := $.Table.Columns }}
 	{{- if $ind }}, {{ end -}}
-	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if IsBinary $key }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
+	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if eq $key.BareDDL "BINARY" }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}
 	FROM @flow_v1
 );
@@ -359,7 +359,7 @@ COPY INTO {{ $.Table.Identifier }} (
 ) FROM (
 	SELECT {{ range $ind, $key := $.Table.Columns }}
 	{{- if $ind }}, {{ end -}}
-	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if IsBinary $key }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
+	{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if eq $key.BareDDL "BINARY" }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}
 	FROM {{ $.File }}
 );
@@ -371,7 +371,7 @@ MERGE INTO {{ $.Table.Identifier }} AS l
 USING (
 	SELECT {{ range $ind, $key := $.Table.Columns }}
 		{{- if $ind }}, {{ end -}}
-		{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if IsBinary $key }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
+		{{ if eq $key.DDL "VARIANT" }}NULLIF($1[{{$ind}}], PARSE_JSON('null')){{ else if eq $key.BareDDL "BINARY" }}BASE64_DECODE_BINARY($1[{{$ind}}]){{ else }}$1[{{$ind}}]{{ end }} AS {{$key.Identifier -}}
 	{{- end }}, $1[{{ len $.Table.Columns }}] AS _flow_delete
 	FROM {{ $.File }}
 ) AS r

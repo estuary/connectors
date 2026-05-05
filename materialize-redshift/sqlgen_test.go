@@ -1,6 +1,7 @@
 package main
 
 import (
+	"maps"
 	"strings"
 	"testing"
 	"text/template"
@@ -14,8 +15,23 @@ import (
 var testDialect = createRsDialect(false, featureFlagDefaults)
 var testTemplates = renderTemplates(testDialect)
 
-func TestSQLGeneration(t *testing.T) {
+func flagsWithoutNativeBinary() map[string]bool {
+	out := maps.Clone(featureFlagDefaults)
+	out["native_binary_column_type"] = false
+	return out
+}
 
+func TestSQLGeneration(t *testing.T) {
+	runSQLGen(t, testDialect, testTemplates)
+}
+
+func TestSQLGeneration_NoNativeBinaryColumnType(t *testing.T) {
+	dialect := createRsDialect(false, flagsWithoutNativeBinary())
+	tpls := renderTemplates(dialect)
+	runSQLGen(t, dialect, tpls)
+}
+
+func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 	snap, tables := sql.RunSqlGenTests(
 		t,
 		testDialect,

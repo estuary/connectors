@@ -275,7 +275,7 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 	CAST({{ $ident }} AS STRING)
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E*SZ', {{ $ident }}, 'UTC')
-{{- else if eq $.AsFlatType "binary" -}}
+{{- else if eq $.BareDDL "BYTES" -}}
 	TO_BASE64({{ $ident }})
 {{- else -}}
 	{{ $ident }}
