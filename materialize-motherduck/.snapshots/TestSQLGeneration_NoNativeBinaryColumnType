@@ -1,0 +1,247 @@
+--- Begin db."a-schema".key_value createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS db."a-schema".key_value (
+	key1 BIGINT NOT NULL,
+	key2 BOOLEAN NOT NULL,
+	"key!binary" VARCHAR NOT NULL,
+	"array" JSON,
+	"binary" VARCHAR,
+	"boolean" BOOLEAN,
+	field_with_projection VARCHAR,
+	flow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,
+	"integer" BIGINT,
+	"integerGt128Bit" HUGEINT,
+	"integerGt256Bit" HUGEINT,
+	"integerGt64Bit" HUGEINT,
+	"integerWithUserDDL" DECIMAL(20),
+	multiple JSON,
+	"nonAsciiκόσμε" VARCHAR,
+	number DOUBLE,
+	"numberCastToString" VARCHAR,
+	"object" JSON,
+	string VARCHAR,
+	"stringInteger" HUGEINT,
+	"stringInteger18Chars" HUGEINT,
+	"stringInteger38Chars" HUGEINT,
+	"stringInteger39Chars" VARCHAR,
+	"stringInteger66Chars" VARCHAR,
+	"stringInteger77Chars" VARCHAR,
+	"stringNumber" DOUBLE,
+	flow_document JSON NOT NULL
+);
+--- End db."a-schema".key_value createTargetTable ---
+
+--- Begin db."a-schema".delta_updates createTargetTable ---
+
+CREATE TABLE IF NOT EXISTS db."a-schema".delta_updates (
+	"theKey" VARCHAR NOT NULL,
+	"aValue" BIGINT,
+	flow_published_at TIMESTAMP WITH TIME ZONE NOT NULL
+);
+--- End db."a-schema".delta_updates createTargetTable ---
+
+--- Begin Fence Update ---
+UPDATE path."to".checkpoints
+	SET   checkpoint = 'AAECAwQFBgcICQ=='
+	WHERE materialization = 'some/Materialization'
+	AND   key_begin = 1122867
+	AND   key_end   = 4293844428
+	AND   fence     = 123;
+--- End Fence Update ---
+
+--- Begin db."a-schema".key_value loadQuery ---
+SELECT 0 AS binding, l.flow_document AS doc
+FROM db."a-schema".key_value AS l
+JOIN read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	columns={
+		key1: 'BIGINT NOT NULL',
+		key2: 'BOOLEAN NOT NULL',
+		"key!binary": 'VARCHAR NOT NULL'
+	}
+) AS r
+	 ON  l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+	 AND l.key2 = r.key2
+	 AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='
+--- End db."a-schema".key_value loadQuery ---
+
+--- Begin db."a-schema".key_value loadQueryNoFlowDocument ---                                                                                                                             
+SELECT 0 AS binding,                                                                                                                                 
+json_object(                                                                                                                                        
+       'key1', l.key1,                                                                                                                                         
+       'key2', l.key2,                                                                                                                                         
+       'key!binary', l."key!binary",                                                                                                                                         
+       'array', l."array",                                                                                                                                         
+       'binary', l."binary",                                                                                                                                         
+       'boolean', l."boolean",                                                                                                                                         
+       'field_with_projection', l.field_with_projection,                                                                                                                                         
+       'integer', l."integer",                                                                                                                                         
+       'integerGt128Bit', l."integerGt128Bit",                                                                                                                                         
+       'integerGt256Bit', l."integerGt256Bit",                                                                                                                                         
+       'integerGt64Bit', l."integerGt64Bit",                                                                                                                                         
+       'integerWithUserDDL', l."integerWithUserDDL",                                                                                                                                         
+       'multiple', l.multiple,                                                                                                                                         
+       'nonAsciiκόσμε', l."nonAsciiκόσμε",                                                                                                                                         
+       'number', l.number,                                                                                                                                         
+       'numberCastToString', CAST(l."numberCastToString" AS VARCHAR),                                                                                                                                         
+       'object', l."object",                                                                                                                                         
+       'string', l.string,                                                                                                                                         
+       'stringInteger', CAST(l."stringInteger" AS VARCHAR),                                                                                                                                         
+       'stringInteger18Chars', CAST(l."stringInteger18Chars" AS VARCHAR),                                                                                                                                         
+       'stringInteger38Chars', CAST(l."stringInteger38Chars" AS VARCHAR),                                                                                                                                         
+       'stringInteger39Chars', CAST(l."stringInteger39Chars" AS VARCHAR),                                                                                                                                         
+       'stringInteger66Chars', CAST(l."stringInteger66Chars" AS VARCHAR),                                                                                                                                         
+       'stringInteger77Chars', CAST(l."stringInteger77Chars" AS VARCHAR),                                                                                                                                         
+       'stringNumber', CAST(l."stringNumber" AS VARCHAR)                                                                                                                                                          
+) as doc                                                                                                                                                           
+FROM db."a-schema".key_value AS l                                                                                                                                       
+JOIN read_json(                                                                                                                                                    
+       ['s3://bucket/file1', 's3://bucket/file2'],                                                                                                                                                          
+       format='newline_delimited',                                                                                                                                 
+       compression='gzip',                                                                                                                                         
+       columns={                                                                                                                            
+               key1: 'BIGINT NOT NULL',                                                                                                                            
+               key2: 'BOOLEAN NOT NULL',                                                                                                                            
+               "key!binary": 'VARCHAR NOT NULL'                                                                                                                                                  
+       }                                                                                                                                                           
+) AS r                                                                                                                              
+        ON  l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100                                                                                                                              
+        AND l.key2 = r.key2                                                                                                                              
+        AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='                                                                                                                                                         
+--- End db."a-schema".key_value loadQueryNoFlowDocument ---
+
+--- Begin db."a-schema".key_value storeDeleteQuery ---
+DELETE FROM db."a-schema".key_value AS l
+USING read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	maximum_object_size=67108864,
+	columns={
+		key1: 'BIGINT NOT NULL',
+		key2: 'BOOLEAN NOT NULL',
+		"key!binary": 'VARCHAR NOT NULL',
+		"array": 'JSON',
+		"binary": 'VARCHAR',
+		"boolean": 'BOOLEAN',
+		field_with_projection: 'VARCHAR',
+		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL',
+		"integer": 'BIGINT',
+		"integerGt128Bit": 'HUGEINT',
+		"integerGt256Bit": 'HUGEINT',
+		"integerGt64Bit": 'HUGEINT',
+		"integerWithUserDDL": 'DECIMAL(20)',
+		multiple: 'JSON',
+		"nonAsciiκόσμε": 'VARCHAR',
+		number: 'DOUBLE',
+		"numberCastToString": 'VARCHAR',
+		"object": 'JSON',
+		string: 'VARCHAR',
+		"stringInteger": 'HUGEINT',
+		"stringInteger18Chars": 'HUGEINT',
+		"stringInteger38Chars": 'HUGEINT',
+		"stringInteger39Chars": 'VARCHAR',
+		"stringInteger66Chars": 'VARCHAR',
+		"stringInteger77Chars": 'VARCHAR',
+		"stringNumber": 'DOUBLE',
+		flow_document: 'JSON NOT NULL'
+	}
+) AS r
+	 WHERE l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
+	 AND l.key2 = r.key2
+	 AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo=';
+--- End db."a-schema".key_value storeDeleteQuery ---
+
+--- Begin db."a-schema".key_value storeQuery ---
+INSERT INTO db."a-schema".key_value (key1, key2, "key!binary", "array", "binary", "boolean", field_with_projection, flow_published_at, "integer", "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", "object", string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document
+)
+SELECT
+		key1, 
+		key2, 
+		"key!binary", 
+		"array", 
+		"binary", 
+		"boolean", 
+		field_with_projection, 
+		flow_published_at, 
+		"integer", 
+		"integerGt128Bit", 
+		"integerGt256Bit", 
+		"integerGt64Bit", 
+		"integerWithUserDDL", 
+		multiple, 
+		"nonAsciiκόσμε", 
+		number, 
+		"numberCastToString", 
+		"object", 
+		string, 
+		"stringInteger", 
+		"stringInteger18Chars", 
+		"stringInteger38Chars", 
+		"stringInteger39Chars", 
+		"stringInteger66Chars", 
+		"stringInteger77Chars", 
+		"stringNumber", 
+		flow_document
+FROM read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	maximum_object_size=67108864,
+	columns={
+		key1: 'BIGINT NOT NULL',
+		key2: 'BOOLEAN NOT NULL',
+		"key!binary": 'VARCHAR NOT NULL',
+		"array": 'JSON',
+		"binary": 'VARCHAR',
+		"boolean": 'BOOLEAN',
+		field_with_projection: 'VARCHAR',
+		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL',
+		"integer": 'BIGINT',
+		"integerGt128Bit": 'HUGEINT',
+		"integerGt256Bit": 'HUGEINT',
+		"integerGt64Bit": 'HUGEINT',
+		"integerWithUserDDL": 'DECIMAL(20)',
+		multiple: 'JSON',
+		"nonAsciiκόσμε": 'VARCHAR',
+		number: 'DOUBLE',
+		"numberCastToString": 'VARCHAR',
+		"object": 'JSON',
+		string: 'VARCHAR',
+		"stringInteger": 'HUGEINT',
+		"stringInteger18Chars": 'HUGEINT',
+		"stringInteger38Chars": 'HUGEINT',
+		"stringInteger39Chars": 'VARCHAR',
+		"stringInteger66Chars": 'VARCHAR',
+		"stringInteger77Chars": 'VARCHAR',
+		"stringNumber": 'DOUBLE',
+		flow_document: 'JSON NOT NULL'
+	, _flow_delete: 'BOOLEAN NOT NULL'
+	}
+) WHERE NOT _flow_delete;
+--- End db."a-schema".key_value storeQuery ---
+
+--- Begin db."a-schema".delta_updates storeQuery ---
+INSERT INTO db."a-schema".delta_updates ("theKey", "aValue", flow_published_at
+)
+SELECT
+		"theKey", 
+		"aValue", 
+		flow_published_at
+FROM read_json(
+	['s3://bucket/file1', 's3://bucket/file2'],
+	format='newline_delimited',
+	compression='gzip',
+	maximum_object_size=67108864,
+	columns={
+		"theKey": 'VARCHAR NOT NULL',
+		"aValue": 'BIGINT',
+		flow_published_at: 'TIMESTAMP WITH TIME ZONE NOT NULL'
+	, _flow_delete: 'BOOLEAN NOT NULL'
+	}
+) WHERE NOT _flow_delete;
+--- End db."a-schema".delta_updates storeQuery ---
+
+

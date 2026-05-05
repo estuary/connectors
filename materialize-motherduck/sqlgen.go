@@ -176,13 +176,13 @@ JOIN read_json(
 	columns={
 	{{- range $ind, $bound := $.Bounds }}
 		{{- if $ind }},{{ end }}
-		{{$bound.Identifier}}: '{{ if IsBinary $bound }}VARCHAR{{ if $bound.MustExist }} NOT NULL{{ end }}{{ else }}{{$bound.DDL}}{{ end }}'
+		{{$bound.Identifier}}: '{{ if eq $bound.BareDDL "BLOB" }}VARCHAR{{ if $bound.MustExist }} NOT NULL{{ end }}{{ else }}{{$bound.DDL}}{{ end }}'
 	{{- end }}
 	}
 ) AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-	l.{{ $bound.Identifier }} = {{ if IsBinary $bound }}FROM_BASE64(r.{{ $bound.Identifier }}){{ else }}r.{{ $bound.Identifier }}{{ end }}
+	l.{{ $bound.Identifier }} = {{ if eq $bound.BareDDL "BLOB" }}FROM_BASE64(r.{{ $bound.Identifier }}){{ else }}r.{{ $bound.Identifier }}{{ end }}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end -}}
 {{ else -}}
@@ -206,13 +206,13 @@ USING read_json(
 	columns={
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{$col.Identifier}}: '{{ if IsBinary $col }}VARCHAR{{ if $col.MustExist }} NOT NULL{{ end }}{{ else }}{{$col.DDL}}{{ end }}'
+		{{$col.Identifier}}: '{{ if eq $col.BareDDL "BLOB" }}VARCHAR{{ if $col.MustExist }} NOT NULL{{ end }}{{ else }}{{$col.DDL}}{{ end }}'
 	{{- end }}
 	}
 ) AS r
 {{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} WHERE {{ end -}}
-	l.{{ $bound.Identifier }} = {{ if IsBinary $bound }}FROM_BASE64(r.{{ $bound.Identifier }}){{ else }}r.{{ $bound.Identifier }}{{ end }}
+	l.{{ $bound.Identifier }} = {{ if eq $bound.BareDDL "BLOB" }}FROM_BASE64(r.{{ $bound.Identifier }}){{ else }}r.{{ $bound.Identifier }}{{ end }}
 	{{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }};
 {{ end }}
@@ -227,7 +227,7 @@ INSERT INTO {{$.Identifier}} (
 SELECT
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end }}
-		{{ if IsBinary $col }}FROM_BASE64({{$col.Identifier}}){{ else }}{{$col.Identifier}}{{ end }}
+		{{ if eq $col.BareDDL "BLOB" }}FROM_BASE64({{$col.Identifier}}){{ else }}{{$col.Identifier}}{{ end }}
 	{{- end }}
 FROM read_json(
 	[
@@ -241,7 +241,7 @@ FROM read_json(
 	columns={
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{$col.Identifier}}: '{{ if IsBinary $col }}VARCHAR{{ if $col.MustExist }} NOT NULL{{ end }}{{ else }}{{$col.DDL}}{{ end }}'
+		{{$col.Identifier}}: '{{ if eq $col.BareDDL "BLOB" }}VARCHAR{{ if $col.MustExist }} NOT NULL{{ end }}{{ else }}{{$col.DDL}}{{ end }}'
 	{{- end }}
 	, _flow_delete: 'BOOLEAN NOT NULL'
 	}
@@ -260,7 +260,7 @@ FROM read_json(
 	strftime(timezone('UTC', {{ $ident }}), '%Y-%m-%dT%H:%M:%S.%fZ')
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	CAST({{ $ident }} AS VARCHAR)
-{{- else if eq $.AsFlatType "binary" -}}
+{{- else if eq $.BareDDL "BLOB" -}}
 	TO_BASE64({{ $ident }})
 {{- else -}}
 	{{ $ident }}
@@ -290,13 +290,13 @@ JOIN read_json(
        columns={                                                                                                                                                   
        {{- range $ind, $bound := $.Bounds }}                                                                                                                       
                {{- if $ind }},{{ end }}                                                                                                                            
-               {{$bound.Identifier}}: '{{ if IsBinary $bound }}VARCHAR{{ if $bound.MustExist }} NOT NULL{{ end }}{{ else }}{{$bound.DDL}}{{ end }}'
+               {{$bound.Identifier}}: '{{ if eq $bound.BareDDL "BLOB" }}VARCHAR{{ if $bound.MustExist }} NOT NULL{{ end }}{{ else }}{{$bound.DDL}}{{ end }}'
        {{- end }}                                                                                                                                                  
        }                                                                                                                                                           
 ) AS r                                                                                                                                                             
 {{- range $ind, $bound := $.Bounds }}                                                                                                                              
        {{ if $ind }} AND {{ else }} ON  {{ end -}}                                                                                                                 
-       l.{{ $bound.Identifier }} = {{ if IsBinary $bound }}FROM_BASE64(r.{{ $bound.Identifier }}){{ else }}r.{{ $bound.Identifier }}{{ end }}
+       l.{{ $bound.Identifier }} = {{ if eq $bound.BareDDL "BLOB" }}FROM_BASE64(r.{{ $bound.Identifier }}){{ else }}r.{{ $bound.Identifier }}{{ end }}
        {{- if $bound.LiteralLower }} AND l.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND l.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end -}}                                                                                                                                                        
 {{- end }}                                                                                                                                                         

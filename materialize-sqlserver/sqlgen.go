@@ -361,7 +361,7 @@ SELECT TOP 0 -1, NULL
 	FORMAT({{ $ident }} AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.FFFFFFF') + 'Z'
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	FORMAT({{ $ident }}, 'HH:mm:ss.FFFFFFF')
-{{- else if eq $.AsFlatType "binary" -}}
+{{- else if or (eq $.BareDDL "VARBINARY(900)") (eq $.BareDDL "VARBINARY(MAX)") -}}
 	{{- /* Encodes a VARBINARY column back to a base64 VARCHAR via the same
 	       xs:base64Binary XML cast used by stringToVarbinaryCast for migration.
 	       Direction is determined by the source column type and the cast target:

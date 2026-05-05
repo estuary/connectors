@@ -327,10 +327,18 @@ func renderTemplates(dialect sql.Dialect, product string) templates {
 	var jsonBuildFunction = "JSON_OBJECT"
 	var tempTruncateCommand = "TRUNCATE"
 	var loadDataModifier = ""
+	// updateTableDDL selects which MappedType field is used for the
+	// per-column DDL inside the update-staging temp table. Singlestore
+	// validates NOT NULL constraints during LOAD DATA before any SET clause
+	// runs, so the staging table's non-key columns are made nullable; the
+	// final REPLACE into the target table still enforces the original NOT
+	// NULL constraints.
+	var updateTableDDL = "DDL"
 	if product == "singlestore" {
 		jsonBuildFunction = "JSON_BUILD_OBJECT"
 		tempTruncateCommand = "DELETE FROM "
 		loadDataModifier = " REPLACE"
+		updateTableDDL = "NullableDDL"
 	}
 
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
@@ -455,7 +463,7 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 	DATE_FORMAT({{ $ident }}, '%Y-%m-%dT%H:%i:%s.%fZ')
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	TIME_FORMAT({{ $ident }}, '%H:%i:%s.%fZ')
-{{- else if eq $.AsFlatType "binary" -}}
+{{- else if or (eq $.BareDDL "VARBINARY(256)") (eq $.BareDDL "LONGBLOB") -}}
 	TO_BASE64({{ $ident }})
 {{- else -}}
 	{{ $ident }}
@@ -502,7 +510,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert'`+loadDataModifier+` INTO
 CREATE TEMPORARY TABLE {{ template "temp_update_name" . }} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{$col.Identifier}} {{$col.DDL}}
+		{{$col.Identifier}} {{$col.`+updateTableDDL+`}}
 	{{- end }}
 	,
 	PRIMARY KEY (
