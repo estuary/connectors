@@ -80,6 +80,7 @@ type config struct {
 	ProjectID   string             `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the Bigtable instance." jsonschema_extras:"order=0"`
 	InstanceID  string             `json:"instance_id" jsonschema:"title=Instance ID,description=Bigtable instance ID for the materialized tables." jsonschema_extras:"order=1"`
 	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=2"`
+	HardDelete  bool               `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=3"`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
@@ -418,7 +419,7 @@ func (d *materialization) NewTransactor(
 		bindings = append(bindings, b)
 	}
 
-	return &transactor{bindings: bindings}, nil
+	return &transactor{bindings: bindings, hardDelete: d.cfg.HardDelete}, nil
 }
 
 func (d *materialization) ListTestTasks(ctx context.Context) ([]string, error)        { return nil, nil }

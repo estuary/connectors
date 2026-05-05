@@ -25,6 +25,29 @@ materializations:
         fields:
           recommended: true
 
+  acmeCo/tests/materialize-bigtable-hard-delete:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.hard-delete.yaml
+    bindings:
+      - resource:
+          table: simple_standard_hd
+        source: tests/simple
+        fields:
+          recommended: true
+      - resource:
+          table: not_simple_hd
+        source: tests/not-simple
+        fields:
+          recommended: true
+      - resource:
+          table: data_types_hd
+        source: tests/data-types
+        fields:
+          recommended: true
+
   # See README.md for instructions on running against a real Cloud Bigtable
   # instance.
 
