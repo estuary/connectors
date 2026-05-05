@@ -48,8 +48,9 @@ type state struct {
 }
 
 type transactor struct {
-	bindings []binding
-	state    state
+	bindings   []binding
+	state      state
+	hardDelete bool
 }
 
 func (t *transactor) RecoverCheckpoint(ctx context.Context, spec pf.MaterializationSpec, rangeSpec pf.RangeSpec) (m.RuntimeCheckpoint, error) {
@@ -235,7 +236,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 	}
 
-	for it.Next(false) {
+	for it.Next(t.hardDelete) {
 		if len(currentBatch.rowKeys) > 0 && currentBatch.binding != it.Binding {
 			if err := sendBatch(); err != nil {
 				return nil, fmt.Errorf("sending store batch: %w", err)
@@ -243,18 +244,22 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 		}
 
 		b := &t.bindings[it.Binding]
-		allFields := append(it.Key, it.Values...)
 
 		mut := bigtable.NewMutation()
-		for i, te := range allFields {
-			f := b.fields[i]
-			val, err := f.encode(te)
-			if err != nil {
-				return nil, fmt.Errorf("encoding field %q on table %q: %w", f.field, b.tableName, err)
+		if it.Delete && t.hardDelete {
+			mut.DeleteRow()
+		} else {
+			allFields := append(it.Key, it.Values...)
+			for i, te := range allFields {
+				f := b.fields[i]
+				val, err := f.encode(te)
+				if err != nil {
+					return nil, fmt.Errorf("encoding field %q on table %q: %w", f.field, b.tableName, err)
+				}
+				mut.Set(columnFamily, f.field, ts, val)
 			}
-			mut.Set(columnFamily, f.field, ts, val)
+			mut.Set(columnFamily, b.docField, ts, it.RawJSON)
 		}
-		mut.Set(columnFamily, b.docField, ts, it.RawJSON)
 
 		currentBatch.binding = it.Binding
 		currentBatch.rowKeys = append(currentBatch.rowKeys, string(it.PackedKey))
@@ -320,4 +325,3 @@ func (t *transactor) storeWorker(ctx context.Context, batches <-chan storeBatch)
 }
 
 func (t *transactor) Destroy() {}
-
