@@ -32,11 +32,3 @@ materializations:
         protobuf: true
         config: config.local.hard-delete.yaml
     bindings: *bindings
-
-  acmeCo/tests/materialize-bigtable-gcp:
-    endpoint:
-      local:
-        command: ["go", "run", "."]
-        protobuf: true
-        config: config.gcp.yaml
-    bindings: *bindings
