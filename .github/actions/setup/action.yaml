@@ -41,7 +41,7 @@ runs:
           docker login --username ${{ github.actor }} --password-stdin ghcr.io
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
+      uses: docker/setup-buildx-action@v4
       with:
         driver-opts: network=host
 

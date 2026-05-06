@@ -1,0 +1,42 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-bigtable:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.yaml
+    bindings: &bindings
+      - resource:
+          table: simple_standard
+        source: tests/simple
+        fields:
+          recommended: true
+      - resource:
+          table: not_simple
+        source: tests/not-simple
+        fields:
+          recommended: true
+      - resource:
+          table: data_types
+        source: tests/data-types
+        fields:
+          recommended: true
+
+  acmeCo/tests/materialize-bigtable-hard-delete:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.hard-delete.yaml
+    bindings: *bindings
+
+  acmeCo/tests/materialize-bigtable-gcp:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.gcp.yaml
+    bindings: *bindings

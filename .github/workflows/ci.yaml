@@ -14,7 +14,7 @@ jobs:
   build_base_image:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -27,20 +27,20 @@ jobs:
           echo ::set-output name=version::${VERSION}
 
       - name: Login to GitHub package docker registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v4
         with:
           driver-opts: |
             network=host
 
       - name: Build base-image Docker Image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: base-image/Dockerfile
@@ -48,7 +48,7 @@ jobs:
           tags: ghcr.io/estuary/base-image:local
 
       - name: Push base-image image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: base-image/Dockerfile
@@ -57,7 +57,7 @@ jobs:
 
       - name: Push base-image image with 'dev' tag
         if: ${{ github.event_name == 'push' }}
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: base-image/Dockerfile
@@ -106,6 +106,7 @@ jobs:
           - materialize-azure-blob-parquet
           - materialize-azure-fabric-warehouse
           - materialize-bigquery
+          - materialize-bigtable
           - materialize-clickhouse
           - materialize-databricks
           - materialize-dynamodb
@@ -142,7 +143,7 @@ jobs:
             python: true
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -161,22 +162,25 @@ jobs:
           ./fetch-flow.sh
           echo "${PWD}/flow-bin" >> $GITHUB_PATH
 
+      - name: Authenticate with GCloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
+
       - name: Set up Cloud SDK
-        uses: google-github-actions/setup-gcloud@v0
+        uses: google-github-actions/setup-gcloud@v2
         with:
           project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SERVICE_ACCOUNT_KEY }}
-          export_default_credentials: true
 
       - name: Login to GitHub package docker registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v4
         with:
           driver-opts: |
             network=host
@@ -241,7 +245,7 @@ jobs:
           GIT_LFS_SKIP_SMUDGE: 1
 
       - name: Build ${{ matrix.connector }} Docker Image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         if: ${{!matrix.python}}
         with:
           context: .
@@ -251,7 +255,7 @@ jobs:
           tags: ghcr.io/estuary/${{ matrix.connector }}:local
 
       - name: Build ${{ matrix.connector }} Python Docker Image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v6
         if: ${{matrix.python}}
         with:
           context: .
@@ -323,6 +327,7 @@ jobs:
           contains(fromJson('[
               "materialize-azure-fabric-warehouse",
               "materialize-bigquery",
+              "materialize-bigtable",
               "materialize-clickhouse",
               "materialize-databricks",
               "materialize-dynamodb",

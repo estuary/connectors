@@ -14,6 +14,11 @@ import (
 func (db *postgresDatabase) SetupPrerequisites(ctx context.Context) []error {
 	var errs []error
 
+	if db.featureFlags["skip_prerequisites"] {
+		logrus.Warn("skipping all prerequisite checks because the 'skip_prerequisites' feature flag is set")
+		return nil
+	}
+
 	if err := db.prerequisiteVersion(ctx); err != nil {
 		// Return early if the database version is incompatible with the connector since additional
 		// errors will be of minimal use.
@@ -220,6 +225,10 @@ func (db *postgresDatabase) prerequisiteWatermarksInPublication(ctx context.Cont
 
 func (db *postgresDatabase) SetupTablePrerequisites(ctx context.Context, tables []sqlcapture.TableID) map[sqlcapture.TableID]error {
 	var errs = make(map[sqlcapture.TableID]error)
+	if db.featureFlags["skip_prerequisites"] || db.featureFlags["skip_table_prerequisites"] {
+		logrus.Warn("skipping per-table prerequisite checks because the 'skip_prerequisites' or 'skip_table_prerequisites' feature flag is set")
+		return errs
+	}
 	for _, table := range tables {
 		if err := db.setupTablePrerequisite(ctx, table.Schema, table.Table); err != nil {
 			errs[table] = err

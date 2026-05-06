@@ -1,0 +1,138 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-bigtable/config",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "title": "Project ID",
+        "description": "Google Cloud Project ID that owns the Bigtable instance.",
+        "order": 0
+      },
+      "instance_id": {
+        "type": "string",
+        "title": "Instance ID",
+        "description": "Bigtable instance ID for the materialized tables.",
+        "order": 1
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/materialize-bigtable/credentials-json-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "CredentialsJSON",
+                "default": "CredentialsJSON",
+                "order": 0
+              },
+              "credentials_json": {
+                "type": "string",
+                "title": "Service Account JSON",
+                "description": "The JSON credentials of the service account to use for authorization.",
+                "multiline": true,
+                "order": 0,
+                "secret": true
+              }
+            },
+            "type": "object",
+            "required": [
+              "credentials_json"
+            ],
+            "title": "Credentials JSON"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/gcp-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "GCPIAM",
+                "default": "GCPIAM",
+                "order": 0
+              },
+              "gcp_service_account_to_impersonate": {
+                "type": "string",
+                "title": "Service Account",
+                "description": "GCP Service Account email for Cloud SQL IAM authentication"
+              },
+              "gcp_workload_identity_pool_audience": {
+                "type": "string",
+                "title": "Workload Identity Pool Audience",
+                "description": "GCP Workload Identity Pool Audience in the format //iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"
+              }
+            },
+            "type": "object",
+            "required": [
+              "gcp_service_account_to_impersonate",
+              "gcp_workload_identity_pool_audience"
+            ],
+            "title": "GCP IAM"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "default": {
+          "auth_type": "CredentialsJSON"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
+        "order": 2,
+        "x-iam-auth": true
+      },
+      "hardDelete": {
+        "type": "boolean",
+        "title": "Hard Delete",
+        "description": "If this option is enabled items deleted in the source will also be deleted from the destination. By default is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).",
+        "default": false,
+        "order": 3
+      },
+      "advanced": {
+        "properties": {
+          "endpoint": {
+            "type": "string",
+            "title": "Bigtable Endpoint",
+            "description": "The Bigtable endpoint URI to connect to. Use if you're materializing to a compatible API that isn't provided by Google."
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "project_id",
+      "instance_id",
+      "credentials"
+    ],
+    "title": "Materialize Bigtable Spec"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/materialize-bigtable/resource",
+    "properties": {
+      "table": {
+        "type": "string",
+        "title": "Table Name",
+        "description": "The name of the Bigtable table to materialize to.",
+        "x-collection-name": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "table"
+    ],
+    "title": "Bigtable Table"
+  },
+  "documentation_url": "https://go.estuary.dev/materialize-bigtable"
+}

@@ -416,7 +416,15 @@ func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (map
 		return mappedType{}, nil
 	}
 
-	return mappedType{icebergType: parquetTypeToIcebergType(s.DataType)}, nil
+	var elementConverter boilerplate.ElementConverter
+	switch parquetTypeToIcebergType(s.DataType) {
+	case icebergTypeTimestamptz:
+		elementConverter = clampTimestamp
+	case icebergTypeDate:
+		elementConverter = clampDate
+	}
+
+	return mappedType{icebergType: parquetTypeToIcebergType(s.DataType)}, elementConverter
 }
 
 func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
@@ -462,7 +470,8 @@ func (d *materialization) NewTransactor(
 	var resourcePaths [][]string
 	var bindings []binding
 
-	for _, b := range mappedBindings {
+	for i := range mappedBindings {
+		b := &mappedBindings[i]
 		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
 		if err != nil {
 			return nil, err
@@ -470,10 +479,10 @@ func (d *materialization) NewTransactor(
 
 		resourcePaths = append(resourcePaths, b.ResourcePath)
 		bindings = append(bindings, binding{
-			path:       b.ResourcePath,
-			pqSchema:   pqSchema,
-			includeDoc: b.FieldSelection.Document != "",
-			stateKey:   b.StateKey,
+			path:     b.ResourcePath,
+			pqSchema: pqSchema,
+			stateKey: b.StateKey,
+			mapped:   b,
 		})
 	}
 
