@@ -28,11 +28,14 @@ import (
 )
 
 const (
-	// streamToFenceWatchdogInterval is the length of time to wait between checking whether
-	// we're still processing change events. This should never be hit in normal operation,
-	// and exists only so that certain rare failure modes produce an error rather than
-	// blocking forever.
-	streamToFenceWatchdogInterval = 6 * time.Hour
+	// replicationStreamReceiveTimeout bounds how long we will wait for any message from the
+	// server during replication streaming before assuming the connection is dead. We send
+	// Standby Status Updates with reply-requested every 10s, and the server is expected to
+	// send Primary Keepalive Messages at least every wal_sender_timeout/2 (default 30s),
+	// so a long quiet period is a strong signal of a silent disconnect. The threshold is
+	// generous enough to tolerate the worst realistic case of a slow output-plugin commit
+	// callback for a very large transaction without yielding back to the walsender loop.
+	replicationStreamReceiveTimeout = 15 * time.Minute
 
 	// replicationStreamReadTimeout is the maximum amount of time any single read operation may
 	// block for. But all we do when it's hit is check the context for cancellation and retry,
@@ -52,6 +55,11 @@ const (
 )
 
 var slotInUseRe = regexp.MustCompile(`replication slot ".*" is active for PID`)
+
+// errReceiveTimeout is returned by relayChanges (and used as the cancellation cause on its
+// derived context) when the replication stream goes silent for longer than the configured
+// liveness timeout, indicating a likely silently disconnected connection.
+var errReceiveTimeout = fmt.Errorf("no replication messages received from server within %s", replicationStreamReceiveTimeout)
 
 const standbyStatusInterval = 10 * time.Second
 
@@ -357,34 +365,13 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 		}
 	}
 
-	// Stream replication events until the fence is reached or the watchdog timeout hits.
+	// Stream replication events until the fence is reached. Liveness is enforced inside
+	// relayChanges via replicationStreamReceiveTimeout.
 	var relayCtx, cancelRelayCtx = context.WithCancelCause(ctx)
 	var fenceReached = errors.New("fenced reached")
 	defer cancelRelayCtx(nil)
 
-	// Given that the early-exit fast path was not taken, there must be further data for
-	// us to read. Thus if we sit idle for too long without reaching our fence position,
-	// something is wrong and we should error out instead of blocking forever.
-	var eventCount atomic.Int64
-	var previousCount int64
-	var watchdog *time.Timer
-	watchdog = time.AfterFunc(streamToFenceWatchdogInterval, func() {
-		if count := eventCount.Load(); count > previousCount {
-			previousCount = count
-			watchdog.Reset(streamToFenceWatchdogInterval)
-			return
-		}
-
-		var err = fmt.Errorf("replication became idle while streaming from %q to an established fence at %q", latestCommitLSN, fenceLSN.String())
-		if s.db.config.Advanced.ReadOnlyCapture {
-			err = fmt.Errorf("replication became idle (in read-only mode) while streaming from %q to an established fence at %q", latestCommitLSN, fenceLSN.String())
-		}
-		cancelRelayCtx(err)
-	})
-	defer watchdog.Stop()
-
 	if err := s.relayChanges(relayCtx, func(event sqlcapture.DatabaseEvent) error {
-		eventCount.Add(1)
 		if err := callback(event); err != nil {
 			return err
 		}
@@ -484,12 +471,26 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 }
 
 func (s *replicationStream) relayChanges(ctx context.Context, callback func(event sqlcapture.DatabaseEvent) error) error {
-	for ctx.Err() == nil {
-		// Try to receive another message from the database.
-		var msg, err = s.receiveMessage(ctx)
+	// Bound the time we will wait for any message from the server so that a silently dead
+	// connection (e.g. a NAT or middlebox dropping the TCP session without sending RST) is
+	// detected instead of blocking forever. We expect Primary Keepalive Messages from the
+	// server well within this interval even when no decodable changes are being produced.
+	var relayCtx, cancelRelay = context.WithCancelCause(ctx)
+	defer cancelRelay(nil)
+	var receiveTimer = time.AfterFunc(replicationStreamReceiveTimeout, func() {
+		cancelRelay(errReceiveTimeout)
+	})
+	defer receiveTimer.Stop()
+
+	for relayCtx.Err() == nil {
+		var msg, err = s.receiveMessage(relayCtx)
 		if err != nil {
+			if errors.Is(context.Cause(relayCtx), errReceiveTimeout) {
+				return errReceiveTimeout
+			}
 			return err
 		}
+		receiveTimer.Reset(replicationStreamReceiveTimeout)
 
 		// Handle messages that aren't CopyData
 		var data []byte
@@ -552,10 +553,14 @@ func (s *replicationStream) relayChanges(ctx context.Context, callback func(even
 	return ctx.Err()
 }
 
-// receiveMessage reads and returns the next complete message from the database. It will
-// return os.DeadlineExceeded if no message is immediately available. It returns the
-// complete message including initial message type byte and length header. The bytes
-// are valid only until the next call to receiveMessage.
+// receiveMessage reads and returns the next complete message from the database, blocking
+// until one is available. It returns the complete message including initial message type
+// byte and length header. The bytes are valid only until the next call to receiveMessage.
+//
+// Internally a short read deadline is used so that the loop periodically checks the
+// context for cancellation, but deadline expirations are not surfaced to the caller.
+// The function only returns when a complete message has been read, the context is
+// canceled, or a non-timeout I/O or framing error occurs.
 func (s *replicationStream) receiveMessage(ctx context.Context) ([]byte, error) {
 	for ctx.Err() == nil {
 		// 1. Check if a complete message exists in the buffer at rxoff. If so, slice and return it.
