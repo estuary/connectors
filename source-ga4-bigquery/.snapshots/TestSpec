@@ -1,0 +1,168 @@
+{
+  "config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-ga4-bigquery/config",
+    "properties": {
+      "project_id": {
+        "type": "string",
+        "title": "Project ID",
+        "description": "Google Cloud Project ID that owns the BigQuery dataset(s) containing GA4 exports.",
+        "order": 0
+      },
+      "dataset": {
+        "type": "string",
+        "title": "Dataset",
+        "description": "Optional. The specific BigQuery dataset containing GA4 exports. If unset all datasets in the project will be discovered for matching tables; in that case the credentials must have permission to list datasets in the project.",
+        "order": 1
+      },
+      "credentials": {
+        "oneOf": [
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/capture/bigquery/client/credentials-json-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "CredentialsJSON",
+                "default": "CredentialsJSON",
+                "order": 0
+              },
+              "credentials_json": {
+                "type": "string",
+                "title": "Service Account JSON",
+                "description": "The JSON credentials of the service account to use for authorization.",
+                "multiline": true,
+                "order": 0,
+                "secret": true
+              }
+            },
+            "type": "object",
+            "required": [
+              "credentials_json"
+            ],
+            "title": "Credentials JSON"
+          },
+          {
+            "$schema": "https://json-schema.org/draft/2020-12/schema",
+            "$id": "https://github.com/estuary/connectors/go/auth/iam/gcp-config",
+            "properties": {
+              "auth_type": {
+                "type": "string",
+                "const": "GCPIAM",
+                "default": "GCPIAM",
+                "order": 0
+              },
+              "gcp_service_account_to_impersonate": {
+                "type": "string",
+                "title": "Service Account",
+                "description": "GCP Service Account email for Cloud SQL IAM authentication"
+              },
+              "gcp_workload_identity_pool_audience": {
+                "type": "string",
+                "title": "Workload Identity Pool Audience",
+                "description": "GCP Workload Identity Pool Audience in the format //iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/test-pool/providers/test-provider"
+              }
+            },
+            "type": "object",
+            "required": [
+              "gcp_service_account_to_impersonate",
+              "gcp_workload_identity_pool_audience"
+            ],
+            "title": "GCP IAM"
+          }
+        ],
+        "type": "object",
+        "title": "Authentication",
+        "default": {
+          "auth_type": "CredentialsJSON"
+        },
+        "discriminator": {
+          "propertyName": "auth_type"
+        },
+        "order": 2,
+        "x-iam-auth": true
+      },
+      "advanced": {
+        "properties": {
+          "poll": {
+            "type": "string",
+            "title": "Polling Schedule",
+            "description": "When and how often to execute the polling cycle. Accepts a Go duration string like '24h' or a string like 'daily at 12:34Z' to poll at a specific time (specified in UTC) every day. Defaults to 'daily at 12:00Z'.",
+            "pattern": "^([-+]?([0-9]+([.][0-9]+)?(h|m|s|ms))+|daily at [0-9][0-9]?:[0-9]{2}Z)$"
+          },
+          "window_days": {
+            "type": "integer",
+            "title": "Window Days",
+            "description": "Number of recent daily tables treated as the live window. Each cycle final-captures the oldest table in this window (catching late events) and primary-captures the newest. Defaults to 4 which aligns with GA4's 72-hour late-event window."
+          },
+          "capture_intermediate": {
+            "type": "boolean",
+            "title": "Capture Intermediate Days",
+            "description": "If enabled the connector queries every table in the live window on each poll rather than just the newest and oldest. Trades higher BigQuery scan cost for fresher intermediate-day data. Defaults to false."
+          },
+          "min_date": {
+            "type": "string",
+            "title": "Minimum Date",
+            "description": "Optional YYYY-MM-DD cutoff. Tables for dates strictly before this are skipped. Used to bound the cost of an initial backfill.",
+            "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          },
+          "source_tag": {
+            "type": "string",
+            "title": "Source Tag",
+            "description": "When set the capture will add this value as the property 'tag' in the source metadata of each document."
+          },
+          "feature_flags": {
+            "type": "string",
+            "title": "Feature Flags",
+            "description": "This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Advanced Options",
+        "description": "Options for advanced users. You should not typically need to modify these.",
+        "advanced": true
+      }
+    },
+    "type": "object",
+    "required": [
+      "project_id",
+      "credentials"
+    ],
+    "title": "GA4 BigQuery"
+  },
+  "resource_config_schema_json": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/estuary/connectors/source-ga4-bigquery/resource",
+    "properties": {
+      "dataset": {
+        "type": "string",
+        "title": "Dataset",
+        "description": "The BigQuery dataset containing the GA4 export tables for this binding.",
+        "order": 0
+      },
+      "stream_type": {
+        "type": "string",
+        "title": "Stream Type",
+        "description": "Which GA4 logical stream this binding represents.",
+        "enum": [
+          "events",
+          "users",
+          "pseudonymous_users"
+        ],
+        "order": 1
+      }
+    },
+    "type": "object",
+    "required": [
+      "dataset",
+      "stream_type"
+    ],
+    "title": "GA4 BigQuery Resource Spec"
+  },
+  "documentation_url": "https://go.estuary.dev/source-ga4-bigquery",
+  "resource_path_pointers": [
+    "/dataset",
+    "/stream_type"
+  ]
+}
