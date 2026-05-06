@@ -529,10 +529,13 @@ func isTableNotFound(err error) bool {
 }
 
 // enumerateStreamTables returns sorted YYYYMMDD suffixes of all tables in
-// the dataset matching the stream's prefix.
+// the dataset matching the stream's prefix. The reference is fully-qualified
+// with the configured ProjectID so the query resolves correctly when the
+// BigQuery client is connected to a different billing project.
 func (c *capture) enumerateStreamTables(ctx context.Context, dataset string, stream *streamDef) ([]string, error) {
 	var query = fmt.Sprintf(
-		"SELECT table_name FROM %s.INFORMATION_SCHEMA.TABLES WHERE table_name LIKE '%s%%'",
+		"SELECT table_name FROM %s.%s.INFORMATION_SCHEMA.TABLES WHERE table_name LIKE '%s%%'",
+		bqclient.QuoteIdentifier(c.Config.ProjectID),
 		bqclient.QuoteIdentifier(dataset),
 		stream.TablePrefix,
 	)
@@ -564,7 +567,7 @@ func (c *capture) enumerateStreamTables(ctx context.Context, dataset string, str
 func (c *capture) queryTable(ctx context.Context, binding *bindingInfo, stream *streamDef) error {
 	var state = c.State.Streams[binding.stateKey]
 	var current = state.Current
-	var query = buildTableQuery(binding.resource.Dataset, stream, current.Suffix, current.Cursor)
+	var query = buildTableQuery(c.Config.ProjectID, binding.resource.Dataset, stream, current.Suffix, current.Cursor)
 	var params = buildQueryParams(stream, current.Cursor)
 
 	log.WithFields(log.Fields{
@@ -716,8 +719,8 @@ func wrapWatchdogErr(parent, query context.Context, err error) error {
 	return fmt.Errorf("error reading query results: %w", err)
 }
 
-func buildTableQuery(dataset string, stream *streamDef, suffix string, cursor any) string {
-	var tableRef = bqclient.QuoteTableName(dataset, stream.TablePrefix+suffix)
+func buildTableQuery(projectID, dataset string, stream *streamDef, suffix string, cursor any) string {
+	var tableRef = bqclient.QuoteIdentifier(projectID) + "." + bqclient.QuoteTableName(dataset, stream.TablePrefix+suffix)
 	var cursorCol = bqclient.QuoteIdentifier(stream.CursorColumn)
 	if cursor == nil {
 		return fmt.Sprintf("SELECT * FROM %s ORDER BY %s", tableRef, cursorCol)

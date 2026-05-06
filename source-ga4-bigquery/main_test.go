@@ -19,9 +19,10 @@ import (
 )
 
 var (
-	testCredentialsPath = flag.String("creds_path", "~/.config/gcloud/application_default_credentials.json", "Path to BigQuery credentials JSON used by integration tests")
-	testProjectID       = flag.String("project_id", "bigquery-public-data", "BigQuery project ID for integration tests")
-	testDataset         = flag.String("test_dataset", "ga4_obfuscated_sample_ecommerce", "BigQuery dataset for integration tests")
+	testCredentialsPath  = flag.String("creds_path", "~/.config/gcloud/application_default_credentials.json", "Path to BigQuery credentials JSON used by integration tests")
+	testProjectID        = flag.String("project_id", "bigquery-public-data", "BigQuery project ID owning the dataset under test")
+	testDataset          = flag.String("test_dataset", "ga4_obfuscated_sample_ecommerce", "BigQuery dataset for integration tests")
+	testBillingProjectID = flag.String("billing_project_id", "", "BigQuery project for billing and job execution. Required when project_id points at a dataset the credentials cannot create jobs in (e.g. bigquery-public-data).")
 )
 
 // TestSpec verifies the connector's response to the Spec RPC against a snapshot.
@@ -256,29 +257,29 @@ func TestBuildTableQuery(t *testing.T) {
 			Name:       "events_no_cursor",
 			StreamType: StreamEvents,
 			Cursor:     nil,
-			Want:       "SELECT * FROM `analytics_1234`.`events_20260501` ORDER BY `event_timestamp`",
+			Want:       "SELECT * FROM `test-project`.`analytics_1234`.`events_20260501` ORDER BY `event_timestamp`",
 		},
 		{
 			Name:       "events_with_cursor",
 			StreamType: StreamEvents,
 			Cursor:     int64(1714521600000000),
-			Want:       "SELECT * FROM `analytics_1234`.`events_20260501` WHERE `event_timestamp` > @cursor ORDER BY `event_timestamp`",
+			Want:       "SELECT * FROM `test-project`.`analytics_1234`.`events_20260501` WHERE `event_timestamp` > @cursor ORDER BY `event_timestamp`",
 		},
 		{
 			Name:       "users_with_cursor",
 			StreamType: StreamUsers,
 			Cursor:     "u-abc",
-			Want:       "SELECT * FROM `analytics_1234`.`users_20260501` WHERE `user_id` > @cursor ORDER BY `user_id`",
+			Want:       "SELECT * FROM `test-project`.`analytics_1234`.`users_20260501` WHERE `user_id` > @cursor ORDER BY `user_id`",
 		},
 		{
 			Name:       "pseudonymous_users_no_cursor",
 			StreamType: StreamPseudonymousUsers,
 			Cursor:     nil,
-			Want:       "SELECT * FROM `analytics_1234`.`pseudonymous_users_20260501` ORDER BY `pseudo_user_id`",
+			Want:       "SELECT * FROM `test-project`.`analytics_1234`.`pseudonymous_users_20260501` ORDER BY `pseudo_user_id`",
 		},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
-			got := buildTableQuery("analytics_1234", streams[tc.StreamType], "20260501", tc.Cursor)
+			got := buildTableQuery("test-project", "analytics_1234", streams[tc.StreamType], "20260501", tc.Cursor)
 			require.Equal(t, tc.Want, got)
 		})
 	}
@@ -389,6 +390,9 @@ func testDiscoveryConfig(t testing.TB) *Config {
 			CredentialsJSONConfig: bqclient.CredentialsJSONConfig{
 				CredentialsJSON: string(credBytes),
 			},
+		},
+		Advanced: advancedConfig{
+			BillingProjectID: *testBillingProjectID,
 		},
 	}
 }

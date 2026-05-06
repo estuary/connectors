@@ -157,7 +157,7 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 	var bindings []*pc.Response_Discovered_Binding
 	var discoveryErrors []error
 	for _, dataset := range datasets {
-		streamsPresent, err := findStreams(ctx, bq, dataset)
+		streamsPresent, err := findStreams(ctx, bq, cfg.ProjectID, dataset)
 		if err != nil {
 			if cfg.Dataset != "" {
 				return nil, fmt.Errorf("discovering GA4 exports in dataset %q: %w", dataset, err)
@@ -205,15 +205,18 @@ func listDatasets(ctx context.Context, bq *bigquery.Client) ([]string, error) {
 }
 
 // findStreams returns the set of stream types whose tables exist in the given
-// dataset.
-func findStreams(ctx context.Context, bq *bigquery.Client, dataset string) (map[StreamType]bool, error) {
+// dataset. Table references are fully qualified with projectID so the query
+// resolves correctly when the BigQuery client is connected to a different
+// billing project.
+func findStreams(ctx context.Context, bq *bigquery.Client, projectID, dataset string) (map[StreamType]bool, error) {
 	var prefixes = streamPrefixes()
 	var clauses []string
 	for _, p := range prefixes {
 		clauses = append(clauses, fmt.Sprintf("table_name LIKE '%s%%'", p))
 	}
 	var query = fmt.Sprintf(
-		"SELECT table_name FROM %s.INFORMATION_SCHEMA.TABLES WHERE %s",
+		"SELECT table_name FROM %s.%s.INFORMATION_SCHEMA.TABLES WHERE %s",
+		bqclient.QuoteIdentifier(projectID),
 		bqclient.QuoteIdentifier(dataset),
 		strings.Join(clauses, " OR "),
 	)
