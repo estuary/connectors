@@ -83,6 +83,7 @@ func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
 			"time":                     {sql.NewMigrationSpec([]string{"varchar"})},
 			"uuid":                     {sql.NewMigrationSpec([]string{"varchar"})},
 			"varchar":                  {sql.NewMigrationSpec([]string{"blob"}, sql.WithCastSQL(stringToBlobCast))},
+			"blob":                     {sql.NewMigrationSpec([]string{"varchar"}, sql.WithCastSQL(blobToStringCast))},
 			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -141,6 +142,13 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 // that previously stored binary fields as base64 text.
 func stringToBlobCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`from_base64(%s)`, migration.Identifier)
+}
+
+// blobToStringCast encodes a BLOB column as a base64 VARCHAR, the canonical
+// textual representation of binary data in Flow. Used when reverting from
+// native binary back to base64 text storage.
+func blobToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`to_base64(%s)`, migration.Identifier)
 }
 
 type queryParams struct {

@@ -101,6 +101,42 @@ func TestStringToVarbinaryCast_QuotedField(t *testing.T) {
 	}
 }
 
+func TestVarbinaryToStringCast_QuotedField(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		field string
+		want  string
+	}{
+		{
+			name:  "simple",
+			field: "col",
+			want:  `CAST(N'' AS XML).value('xs:base64Binary(sql:column("[col]"))', 'VARCHAR(MAX)')`,
+		},
+		{
+			name:  "double quotes in name",
+			field: `a"b"c`,
+			want:  `CAST(N'' AS XML).value('xs:base64Binary(sql:column("[a""b""c]"))', 'VARCHAR(MAX)')`,
+		},
+		{
+			name:  "apostrophe in name",
+			field: "a'b",
+			want:  `CAST(N'' AS XML).value('xs:base64Binary(sql:column("[a''b]"))', 'VARCHAR(MAX)')`,
+		},
+		{
+			name:  "bracket in name",
+			field: "a]b",
+			want:  `CAST(N'' AS XML).value('xs:base64Binary(sql:column("[a]]b]"))', 'VARCHAR(MAX)')`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := varbinaryToStringCast(sql.ColumnTypeMigration{
+				Column: sql.Column{Projection: sql.Projection{Projection: pf.Projection{Field: tc.field}}},
+			})
+			require.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestDateTimeColumn(t *testing.T) {
 	var dialect = testDialect
 	var mapped = dialect.MapType(&sql.Projection{

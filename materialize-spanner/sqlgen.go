@@ -92,6 +92,7 @@ func createSpannerDialect(featureFlags map[string]bool) sql.Dialect {
 			"date":        {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(toStringCast))},
 			"timestamp":   {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(timestampToStringCast))},
 			"string(max)": {sql.NewMigrationSpec([]string{"bytes(max)"}, sql.WithCastSQL(stringToBytesCast))},
+			"bytes(max)":  {sql.NewMigrationSpec([]string{"string(max)"}, sql.WithCastSQL(bytesToStringCast))},
 			"*":           {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -149,6 +150,13 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 // task that previously stored binary fields as base64 text.
 func stringToBytesCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`FROM_BASE64(%s)`, migration.Identifier)
+}
+
+// bytesToStringCast encodes a BYTES column as a base64 STRING, the canonical
+// textual representation of binary data in Flow. Used when reverting from
+// native binary back to base64 text storage.
+func bytesToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_BASE64(%s)`, migration.Identifier)
 }
 
 type templates struct {

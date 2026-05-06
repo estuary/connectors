@@ -79,6 +79,7 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
 			"text":                     {sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast))},
 			"character varying":        {sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast))},
+			"bytea":                    {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(byteaToStringCast))},
 			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -129,6 +130,16 @@ func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 // on a task that previously stored binary fields as base64 text.
 func stringToByteaCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`decode(%s, 'base64')`, migration.Identifier)
+}
+
+// byteaToStringCast encodes a BYTEA column's raw bytes as a base64 TEXT
+// string, the canonical textual representation of binary data in Flow. The
+// embedded newlines that Postgres' `encode(_, 'base64')` inserts every 76
+// characters (per RFC 2045) are stripped so downstream consumers see a single
+// contiguous base64 string. Used when reverting from native binary back to
+// base64 text storage.
+func byteaToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`translate(encode(%s, 'base64'), E'\n', '')`, migration.Identifier)
 }
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {

@@ -96,6 +96,7 @@ func createDialect(featureFlags map[string]bool, caseInsensitiveResources bool) 
 			"datetime2": {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
 			"time":      {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"})},
 			"varchar":   {sql.NewMigrationSpec([]string{"VARBINARY(MAX)"}, sql.WithCastSQL(stringToVarbinaryCast))},
+			"varbinary": {sql.NewMigrationSpec([]string{"VARCHAR(MAX)"}, sql.WithCastSQL(varbinaryToStringCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
@@ -137,6 +138,13 @@ func bitToStringCast(m sql.ColumnTypeMigration) string {
 // enabled on a task that previously stored binary fields as base64 text.
 func stringToVarbinaryCast(m sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`BASE64_DECODE(%s)`, m.Identifier)
+}
+
+// varbinaryToStringCast encodes a VARBINARY column as a base64 VARCHAR, the
+// canonical textual representation of binary data in Flow. Used when reverting
+// from native binary back to base64 text storage.
+func varbinaryToStringCast(m sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`BASE64_ENCODE(%s)`, m.Identifier)
 }
 
 type queryParams struct {

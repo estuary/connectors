@@ -127,6 +127,9 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 			"nvarchar": {
 				sql.NewMigrationSpec([]string{"varbinary(900)", "varbinary(max)"}, sql.WithCastSQL(stringToVarbinaryCast)),
 			},
+			"varbinary": {
+				sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(varbinaryToStringCast)),
+			},
 			"*": {sql.NewMigrationSpec([]string{textType}, nocast)},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -201,6 +204,16 @@ func stringToVarbinaryCast(migration sql.ColumnTypeMigration) string {
 	// quotes that survived the inner escapes need to be doubled here.
 	colRef = strings.ReplaceAll(colRef, "'", "''")
 	return fmt.Sprintf(`CAST(N'' AS XML).value('xs:base64Binary(sql:column("%s"))', 'VARBINARY(MAX)')`, colRef)
+}
+
+// varbinaryToStringCast encodes a VARBINARY column as a base64 VARCHAR via the
+// same xs:base64Binary XML cast used by stringToVarbinaryCast for the inverse
+// migration; direction is determined by the cast target type. Used when
+// reverting from native binary back to base64 text storage.
+func varbinaryToStringCast(migration sql.ColumnTypeMigration) string {
+	colRef := xqueryColumnRef("", migration.Field)
+	colRef = strings.ReplaceAll(colRef, "'", "''")
+	return fmt.Sprintf(`CAST(N'' AS XML).value('xs:base64Binary(sql:column("%s"))', 'VARCHAR(MAX)')`, colRef)
 }
 
 // xqueryColumnRef builds the inside of `sql:column("...")` for a column with
