@@ -49,6 +49,24 @@ type FlatTypeString struct {
 	InferenceString pf.Inference_String
 }
 
+// BinaryContentMediaType is the JSON Schema contentMediaType annotation that,
+// in combination with contentEncoding=base64, marks a string field as raw
+// binary.
+const BinaryContentMediaType = "application/octet-stream"
+
+// IsBinaryInference reports whether a string inference describes a raw binary
+// field. A field is treated as binary iff contentEncoding is base64 and
+// contentMediaType is either absent or application/octet-stream. A string with
+// contentEncoding=base64 but a different contentMediaType (e.g. a serialized
+// proto message) stays mapped as a string and can be handled via
+// StringMappings.WithContentType.
+func IsBinaryInference(s *pf.Inference_String) bool {
+	if s == nil || s.ContentEncoding != "base64" {
+		return false
+	}
+	return s.ContentType == "" || s.ContentType == BinaryContentMediaType
+}
+
 type FlatTypeStringFormatInteger struct {
 	InferenceString  pf.Inference_String
 	InferenceNumeric pf.Inference_Numeric
@@ -182,7 +200,7 @@ func mapProjection(p pf.Projection, fc FieldConfiger) Projection {
 			flat.InferenceString = *inf
 		}
 
-		if flat.InferenceString.ContentEncoding == "base64" {
+		if IsBinaryInference(&flat.InferenceString) {
 			out.FlatType = FlatTypeBinary(flat)
 		} else {
 			out.FlatType = flat

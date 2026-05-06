@@ -294,36 +294,32 @@ func (c *client) DeleteCheckpointsEntry(ctx context.Context, taskName string) er
 func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNames []string, rows [][]any, _ error) {
 	if err := c.withDB(func(db *stdsql.DB) error {
 		var err error
-		columnNames, rows, err = sql.SnapshotTestTable(ctx, db, c.ep.Dialect.Identifier(path...))
+		columnNames, rows, err = snapshotTestTable(ctx, db, c.ep.Dialect, path)
 		return err
 	}); err != nil {
 		return nil, nil, err
 	}
 
-	// Redshift VARBYTE columns are returned as hex-encoded strings by the
-	// driver. Checkpoint data is stored as base64(gzip(bytes)) in VARBYTE,
-	// so the driver returns hex(utf8(base64(gzip(bytes)))). Decode this chain
-	// back to base64(bytes) so that snapshots match the common format used by
-	// other SQL materializations.
-	checkpointIdx := -1
+	// Checkpoint data is stored as base64(gzip(bytes)) in a VARBYTE column.
+	// snapshotTestTable queries VARBYTE values via FROM_VARBYTE(col, 'base64'),
+	// so the value already comes back as base64(utf8(base64(gzip(bytes)))).
+	// Unwrap that extra layer and the gzip wrapper to produce plain
+	// base64(bytes) for snapshot comparison.
 	for i, col := range columnNames {
-		if col == "checkpoint" {
-			checkpointIdx = i
-			break
+		if col != "checkpoint" {
+			continue
 		}
-	}
-	if checkpointIdx >= 0 {
 		for _, row := range rows {
-			s, ok := row[checkpointIdx].(string)
+			s, ok := row[i].(string)
 			if !ok || s == "" {
 				continue
 			}
-			// Hex decode to get the UTF-8 bytes of the base64 string.
-			utf8Bytes, err := hex.DecodeString(s)
+			// Base64 decode to get the UTF-8 bytes of the inner base64 string.
+			utf8Bytes, err := base64.StdEncoding.DecodeString(s)
 			if err != nil {
 				continue
 			}
-			// Base64 decode to get the gzip-compressed bytes.
+			// Base64 decode again to get the gzip-compressed bytes.
 			gzBytes, err := base64.StdEncoding.DecodeString(string(utf8Bytes))
 			if err != nil {
 				continue
@@ -334,11 +330,70 @@ func (c *client) SnapshotTestTable(ctx context.Context, path []string) (columnNa
 				continue
 			}
 			// Re-encode as plain base64 for snapshot comparison.
-			row[checkpointIdx] = base64.StdEncoding.EncodeToString(raw)
+			row[i] = base64.StdEncoding.EncodeToString(raw)
 		}
 	}
 
 	return columnNames, rows, nil
+}
+
+// snapshotTestTable returns all rows of the given table for snapshot testing.
+// VARBYTE columns are read as base64 via FROM_VARBYTE so that binary values
+// have the same textual representation as they do in Flow and other
+// materializations, and so that hex-encoded strings composed entirely of
+// digits aren't inadvertently emitted as JSON numbers by the snapshot encoder.
+func snapshotTestTable(ctx context.Context, db *stdsql.DB, dialect sql.Dialect, path []string) ([]string, [][]any, error) {
+	var tableSchema, tableName string
+	switch len(path) {
+	case 1:
+		tableSchema = "public"
+		tableName = path[0]
+	case 2:
+		tableSchema = path[0]
+		tableName = path[1]
+	default:
+		return nil, nil, fmt.Errorf("unexpected resource path length %d", len(path))
+	}
+
+	colRows, err := db.QueryContext(
+		ctx,
+		`SELECT column_name, data_type FROM information_schema.columns
+			WHERE table_schema = $1 AND table_name = $2
+			ORDER BY ordinal_position;`,
+		strings.ToLower(tableSchema),
+		strings.ToLower(tableName),
+	)
+	if err != nil {
+		return nil, nil, fmt.Errorf("listing columns for %s.%s: %w", tableSchema, tableName, err)
+	}
+	defer colRows.Close()
+
+	var selectExprs []string
+	for colRows.Next() {
+		var name, dataType string
+		if err := colRows.Scan(&name, &dataType); err != nil {
+			return nil, nil, err
+		}
+		ident := dialect.Identifier(name)
+		if dataType == "binary varying" {
+			// FROM_VARBYTE may insert line breaks for large base64 outputs.
+			// Strip them so snapshots and downstream base64 decoders see a
+			// single contiguous string. CHR(10) is LF, CHR(13) is CR.
+			selectExprs = append(selectExprs, fmt.Sprintf("REPLACE(REPLACE(FROM_VARBYTE(%s, 'base64'), CHR(10), ''), CHR(13), '') AS %s", ident, ident))
+		} else {
+			selectExprs = append(selectExprs, ident)
+		}
+	}
+	if err := colRows.Err(); err != nil {
+		return nil, nil, err
+	}
+	if len(selectExprs) == 0 {
+		return nil, nil, fmt.Errorf("no columns found for %s.%s", tableSchema, tableName)
+	}
+
+	tableIdentifier := dialect.Identifier(path...)
+	query := fmt.Sprintf("SELECT %s FROM %s;", strings.Join(selectExprs, ", "), tableIdentifier)
+	return sql.SnapshotTestTableQuery(ctx, db, tableIdentifier, query)
 }
 
 func (c *client) Close() {

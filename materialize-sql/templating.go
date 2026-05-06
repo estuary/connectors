@@ -25,8 +25,8 @@ func (c ColumnWithAlias) Format() string {
 
 // MustParseTemplate is a convenience which parses the template `body` and
 // installs common functions for accessing Dialect behavior.
-func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
-	var tpl = template.New(name).Funcs(template.FuncMap{
+func MustParseTemplate(dialect Dialect, name, body string, extraFuncs ...template.FuncMap) *template.Template {
+	funcs := template.FuncMap{
 		"Literal":          dialect.Literal,
 		"Base64Std":        base64.StdEncoding.EncodeToString,
 		"ColumnIdentifier": dialect.Identifier,
@@ -58,8 +58,13 @@ func MustParseTemplate(dialect Dialect, name, body string) *template.Template {
 			}
 			return chunks
 		},
-	})
-	return template.Must(tpl.Parse(body))
+	}
+	for _, extra := range extraFuncs {
+		for k, v := range extra {
+			funcs[k] = v
+		}
+	}
+	return template.Must(template.New(name).Funcs(funcs).Parse(body))
 }
 
 // RenderTableTemplate is a simple implementation of rendering a template with a Table

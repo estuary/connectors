@@ -42,6 +42,7 @@ func (m mapped) CanMigrate(existing boilerplate.ExistingField) bool {
 var allowedMigrations = boilerplate.TypeMigrations[iceberg.Type]{
 	"long":                      {iceberg.DecimalTypeOf(38, 0), iceberg.Float64Type{}},
 	"decimal(38, 0)":            {iceberg.Float64Type{}},
+	"string":                    {iceberg.BinaryType{}},
 	boilerplate.AnyExistingType: {iceberg.StringType{}},
 }
 

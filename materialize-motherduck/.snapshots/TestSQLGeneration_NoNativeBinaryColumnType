@@ -3,9 +3,9 @@
 CREATE TABLE IF NOT EXISTS db."a-schema".key_value (
 	key1 BIGINT NOT NULL,
 	key2 BOOLEAN NOT NULL,
-	"key!binary" BLOB NOT NULL,
+	"key!binary" VARCHAR NOT NULL,
 	"array" JSON,
-	"binary" BLOB,
+	"binary" VARCHAR,
 	"boolean" BOOLEAN,
 	field_with_projection VARCHAR,
 	flow_published_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -64,7 +64,7 @@ JOIN read_json(
 ) AS r
 	 ON  l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	 AND l.key2 = r.key2
-	 AND l."key!binary" = FROM_BASE64(r."key!binary") AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='
+	 AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='
 --- End db."a-schema".key_value loadQuery ---
 
 --- Begin db."a-schema".key_value loadQueryNoFlowDocument ---                                                                                                                             
@@ -72,9 +72,9 @@ SELECT 0 AS binding,
 json_object(                                                                                                                                        
        'key1', l.key1,                                                                                                                                         
        'key2', l.key2,                                                                                                                                         
-       'key!binary', TO_BASE64(l."key!binary"),                                                                                                                                         
+       'key!binary', l."key!binary",                                                                                                                                         
        'array', l."array",                                                                                                                                         
-       'binary', TO_BASE64(l."binary"),                                                                                                                                         
+       'binary', l."binary",                                                                                                                                         
        'boolean', l."boolean",                                                                                                                                         
        'field_with_projection', l.field_with_projection,                                                                                                                                         
        'integer', l."integer",                                                                                                                                         
@@ -109,7 +109,7 @@ JOIN read_json(
 ) AS r                                                                                                                              
         ON  l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100                                                                                                                              
         AND l.key2 = r.key2                                                                                                                              
-        AND l."key!binary" = FROM_BASE64(r."key!binary") AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='                                                                                                                                                         
+        AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo='                                                                                                                                                         
 --- End db."a-schema".key_value loadQueryNoFlowDocument ---
 
 --- Begin db."a-schema".key_value storeDeleteQuery ---
@@ -151,7 +151,7 @@ USING read_json(
 ) AS r
 	 WHERE l.key1 = r.key1 AND l.key1 >= 10 AND l.key1 <= 100
 	 AND l.key2 = r.key2
-	 AND l."key!binary" = FROM_BASE64(r."key!binary") AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo=';
+	 AND l."key!binary" = r."key!binary" AND l."key!binary" >= 'aGVsbG8K' AND l."key!binary" <= 'Z29vZGJ5ZQo=';
 --- End db."a-schema".key_value storeDeleteQuery ---
 
 --- Begin db."a-schema".key_value storeQuery ---
@@ -160,9 +160,9 @@ INSERT INTO db."a-schema".key_value (key1, key2, "key!binary", "array", "binary"
 SELECT
 		key1, 
 		key2, 
-		FROM_BASE64("key!binary"), 
+		"key!binary", 
 		"array", 
-		FROM_BASE64("binary"), 
+		"binary", 
 		"boolean", 
 		field_with_projection, 
 		flow_published_at, 

@@ -18,9 +18,9 @@ auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
 		`integerWithUserDDL` DECIMAL(20) COMMENT 'auto-generated projection of JSON at: /integerWithUserDDL with inferred types: [integer]',
 		multiple JSON COMMENT 'auto-generated projection of JSON at: /multiple with inferred types: [boolean integer object]',
 		`nonAsciiÎºá½¹ÏÎ¼Îµ` LONGTEXT COMMENT 'auto-generated projection of JSON at: /nonAsciiκόσμε with inferred types: [string]',
-		`number` DOUBLE PRECISION COMMENT 'auto-generated projection of JSON at: /number with inferred types: [number]',
+		number DOUBLE PRECISION COMMENT 'auto-generated projection of JSON at: /number with inferred types: [number]',
 		`numberCastToString` LONGTEXT COMMENT 'auto-generated projection of JSON at: /numberCastToString with inferred types: [number string]',
-		object JSON COMMENT 'auto-generated projection of JSON at: /object with inferred types: [object]',
+		`object` JSON COMMENT 'auto-generated projection of JSON at: /object with inferred types: [object]',
 		`string` LONGTEXT COMMENT 'auto-generated projection of JSON at: /string with inferred types: [string]',
 		`stringInteger` NUMERIC(65,0) COMMENT 'auto-generated projection of JSON at: /stringInteger with inferred types: [integer string]',
 		`stringInteger18Chars` NUMERIC(65,0) COMMENT 'auto-generated projection of JSON at: /stringInteger18Chars with inferred types: [integer string]',
@@ -38,7 +38,7 @@ auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
 --- Begin delta_updates createTargetTable ---
 
 CREATE TABLE IF NOT EXISTS delta_updates (
-		`theKey` VARCHAR(256) NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
+		`theKey` TEXT NOT NULL COMMENT 'auto-generated projection of JSON at: /theKey with inferred types: [string]',
 		`aValue` BIGINT COMMENT 'A super-awesome value.
 auto-generated projection of JSON at: /aValue with inferred types: [integer]',
 		flow_published_at DATETIME(6) NOT NULL COMMENT 'Flow Publication Time
@@ -61,7 +61,7 @@ CREATE TEMPORARY TABLE flow_temp_load_table_0 (
 --- Begin delta_updates createLoadTable ---
 
 CREATE TEMPORARY TABLE flow_temp_load_table_1 (
-		`theKey` VARCHAR(256) NOT NULL
+		`theKey` TEXT NOT NULL
 	,
 		PRIMARY KEY (`theKey`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
@@ -70,14 +70,14 @@ CREATE TEMPORARY TABLE flow_temp_load_table_1 (
 --- Begin key_value createUpdateTable ---
 
 CREATE TEMPORARY TABLE flow_temp_update_table_0 (
-		key1 BIGINT NOT NULL,
-		key2 BOOLEAN NOT NULL,
-		`key!binary` VARBINARY(256) NOT NULL,
+		key1 BIGINT,
+		key2 BOOLEAN,
+		`key!binary` VARBINARY(256),
 		`array` JSON,
 		`binary` LONGBLOB,
 		`boolean` BOOLEAN,
 		field_with_projection LONGTEXT,
-		flow_published_at DATETIME(6) NOT NULL,
+		flow_published_at DATETIME(6),
 		`integer` BIGINT,
 		`integerGt128Bit` NUMERIC(65,0),
 		`integerGt256Bit` NUMERIC(65,0),
@@ -85,9 +85,9 @@ CREATE TEMPORARY TABLE flow_temp_update_table_0 (
 		`integerWithUserDDL` DECIMAL(20),
 		multiple JSON,
 		`nonAsciiÎºá½¹ÏÎ¼Îµ` LONGTEXT,
-		`number` DOUBLE PRECISION,
+		number DOUBLE PRECISION,
 		`numberCastToString` LONGTEXT,
-		object JSON,
+		`object` JSON,
 		`string` LONGTEXT,
 		`stringInteger` NUMERIC(65,0),
 		`stringInteger18Chars` NUMERIC(65,0),
@@ -96,7 +96,7 @@ CREATE TEMPORARY TABLE flow_temp_update_table_0 (
 		`stringInteger66Chars` LONGTEXT,
 		`stringInteger77Chars` LONGTEXT,
 		`stringNumber` DOUBLE PRECISION,
-		flow_document JSON NOT NULL
+		flow_document JSON
 	,
 	PRIMARY KEY (key1, key2, `key!binary`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
@@ -105,9 +105,9 @@ CREATE TEMPORARY TABLE flow_temp_update_table_0 (
 --- Begin delta_updates createUpdateTable ---
 
 CREATE TEMPORARY TABLE flow_temp_update_table_1 (
-		`theKey` VARCHAR(256) NOT NULL,
+		`theKey` TEXT,
 		`aValue` BIGINT,
-		flow_published_at DATETIME(6) NOT NULL
+		flow_published_at DATETIME(6)
 	,
 	PRIMARY KEY (`theKey`)
 ) CHARACTER SET=utf8mb4 COLLATE=utf8mb4_bin;
@@ -115,17 +115,17 @@ CREATE TEMPORARY TABLE flow_temp_update_table_1 (
 
 --- Begin key_value truncateTempTable ---
 
-TRUNCATE flow_temp_load_table_0;
+DELETE FROM  flow_temp_load_table_0;
 --- End key_value truncateTempTable ---
 
 --- Begin delta_updates truncateTempTable ---
 
-TRUNCATE flow_temp_load_table_1;
+DELETE FROM  flow_temp_load_table_1;
 --- End delta_updates truncateTempTable ---
 
 --- Begin key_value loadLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_table_0 CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' REPLACE INTO TABLE flow_temp_load_table_0 CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		ESCAPED BY '\\'
@@ -140,7 +140,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_
 
 --- Begin delta_updates loadLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE flow_temp_load_table_1 CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' REPLACE INTO TABLE flow_temp_load_table_1 CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		ESCAPED BY '\\'
@@ -170,7 +170,7 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 
 --- Begin key_value loadQueryNoFlowDocument ---
 
-SELECT 0, JSON_OBJECT(
+SELECT 0, JSON_BUILD_OBJECT(
     'key1', r.key1,
     'key2', r.key2,
     'key!binary', TO_BASE64(r.`key!binary`),
@@ -185,9 +185,9 @@ SELECT 0, JSON_OBJECT(
     'integerWithUserDDL', r.`integerWithUserDDL`,
     'multiple', r.multiple,
     'nonAsciiκόσμε', r.`nonAsciiÎºá½¹ÏÎ¼Îµ`,
-    'number', r.`number`,
+    'number', r.number,
     'numberCastToString', CAST(r.`numberCastToString` AS CHAR),
-    'object', r.object,
+    'object', r.`object`,
     'string', r.`string`,
     'stringInteger', CAST(r.`stringInteger` AS CHAR),
     'stringInteger18Chars', CAST(r.`stringInteger18Chars` AS CHAR),
@@ -213,7 +213,7 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 
 --- Begin key_value insertLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE key_value CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' REPLACE INTO TABLE key_value CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		ESCAPED BY '\\'
@@ -235,9 +235,9 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE key_value CHA
 		`integerWithUserDDL`,
 		multiple,
 		`nonAsciiÎºá½¹ÏÎ¼Îµ`,
-		`number`,
+		number,
 		`numberCastToString`,
-		object,
+		`object`,
 		`string`,
 		`stringInteger`,
 		`stringInteger18Chars`,
@@ -252,7 +252,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE key_value CHA
 
 --- Begin delta_updates insertLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE delta_updates CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' REPLACE INTO TABLE delta_updates CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		ESCAPED BY '\\'
@@ -267,7 +267,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE delta_updates
 
 --- Begin key_value updateLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_update_table_0 CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' REPLACE INTO TABLE flow_temp_update_table_0 CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		ESCAPED BY '\\'
@@ -289,9 +289,9 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_upd
 		`integerWithUserDDL`,
 		multiple,
 		`nonAsciiÎºá½¹ÏÎ¼Îµ`,
-		`number`,
+		number,
 		`numberCastToString`,
-		object,
+		`object`,
 		`string`,
 		`stringInteger`,
 		`stringInteger18Chars`,
@@ -306,7 +306,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_upd
 
 --- Begin delta_updates updateLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE flow_temp_update_table_1 CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' REPLACE INTO TABLE flow_temp_update_table_1 CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		ESCAPED BY '\\'
@@ -338,9 +338,9 @@ REPLACE INTO key_value
 		`integerWithUserDDL`,
 		multiple,
 		`nonAsciiÎºá½¹ÏÎ¼Îµ`,
-		`number`,
+		number,
 		`numberCastToString`,
-		object,
+		`object`,
 		`string`,
 		`stringInteger`,
 		`stringInteger18Chars`,
@@ -367,9 +367,9 @@ SELECT
 		`integerWithUserDDL`,
 		multiple,
 		`nonAsciiÎºá½¹ÏÎ¼Îµ`,
-		`number`,
+		number,
 		`numberCastToString`,
-		object,
+		`object`,
 		`string`,
 		`stringInteger`,
 		`stringInteger18Chars`,
@@ -399,12 +399,12 @@ FROM flow_temp_update_table_1;
 
 --- Begin key_value truncateUpdateTable ---
 
-TRUNCATE flow_temp_update_table_0;
+DELETE FROM  flow_temp_update_table_0;
 --- End key_value truncateUpdateTable ---
 
 --- Begin delta_updates truncateUpdateTable ---
 
-TRUNCATE flow_temp_update_table_1;
+DELETE FROM  flow_temp_update_table_1;
 --- End delta_updates truncateUpdateTable ---
 
 --- Begin key_value deleteQuery ---
@@ -425,7 +425,7 @@ WHERE
 
 --- Begin key_value deleteLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_delete_table_0 CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' REPLACE INTO TABLE flow_temp_delete_table_0 CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		ESCAPED BY '\\'
@@ -440,7 +440,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_del
 
 --- Begin delta_updates deleteLoad ---
 
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_delete_table_1 CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' REPLACE INTO TABLE flow_temp_delete_table_1 CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
 		ESCAPED BY '\\'
@@ -453,12 +453,12 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE flow_temp_del
 
 --- Begin key_value truncateDeleteTable ---
 
-TRUNCATE flow_temp_delete_table_0;
+DELETE FROM  flow_temp_delete_table_0;
 --- End key_value truncateDeleteTable ---
 
 --- Begin delta_updates truncateDeleteTable ---
 
-TRUNCATE flow_temp_delete_table_1;
+DELETE FROM  flow_temp_delete_table_1;
 --- End delta_updates truncateDeleteTable ---
 
 --- Begin alter table add columns and drop not nulls ---
@@ -489,7 +489,7 @@ ALTER TABLE key_value
 with
 -- Increment the fence value of _any_ checkpoint which overlaps our key range.
 update_covered as (
-	update `path`.`to`.checkpoints
+	update path.`to`.checkpoints
 		set   fence = fence + 1
 		where materialization = 'some/Materialization'
 		and   key_end >= 1122867
@@ -507,7 +507,7 @@ best_match as (
 ),
 -- Install a new checkpoint if best_match is not an exact match.
 install_new as (
-	insert into `path`.`to`.checkpoints (materialization, key_begin, key_end, fence, checkpoint)
+	insert into path.`to`.checkpoints (materialization, key_begin, key_end, fence, checkpoint)
 		-- Case: best_match is a non-empty covering span but not an exact match
 		select 'some/Materialization', 1122867, 4293844428, fence, checkpoint
 			from best_match where key_begin != 1122867 or key_end != 4293844428
@@ -525,7 +525,7 @@ limit 1
 --- End Fence Install ---
 
 --- Begin Fence Update ---
-UPDATE `path`.`to`.checkpoints
+UPDATE path.`to`.checkpoints
 	SET   checkpoint = 'AAECAwQFBgcICQ=='
 	WHERE materialization = 'some/Materialization'
 	AND   key_begin = 1122867

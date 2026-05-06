@@ -15,6 +15,12 @@ materializations:
       fields:
         recommended: true
         exclude:
+          # TODO: to_json(struct(... AS field)) in loadQueryNoFlowDocument uses
+          # the raw projection name as the struct field alias, which fails to
+          # parse for names with characters that aren't valid Databricks
+          # identifiers (without backtick quoting).
+          - binary"With"Quote
+          - stringToBinary"With"Quote
           # TODO: Databricks NUMERIC(38,0) overflows on int128/int129/int256/int257
           # values (39+ digits). The JSON reader parses them as DOUBLE and the
           # staging cast fails in ANSI mode with NUMERIC_VALUE_OUT_OF_RANGE,

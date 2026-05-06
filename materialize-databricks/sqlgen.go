@@ -78,6 +78,8 @@ func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 			"timestamp": {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
 			"date":      {sql.NewMigrationSpec([]string{"string"})},
 			"boolean":   {sql.NewMigrationSpec([]string{"string"})},
+			"string":    {sql.NewMigrationSpec([]string{"binary"}, sql.WithCastSQL(stringToBinaryCast))},
+			"binary":    {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(binaryToStringCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{
@@ -127,6 +129,20 @@ func createDatabricksDialect(featureFlags map[string]bool) sql.Dialect {
 
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`date_format(from_utc_timestamp(%s, 'UTC'), "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS'Z'")`, migration.Identifier)
+}
+
+// stringToBinaryCast decodes a base64-encoded STRING column into native BINARY
+// bytes. Used when the native_binary_column_type feature flag is enabled on a
+// task that previously stored binary fields as base64 text.
+func stringToBinaryCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`unbase64(%s)`, migration.Identifier)
+}
+
+// binaryToStringCast encodes a BINARY column as a base64 STRING, the canonical
+// textual representation of binary data in Flow. Used when reverting from
+// native binary back to base64 text storage.
+func binaryToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`base64(%s)`, migration.Identifier)
 }
 
 type templates struct {

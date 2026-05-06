@@ -98,20 +98,28 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
 	}
 
+	binaryMapping := sql.MapPrimaryKey(
+		sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar")),
+		sql.MapStatic("LONGTEXT"),
+	)
+	if featureFlags["native_binary_column_type"] {
+		binaryMapping = sql.MapPrimaryKey(
+			sql.MapStatic("VARBINARY(256)", sql.AlsoCompatibleWith("varbinary"), sql.UsingConverter(sql.Base64Decoder)),
+			sql.MapStatic("LONGBLOB", sql.UsingConverter(sql.Base64Decoder)),
+		)
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("BIGINT"),
 				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal")),
 			),
-			sql.NUMBER:  sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double")),
-			sql.BOOLEAN: sql.MapStatic("BOOLEAN", sql.AlsoCompatibleWith("tinyint")),
-			sql.OBJECT:  sql.MapStatic(jsonType),
-			sql.ARRAY:   sql.MapStatic(jsonType),
-			sql.BINARY: sql.MapPrimaryKey(
-				sql.MapStatic("VARCHAR(256)", sql.AlsoCompatibleWith("varchar")),
-				sql.MapStatic("LONGTEXT"),
-			),
+			sql.NUMBER:   sql.MapStatic("DOUBLE PRECISION", sql.AlsoCompatibleWith("double")),
+			sql.BOOLEAN:  sql.MapStatic("BOOLEAN", sql.AlsoCompatibleWith("tinyint")),
+			sql.OBJECT:   sql.MapStatic(jsonType),
+			sql.ARRAY:    sql.MapStatic(jsonType),
+			sql.BINARY:   binaryMapping,
 			sql.MULTIPLE: jsonMapper,
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("NUMERIC(65,0)", sql.AlsoCompatibleWith("decimal"), sql.UsingConverter(sql.StrToInt)),
@@ -152,13 +160,17 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		"date":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
 		"time":     {sql.NewMigrationSpec([]string{"varchar", "longtext"}, nocast)},
 		"datetime": {sql.NewMigrationSpec([]string{"varchar", "longtext"}, sql.WithCastSQL(prepareDatetimeToStringCast(tzLocation)))},
+		"varchar": {sql.NewMigrationSpec([]string{"varbinary(256)"}, sql.WithCastSQL(stringToBinaryCast)),
+			sql.NewMigrationSpec([]string{"longblob"}, sql.WithCastSQL(stringToBinaryCast))},
+		"varbinary": {sql.NewMigrationSpec([]string{"varchar", "longtext"}, sql.WithCastSQL(binaryToStringCast))},
+		"longblob":  {sql.NewMigrationSpec([]string{"varchar", "longtext"}, sql.WithCastSQL(binaryToStringCast))},
 	}
 
 	// MariaDB uses longtext for JSON type, so migrating to JSON on MariaDB is not distinguishable from migrating
 	// to a normal longtext
 	if product != "mariadb" {
-		migrationSpecs["varchar"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast(product)))}
-		migrationSpecs["longtext"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast(product)))}
+		migrationSpecs["varchar"] = append(migrationSpecs["varchar"], sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast(product))))
+		migrationSpecs["longtext"] = append(migrationSpecs["longtext"], sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(jsonQuoteCast(product))))
 		migrationSpecs["*"] = []sql.MigrationSpec{sql.NewMigrationSpec([]string{"json"})}
 	}
 
@@ -223,6 +235,21 @@ func jsonQuoteCast(product string) func(migration sql.ColumnTypeMigration) strin
 	return func(migration sql.ColumnTypeMigration) string {
 		return fmt.Sprintf(`JSON_QUOTE(%s)`, migration.Identifier)
 	}
+}
+
+// stringToBinaryCast decodes a base64-encoded VARCHAR/LONGTEXT column into
+// native VARBINARY/LONGBLOB bytes. Used when the native_binary_column_type
+// feature flag is enabled on a task that previously stored binary fields as
+// base64 text.
+func stringToBinaryCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`FROM_BASE64(%s)`, migration.Identifier)
+}
+
+// binaryToStringCast encodes a VARBINARY/LONGBLOB column as a base64
+// VARCHAR/LONGTEXT, the canonical textual representation of binary data in
+// Flow. Used when reverting from native binary back to base64 text storage.
+func binaryToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_BASE64(%s)`, migration.Identifier)
 }
 
 func prepareDatetimeToStringCast(loc *time.Location) sql.CastSQLFunc {
@@ -308,9 +335,19 @@ type templates struct {
 func renderTemplates(dialect sql.Dialect, product string) templates {
 	var jsonBuildFunction = "JSON_OBJECT"
 	var tempTruncateCommand = "TRUNCATE"
+	var loadDataModifier = ""
+	// updateTableDDL selects which MappedType field is used for the
+	// per-column DDL inside the update-staging temp table. Singlestore
+	// validates NOT NULL constraints during LOAD DATA before any SET clause
+	// runs, so the staging table's non-key columns are made nullable; the
+	// final REPLACE into the target table still enforces the original NOT
+	// NULL constraints.
+	var updateTableDDL = "DDL"
 	if product == "singlestore" {
 		jsonBuildFunction = "JSON_BUILD_OBJECT"
 		tempTruncateCommand = "DELETE FROM "
+		loadDataModifier = " REPLACE"
+		updateTableDDL = "NullableDDL"
 	}
 
 	var tplAll = sql.MustParseTemplate(dialect, "root", `
@@ -363,7 +400,7 @@ ALTER TABLE {{$.Identifier}}
 {{- end }};
 {{ end }}
 
--- Templated creation of a temporary load table:
+-- Templated creation of a temporary load table.
 
 {{ define "createLoadTable" }}
 CREATE TEMPORARY TABLE {{ template "temp_load_name" . }} (
@@ -390,11 +427,10 @@ CREATE TEMPORARY TABLE {{ template "temp_load_name" . }} (
 -- Templated load into the temporary load table:
 
 {{ define "loadLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load' INTO TABLE {{ template "temp_load_name" . }} CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_load'`+loadDataModifier+` INTO TABLE {{ template "temp_load_name" . }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
-		OPTIONALLY ENCLOSED BY '"'
-		ESCAPED BY ''
+		ESCAPED BY '\\'
 	LINES
 		TERMINATED BY '\n'
 (
@@ -436,6 +472,8 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 	DATE_FORMAT({{ $ident }}, '%Y-%m-%dT%H:%i:%s.%fZ')
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	TIME_FORMAT({{ $ident }}, '%H:%i:%s.%fZ')
+{{- else if or (eq $.BareDDL "VARBINARY(256)") (eq $.BareDDL "LONGBLOB") -}}
+	TO_BASE64({{ $ident }})
 {{- else -}}
 	{{ $ident }}
 {{- end -}}
@@ -463,11 +501,10 @@ SELECT * FROM (SELECT -1, NULL LIMIT 0) as nodoc
 -- Template to load data into target table
 
 {{ define "insertLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE {{ $.Identifier }} CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert'`+loadDataModifier+` INTO TABLE {{ $.Identifier }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
-		OPTIONALLY ENCLOSED BY '"'
-		ESCAPED BY ''
+		ESCAPED BY '\\'
 	LINES
 		TERMINATED BY '\n'
 (
@@ -482,7 +519,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_insert' INTO TABLE {{ $.Identifi
 CREATE TEMPORARY TABLE {{ template "temp_update_name" . }} (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }},{{ end }}
-		{{$col.Identifier}} {{$col.DDL}}
+		{{$col.Identifier}} {{$col.`+updateTableDDL+`}}
 	{{- end }}
 	,
 	PRIMARY KEY (
@@ -495,11 +532,10 @@ CREATE TEMPORARY TABLE {{ template "temp_update_name" . }} (
 {{ end }}
 
 {{ define "updateLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update' INTO TABLE {{ template "temp_update_name" . }} CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_update'`+loadDataModifier+` INTO TABLE {{ template "temp_update_name" . }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
-		OPTIONALLY ENCLOSED BY '"'
-		ESCAPED BY ''
+		ESCAPED BY '\\'
 	LINES
 		TERMINATED BY '\n'
 (
@@ -549,11 +585,10 @@ CREATE TEMPORARY TABLE {{ template "temp_delete_name" . }} (
 {{ end }}
 
 {{ define "deleteLoad" }}
-LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE {{ template "temp_delete_name" . }} CHARACTER SET utf8mb4
+LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete'`+loadDataModifier+` INTO TABLE {{ template "temp_delete_name" . }} CHARACTER SET utf8mb4
 	FIELDS
 		TERMINATED BY ','
-		OPTIONALLY ENCLOSED BY '"'
-		ESCAPED BY ''
+		ESCAPED BY '\\'
 	LINES
 		TERMINATED BY '\n'
 (
@@ -566,7 +601,7 @@ LOAD DATA LOCAL INFILE 'Reader::flow_batch_data_delete' INTO TABLE {{ template "
 
 {{ define "deleteQuery" }}
 DELETE original FROM {{ $.Identifier }} original, {{ template "temp_delete_name" . }} temp
-WHERE 
+WHERE
 	{{- range $ind, $col := $.Keys }}
 		{{- if $ind }} AND {{ end }}
 		original.{{$col.Identifier}} = temp.{{$col.Identifier}}

@@ -3,9 +3,9 @@
 CREATE TABLE IF NOT EXISTS "a-schema".key_value (
 	key1 BIGINT,
 	key2 BOOLEAN,
-	"key!binary" VARBYTE(1024000),
+	"key!binary" TEXT,
 	"array" SUPER,
-	"binary" VARBYTE(1024000),
+	"binary" TEXT,
 	boolean BOOLEAN,
 	field_with_projection TEXT,
 	flow_published_at TIMESTAMPTZ,
@@ -84,9 +84,9 @@ auto-generated projection of JSON at: /_meta/uuid with inferred types: [string]'
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 	key1 BIGINT,
 	key2 BOOLEAN,
-	"key!binary" VARBYTE(1024000),
+	"key!binary" TEXT,
 	"array" SUPER,
-	"binary" VARBYTE(1024000),
+	"binary" TEXT,
 	boolean BOOLEAN,
 	field_with_projection TEXT,
 	flow_published_at TIMESTAMPTZ,
@@ -166,9 +166,9 @@ SELECT 0,
 OBJECT(
 	'key1', r.key1,
 	'key2', r.key2,
-	'key!binary', FROM_VARBYTE(r."key!binary", 'base64'),
+	'key!binary', r."key!binary",
 	'array', r."array",
-	'binary', FROM_VARBYTE(r."binary", 'base64'),
+	'binary', r."binary",
 	'boolean', r.boolean,
 	'field_with_projection', r.field_with_projection,
 	'integer', r.integer,
@@ -209,7 +209,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 CREATE TEMPORARY TABLE flow_temp_table_0_deleted (
   key1 BIGINT,
   key2 BOOLEAN,
-  "key!binary" VARBYTE(1024000)
+  "key!binary" TEXT
 );
 --- End "a-schema".key_value createDeleteTable ---
 
@@ -236,7 +236,7 @@ WHERE "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 	key1 BIGINT,
 	key2 BOOLEAN,
-	"key!binary" VARBYTE(1024000)
+	"key!binary" TEXT
 );
 --- End "a-schema".key_value createLoadTable (no varchar length) ---
 
@@ -250,7 +250,7 @@ CREATE TEMPORARY TABLE flow_temp_table_1 (
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 	key1 BIGINT,
 	key2 BOOLEAN,
-	"key!binary" VARBYTE(1024000)
+	"key!binary" VARCHAR(400)
 );
 --- End "a-schema".key_value createLoadTable (with varchar length) ---
 

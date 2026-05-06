@@ -1,6 +1,9 @@
 package sql
 
 import (
+	"bytes"
+	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/big"
@@ -190,3 +193,40 @@ var ClampDate ElementConverter = StringCastConverter(func(str string) (interface
 	}
 	return str, nil
 })
+
+// Base64Decoder decodes a base64-encoded tuple element into raw bytes. It is
+// used by materializations that store binary fields in native byte-typed
+// columns and bind the decoded bytes directly to their driver, rather than
+// decoding via SQL on the server side.
+var Base64Decoder ElementConverter = func(te tuple.TupleElement) (any, error) {
+	switch v := te.(type) {
+	case nil:
+		return nil, nil
+	case []byte:
+		return base64.StdEncoding.AppendDecode(nil, v)
+	case string:
+		return base64.StdEncoding.DecodeString(v)
+	case json.RawMessage:
+		// A base64 value that arrives through a json.RawMessage is still
+		// wrapped in JSON string quotes.
+		return base64.StdEncoding.AppendDecode(nil, bytes.Trim(v, `"`))
+	default:
+		return nil, fmt.Errorf("Base64Decoder: unexpected value type %T", te)
+	}
+}
+
+// Base64ToHex re-encodes a base64-encoded tuple element as a lowercase hex
+// string. This is used by warehouses (e.g. Redshift) whose bulk loaders parse
+// VARBYTE/BINARY values from JSON or CSV staging files as hex by default. By
+// emitting hex from the connector, the loader can decode binary directly into
+// the native column without an intermediate staging step.
+var Base64ToHex ElementConverter = func(te tuple.TupleElement) (any, error) {
+	raw, err := Base64Decoder(te)
+	if err != nil {
+		return nil, fmt.Errorf("Base64ToHex: %w", err)
+	}
+	if raw == nil {
+		return nil, nil
+	}
+	return hex.EncodeToString(raw.([]byte)), nil
+}

@@ -56,6 +56,7 @@ var featureFlagDefaults = map[string]bool{
 	"datetime_keys_as_string":          true,
 	"s3_use_dualstack_endpoints":       false,
 	"retain_existing_data_on_backfill": false,
+	"native_binary_column_type":        true,
 }
 
 type sshForwarding struct {

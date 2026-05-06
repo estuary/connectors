@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"context"
 	stdsql "database/sql"
-	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/go-sql-driver/mysql"
 )
@@ -24,7 +24,6 @@ const (
 )
 
 type infile struct {
-	w    *csv.Writer
 	buff *bytes.Buffer
 }
 
@@ -38,24 +37,28 @@ func newInfile(readerName string) *infile {
 	)
 
 	return &infile{
-		w:    csv.NewWriter(&buff),
 		buff: &buff,
 	}
 }
 
 // write writes a single row to the infile buffer. If the buffer is sufficiently larger after the
 // write, it will flush the batch to MySQL per `drainQuery`.
+//
+// Rows are encoded with backslash escaping rather than RFC4180-style doubled
+// quotes because SingleStore's LOAD DATA does not recognize "" as an escape for
+// a literal " inside an enclosed field when ESCAPED BY is empty. The matching
+// SQL template uses `ESCAPED BY '\\'` and no `ENCLOSED BY`, which both MySQL
+// and SingleStore parse identically.
 func (i *infile) write(ctx context.Context, converted []any, txn *stdsql.Tx, drainQuery string) error {
-	if record, err := rowToCSVRecord(converted); err != nil {
-		return fmt.Errorf("error encoding row to CSV: %w", err)
-	} else if err := i.w.Write(record); err != nil {
-		return fmt.Errorf("writing csv record: %w", err)
+	for j, v := range converted {
+		if j > 0 {
+			i.buff.WriteByte(',')
+		}
+		if err := writeInfileField(i.buff, v); err != nil {
+			return fmt.Errorf("encoding row to infile: %w", err)
+		}
 	}
-
-	i.w.Flush()
-	if err := i.w.Error(); err != nil {
-		return fmt.Errorf("flushing csv to buffer: %w", err)
-	}
+	i.buff.WriteByte('\n')
 
 	if i.buff.Len() > batchSizeThreshold {
 		if err := i.drain(ctx, txn, drainQuery); err != nil {
@@ -80,31 +83,46 @@ func (i *infile) drain(ctx context.Context, txn *stdsql.Tx, drainQuery string) e
 	return nil
 }
 
-func rowToCSVRecord(row []any) ([]string, error) {
-	var record = make([]string, len(row))
-	for i, v := range row {
-		switch value := v.(type) {
-		case []byte:
-			record[i] = string(value)
-		case string:
-			record[i] = value
-		case nil:
-			// See https://dev.mysql.com/doc/refman/8.0/en/problems-with-null.html
-			record[i] = "NULL"
-		case bool:
-			if !value {
-				record[i] = "0"
-			} else {
-				record[i] = "1"
-			}
-		default:
-			b, err := json.Marshal(value)
-			if err != nil {
-				return nil, fmt.Errorf("encoding value as json: %w", err)
-			}
-			record[i] = string(b)
+func writeInfileField(buf *bytes.Buffer, v any) error {
+	switch value := v.(type) {
+	case nil:
+		// MySQL/SingleStore interpret \N as SQL NULL when ESCAPED BY '\\'.
+		buf.WriteString(`\N`)
+		return nil
+	case []byte:
+		writeEscapedField(buf, string(value))
+		return nil
+	case string:
+		writeEscapedField(buf, value)
+		return nil
+	case bool:
+		if value {
+			buf.WriteByte('1')
+		} else {
+			buf.WriteByte('0')
 		}
+		return nil
+	default:
+		b, err := json.Marshal(value)
+		if err != nil {
+			return fmt.Errorf("encoding value as json: %w", err)
+		}
+		writeEscapedField(buf, string(b))
+		return nil
 	}
+}
 
-	return record, nil
+// infileFieldReplacer escapes characters that the LOAD DATA parser would
+// otherwise interpret as separators or NULL markers.
+var infileFieldReplacer = strings.NewReplacer(
+	`\`, `\\`,
+	"\n", `\n`,
+	"\r", `\r`,
+	"\t", `\t`,
+	"\x00", `\0`,
+	",", `\,`,
+)
+
+func writeEscapedField(buf *bytes.Buffer, s string) {
+	infileFieldReplacer.WriteString(buf, s)
 }

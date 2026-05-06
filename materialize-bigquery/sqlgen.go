@@ -79,10 +79,15 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
 	}
 
+	binaryMapping := sql.MapStatic("STRING")
+	if featureFlags["native_binary_column_type"] {
+		binaryMapping = sql.MapStatic("BYTES")
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.ARRAY:   objAndArrayCol,
-			sql.BINARY:  sql.MapStatic("STRING"),
+			sql.BINARY:  binaryMapping,
 			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("INTEGER"),
@@ -128,6 +133,8 @@ func bqDialect(featureFlags map[string]bool) sql.Dialect {
 			"float":      {sql.NewMigrationSpec([]string{"string"})},
 			"date":       {sql.NewMigrationSpec([]string{"string"})},
 			"timestamp":  {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
+			"string":     {sql.NewMigrationSpec([]string{"bytes"}, sql.WithCastSQL(stringToBytesCast))},
+			"bytes":      {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(bytesToStringCast))},
 			"*":          {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -167,6 +174,20 @@ func toJsonCast(migration sql.ColumnTypeMigration) string {
 
 func toBigNumericCast(m sql.ColumnTypeMigration) string {
 	return fmt.Sprintf("CAST(%s AS BIGNUMERIC)", m.Identifier)
+}
+
+// stringToBytesCast decodes a base64-encoded STRING column into native BYTES.
+// Used when the native_binary_column_type feature flag is enabled on a task
+// that previously stored binary fields as base64 text.
+func stringToBytesCast(m sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`FROM_BASE64(%s)`, m.Identifier)
+}
+
+// bytesToStringCast encodes a BYTES column as a base64 STRING, the canonical
+// textual representation of binary data in Flow. Used when reverting from
+// native binary back to base64 text storage.
+func bytesToStringCast(m sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_BASE64(%s)`, m.Identifier)
 }
 
 type templates struct {
@@ -262,6 +283,8 @@ SELECT {{ $.Binding }}, l.{{$.Document.Identifier}}
 	CAST({{ $ident }} AS STRING)
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	FORMAT_TIMESTAMP('%Y-%m-%dT%H:%M:%E*SZ', {{ $ident }}, 'UTC')
+{{- else if eq $.BareDDL "BYTES" -}}
+	TO_BASE64({{ $ident }})
 {{- else -}}
 	{{ $ident }}
 {{- end -}}

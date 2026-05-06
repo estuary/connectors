@@ -52,6 +52,22 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 		datetimeMapping = sql.MapPrimaryKey(primaryKeyTextType, datetimeMapping)
 	}
 
+	binaryMapping := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"))
+	if featureFlags["native_binary_column_type"] {
+		// VARBYTE's maximum size is 1,024,000 bytes. The element converter
+		// re-encodes base64 input as hex so the staged JSON files contain
+		// hex strings, which Redshift's COPY parses natively into VARBYTE
+		// (the default decoding for VARBYTE-from-JSON is hex). Staging temp
+		// tables also declare VARBYTE columns directly, so COPY decodes hex
+		// straight into bytes; this avoids the 65,535-byte VARCHAR(MAX) cap
+		// that would otherwise truncate binary values larger than ~32KB on
+		// the merge path.
+		// Redshift's information_schema.columns.data_type reports VARBYTE as
+		// "binary varying", so the compatibility list must include that
+		// spelling for re-applies to recognize an existing VARBYTE column.
+		binaryMapping = sql.MapStatic("VARBYTE(1024000)", sql.AlsoCompatibleWith("varbyte", "binary varying"), sql.UsingConverter(sql.Base64ToHex))
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -62,7 +78,7 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 			sql.BOOLEAN:  sql.MapStatic("BOOLEAN"),
 			sql.OBJECT:   sql.MapStatic("SUPER", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.ARRAY:    sql.MapStatic("SUPER", sql.UsingConverter(sql.ToJsonBytes)),
-			sql.BINARY:   sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying")),
+			sql.BINARY:   binaryMapping,
 			sql.MULTIPLE: sql.MapStatic("SUPER", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("NUMERIC(38,0)", sql.AlsoCompatibleWith("numeric"), sql.UsingConverter(sql.StrToInt)),
@@ -120,8 +136,15 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 				sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast)),
 				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(datetimeToSuperCast)),
 			},
-			"character varying": {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(jsonQuoteCast))},
-			"*":                 {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(toJsonCast))},
+			"character varying": {
+				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(jsonQuoteCast)),
+				sql.NewMigrationSpec([]string{"varbyte(1024000)"}, sql.WithCastSQL(stringToVarbyteCast)),
+			},
+			"binary varying": {
+				sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(varbyteToStringCast)),
+				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(varbyteToSuperCast)),
+			},
+			"*": {sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -175,6 +198,29 @@ func datetimeToSuperCast(migration sql.ColumnTypeMigration) string {
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`CAST(%s as SUPER)`, migration.Identifier)
+}
+
+// varbyteToStringCast decodes a VARBYTE column's raw bytes as a base64 string,
+// which is the canonical textual representation of binary data in Flow.
+func varbyteToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`FROM_VARBYTE(%s, 'base64')`, migration.Identifier)
+}
+
+// stringToVarbyteCast decodes a base64-encoded VARCHAR/TEXT column into native
+// VARBYTE bytes. Used when the native_binary_column_type feature flag is
+// enabled on a task that previously stored binary fields as base64 text.
+func stringToVarbyteCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_VARBYTE(%s, 'base64')`, migration.Identifier)
+}
+
+// varbyteToSuperCast converts a VARBYTE column into a SUPER value containing
+// the base64-encoded JSON string representation of the binary data. A direct
+// CAST from VARBYTE to SUPER is not supported by Redshift. FROM_VARBYTE may
+// emit base64 with embedded line breaks for large inputs, which would produce
+// invalid JSON when wrapped in a string literal, so the line breaks are
+// stripped before json_parse. CHR(10) is LF and CHR(13) is CR.
+func varbyteToSuperCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`json_parse('"' || REPLACE(REPLACE(FROM_VARBYTE(%s, 'base64'), CHR(10), ''), CHR(13), '') || '"')`, migration.Identifier)
 }
 
 func jsonQuoteCast(migration sql.ColumnTypeMigration) string {
@@ -262,7 +308,10 @@ CREATE TEMPORARY TABLE {{ template "temp_name" $.Target }} (
 
 {{ define "createStoreTable" }}
 CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
-	LIKE {{$.Identifier}}
+{{- range $ind, $col := $.Columns }}
+	{{- if $ind }},{{ end }}
+	{{ $col.Identifier }} {{ $col.DDL }}
+{{- end }}
 );
 {{ end }}
 
@@ -290,7 +339,7 @@ WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{end -}}
 		{{$val.Identifier}} = r.{{$val.Identifier}}
-	{{- end}} 
+	{{- end}}
 	{{- if $.Document -}}
 		{{ if $.Values  }}, {{ end }}{{$.Document.Identifier}} = r.{{$.Document.Identifier}}
 	{{- end }}
@@ -349,6 +398,8 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 	TO_CHAR({{ $ident }}, 'YYYY-MM-DD')
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "date-time") (not $.IsPrimaryKey) -}}
 	TO_CHAR({{ $ident }} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
+{{- else if eq $.BareDDL "VARBYTE(1024000)" -}}
+	FROM_VARBYTE({{ $ident }}, 'base64')
 {{- else -}}
 	{{ $ident }}
 {{- end -}}
@@ -356,7 +407,7 @@ SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
 
 {{ define "loadQueryNoFlowDocument" }}
 {{ if not $.DeltaUpdates -}}
-SELECT {{ $.Binding }}, 
+SELECT {{ $.Binding }},
 OBJECT(
 {{- range $i, $col := $.RootLevelColumns}}
 	{{- if $i}},{{end}}

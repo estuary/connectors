@@ -56,6 +56,20 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
 	}
 
+	binaryMapping := sql.MapPrimaryKey(
+		sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)),
+		sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
+	)
+	if featureFlags["native_binary_column_type"] {
+		// SQL Server limits PK column sizes to 900 bytes. VARBINARY(MAX)
+		// cannot be used for indexed columns, so PKs fall back to
+		// VARBINARY(900).
+		binaryMapping = sql.MapPrimaryKey(
+			sql.MapStatic("VARBINARY(900)", sql.AlsoCompatibleWith("varbinary"), sql.UsingConverter(sql.Base64Decoder)),
+			sql.MapStatic("VARBINARY(MAX)", sql.AlsoCompatibleWith("varbinary"), sql.UsingConverter(sql.Base64Decoder)),
+		)
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -66,10 +80,7 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 			sql.BOOLEAN: sql.MapStatic("BIT"),
 			sql.OBJECT:  sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
 			sql.ARRAY:   sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
-			sql.BINARY: sql.MapPrimaryKey(
-				sql.MapStatic(textPKType, sql.AlsoCompatibleWith(stringType)),
-				sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType)),
-			),
+			sql.BINARY:  binaryMapping,
 			sql.MULTIPLE: sql.MapStatic(textType, sql.AlsoCompatibleWith(stringType), sql.UsingConverter(sql.ToJsonString)),
 			sql.STRING_INTEGER: sql.MapStringMaxLen(
 				sql.MapStatic("BIGINT", sql.UsingConverter(strToInt)),
@@ -109,8 +120,17 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 			"date":      {sql.NewMigrationSpec([]string{textType}, nocast)},
 			"time":      {sql.NewMigrationSpec([]string{textType}, nocast)},
 			"datetime2": {sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(datetimeToStringCast))},
-			"varchar":   {sql.NewMigrationSpecTarget(&StringSizeMigrationTarget{}, nocast)},
-			"*":         {sql.NewMigrationSpec([]string{textType}, nocast)},
+			"varchar": {
+				sql.NewMigrationSpecTarget(&StringSizeMigrationTarget{}, nocast),
+				sql.NewMigrationSpec([]string{"varbinary(900)", "varbinary(max)"}, sql.WithCastSQL(stringToVarbinaryCast)),
+			},
+			"nvarchar": {
+				sql.NewMigrationSpec([]string{"varbinary(900)", "varbinary(max)"}, sql.WithCastSQL(stringToVarbinaryCast)),
+			},
+			"varbinary": {
+				sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(varbinaryToStringCast)),
+			},
+			"*": {sql.NewMigrationSpec([]string{textType}, nocast)},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
@@ -171,6 +191,47 @@ func rfc3339TimeToUTC() sql.ElementConverter {
 
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`FORMAT(%s AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.FFFFFFF') + 'Z'`, migration.Identifier)
+}
+
+// stringToVarbinaryCast decodes a base64-encoded VARCHAR/NVARCHAR column into
+// native VARBINARY bytes. SQL Server doesn't expose a direct base64 decoder,
+// so we go through the XML xs:base64Binary cast. Used when the
+// native_binary_column_type feature flag is enabled on a task that previously
+// stored binary fields as base64 text.
+func stringToVarbinaryCast(migration sql.ColumnTypeMigration) string {
+	colRef := xqueryColumnRef("", migration.Field)
+	// The whole XQuery is wrapped in a T-SQL '...' literal, so any single
+	// quotes that survived the inner escapes need to be doubled here.
+	colRef = strings.ReplaceAll(colRef, "'", "''")
+	return fmt.Sprintf(`CAST(N'' AS XML).value('xs:base64Binary(sql:column("%s"))', 'VARBINARY(MAX)')`, colRef)
+}
+
+// varbinaryToStringCast encodes a VARBINARY column as a base64 VARCHAR via the
+// same xs:base64Binary XML cast used by stringToVarbinaryCast for the inverse
+// migration; direction is determined by the cast target type. Used when
+// reverting from native binary back to base64 text storage.
+func varbinaryToStringCast(migration sql.ColumnTypeMigration) string {
+	colRef := xqueryColumnRef("", migration.Field)
+	colRef = strings.ReplaceAll(colRef, "'", "''")
+	return fmt.Sprintf(`CAST(N'' AS XML).value('xs:base64Binary(sql:column("%s"))', 'VARCHAR(MAX)')`, colRef)
+}
+
+// xqueryColumnRef builds the inside of `sql:column("...")` for a column with
+// an arbitrary name, when the call is embedded inside an XQuery `"..."`
+// string literal that is itself inside a T-SQL `'...'` literal.
+//
+// The column is referenced via T-SQL bracket-quoted identifier syntax, with
+// `]` doubled (T-SQL identifier escape) and `"` doubled (XQuery string escape).
+// The optional alias is prefixed unquoted; aliases in our generated SQL are
+// always simple identifiers ("l" / "r"), so they need no escaping. The caller
+// is still responsible for doubling any embedded `'` for the outer T-SQL
+// string literal.
+func xqueryColumnRef(alias, field string) string {
+	bracketed := "[" + strings.ReplaceAll(field, "]", "]]") + "]"
+	if alias != "" {
+		bracketed = alias + "." + bracketed
+	}
+	return strings.ReplaceAll(bracketed, `"`, `""`)
 }
 
 type templates struct {
@@ -334,6 +395,17 @@ SELECT TOP 0 -1, NULL
 	FORMAT({{ $ident }} AT TIME ZONE 'UTC', 'yyyy-MM-ddTHH:mm:ss.FFFFFFF') + 'Z'
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	FORMAT({{ $ident }}, 'HH:mm:ss.FFFFFFF')
+{{- else if or (eq $.BareDDL "VARBINARY(900)") (eq $.BareDDL "VARBINARY(MAX)") -}}
+	{{- /* Encodes a VARBINARY column back to a base64 VARCHAR via the same
+	       xs:base64Binary XML cast used by stringToVarbinaryCast for migration.
+	       Direction is determined by the source column type and the cast target:
+	       here the source is VARBINARY and the target is VARCHAR(MAX), which
+	       base64-encodes; in the migration path the source is VARCHAR and the
+	       target is VARBINARY(MAX), which base64-decodes. The column is
+	       referenced via XQueryColumnRef (T-SQL bracket-quoted identifier) so
+	       that field names containing ", ], or other characters are escaped
+	       correctly. */ -}}
+	CAST(N'' AS XML).value('xs:base64Binary(sql:column("{{ XQueryColumnRef $.Alias $.Field }}"))', 'VARCHAR(MAX)')
 {{- else -}}
 	{{ $ident }}
 {{- end -}}
@@ -428,7 +500,9 @@ UPDATE {{ Identifier $.TablePath }}
 	AND   key_end   = {{ $.KeyEnd }}
 	AND   fence     = {{ $.Fence }};
 {{ end }}
-	`)
+	`, template.FuncMap{
+		"XQueryColumnRef": xqueryColumnRef,
+	})
 
 	return templates{
 		tempLoadTableName:       tplAll.Lookup("temp_load_name"),

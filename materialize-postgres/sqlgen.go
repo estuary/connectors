@@ -29,6 +29,11 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 		timeMapping = sql.MapPrimaryKey(primaryKeyTextType, timeMapping)
 	}
 
+	binaryMapping := sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying"))
+	if featureFlags["native_binary_column_type"] {
+		binaryMapping = sql.MapStatic("BYTEA", sql.UsingConverter(sql.Base64Decoder))
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
@@ -39,7 +44,7 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
 			sql.OBJECT:         sql.MapStatic("JSON"),
 			sql.ARRAY:          sql.MapStatic("JSON"),
-			sql.BINARY:         sql.MapStatic("TEXT", sql.AlsoCompatibleWith("character varying")),
+			sql.BINARY:         binaryMapping,
 			sql.MULTIPLE:       sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
 			sql.STRING_INTEGER: sql.MapStatic("NUMERIC"),
 			sql.STRING_NUMBER:  sql.MapStatic("DECIMAL", sql.AlsoCompatibleWith("numeric")),
@@ -72,6 +77,9 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 			"date":                     {sql.NewMigrationSpec([]string{"text"})},
 			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},
 			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
+			"text":                     {sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast))},
+			"character varying":        {sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast))},
+			"bytea":                    {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(byteaToStringCast))},
 			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
@@ -115,6 +123,23 @@ type loadTableColumns struct {
 
 func datetimeToStringCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`to_char(%s AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`, migration.Identifier)
+}
+
+// stringToByteaCast decodes a base64-encoded TEXT/VARCHAR column into native
+// BYTEA bytes. Used when the native_binary_column_type feature flag is enabled
+// on a task that previously stored binary fields as base64 text.
+func stringToByteaCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`decode(%s, 'base64')`, migration.Identifier)
+}
+
+// byteaToStringCast encodes a BYTEA column's raw bytes as a base64 TEXT
+// string, the canonical textual representation of binary data in Flow. The
+// embedded newlines that Postgres' `encode(_, 'base64')` inserts every 76
+// characters (per RFC 2045) are stripped so downstream consumers see a single
+// contiguous base64 string. Used when reverting from native binary back to
+// base64 text storage.
+func byteaToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`translate(encode(%s, 'base64'), E'\n', '')`, migration.Identifier)
 }
 
 func toJsonCast(migration sql.ColumnTypeMigration) string {
@@ -242,6 +267,8 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 	to_char({{ $ident }} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	TO_CHAR({{ $ident }}, 'HH24:MI:SS.US"Z"')
+{{- else if eq $.BareDDL "BYTEA" -}}
+	translate(encode({{ $ident }}, 'base64'), E'\n', '')
 {{- else -}}
 	{{ $ident }}
 {{- end -}}

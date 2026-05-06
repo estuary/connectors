@@ -61,6 +61,9 @@ func parseTemplates() templates {
 				// timestamptz column.
 				return fmt.Sprintf(`DATE_FORMAT(%s, 'yyyy-MM-dd\'T\'HH:mm:ss.SSSSSS\'Z\'')`, ident)
 			default:
+				if m.TargetType.Equals(iceberg.BinaryType{}) {
+					return fmt.Sprintf("UNBASE64(%s)", ident)
+				}
 				return fmt.Sprintf("CAST(%s AS %s)", ident, m.TargetType.Type())
 			}
 		},

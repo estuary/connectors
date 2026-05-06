@@ -28,6 +28,7 @@ var featureFlagDefaults = map[string]bool{
 	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
 	"skip_cleanup":                     false,
+	"native_binary_column_type":        true,
 }
 
 type AuthType string
