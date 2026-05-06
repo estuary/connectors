@@ -278,6 +278,8 @@ type templates struct {
 	alterTargetColumns               *template.Template
 	alterTargetMigrateAddColumn      *template.Template
 	alterTargetMigratePopulateColumn *template.Template
+	alterTargetMigrateDropColumn     *template.Template
+	alterTargetMigrateRenameColumn   *template.Template
 	createLoadTable                  *template.Template
 	insertLoadTable                  *template.Template
 	queryLoadTable                   *template.Template
@@ -397,6 +399,26 @@ ADD COLUMN {{ $ins.TempColumnIdentifier }} {{ $ins.TypeMigration.DDL }};
 ALTER TABLE {{$.Table.Identifier}}
 UPDATE {{ $ins.TempColumnIdentifier }} = if({{ $ins.TypeMigration.Identifier }} IS NULL, NULL, {{ call $ins.TypeMigration.CastSQL $ins.TypeMigration }})
 WHERE true
+SETTINGS mutations_sync = 1;
+{{ end -}}
+{{ end }}
+
+-- mutations_sync = 1 blocks until the DROP mutation is fully applied, so
+-- the subsequent RENAME cannot collide with a not-yet-dropped column and
+-- a connector restart cannot leave a *_flowtmp1 orphan behind.
+
+{{ define "alterTargetMigrateDropColumn" }}
+{{- range $ins := $.Instructions }}
+ALTER TABLE {{$.Table.Identifier}}
+DROP COLUMN {{ $ins.TypeMigration.Identifier }}
+SETTINGS mutations_sync = 1;
+{{ end -}}
+{{ end }}
+
+{{ define "alterTargetMigrateRenameColumn" }}
+{{- range $ins := $.Instructions }}
+ALTER TABLE {{$.Table.Identifier}}
+RENAME COLUMN {{ $ins.TempColumnIdentifier }} TO {{ $ins.TypeMigration.Identifier }}
 SETTINGS mutations_sync = 1;
 {{ end -}}
 {{ end }}
@@ -580,6 +602,8 @@ DROP TABLE IF EXISTS {{ template "storeTableNameIdentifier" . }};
 		alterTargetColumns:               tplAll.Lookup("alterTargetColumns"),
 		alterTargetMigrateAddColumn:      tplAll.Lookup("alterTargetMigrateAddColumn"),
 		alterTargetMigratePopulateColumn: tplAll.Lookup("alterTargetMigratePopulateColumn"),
+		alterTargetMigrateDropColumn:     tplAll.Lookup("alterTargetMigrateDropColumn"),
+		alterTargetMigrateRenameColumn:   tplAll.Lookup("alterTargetMigrateRenameColumn"),
 		createLoadTable:                  tplAll.Lookup("createLoadTable"),
 		insertLoadTable:                  tplAll.Lookup("insertLoadTable"),
 		queryLoadTable:                   tplAll.Lookup("queryLoadTable"),

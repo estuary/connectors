@@ -178,11 +178,53 @@ var clickHouseMigrationSteps = []sql.ColumnMigrationStep{
 		return stmts, nil
 	},
 
-	// Step 2: Drop the old columns
-	sql.StdMigrationSteps[2],
+	// Step 2: Drop the old columns. SETTINGS mutations_sync = 1 makes the
+	// DROP block until the mutation completes, so an interruption between
+	// steps cannot leave a *_flowtmp1 orphan paired with its original.
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		d := struct {
+			Table        sql.Table
+			Instructions []sql.MigrationInstruction
+		}{
+			Table:        table,
+			Instructions: instructions,
+		}
 
-	// Step 3: Rename the temporary columns
-	sql.StdMigrationSteps[3],
+		var alterStmt strings.Builder
+		if err := renderTemplates(dialect, false).alterTargetMigrateDropColumn.Execute(&alterStmt, d); err != nil {
+			return nil, fmt.Errorf("executing alter target migrate drop column: %w", err)
+		}
+		stmts := make([]string, 0, len(instructions))
+		for _, s := range strings.Split(alterStmt.String(), ";") {
+			if s = strings.TrimSpace(s); s != "" {
+				stmts = append(stmts, s+";")
+			}
+		}
+		return stmts, nil
+	},
+
+	// Step 3: Rename the temporary columns, also blocking on completion.
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		d := struct {
+			Table        sql.Table
+			Instructions []sql.MigrationInstruction
+		}{
+			Table:        table,
+			Instructions: instructions,
+		}
+
+		var alterStmt strings.Builder
+		if err := renderTemplates(dialect, false).alterTargetMigrateRenameColumn.Execute(&alterStmt, d); err != nil {
+			return nil, fmt.Errorf("executing alter target migrate rename column: %w", err)
+		}
+		stmts := make([]string, 0, len(instructions))
+		for _, s := range strings.Split(alterStmt.String(), ";") {
+			if s = strings.TrimSpace(s); s != "" {
+				stmts = append(stmts, s+";")
+			}
+		}
+		return stmts, nil
+	},
 
 	// Step 4: No-op. ClickHouse non-nullable columns are not required, so the
 	// new columns' ultimate nullability was set in step 0.
