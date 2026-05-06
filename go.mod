@@ -18,7 +18,6 @@ require (
 	github.com/alpacahq/alpaca-trade-api-go/v2 v2.8.0
 	github.com/apache/arrow-go/v18 v18.5.3-0.20260309043541-3ad38d03dbc8
 	github.com/apache/iceberg-go v0.5.0
-	github.com/aws/aws-sdk-go v1.55.8
 	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.9
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.9
@@ -76,10 +75,7 @@ require (
 	github.com/stretchr/testify v1.11.1
 	github.com/tidwall/gjson v1.17.3
 	github.com/tidwall/sjson v1.2.5
-	github.com/trinodb/trino-go-client v0.313.0
 	github.com/wk8/go-ordered-map/v2 v2.1.8
-	github.com/xitongsys/parquet-go v1.6.2
-	github.com/xitongsys/parquet-go-source v0.0.0-20220527110425-ba4adb87a31b
 	go.gazette.dev/core v0.102.0
 	go.mongodb.org/mongo-driver v1.17.4
 	golang.org/x/crypto v0.49.0
@@ -132,7 +128,6 @@ require (
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/exporter/metric v0.55.0 // indirect
 	github.com/GoogleCloudPlatform/opentelemetry-operations-go/internal/resourcemapping v0.55.0 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
-	github.com/apache/arrow/go/arrow v0.0.0-20211112161151-bc219186db40 // indirect
 	github.com/apache/arrow/go/v12 v12.0.1 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
 	github.com/apache/thrift v0.22.0 // indirect
@@ -207,15 +202,12 @@ require (
 	github.com/hamba/avro/v2 v2.31.0 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.8 // indirect
-	github.com/hashicorp/go-uuid v1.0.3 // indirect
 	github.com/hashicorp/golang-lru v1.0.2 // indirect
 	github.com/ibmruntimes/go-recordio/v2 v2.0.0-20240416213906-ae0ad556db70 // indirect
 	github.com/jackc/chunkreader/v2 v2.0.1 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/jcmturner/gofork v1.7.6 // indirect
-	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
@@ -296,10 +288,6 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	gopkg.in/ini.v1 v1.67.1 // indirect
-	gopkg.in/jcmturner/aescts.v1 v1.0.1 // indirect
-	gopkg.in/jcmturner/dnsutils.v1 v1.0.1 // indirect
-	gopkg.in/jcmturner/gokrb5.v6 v6.1.1 // indirect
-	gopkg.in/jcmturner/rpc.v1 v1.1.0 // indirect
 	gotest.tools/gotestsum v1.13.0 // indirect
 	nhooyr.io/websocket v1.8.7 // indirect
 )
