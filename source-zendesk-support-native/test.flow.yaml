@@ -135,6 +135,10 @@ captures:
         interval: PT5M
       target: acmeCo/ticket_comments
     - resource:
+        name: side_conversations
+        interval: PT5M
+      target: acmeCo/side_conversations
+    - resource:
         name: post_votes
         interval: PT30M
       target: acmeCo/post_votes

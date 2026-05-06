@@ -614,6 +614,38 @@
     }
   ],
   [
+    "acmeCo/side_conversations",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef",
+        "row_id": 0
+      },
+      "created_at": "2026-05-08T13:22:48.141Z",
+      "external_ids": {},
+      "id": "01ad1c9e-4ae1-11f1-9738-b5e9d567b472",
+      "message_added_at": "2026-05-08T13:22:48.141Z",
+      "participants": [
+        {
+          "email": "alexb@estuary.dev",
+          "name": "Alex Bair",
+          "user_id": 28835702984212
+        },
+        {
+          "email": "someone@example.com",
+          "name": "Someone",
+          "user_id": 49045981562772
+        }
+      ],
+      "preview_text": "The smoke is very colorful.",
+      "state": "open",
+      "state_updated_at": "2026-05-08T13:22:48.141Z",
+      "subject": "My mouse is on fire!",
+      "ticket_id": 1,
+      "updated_at": "redacted",
+      "url": "https://d3v-estuary.zendesk.com/api/v2/tickets/1/side_conversations/01ad1c9e-4ae1-11f1-9738-b5e9d567b472"
+    }
+  ],
+  [
     "acmeCo/sla_policies",
     {
       "_meta": {
