@@ -57,12 +57,15 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 		// VARBYTE's maximum size is 1,024,000 bytes. The element converter
 		// re-encodes base64 input as hex so the staged JSON files contain
 		// hex strings, which Redshift's COPY parses natively into VARBYTE
-		// (the default decoding for VARBYTE-from-JSON is hex). This lets the
-		// store path keep using the direct COPY-into-target shortcut for
-		// insert-only transactions; the merge path (when a row already
-		// exists) decodes via TO_VARBYTE(col, 'hex') from the VARCHAR
-		// staging column.
-		binaryMapping = sql.MapStatic("VARBYTE(1024000)", sql.AlsoCompatibleWith("varbyte"), sql.UsingConverter(sql.Base64ToHex))
+		// (the default decoding for VARBYTE-from-JSON is hex). Staging temp
+		// tables also declare VARBYTE columns directly, so COPY decodes hex
+		// straight into bytes; this avoids the 65,535-byte VARCHAR(MAX) cap
+		// that would otherwise truncate binary values larger than ~32KB on
+		// the merge path.
+		// Redshift's information_schema.columns.data_type reports VARBYTE as
+		// "binary varying", so the compatibility list must include that
+		// spelling for re-applies to recognize an existing VARBYTE column.
+		binaryMapping = sql.MapStatic("VARBYTE(1024000)", sql.AlsoCompatibleWith("varbyte", "binary varying"), sql.UsingConverter(sql.Base64ToHex))
 	}
 
 	mapper := sql.NewDDLMapper(
@@ -292,9 +295,7 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 CREATE TEMPORARY TABLE {{ template "temp_name" $.Target }} (
 {{- range $ind, $key := $.Target.Keys }}
 	{{- if $ind }},{{ end }}
-	{{ $key.Identifier }} {{ if eq $key.BareDDL "VARBYTE(1024000)" -}}
-		VARCHAR(MAX)
-	{{- else if and (eq $key.DDL "TEXT") (not (eq $.VarCharLength 0)) -}}
+	{{ $key.Identifier }} {{ if and (eq $key.DDL "TEXT") (not (eq $.VarCharLength 0)) -}}
 		VARCHAR({{ $.VarCharLength }})
 	{{- else }}
 		{{- $key.DDL }}
@@ -309,11 +310,7 @@ CREATE TEMPORARY TABLE {{ template "temp_name" $.Target }} (
 CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 {{- range $ind, $col := $.Columns }}
 	{{- if $ind }},{{ end }}
-	{{ $col.Identifier }} {{ if eq $col.BareDDL "VARBYTE(1024000)" -}}
-		VARCHAR(MAX)
-	{{- else -}}
-		{{ $col.DDL }}
-	{{- end }}
+	{{ $col.Identifier }} {{ $col.DDL }}
 {{- end }}
 );
 {{ end }}
@@ -322,11 +319,7 @@ CREATE TEMPORARY TABLE {{ template "temp_name" . }} (
 CREATE TEMPORARY TABLE {{ template "temp_name_deleted" . }} (
 {{- range $ind, $key := $.Keys }}
 	{{- if $ind }},{{ end }}
-  {{ $key.Identifier }} {{ if eq $key.BareDDL "VARBYTE(1024000)" -}}
-	VARCHAR(MAX)
-  {{- else -}}
-	{{ $key.DDL }}
-  {{- end }}
+  {{ $key.Identifier }} {{ $key.DDL }}
 {{- end }}
 );
 {{ end }}
@@ -340,12 +333,12 @@ MERGE INTO {{ $.Identifier }}
 USING {{ template "temp_name" . }} AS r
 ON {{ range $ind, $key := $.Keys }}
 {{- if $ind }} AND {{end -}}
-	{{$.Identifier}}.{{$key.Identifier}} = {{ if eq $key.BareDDL "VARBYTE(1024000)" }}TO_VARBYTE(r.{{$key.Identifier}}, 'hex'){{ else }}r.{{$key.Identifier}}{{ end }}
+	{{$.Identifier}}.{{$key.Identifier}} = r.{{$key.Identifier}}
 {{- end}}
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
 	{{- if $ind }}, {{end -}}
-		{{$val.Identifier}} = {{ if eq $val.BareDDL "VARBYTE(1024000)" }}TO_VARBYTE(r.{{$val.Identifier}}, 'hex'){{ else }}r.{{$val.Identifier}}{{ end }}
+		{{$val.Identifier}} = r.{{$val.Identifier}}
 	{{- end}}
 	{{- if $.Document -}}
 		{{ if $.Values  }}, {{ end }}{{$.Document.Identifier}} = r.{{$.Document.Identifier}}
@@ -360,7 +353,7 @@ WHEN NOT MATCHED THEN
 	VALUES (
 	{{- range $ind, $col := $.Columns }}
 		{{- if $ind }}, {{ end -}}
-		{{ if eq $col.BareDDL "VARBYTE(1024000)" }}TO_VARBYTE(r.{{$col.Identifier}}, 'hex'){{ else }}r.{{$col.Identifier}}{{ end }}
+		r.{{$col.Identifier}}
 	{{- end -}}
 	);
 {{ end }}
@@ -371,7 +364,7 @@ DELETE FROM {{ $.Identifier }}
 USING {{ template "temp_name_deleted" . }} AS r
 WHERE {{ range $ind, $key := $.Keys }}
 {{- if $ind }} AND {{end -}}
-	{{$.Identifier}}.{{$key.Identifier}} = {{ if eq $key.BareDDL "VARBYTE(1024000)" }}TO_VARBYTE(r.{{$key.Identifier}}, 'hex'){{ else }}r.{{$key.Identifier}}{{ end }}
+	{{$.Identifier}}.{{$key.Identifier}} = r.{{$key.Identifier}}
 {{- end }}
 {{- end }}
 {{ end }}
@@ -386,7 +379,7 @@ SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 	JOIN {{ $.Identifier}} AS r
 	{{- range $ind, $key := $.Keys }}
 		{{ if $ind }} AND {{ else }} ON  {{ end -}}
-			{{ if eq $key.BareDDL "VARBYTE(1024000)" }}TO_VARBYTE(l.{{ $key.Identifier }}, 'hex'){{ else }}l.{{ $key.Identifier }}{{ end }} = r.{{ $key.Identifier }}
+			l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 	{{- end }}
 {{- else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
@@ -425,7 +418,7 @@ FROM {{ template "temp_name" . }} AS l
 JOIN {{ $.Identifier}} AS r
 {{- range $ind, $key := $.Keys }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-		{{ if eq $key.BareDDL "VARBYTE(1024000)" }}TO_VARBYTE(l.{{ $key.Identifier }}, 'hex'){{ else }}l.{{ $key.Identifier }}{{ end }} = r.{{ $key.Identifier }}
+		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
 {{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
