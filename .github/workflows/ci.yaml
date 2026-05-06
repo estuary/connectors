@@ -131,7 +131,6 @@ jobs:
           - materialize-spanner
           - materialize-sqlite
           - materialize-sqlserver
-          - materialize-starburst
           - materialize-webhook
         include:
           - connector: source-criteo

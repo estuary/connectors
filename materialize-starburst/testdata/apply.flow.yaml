@@ -1,8 +1,0 @@
-materializations:
-  acmeCo/tests/materialize-starburst:
-    endpoint:
-      local:
-        command: ["go", "run", "."]
-        protobuf: true
-        config: config.local.yaml
-    bindings: []
