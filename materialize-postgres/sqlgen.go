@@ -267,6 +267,8 @@ SELECT * FROM (SELECT -1, CAST(NULL AS JSON) LIMIT 0) as nodoc
 	to_char({{ $ident }} AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')
 {{- else if and (eq $.AsFlatType "string") (eq $.Format "time") (not $.IsPrimaryKey) -}}
 	TO_CHAR({{ $ident }}, 'HH24:MI:SS.US"Z"')
+{{- else if eq $.BareDDL "BYTEA" -}}
+	translate(encode({{ $ident }}, 'base64'), E'\n', '')
 {{- else -}}
 	{{ $ident }}
 {{- end -}}
