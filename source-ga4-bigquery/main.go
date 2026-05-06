@@ -35,6 +35,7 @@ type advancedConfig struct {
 	CaptureIntermediate bool   `json:"capture_intermediate,omitempty" jsonschema:"title=Capture Intermediate Days,description=If enabled the connector queries every table in the live window on each poll rather than just the newest and oldest. Trades higher BigQuery scan cost for fresher intermediate-day data. Defaults to false."`
 	MinDate             string `json:"min_date,omitempty" jsonschema:"title=Minimum Date,description=Optional YYYY-MM-DD cutoff. Tables for dates strictly before this are skipped. Used to bound the cost of an initial backfill." jsonschema_extras:"pattern=^[0-9]{4}-[0-9]{2}-[0-9]{2}$"`
 	SourceTag           string `json:"source_tag,omitempty" jsonschema:"title=Source Tag,description=When set the capture will add this value as the property 'tag' in the source metadata of each document."`
+	BillingProjectID    string `json:"billing_project_id,omitempty" jsonschema:"title=Billing Project ID,description=Project that BigQuery jobs are billed to. Defaults to Project ID if not specified."`
 	FeatureFlags        string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
 
 	parsedFeatureFlags map[string]bool
@@ -96,7 +97,11 @@ func connectBigQuery(ctx context.Context, cfg *Config) (*bigquery.Client, error)
 	if err != nil {
 		return nil, err
 	}
-	return bqclient.Connect(ctx, cfg.ProjectID, credOption)
+	var billingProjectID = cfg.Advanced.BillingProjectID
+	if billingProjectID == "" {
+		billingProjectID = cfg.ProjectID
+	}
+	return bqclient.Connect(ctx, billingProjectID, credOption)
 }
 
 func (c *Config) credentialsClientOption() (option.ClientOption, error) {
