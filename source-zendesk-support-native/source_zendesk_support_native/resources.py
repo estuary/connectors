@@ -8,6 +8,7 @@ from estuary_cdk.capture import common, Task
 from estuary_cdk.http import HTTPMixin, TokenSource, HTTPError
 
 from .models import (
+    AccountSettings,
     AuditLog,
     ClientSideIncrementalOffsetPaginatedResponse,
     ClientSideIncrementalCursorPaginatedResponse,
@@ -22,6 +23,7 @@ from .models import (
     TalkIncrementalExportResponse,
     ResourceConfig,
     ResourceState,
+    SideConversation,
     TimestampedResource,
     ZendeskResource,
     EPOCH,
@@ -47,6 +49,7 @@ from .api import (
     backfill_incremental_cursor_paginated_resources,
     backfill_satisfaction_ratings,
     backfill_talk_incremental_export_resources,
+    backfill_side_conversations,
     backfill_ticket_child_resources,
     backfill_ticket_metrics,
     fetch_audit_logs,
@@ -58,6 +61,7 @@ from .api import (
     fetch_post_child_resources,
     fetch_post_comment_votes,
     fetch_satisfaction_ratings,
+    fetch_side_conversations,
     fetch_talk_incremental_export_resources,
     fetch_ticket_child_resources,
     fetch_ticket_metrics,
@@ -90,6 +94,11 @@ HELP_DESK_STREAMS = [
 TALK_STREAMS = [
     "calls",
     "call_legs",
+]
+
+
+SIDE_CONVERSATION_STREAMS = [
+    "side_conversations",
 ]
 
 
@@ -133,6 +142,18 @@ async def _is_talk_enabled(
             raise err
 
     return True
+
+
+# I'm not sure if this is the best way to determine if side conversations are enabled
+# for a given Zendesk instance, but I couldn't find a better check. If we see lots of
+# tasks attempting to capture side_conversations but are hitting 4xx errors, we should
+# re-evaluate this check.
+async def _is_side_conversations_enabled(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> bool:
+    body = await http.request(log, f"{url_base(config.subdomain)}/account/settings")
+    settings = AccountSettings.model_validate_json(body)
+    return settings.settings.side_conversations.show_in_context_panel
 
 
 async def validate_credentials(
@@ -837,6 +858,56 @@ def ticket_child_resources(
     return resources
 
 
+def side_conversations(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> common.Resource:
+
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_side_conversations,
+                http,
+                config.subdomain,
+            ),
+            fetch_page=functools.partial(
+                backfill_side_conversations,
+                http,
+                config.subdomain,
+                config.start_date,
+            )
+        )
+
+    cutoff = datetime.now(tz=UTC) - TIME_PARAMETER_DELAY
+    # Initial state is the stringified version of the cutoff as a Unix timestamp.
+    # This is done to maintain the strictly increasing nature of yielded LogCursors.
+    initial_state = (str(_dt_to_s(cutoff)),)
+
+    return common.Resource(
+        name="side_conversations",
+        key=["/id"],
+        model=SideConversation,
+        open=open,
+        initial_state=ResourceState(
+            inc=ResourceState.Incremental(cursor=initial_state),
+            backfill=ResourceState.Backfill(cutoff=cutoff, next_page=None)
+        ),
+        initial_config=ResourceConfig(
+            name="side_conversations", interval=timedelta(minutes=5)
+        ),
+        schema_inference=True,
+    )
+
+
 def post_child_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
@@ -939,6 +1010,7 @@ def _generate_resources(
         *talk_incremental_export_resources(log, http, config),
         *incremental_cursor_export_resources(log, http, config),
         *ticket_child_resources(log, http, config),
+        side_conversations(log, http, config),
         *post_child_resources(log, http, config),
         post_comment_votes(log, http, config),
     ]
@@ -962,6 +1034,9 @@ async def all_resources(
 
     if not await _is_talk_enabled(log, http, config):
         excluded_streams.update(TALK_STREAMS)
+
+    if not await _is_side_conversations_enabled(log, http, config):
+        excluded_streams.update(SIDE_CONVERSATION_STREAMS)
 
     if excluded_streams:
         resources = [r for r in resources if r.name not in excluded_streams]
