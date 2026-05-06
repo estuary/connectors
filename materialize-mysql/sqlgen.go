@@ -162,6 +162,8 @@ var mysqlDialect = func(tzLocation *time.Location, database string, product stri
 		"datetime": {sql.NewMigrationSpec([]string{"varchar", "longtext"}, sql.WithCastSQL(prepareDatetimeToStringCast(tzLocation)))},
 		"varchar": {sql.NewMigrationSpec([]string{"varbinary(256)"}, sql.WithCastSQL(stringToBinaryCast)),
 			sql.NewMigrationSpec([]string{"longblob"}, sql.WithCastSQL(stringToBinaryCast))},
+		"varbinary": {sql.NewMigrationSpec([]string{"varchar", "longtext"}, sql.WithCastSQL(binaryToStringCast))},
+		"longblob":  {sql.NewMigrationSpec([]string{"varchar", "longtext"}, sql.WithCastSQL(binaryToStringCast))},
 	}
 
 	// MariaDB uses longtext for JSON type, so migrating to JSON on MariaDB is not distinguishable from migrating
@@ -241,6 +243,13 @@ func jsonQuoteCast(product string) func(migration sql.ColumnTypeMigration) strin
 // base64 text.
 func stringToBinaryCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`FROM_BASE64(%s)`, migration.Identifier)
+}
+
+// binaryToStringCast encodes a VARBINARY/LONGBLOB column as a base64
+// VARCHAR/LONGTEXT, the canonical textual representation of binary data in
+// Flow. Used when reverting from native binary back to base64 text storage.
+func binaryToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`TO_BASE64(%s)`, migration.Identifier)
 }
 
 func prepareDatetimeToStringCast(loc *time.Location) sql.CastSQLFunc {

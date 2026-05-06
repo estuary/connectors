@@ -51,6 +51,20 @@ var timestampConverter sql.ElementConverter = func(te tuple.TupleElement) (inter
 	return timestamp, nil
 }
 
+// stringToVarbinaryCast decodes a base64-encoded VARCHAR column into native
+// VARBINARY bytes. Used when the native_binary_column_type feature flag is
+// enabled on a task that previously stored binary fields as base64 text.
+func stringToVarbinaryCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`from_base64(%s)`, migration.Identifier)
+}
+
+// varbinaryToStringCast encodes a VARBINARY column as a base64 VARCHAR, the
+// canonical textual representation of binary data in Flow. Used when reverting
+// from native binary back to base64 text storage.
+func varbinaryToStringCast(migration sql.ColumnTypeMigration) string {
+	return fmt.Sprintf(`to_base64(%s)`, migration.Identifier)
+}
+
 // newStarburstTrinoDialect returns a representation of the Starburst Trino SQL dialect used for target table.
 func newStarburstTrinoDialect(featureFlags map[string]bool) sql.Dialect {
 	dateTimeMapper := sql.MapStatic("TIMESTAMP(6) WITH TIME ZONE", sql.UsingConverter(timestampConverter))
@@ -93,6 +107,10 @@ var starburstDialect = func(dateMapper sql.MapProjectionFn, dateTimeMapper sql.M
 	)
 
 	return sql.Dialect{
+		MigratableTypes: sql.MigrationSpecs{
+			"varchar":   {sql.NewMigrationSpec([]string{"varbinary"}, sql.WithCastSQL(stringToVarbinaryCast))},
+			"varbinary": {sql.NewMigrationSpec([]string{"varchar"}, sql.WithCastSQL(varbinaryToStringCast))},
+		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
 				return sql.InfoTableLocation{
