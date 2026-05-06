@@ -31,6 +31,8 @@ from .models import (
     PostComment,
     PostCommentsResponse,
     PostCommentVotesResponse,
+    SideConversation,
+    SideConversationsResponse,
     INCREMENTAL_CURSOR_EXPORT_TYPES,
     FilterParam,
     TicketChildResourceValidationContext,
@@ -956,6 +958,125 @@ async def backfill_ticket_child_resources(
 
                 async for child_resource in _fetch_ticket_child_resources(http, subdomain, path, response_model, ticket.id, log):
                     yield child_resource
+
+            yield next_page_cursor
+            tickets = []
+        elif not next_page_cursor:
+            break
+
+
+async def _fetch_side_conversations(
+    http: HTTPSession,
+    subdomain: str,
+    ticket_id: int,
+    log: Logger,
+) -> AsyncGenerator[SideConversation, None]:
+    # Side conversations are scoped per-ticket: GET /tickets/{ticket_id}/side_conversations.
+    # The endpoint uses classic next_page URL-based pagination.
+    url: str | None = f"{url_base(subdomain)}/tickets/{ticket_id}/side_conversations"
+
+    while url:
+        response = SideConversationsResponse.model_validate_json(
+            await http.request(log, url)
+        )
+
+        for resource in response.side_conversations:
+            yield resource
+
+        url = response.next_page
+
+
+async def fetch_side_conversations(
+    http: HTTPSession,
+    subdomain: str,
+    log: Logger,
+    log_cursor: LogCursor,
+) -> AsyncGenerator[SideConversation | LogCursor, None]:
+    # Side conversations are ticket child resources: a side conversation can only
+    # change if its parent ticket changes. We therefore use the tickets incremental
+    # cursor export to find recently-updated tickets, then fetch their side
+    # conversations — mirroring the approach used for ticket_comments and ticket_audits.
+    assert isinstance(log_cursor, tuple)
+    cursor = log_cursor[0]
+    assert isinstance(cursor, str)
+
+    start_date: datetime | None = None
+
+    if _is_timestamp(cursor):
+        start_date = _s_to_dt(int(cursor))
+        cursor = None
+
+    tickets_generator = _fetch_incremental_cursor_export_resources(
+        http, subdomain, "tickets", start_date, cursor, log
+    )
+
+    tickets: list[AbbreviatedTicket] = []
+
+    while True:
+        next_page_cursor: str | None = None
+        async for result in tickets_generator:
+            if isinstance(result, TimestampedResource):
+                tickets.append(AbbreviatedTicket(
+                    id=result.id,
+                    status=getattr(result, "status"),
+                    updated_at=result.updated_at,
+                ))
+            elif isinstance(result, str):
+                next_page_cursor = result
+                break
+
+        if len(tickets) > 0 and next_page_cursor:
+            for ticket in tickets:
+                if ticket.status == 'deleted':
+                    continue
+                async for side_conv in _fetch_side_conversations(http, subdomain, ticket.id, log):
+                    yield side_conv
+
+            yield (next_page_cursor,)
+            tickets = []
+        elif not next_page_cursor:
+            break
+
+
+async def backfill_side_conversations(
+    http: HTTPSession,
+    subdomain: str,
+    start_date: datetime,
+    log: Logger,
+    page: PageCursor | None,
+    cutoff: LogCursor,
+) -> AsyncGenerator[SideConversation | PageCursor, None]:
+    if page is not None:
+        assert isinstance(page, str)
+    assert isinstance(cutoff, datetime)
+
+    tickets_generator = _fetch_incremental_cursor_export_resources(
+        http, subdomain, "tickets", start_date, page, log
+    )
+
+    tickets: list[AbbreviatedTicket] = []
+
+    while True:
+        next_page_cursor: str | None = None
+        async for result in tickets_generator:
+            if isinstance(result, TimestampedResource):
+                tickets.append(AbbreviatedTicket(
+                    id=result.id,
+                    status=getattr(result, "status"),
+                    updated_at=result.updated_at,
+                ))
+            elif isinstance(result, str):
+                next_page_cursor = result
+                break
+
+        if len(tickets) > 0 and next_page_cursor:
+            for ticket in tickets:
+                if ticket.updated_at >= cutoff:
+                    return
+                if ticket.status == "deleted":
+                    continue
+                async for side_conv in _fetch_side_conversations(http, subdomain, ticket.id, log):
+                    yield side_conv
 
             yield next_page_cursor
             tickets = []

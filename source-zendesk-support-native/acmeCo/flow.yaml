@@ -103,6 +103,10 @@ collections:
     schema: ticket_comments.schema.yaml
     key:
     - /id
+  acmeCo/side_conversations:
+    schema: side_conversations.schema.yaml
+    key:
+    - /id
   acmeCo/ticket_fields:
     schema: ticket_fields.schema.yaml
     key:
