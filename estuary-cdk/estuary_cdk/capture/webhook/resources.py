@@ -1,6 +1,7 @@
 from collections.abc import Sequence
 from datetime import UTC, datetime
-from typing import ClassVar, Generic, TypeVar, override
+from typing import ClassVar, Generic, TypeVar
+from typing_extensions import override
 from uuid import uuid4
 from pydantic import BaseModel, Field
 from estuary_cdk.capture.common import (

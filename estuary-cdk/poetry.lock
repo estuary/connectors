@@ -3000,4 +3000,4 @@ airbyte-shim = ["airbyte-cdk"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "fe7e41e8e39549ab47df05ed7fac85201ab92f0e11b7d0eb82614ce72d924ec8"
+content-hash = "30c82cad7cccacf8d308f5785c21ea89883abd55ce8546fa58db8aa8e9f49445"
