@@ -5,7 +5,8 @@ import re
 from abc import abstractmethod
 from collections.abc import Sequence
 from logging import Logger
-from typing import Any, Literal, override
+from typing import Any, Literal
+from typing_extensions import override
 
 from aiohttp import web
 from aiohttp.web_urldispatcher import DynamicResource
