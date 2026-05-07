@@ -128,6 +128,13 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 		})
 	}
 
+	// Field IDs are assigned 1..N by iceberg-ctl in the order columns appear
+	// here, which is FieldSelection.AllFields() == Keys ++ Values ++ Document.
+	// Sort by collection key so writers cluster rows by key within data files.
+	for i := 1; i <= len(b.FieldSelection.Keys); i++ {
+		tc.SortFieldIDs = append(tc.SortFieldIDs, i)
+	}
+
 	input, err := json.Marshal(tc)
 	if err != nil {
 		return "", nil, err

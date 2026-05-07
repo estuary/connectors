@@ -16,6 +16,8 @@ from pyiceberg.catalog.rest import RestCatalog
 from pyiceberg.io import PY_IO_IMPL
 from pyiceberg.schema import Schema
 from pyiceberg.table import TableProperties
+from pyiceberg.table.sorting import NullOrder, SortDirection, SortField, SortOrder
+from pyiceberg.transforms import IdentityTransform
 from pyiceberg.types import (
     BinaryType,
     BooleanType,
@@ -308,6 +310,7 @@ class TableCreate(BaseModel, extra="forbid"):
     location: str
     fields: list[IcebergColumn]
     properties: dict[str, str] | None = None
+    sort_field_ids: list[int] | None = None
 
 
 @run.command()
@@ -343,7 +346,26 @@ def create_table(
             if k == TableProperties.DEFAULT_NAME_MAPPING:
                 continue
             properties[k] = v
-    catalog.create_table(table, schema, table_create.location, properties=properties)
+
+    sort_order = SortOrder()
+    if table_create.sort_field_ids:
+        sort_order = SortOrder(*[
+            SortField(
+                source_id=field_id,
+                transform=IdentityTransform(),
+                direction=SortDirection.ASC,
+                null_order=NullOrder.NULLS_FIRST,
+            )
+            for field_id in table_create.sort_field_ids
+        ])
+
+    catalog.create_table(
+        table,
+        schema,
+        table_create.location,
+        sort_order=sort_order,
+        properties=properties,
+    )
     log(f"create_table: created table {table}")
 
 
