@@ -1,0 +1,608 @@
+=== Transcript Metadata ===
+Checksum: 5d2dfd872136f9f3351a8bf306d9bf80b68d61ed32c4bf13c5f5bc2fad84f4cb
+Total Size: 980194867
+
+=== Discover: Discover Public Sample ===
+acmeCo/test_capture/ga4_obfuscated_sample_ecommerce/events
+=== Run: Capture All Events in Window ===
+[
+  "acmeCo/test_capture/ga4_obfuscated_sample_ecommerce/events",
+  {
+    "_meta": {
+      "index": 0,
+      "polled": "REDACTED",
+      "source": {
+        "dataset": "ga4_obfuscated_sample_ecommerce",
+        "stream_type": "events",
+        "table_date": "20210131"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "app_info": null,
+    "device": {
+      "advertising_id": null,
+      "category": "desktop",
+      "is_limited_ad_tracking": "No",
+      "language": null,
+      "mobile_brand_name": "Google",
+      "mobile_marketing_name": "<Other>",
+      "mobile_model_name": "Chrome",
+      "mobile_os_hardware_model": null,
+      "operating_system": "Windows",
+      "operating_system_version": "Windows 10",
+      "time_zone_offset_seconds": null,
+      "vendor_id": null,
+      "web_info": {
+        "browser": "Chrome",
+        "browser_version": "<Other>"
+      }
+    },
+    "ecommerce": {
+      "purchase_revenue": null,
+      "purchase_revenue_in_usd": null,
+      "refund_value": null,
+      "refund_value_in_usd": null,
+      "shipping_value": null,
+      "shipping_value_in_usd": null,
+      "tax_value": null,
+      "tax_value_in_usd": null,
+      "total_item_quantity": null,
+      "transaction_id": null,
+      "unique_items": null
+    },
+    "event_bundle_sequence_id": -8047272829,
+    "event_date": "20210131",
+    "event_dimensions": null,
+    "event_name": "page_view",
+    "event_params": [
+      {
+        "key": "page_title",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": null,
+          "string_value": "YouTube | Shop by Brand | Google Merchandise Store"
+        }
+      },
+      {
+        "key": "campaign",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": null,
+          "string_value": "(referral)"
+        }
+      },
+      {
+        "key": "ga_session_number",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": 1,
+          "string_value": null
+        }
+      },
+      {
+        "key": "engaged_session_event",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": 1,
+          "string_value": null
+        }
+      },
+      {
+        "key": "medium",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": null,
+          "string_value": "referral"
+        }
+      },
+      {
+        "key": "page_location",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": null,
+          "string_value": "https://shop.googlemerchandisestore.com/Google+Redesign/Shop+by+Brand/YouTube"
+        }
+      },
+      {
+        "key": "engagement_time_msec",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": 18,
+          "string_value": null
+        }
+      },
+      {
+        "key": "source",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": null,
+          "string_value": "creatoracademy.youtube.com"
+        }
+      },
+      {
+        "key": "page_referrer",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": null,
+          "string_value": null
+        }
+      },
+      {
+        "key": "ga_session_id",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": 4089532426,
+          "string_value": null
+        }
+      },
+      {
+        "key": "debug_mode",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": 1,
+          "string_value": null
+        }
+      },
+      {
+        "key": "session_engaged",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": null,
+          "string_value": "1"
+        }
+      }
+    ],
+    "event_previous_timestamp": null,
+    "event_server_timestamp_offset": null,
+    "event_timestamp": 1612051200657906,
+    "event_value_in_usd": null,
+    "geo": {
+      "city": "Ashburn",
+      "continent": "Americas",
+      "country": "United States",
+      "metro": "(not set)",
+      "region": "Virginia",
+      "sub_continent": "Northern America"
+    },
+    "items": [],
+    "platform": "WEB",
+    "privacy_info": {
+      "ads_storage": null,
+      "analytics_storage": null,
+      "uses_transient_token": "No"
+    },
+    "stream_id": 2100450278,
+    "traffic_source": {
+      "medium": "organic",
+      "name": "(organic)",
+      "source": "google"
+    },
+    "user_first_touch_timestamp": 1612051195601915,
+    "user_id": null,
+    "user_ltv": {
+      "currency": "USD",
+      "revenue": 0
+    },
+    "user_properties": [],
+    "user_pseudo_id": "35921648.4166533247"
+  }
+]
+[
+  "acmeCo/test_capture/ga4_obfuscated_sample_ecommerce/events",
+  {
+    "_meta": {
+      "index": 1,
+      "polled": "REDACTED",
+      "source": {
+        "dataset": "ga4_obfuscated_sample_ecommerce",
+        "stream_type": "events",
+        "table_date": "20210131"
+      },
+      "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+    },
+    "app_info": null,
+    "device": {
+      "advertising_id": null,
+      "category": "desktop",
+      "is_limited_ad_tracking": "No",
+      "language": null,
+      "mobile_brand_name": "Google",
+      "mobile_marketing_name": "<Other>",
+      "mobile_model_name": "Chrome",
+      "mobile_os_hardware_model": null,
+      "operating_system": "Web",
+      "operating_system_version": "10",
+      "time_zone_offset_seconds": null,
+      "vendor_id": null,
+      "web_info": {
+        "browser": "Chrome",
+        "browser_version": "87.0"
+      }
+    },
+    "ecommerce": {
+      "purchase_revenue": null,
+      "purchase_revenue_in_usd": null,
+      "refund_value": null,
+      "refund_value_in_usd": null,
+      "shipping_value": null,
+      "shipping_value_in_usd": null,
+      "tax_value": null,
+      "tax_value_in_usd": null,
+      "total_item_quantity": null,
+      "transaction_id": null,
+      "unique_items": null
+    },
+    "event_bundle_sequence_id": 4093402265,
+    "event_date": "20210131",
+    "event_dimensions": null,
+    "event_name": "user_engagement",
+    "event_params": [
+      {
+        "key": "medium",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": null,
+          "string_value": "referral"
+        }
+      },
+      {
+        "key": "session_engaged",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": null,
+          "string_value": "1"
+        }
+      },
+      {
+        "key": "ga_session_id",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": 9168618450,
+          "string_value": null
+        }
+      },
+      {
+        "key": "page_title",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": null,
+          "string_value": "Men's / Unisex | Apparel | Google Merchandise Store"
+        }
+      },
+      {
+        "key": "engaged_session_event",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": 1,
+          "string_value": null
+        }
+      },
+      {
+        "key": "page_referrer",
+        "value": {
+          "double_value": null,
+          "float_value": null,
+          "int_value": null,
+          "string_value": null
+        }
+
+=== ... 37219283 transcript lines elided ... ===
+
+        "item_list_name": "(not set)",
+        "item_name": "Google Men's Softshell Moss",
+        "item_refund": null,
+        "item_refund_in_usd": null,
+        "item_revenue": null,
+        "item_revenue_in_usd": null,
+        "item_variant": "(not set)",
+        "location_id": "(not set)",
+        "price": 99,
+        "price_in_usd": null,
+        "promotion_id": "(not set)",
+        "promotion_name": "(not set)",
+        "quantity": null
+      },
+      {
+        "affiliation": "(not set)",
+        "coupon": "(not set)",
+        "creative_name": "(not set)",
+        "creative_slot": "(not set)",
+        "item_brand": "(not set)",
+        "item_category": "Home/Apparel/Men's / Unisex/",
+        "item_category2": "(not set)",
+        "item_category3": "(not set)",
+        "item_category4": "(not set)",
+        "item_category5": "(not set)",
+        "item_id": "GGOEGXXX0913",
+        "item_list_id": "(not set)",
+        "item_list_index": "12",
+        "item_list_name": "(not set)",
+        "item_name": "Google Crewneck Sweatshirt Navy",
+        "item_refund": null,
+        "item_refund_in_usd": null,
+        "item_revenue": null,
+        "item_revenue_in_usd": null,
+        "item_variant": "(not set)",
+        "location_id": "(not set)",
+        "price": 55,
+        "price_in_usd": null,
+        "promotion_id": "(not set)",
+        "promotion_name": "(not set)",
+        "quantity": null
+      },
+      {
+        "affiliation": "(not set)",
+        "coupon": "(not set)",
+        "creative_name": "(not set)",
+        "creative_slot": "(not set)",
+        "item_brand": "(not set)",
+        "item_category": "Home/Apparel/Men's / Unisex/",
+        "item_category2": "(not set)",
+        "item_category3": "(not set)",
+        "item_category4": "(not set)",
+        "item_category5": "(not set)",
+        "item_id": "GGOEGXXX1109",
+        "item_list_id": "(not set)",
+        "item_list_index": "9",
+        "item_list_name": "(not set)",
+        "item_name": "Google Zip Hoodie F/C",
+        "item_refund": null,
+        "item_refund_in_usd": null,
+        "item_revenue": null,
+        "item_revenue_in_usd": null,
+        "item_variant": "(not set)",
+        "location_id": "(not set)",
+        "price": 60,
+        "price_in_usd": null,
+        "promotion_id": "(not set)",
+        "promotion_name": "(not set)",
+        "quantity": null
+      },
+      {
+        "affiliation": "(not set)",
+        "coupon": "(not set)",
+        "creative_name": "(not set)",
+        "creative_slot": "(not set)",
+        "item_brand": "(not set)",
+        "item_category": "Home/Apparel/Men's / Unisex/",
+        "item_category2": "(not set)",
+        "item_category3": "(not set)",
+        "item_category4": "(not set)",
+        "item_category5": "(not set)",
+        "item_id": "GGOEYXXX1207",
+        "item_list_id": "(not set)",
+        "item_list_index": "10",
+        "item_list_name": "(not set)",
+        "item_name": "YouTube Standards Zip Hoodie Black",
+        "item_refund": null,
+        "item_refund_in_usd": null,
+        "item_revenue": null,
+        "item_revenue_in_usd": null,
+        "item_variant": "(not set)",
+        "location_id": "(not set)",
+        "price": 60,
+        "price_in_usd": null,
+        "promotion_id": "(not set)",
+        "promotion_name": "(not set)",
+        "quantity": null
+      },
+      {
+        "affiliation": "(not set)",
+        "coupon": "(not set)",
+        "creative_name": "(not set)",
+        "creative_slot": "(not set)",
+        "item_brand": "(not set)",
+        "item_category": "Home/Apparel/Men's / Unisex/",
+        "item_category2": "(not set)",
+        "item_category3": "(not set)",
+        "item_category4": "(not set)",
+        "item_category5": "(not set)",
+        "item_id": "GGOEGXXX1340",
+        "item_list_id": "(not set)",
+        "item_list_index": "11",
+        "item_list_name": "(not set)",
+        "item_name": "Google Badge Heavyweight Pullover Black",
+        "item_refund": null,
+        "item_refund_in_usd": null,
+        "item_revenue": null,
+        "item_revenue_in_usd": null,
+        "item_variant": "(not set)",
+        "location_id": "(not set)",
+        "price": 58,
+        "price_in_usd": null,
+        "promotion_id": "(not set)",
+        "promotion_name": "(not set)",
+        "quantity": null
+      },
+      {
+        "affiliation": "(not set)",
+        "coupon": "(not set)",
+        "creative_name": "(not set)",
+        "creative_slot": "(not set)",
+        "item_brand": "(not set)",
+        "item_category": "Home/Apparel/Men's / Unisex/",
+        "item_category2": "(not set)",
+        "item_category3": "(not set)",
+        "item_category4": "(not set)",
+        "item_category5": "(not set)",
+        "item_id": "GGOEGXXX1352",
+        "item_list_id": "(not set)",
+        "item_list_index": "7",
+        "item_list_name": "(not set)",
+        "item_name": "Google Sherpa Zip Hoodie Charcoal",
+        "item_refund": null,
+        "item_refund_in_usd": null,
+        "item_revenue": null,
+        "item_revenue_in_usd": null,
+        "item_variant": "(not set)",
+        "location_id": "(not set)",
+        "price": 69,
+        "price_in_usd": null,
+        "promotion_id": "(not set)",
+        "promotion_name": "(not set)",
+        "quantity": null
+      },
+      {
+        "affiliation": "(not set)",
+        "coupon": "(not set)",
+        "creative_name": "(not set)",
+        "creative_slot": "(not set)",
+        "item_brand": "(not set)",
+        "item_category": "Home/Apparel/Men's / Unisex/",
+        "item_category2": "(not set)",
+        "item_category3": "(not set)",
+        "item_category4": "(not set)",
+        "item_category5": "(not set)",
+        "item_id": "GGOEGXXX1385",
+        "item_list_id": "(not set)",
+        "item_list_index": "4",
+        "item_list_name": "(not set)",
+        "item_name": "Google Men's Tech Fleece Grey",
+        "item_refund": null,
+        "item_refund_in_usd": null,
+        "item_revenue": null,
+        "item_revenue_in_usd": null,
+        "item_variant": "(not set)",
+        "location_id": "(not set)",
+        "price": 89,
+        "price_in_usd": null,
+        "promotion_id": "(not set)",
+        "promotion_name": "(not set)",
+        "quantity": null
+      },
+      {
+        "affiliation": "(not set)",
+        "coupon": "(not set)",
+        "creative_name": "(not set)",
+        "creative_slot": "(not set)",
+        "item_brand": "(not set)",
+        "item_category": "Home/Apparel/Men's / Unisex/",
+        "item_category2": "(not set)",
+        "item_category3": "(not set)",
+        "item_category4": "(not set)",
+        "item_category5": "(not set)",
+        "item_id": "GGOECXXX1630",
+        "item_list_id": "(not set)",
+        "item_list_index": "8",
+        "item_list_name": "(not set)",
+        "item_name": "Google Cloud  Unisex Zip Hoodie",
+        "item_refund": null,
+        "item_refund_in_usd": null,
+        "item_revenue": null,
+        "item_revenue_in_usd": null,
+        "item_variant": "(not set)",
+        "location_id": "(not set)",
+        "price": 69,
+        "price_in_usd": null,
+        "promotion_id": "(not set)",
+        "promotion_name": "(not set)",
+        "quantity": null
+      },
+      {
+        "affiliation": "(not set)",
+        "coupon": "(not set)",
+        "creative_name": "(not set)",
+        "creative_slot": "(not set)",
+        "item_brand": "(not set)",
+        "item_category": "Home/Apparel/Men's / Unisex/",
+        "item_category2": "(not set)",
+        "item_category3": "(not set)",
+        "item_category4": "(not set)",
+        "item_category5": "(not set)",
+        "item_id": "GGOEGXXX1347",
+        "item_list_id": "(not set)",
+        "item_list_index": "6",
+        "item_list_name": "(not set)",
+        "item_name": "Google Sherpa Zip Hoodie Navy",
+        "item_refund": null,
+        "item_refund_in_usd": null,
+        "item_revenue": null,
+        "item_revenue_in_usd": null,
+        "item_variant": "(not set)",
+        "location_id": "(not set)",
+        "price": 69,
+        "price_in_usd": null,
+        "promotion_id": "(not set)",
+        "promotion_name": "(not set)",
+        "quantity": null
+      },
+      {
+        "affiliation": "(not set)",
+        "coupon": "(not set)",
+        "creative_name": "(not set)",
+        "creative_slot": "(not set)",
+        "item_brand": "(not set)",
+        "item_category": "Men's / Unisex",
+        "item_category2": "(not set)",
+        "item_category3": "(not set)",
+        "item_category4": "(not set)",
+        "item_category5": "(not set)",
+        "item_id": "GGOEGXXX0964",
+        "item_list_id": "(not set)",
+        "item_list_index": "13",
+        "item_list_name": "Not available in demo dataset",
+        "item_name": "Google Crewneck Sweatshirt Grey",
+        "item_refund": null,
+        "item_refund_in_usd": null,
+        "item_revenue": null,
+        "item_revenue_in_usd": null,
+        "item_variant": "(not set)",
+        "location_id": "(not set)",
+        "price": 55,
+        "price_in_usd": null,
+        "promotion_id": "(not set)",
+        "promotion_name": "(not set)",
+        "quantity": null
+      }
+    ],
+    "platform": "WEB",
+    "privacy_info": {
+      "ads_storage": null,
+      "analytics_storage": null,
+      "uses_transient_token": "No"
+    },
+    "stream_id": 2100450278,
+    "traffic_source": {
+      "medium": "referral",
+      "name": "(referral)",
+      "source": "shop.googlemerchandisestore.com"
+    },
+    "user_first_touch_timestamp": 1603566165034604,
+    "user_id": null,
+    "user_ltv": {
+      "currency": "USD",
+      "revenue": 0
+    },
+    "user_properties": [],
+    "user_pseudo_id": "13559331.3204827580"
+  }
+]
+--- Final Checkpoint ---
+{
+  "bindingStateV1": {
+    "ga4_obfuscated_sample_ecommerce%2Fevents": {
+      "final_through": "20210128",
+      "last_poll_started": "REDACTED",
+      "pending": [],
+      "primary_through": "20210131"
+    }
+  }
+}
+

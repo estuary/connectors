@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"sort"
 	"strings"
@@ -291,6 +292,14 @@ func (c *capture) Run(ctx context.Context) error {
 			continue
 		}
 
+		// Tests set SHUTDOWN_AFTER_POLLING=yes to exit cleanly once there's no
+		// immediate work pending, instead of sleeping until the next scheduled
+		// poll.
+		if os.Getenv("SHUTDOWN_AFTER_POLLING") == "yes" {
+			log.Info("shutting down due to SHUTDOWN_AFTER_POLLING=yes")
+			return nil
+		}
+
 		if err := c.sleepUntilNextDue(ctx); err != nil {
 			return err
 		}
@@ -404,7 +413,7 @@ func (c *capture) runPollCycle(ctx context.Context, binding *bindingInfo) error 
 		"pendingTotal":   len(state.Pending),
 		"primaryThrough": state.PrimaryThrough,
 		"finalThrough":   state.FinalThrough,
-	}).Info("polling cycle complete")
+	}).Info("evaluated available tables")
 
 	return c.checkpoint()
 }
@@ -570,13 +579,6 @@ func (c *capture) queryTable(ctx context.Context, binding *bindingInfo, stream *
 	var query = buildTableQuery(c.Config.ProjectID, binding.resource.Dataset, stream, current.Suffix, current.Cursor)
 	var params = buildQueryParams(stream, current.Cursor)
 
-	log.WithFields(log.Fields{
-		"dataset":     binding.resource.Dataset,
-		"streamType":  binding.resource.StreamType,
-		"tableSuffix": current.Suffix,
-		"cursor":      fmt.Sprintf("%v", current.Cursor),
-	}).Info("querying table")
-
 	queryCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -589,6 +591,13 @@ func (c *capture) queryTable(ctx context.Context, binding *bindingInfo, stream *
 		cancel()
 	})
 	defer watchdog.Stop()
+
+	log.WithFields(log.Fields{
+		"dataset":     binding.resource.Dataset,
+		"streamType":  binding.resource.StreamType,
+		"tableSuffix": current.Suffix,
+		"cursor":      fmt.Sprintf("%v", current.Cursor),
+	}).Info("querying daily table")
 
 	var q = c.DB.Query(query)
 	q.Parameters = params
