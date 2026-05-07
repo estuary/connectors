@@ -53,7 +53,7 @@ func (c config) CommonConfig() filesink.CommonConfig {
 	}
 }
 
-var driver = filesink.FileDriver[*filesink.S3MultipartUpload]{
+var driver = filesink.FileDriver[*filesink.S3MultipartUpload, filesink.S3Resource]{
 	NewConfig: func(raw json.RawMessage) (filesink.Config, error) {
 		var cfg config
 		if err := pf.UnmarshalStrict(raw, &cfg); err != nil {

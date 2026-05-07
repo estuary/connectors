@@ -73,6 +73,10 @@ func (c *CredentialsConfig) Validate() error {
 	return fmt.Errorf("unknown 'auth_type'")
 }
 
+type S3Resource struct {
+	Path string `json:"path" jsonschema:"title=Path,description=The path that objects will be materialized to. May contain date patterns." jsonschema_extras:"x-collection-name=true"`
+}
+
 type S3StoreConfig struct {
 	Bucket             string `json:"bucket" jsonschema:"title=Bucket,description=Bucket to store materialized objects." jsonschema_extras:"order=0"`
 	AWSAccessKeyID     string `json:"awsAccessKeyId,omitempty" jsonschema:"-"`
