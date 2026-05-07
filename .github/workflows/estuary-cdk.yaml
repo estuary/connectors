@@ -43,4 +43,5 @@ jobs:
           cd estuary-cdk
           poetry install
           source $(poetry env info --path)/bin/activate
+          python -m compileall -q estuary_cdk
           pytest
