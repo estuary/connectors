@@ -2,6 +2,7 @@ package writer
 
 import (
 	"bytes"
+	"io"
 	"os"
 	"testing"
 
@@ -109,4 +110,56 @@ func TestParquetEOFReadingByteArrayRegression(t *testing.T) {
 	defLvls := make([]int16, numRows)
 	_, _, err = cr.(*file.ByteArrayColumnChunkReader).ReadBatch(int64(numRows), vals, defLvls, nil)
 	require.NoError(t, err)
+}
+
+// BenchmarkParquetWriter exercises the full Write→Close pipeline with workloads sized to fire
+// flushScratchFile (and therefore transferColumnValues) at least once per op. Used to compare
+// before/after when refactoring transferColumnValues; run with -count=8 and feed both runs to
+// benchstat.
+func BenchmarkParquetWriter(b *testing.B) {
+	sch := makeTestParquetSchema(true)
+
+	// makeTestRow adds `seed` years to a date starting at 2006, so the seed must stay below
+	// ~7993 to keep the formatted year in the 4-digit range that time.DateOnly can re-parse.
+	// Pool size of 5000 gives plenty of variety while staying well under that ceiling.
+	const distinctRows = 5000
+	pool := make([][]any, distinctRows)
+	for i := range pool {
+		pool[i] = makeTestRow(b, i)
+	}
+
+	cases := []struct {
+		name        string
+		rows        int
+		rowGroupRow int
+		compression ParquetCompression
+	}{
+		{"small/uncompressed", 200_000, 50_000, Uncompressed},
+		{"small/snappy", 200_000, 50_000, Snappy},
+		{"large/uncompressed", 1_000_000, 0, Uncompressed},
+		{"large/snappy", 1_000_000, 0, Snappy},
+	}
+
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			rows := make([][]any, tc.rows)
+			for i := range rows {
+				rows[i] = pool[i%distinctRows]
+			}
+
+			opts := []ParquetOption{WithParquetCompression(tc.compression)}
+			if tc.rowGroupRow > 0 {
+				opts = append(opts, WithParquetRowGroupRowLimit(tc.rowGroupRow))
+			}
+
+			b.ReportAllocs()
+			for b.Loop() {
+				w := NewParquetWriter(&nopWriteCloser{w: io.Discard}, sch, opts...)
+				for _, row := range rows {
+					require.NoError(b, w.Write(row))
+				}
+				require.NoError(b, w.Close())
+			}
+		})
+	}
 }
