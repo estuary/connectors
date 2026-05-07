@@ -8,11 +8,13 @@ on:
     branches: [main]
     paths:
       - "estuary-cdk/**"
+      - ".github/workflows/estuary-cdk.yaml"
 
   pull_request:
     branches: [main]
     paths:
       - "estuary-cdk/**"
+      - ".github/workflows/estuary-cdk.yaml"
 
 concurrency:
   group: estuary-cdk-${{ github.ref }}
