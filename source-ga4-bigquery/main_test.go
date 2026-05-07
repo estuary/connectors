@@ -19,10 +19,18 @@ import (
 )
 
 var (
-	testCredentialsPath  = flag.String("creds_path", "~/.config/gcloud/application_default_credentials.json", "Path to BigQuery credentials JSON used by integration tests")
-	testProjectID        = flag.String("project_id", "bigquery-public-data", "BigQuery project ID owning the dataset under test")
-	testDataset          = flag.String("test_dataset", "ga4_obfuscated_sample_ecommerce", "BigQuery dataset for integration tests")
-	testBillingProjectID = flag.String("billing_project_id", "", "BigQuery project for billing and job execution. Required when project_id points at a dataset the credentials cannot create jobs in (e.g. bigquery-public-data).")
+	testCredentialsPath = flag.String("creds_path", "~/.config/gcloud/application_default_credentials.json", "Path to BigQuery credentials JSON used by integration tests")
+	testProjectID       = flag.String("project_id", "estuary-theatre", "Operator's GCP project. For public-sample tests this is the billing project. For future stimulus-response tests it would also be the project hosting the test dataset.")
+)
+
+// Identifiers of the GA4 obfuscated public sample dataset, which is the
+// fixed read-only target of integration tests in this package. Other
+// connectors with a stimulus-response test pattern would take operator-
+// supplied dataset identifiers via flags, but here the dataset is part of
+// the test itself.
+const (
+	publicSampleProjectID = "bigquery-public-data"
+	publicSampleDataset   = "ga4_obfuscated_sample_ecommerce"
 )
 
 // TestSpec verifies the connector's response to the Spec RPC against a snapshot.
@@ -383,8 +391,8 @@ func testDiscoveryConfig(t testing.TB) *Config {
 	require.NoError(t, err)
 
 	return &Config{
-		ProjectID: *testProjectID,
-		Dataset:   *testDataset,
+		ProjectID: publicSampleProjectID,
+		Dataset:   publicSampleDataset,
 		Credentials: &bqclient.Credentials{
 			AuthType: bqclient.CredentialsJSON,
 			CredentialsJSONConfig: bqclient.CredentialsJSONConfig{
@@ -392,7 +400,7 @@ func testDiscoveryConfig(t testing.TB) *Config {
 			},
 		},
 		Advanced: advancedConfig{
-			BillingProjectID: *testBillingProjectID,
+			BillingProjectID: *testProjectID,
 		},
 	}
 }
@@ -411,11 +419,11 @@ func TestDiscoverPublicSample(t *testing.T) {
 	}
 	bindings := cs.Discover(context.Background(), t)
 	require.Len(t, bindings, 1, "expected exactly one binding (events) for the public sample dataset")
-	require.Equal(t, *testDataset+"/events", bindings[0].RecommendedName)
+	require.Equal(t, publicSampleDataset+"/events", bindings[0].RecommendedName)
 
 	var res Resource
 	require.NoError(t, json.Unmarshal(bindings[0].ResourceConfigJson, &res))
-	require.Equal(t, *testDataset, res.Dataset)
+	require.Equal(t, publicSampleDataset, res.Dataset)
 	require.Equal(t, StreamEvents, res.StreamType)
 	require.Equal(t, []string{"/event_timestamp", "/event_name", "/user_pseudo_id", "/event_bundle_sequence_id"}, bindings[0].Key)
 

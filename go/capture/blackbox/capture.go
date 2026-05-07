@@ -371,7 +371,16 @@ func (c *Capture) RunWithContext(ctx context.Context, sessions int) ([]byte, err
 			}
 			if len(state.Updated) > 0 {
 				if state.MergePatch {
-					c.Checkpoint, err = jsonpatch.MergePatch(c.Checkpoint, state.Updated)
+					// jsonpatch.MargePatch does not allow "null" as the target value (though
+					// oddly it does allow it as the update), so we have to switch out nulls
+					// for the empty document {} in a subsequent merge. This comes up when
+					// processing non-merge updates, which the Flow runtime translates into
+					// a sequence of null followed by the full document.
+					var target = c.Checkpoint
+					if len(target) == 0 || bytes.Equal(target, []byte("null")) {
+						target = []byte(`{}`)
+					}
+					c.Checkpoint, err = jsonpatch.MergePatch(target, state.Updated)
 					if err != nil {
 						return nil, fmt.Errorf("applying state merge patch: %w", err)
 					}
