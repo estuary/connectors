@@ -1,0 +1,26 @@
+services:
+  storage:
+    image: rustfs/rustfs:latest
+    pull_policy: missing
+    ports:
+      - "4566:4566"
+    environment:
+      RUSTFS_ADDRESS: 0.0.0.0:4566
+      RUSTFS_ACCESS_KEY: test_key
+      RUSTFS_SECRET_KEY: test_secret
+    networks:
+      flow-test:
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://127.0.0.1:4566/health"
+        ]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+networks:
+  flow-test:
+    external: true
