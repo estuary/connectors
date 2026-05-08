@@ -45,7 +45,7 @@ const (
 // document.
 type documentMetadata struct {
 	Polled time.Time              `json:"polled" jsonschema:"title=Polled Timestamp,description=The time at which the readout that produced this document began."`
-	Index  int                    `json:"index" jsonschema:"title=Result Index,description=The index of this document within the table query that produced it."`
+	Index  int                    `json:"index" jsonschema:"title=Result Index,description=The index of this document within the readout that produced it."`
 	Source documentSourceMetadata `json:"source"`
 }
 
