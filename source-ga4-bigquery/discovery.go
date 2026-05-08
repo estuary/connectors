@@ -148,7 +148,7 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 	if cfg.Dataset != "" {
 		datasets = []string{cfg.Dataset}
 	} else {
-		datasets, err = listDatasets(ctx, bq)
+		datasets, err = listDatasets(ctx, bq, cfg.ProjectID)
 		if err != nil {
 			return nil, fmt.Errorf("listing datasets: %w", err)
 		}
@@ -187,10 +187,13 @@ func (d *Driver) Discover(ctx context.Context, req *pc.Request_Discover) (*pc.Re
 	return &pc.Response_Discovered{Bindings: bindings}, nil
 }
 
-// listDatasets enumerates dataset IDs in the configured project.
-func listDatasets(ctx context.Context, bq *bigquery.Client) ([]string, error) {
-	var out []string
+// listDatasets enumerates dataset IDs in the configured source project.
+func listDatasets(ctx context.Context, bq *bigquery.Client, projectID string) ([]string, error) {
+	// This is, apparently, the recommended way to list datasets in a specific project.
 	var iter = bq.Datasets(ctx)
+	iter.ProjectID = projectID
+
+	var out []string
 	for {
 		ds, err := iter.Next()
 		if err == iterator.Done {
@@ -236,9 +239,8 @@ func findStreams(ctx context.Context, bq *bigquery.Client, projectID, dataset st
 		}
 		var tableName, _ = row[0].(string)
 		for _, s := range streams {
-			if strings.HasPrefix(tableName, s.TablePrefix) {
+			if suffix, ok := strings.CutPrefix(tableName, s.TablePrefix); ok {
 				// Sanity check: only count if the suffix looks like a date
-				var suffix = strings.TrimPrefix(tableName, s.TablePrefix)
 				if isDateSuffix(suffix) {
 					present[s.Type] = true
 				}
