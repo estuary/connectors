@@ -425,7 +425,7 @@ func TestDiscoverPublicSample(t *testing.T) {
 	require.NoError(t, json.Unmarshal(bindings[0].ResourceConfigJson, &res))
 	require.Equal(t, publicSampleDataset, res.Dataset)
 	require.Equal(t, StreamEvents, res.StreamType)
-	require.Equal(t, []string{"/event_timestamp", "/event_name", "/user_pseudo_id", "/event_bundle_sequence_id"}, bindings[0].Key)
+	require.Equal(t, []string{"/event_timestamp", "/event_name", "/user_pseudo_id", "/event_bundle_sequence_id", "/batch_event_index"}, bindings[0].Key)
 
 	// Verify the schema includes _meta and the key columns.
 	var schema map[string]any
@@ -435,6 +435,7 @@ func TestDiscoverPublicSample(t *testing.T) {
 	require.Contains(t, props, "_meta")
 	require.Contains(t, props, "event_timestamp")
 	require.Contains(t, props, "event_name")
+	require.Contains(t, props, "batch_event_index")
 }
 
 // testBigQueryClient is a helper for tests that need a raw BigQuery client.
