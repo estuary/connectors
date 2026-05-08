@@ -446,23 +446,22 @@ func evaluatePollCycle(state *streamState, suffixes []string, windowDays int, ca
 		if minDate != "" && T < minDate {
 			continue
 		}
-		if T <= state.FinalThrough {
-			continue
-		}
-		if pendingSet[T] {
-			continue
-		}
 
 		var shouldEnqueue bool
 		switch {
+		case T <= state.FinalThrough:
+			shouldEnqueue = false
 		case T <= windowOldest:
 			shouldEnqueue = true
-		case T > state.PrimaryThrough:
-			shouldEnqueue = true
-		default:
+		case T <= state.PrimaryThrough:
 			shouldEnqueue = captureIntermediate
+		default:
+			shouldEnqueue = true
 		}
 		if !shouldEnqueue {
+			continue
+		}
+		if pendingSet[T] {
 			continue
 		}
 
