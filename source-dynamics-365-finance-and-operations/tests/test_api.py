@@ -1,10 +1,11 @@
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Callable
 
 import pytest
 
+from source_dynamics_365_finance_and_operations.adls_gen2_client import ADLSPathMetadata
 from source_dynamics_365_finance_and_operations.api import (
-    order_key,
-    defer_deletes,
+    TransformedRow,
+    stream_folder_rows,
     transform_row,
 )
 
@@ -132,36 +133,47 @@ class TestTransformRow:
         assert "_meta" in row
 
 
-class TestOrderKey:
-    def test_versionnumber_drives_comparison(self):
-        a = make_row("X", "10")
-        b = make_row("X", "20")
-        assert order_key(a) < order_key(b)
-
-    def test_sink_modified_on_breaks_ties(self):
-        a = make_row("X", "10", sink_modified_on="4/29/2026 9:01:26 PM")
-        b = make_row("X", "10", sink_modified_on="4/29/2026 9:01:27 PM")
-        assert order_key(a) < order_key(b)
-
-    @pytest.mark.parametrize("missing_field", ["versionnumber", "SinkModifiedOn"])
-    def test_missing_required_field_raises(self, missing_field: str):
-        row = make_row("X", "10")
-        row[missing_field] = None
-        with pytest.raises(ValueError, match="missing required ordering fields"):
-            order_key(row)
+def fake_csv(name: str) -> ADLSPathMetadata:
+    """Build an ADLSPathMetadata."""
+    return ADLSPathMetadata(
+        name=name,
+        lastModified="Wed, 24 Sep 2025 14:24:24 GMT",
+        etag="x",
+        isDirectory=None,
+        contentLength=None,
+        group=None,
+        owner=None,
+        permissions=None,
+        creationTime=None,
+    )
 
 
-class TestDeferDeletes:
-    """Tests for the per-folder delete-deferral state machine."""
+def make_factory(
+    rows_by_csv: dict[str, list[TransformedRow]],
+) -> Callable[[ADLSPathMetadata], AsyncGenerator[TransformedRow, None]]:
+    def open_csv(csv: ADLSPathMetadata) -> AsyncGenerator[TransformedRow, None]:
+        async def gen() -> AsyncGenerator[TransformedRow, None]:
+            for row in rows_by_csv[csv.name]:
+                yield row
+        return gen()
+    return open_csv
+
+
+class TestStreamFolderRows:
+    """Tests for the per-folder, file-op-aware streaming state machine."""
 
     @pytest.mark.asyncio
     async def test_in_order_passthrough(self):
-        rows = [
-            make_row("A", "10"),
-            make_row("B", "20"),
-            make_row("A", "30"),
-        ]
-        result = await collect(defer_deletes(as_async_gen(rows)))
+        """All-upsert single file: rows yield in order."""
+        csvs = [fake_csv("upserts.csv")]
+        factory = make_factory({
+            "upserts.csv": [
+                make_row("A", "10"),
+                make_row("B", "20"),
+                make_row("A", "30"),
+            ],
+        })
+        result = await collect(stream_folder_rows(csvs, factory))
         assert [(r["Id"], r["versionnumber"]) for r in result] == [
             ("A", "10"),
             ("B", "20"),
@@ -169,14 +181,14 @@ class TestDeferDeletes:
         ]
 
     @pytest.mark.asyncio
-    async def test_delete_emitted_at_end(self):
-        """A delete is buffered and only emitted after all upserts."""
-        rows = [
-            make_row("A", "10"),
-            make_row("A", "20", is_delete=True),
-            make_row("B", "30"),
-        ]
-        result = await collect(defer_deletes(as_async_gen(rows)))
+    async def test_delete_files_emitted_after_upsert_files(self):
+        """All upsert files are read before any delete file."""
+        csvs = [fake_csv("upserts.csv"), fake_csv("deletes.csv")]
+        factory = make_factory({
+            "upserts.csv": [make_row("A", "10"), make_row("B", "30")],
+            "deletes.csv": [make_row("A", "20", is_delete=True)],
+        })
+        result = await collect(stream_folder_rows(csvs, factory))
         assert [(r["Id"], r["versionnumber"], r["IsDelete"]) for r in result] == [
             ("A", "10", False),
             ("B", "30", False),
@@ -184,100 +196,54 @@ class TestDeferDeletes:
         ]
 
     @pytest.mark.asyncio
-    async def test_delete_then_recreate_coalesces_delete(self):
-        rows = [
-            make_row("A", "10", is_delete=True),
-            make_row("A", "20"),
-        ]
-        result = await collect(defer_deletes(as_async_gen(rows)))
+    async def test_mtime_ordering_does_not_invert_passes(self):
+        """A delete file with earlier mtime than an upsert file is still
+        deferred until after all upsert files."""
+        csvs = [fake_csv("deletes.csv"), fake_csv("upserts.csv")]
+        factory = make_factory({
+            "deletes.csv": [make_row("A", "10", is_delete=True)],
+            "upserts.csv": [make_row("A", "20")],
+        })
+        result = await collect(stream_folder_rows(csvs, factory))
         assert [(r["Id"], r["versionnumber"], r["IsDelete"]) for r in result] == [
             ("A", "20", False),
+            ("A", "10", True),
         ]
 
     @pytest.mark.asyncio
-    async def test_recreate_then_stale_delete_arrives_first(self):
-        rows = [
-            make_row("A", "20"),
-            make_row("A", "10", is_delete=True),
-        ]
-        result = await collect(defer_deletes(as_async_gen(rows)))
-        assert [(r["Id"], r["versionnumber"], r["IsDelete"]) for r in result] == [
-            ("A", "20", False),
-        ]
+    async def test_homogeneity_violation_in_upsert_file(self):
+        """An upsert file with a delete row mid-stream raises RuntimeError."""
+        csvs = [fake_csv("mixed.csv")]
+        factory = make_factory({
+            "mixed.csv": [
+                make_row("A", "10"),
+                make_row("B", "20", is_delete=True),
+            ],
+        })
+        with pytest.raises(RuntimeError, match="mixed.csv"):
+            await collect(stream_folder_rows(csvs, factory))
 
     @pytest.mark.asyncio
-    async def test_insert_delete_recreate_same_id(self):
-        """insert@10, delete@20, recreate@30 — recreate wins, delete dropped."""
-        rows = [
-            make_row("A", "10"),
-            make_row("A", "20", is_delete=True),
-            make_row("A", "30"),
-        ]
-        result = await collect(defer_deletes(as_async_gen(rows)))
-        assert [(r["Id"], r["versionnumber"], r["IsDelete"]) for r in result] == [
-            ("A", "10", False),
-            ("A", "30", False),
-        ]
+    async def test_homogeneity_violation_in_delete_file(self):
+        """A delete file with a non-delete row mid-stream raises RuntimeError."""
+        csvs = [fake_csv("mixed.csv")]
+        factory = make_factory({
+            "mixed.csv": [
+                make_row("A", "10", is_delete=True),
+                make_row("B", "20"),
+            ],
+        })
+        with pytest.raises(RuntimeError, match="mixed.csv"):
+            await collect(stream_folder_rows(csvs, factory))
 
     @pytest.mark.asyncio
-    async def test_multiple_deletes_keep_highest(self):
-        """When multiple deletes for one Id arrive, only the highest survives."""
-        rows = [
-            make_row("A", "10", is_delete=True),
-            make_row("A", "30", is_delete=True),
-            make_row("A", "20", is_delete=True),
-        ]
-        result = await collect(defer_deletes(as_async_gen(rows)))
-        assert [(r["Id"], r["versionnumber"], r["IsDelete"]) for r in result] == [
-            ("A", "30", True),
-        ]
-
-    @pytest.mark.asyncio
-    async def test_state_resets_between_folders(self):
-        """A new call has fresh state; deletes are not silently suppressed."""
-        # First call: emit insert@10
-        first = await collect(defer_deletes(
-            as_async_gen([make_row("A", "10")]),
-        ))
-        assert len(first) == 1
-
-        # Second call (next folder): delete@20 should emit since state is
-        # not carried across calls.
-        second = await collect(defer_deletes(
-            as_async_gen([make_row("A", "20", is_delete=True)]),
-        ))
-        assert [(r["Id"], r["IsDelete"]) for r in second] == [("A", True)]
-
-    @pytest.mark.asyncio
-    async def test_equal_versionnumber_tiebreaker(self):
-        """Equal versionnumber falls back to SinkModifiedOn."""
-        rows = [
-            make_row("A", "10", sink_modified_on="4/29/2026 9:01:26 PM"),
-            make_row(
-                "A", "10",
-                is_delete=True,
-                sink_modified_on="4/29/2026 9:01:27 PM",
-            ),
-        ]
-        result = await collect(defer_deletes(as_async_gen(rows)))
-        # Delete has higher SinkModifiedOn, so it wins.
-        assert [(r["Id"], r["IsDelete"]) for r in result] == [
-            ("A", False),
-            ("A", True),
-        ]
-
-    @pytest.mark.asyncio
-    async def test_stale_upsert_dropped(self):
-        """
-        An upsert with a lower versionnumber than one already
-        emitted for the same Id should be dropped.
-        """
-        rows = [
-            make_row("A", "30"),
-            make_row("A", "10"),
-        ]
-        result = await collect(defer_deletes(as_async_gen(rows)))
-        assert [(r["Id"], r["versionnumber"]) for r in result] == [
-            ("A", "30"),
-        ]
+    async def test_empty_csv_skipped(self):
+        """An empty CSV is skipped without affecting subsequent CSVs."""
+        csvs = [fake_csv("empty.csv"), fake_csv("upserts.csv")]
+        factory = make_factory({
+            "empty.csv": [],
+            "upserts.csv": [make_row("A", "10")],
+        })
+        result = await collect(stream_folder_rows(csvs, factory))
+        assert [(r["Id"], r["versionnumber"]) for r in result] == [("A", "10")]
 
