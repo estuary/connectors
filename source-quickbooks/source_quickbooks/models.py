@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING, ClassVar
 
 from estuary_cdk.capture.common import (
     BaseDocument,
-    ResourceConfig,
     ResourceState,
 )
 from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
 from estuary_cdk.flow import (
+    OAuth2ClientCredentialsPlacement,
     OAuth2Spec,
     RotatingOAuth2Credentials,
 )
@@ -55,11 +55,11 @@ OAUTH2_SPEC = OAuth2Spec(
 
 if TYPE_CHECKING:
     OAuth2Credentials = RotatingOAuth2Credentials.with_client_credentials_placement(
-        "headers"
+        OAuth2ClientCredentialsPlacement.HEADERS
     )
 else:
     OAuth2Credentials = RotatingOAuth2Credentials.with_client_credentials_placement(
-        "headers"
+        OAuth2ClientCredentialsPlacement.HEADERS
     ).for_provider(OAUTH2_SPEC.provider)
 
 
@@ -86,6 +86,12 @@ class EndpointConfig(BaseModel):
         default_factory=default_start_date,
         ge=EPOCH,
         json_schema_extra={"order": 2},
+    )
+    is_sandbox: bool = Field(
+        description="Enable to capture from a QuickBooks sandbox company instead of production.",
+        title="Use Sandbox Environment",
+        default=False,
+        json_schema_extra={"order": 3},
     )
 
 
