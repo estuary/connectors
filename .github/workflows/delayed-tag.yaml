@@ -1,0 +1,402 @@
+name: Delayed tag
+
+# Publish a ':delayed' image tag for each connector, pointing at the most
+# recent pull-request affecting that connector that was merged into `main` at
+# least 2 weeks ago AND whose merge has not since been reverted on `main`.
+#
+# The boundary is per-connector: an idle connector keeps a stable ':delayed'
+# tag even when other connectors are seeing churn. The unit is the PR (not the
+# commit): the repo uses rebase-and-merge, so a single PR's commits land on
+# main as a linear sequence of N commits, and mid-PR states may not build or
+# behave correctly. We always pin ':delayed' to a PR's tip commit on main
+# (`mergeCommit.oid`), which is what CI built and pushed to GHCR.
+#
+# After picking a candidate PR per connector we also ask Claude Sonnet to
+# check whether any *later* PR touching the same directory is a roll-forward
+# fix of the candidate — i.e. a hotfix patching a regression the candidate
+# introduced. Currently advisory: the verdict is logged but does not yet drop
+# flagged connectors from the plan.
+
+on:
+  schedule:
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+  # While this workflow is in dry-run mode, also trigger on pull-requests that
+  # touch the workflow itself so we can iterate on it without merging to main.
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/delayed-tag.yaml'
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: read
+
+jobs:
+  publish_delayed:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history is required so we can walk first-parent commits per
+          # connector directory and check for revert references on `main`.
+          fetch-depth: 0
+
+      - name: Login to GitHub package docker registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Plan per-connector delayed PR boundaries
+        id: plan
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          CUTOFF_EPOCH=$(date -u -d '14 days ago' +%s)
+          CUTOFF_ISO=$(date -u -d "@${CUTOFF_EPOCH}" '+%Y-%m-%dT%H:%M:%SZ')
+          echo "Cutoff: ${CUTOFF_ISO}"
+          HEAD_REF=$(git rev-parse HEAD)
+          OWNER=${GITHUB_REPOSITORY%%/*}
+          REPO=${GITHUB_REPOSITORY##*/}
+
+          # The set of connector images comes from the matrices in ci.yaml and
+          # python.yaml. Each image is published from the connector's source
+          # directory (image name == directory). Variants declared in
+          # <connector>/VARIANTS are additional image names built from the
+          # parent connector's directory, so they inherit its boundary.
+          #
+          # Output schema (tab-separated): <image_name>\t<source_dir>
+          {
+            yq '.jobs.build_connectors.strategy.matrix.connector[]' .github/workflows/ci.yaml
+            yq '.jobs.build_connectors.strategy.matrix.include[].connector' .github/workflows/ci.yaml
+            yq '.jobs.py_connector.strategy.matrix.connector[].name' .github/workflows/python.yaml
+          } | awk 'NF && !seen[$0]++' > /tmp/connectors.txt
+
+          : > /tmp/images.tsv
+          while IFS= read -r CONNECTOR; do
+            [ -z "${CONNECTOR}" ] && continue
+            printf '%s\t%s\n' "${CONNECTOR}" "${CONNECTOR}" >> /tmp/images.tsv
+            if [ -f "${CONNECTOR}/VARIANTS" ]; then
+              # VARIANTS is whitespace-separated.
+              for VARIANT in $(cat "${CONNECTOR}/VARIANTS"); do
+                printf '%s\t%s\n' "${VARIANT}" "${CONNECTOR}" >> /tmp/images.tsv
+              done
+            fi
+          done < /tmp/connectors.txt
+          awk -F'\t' '!seen[$1]++' /tmp/images.tsv > /tmp/images.dedup.tsv
+          mv /tmp/images.dedup.tsv /tmp/images.tsv
+          echo "Considering $(wc -l < /tmp/images.tsv) connector image(s)"
+
+          # Fetch merged PRs newest-first via GraphQL. PR is our unit of work:
+          # with rebase-and-merge, a PR's commits land on main as a linear
+          # sequence, and pinning ':delayed' to a non-tip commit could ship
+          # a mid-PR state that doesn't build or behave correctly. We always
+          # use the PR's mergeCommit.oid (the tip of the rebased sequence,
+          # which CI built and pushed to GHCR).
+          #
+          # GraphQL only supports orderBy: UPDATED_AT (not MERGED_AT), so we
+          # paginate by updatedAt then re-sort by mergedAt locally. We stop
+          # paginating once we've gone 60 days back by updatedAt, or hit 10
+          # pages (1000 PRs) — plenty to find a CHOSEN for any active
+          # connector and all LATER PRs that landed since.
+          : > /tmp/prs.jsonl
+          CURSOR=""
+          STOP_UPDATED_EPOCH=$(date -u -d '60 days ago' +%s)
+          for page in $(seq 1 10); do
+            if [ -z "${CURSOR}" ]; then
+              AFTER_ARG=""
+            else
+              AFTER_ARG=", after: \"${CURSOR}\""
+            fi
+            RESP=$(gh api graphql -f query="
+              query {
+                repository(owner: \"${OWNER}\", name: \"${REPO}\") {
+                  pullRequests(states: MERGED, baseRefName: \"main\", orderBy: {field: UPDATED_AT, direction: DESC}, first: 100${AFTER_ARG}) {
+                    pageInfo { hasNextPage endCursor }
+                    nodes {
+                      number
+                      title
+                      mergedAt
+                      updatedAt
+                      mergeCommit { oid }
+                      files(first: 100) { totalCount nodes { path } }
+                    }
+                  }
+                }
+              }
+            ")
+            echo "$RESP" | jq -c '.data.repository.pullRequests.nodes[]' >> /tmp/prs.jsonl
+            HAS_NEXT=$(echo "$RESP" | jq -r '.data.repository.pullRequests.pageInfo.hasNextPage')
+            CURSOR=$(echo  "$RESP" | jq -r '.data.repository.pullRequests.pageInfo.endCursor')
+            OLDEST_UPDATED=$(echo "$RESP" | jq -r '.data.repository.pullRequests.nodes | last | .updatedAt | fromdateiso8601')
+            echo "  page ${page}: $(wc -l < /tmp/prs.jsonl) PRs total, oldest updatedAt @$(date -u -d @${OLDEST_UPDATED} '+%Y-%m-%dT%H:%M:%SZ')"
+            [ "$HAS_NEXT" = "true" ] || break
+            [ "${OLDEST_UPDATED}" -lt "${STOP_UPDATED_EPOCH}" ] && break
+          done
+
+          # Reshape to TSV. GraphQL caps `files(first:)` at 100 per PR, so we
+          # also pull totalCount and, for any PR that exceeds 100 files, fetch
+          # the full file list via the REST endpoint (which paginates without
+          # that cap) so we never silently undercount a connector's touch.
+          #
+          # Final schema sorted by mergedAt desc:
+          #   <pr_num>\t<merged_epoch>\t<tip_sha>\t<paths_pipe_joined>
+          jq -r '[.number, (.mergedAt | fromdateiso8601), .mergeCommit.oid, .files.totalCount, (.files.nodes | map(.path) | join("|"))] | @tsv' \
+            /tmp/prs.jsonl > /tmp/prs.raw.tsv
+          : > /tmp/prs.tsv
+          while IFS=$'\t' read -r PR_NUM PR_TS PR_SHA FILE_COUNT PATHS; do
+            if [ "${FILE_COUNT}" -gt 100 ]; then
+              echo "  PR #${PR_NUM} has ${FILE_COUNT} files; fetching full list via REST"
+              PATHS=$(gh api --paginate "/repos/${OWNER}/${REPO}/pulls/${PR_NUM}/files" \
+                        --jq '.[].filename' | paste -sd '|' -)
+            fi
+            printf '%s\t%s\t%s\t%s\n' "${PR_NUM}" "${PR_TS}" "${PR_SHA}" "${PATHS}"
+          done < /tmp/prs.raw.tsv | sort -t $'\t' -k2,2nr > /tmp/prs.tsv
+          echo "Considering $(wc -l < /tmp/prs.tsv) merged PR(s) in window"
+
+          # For each connector:
+          #   CHOSEN = newest PR with mergedAt <= cutoff that touched DIR/ and isn't reverted
+          #   LATER  = PRs with mergedAt > CHOSEN.mergedAt that touched DIR/
+          #
+          # Revert detection: `git revert` (and GitHub's UI revert, which is
+          # built on git revert) writes "This reverts commit <full-sha>." into
+          # the revert commit message. We grep for that against commits on
+          # main between the candidate PR's tip and HEAD.
+          : > /tmp/plan.tsv      # <image>\t<chosen_short_sha>\t<chosen_pr_num>
+          : > /tmp/later.tsv     # <image>\t<later_pr_num>           (one row per LATER PR per image)
+          while IFS=$'\t' read -r IMAGE DIR; do
+            [ -z "${IMAGE}" ] && continue
+            if [ ! -d "${DIR}" ]; then
+              echo "skip ${IMAGE}: directory ${DIR}/ not found at HEAD"
+              continue
+            fi
+
+            CHOSEN_SHA=""
+            CHOSEN_PR=""
+            LATER_FOR_IMAGE=()
+
+            while IFS=$'\t' read -r PR_NUM PR_TS PR_SHA PR_PATHS; do
+              # Did this PR touch any file under DIR/? Anchored substring match.
+              case "|${PR_PATHS}|" in
+                *"|${DIR}/"*) ;;
+                "${DIR}/"*)   ;;
+                *) continue ;;
+              esac
+
+              if [ "${PR_TS}" -gt "${CUTOFF_EPOCH}" ]; then
+                LATER_FOR_IMAGE+=("${PR_NUM}")
+                continue
+              fi
+              # First PR within the cutoff. Skip if its tip was reverted.
+              if ! git cat-file -e "${PR_SHA}" 2>/dev/null; then
+                echo "  ${IMAGE}: PR #${PR_NUM} tip ${PR_SHA:0:7} not in local history, skipping"
+                continue
+              fi
+              if git log --format=%H "${PR_SHA}..${HEAD_REF}" \
+                   --grep="This reverts commit ${PR_SHA}" | grep -q .; then
+                echo "  ${IMAGE}: PR #${PR_NUM} (${PR_SHA:0:7}) was reverted, looking further back"
+                continue
+              fi
+              CHOSEN_SHA="${PR_SHA}"
+              CHOSEN_PR="${PR_NUM}"
+              break
+            done < /tmp/prs.tsv
+
+            if [ -z "${CHOSEN_SHA}" ]; then
+              echo "skip ${IMAGE}: no eligible PR touched ${DIR}/ within the lookback window"
+              continue
+            fi
+            printf '%s\t%s\t%s\n' "${IMAGE}" "${CHOSEN_SHA:0:7}" "${CHOSEN_PR}" >> /tmp/plan.tsv
+            echo "  ${IMAGE} -> PR #${CHOSEN_PR} (${CHOSEN_SHA:0:7})"
+            for L in "${LATER_FOR_IMAGE[@]}"; do
+              printf '%s\t%s\n' "${IMAGE}" "${L}" >> /tmp/later.tsv
+            done
+          done < /tmp/images.tsv
+
+          echo "Planned $(wc -l < /tmp/plan.tsv) delayed tag(s); $(wc -l < /tmp/later.tsv) (image, later-PR) pairs for roll-forward check"
+
+      - name: Check for roll-forward fixes via Claude (advisory)
+        # DRY RUN: for each planned delayed tag, ask Claude Sonnet whether any
+        # LATER PR touching the connector's directory is a roll-forward fix of
+        # the CHOSEN PR — i.e. patches a regression introduced by CHOSEN, as
+        # opposed to an unrelated change. Git reverts are already filtered out
+        # in the plan step; this catches the case where a bug is fixed forward
+        # instead of reverted.
+        #
+        # Currently advisory: the verdict is logged per connector but does not
+        # drop rows from /tmp/plan.tsv. To enforce, post-process the verdicts
+        # file before the tag step.
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -uo pipefail
+          if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
+            echo "::warning::ANTHROPIC_API_KEY not set; skipping roll-forward check"
+            exit 0
+          fi
+          if [ ! -s /tmp/later.tsv ]; then
+            echo "no LATER PRs across any connector; nothing to check"
+            exit 0
+          fi
+
+          : > /tmp/claude_verdicts.tsv
+          flagged=0; checked=0
+
+          # Per-PR diff cap (in lines). Sonnet 4.6 has 200K context, but we
+          # bound each PR's diff to keep prompts predictable for very large
+          # PRs (e.g. generated code) — the commit messages plus first ~2000
+          # diff lines are typically enough to identify a roll-forward fix.
+          DIFF_LINE_CAP=2000
+
+          while IFS=$'\t' read -r IMAGE CHOSEN_SHA CHOSEN_PR; do
+            # Collect LATER PR numbers for this image.
+            mapfile -t LATER_PRS < <(awk -F'\t' -v img="${IMAGE}" '$1==img{print $2}' /tmp/later.tsv)
+            if [ "${#LATER_PRS[@]}" -eq 0 ]; then
+              printf '%s\tsafe\tno LATER PRs\n' "${IMAGE}" >> /tmp/claude_verdicts.tsv
+              continue
+            fi
+            DIR=$(awk -F'\t' -v img="${IMAGE}" '$1==img{print $2; exit}' /tmp/images.tsv)
+
+            {
+              printf '%s\n' \
+                "You are auditing a release pipeline for the Estuary connectors monorepo." \
+                "We are about to promote the image '${IMAGE}' (source dir '${DIR}/') to" \
+                "the ':delayed' tag, pinned to PR #${CHOSEN_PR}." \
+                "" \
+                "Determine whether any LATER PR is a roll-forward fix of the CHOSEN PR —" \
+                "i.e. patches a bug or regression introduced BY the CHOSEN PR. A feature" \
+                "addition, refactor, dependency bump, test addition, or unrelated bugfix" \
+                "is NOT a roll-forward fix. Only flag PRs that exist because the CHOSEN" \
+                "PR was buggy." \
+                "" \
+                "Note: this repo uses rebase-and-merge, so each PR's commits land on main" \
+                "as a linear sequence — judge PRs as units, not individual commits." \
+                ""
+              printf '=== CHOSEN: PR #%s ===\n' "${CHOSEN_PR}"
+              gh pr view "${CHOSEN_PR}" --json title,body \
+                --template '{{.title}}{{"\n\n"}}{{.body}}{{"\n"}}' || true
+              printf '\n--- diff (truncated to %s lines) ---\n' "${DIFF_LINE_CAP}"
+              gh pr diff "${CHOSEN_PR}" 2>/dev/null | head -n "${DIFF_LINE_CAP}" || true
+              printf '\n'
+              for L in "${LATER_PRS[@]}"; do
+                printf '=== LATER: PR #%s ===\n' "${L}"
+                gh pr view "${L}" --json title,body \
+                  --template '{{.title}}{{"\n\n"}}{{.body}}{{"\n"}}' || true
+                printf '\n--- diff (truncated to %s lines) ---\n' "${DIFF_LINE_CAP}"
+                gh pr diff "${L}" 2>/dev/null | head -n "${DIFF_LINE_CAP}" || true
+                printf '\n'
+              done
+              printf '%s\n' \
+                "Reply with ONLY a JSON object, no prose:" \
+                '{"verdict": "safe" | "hold", "reason": "<one short sentence>", "fix_prs": [<pr numbers that are roll-forward fixes of CHOSEN>]}' \
+                'Use "hold" iff at least one LATER PR is a roll-forward fix of CHOSEN. Otherwise "safe".'
+            } > /tmp/claude_prompt.txt
+
+            jq -n --rawfile p /tmp/claude_prompt.txt '{
+              model: "claude-sonnet-4-6",
+              max_tokens: 1024,
+              messages: [{role: "user", content: $p}]
+            }' > /tmp/claude_req.json
+
+            checked=$((checked + 1))
+            if ! curl -sS --fail-with-body https://api.anthropic.com/v1/messages \
+                  -H "content-type: application/json" \
+                  -H "x-api-key: ${ANTHROPIC_API_KEY}" \
+                  -H "anthropic-version: 2023-06-01" \
+                  --data-binary @/tmp/claude_req.json \
+                  -o /tmp/claude_resp.json; then
+              echo "::warning::${IMAGE}: Claude API call failed; treating as safe"
+              printf '%s\tsafe\tapi error\n' "${IMAGE}" >> /tmp/claude_verdicts.tsv
+              continue
+            fi
+
+            TEXT=$(jq -r '.content[0].text // ""' /tmp/claude_resp.json)
+            VERDICT=$(printf '%s' "${TEXT}" | jq -r '.verdict // "safe"' 2>/dev/null || echo "safe")
+            REASON=$(printf '%s'  "${TEXT}" | jq -r '.reason // ""'    2>/dev/null || echo "")
+
+            if [ "${VERDICT}" = "hold" ]; then
+              flagged=$((flagged + 1))
+              echo "::warning::${IMAGE}: HOLD on PR #${CHOSEN_PR} — ${REASON}"
+            else
+              echo "  ${IMAGE}: safe — ${REASON:-no LATER PR flagged}"
+            fi
+            printf '%s\t%s\t%s\n' "${IMAGE}" "${VERDICT}" "${REASON}" >> /tmp/claude_verdicts.tsv
+          done < /tmp/plan.tsv
+
+          echo "Claude checked ${checked} connector(s); flagged ${flagged} for HOLD (advisory, not enforced)"
+
+      - name: Tag images as ':delayed'
+        # DRY RUN: the only mutating call in this step (the `docker buildx
+        # imagetools create` line) is commented out. Everything else — the
+        # inspect probes, the per-image log lines, counters, and the summary —
+        # still executes, so the workflow logs are a faithful preview of what
+        # the real run will publish. To enable: uncomment the docker line and
+        # delete the `tag_cmd=true` line just above it.
+        run: |
+          set -uo pipefail
+          tagged=0; missing=0; failed=0
+          : > /tmp/tagged.txt
+          while IFS=$'\t' read -r IMAGE SHA; do
+            [ -z "${IMAGE}" ] && continue
+            SRC="ghcr.io/estuary/${IMAGE}:${SHA}"
+            DST="ghcr.io/estuary/${IMAGE}:delayed"
+            # `docker buildx imagetools create --tag DST SRC` is a manifest-only
+            # operation that creates DST pointing at the same digest as SRC. No
+            # image layers are downloaded or re-uploaded. It also fails fast
+            # when SRC is missing from the registry.
+            if ! docker buildx imagetools inspect "${SRC}" >/dev/null 2>&1; then
+              echo "skip ${IMAGE}: no image at ${SHA} (may have been pruned from registry)"
+              missing=$((missing + 1))
+              continue
+            fi
+            echo "would tag ${DST} -> ${SHA}"
+            tag_cmd=true  # DRY RUN — remove this line and uncomment the next to publish
+            # tag_cmd="docker buildx imagetools create --tag ${DST} ${SRC}"
+            if $tag_cmd >/dev/null; then
+              echo "${IMAGE}" >> /tmp/tagged.txt
+              tagged=$((tagged + 1))
+            else
+              echo "::warning::failed to tag ${IMAGE}"
+              failed=$((failed + 1))
+            fi
+          done < /tmp/plan.tsv
+          echo "Summary: tagged=${tagged} missing=${missing} failed=${failed}"
+          if [ "${failed}" -gt 0 ]; then
+            exit 1
+          fi
+
+      - name: Install psql
+        run: |
+          sudo apt update
+          sudo apt install -y postgresql-client
+
+      - name: Refresh connector_tags rows for ':delayed'
+        # DRY RUN: only the `| psql` pipe is commented out. The exact SQL we
+        # would run is still echoed per image, which is what we want preserved
+        # in the workflow logs for diagnostics.
+        env:
+          PGHOST: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
+          PGUSER: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}
+          PGPASSWORD: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_PASSWORD }}
+          PGDATABASE: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_DATABASE }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r IMAGE; do
+            [ -z "${IMAGE}" ] && continue
+            echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
+                    WHERE connector_id IN (
+                      SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${IMAGE}'
+                    ) AND image_tag = ':delayed';" # DRY RUN — append ` | psql` to publish
+          done < /tmp/tagged.txt
