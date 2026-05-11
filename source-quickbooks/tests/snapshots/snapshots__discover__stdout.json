@@ -96,9 +96,9 @@
     ]
   },
   {
-    "recommendedName": "Bill Payments",
+    "recommendedName": "Bill_Payments",
     "resourceConfig": {
-      "name": "Bill Payments",
+      "name": "Bill_Payments",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -480,9 +480,9 @@
     ]
   },
   {
-    "recommendedName": "Credit Memos",
+    "recommendedName": "Credit_Memos",
     "resourceConfig": {
-      "name": "Credit Memos",
+      "name": "Credit_Memos",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1248,9 +1248,9 @@
     ]
   },
   {
-    "recommendedName": "Journal Entries",
+    "recommendedName": "Journal_Entries",
     "resourceConfig": {
-      "name": "Journal Entries",
+      "name": "Journal_Entries",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1344,9 +1344,9 @@
     ]
   },
   {
-    "recommendedName": "Payment Methods",
+    "recommendedName": "Payment_Methods",
     "resourceConfig": {
-      "name": "Payment Methods",
+      "name": "Payment_Methods",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1536,9 +1536,9 @@
     ]
   },
   {
-    "recommendedName": "Purchase Orders",
+    "recommendedName": "Purchase_Orders",
     "resourceConfig": {
-      "name": "Purchase Orders",
+      "name": "Purchase_Orders",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1728,9 +1728,9 @@
     ]
   },
   {
-    "recommendedName": "Refund Receipts",
+    "recommendedName": "Refund_Receipts",
     "resourceConfig": {
-      "name": "Refund Receipts",
+      "name": "Refund_Receipts",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1824,9 +1824,9 @@
     ]
   },
   {
-    "recommendedName": "Sales Receipts",
+    "recommendedName": "Sales_Receipts",
     "resourceConfig": {
-      "name": "Sales Receipts",
+      "name": "Sales_Receipts",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -1920,9 +1920,9 @@
     ]
   },
   {
-    "recommendedName": "Tax Agencies",
+    "recommendedName": "Tax_Agencies",
     "resourceConfig": {
-      "name": "Tax Agencies",
+      "name": "Tax_Agencies",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -2016,9 +2016,9 @@
     ]
   },
   {
-    "recommendedName": "Tax Codes",
+    "recommendedName": "Tax_Codes",
     "resourceConfig": {
-      "name": "Tax Codes",
+      "name": "Tax_Codes",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -2112,9 +2112,9 @@
     ]
   },
   {
-    "recommendedName": "Tax Rates",
+    "recommendedName": "Tax_Rates",
     "resourceConfig": {
-      "name": "Tax Rates",
+      "name": "Tax_Rates",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -2304,9 +2304,9 @@
     ]
   },
   {
-    "recommendedName": "Time Activities",
+    "recommendedName": "Time_Activities",
     "resourceConfig": {
-      "name": "Time Activities",
+      "name": "Time_Activities",
       "interval": "PT5M"
     },
     "documentSchema": {
@@ -2496,9 +2496,9 @@
     ]
   },
   {
-    "recommendedName": "Vendor Credits",
+    "recommendedName": "Vendor_Credits",
     "resourceConfig": {
-      "name": "Vendor Credits",
+      "name": "Vendor_Credits",
       "interval": "PT5M"
     },
     "documentSchema": {
