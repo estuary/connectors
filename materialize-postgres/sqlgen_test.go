@@ -41,7 +41,82 @@ func TestSQLGeneration(t *testing.T) {
 		},
 	)
 
+	// Exercise the source-postgres -> materialize-postgres JSONB round-trip:
+	// a value field carrying the application/vnd.postgresql.jsonb+json
+	// contentMediaType must render as JSONB, while a sibling field without
+	// the annotation stays on JSON.
+	jsonbTable := buildJSONBTestTable(t)
+	jsonbName := "createTargetTable [jsonb contentMediaType]"
+	snap.WriteString("--- Begin " + jsonbName + " ---\n")
+	require.NoError(t, testTemplates.createTargetTable.Execute(snap, &jsonbTable))
+	snap.WriteString("--- End " + jsonbName + " ---\n\n")
+
 	cupaloy.SnapshotT(t, snap.String())
+}
+
+// buildJSONBTestTable assembles a synthetic Table with two value projections:
+// one carrying the jsonb contentMediaType so it should map to JSONB, and one
+// without so it should default to JSON.
+func buildJSONBTestTable(t *testing.T) sql.Table {
+	t.Helper()
+
+	const jsonbMediaType = "application/vnd.postgresql.jsonb+json"
+	multipleTypes := []string{"object", "string", "array", "number", "boolean", "null"}
+
+	mkValue := func(field, contentType string) sql.Column {
+		var stringInf *pf.Inference_String
+		if contentType != "" {
+			stringInf = &pf.Inference_String{ContentType: contentType}
+		}
+		p := sql.Projection{
+			Projection: pf.Projection{
+				Field: field,
+				Ptr:   "/" + field,
+				Inference: pf.Inference{
+					Types:   multipleTypes,
+					String_: stringInf,
+					Exists:  pf.Inference_MAY,
+				},
+			},
+		}
+		return sql.Column{
+			Projection: p,
+			MappedType: testDialect.MapType(&p, sql.FieldConfig{}),
+			Identifier: testDialect.Identifier(field),
+		}
+	}
+
+	keyProj := sql.Projection{
+		Projection: pf.Projection{
+			Field:        "id",
+			Ptr:          "/id",
+			IsPrimaryKey: true,
+			Inference: pf.Inference{
+				Types:  []string{"integer"},
+				Exists: pf.Inference_MUST,
+			},
+		},
+	}
+	keyCol := sql.Column{
+		Projection: keyProj,
+		MappedType: testDialect.MapType(&keyProj, sql.FieldConfig{}),
+		Identifier: testDialect.Identifier("id"),
+		MustExist:  true,
+	}
+
+	tableName := "jsonb_round_trip"
+	return sql.Table{
+		TableShape: sql.TableShape{
+			Path:    []string{"public", tableName},
+			Comment: "Generated for materialize-postgres jsonb round-trip test",
+		},
+		Identifier: testDialect.Identifier("public", tableName),
+		Keys:       []sql.Column{keyCol},
+		Values: []sql.Column{
+			mkValue("plain_json", ""),
+			mkValue("jsonb_col", jsonbMediaType),
+		},
+	}
 }
 
 func TestDateTimeColumn(t *testing.T) {
@@ -60,6 +135,42 @@ func TestDateTimeColumn(t *testing.T) {
 	parsed, err := mapped.Converter("2022-04-04T10:09:08.234567Z")
 	require.Equal(t, "2022-04-04T10:09:08.234567Z", parsed)
 	require.NoError(t, err)
+}
+
+func TestJSONBContentMediaType(t *testing.T) {
+	jsonbMediaType := "application/vnd.postgresql.jsonb+json"
+
+	mapWithMediaType := func(types []string, contentType string) string {
+		var stringInf *pf.Inference_String
+		for _, ty := range types {
+			if ty == "string" {
+				stringInf = &pf.Inference_String{ContentType: contentType}
+				break
+			}
+		}
+		return testDialect.MapType(&sql.Projection{
+			Projection: pf.Projection{
+				Inference: pf.Inference{
+					Types:   types,
+					String_: stringInf,
+					Exists:  pf.Inference_MUST,
+				},
+			},
+		}, sql.FieldConfig{}).DDL
+	}
+
+	require.Equal(t,
+		"JSONB NOT NULL",
+		mapWithMediaType([]string{"object", "string", "array", "number", "boolean"}, jsonbMediaType),
+		"MULTIPLE-typed field with jsonb contentMediaType should map to JSONB")
+	require.Equal(t,
+		"JSON NOT NULL",
+		mapWithMediaType([]string{"object", "string", "array", "number", "boolean"}, "application/json"),
+		"MULTIPLE-typed field with application/json contentMediaType should map to JSON")
+	require.Equal(t,
+		"JSON NOT NULL",
+		mapWithMediaType([]string{"object", "string", "array", "number", "boolean"}, ""),
+		"MULTIPLE-typed field without contentMediaType should default to JSON")
 }
 
 func TestTruncatedIdentifier(t *testing.T) {
