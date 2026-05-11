@@ -116,7 +116,7 @@ class Account(QuickBooksEntity):
 
 
 class BillPayment(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Bill Payments"
+    resource_name: ClassVar[str] = "Bill_Payments"
     table_name: ClassVar[str] = "BillPayment"
 
 
@@ -136,7 +136,7 @@ class Class(QuickBooksEntity):
 
 
 class CreditMemo(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Credit Memos"
+    resource_name: ClassVar[str] = "Credit_Memos"
     table_name: ClassVar[str] = "CreditMemo"
 
 
@@ -176,7 +176,7 @@ class Item(QuickBooksEntity):
 
 
 class JournalEntry(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Journal Entries"
+    resource_name: ClassVar[str] = "Journal_Entries"
     table_name: ClassVar[str] = "JournalEntry"
 
 
@@ -186,7 +186,7 @@ class Payment(QuickBooksEntity):
 
 
 class PaymentMethod(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Payment Methods"
+    resource_name: ClassVar[str] = "Payment_Methods"
     table_name: ClassVar[str] = "PaymentMethod"
 
 
@@ -196,32 +196,32 @@ class Purchase(QuickBooksEntity):
 
 
 class PurchaseOrder(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Purchase Orders"
+    resource_name: ClassVar[str] = "Purchase_Orders"
     table_name: ClassVar[str] = "PurchaseOrder"
 
 
 class RefundReceipt(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Refund Receipts"
+    resource_name: ClassVar[str] = "Refund_Receipts"
     table_name: ClassVar[str] = "RefundReceipt"
 
 
 class SalesReceipt(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Sales Receipts"
+    resource_name: ClassVar[str] = "Sales_Receipts"
     table_name: ClassVar[str] = "SalesReceipt"
 
 
 class TaxAgency(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Tax Agencies"
+    resource_name: ClassVar[str] = "Tax_Agencies"
     table_name: ClassVar[str] = "TaxAgency"
 
 
 class TaxCode(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Tax Codes"
+    resource_name: ClassVar[str] = "Tax_Codes"
     table_name: ClassVar[str] = "TaxCode"
 
 
 class TaxRate(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Tax Rates"
+    resource_name: ClassVar[str] = "Tax_Rates"
     table_name: ClassVar[str] = "TaxRate"
 
 
@@ -231,7 +231,7 @@ class Term(QuickBooksEntity):
 
 
 class TimeActivity(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Time Activities"
+    resource_name: ClassVar[str] = "Time_Activities"
     table_name: ClassVar[str] = "TimeActivity"
 
 
@@ -241,7 +241,7 @@ class Transfer(QuickBooksEntity):
 
 
 class VendorCredit(QuickBooksEntity):
-    resource_name: ClassVar[str] = "Vendor Credits"
+    resource_name: ClassVar[str] = "Vendor_Credits"
     table_name: ClassVar[str] = "VendorCredit"
 
 
