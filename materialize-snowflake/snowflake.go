@@ -1217,6 +1217,10 @@ func (d *transactor) Destroy() {
 }
 
 func logQueryStats(ctx context.Context, db *stdsql.DB, queryID string, table string) {
+	if !log.IsLevelEnabled(log.DebugLevel) {
+		return
+	}
+
 	var scanned, total stdsql.NullInt64
 	row := db.QueryRowContext(ctx,
 		`SELECT SUM(VALUE:"partitions_scanned"::INT), SUM(VALUE:"partitions_total"::INT)
@@ -1245,10 +1249,14 @@ func logQueryStats(ctx context.Context, db *stdsql.DB, queryID string, table str
 		"partitions_scanned":      scanned.Int64,
 		"partitions_total":        total.Int64,
 		"queued_overload_time_ms": queuedOverloadTime.Int64,
-	}).Info("query stats")
+	}).Debug("query stats")
 }
 
 func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr string) {
+	if !log.IsLevelEnabled(log.DebugLevel) {
+		return
+	}
+
 	var result stdsql.NullString
 	query := fmt.Sprintf("SELECT SYSTEM$CLUSTERING_INFORMATION('%s', '%s')", table, keyExpr)
 	if err := db.QueryRowContext(ctx, query).Scan(&result); err != nil {
@@ -1282,7 +1290,7 @@ func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr
 		"average_depth":    info.AverageDepth,
 		"average_overlaps": info.AverageOverlaps,
 		"total_partitions": info.TotalPartitions,
-	}).Info("clustering information")
+	}).Debug("clustering information")
 }
 
 // clusteringKeyExpr builds a Snowflake CLUSTER BY expression from the given
