@@ -115,10 +115,11 @@
     "documentationUrl": "https://go.estuary.dev/source-quickbooks",
     "oauth2": {
       "provider": "intuit",
-      "authUrlTemplate": "https://appcenter.intuit.com/connect/oauth2?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&scope=com.intuit.quickbooks.accounting%20com.intuit.quickbooks.payment%20openid%20profile%20email%20phone%20address&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "authUrlTemplate": "https://appcenter.intuit.com/connect/oauth2?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&scope=com.intuit.quickbooks.accounting&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
       "accessTokenUrlTemplate": "https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer",
       "accessTokenBody": "grant_type=authorization_code&code={{#urlencode}}{{{ code }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}",
       "accessTokenHeaders": {
+        "Authorization": "Basic {{#basicauth}}{{{ client_id }}}:{{{ client_secret }}}{{/basicauth}}",
         "Content-Type": "application/x-www-form-urlencoded"
       },
       "accessTokenResponseMap": {

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import urllib.parse
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, ClassVar
 
@@ -26,16 +25,6 @@ def default_start_date():
     return dt
 
 
-scopes = [
-    "com.intuit.quickbooks.accounting",
-    "com.intuit.quickbooks.payment",
-    "openid",
-    "profile",
-    "email",
-    "phone",
-    "address",
-]
-
 OAUTH2_SPEC = OAuth2Spec(
     provider="intuit",
     accessTokenBody=(
@@ -45,9 +34,8 @@ OAUTH2_SPEC = OAuth2Spec(
     ),
     authUrlTemplate=(
         "https://appcenter.intuit.com/connect/oauth2?"
-        r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
-        r"&scope="
-        + urllib.parse.quote(" ".join(scopes))
+        + r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
+        + r"&scope=com.intuit.quickbooks.accounting"
         + r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
         + r"&response_type=code"
         + r"&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
@@ -59,6 +47,7 @@ OAUTH2_SPEC = OAuth2Spec(
         "access_token_expires_at": r"{{#now_plus}}{{ expires_in }}{{/now_plus}}",
     },
     accessTokenHeaders={
+        "Authorization": r"Basic {{#basicauth}}{{{ client_id }}}:{{{ client_secret }}}{{/basicauth}}",
         "Content-Type": "application/x-www-form-urlencoded",
     },
 )
