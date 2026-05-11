@@ -167,12 +167,12 @@
   },
   "resource_config_schema_json": {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
-    "$id": "https://github.com/estuary/connectors/filesink/resource",
+    "$id": "https://github.com/estuary/connectors/filesink/s3-resource",
     "properties": {
       "path": {
         "type": "string",
         "title": "Path",
-        "description": "The path that objects will be materialized to.",
+        "description": "The path that objects will be materialized to. May contain date patterns.",
         "x-collection-name": true
       }
     },
