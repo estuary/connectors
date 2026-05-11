@@ -36,10 +36,12 @@ sql> COMMENT ON COLUMN test.discoverycomplex_934635.k1 IS 'I think this is a key
             ]
           },
           "doc": {
-            "description": "(source type: json)"
+            "description": "(source type: json)",
+            "contentMediaType": "application/json"
           },
           "doc/bin": {
-            "description": "(source type: non-nullable jsonb)"
+            "description": "(source type: non-nullable jsonb)",
+            "contentMediaType": "application/vnd.postgresql.jsonb+json"
           },
           "foo": {
             "description": "This is a text field! (source type: text)",

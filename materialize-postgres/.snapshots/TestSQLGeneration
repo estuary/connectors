@@ -344,4 +344,20 @@ BEGIN
 END $$;
 --- End Fence Update ---
 
+--- Begin createTargetTable [jsonb contentMediaType] ---
+
+CREATE TABLE IF NOT EXISTS "public".jsonb_round_trip (
+		id BIGINT NOT NULL,
+		plain_json JSON,
+		jsonb_col JSONB,
+
+		PRIMARY KEY (id)
+);
+
+COMMENT ON TABLE "public".jsonb_round_trip IS 'Generated for materialize-postgres jsonb round-trip test';
+COMMENT ON COLUMN "public".jsonb_round_trip.id IS '';
+COMMENT ON COLUMN "public".jsonb_round_trip.plain_json IS '';
+COMMENT ON COLUMN "public".jsonb_round_trip.jsonb_col IS '';
+--- End createTargetTable [jsonb contentMediaType] ---
+
 

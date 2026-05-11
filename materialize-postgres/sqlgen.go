@@ -34,18 +34,36 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 		binaryMapping = sql.MapStatic("BYTEA", sql.UsingConverter(sql.Base64Decoder))
 	}
 
+	// Fields originating from a PostgreSQL JSONB column carry this
+	// (non-standard, vendor-tree) contentMediaType so they can be recreated
+	// as JSONB at the destination instead of collapsing onto JSON. Anything
+	// without the annotation defaults to JSON, preserving the historical
+	// behavior for existing materializations and non-Postgres sources.
+	jsonbContentMediaType := "application/vnd.postgresql.jsonb+json"
+	jsonOrJsonb := func(jsonMapper, jsonbMapper sql.MapProjectionFn) sql.MapProjectionFn {
+		return func(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
+			if p.Inference.String_ != nil && p.Inference.String_.ContentType == jsonbContentMediaType {
+				return jsonbMapper(p)
+			}
+			return jsonMapper(p)
+		}
+	}
+
 	mapper := sql.NewDDLMapper(
 		sql.FlatTypeMappings{
 			sql.INTEGER: sql.MapSignedInt64(
 				sql.MapStatic("BIGINT", sql.AlsoCompatibleWith("integer")),
 				sql.MapStatic("NUMERIC"),
 			),
-			sql.NUMBER:         sql.MapStatic("DOUBLE PRECISION"),
-			sql.BOOLEAN:        sql.MapStatic("BOOLEAN"),
-			sql.OBJECT:         sql.MapStatic("JSON"),
-			sql.ARRAY:          sql.MapStatic("JSON"),
-			sql.BINARY:         binaryMapping,
-			sql.MULTIPLE:       sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+			sql.NUMBER:  sql.MapStatic("DOUBLE PRECISION"),
+			sql.BOOLEAN: sql.MapStatic("BOOLEAN"),
+			sql.OBJECT:  jsonOrJsonb(sql.MapStatic("JSON"), sql.MapStatic("JSONB")),
+			sql.ARRAY:   jsonOrJsonb(sql.MapStatic("JSON"), sql.MapStatic("JSONB")),
+			sql.BINARY:  binaryMapping,
+			sql.MULTIPLE: jsonOrJsonb(
+				sql.MapStatic("JSON", sql.UsingConverter(sql.ToJsonBytes)),
+				sql.MapStatic("JSONB", sql.UsingConverter(sql.ToJsonBytes)),
+			),
 			sql.STRING_INTEGER: sql.MapStatic("NUMERIC"),
 			sql.STRING_NUMBER:  sql.MapStatic("DECIMAL", sql.AlsoCompatibleWith("numeric")),
 			sql.STRING: sql.MapString(sql.StringMappings{
@@ -102,6 +120,8 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 				}),
 			)},
 			"bytea": {sql.NewMigrationSpec([]string{"text"}, sql.WithDirectCast(), sql.WithCastSQL(byteaToStringCast))},
+			"json":  {sql.NewMigrationSpec([]string{"jsonb"}, sql.WithDirectCast())},
+			"jsonb": {sql.NewMigrationSpec([]string{"json"}, sql.WithDirectCast())},
 			"*":     {sql.NewMigrationSpec([]string{"json"}, sql.WithDirectCast(), sql.WithCastSQL(toJsonCast))},
 		},
 		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
