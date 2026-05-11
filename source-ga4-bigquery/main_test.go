@@ -89,128 +89,119 @@ func TestEvaluatePollCycle(t *testing.T) {
 		WantCurrentNil      bool
 	}{
 		{
-			// First poll: PrimaryThrough is "" so every live-window
-			// table satisfies T > PrimaryThrough and gets enqueued as
-			// primary. Endpoints-only mode only kicks in on subsequent
-			// polls once PrimaryThrough has advanced.
+			// First poll: PrimaryThrough is "" so every live-window table satisfies T > PrimaryThrough and gets enqueued as
+			// primary. Endpoints-only mode only kicks in on subsequent polls once PrimaryThrough has advanced.
 			Name:               "initial_backfill_endpoints_only",
 			Initial:            streamState{},
-			Suffixes:           []string{"20260101", "20260102", "20260503", "20260504", "20260505", "20260506"},
+			Suffixes:           []string{"20260101", "20260102", "20260103", "20260104", "20260105", "20260106"},
 			WindowDays:         windowDays,
-			WantPending:        []string{"20260506", "20260505", "20260504", "20260503", "20260102", "20260101"},
-			WantPrimaryThrough: "20260506",
-			WantFinalThrough:   "20260503",
+			WantPending:        []string{"20260106", "20260105", "20260104", "20260103", "20260102", "20260101"},
+			WantPrimaryThrough: "20260106",
+			WantFinalThrough:   "20260103",
 			WantAdded:          6,
 		},
 		{
-			// First poll, intermediate mode: every live-window table is
-			// enqueued as primary too.
+			// First poll, intermediate mode: every live-window table is enqueued as primary too.
 			Name:                "initial_backfill_intermediate",
 			Initial:             streamState{},
-			Suffixes:            []string{"20260101", "20260503", "20260504", "20260505", "20260506"},
+			Suffixes:            []string{"20260101", "20260102", "20260103", "20260104", "20260105", "20260106"},
 			WindowDays:          windowDays,
 			CaptureIntermediate: true,
-			WantPending:         []string{"20260506", "20260505", "20260504", "20260503", "20260101"},
-			WantPrimaryThrough:  "20260506",
-			WantFinalThrough:    "20260503",
-			WantAdded:           5,
+			WantPending:         []string{"20260106", "20260105", "20260104", "20260103", "20260102", "20260101"},
+			WantPrimaryThrough:  "20260106",
+			WantFinalThrough:    "20260103",
+			WantAdded:           6,
 		},
 		{
-			// Steady state, endpoint-only: window slid by one. Only the
-			// newly-oldest (rotated final) and the newly-newest (new
-			// primary) get enqueued; previously-primary'd intermediates
-			// are skipped.
+			// Steady state, endpoint-only: window slid by one. Only the newly-oldest (rotated final) and the newly-newest (new
+			// primary) get enqueued; previously-primary'd intermediates are skipped.
 			Name: "steady_state_window_advances_by_one",
 			Initial: streamState{
-				PrimaryThrough: "20260506",
-				FinalThrough:   "20260503",
+				PrimaryThrough: "20260106",
+				FinalThrough:   "20260103",
 			},
-			Suffixes:           []string{"20260101", "20260503", "20260504", "20260505", "20260506", "20260507"},
+			Suffixes:           []string{"20260101", "20260102", "20260103", "20260104", "20260105", "20260106", "20260107"},
 			WindowDays:         windowDays,
-			WantPending:        []string{"20260507", "20260504"},
-			WantPrimaryThrough: "20260507",
-			WantFinalThrough:   "20260504",
+			WantPending:        []string{"20260107", "20260104"},
+			WantPrimaryThrough: "20260107",
+			WantFinalThrough:   "20260104",
 			WantAdded:          2,
 		},
 		{
-			// MinDate filter: tables strictly before the cutoff are
-			// silently dropped, but FinalThrough still advances past
-			// window_oldest so future polls don't reconsider them.
-			// Live-window tables still get primary'd on the first poll
+			// MinDate filter: tables strictly before the cutoff are silently dropped, but FinalThrough still advances past
+			// window_oldest so future polls don't reconsider them. Live-window tables still get primary'd on the first poll
 			// (because PrimaryThrough = "").
 			Name:               "min_date_filters_old_tables",
 			Initial:            streamState{},
-			Suffixes:           []string{"20250101", "20250601", "20260503", "20260504", "20260505", "20260506"},
+			Suffixes:           []string{"20250101", "20250203", "20260503", "20260504", "20260505", "20260506"},
 			WindowDays:         windowDays,
 			MinDate:            "20260101",
-			WantPending:        []string{"20260506", "20260505", "20260504", "20260503"}, // 20250* dropped
+			WantPending:        []string{"20260506", "20260505", "20260504", "20260503"}, // 2025 skipped
 			WantPrimaryThrough: "20260506",
 			WantFinalThrough:   "20260503",
 			WantAdded:          4,
 		},
 		{
-			// Post-pause catch-up: PrimaryThrough is far behind the
-			// dataset's current state. Tables between the old
-			// FinalThrough and new window_oldest are finalized backlog;
-			// tables in the new live window are all > PrimaryThrough
+			// Post-pause catch-up: PrimaryThrough is far behind the dataset's current state. Tables between the old
+			// FinalThrough and new window_oldest are finalized backlog; tables in the new live window are all > PrimaryThrough
 			// so they all get primary captures (Option B falls out).
 			Name: "post_pause_catchup",
 			Initial: streamState{
-				PrimaryThrough: "20260201",
-				FinalThrough:   "20260131",
+				PrimaryThrough: "20260104",
+				FinalThrough:   "20260101",
 			},
-			Suffixes:           []string{"20260131", "20260201", "20260403", "20260601", "20260602", "20260603", "20260604"},
+			Suffixes:           []string{"20260101", "20260102", "20260103", "20260104", "20260105", "20260106", "20260107"},
 			WindowDays:         windowDays,
-			WantPending:        []string{"20260604", "20260603", "20260602", "20260601", "20260403", "20260201"},
-			WantPrimaryThrough: "20260604",
-			WantFinalThrough:   "20260601",
+			WantPending:        []string{"20260107", "20260106", "20260105", "20260104", "20260103", "20260102"},
+			WantPrimaryThrough: "20260107",
+			WantFinalThrough:   "20260104",
 			WantAdded:          6,
 		},
 		{
-			// Dataset smaller than window_days: window_oldest clamps
-			// to the dataset's oldest suffix.
-			Name:               "small_dataset_clamps_window",
+			// Dataset smaller than window_days (e.g., freshly-enabled GA4 export): we don't yet have enough history to
+			// know where the live window's far edge is, so finalization is deferred. Every table gets a primary capture,
+			// FinalThrough stays empty, and the oldest table will roll into a final capture later once the dataset has
+			// grown to window_days tables.
+			Name:               "small_dataset_defers_finalization",
 			Initial:            streamState{},
 			Suffixes:           []string{"20260504", "20260505", "20260506"},
 			WindowDays:         windowDays,
 			WantPending:        []string{"20260506", "20260505", "20260504"},
 			WantPrimaryThrough: "20260506",
-			WantFinalThrough:   "20260504",
+			WantFinalThrough:   "",
 			WantAdded:          3,
 		},
 		{
 			// Already-pending suffixes are not duplicated.
 			Name: "dedup_against_pending",
 			Initial: streamState{
-				Pending:        []string{"20260506"},
-				PrimaryThrough: "20260506",
-				FinalThrough:   "20260502",
+				Pending:        []string{"20260104"},
+				PrimaryThrough: "20260106",
+				FinalThrough:   "20260103",
 			},
-			Suffixes:           []string{"20260503", "20260504", "20260505", "20260506", "20260507"},
+			Suffixes:           []string{"20260101", "20260102", "20260103", "20260104", "20260105", "20260106", "20260107"},
 			WindowDays:         windowDays,
-			WantPending:        []string{"20260507", "20260506", "20260504", "20260503"},
-			WantPrimaryThrough: "20260507",
-			WantFinalThrough:   "20260504",
-			WantAdded:          3,
+			WantPending:        []string{"20260107", "20260104"},
+			WantPrimaryThrough: "20260107",
+			WantFinalThrough:   "20260104",
+			WantAdded:          1,
 		},
 		{
-			// If a polling cycle wants to re-enqueue the suffix
-			// currently being read out, Current is abandoned. Here
-			// 20260504 is the still-being-primary'd table that's
-			// just rotated to window_oldest position, so it's
+			// If a polling cycle wants to re-enqueue the suffix currently being read out, Current is abandoned. Here
+			// 20260103 is the still-being-primary'd table that's just rotated to window_oldest position, so it's
 			// re-enqueued as a final capture.
 			Name: "abandons_current_on_re_enqueue",
 			Initial: streamState{
-				Current:        &currentTable{Suffix: "20260504"},
-				PrimaryThrough: "20260507",
-				FinalThrough:   "20260503",
+				Current:        &currentTable{Suffix: "20260104"},
+				PrimaryThrough: "20260106",
+				FinalThrough:   "20260103",
 			},
-			Suffixes:           []string{"20260503", "20260504", "20260505", "20260506", "20260507", "20260508"},
+			Suffixes:           []string{"20260101", "20260102", "20260103", "20260104", "20260105", "20260106", "20260107"},
 			WindowDays:         windowDays,
-			WantPending:        []string{"20260508", "20260505", "20260504"},
-			WantPrimaryThrough: "20260508",
-			WantFinalThrough:   "20260505",
-			WantAdded:          3,
+			WantPending:        []string{"20260107", "20260104"},
+			WantPrimaryThrough: "20260107",
+			WantFinalThrough:   "20260104",
+			WantAdded:          2,
 			WantCurrentNil:     true,
 		},
 		{
@@ -226,10 +217,10 @@ func TestEvaluatePollCycle(t *testing.T) {
 		t.Run(tc.Name, func(t *testing.T) {
 			state := tc.Initial
 			added := evaluatePollCycle(&state, tc.Suffixes, tc.WindowDays, tc.CaptureIntermediate, tc.MinDate)
-			require.Equal(t, tc.WantAdded, added, "added count")
 			require.Equal(t, tc.WantPending, state.Pending, "pending list (descending)")
 			require.Equal(t, tc.WantPrimaryThrough, state.PrimaryThrough, "primary_through")
 			require.Equal(t, tc.WantFinalThrough, state.FinalThrough, "final_through")
+			require.Equal(t, tc.WantAdded, added, "added count")
 			if tc.WantCurrentNil {
 				require.Nil(t, state.Current, "Current should have been abandoned")
 			}
@@ -250,6 +241,50 @@ func TestEvaluatePollCycleIdempotent(t *testing.T) {
 	added = evaluatePollCycle(&state, suffixes, 4, false, "")
 	require.Equal(t, 0, added, "no new enqueues with unchanged dataset")
 	require.Empty(t, state.Pending)
+}
+
+// TestEvaluatePollCycleWarmup walks a freshly-enabled GA4 export through
+// successive polling cycles. While the dataset has fewer than window_days
+// tables we don't yet know where the live window's far edge is, so every
+// table gets a primary capture and FinalThrough stays empty. The moment
+// the dataset reaches window_days tables, normal sliding-window scheduling
+// engages and the oldest table rolls into its final capture on that same
+// poll.
+func TestEvaluatePollCycleWarmup(t *testing.T) {
+	const windowDays = 4
+	var state = streamState{}
+
+	// Day 1: One table, primary capture only.
+	var tables = []string{"20260510"}
+	evaluatePollCycle(&state, tables, windowDays, false, "")
+	require.Equal(t, []string{"20260510"}, state.Pending)
+	require.Equal(t, "20260510", state.PrimaryThrough)
+	require.Equal(t, "", state.FinalThrough)
+	state.Pending = nil // simulate readout
+
+	// Day 2: Two tables, primary capture only.
+	tables = append(tables, "20260511")
+	evaluatePollCycle(&state, tables, windowDays, false, "")
+	require.Equal(t, []string{"20260511"}, state.Pending)
+	require.Equal(t, "20260511", state.PrimaryThrough)
+	require.Equal(t, "", state.FinalThrough)
+	state.Pending = nil
+
+	// Day 3: Three tables, primary capture only.
+	tables = append(tables, "20260512")
+	evaluatePollCycle(&state, tables, windowDays, false, "")
+	require.Equal(t, []string{"20260512"}, state.Pending)
+	require.Equal(t, "20260512", state.PrimaryThrough)
+	require.Equal(t, "", state.FinalThrough) // still no FinalThrough up to here
+	state.Pending = nil
+
+	// Day 4: Four tables, the live window is now well defined, primary capture
+	// the newest table and final capture of the oldest in the window.
+	tables = append(tables, "20260513")
+	evaluatePollCycle(&state, tables, windowDays, false, "")
+	require.Equal(t, []string{"20260513", "20260510"}, state.Pending)
+	require.Equal(t, "20260513", state.PrimaryThrough)
+	require.Equal(t, "20260510", state.FinalThrough)
 }
 
 // TestBuildTableQuery verifies that per-table queries are constructed

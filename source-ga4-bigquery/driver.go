@@ -430,11 +430,14 @@ func evaluatePollCycle(state *streamState, suffixes []string, windowDays int, ca
 	}
 
 	var windowLatest = suffixes[len(suffixes)-1]
-	var oldestIdx = len(suffixes) - windowDays
-	if oldestIdx < 0 {
-		oldestIdx = 0
+	// During warm-up (a new GA4 export with fewer than window_days tables) we don't yet
+	// have enough history to reach the 'final capture' edge of the live window. In this
+	// state no tables are queued for final capture and FinalThrough stays where it is.
+	var hasFullWindow = len(suffixes) >= windowDays
+	var windowOldest string
+	if hasFullWindow {
+		windowOldest = suffixes[len(suffixes)-windowDays]
 	}
-	var windowOldest = suffixes[oldestIdx]
 
 	var pendingSet = make(map[string]bool, len(state.Pending))
 	for _, s := range state.Pending {
@@ -451,7 +454,7 @@ func evaluatePollCycle(state *streamState, suffixes []string, windowDays int, ca
 		switch {
 		case T <= state.FinalThrough:
 			shouldEnqueue = false
-		case T <= windowOldest:
+		case hasFullWindow && T <= windowOldest:
 			shouldEnqueue = true
 		case T <= state.PrimaryThrough:
 			shouldEnqueue = captureIntermediate
@@ -478,7 +481,7 @@ func evaluatePollCycle(state *streamState, suffixes []string, windowDays int, ca
 	if windowLatest > state.PrimaryThrough {
 		state.PrimaryThrough = windowLatest
 	}
-	if windowOldest > state.FinalThrough {
+	if hasFullWindow && windowOldest > state.FinalThrough {
 		state.FinalThrough = windowOldest
 	}
 
