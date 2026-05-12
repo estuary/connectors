@@ -68,10 +68,22 @@ ConnectorState = GenericConnectorState[ResourceState]
 class ApiResponse(BaseModel):
     class ErrorMessage(BaseModel):
         class Error(BaseModel):
-            errorno: str
-            description2: str
+            errorno: str | None = None
+            description2: str | None = None
+
+            def __str__(self) -> str:
+                parts = []
+                if self.errorno:
+                    parts.append(f"Error: {self.errorno}")
+                if self.description2:
+                    parts.append(self.description2)
+                return " - ".join(parts) if parts else "unspecified Sage Intacct error"
 
         error: list[Error] | Error
+
+        def __str__(self) -> str:
+            err = self.error[0] if isinstance(self.error, list) else self.error
+            return str(err)
 
     class Response(BaseModel):
         class Operation(BaseModel):
@@ -96,18 +108,10 @@ class ApiResponse(BaseModel):
 
     def raise_for_error(self):
         if self.response.errormessage:
-            if isinstance(self.response.errormessage.error, list):
-                error = self.response.errormessage.error[0]
-            else:
-                error = self.response.errormessage.error
-            raise ValidationError([f"Error: {error.errorno} - {error.description2}"])
+            raise ValidationError([str(self.response.errormessage)])
 
         if self.response.operation and self.response.operation.errormessage:
-            if isinstance(self.response.operation.errormessage.error, list):
-                error = self.response.operation.errormessage.error[0]
-            else:
-                error = self.response.operation.errormessage.error
-            raise ValidationError([f"Error: {error.errorno} - {error.description2}"])
+            raise ValidationError([str(self.response.operation.errormessage)])
 
         if self.response.operation:
             if self.response.operation.authentication.status != "success":
@@ -118,6 +122,11 @@ class ApiResponse(BaseModel):
                 )
 
             if self.response.operation.result:
+                if self.response.operation.result.errormessage:
+                    raise ValidationError(
+                        [str(self.response.operation.result.errormessage)]
+                    )
+
                 if self.response.operation.result.status != "success":
                     raise ValidationError(
                         [f"result status: {self.response.operation.result.status}"]
