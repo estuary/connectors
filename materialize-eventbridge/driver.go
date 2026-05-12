@@ -290,8 +290,14 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
 		constraint.Reason = "The root document must be materialized"
 	case p.IsPrimaryKey:
-		constraint.Type = pm.Response_Validated_Constraint_LOCATION_REQUIRED
-		constraint.Reason = "Document keys must be included"
+		// EventBridge has no partition/order/dedup concept and the
+		// connector never reads it.PackedKey or per-key projections, so
+		// keys carry no meaning on the destination side. FIELD_FORBIDDEN
+		// would be the most accurate signal, but the Flow runtime rejects
+		// FORBIDDEN on collection-key fields (they back the materialization
+		// group-by). OPTIONAL is the closest we can go.
+		constraint.Type = pm.Response_Validated_Constraint_FIELD_OPTIONAL
+		constraint.Reason = "EventBridge ignores keys; including them in the payload is optional"
 	default:
 		constraint.Type = pm.Response_Validated_Constraint_FIELD_FORBIDDEN
 		constraint.Reason = "EventBridge only materializes the full document"
