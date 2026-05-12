@@ -337,6 +337,24 @@ class Sage:
 
         return model
 
+    async def probe_query_permission(self, obj: str) -> None:
+        """Issues a cheap QUERY probe against `obj`. Returns silently if the
+        authenticated user can QUERY it; raises SagePermissionError with
+        the Sage error message attached on a PL04000005 denial."""
+        await self._maybe_refresh_session()
+
+        data = permission_probe_request(self.config, self.session_id, obj)
+        bs = await self.http.request(
+            self.log,
+            endpoint_url,
+            method="POST",
+            headers={"Content-Type": "application/xml"},
+            form=data,
+        )
+
+        parsed = ApiResponse.model_validate(xmltodict.parse(bs))
+        parsed.raise_for_error()
+
     async def _req_xml(
         self, cls: type[XMLRecord], data: Any, skip_refresh=False
     ) -> XMLRecord:
@@ -514,6 +532,27 @@ def get_user_by_id_request(cfg: EndpointConfig, session_id: str, user_id: str) -
           <keys>{user_id}</keys>
           <fields>RECORDNO</fields>
         </readByName>
+""".strip()
+
+    return function_with_session_id_xml(cfg, session_id, exec)
+
+
+def permission_probe_request(
+    cfg: EndpointConfig, session_id: str, object: str
+) -> str:
+    # A `pagesize=1` query is the cheapest way to surface a PL04000005
+    # permission denial: Sage checks permissions before retrieval, so the
+    # error fires regardless of whether the query would match any rows.
+    # `lookup` / `inspect` can't substitute here because they bypass
+    # permissions entirely.
+    exec = f"""
+        <query>
+          <object>{object}</object>
+          <select>
+            <field>RECORDNO</field>
+          </select>
+          <pagesize>1</pagesize>
+        </query>
 """.strip()
 
     return function_with_session_id_xml(cfg, session_id, exec)

@@ -65,6 +65,11 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
+class SagePermissionError(Exception):
+    """Raised when a Sage Intacct API call fails because the authenticated
+    user's role lacks permission for the requested operation."""
+
+
 class ApiResponse(BaseModel):
     class ErrorMessage(BaseModel):
         class Error(BaseModel):
@@ -79,11 +84,19 @@ class ApiResponse(BaseModel):
                     parts.append(self.description2)
                 return " - ".join(parts) if parts else "unspecified Sage Intacct error"
 
+            def is_permission_error(self) -> bool:
+                return self.errorno == "PL04000005"
+
         error: list[Error] | Error
 
+        def _errors(self) -> list["ApiResponse.ErrorMessage.Error"]:
+            return self.error if isinstance(self.error, list) else [self.error]
+
         def __str__(self) -> str:
-            err = self.error[0] if isinstance(self.error, list) else self.error
-            return str(err)
+            return str(self._errors()[0])
+
+        def is_permission_error(self) -> bool:
+            return any(e.is_permission_error() for e in self._errors())
 
     class Response(BaseModel):
         class Operation(BaseModel):
@@ -108,10 +121,10 @@ class ApiResponse(BaseModel):
 
     def raise_for_error(self):
         if self.response.errormessage:
-            raise ValidationError([str(self.response.errormessage)])
+            self._raise(self.response.errormessage)
 
         if self.response.operation and self.response.operation.errormessage:
-            raise ValidationError([str(self.response.operation.errormessage)])
+            self._raise(self.response.operation.errormessage)
 
         if self.response.operation:
             if self.response.operation.authentication.status != "success":
@@ -123,14 +136,18 @@ class ApiResponse(BaseModel):
 
             if self.response.operation.result:
                 if self.response.operation.result.errormessage:
-                    raise ValidationError(
-                        [str(self.response.operation.result.errormessage)]
-                    )
+                    self._raise(self.response.operation.result.errormessage)
 
                 if self.response.operation.result.status != "success":
                     raise ValidationError(
                         [f"result status: {self.response.operation.result.status}"]
                     )
+
+    @staticmethod
+    def _raise(err: "ApiResponse.ErrorMessage") -> None:
+        if err.is_permission_error():
+            raise SagePermissionError(str(err))
+        raise ValidationError([str(err)])
 
 
 class GenerateApiSessionResponse(BaseModel):
