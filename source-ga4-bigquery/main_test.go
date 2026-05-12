@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"os"
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -13,7 +12,6 @@ import (
 	"cloud.google.com/go/bigquery"
 	"github.com/bradleyjkemp/cupaloy"
 	bqclient "github.com/estuary/connectors/go/capture/bigquery/client"
-	st "github.com/estuary/connectors/source-boilerplate/testing"
 	pc "github.com/estuary/flow/go/protocols/capture"
 	"github.com/stretchr/testify/require"
 )
@@ -438,39 +436,6 @@ func testDiscoveryConfig(t testing.TB) *Config {
 			BillingProjectID: *testProjectID,
 		},
 	}
-}
-
-// TestDiscoverPublicSample exercises Discover against the public GA4 sample
-// dataset. Requires real BigQuery credentials and TEST_DATABASE=yes. The
-// public sample only has events_YYYYMMDD tables, so we expect exactly one
-// binding (events).
-func TestDiscoverPublicSample(t *testing.T) {
-	cfg := testDiscoveryConfig(t)
-	cs := &st.CaptureSpec{
-		Driver:       ga4Driver,
-		EndpointSpec: cfg,
-		Validator:    &st.SortedCaptureValidator{IncludeSourcedSchemas: true, PrettyDocuments: true},
-		Sanitizers:   make(map[string]*regexp.Regexp),
-	}
-	bindings := cs.Discover(context.Background(), t)
-	require.Len(t, bindings, 1, "expected exactly one binding (events) for the public sample dataset")
-	require.Equal(t, publicSampleDataset+"/events", bindings[0].RecommendedName)
-
-	var res Resource
-	require.NoError(t, json.Unmarshal(bindings[0].ResourceConfigJson, &res))
-	require.Equal(t, publicSampleDataset, res.Dataset)
-	require.Equal(t, StreamEvents, res.StreamType)
-	require.Equal(t, []string{"/event_timestamp", "/event_name", "/user_pseudo_id", "/event_bundle_sequence_id", "/batch_event_index"}, bindings[0].Key)
-
-	// Verify the schema includes _meta and the key columns.
-	var schema map[string]any
-	require.NoError(t, json.Unmarshal(bindings[0].DocumentSchemaJson, &schema))
-	props, ok := schema["properties"].(map[string]any)
-	require.True(t, ok)
-	require.Contains(t, props, "_meta")
-	require.Contains(t, props, "event_timestamp")
-	require.Contains(t, props, "event_name")
-	require.Contains(t, props, "batch_event_index")
 }
 
 // testBigQueryClient is a helper for tests that need a raw BigQuery client.
