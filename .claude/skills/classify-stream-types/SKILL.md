@@ -95,15 +95,12 @@ def open(
         state,
         task,
         fetch_snapshot=functools.partial(list_all, http, ...),
-        tombstone=MyDocument(_meta=MyDocument.Meta(op="d")),
     )
 
 resource = SnapshotResource(
     name=MyDocument.name,
-    model=MyDocument,
     open=open,
     initial_config=ResourceConfig(name=MyDocument.name, interval=timedelta(minutes=5)),
-    schema_inference=True,
 )
 ```
 
