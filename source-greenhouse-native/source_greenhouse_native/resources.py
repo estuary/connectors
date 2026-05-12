@@ -4,13 +4,15 @@ from logging import Logger
 
 from estuary_cdk.flow import CaptureBinding, ValidationError
 from estuary_cdk.capture import Task
-from estuary_cdk.capture.common import BaseDocument, Resource, open_binding
+from estuary_cdk.capture.common import Resource, SnapshotResource, open_binding
 from estuary_cdk.http import HTTPMixin, HTTPError
 
 from .models import (
     INCREMENTAL_RESOURCES,
+    SNAPSHOT_RESOURCES,
     EndpointConfig,
     GreenhouseResource,
+    GreenhouseSnapshotResource,
     GreenhouseTokenSource,
     Interviewers,
     OAUTH2_SPEC,
@@ -22,6 +24,7 @@ from .api import (
     GREENHOUSE_BASE_URL,
     fetch_greenhouse_resources,
     backfill_greenhouse_resources,
+    snapshot_greenhouse_resources,
 )
 
 from .shared import now
@@ -97,6 +100,43 @@ def incremental_resources(
     return resources
 
 
+def snapshot_resources(
+        log: Logger, http: HTTPMixin, config: EndpointConfig
+) -> list[Resource]:
+    def open(
+            stream: type[GreenhouseSnapshotResource],
+            binding: CaptureBinding[ResourceConfig],
+            binding_index: int,
+            state: ResourceState,
+            task: Task,
+            all_bindings
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(
+                snapshot_greenhouse_resources,
+                http,
+                stream,
+            ),
+        )
+
+    resources = [
+        SnapshotResource(
+            name=stream.name,
+            open=functools.partial(open, stream),
+            initial_config=ResourceConfig(
+                name=stream.name, interval=timedelta(minutes=15)
+            ),
+        )
+        for stream in SNAPSHOT_RESOURCES
+    ]
+
+    return resources
+
+
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[Resource]:
@@ -104,4 +144,5 @@ async def all_resources(
 
     return [
         *incremental_resources(log, http, config),
+        *snapshot_resources(log, http, config),
     ]
