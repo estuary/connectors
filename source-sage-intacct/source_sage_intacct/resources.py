@@ -19,6 +19,7 @@ from .models import (
     IncrementalResource,
     ResourceConfig,
     ResourceState,
+    SagePermissionError,
     SnapshotResource,
 )
 from .sage import PAGE_SIZE, Sage
@@ -162,9 +163,37 @@ async def all_resources(
     sage = Sage(log, http, config)
     await sage.setup()
 
+    # Sage gates QUERY access per-object — either via the user's role or
+    # via what the tenant's subscription exposes. Probe each candidate up
+    # front and drop bindings whose probe returns a PL04000005 denial,
+    # rather than failing the whole capture on the first denial. The
+    # warning surfaces Sage's own message so the reader can distinguish
+    # "your role lacks the grant" from "this object isn't queryable here".
+    async def _probe(obj: str) -> tuple[str, str | None]:
+        try:
+            await sage.probe_query_permission(obj)
+            return obj, None
+        except SagePermissionError as e:
+            return obj, str(e)
+
+    object_names = sorted(INCREMENTAL_OBJECTS | SNAPSHOT_OBJECTS)
+    probes = await asyncio.gather(*(_probe(obj) for obj in object_names))
+    accessible_objects = {obj for obj, denial in probes if denial is None}
+    for obj, denial in probes:
+        if denial is not None:
+            log.warning(f"omitting binding for {obj}: {denial}")
+
     started_at = datetime.now(tz=UTC)
-    inc = [incremental_resource(sage, obj, started_at) for obj in INCREMENTAL_OBJECTS]
-    snap = [snapshot_resource(sage, obj) for obj in SNAPSHOT_OBJECTS]
+    inc = [
+        incremental_resource(sage, obj, started_at)
+        for obj in INCREMENTAL_OBJECTS
+        if obj in accessible_objects
+    ]
+    snap = [
+        snapshot_resource(sage, obj)
+        for obj in SNAPSHOT_OBJECTS
+        if obj in accessible_objects
+    ]
 
     # TODO(whb): Add a binding for AUDITHISTORY to capture deletes once we have
     # access to this object type.
