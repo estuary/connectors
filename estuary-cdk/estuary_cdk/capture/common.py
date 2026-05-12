@@ -481,12 +481,16 @@ class SnapshotResource(Resource[_BaseDocument, _BaseResourceConfig, ResourceStat
     work well with the rest of the CDK and Estuary Flow platform.
 
     Sets key to /_meta/row_id (required for CDK deletion inference),
-    initial_state to an empty ResourceState, and reduction_strategy to
-    lastWriteWins — the invariant choices for all snapshot bindings.
+    initial_state to an empty ResourceState, model to BaseDocument
+    with schema_inference enabled (snapshot bindings rely on schema
+    inference rather than a typed model) — the invariant choices
+    for snapshot bindings.
     """
 
     key: list[str] = field(default_factory=lambda: ["/_meta/row_id"])
     initial_state: ResourceState = field(default_factory=ResourceState)
+    model: type[BaseDocument] | Resource.FixedSchema = BaseDocument
+    schema_inference: bool = True
 
 
 def discovered(
