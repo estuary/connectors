@@ -58,6 +58,14 @@ type streamDef struct {
 	KeyColumns   []string
 	DataFields   map[string]*jsonschema.Schema
 	DataRequired []string
+
+	// OmitWhenNull names fields whose null values should be elided from the
+	// emitted document (rather than serialized as JSON null). This is
+	// required for nullable key columns: materialize-boilerplate rejects
+	// nullable keys without a `default` annotation, and the runtime only
+	// substitutes the default for absent properties (not explicit nulls).
+	// Listed names should also have a `default` set in DataFields.
+	OmitWhenNull []string
 }
 
 var streams = map[StreamType]*streamDef{
@@ -76,11 +84,12 @@ var streams = map[StreamType]*streamDef{
 		DataFields: map[string]*jsonschema.Schema{
 			"event_timestamp":          {Type: "integer"},
 			"event_name":               {Type: "string"},
-			"user_pseudo_id":           nullableStringSchema(),
-			"event_bundle_sequence_id": nullableIntegerSchema(),
-			"batch_event_index":        nullableIntegerSchema(),
+			"user_pseudo_id":           nullableStringSchemaWithDefault("unknown"),
+			"event_bundle_sequence_id": nullableIntegerSchemaWithDefault(-1),
+			"batch_event_index":        nullableIntegerSchemaWithDefault(-1),
 		},
 		DataRequired: []string{"event_timestamp", "event_name"},
+		OmitWhenNull: []string{"user_pseudo_id", "event_bundle_sequence_id", "batch_event_index"},
 	},
 	StreamUsers: {
 		Type:         StreamUsers,
@@ -122,12 +131,18 @@ func streamPrefixes() []string {
 	return out
 }
 
-func nullableStringSchema() *jsonschema.Schema {
-	return &jsonschema.Schema{Extras: map[string]any{"type": []string{"string", "null"}}}
+// Nullable schema helpers with a `default` annotation. Required for nullable
+// key fields so that materialize-boilerplate accepts them, since the runtime
+// fills in the default for absent values during materialization. The connector
+// elides these fields (rather than emitting JSON null) for any field listed in
+// streamDef.OmitWhenNull, so the default actually takes effect downstream.
+
+func nullableStringSchemaWithDefault(def string) *jsonschema.Schema {
+	return &jsonschema.Schema{Extras: map[string]any{"type": []string{"string", "null"}, "default": def}}
 }
 
-func nullableIntegerSchema() *jsonschema.Schema {
-	return &jsonschema.Schema{Extras: map[string]any{"type": []string{"integer", "null"}}}
+func nullableIntegerSchemaWithDefault(def int64) *jsonschema.Schema {
+	return &jsonschema.Schema{Extras: map[string]any{"type": []string{"integer", "null"}, "default": def}}
 }
 
 // Discover enumerates GA4 export tables across the configured dataset (or all
