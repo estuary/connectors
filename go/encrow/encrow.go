@@ -19,6 +19,15 @@ type Shape struct {
 	SkipNulls bool             // When true, fields with a nil value will not be serialized.
 }
 
+// OmitField is a sentinel value which, when placed in a row passed to
+// Shape.Encode, causes that field's name prefix and value to be elided
+// from the serialized output entirely. This is distinct from a nil value
+// (which encodes as JSON null unless SkipNulls is enabled) and is useful
+// when only specific fields should be omitted on a per-value basis.
+var OmitField any = &omitFieldSentinel{}
+
+type omitFieldSentinel struct{}
+
 // NewShape constructs a new Shape corresponding to the provided field names.
 func NewShape(fields []string) *Shape {
 	// Construct a list of swizzle indices which order the fields by name.
@@ -90,6 +99,9 @@ func (s *Shape) Encode(buf []byte, values []any) ([]byte, error) {
 	buf = append(buf, '{')
 	for idx, vidx := range s.Swizzle {
 		var v = values[vidx]
+		if v == OmitField {
+			continue
+		}
 		if s.SkipNulls && v == nil {
 			continue
 		}

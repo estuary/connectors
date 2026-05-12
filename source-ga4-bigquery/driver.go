@@ -610,6 +610,7 @@ func (c *capture) queryTable(ctx context.Context, binding *bindingInfo, stream *
 
 	var shape *encrow.Shape
 	var cursorColumnIdx = -1
+	var omitWhenNull []bool // parallel to rows.Schema; true for fields elided when null
 	var rowValues []any
 	var serializedDoc []byte
 	var resultRowCount = 0
@@ -641,6 +642,14 @@ func (c *capture) queryTable(ctx context.Context, binding *bindingInfo, stream *
 			if cursorColumnIdx < 0 {
 				return fmt.Errorf("cursor column %q not present in result schema", stream.CursorColumn)
 			}
+			var omitSet = make(map[string]bool, len(stream.OmitWhenNull))
+			for _, name := range stream.OmitWhenNull {
+				omitSet[name] = true
+			}
+			omitWhenNull = make([]bool, len(rows.Schema))
+			for i, field := range rows.Schema {
+				omitWhenNull[i] = omitSet[field.Name]
+			}
 		}
 		if len(rowValues) != len(row)+1 {
 			rowValues = make([]any, len(row)+1)
@@ -661,7 +670,11 @@ func (c *capture) queryTable(ctx context.Context, binding *bindingInfo, stream *
 			if err != nil {
 				return fmt.Errorf("translating column %q: %w", rows.Schema[i].Name, err)
 			}
-			rowValues[i+1] = translated
+			if translated == nil && omitWhenNull[i] {
+				rowValues[i+1] = encrow.OmitField
+			} else {
+				rowValues[i+1] = translated
+			}
 		}
 
 		// Extract resume cursor and emit checkpoint only when it's been a bit since
