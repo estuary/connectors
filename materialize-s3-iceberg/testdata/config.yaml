@@ -1,11 +1,13 @@
-aws_access_key_id: flow
-aws_secret_access_key: flow
 bucket: test-warehouse
 region: us-east-1
 prefix: warehouse
 namespace: tests
 upload_interval: PT1S
 s3_endpoint: http://localhost:9702
+credentials:
+    auth_type: AWSAccessKey
+    awsAccessKeyId: flow
+    awsSecretAccessKey: flow
 catalog:
     catalog_type: Iceberg REST Server
     uri: http://localhost:9700/api/catalog

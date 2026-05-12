@@ -45,6 +45,24 @@ UUID_COLLECTION = {
     "key_type": "uuid",
 }
 
+# Uses enum values of *different* byte-lengths on purpose, so the exact
+# byte-size tests exercise the per-variant overhead bookkeeping.
+ENUM_VALUES = ["ck0", "ck1", "ck2", "ck3", "ck4", "ck5", "ck6", "ck7", "ck8", "ck9"]
+ENUM_COLLECTION = {
+    "name": "bench/enum",
+    "schema": {
+        "type": "object",
+        "properties": {
+            "id": {"type": "integer"},
+            "val": {"type": "integer"},
+            "cluster_key": {"type": "string", "enum": ENUM_VALUES},
+            "payload": {"type": "string"},
+        },
+        "required": ["id"],
+    },
+    "key": ["/id"],
+}
+
 
 def _scenario(transactions: list[dict], collection: dict | None = None) -> dict:
     return {"collections": [collection or SIMPLE_COLLECTION], "transactions": transactions}
@@ -189,6 +207,255 @@ class TestOverlap(unittest.TestCase):
                 ]
             )
 
+    def test_overlap_range_restricts_to_tail(self):
+        """range: [0.6, 1.0] should sample only from the last 40% of the source tx."""
+        lines, state = _run(
+            [
+                {"doc_count": 100, "doc_size": 256},
+                {
+                    "doc_count": 100,
+                    "doc_size": 256,
+                    "overlaps": [
+                        {"with": 0, "fraction": 0.20, "op": "u", "range": [0.6, 1.0]},
+                    ],
+                },
+            ]
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        tx1_docs = docs[100:]
+        update_keys = [d["id"] for c, d in tx1_docs if d["_meta"]["op"] == "u"]
+        self.assertEqual(len(update_keys), 20)
+        # Tx 0 used keys [0, 100); the last 40% is [60, 100).
+        self.assertTrue(all(60 <= k < 100 for k in update_keys),
+                        f"expected all keys in [60, 100), got {sorted(update_keys)}")
+
+    def test_overlap_range_restricts_to_head(self):
+        lines, _ = _run(
+            [
+                {"doc_count": 100, "doc_size": 256},
+                {
+                    "doc_count": 100,
+                    "doc_size": 256,
+                    "overlaps": [
+                        {"with": 0, "fraction": 0.10, "op": "u", "range": [0.0, 0.25]},
+                    ],
+                },
+            ]
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        tx1_docs = docs[100:]
+        update_keys = [d["id"] for c, d in tx1_docs if d["_meta"]["op"] == "u"]
+        self.assertEqual(len(update_keys), 10)
+        # First 25% of tx 0 is [0, 25).
+        self.assertTrue(all(0 <= k < 25 for k in update_keys),
+                        f"expected all keys in [0, 25), got {sorted(update_keys)}")
+
+    def test_overlap_range_invalid_bounds(self):
+        for bad in ([0.5, 0.5], [0.7, 0.3], [-0.1, 0.5], [0.5, 1.1], [0.5]):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    _run(
+                        [
+                            {"doc_count": 10, "doc_size": 256},
+                            {
+                                "doc_count": 10,
+                                "doc_size": 256,
+                                "overlaps": [
+                                    {"with": 0, "fraction": 0.5, "op": "u", "range": bad},
+                                ],
+                            },
+                        ]
+                    )
+
+    def test_overlap_range_too_narrow_for_fraction(self):
+        # 50% of 10 docs = 5 keys, but range covers only 2 keys of source.
+        with self.assertRaises(ValueError):
+            _run(
+                [
+                    {"doc_count": 10, "doc_size": 256},
+                    {
+                        "doc_count": 10,
+                        "doc_size": 256,
+                        "overlaps": [
+                            {"with": 0, "fraction": 0.5, "op": "u", "range": [0.0, 0.2]},
+                        ],
+                    },
+                ]
+            )
+
+
+class TestZipfianDistribution(unittest.TestCase):
+    """Zipfian-weighted overlap sampling: biases overlap keys towards one
+    end of the source tx's (sub-)range with a long-tail decay. Useful for
+    modelling real-world hot-spot updates."""
+
+    def _zipf_update_keys(self, distribution_kwargs: dict, seed: int = 0):
+        lines, _ = _run(
+            [
+                {"doc_count": 1000, "doc_size": 256},
+                {
+                    "doc_count": 1000,
+                    "doc_size": 256,
+                    "overlaps": [
+                        {"with": 0, "fraction": 0.20, "op": "u", **distribution_kwargs},
+                    ],
+                },
+            ],
+            seed=seed,
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        return [d["id"] for _, d in docs[1000:] if d["_meta"]["op"] == "u"]
+
+    def test_zipfian_biases_to_tail(self):
+        keys = self._zipf_update_keys({"distribution": "zipfian", "zipf_s": 1.5})
+        self.assertEqual(len(keys), 200)
+        # Tx 0 spans [0, 1000). With heavy tail bias, mass should sit
+        # well above the midpoint. Median > 700 is a stable threshold for
+        # s=1.5: empirically the median floats around 850.
+        median = sorted(keys)[len(keys) // 2]
+        self.assertGreater(median, 700, f"expected median key > 700, got {median}")
+        # And the top decile should contain a disproportionate share of picks.
+        top_decile_share = sum(1 for k in keys if k >= 900) / len(keys)
+        self.assertGreater(top_decile_share, 0.30,
+                           f"top 10% of range should hold >30% of picks, got {top_decile_share:.2%}")
+
+    def test_zipfian_biases_to_head(self):
+        keys = self._zipf_update_keys(
+            {"distribution": "zipfian", "zipf_s": 1.5, "zipf_bias": "head"}
+        )
+        median = sorted(keys)[len(keys) // 2]
+        self.assertLess(median, 300, f"expected median key < 300, got {median}")
+
+    def test_zipfian_no_replacement(self):
+        keys = self._zipf_update_keys({"distribution": "zipfian", "zipf_s": 1.5})
+        self.assertEqual(len(keys), len(set(keys)),
+                         "zipfian sampling must not produce duplicate keys")
+
+    def test_zipfian_deterministic(self):
+        a = self._zipf_update_keys({"distribution": "zipfian", "zipf_s": 1.2}, seed=11)
+        b = self._zipf_update_keys({"distribution": "zipfian", "zipf_s": 1.2}, seed=11)
+        self.assertEqual(a, b)
+        c = self._zipf_update_keys({"distribution": "zipfian", "zipf_s": 1.2}, seed=12)
+        self.assertNotEqual(sorted(a), sorted(c))
+
+    def test_zipfian_with_subrange(self):
+        # Combine zipfian-tail with a [0.6, 1.0] sub-range: keys must lie in
+        # the last 40% of tx 0, AND skew towards the upper edge of THAT.
+        lines, _ = _run(
+            [
+                {"doc_count": 1000, "doc_size": 256},
+                {
+                    "doc_count": 1000,
+                    "doc_size": 256,
+                    "overlaps": [
+                        {
+                            "with": 0,
+                            "fraction": 0.10,
+                            "op": "u",
+                            "range": [0.6, 1.0],
+                            "distribution": "zipfian",
+                            "zipf_s": 1.5,
+                        },
+                    ],
+                },
+            ]
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        keys = [d["id"] for _, d in docs[1000:] if d["_meta"]["op"] == "u"]
+        self.assertEqual(len(keys), 100)
+        # All keys in the [0.6, 1.0] sub-range = [600, 1000).
+        self.assertTrue(all(600 <= k < 1000 for k in keys),
+                        f"expected all keys in [600, 1000), got min={min(keys)} max={max(keys)}")
+        # Tail bias: median should still skew above the sub-range midpoint (800).
+        median = sorted(keys)[len(keys) // 2]
+        self.assertGreater(median, 800, f"expected median > 800, got {median}")
+
+    def test_zipfian_disjoint_with_exclusions(self):
+        # Two overlap entries against the same source tx must produce
+        # disjoint key sets (existing invariant) under zipfian too.
+        lines, _ = _run(
+            [
+                {"doc_count": 1000, "doc_size": 256},
+                {
+                    "doc_count": 1000,
+                    "doc_size": 256,
+                    "overlaps": [
+                        {"with": 0, "fraction": 0.20, "op": "u",
+                         "distribution": "zipfian", "zipf_s": 1.5},
+                        {"with": 0, "fraction": 0.10, "op": "d",
+                         "distribution": "zipfian", "zipf_s": 1.5},
+                    ],
+                },
+            ]
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        tx1_docs = docs[1000:]
+        update_keys = {d["id"] for _, d in tx1_docs if d["_meta"]["op"] == "u"}
+        delete_keys = {d["id"] for _, d in tx1_docs if d["_meta"]["op"] == "d"}
+        self.assertEqual(len(update_keys), 200)
+        self.assertEqual(len(delete_keys), 100)
+        self.assertTrue(update_keys.isdisjoint(delete_keys))
+
+    def test_zipfian_sub_s_approaches_uniform(self):
+        # s=0.01 (almost flat) should look roughly uniform over the range.
+        keys = self._zipf_update_keys(
+            {"distribution": "zipfian", "zipf_s": 0.01}, seed=3,
+        )
+        # Mean within a generous band around the uniform mean of 499.5.
+        mean = sum(keys) / len(keys)
+        self.assertGreater(mean, 350)
+        self.assertLess(mean, 650)
+
+    def test_invalid_distribution_rejected(self):
+        with self.assertRaises(ValueError):
+            _run(
+                [
+                    {"doc_count": 100, "doc_size": 256},
+                    {
+                        "doc_count": 100,
+                        "doc_size": 256,
+                        "overlaps": [
+                            {"with": 0, "fraction": 0.2, "op": "u",
+                             "distribution": "lognormal"},
+                        ],
+                    },
+                ]
+            )
+
+    def test_invalid_zipf_s_rejected(self):
+        for bad in (0, -1.0):
+            with self.subTest(s=bad):
+                with self.assertRaises(ValueError):
+                    _run(
+                        [
+                            {"doc_count": 100, "doc_size": 256},
+                            {
+                                "doc_count": 100,
+                                "doc_size": 256,
+                                "overlaps": [
+                                    {"with": 0, "fraction": 0.2, "op": "u",
+                                     "distribution": "zipfian", "zipf_s": bad},
+                                ],
+                            },
+                        ]
+                    )
+
+    def test_invalid_zipf_bias_rejected(self):
+        with self.assertRaises(ValueError):
+            _run(
+                [
+                    {"doc_count": 100, "doc_size": 256},
+                    {
+                        "doc_count": 100,
+                        "doc_size": 256,
+                        "overlaps": [
+                            {"with": 0, "fraction": 0.2, "op": "u",
+                             "distribution": "zipfian", "zipf_bias": "middle"},
+                        ],
+                    },
+                ]
+            )
+
 
 class TestManualLineAssembly(unittest.TestCase):
     """The fast path assembles the fixture line by string fragments rather
@@ -300,6 +567,81 @@ class TestUUIDKeys(unittest.TestCase):
         bad_collection = dict(UUID_COLLECTION, key_type="sha256")
         with self.assertRaises(ValueError):
             _run([{"doc_count": 1, "doc_size": 256}], collection=bad_collection)
+
+
+class TestEnumFields(unittest.TestCase):
+    def test_values_from_enum_set(self):
+        lines, _ = _run(
+            [{"doc_count": 200, "doc_size": 256}], collection=ENUM_COLLECTION
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        self.assertEqual(len(docs), 200)
+        for _, doc in docs:
+            self.assertIn(doc["cluster_key"], ENUM_VALUES)
+
+    def test_exact_byte_size_with_enum(self):
+        # With variable-length enum values, per-variant overhead must drive
+        # payload padding correctly so each doc still hits doc_size exactly.
+        lines, _ = _run(
+            [{"doc_count": 200, "doc_size": 256}], collection=ENUM_COLLECTION
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        for _, doc in docs:
+            encoded = json.dumps(doc, separators=(",", ":"))
+            self.assertEqual(len(encoded.encode("utf-8")), 256)
+
+    def test_distribution_covers_all_enum_values(self):
+        # Keys are allocated as [0, N), and variant selection is
+        # key % len(enum), so all values must appear when N >> len(enum).
+        lines, _ = _run(
+            [{"doc_count": 500, "doc_size": 256}], collection=ENUM_COLLECTION
+        )
+        docs = [json.loads(l) for l in lines if not l.startswith("{")]
+        seen = {d["cluster_key"] for _, d in docs}
+        self.assertEqual(seen, set(ENUM_VALUES))
+
+    def test_enum_deterministic(self):
+        a, _ = _run(
+            [{"doc_count": 100, "doc_size": 256}], seed=7, collection=ENUM_COLLECTION
+        )
+        b, _ = _run(
+            [{"doc_count": 100, "doc_size": 256}], seed=7, collection=ENUM_COLLECTION
+        )
+        self.assertEqual(a, b)
+
+    def test_empty_enum_rejected(self):
+        bad = {
+            "name": "bench/bad-enum",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "cluster_key": {"type": "string", "enum": []},
+                    "payload": {"type": "string"},
+                },
+                "required": ["id"],
+            },
+            "key": ["/id"],
+        }
+        with self.assertRaises(ValueError):
+            _run([{"doc_count": 1, "doc_size": 256}], collection=bad)
+
+    def test_non_scalar_enum_rejected(self):
+        bad = {
+            "name": "bench/bad-enum",
+            "schema": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "cluster_key": {"enum": [{"nested": "object"}]},
+                    "payload": {"type": "string"},
+                },
+                "required": ["id"],
+            },
+            "key": ["/id"],
+        }
+        with self.assertRaises(ValueError):
+            _run([{"doc_count": 1, "doc_size": 256}], collection=bad)
 
 
 class TestDeterminism(unittest.TestCase):

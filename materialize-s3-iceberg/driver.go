@@ -114,22 +114,19 @@ func (c config) Validate() error {
 		}
 	}
 
-	hasLegacy := c.AWSAccessKeyID != "" || c.AWSSecretAccessKey != ""
-	hasNew := c.Credentials != nil
-
-	if hasLegacy && hasNew {
-		return fmt.Errorf("cannot specify both top-level aws_access_key_id/aws_secret_access_key and credentials")
-	} else if !hasLegacy && !hasNew {
-		return fmt.Errorf("must provide either credentials or aws_access_key_id/aws_secret_access_key")
-	} else if hasLegacy {
+	if c.Credentials != nil {
+		if err := c.Credentials.Validate(); err != nil {
+			return err
+		}
+	} else if c.AWSAccessKeyID != "" || c.AWSSecretAccessKey != "" {
 		if c.AWSAccessKeyID == "" {
 			return fmt.Errorf("missing 'aws_access_key_id'")
 		}
 		if c.AWSSecretAccessKey == "" {
 			return fmt.Errorf("missing 'aws_secret_access_key'")
 		}
-	} else if err := c.Credentials.Validate(); err != nil {
-		return err
+	} else {
+		return fmt.Errorf("must provide credentials")
 	}
 
 	if c.Catalog.CatalogType == "" {

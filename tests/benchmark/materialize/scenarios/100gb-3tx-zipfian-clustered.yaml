@@ -1,0 +1,58 @@
+# 100 GB across three equal transactions (~33.3 GB each) with zipfian-
+# distributed updates: each tx updates keys drawn from the entire previous
+# tx's fresh range, but with probability ∝ 1/rank^s where rank=1 sits at
+# the tail (newest) end. The most recent rows get hammered while a long
+# tail of older rows still receives occasional touches — a closer match
+# to real workloads than either pure uniform overlap or the hard
+# `range: [0.6, 1.0]` cutoff used in the recency-biased scenarios.
+#
+# This variant enables Snowflake automatic clustering on the primary key
+# and materializes to a separate table (wide_zipfian_clustered) so it can
+# coexist with 100gb-3tx-zipfian.yaml for side-by-side comparison.
+# Compared to 100gb-3tx-recency-biased-clustered.yaml, this exercises a
+# more realistic update shape: heavy mass on recent keys (where pruning
+# is easy) plus a long tail of older keys (where pruning is harder).
+#
+# Overlap math (1KB docs, ~34.6M docs per 33GB):
+#   tx1: 20% overlap of 34.6M = 6.9M keys, drawn zipfian-tail (s=1.0)
+#        from the full 34.6M of tx0's keys. 26.7M fresh allocated.
+#   tx2: 20% overlap of 35.6M = 7.1M keys, drawn zipfian-tail (s=1.0)
+#        from the full ~28.5M of tx1's fresh range. 28.5M fresh allocated.
+collections:
+  - name: bench/wide
+    schema:
+      type: object
+      if:
+        properties:
+          _meta:
+            properties: { op: { const: d } }
+      then:
+        reduce: { delete: true, strategy: lastWriteWins }
+      properties:
+        id:      { type: integer }
+        val:     { type: integer }
+        payload: { type: string }
+        _meta:
+          type: object
+          properties: { op: { type: string } }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+    resource:
+      table: wide_zipfian_clustered
+      clustering: id
+
+transactions:
+  - total_size: 33GB
+    doc_size:   1KB
+    op: c
+
+  - total_size: 33GB
+    doc_size:   1KB
+    overlaps:
+      - { with: 0, fraction: 0.20, op: u, distribution: zipfian, zipf_s: 1.0, zipf_bias: tail }
+
+  - total_size: 34GB
+    doc_size:   1KB
+    overlaps:
+      - { with: 1, fraction: 0.20, op: u, distribution: zipfian, zipf_s: 1.0, zipf_bias: tail }

@@ -1,12 +1,12 @@
 import asyncio
 from dataclasses import dataclass
-from typing import Any, AsyncGenerator, Awaitable, TypeVar
+from typing import Any, AsyncGenerator, Awaitable, Generic, TypeVar
 
 T = TypeVar("T")
 
 
 @dataclass
-class BufferWork[T]:
+class BufferWork(Generic[T]):
     aw: Awaitable[T]
     result: asyncio.Queue[T | None]
 

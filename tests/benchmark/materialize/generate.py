@@ -20,7 +20,10 @@ Usage:
 """
 
 import argparse
+import heapq
+import itertools
 import json
+import math
 import random
 import string
 import sys
@@ -80,6 +83,23 @@ class OverlapSpec:
     with_tx: int
     fraction: float
     op: Literal["u", "d"]
+    # Sub-range of the source tx's key space to sample from, expressed as
+    # fractions in [0, 1]. Defaults to the full range. For example,
+    # (0.6, 1.0) restricts sampling to the last 40% of the source tx's keys
+    # — useful for modelling recency-biased update patterns.
+    range_lo: float = 0.0
+    range_hi: float = 1.0
+    # Sampling distribution within the (sub-)range:
+    # - "uniform" (default): each key equally likely.
+    # - "zipfian": each key drawn with probability ∝ 1/rank^s with rank=1
+    #   sitting at the biased end (zipf_bias). Models hot-spot workloads
+    #   where a small set of keys near one end of the range gets the bulk
+    #   of activity, with a long tail across the rest. Real-world updates
+    #   often concentrate on the most recent rows but occasionally reach
+    #   back into older ones — that's the shape this captures.
+    distribution: Literal["uniform", "zipfian"] = "uniform"
+    zipf_s: float = 1.0
+    zipf_bias: Literal["tail", "head"] = "tail"
 
 
 @dataclass
@@ -150,6 +170,23 @@ def load_scenario(path: str) -> tuple[dict[str, CollectionSpec], list[TxSpec]]:
             raise ValueError(
                 f"collection {spec.name}: payload_field '{spec.payload_field}' not in schema.properties"
             )
+        for prop_name, prop_schema in spec.schema.get("properties", {}).items():
+            if not isinstance(prop_schema, dict) or "enum" not in prop_schema:
+                continue
+            if prop_name in (spec.key_field, spec.payload_field):
+                raise ValueError(
+                    f"collection {spec.name}: enum not supported on key or payload field {prop_name!r}"
+                )
+            values = prop_schema["enum"]
+            if not isinstance(values, list) or not values:
+                raise ValueError(
+                    f"collection {spec.name}: property {prop_name!r} enum must be a non-empty list"
+                )
+            for v in values:
+                if v is not None and not isinstance(v, (str, int, float, bool)):
+                    raise ValueError(
+                        f"collection {spec.name}: property {prop_name!r} enum value {v!r} is not a JSON scalar"
+                    )
         collections[spec.name] = spec
 
     if not collections:
@@ -160,10 +197,52 @@ def load_scenario(path: str) -> tuple[dict[str, CollectionSpec], list[TxSpec]]:
     transactions: list[TxSpec] = []
     for i, t in enumerate(raw.get("transactions", [])):
         doc_count, doc_size = _resolve_sizing(t, i)
-        overlaps = [
-            OverlapSpec(with_tx=int(o["with"]), fraction=float(o["fraction"]), op=o["op"])
-            for o in t.get("overlaps", [])
-        ]
+        overlaps = []
+        for o in t.get("overlaps", []):
+            range_spec = o.get("range")
+            if range_spec is None:
+                rlo, rhi = 0.0, 1.0
+            else:
+                if not isinstance(range_spec, list) or len(range_spec) != 2:
+                    raise ValueError(
+                        f"transaction[{i}]: overlap.range must be a [lo, hi] list "
+                        f"(got {range_spec!r})"
+                    )
+                rlo, rhi = float(range_spec[0]), float(range_spec[1])
+                if not (0.0 <= rlo < rhi <= 1.0):
+                    raise ValueError(
+                        f"transaction[{i}]: overlap.range must satisfy "
+                        f"0 <= lo < hi <= 1 (got [{rlo}, {rhi}])"
+                    )
+            distribution = o.get("distribution", "uniform")
+            if distribution not in ("uniform", "zipfian"):
+                raise ValueError(
+                    f"transaction[{i}]: overlap.distribution must be "
+                    f"'uniform' or 'zipfian' (got {distribution!r})"
+                )
+            zipf_s = float(o.get("zipf_s", 1.0))
+            if zipf_s <= 0:
+                raise ValueError(
+                    f"transaction[{i}]: overlap.zipf_s must be > 0 (got {zipf_s})"
+                )
+            zipf_bias = o.get("zipf_bias", "tail")
+            if zipf_bias not in ("tail", "head"):
+                raise ValueError(
+                    f"transaction[{i}]: overlap.zipf_bias must be "
+                    f"'tail' or 'head' (got {zipf_bias!r})"
+                )
+            overlaps.append(
+                OverlapSpec(
+                    with_tx=int(o["with"]),
+                    fraction=float(o["fraction"]),
+                    op=o["op"],
+                    range_lo=rlo,
+                    range_hi=rhi,
+                    distribution=distribution,
+                    zipf_s=zipf_s,
+                    zipf_bias=zipf_bias,
+                )
+            )
         for o in overlaps:
             if o.op not in ("u", "d"):
                 raise ValueError(f"transaction[{i}]: overlap op must be 'u' or 'd' (got {o.op!r})")
@@ -264,14 +343,21 @@ def _make_pool(seed: int, size: int) -> str:
 
 def _build_emit_template(
     col: CollectionSpec, op: str
-) -> tuple[str, str, str, int]:
-    """Return (prefix, middle, suffix, fixed_overhead) for one (collection, op).
+) -> list[tuple[str, str, str, int]]:
+    """Return a list of (prefix, middle, suffix, fixed_overhead) variants
+    for one (collection, op).
 
     Emitted line: prefix + str(key) + middle + payload_slice + suffix
     (suffix already includes the trailing newline).
 
     fixed_overhead = len(prefix) + len(middle) + len(suffix), so
-    payload_len = doc_size - fixed_overhead - len(str(key))."""
+    payload_len = doc_size - fixed_overhead - len(str(key)).
+
+    When a property has a JSON Schema `enum`, each enum value produces a
+    distinct variant. Variants span the cross-product of all enum fields,
+    so selecting by `key % len(variants)` at emit time spreads enum values
+    evenly across docs without per-doc RNG. When no field has an enum,
+    the returned list has exactly one tuple."""
     props = col.schema.get("properties", {})
     if col.key_field not in props:
         raise ValueError(f"collection {col.name}: key_field {col.key_field!r} not in schema.properties")
@@ -291,6 +377,8 @@ def _build_emit_template(
     doc_parts: list[str] = ["{"]
     key_slot: int = -1
     payload_slot: int = -1
+    # (values, slot_index) per enum field, in property order.
+    enum_slots: list[tuple[list[Any], int]] = []
     first = True
 
     key_is_string = col.key_type == "uuid"
@@ -313,6 +401,10 @@ def _build_emit_template(
             payload_slot = len(doc_parts)
             doc_parts.append("")  # filled with pool_slice at emit time
             doc_parts.append('"')
+        elif "enum" in props[name]:
+            doc_parts.append(f'{sep}"{name}":')
+            enum_slots.append((props[name]["enum"], len(doc_parts)))
+            doc_parts.append("")  # filled per variant below
         else:
             val = _fixed_scalar(name, props[name])
             doc_parts.append(f'{sep}"{name}":{json.dumps(val, separators=(",", ":"))}')
@@ -323,21 +415,38 @@ def _build_emit_template(
     doc_parts.append(f'{meta_sep}"_meta":{{"op":"{op}"}}')
     doc_parts.append("}")
 
-    doc_prefix = "".join(doc_parts[:key_slot])
-    doc_middle = "".join(doc_parts[key_slot + 1 : payload_slot])
-    doc_suffix = "".join(doc_parts[payload_slot + 1 :])
-    # `overhead` measures the doc's static bytes only -- so that
-    # payload_len = doc_size - overhead - len(str(key)) makes each
-    # emitted DOC exactly doc_size bytes (the fixture envelope is extra).
-    overhead = len(doc_prefix) + len(doc_middle) + len(doc_suffix)
-
     # Wrap the doc in the fixture envelope: ["<collection>",<doc>]\n.
     envelope_prefix = f'["{col.name}",'
     envelope_suffix = "]\n"
-    prefix = envelope_prefix + doc_prefix
-    middle = doc_middle
-    suffix = doc_suffix + envelope_suffix
-    return prefix, middle, suffix, overhead
+
+    # Expand the cross-product of enum values into a list of concrete
+    # variants. itertools.product() with no iterables yields a single
+    # empty tuple, which produces one variant (today's behavior).
+    value_lists = [values for values, _ in enum_slots]
+    slot_indices = [idx for _, idx in enum_slots]
+
+    variants: list[tuple[str, str, str, int]] = []
+    for combo in itertools.product(*value_lists):
+        parts = list(doc_parts)
+        for slot_idx, value in zip(slot_indices, combo):
+            parts[slot_idx] = json.dumps(value, separators=(",", ":"))
+
+        doc_prefix = "".join(parts[:key_slot])
+        doc_middle = "".join(parts[key_slot + 1 : payload_slot])
+        doc_suffix = "".join(parts[payload_slot + 1 :])
+        # `overhead` measures the doc's static bytes only -- so that
+        # payload_len = doc_size - overhead - len(str(key)) makes each
+        # emitted DOC exactly doc_size bytes (the fixture envelope is extra).
+        overhead = len(doc_prefix) + len(doc_middle) + len(doc_suffix)
+        variants.append(
+            (
+                envelope_prefix + doc_prefix,
+                doc_middle,
+                doc_suffix + envelope_suffix,
+                overhead,
+            )
+        )
+    return variants
 
 
 # ---------------------------------------------------------------------------
@@ -364,29 +473,101 @@ class CollectionState:
         self.tx_ranges[tx_idx] = (start, count)
 
     def sample_from_tx(
-        self, tx_idx: int, n: int, exclude: set[int], rng: random.Random
+        self,
+        tx_idx: int,
+        n: int,
+        exclude: set[int],
+        rng: random.Random,
+        range_lo: float = 0.0,
+        range_hi: float = 1.0,
+        distribution: str = "uniform",
+        zipf_s: float = 1.0,
+        zipf_bias: str = "tail",
     ) -> list[int]:
-        """Sample n keys from tx_idx's key range, excluding `exclude`."""
+        """Sample n keys from tx_idx's key range, excluding `exclude`.
+
+        range_lo/range_hi restrict sampling to a sub-range of the source tx's
+        keys, expressed as fractions in [0, 1]. The defaults sample from the
+        full range (preserves prior behaviour).
+
+        distribution selects the sampling distribution within the sub-range:
+        "uniform" (each key equally likely) or "zipfian" (probability
+        ∝ 1/rank^s with rank=1 at zipf_bias's end of the sub-range).
+        """
         start, count = self.tx_ranges[tx_idx]
         if count == 0:
             raise ValueError(f"cannot overlap with tx {tx_idx}: it allocated no keys")
+        sub_start = start + int(count * range_lo)
+        sub_end = start + int(count * range_hi)
+        sub_count = sub_end - sub_start
+
+        if distribution == "zipfian":
+            available = sub_count - (
+                sum(1 for k in exclude if sub_start <= k < sub_end) if exclude else 0
+            )
+            if n > available:
+                raise ValueError(
+                    f"overlap requests {n} keys from tx {tx_idx} sub-range "
+                    f"[{range_lo}, {range_hi}) after exclusions, only {available} available"
+                )
+            return _sample_zipfian(
+                sub_start, sub_end, n, exclude, rng, zipf_s, zipf_bias
+            )
+
         # Fast path: when exclude is empty we can sample directly from range().
         if not exclude:
-            if n > count:
+            if n > sub_count:
                 raise ValueError(
-                    f"overlap requests {n} keys from tx {tx_idx} which only has {count}"
+                    f"overlap requests {n} keys from tx {tx_idx} sub-range "
+                    f"[{range_lo}, {range_hi}) which only has {sub_count}"
                 )
-            return rng.sample(range(start, start + count), n)
+            return rng.sample(range(sub_start, sub_end), n)
         # With exclusions, fall back to building the candidate list. This
         # is acceptable because cross-overlap exclusions within one tx are
         # bounded by the tx's overlap size (not by total doc count).
-        candidates = [k for k in range(start, start + count) if k not in exclude]
+        candidates = [k for k in range(sub_start, sub_end) if k not in exclude]
         if n > len(candidates):
             raise ValueError(
-                f"overlap requests {n} keys from tx {tx_idx} after exclusions, "
-                f"only {len(candidates)} available"
+                f"overlap requests {n} keys from tx {tx_idx} sub-range "
+                f"[{range_lo}, {range_hi}) after exclusions, only {len(candidates)} available"
             )
         return rng.sample(candidates, n)
+
+
+def _sample_zipfian(
+    sub_start: int,
+    sub_end: int,
+    n: int,
+    exclude: set[int],
+    rng: random.Random,
+    s: float,
+    bias: str,
+) -> list[int]:
+    """Weighted sample without replacement using the Efraimidis-Spirakis
+    A-Res reservoir trick. Each key i gets weight 1/rank(i)^s with rank=1
+    at the biased end of [sub_start, sub_end); we assign each key a
+    priority log(u)/weight = log(u) * rank^s and keep the top-n priorities
+    (closest to zero, since both factors push priority negative).
+
+    Heavy mass on a few keys near the bias end, with a long tail decaying
+    over the rest of the sub-range. O(N log n) time, O(n) heap space —
+    fine at fixture-generation sizes.
+    """
+    heap: list[tuple[float, int]] = []
+    for i in range(sub_start, sub_end):
+        if i in exclude:
+            continue
+        if bias == "tail":
+            rank = sub_end - i  # rank 1 at sub_end - 1 (the tail).
+        else:
+            rank = i - sub_start + 1  # rank 1 at sub_start (the head).
+        u = rng.random() or 1e-300  # guard against log(0).
+        priority = math.log(u) * (rank ** s)
+        if len(heap) < n:
+            heapq.heappush(heap, (priority, i))
+        elif priority > heap[0][0]:
+            heapq.heapreplace(heap, (priority, i))
+    return [i for _, i in heap]
 
 
 # ---------------------------------------------------------------------------
@@ -426,7 +607,17 @@ def _resolve_op_plan(
             plans.append(OverlapPlan(op=o.op, src_tx=o.with_tx, keys=[]))
             continue
         used = used_per_tx.setdefault(o.with_tx, set())
-        keys = state.sample_from_tx(o.with_tx, n, used, rng)
+        keys = state.sample_from_tx(
+            o.with_tx,
+            n,
+            used,
+            rng,
+            range_lo=o.range_lo,
+            range_hi=o.range_hi,
+            distribution=o.distribution,
+            zipf_s=o.zipf_s,
+            zipf_bias=o.zipf_bias,
+        )
         used.update(keys)
         plans.append(OverlapPlan(op=o.op, src_tx=o.with_tx, keys=keys))
 
@@ -456,8 +647,10 @@ def emit(
     pool = _make_pool(seed, pool_size)
 
     # Precompute per-(collection, op) line templates. Computed once up front,
-    # then the emit loop just does string concatenation + writes.
-    templates: dict[tuple[str, str], tuple[str, str, str, int]] = {}
+    # then the emit loop just does string concatenation + writes. Each entry
+    # is a list of variants when the schema has enum fields (one per value
+    # combination), otherwise a single-element list.
+    templates: dict[tuple[str, str], list[tuple[str, str, str, int]]] = {}
     for tx in transactions:
         col = collections[tx.collection]
         for op in {tx.op} | {o.op for o in tx.overlaps}:
@@ -495,8 +688,10 @@ def emit(
         format_key = _int_key_to_uuid if col.key_type == "uuid" else str
 
         def _emit_run(keys, op: str) -> None:
-            prefix, middle, suffix, overhead = templates[(col.name, op)]
+            variants = templates[(col.name, op)]
+            n_variants = len(variants)
             for key in keys:
+                prefix, middle, suffix, overhead = variants[key % n_variants]
                 key_s = format_key(key)
                 pad = doc_size - overhead - len(key_s)
                 if pad < 0:

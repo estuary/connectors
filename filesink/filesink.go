@@ -67,11 +67,11 @@ type StreamWriter interface {
 	Close() error
 }
 
-type resource struct {
+type Resource struct {
 	Path string `json:"path" jsonschema:"title=Path,description=The path that objects will be materialized to." jsonschema_extras:"x-collection-name=true"`
 }
 
-func (r resource) Validate() error {
+func (r Resource) Validate() error {
 	if r.Path == "" {
 		return fmt.Errorf("missing 'path'")
 	}
@@ -87,14 +87,14 @@ func (fc fieldConfig) Validate() error {
 	return nil
 }
 
-var _ boilerplate.Connector = &FileDriver[*SinglePhase]{}
+var _ boilerplate.Connector = &FileDriver[*SinglePhase, Resource]{}
 
 type Upload interface {
 	FileKey() string
 }
 
 // FileDriver contains the behaviors particular to a destination system and file format.
-type FileDriver[T Upload] struct {
+type FileDriver[T Upload, R any] struct {
 	NewConfig        func(raw json.RawMessage) (Config, error)
 	NewStore         func(ctx context.Context, config Config, featureFlags map[string]bool) (Store[T], error)
 	NewWriter        func(config Config, featureFlags map[string]bool, b *pf.MaterializationSpec_Binding, w io.WriteCloser) (StreamWriter, error)
@@ -103,11 +103,11 @@ type FileDriver[T Upload] struct {
 	ConfigSchema     func() ([]byte, error)
 }
 
-func (d FileDriver[T]) Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error) {
+func (d FileDriver[T, R]) Apply(context.Context, *pm.Request_Apply) (*pm.Response_Applied, error) {
 	return &pm.Response_Applied{}, nil
 }
 
-func (d FileDriver[T]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
+func (d FileDriver[T, R]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec, error) {
 	if err := req.Validate(); err != nil {
 		return nil, fmt.Errorf("validating request: %w", err)
 	}
@@ -117,7 +117,7 @@ func (d FileDriver[T]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Resp
 		return nil, fmt.Errorf("generating endpoint schema: %w", err)
 	}
 
-	resourceSchema, err := schemagen.GenerateSchema("ResourceConfig", &resource{}).MarshalJSON()
+	resourceSchema, err := schemagen.GenerateSchema("ResourceConfig", new(R)).MarshalJSON()
 	if err != nil {
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
@@ -129,7 +129,7 @@ func (d FileDriver[T]) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Resp
 	}, nil
 }
 
-func (d FileDriver[T]) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
+func (d FileDriver[T, R]) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
 	var out []*pm.Response_Validated_Binding
 
 	var config, err = d.NewConfig(req.ConfigJson)
@@ -138,7 +138,7 @@ func (d FileDriver[T]) Validate(ctx context.Context, req *pm.Request_Validate) (
 	}
 
 	for _, b := range req.Bindings {
-		var res resource
+		var res Resource
 		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
 			return nil, fmt.Errorf("parsing resource config: %w", err)
 		}
@@ -159,7 +159,7 @@ func (d FileDriver[T]) Validate(ctx context.Context, req *pm.Request_Validate) (
 	return &pm.Response_Validated{Bindings: out}, nil
 }
 
-func (d FileDriver[T]) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
+func (d FileDriver[T, R]) NewTransactor(ctx context.Context, open pm.Request_Open, _ *m.BindingEvents) (m.Transactor, *pm.Response_Opened, *m.MaterializeOptions, error) {
 	driverCfg, err := d.NewConfig(open.Materialization.ConfigJson)
 	if err != nil {
 		return nil, nil, nil, err
@@ -179,7 +179,7 @@ func (d FileDriver[T]) NewTransactor(ctx context.Context, open pm.Request_Open, 
 	bindings := make([]binding, 0, len(open.Materialization.Bindings))
 
 	for _, b := range open.Materialization.Bindings {
-		var res resource
+		var res Resource
 		if err := pf.UnmarshalStrict(b.ResourceConfigJson, &res); err != nil {
 			return nil, nil, nil, err
 		}

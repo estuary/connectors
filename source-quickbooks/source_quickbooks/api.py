@@ -15,6 +15,9 @@ from .models import QuickBooksEntity
 PAGE_SIZE = 1000
 TARGET_FETCH_PAGE_INVOCATION_RUN_TIME = timedelta(minutes=5)
 
+PROD_API_BASE_URL = "https://quickbooks.api.intuit.com"
+SANDBOX_API_BASE_URL = "https://sandbox-quickbooks.api.intuit.com"
+
 T = TypeVar("T", bound=QuickBooksEntity)
 
 
@@ -23,10 +26,11 @@ async def query_entity(
     start_date: datetime,
     end_date: datetime,
     http: HTTPSession,
+    base_url: str,
     realm_id: str,
     log: Logger,
 ) -> AsyncGenerator[T, None]:
-    url = f"https://quickbooks.api.intuit.com/v3/company/{realm_id}/query"
+    url = f"{base_url}/v3/company/{realm_id}/query"
     query_offset = 0
 
     while True:
@@ -66,6 +70,7 @@ async def query_entity(
 async def backfill_entity(
     model: type[T],
     http: HTTPSession,
+    base_url: str,
     realm_id: str,
     log: Logger,
     page: PageCursor,
@@ -86,7 +91,9 @@ async def backfill_entity(
     if page_ts >= cutoff:
         return
 
-    async for item in query_entity(model, page_ts, cutoff, http, realm_id, log):
+    async for item in query_entity(
+        model, page_ts, cutoff, http, base_url, realm_id, log
+    ):
         if (
             timeout_checkpoint is not None
             and item.MetaData.LastUpdatedTime >= timeout_checkpoint
@@ -107,6 +114,7 @@ async def backfill_entity(
 async def fetch_entity(
     model: type[T],
     http: HTTPSession,
+    base_url: str,
     realm_id: str,
     log: Logger,
     log_cursor: LogCursor,
@@ -132,7 +140,9 @@ async def fetch_entity(
     log.info("Starting incremental fetch", {"log_cursor": log_cursor})
 
     new_log_cursor = log_cursor
-    async for item in query_entity(model, log_cursor, now, http, realm_id, log):
+    async for item in query_entity(
+        model, log_cursor, now, http, base_url, realm_id, log
+    ):
         new_log_cursor = max(item.MetaData.LastUpdatedTime, new_log_cursor)
         yield item
 

@@ -1,18 +1,24 @@
 [
   {
+    "recommendedName": "addresses",
+    "resourceConfig": {
+      "stream": "addresses",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
     "documentSchema": {
       "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
       "properties": {
-        "_meta": {
-          "properties": {
-            "row_id": {
-              "type": "integer"
-            }
-          },
-          "required": [
-            "row_id"
-          ],
-          "type": "object"
+        "id": {
+          "type": [
+            "integer"
+          ]
         },
         "address1": {
           "type": [
@@ -50,18 +56,18 @@
             "string"
           ]
         },
-        "created_at": {
-          "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "customer_id": {
           "type": [
             "null",
             "integer"
           ]
+        },
+        "created_at": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "format": "date-time"
         },
         "discount_id": {
           "type": [
@@ -73,11 +79,6 @@
           "type": [
             "null",
             "string"
-          ]
-        },
-        "id": {
-          "type": [
-            "integer"
           ]
         },
         "last_name": {
@@ -111,41 +112,20 @@
           ]
         },
         "updated_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "zip": {
           "type": [
             "null",
             "string"
           ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/id"
-    ],
-    "recommendedName": "addresses",
-    "resourceConfig": {
-      "cursorField": [
-        "updated_at"
-      ],
-      "stream": "addresses",
-      "syncMode": "incremental"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "properties": {
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -153,8 +133,57 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
+          ]
+        }
+      },
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "charges",
+    "resourceConfig": {
+      "stream": "charges",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "integer"
+          ]
         },
         "address_id": {
           "type": [
@@ -169,7 +198,17 @@
           ]
         },
         "billing_address": {
+          "type": [
+            "null",
+            "object"
+          ],
           "properties": {
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
             "address1": {
               "type": [
                 "null",
@@ -206,18 +245,18 @@
                 "string"
               ]
             },
-            "created_at": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            },
             "customer_id": {
               "type": [
                 "null",
                 "integer"
               ]
+            },
+            "created_at": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "format": "date-time"
             },
             "discount_id": {
               "type": [
@@ -229,12 +268,6 @@
               "type": [
                 "null",
                 "string"
-              ]
-            },
-            "id": {
-              "type": [
-                "null",
-                "integer"
               ]
             },
             "last_name": {
@@ -268,11 +301,11 @@
               ]
             },
             "updated_at": {
-              "format": "date-time",
               "type": [
                 "null",
                 "string"
-              ]
+              ],
+              "format": "date-time"
             },
             "zip": {
               "type": [
@@ -280,11 +313,7 @@
                 "string"
               ]
             }
-          },
-          "type": [
-            "null",
-            "object"
-          ]
+          }
         },
         "client_details": {
           "type": [
@@ -293,11 +322,11 @@
           ]
         },
         "created_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "customer_hash": {
           "type": [
@@ -312,16 +341,16 @@
           ]
         },
         "discount_codes": {
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
             "type": [
               "null",
               "object"
             ]
-          },
-          "type": [
-            "null",
-            "array"
-          ]
+          }
         },
         "email": {
           "type": [
@@ -347,34 +376,29 @@
             "string"
           ]
         },
-        "has_uncommited_changes": {
-          "type": [
-            "null",
-            "boolean"
-          ]
-        },
-        "id": {
-          "type": [
-            "integer"
-          ]
-        },
-        "last_charge_attempt_date": {
-          "format": "date-time",
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "last_name": {
           "type": [
             "null",
             "string"
           ]
         },
+        "last_charge_attempt_date": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "format": "date-time"
+        },
         "line_items": {
           "type": [
             "null",
             "array"
+          ]
+        },
+        "has_uncommited_changes": {
+          "type": [
+            "null",
+            "boolean"
           ]
         },
         "note": {
@@ -396,11 +420,11 @@
           ]
         },
         "processed_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "processor_name": {
           "type": [
@@ -409,11 +433,11 @@
           ]
         },
         "retry_date": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "scheduled_at": {
           "type": [
@@ -428,7 +452,17 @@
           ]
         },
         "shipping_address": {
+          "type": [
+            "null",
+            "object"
+          ],
           "properties": {
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
             "address1": {
               "type": [
                 "null",
@@ -465,18 +499,18 @@
                 "string"
               ]
             },
-            "created_at": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            },
             "customer_id": {
               "type": [
                 "null",
                 "integer"
               ]
+            },
+            "created_at": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "format": "date-time"
             },
             "discount_id": {
               "type": [
@@ -488,12 +522,6 @@
               "type": [
                 "null",
                 "string"
-              ]
-            },
-            "id": {
-              "type": [
-                "null",
-                "integer"
               ]
             },
             "last_name": {
@@ -527,11 +555,11 @@
               ]
             },
             "updated_at": {
-              "format": "date-time",
               "type": [
                 "null",
                 "string"
-              ]
+              ],
+              "format": "date-time"
             },
             "zip": {
               "type": [
@@ -539,20 +567,16 @@
                 "string"
               ]
             }
-          },
-          "type": [
-            "null",
-            "object"
-          ]
+          }
         },
         "shipping_lines": {
-          "items": {
-            "type": "object"
-          },
           "type": [
             "null",
             "array"
-          ]
+          ],
+          "items": {
+            "type": "object"
+          }
         },
         "shopify_order_id": {
           "type": [
@@ -639,35 +663,14 @@
           ]
         },
         "updated_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/id"
-    ],
-    "recommendedName": "charges",
-    "resourceConfig": {
-      "cursorField": [
-        "updated_at"
-      ],
-      "stream": "charges",
-      "syncMode": "incremental"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "properties": {
+          ],
+          "format": "date-time"
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -675,16 +678,50 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
-        },
-        "created_at": {
-          "format": "date-time",
-          "type": [
-            "null",
-            "string"
           ]
-        },
+        }
+      },
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "collections",
+    "resourceConfig": {
+      "stream": "collections",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
         "id": {
           "type": [
             "integer"
@@ -696,33 +733,22 @@
             "string"
           ]
         },
-        "updated_at": {
-          "format": "date-time",
+        "created_at": {
           "type": [
             "null",
             "string"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/id"
-    ],
-    "recommendedName": "collections",
-    "resourceConfig": {
-      "stream": "collections",
-      "syncMode": "full_refresh"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "properties": {
+          ],
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "format": "date-time"
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -730,8 +756,57 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
+          ]
+        }
+      },
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "customers",
+    "resourceConfig": {
+      "stream": "customers",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "integer"
+          ]
         },
         "accepts_marketing": {
           "type": [
@@ -743,12 +818,6 @@
           "type": [
             "null",
             "object"
-          ]
-        },
-        "apply_credit_to_next_recurring_charge": {
-          "type": [
-            "null",
-            "boolean"
           ]
         },
         "billing_address1": {
@@ -812,11 +881,11 @@
           ]
         },
         "created_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "email": {
           "type": [
@@ -825,11 +894,11 @@
           ]
         },
         "first_charge_processed_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "first_name": {
           "type": [
@@ -853,11 +922,6 @@
           "type": [
             "null",
             "string"
-          ]
-        },
-        "id": {
-          "type": [
-            "integer"
           ]
         },
         "last_name": {
@@ -909,35 +973,20 @@
           ]
         },
         "updated_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
+          ],
+          "format": "date-time"
+        },
+        "apply_credit_to_next_recurring_charge": {
+          "type": [
+            "null",
+            "boolean"
           ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/id"
-    ],
-    "recommendedName": "customers",
-    "resourceConfig": {
-      "cursorField": [
-        "updated_at"
-      ],
-      "stream": "customers",
-      "syncMode": "incremental"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "properties": {
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -945,8 +994,57 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
+          ]
+        }
+      },
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "discounts",
+    "resourceConfig": {
+      "stream": "discounts",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "integer"
+          ]
         },
         "applies_to": {
           "type": [
@@ -973,44 +1071,44 @@
           ]
         },
         "channel_settings": {
-          "properties": {
-            "api": {
-              "properties": {
-                "can_apply": {
-                  "type": "boolean"
-                }
-              },
-              "type": "object"
-            },
-            "checkout_page": {
-              "properties": {
-                "can_apply": {
-                  "type": "boolean"
-                }
-              },
-              "type": "object"
-            },
-            "customer_portal": {
-              "properties": {
-                "can_apply": {
-                  "type": "boolean"
-                }
-              },
-              "type": "object"
-            },
-            "merchant_portal": {
-              "properties": {
-                "can_apply": {
-                  "type": "boolean"
-                }
-              },
-              "type": "object"
-            }
-          },
           "type": [
             "null",
             "object"
-          ]
+          ],
+          "properties": {
+            "api": {
+              "type": "object",
+              "properties": {
+                "can_apply": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "checkout_page": {
+              "type": "object",
+              "properties": {
+                "can_apply": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "customer_portal": {
+              "type": "object",
+              "properties": {
+                "can_apply": {
+                  "type": "boolean"
+                }
+              }
+            },
+            "merchant_portal": {
+              "type": "object",
+              "properties": {
+                "can_apply": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
         },
         "code": {
           "type": [
@@ -1019,11 +1117,11 @@
           ]
         },
         "created_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "discount_type": {
           "type": [
@@ -1044,11 +1142,11 @@
           ]
         },
         "ends_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "external_discount_id": {
           "type": [
@@ -1068,11 +1166,6 @@
             "string"
           ]
         },
-        "id": {
-          "type": [
-            "integer"
-          ]
-        },
         "once_per_customer": {
           "type": [
             "null",
@@ -1086,11 +1179,11 @@
           ]
         },
         "starts_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "status": {
           "type": [
@@ -1105,11 +1198,11 @@
           ]
         },
         "updated_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "usage_limit": {
           "type": [
@@ -1122,30 +1215,9 @@
             "null",
             "number"
           ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/id"
-    ],
-    "recommendedName": "discounts",
-    "resourceConfig": {
-      "cursorField": [
-        "updated_at"
-      ],
-      "stream": "discounts",
-      "syncMode": "incremental"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "properties": {
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -1153,25 +1225,66 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
+          ]
+        }
+      },
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "metafields",
+    "resourceConfig": {
+      "stream": "metafields",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "integer"
+          ]
         },
         "created_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "description": {
           "type": [
             "null",
             "string"
-          ]
-        },
-        "id": {
-          "type": [
-            "integer"
           ]
         },
         "key": {
@@ -1199,11 +1312,11 @@
           ]
         },
         "updated_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "value": {
           "type": [
@@ -1216,27 +1329,9 @@
             "null",
             "string"
           ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/id"
-    ],
-    "recommendedName": "metafields",
-    "resourceConfig": {
-      "stream": "metafields",
-      "syncMode": "full_refresh"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "properties": {
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -1244,8 +1339,57 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
+          ]
+        }
+      },
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "onetimes",
+    "resourceConfig": {
+      "stream": "onetimes",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "integer"
+          ]
         },
         "address_id": {
           "type": [
@@ -1254,21 +1398,16 @@
           ]
         },
         "created_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "customer_id": {
           "type": [
             "null",
             "string"
-          ]
-        },
-        "id": {
-          "type": [
-            "integer"
           ]
         },
         "next_charge_scheduled_at": {
@@ -1332,41 +1471,20 @@
           ]
         },
         "updated_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "variant_title": {
           "type": [
             "null",
             "string"
           ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/id"
-    ],
-    "recommendedName": "onetimes",
-    "resourceConfig": {
-      "cursorField": [
-        "updated_at"
-      ],
-      "stream": "onetimes",
-      "syncMode": "incremental"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "properties": {
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -1374,8 +1492,57 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
+          ]
+        }
+      },
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "orders",
+    "resourceConfig": {
+      "stream": "orders",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "integer"
+          ]
         },
         "address_id": {
           "type": [
@@ -1390,7 +1557,17 @@
           ]
         },
         "billing_address": {
+          "type": [
+            "null",
+            "object"
+          ],
           "properties": {
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
             "address1": {
               "type": [
                 "null",
@@ -1427,18 +1604,18 @@
                 "string"
               ]
             },
-            "created_at": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            },
             "customer_id": {
               "type": [
                 "null",
                 "integer"
               ]
+            },
+            "created_at": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "format": "date-time"
             },
             "discount_id": {
               "type": [
@@ -1450,12 +1627,6 @@
               "type": [
                 "null",
                 "string"
-              ]
-            },
-            "id": {
-              "type": [
-                "null",
-                "integer"
               ]
             },
             "last_name": {
@@ -1489,11 +1660,11 @@
               ]
             },
             "updated_at": {
-              "format": "date-time",
               "type": [
                 "null",
                 "string"
-              ]
+              ],
+              "format": "date-time"
             },
             "zip": {
               "type": [
@@ -1501,11 +1672,7 @@
                 "string"
               ]
             }
-          },
-          "type": [
-            "null",
-            "object"
-          ]
+          }
         },
         "browser_ip": {
           "type": [
@@ -1514,9 +1681,23 @@
           ]
         },
         "charge": {
+          "type": [
+            "null",
+            "object"
+          ],
           "additionalProperties": true,
           "properties": {
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
             "external_transaction_id": {
+              "type": [
+                "null",
+                "object"
+              ],
               "additionalProperties": true,
               "properties": {
                 "payment_processor": {
@@ -1525,17 +1706,7 @@
                     "string"
                   ]
                 }
-              },
-              "type": [
-                "null",
-                "object"
-              ]
-            },
-            "id": {
-              "type": [
-                "null",
-                "integer"
-              ]
+              }
             },
             "payment_processor_name": {
               "type": [
@@ -1549,25 +1720,13 @@
                 "string"
               ]
             }
-          },
+          }
+        },
+        "client_details": {
           "type": [
             "null",
             "object"
-          ]
-        },
-        "charge_id": {
-          "type": [
-            "null",
-            "integer"
-          ]
-        },
-        "charge_status": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "client_details": {
+          ],
           "additionalProperties": true,
           "properties": {
             "browser_ip": {
@@ -1582,14 +1741,114 @@
                 "string"
               ]
             }
-          },
+          }
+        },
+        "discounts": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "error": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "external_cart_token": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "external_order_id": {
           "type": [
             "null",
             "object"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "ecommerce": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          }
+        },
+        "external_order_name": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "ecommerce": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          }
+        },
+        "external_order_number": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "additionalProperties": true,
+          "properties": {
+            "ecommerce": {
+              "type": [
+                "null",
+                "string"
+              ]
+            }
+          }
+        },
+        "order_attributes": {
+          "type": [
+            "null",
+            "array"
+          ],
+          "items": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        },
+        "taxable": {
+          "type": [
+            "null",
+            "boolean"
           ]
         },
-        "created_at": {
-          "format": "date-time",
+        "total_duties": {
+          "type": [
+            "null",
+            "string"
+          ]
+        },
+        "total_weight_grams": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "charge_id": {
+          "type": [
+            "null",
+            "integer"
+          ]
+        },
+        "charge_status": {
           "type": [
             "null",
             "string"
@@ -1601,8 +1860,25 @@
             "string"
           ]
         },
+        "created_at": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "format": "date-time"
+        },
         "customer": {
+          "type": [
+            "null",
+            "object"
+          ],
           "properties": {
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
             "billing_address1": {
               "type": [
                 "null",
@@ -1664,11 +1940,11 @@
               ]
             },
             "created_at": {
-              "format": "date-time",
               "type": [
                 "null",
                 "string"
-              ]
+              ],
+              "format": "date-time"
             },
             "email": {
               "type": [
@@ -1677,11 +1953,11 @@
               ]
             },
             "first_charge_processed_at": {
-              "format": "date-time",
               "type": [
                 "null",
                 "string"
-              ]
+              ],
+              "format": "date-time"
             },
             "first_name": {
               "type": [
@@ -1705,12 +1981,6 @@
               "type": [
                 "null",
                 "string"
-              ]
-            },
-            "id": {
-              "type": [
-                "null",
-                "integer"
               ]
             },
             "last_name": {
@@ -1756,17 +2026,13 @@
               ]
             },
             "updated_at": {
-              "format": "date-time",
               "type": [
                 "null",
                 "string"
-              ]
+              ],
+              "format": "date-time"
             }
-          },
-          "type": [
-            "null",
-            "object"
-          ]
+          }
         },
         "customer_id": {
           "type": [
@@ -1780,79 +2046,10 @@
             "array"
           ]
         },
-        "discounts": {
-          "items": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
         "email": {
           "type": [
             "null",
             "string"
-          ]
-        },
-        "error": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "external_cart_token": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
-        "external_order_id": {
-          "additionalProperties": true,
-          "properties": {
-            "ecommerce": {
-              "type": [
-                "null",
-                "string"
-              ]
-            }
-          },
-          "type": [
-            "null",
-            "object"
-          ]
-        },
-        "external_order_name": {
-          "additionalProperties": true,
-          "properties": {
-            "ecommerce": {
-              "type": [
-                "null",
-                "string"
-              ]
-            }
-          },
-          "type": [
-            "null",
-            "object"
-          ]
-        },
-        "external_order_number": {
-          "additionalProperties": true,
-          "properties": {
-            "ecommerce": {
-              "type": [
-                "null",
-                "string"
-              ]
-            }
-          },
-          "type": [
-            "null",
-            "object"
           ]
         },
         "first_name": {
@@ -1865,11 +2062,6 @@
           "type": [
             "null",
             "string"
-          ]
-        },
-        "id": {
-          "type": [
-            "integer"
           ]
         },
         "is_prepaid": {
@@ -1885,7 +2077,12 @@
           ]
         },
         "line_items": {
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
+            "type": "object",
             "properties": {
               "external_inventory_policy": {
                 "type": [
@@ -1959,13 +2156,8 @@
                   "string"
                 ]
               }
-            },
-            "type": "object"
-          },
-          "type": [
-            "null",
-            "array"
-          ]
+            }
+          }
         },
         "note": {
           "type": [
@@ -1979,18 +2171,6 @@
             "array"
           ]
         },
-        "order_attributes": {
-          "items": {
-            "type": [
-              "null",
-              "string"
-            ]
-          },
-          "type": [
-            "null",
-            "array"
-          ]
-        },
         "payment_processor": {
           "type": [
             "null",
@@ -1998,11 +2178,11 @@
           ]
         },
         "processed_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "redacted": {
           "type": [
@@ -2011,21 +2191,31 @@
           ]
         },
         "scheduled_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "shipped_date": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "shipping_address": {
+          "type": [
+            "null",
+            "object"
+          ],
           "properties": {
+            "id": {
+              "type": [
+                "null",
+                "integer"
+              ]
+            },
             "address1": {
               "type": [
                 "null",
@@ -2062,18 +2252,18 @@
                 "string"
               ]
             },
-            "created_at": {
-              "format": "date-time",
-              "type": [
-                "null",
-                "string"
-              ]
-            },
             "customer_id": {
               "type": [
                 "null",
                 "integer"
               ]
+            },
+            "created_at": {
+              "type": [
+                "null",
+                "string"
+              ],
+              "format": "date-time"
             },
             "discount_id": {
               "type": [
@@ -2085,12 +2275,6 @@
               "type": [
                 "null",
                 "string"
-              ]
-            },
-            "id": {
-              "type": [
-                "null",
-                "integer"
               ]
             },
             "last_name": {
@@ -2124,11 +2308,11 @@
               ]
             },
             "updated_at": {
-              "format": "date-time",
               "type": [
                 "null",
                 "string"
-              ]
+              ],
+              "format": "date-time"
             },
             "zip": {
               "type": [
@@ -2136,11 +2320,7 @@
                 "string"
               ]
             }
-          },
-          "type": [
-            "null",
-            "object"
-          ]
+          }
         },
         "shipping_lines": {
           "type": [
@@ -2196,22 +2376,16 @@
             "array"
           ]
         },
-        "taxable": {
+        "transaction_id": {
           "type": [
             "null",
-            "boolean"
+            "string"
           ]
         },
         "total_discounts": {
           "type": [
             "null",
             "number"
-          ]
-        },
-        "total_duties": {
-          "type": [
-            "null",
-            "string"
           ]
         },
         "total_line_items_price": {
@@ -2244,18 +2418,6 @@
             "integer"
           ]
         },
-        "total_weight_grams": {
-          "type": [
-            "null",
-            "integer"
-          ]
-        },
-        "transaction_id": {
-          "type": [
-            "null",
-            "string"
-          ]
-        },
         "type": {
           "type": [
             "null",
@@ -2263,35 +2425,14 @@
           ]
         },
         "updated_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/id"
-    ],
-    "recommendedName": "orders",
-    "resourceConfig": {
-      "cursorField": [
-        "updated_at"
-      ],
-      "stream": "orders",
-      "syncMode": "incremental"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "properties": {
+          ],
+          "format": "date-time"
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -2299,8 +2440,54 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
+          ]
+        }
+      },
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "products",
+    "resourceConfig": {
+      "stream": "products",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "integer"
+          ]
         },
         "charge_interval_frequency": {
           "type": [
@@ -2315,11 +2502,11 @@
           ]
         },
         "created_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "cutoff_day_of_month": {
           "type": [
@@ -2355,11 +2542,6 @@
           "type": [
             "null",
             "string"
-          ]
-        },
-        "id": {
-          "type": [
-            "integer"
           ]
         },
         "images": {
@@ -2423,32 +2605,14 @@
           ]
         },
         "updated_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
-        }
-      },
-      "required": [
-        "id"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/id"
-    ],
-    "recommendedName": "products",
-    "resourceConfig": {
-      "stream": "products",
-      "syncMode": "full_refresh"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "properties": {
+          ],
+          "format": "date-time"
+        },
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -2456,8 +2620,52 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
+          ]
+        }
+      },
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/id"
+    ]
+  },
+  {
+    "recommendedName": "shop",
+    "resourceConfig": {
+      "stream": "shop",
+      "syncMode": "full_refresh"
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "store_id"
+      ],
+      "properties": {
+        "store_id": {
+          "type": "integer"
         },
         "shop": {
           "type": [
@@ -2466,7 +2674,13 @@
           ]
         },
         "store": {
+          "type": [
+            "object"
+          ],
           "properties": {
+            "id": {
+              "type": "integer"
+            },
             "checkout_platform": {
               "type": [
                 "string",
@@ -2482,12 +2696,6 @@
             "currency": {
               "type": [
                 "string",
-                "null"
-              ]
-            },
-            "disabled_currencies_historical": {
-              "type": [
-                "array",
                 "null"
               ]
             },
@@ -2515,14 +2723,17 @@
                 "null"
               ]
             },
+            "disabled_currencies_historical": {
+              "type": [
+                "array",
+                "null"
+              ]
+            },
             "iana_timezone": {
               "type": [
                 "string",
                 "null"
               ]
-            },
-            "id": {
-              "type": "integer"
             },
             "my_shopify_domain": {
               "type": [
@@ -2560,34 +2771,10 @@
                 "null"
               ]
             }
-          },
-          "type": [
-            "object"
-          ]
+          }
         },
-        "store_id": {
-          "type": "integer"
-        }
-      },
-      "required": [
-        "store_id"
-      ],
-      "type": "object"
-    },
-    "key": [
-      "/store_id"
-    ],
-    "recommendedName": "shop",
-    "resourceConfig": {
-      "stream": "shop",
-      "syncMode": "full_refresh"
-    }
-  },
-  {
-    "documentSchema": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "properties": {
         "_meta": {
+          "type": "object",
           "properties": {
             "row_id": {
               "type": "integer"
@@ -2595,8 +2782,57 @@
           },
           "required": [
             "row_id"
-          ],
-          "type": "object"
+          ]
+        }
+      },
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
+    },
+    "key": [
+      "/store_id"
+    ]
+  },
+  {
+    "recommendedName": "subscriptions",
+    "resourceConfig": {
+      "stream": "subscriptions",
+      "syncMode": "incremental",
+      "cursorField": [
+        "updated_at"
+      ]
+    },
+    "documentSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": [
+            "integer"
+          ]
         },
         "address_id": {
           "type": [
@@ -2623,11 +2859,11 @@
           ]
         },
         "cancelled_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "charge_interval_frequency": {
           "type": [
@@ -2635,17 +2871,17 @@
             "string"
           ]
         },
+        "created_at": {
+          "type": [
+            "null",
+            "string"
+          ],
+          "format": "date-time"
+        },
         "commit_update": {
           "type": [
             "null",
             "boolean"
-          ]
-        },
-        "created_at": {
-          "format": "date-time",
-          "type": [
-            "null",
-            "string"
           ]
         },
         "customer_id": {
@@ -2669,11 +2905,6 @@
         "has_queued_charges": {
           "type": [
             "null",
-            "integer"
-          ]
-        },
-        "id": {
-          "type": [
             "integer"
           ]
         },
@@ -2744,7 +2975,12 @@
           ]
         },
         "properties": {
+          "type": [
+            "null",
+            "array"
+          ],
           "items": {
+            "type": "object",
             "properties": {
               "name": {
                 "type": "string"
@@ -2755,13 +2991,8 @@
                   "string"
                 ]
               }
-            },
-            "type": "object"
-          },
-          "type": [
-            "null",
-            "array"
-          ]
+            }
+          }
         },
         "quantity": {
           "type": [
@@ -2806,34 +3037,56 @@
           ]
         },
         "updated_at": {
-          "format": "date-time",
           "type": [
             "null",
             "string"
-          ]
+          ],
+          "format": "date-time"
         },
         "variant_title": {
           "type": [
             "null",
             "string"
           ]
+        },
+        "_meta": {
+          "type": "object",
+          "properties": {
+            "row_id": {
+              "type": "integer"
+            }
+          },
+          "required": [
+            "row_id"
+          ]
         }
       },
-      "required": [
-        "id"
-      ],
-      "type": "object"
+      "if": {
+        "required": [
+          "_meta"
+        ],
+        "properties": {
+          "_meta": {
+            "required": [
+              "op"
+            ],
+            "properties": {
+              "op": {
+                "const": "d"
+              }
+            }
+          }
+        }
+      },
+      "then": {
+        "reduce": {
+          "strategy": "merge",
+          "delete": true
+        }
+      }
     },
     "key": [
       "/id"
-    ],
-    "recommendedName": "subscriptions",
-    "resourceConfig": {
-      "cursorField": [
-        "updated_at"
-      ],
-      "stream": "subscriptions",
-      "syncMode": "incremental"
-    }
+    ]
   }
 ]

@@ -63,6 +63,22 @@ transactions:
       - with: 0                # referenced earlier transaction's key range.
         fraction: 0.20         # 20% of this tx updates keys from tx 0.
         op: u
+        range: [0.6, 1.0]      # (optional) restrict sampling to the last 40%
+                               # of tx 0's keys. Models recency-biased updates
+                               # (newer records get updated more than old).
+                               # Defaults to [0.0, 1.0] (full range).
+        distribution: zipfian  # (optional) sampling distribution within the
+                               # (sub-)range. "uniform" (default) or "zipfian".
+                               # Zipfian concentrates picks on a few keys near
+                               # zipf_bias's end with a long tail decaying
+                               # across the rest -- a closer match to many
+                               # real workloads (a hot recent set + occasional
+                               # touches of older rows) than pure uniform.
+        zipf_s: 1.0            # (optional) Zipfian skew exponent; default 1.0.
+                               # Larger s = more concentrated. s ~ 0 ≈ uniform.
+        zipf_bias: tail        # (optional) "tail" (default) or "head" --
+                               # which end of the (sub-)range gets rank 1
+                               # (the highest-weight key).
       - with: 0
         fraction: 0.10
         op: d                  # 10% of this tx deletes keys from tx 0.
@@ -86,6 +102,25 @@ Overlap rules:
   the remainder are fresh creates with new keys.
 * Within a single transaction, overlap key sets are pairwise disjoint
   (a key is never both updated and deleted in the same tx).
+* `overlap.range` (optional) is a `[lo, hi]` pair of fractions in `[0, 1]`
+  with `lo < hi`. Restricts sampling to a sub-range of the source tx's
+  keys: e.g. `[0.6, 1.0]` for the last 40% (recency-biased updates),
+  `[0.0, 0.1]` for the first 10% (cold-data updates). Each transaction
+  emits `fresh` keys sequentially, so a sub-range maps to a contiguous
+  slice of the id space — useful for exercising partition pruning on
+  destinations that cluster on the key column.
+* `overlap.distribution` (optional) is `uniform` (default) or `zipfian`.
+  `zipfian` weights each key in the (sub-)range by `1/rank^s` so a small
+  set of keys near `zipf_bias` (default `tail`) gets the bulk of the
+  picks, with a long tail trailing across the rest. This is closer to
+  many production workloads than pure uniform: most updates land on the
+  newest rows, but a few reach back into older history. Composes with
+  `range` — e.g. `range: [0.0, 1.0]` + `distribution: zipfian` says
+  "pull from anywhere in the prior tx, but mostly from the tail",
+  whereas `range: [0.6, 1.0]` + `distribution: zipfian` further
+  restricts the candidate window. Tunables: `zipf_s` (skew exponent,
+  default `1.0`; larger = more concentrated; `~0` ≈ uniform) and
+  `zipf_bias` (`tail` or `head`).
 
 ## CLI flags
 

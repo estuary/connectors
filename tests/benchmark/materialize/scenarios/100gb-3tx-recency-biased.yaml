@@ -1,0 +1,49 @@
+# 100 GB across three equal transactions (~33.3 GB each) with recency-biased
+# updates: each tx updates keys concentrated in the most recent slice of the
+# previous tx's fresh range. Models a real-world workload where newer records
+# get updated more than old ones.
+#
+# This is the baseline (no clustering). Pair with
+# 100gb-3tx-recency-biased-clustered.yaml to compare against the variant with
+# automatic clustering enabled on the primary key.
+#
+# Overlap math (1KB docs, ~34.6M docs per 33GB):
+#   tx1: 20% overlap of 34.6M = 6.9M keys, drawn from last 40% of tx0
+#        (13.8M candidates). 26.7M fresh allocated.
+#   tx2: 20% overlap of 35.6M = 7.1M keys, drawn from last 40% of tx1's fresh
+#        (11.1M candidates). 28.5M fresh allocated.
+collections:
+  - name: bench/wide
+    schema:
+      type: object
+      if:
+        properties:
+          _meta:
+            properties: { op: { const: d } }
+      then:
+        reduce: { delete: true, strategy: lastWriteWins }
+      properties:
+        id:      { type: integer }
+        val:     { type: integer }
+        payload: { type: string }
+        _meta:
+          type: object
+          properties: { op: { type: string } }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+
+transactions:
+  - total_size: 33GB
+    doc_size:   1KB
+    op: c
+
+  - total_size: 33GB
+    doc_size:   1KB
+    overlaps:
+      - { with: 0, fraction: 0.20, op: u, range: [0.6, 1.0] }
+
+  - total_size: 34GB
+    doc_size:   1KB
+    overlaps:
+      - { with: 1, fraction: 0.20, op: u, range: [0.6, 1.0] }

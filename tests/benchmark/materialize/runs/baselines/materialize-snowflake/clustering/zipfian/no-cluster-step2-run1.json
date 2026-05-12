@@ -1,0 +1,74 @@
+{
+  "connector": "materialize-snowflake",
+  "scenario": "100gb-3tx-zipfian.yaml",
+  "seed": 0,
+  "preview_exit_code": 0,
+  "apply_seconds": 6.458223742,
+  "wall_seconds": 8195.777315963,
+  "total_docs": 104857600,
+  "total_bytes": 107374182400,
+  "docs_per_sec": 12794.100663980678,
+  "mb_per_sec": 12.494238929668631,
+  "transactions": [
+    {
+      "index": 0,
+      "collection": "bench/wide",
+      "doc_count": 34603008,
+      "doc_size": 1024,
+      "bytes": 35433480192,
+      "fresh": {
+        "start": 0,
+        "count": 34603008,
+        "op": "c"
+      },
+      "overlaps": [],
+      "wall_seconds": 2123.053581384,
+      "mb_per_sec": 15.916696731681775,
+      "docs_per_sec": 16298.697453242137
+    },
+    {
+      "index": 1,
+      "collection": "bench/wide",
+      "doc_count": 34603008,
+      "doc_size": 1024,
+      "bytes": 35433480192,
+      "fresh": {
+        "start": 34603008,
+        "count": 27682406,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 0,
+          "count": 6920602
+        }
+      ],
+      "wall_seconds": 2385.292395385,
+      "mb_per_sec": 14.166816640752245,
+      "docs_per_sec": 14506.820240130299
+    },
+    {
+      "index": 2,
+      "collection": "bench/wide",
+      "doc_count": 35651584,
+      "doc_size": 1024,
+      "bytes": 36507222016,
+      "fresh": {
+        "start": 62285414,
+        "count": 28521267,
+        "op": "c"
+      },
+      "overlaps": [
+        {
+          "op": "u",
+          "with": 1,
+          "count": 7130317
+        }
+      ],
+      "wall_seconds": 2656.769834289,
+      "mb_per_sec": 13.104635392443544,
+      "docs_per_sec": 13419.14664186219
+    }
+  ]
+}

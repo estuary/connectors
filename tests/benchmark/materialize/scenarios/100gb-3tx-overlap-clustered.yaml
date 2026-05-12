@@ -1,0 +1,41 @@
+# Same workload as 100gb-3tx-overlap, but with automatic clustering enabled
+# and materialized to a separate table (wide_clustered) so both variants can
+# coexist in the same Snowflake schema for side-by-side comparison.
+collections:
+  - name: bench/wide
+    schema:
+      type: object
+      if:
+        properties:
+          _meta:
+            properties: { op: { const: d } }
+      then:
+        reduce: { delete: true, strategy: lastWriteWins }
+      properties:
+        id:      { type: integer }
+        val:     { type: integer }
+        payload: { type: string }
+        _meta:
+          type: object
+          properties: { op: { type: string } }
+          required: [op]
+      required: [id, _meta]
+    key: [/id]
+    resource:
+      table: wide_clustered
+      clustering: id
+
+transactions:
+  - total_size: 33GB
+    doc_size:   1KB
+    op: c
+
+  - total_size: 33GB
+    doc_size:   1KB
+    overlaps:
+      - { with: 0, fraction: 0.25, op: u }
+
+  - total_size: 34GB
+    doc_size:   1KB
+    overlaps:
+      - { with: 1, fraction: 0.50, op: u }

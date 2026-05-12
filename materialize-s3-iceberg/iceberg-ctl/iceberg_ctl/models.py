@@ -1,5 +1,6 @@
+import sys
 from datetime import timedelta
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import (
     BaseModel,
@@ -21,17 +22,19 @@ class AccessKeyCredentials(BaseModel):
     auth_type: AuthTypeAccessKey = Field(
         default="AWSAccessKey", json_schema_extra={"order": 0, "type": "string"}
     )
-    awsAccessKeyId: str = Field(
+    aws_access_key_id: str = Field(
         min_length=1,
         title="AWS Access Key ID",
         description="Access Key ID for accessing AWS services.",
         json_schema_extra={"order": 1},
+        alias="awsAccessKeyId",
     )
-    awsSecretAccessKey: str = Field(
+    aws_secret_access_key: str = Field(
         min_length=1,
         title="AWS Secret Access Key",
         description="Secret Access Key for accessing AWS services.",
         json_schema_extra={"order": 2, "secret": True},
+        alias="awsSecretAccessKey",
     )
 
 
@@ -139,24 +142,9 @@ class AdvancedConfig(BaseModel):
 
 
 class EndpointConfig(BaseModel):
-    # Kept for backwards compatibility
-    aws_access_key_id: str | None = Field(
-        title="AWS Access Key ID",
-        description="Access Key ID for accessing AWS services (legacy).",
-        default=None,
-        json_schema_extra={"order": 0, "x-hidden-field": True},
-    )
-    # Kept for backwards compatibility
-    aws_secret_access_key: str | None = Field(
-        title="AWS Secret Access Key",
-        description="Secret Access Key for accessing AWS services (legacy).",
-        default=None,
-        json_schema_extra={"order": 1, "secret": True, "x-hidden-field": True},
-    )
-    credentials: AccessKeyCredentials | IAMCredentials | None = Field(
+    credentials: AccessKeyCredentials | IAMCredentials = Field(
         discriminator="auth_type",
         title="Authentication",
-        default=None,
         json_schema_extra={
             "order": 2,
             "x-iam-auth": True,
@@ -202,25 +190,38 @@ class EndpointConfig(BaseModel):
         json_schema_extra={"order": 10, "advanced": True},
     )
 
-    @model_validator(mode="after")
-    def validate_credentials(self):
-        has_legacy = (
-            self.aws_access_key_id is not None or self.aws_secret_access_key is not None
-        )
-        has_new = self.credentials is not None
+    @model_validator(mode="before")
+    @classmethod
+    def transform_legacy_credentials(cls, data: Any):
+        if not isinstance(data, dict):
+            return data
+
+        legacy_id = data.get("aws_access_key_id")
+        legacy_secret = data.get("aws_secret_access_key")
+        has_legacy = legacy_id is not None or legacy_secret is not None
+        has_new = data.get("credentials") is not None
 
         if has_legacy and has_new:
-            raise ValueError(
-                "cannot specify both top-level aws_access_key_id/aws_secret_access_key and credentials"
+            print(
+                (
+                    "Credentials have been found in both the legacy"
+                    " (top-level aws_access_key_id/aws_secret_access_key keys)"
+                    " and new formats (credentials object)."
+                    " The former will be ignored in favour of the latter"
+                ),
+                file=sys.stderr,
+                flush=True,
             )
-        if not has_legacy and not has_new:
-            raise ValueError(
-                "must provide either credentials or aws_access_key_id/aws_secret_access_key"
-            )
-        if has_legacy:
-            if not self.aws_access_key_id:
-                raise ValueError("missing aws_access_key_id")
-            if not self.aws_secret_access_key:
-                raise ValueError("missing aws_secret_access_key")
+        elif has_legacy:
+            data["credentials"] = {
+                "auth_type": "AWSAccessKey",
+                "awsAccessKeyId": legacy_id,
+                "awsSecretAccessKey": legacy_secret,
+            }
+        elif not has_new:
+            raise ValueError("must provide credentials")
 
-        return self
+        data.pop("aws_access_key_id", None)
+        data.pop("aws_secret_access_key", None)
+
+        return data

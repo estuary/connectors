@@ -194,6 +194,20 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		}
 		return err
 	}
+
+	if rc, ok := tc.Resource.(tableConfig); ok {
+		if fields := rc.ClusteringColumns(); len(fields) > 0 {
+			keyExpr, err := clusteringKeyExpr(tc.Table, fields)
+			if err != nil {
+				return err
+			}
+			stmt := fmt.Sprintf("ALTER TABLE %s CLUSTER BY %s;", tc.Identifier, keyExpr)
+			if _, err := c.db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("enabling clustering on new table %s: %w", tc.Identifier, err)
+			}
+		}
+	}
+
 	return nil
 }
 

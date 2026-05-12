@@ -134,7 +134,7 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			schema.NewTimeLogicalType(true, schema.TimeUnitMicros),
 			parquet.Types.Int64,
 			-1,
-			-1,
+			fieldId,
 		))
 	case LogicalTypeTimestamp:
 		return schema.Must(schema.NewPrimitiveNodeLogical(

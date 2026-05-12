@@ -27,9 +27,10 @@ import (
 )
 
 type tableConfig struct {
-	Table  string `json:"table" jsonschema_extras:"x-collection-name=true"`
-	Schema string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
-	Delta  bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings" jsonschema_extras:"x-delta-updates=true"`
+	Table      string `json:"table" jsonschema_extras:"x-collection-name=true"`
+	Schema     string `json:"schema,omitempty" jsonschema:"title=Alternative Schema,description=Alternative schema for this table (optional)" jsonschema_extras:"x-schema-name=true"`
+	Delta      bool   `json:"delta_updates,omitempty" jsonschema:"title=Delta Updates,description=Use Private Key authentication to enable Snowpipe Streaming for Delta Update bindings" jsonschema_extras:"x-delta-updates=true"`
+	Clustering string `json:"clustering,omitempty" jsonschema:"title=Clustering Keys,description=Comma-separated list of column names to use as the clustering key for Snowflake Automatic Clustering. Leave empty to disable clustering. Recommended only for large tables queried with selective filters on the chosen columns. Consumes additional Snowflake credits." jsonschema_extras:"advanced=true"`
 
 	// If the endpoint schema is the same as the resource schema, the resource path will be only the
 	// table name. This is to provide compatibility for materializations that were created prior to
@@ -52,6 +53,22 @@ func (c tableConfig) Validate() error {
 		return fmt.Errorf("expected table")
 	}
 	return nil
+}
+
+// ClusteringColumns parses the comma-separated clustering column list, trimming
+// whitespace and ignoring empty entries.
+func (c tableConfig) ClusteringColumns() []string {
+	if c.Clustering == "" {
+		return nil
+	}
+	parts := strings.Split(c.Clustering, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 func schemasEqual(s1 string, s2 string) bool {
@@ -323,6 +340,10 @@ func newTransactor(
 		}
 	}
 
+	if err := d.syncClustering(ctx, bindings, open); err != nil {
+		return nil, fmt.Errorf("syncing clustering keys: %w", err)
+	}
+
 	go func() {
 		d.logAllClusteringInfo(ctx)
 	}()
@@ -335,6 +356,9 @@ type binding struct {
 
 	streaming bool
 	pipeName  string
+	// clusteringExpr is the parenthesized CLUSTER BY expression for this
+	// binding, or empty if clustering is not configured.
+	clusteringExpr string
 	// Variables exclusively used by Load.
 	load struct {
 		loadQuery   string
@@ -1193,6 +1217,10 @@ func (d *transactor) Destroy() {
 }
 
 func logQueryStats(ctx context.Context, db *stdsql.DB, queryID string, table string) {
+	if !log.IsLevelEnabled(log.DebugLevel) {
+		return
+	}
+
 	var scanned, total stdsql.NullInt64
 	row := db.QueryRowContext(ctx,
 		`SELECT SUM(VALUE:"partitions_scanned"::INT), SUM(VALUE:"partitions_total"::INT)
@@ -1221,10 +1249,14 @@ func logQueryStats(ctx context.Context, db *stdsql.DB, queryID string, table str
 		"partitions_scanned":      scanned.Int64,
 		"partitions_total":        total.Int64,
 		"queued_overload_time_ms": queuedOverloadTime.Int64,
-	}).Info("query stats")
+	}).Debug("query stats")
 }
 
 func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr string) {
+	if !log.IsLevelEnabled(log.DebugLevel) {
+		return
+	}
+
 	var result stdsql.NullString
 	query := fmt.Sprintf("SELECT SYSTEM$CLUSTERING_INFORMATION('%s', '%s')", table, keyExpr)
 	if err := db.QueryRowContext(ctx, query).Scan(&result); err != nil {
@@ -1258,23 +1290,127 @@ func logClusteringInfo(ctx context.Context, db *stdsql.DB, table string, keyExpr
 		"average_depth":    info.AverageDepth,
 		"average_overlaps": info.AverageOverlaps,
 		"total_partitions": info.TotalPartitions,
-	}).Info("clustering information")
+	}).Debug("clustering information")
 }
 
-func clusteringKeyExpr(keys []sql.Column) string {
-	parts := make([]string, len(keys))
-	for i, k := range keys {
-		parts[i] = k.Identifier
+// clusteringKeyExpr builds a Snowflake CLUSTER BY expression from the given
+// collection field names by resolving each one to its quoted column identifier
+// in the table.
+func clusteringKeyExpr(table sql.Table, fieldNames []string) (string, error) {
+	parts := make([]string, len(fieldNames))
+	for i, name := range fieldNames {
+		var ident string
+		for _, col := range table.Columns() {
+			if col.Field == name {
+				ident = col.Identifier
+				break
+			}
+		}
+		if ident == "" {
+			return "", fmt.Errorf("clustering column %q not found in materialized fields of %s", name, table.Identifier)
+		}
+		parts[i] = ident
 	}
-	return "(" + strings.Join(parts, ", ") + ")"
+	return "(" + strings.Join(parts, ", ") + ")", nil
+}
+
+// queryCurrentClusterBy returns the current CLUSTER BY expression for a table,
+// or an empty string if the table has no clustering key.
+func queryCurrentClusterBy(ctx context.Context, db *stdsql.DB, schema, table string) (string, error) {
+	// SHOW TABLES LIKE returns a row with a "cluster_by" column.
+	rows, err := db.QueryContext(ctx, fmt.Sprintf("SHOW TABLES LIKE '%s' IN SCHEMA %q;", table, schema))
+	if err != nil {
+		return "", fmt.Errorf("querying table clustering state: %w", err)
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return "", fmt.Errorf("getting columns: %w", err)
+	}
+
+	clusterByIdx := -1
+	for i, col := range cols {
+		if strings.EqualFold(col, "cluster_by") {
+			clusterByIdx = i
+			break
+		}
+	}
+	if clusterByIdx == -1 {
+		return "", nil
+	}
+
+	if !rows.Next() {
+		return "", nil
+	}
+
+	vals := make([]any, len(cols))
+	ptrs := make([]any, len(cols))
+	for i := range vals {
+		ptrs[i] = &vals[i]
+	}
+	if err := rows.Scan(ptrs...); err != nil {
+		return "", fmt.Errorf("scanning table row: %w", err)
+	}
+
+	if v, ok := vals[clusterByIdx].(string); ok {
+		return v, nil
+	}
+	return "", nil
+}
+
+func (d *transactor) syncClustering(ctx context.Context, bindings []sql.Table, open pm.Request_Open) error {
+	for i, table := range bindings {
+		var rc tableConfig
+		if err := json.Unmarshal(open.Materialization.Bindings[i].ResourceConfigJson, &rc); err != nil {
+			return fmt.Errorf("parsing resource config for %s: %w", table.Identifier, err)
+		}
+
+		fields := rc.ClusteringColumns()
+		if len(fields) > 0 {
+			keyExpr, err := clusteringKeyExpr(table, fields)
+			if err != nil {
+				return err
+			}
+			stmt := fmt.Sprintf("ALTER TABLE %s CLUSTER BY %s;", table.Identifier, keyExpr)
+			if _, err := d.db.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("enabling clustering on %s: %w", table.Identifier, err)
+			}
+			log.WithFields(log.Fields{
+				"table":          table.Identifier,
+				"clustering_key": keyExpr,
+			}).Info("enabled automatic clustering")
+			d.bindings[i].clusteringExpr = keyExpr
+		} else {
+			loc := d.ep.Dialect.TableLocator(table.Path)
+			currentClusterBy, err := queryCurrentClusterBy(ctx, d.db, loc.TableSchema, loc.TableName)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"table": table.Identifier,
+				}).WithError(err).Warn("could not check current clustering state")
+				continue
+			}
+			if currentClusterBy != "" {
+				stmt := fmt.Sprintf("ALTER TABLE %s DROP CLUSTERING KEY;", table.Identifier)
+				if _, err := d.db.ExecContext(ctx, stmt); err != nil {
+					return fmt.Errorf("dropping clustering key on %s: %w", table.Identifier, err)
+				}
+				log.WithFields(log.Fields{
+					"table":               table.Identifier,
+					"previous_cluster_by": currentClusterBy,
+				}).Info("dropped clustering key")
+			}
+		}
+	}
+	return nil
 }
 
 func (d *transactor) logAllClusteringInfo(ctx context.Context) {
 	for _, b := range d.bindings {
-		if len(b.target.Keys) == 0 {
+		if b.clusteringExpr == "" {
 			continue
 		}
-		logClusteringInfo(ctx, d.db, b.target.Identifier, clusteringKeyExpr(b.target.Keys))
+		logClusteringInfo(ctx, d.db, b.target.Identifier, b.clusteringExpr)
 	}
 }
 

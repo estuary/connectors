@@ -50,7 +50,7 @@ func (c config) CommonConfig() filesink.CommonConfig {
 	}
 }
 
-var driver = filesink.FileDriver[*filesink.SinglePhase]{
+var driver = filesink.FileDriver[*filesink.SinglePhase, filesink.Resource]{
 	NewConfig: func(raw json.RawMessage) (filesink.Config, error) {
 		var cfg config
 		if err := pf.UnmarshalStrict(raw, &cfg); err != nil {

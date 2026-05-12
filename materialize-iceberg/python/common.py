@@ -163,6 +163,12 @@ def _build_session(c: dict) -> SparkSession:
             "spark.sql.extensions",
             "org.apache.iceberg.spark.extensions.IcebergSparkSessionExtensions",
         )
+        # The defaultCatalog is no longer used, we always execute fully
+        # qualified queries to avoid abigiuity if the namespace/database is
+        # also named estuary.  It is still specified to ensure tasks migrating
+        # from an older version, which may have a partially qualified query,
+        # are still able to run during the post-commit apply.
+        .config("spark.sql.defaultCatalog", "estuary")
         .config("spark.sql.catalog.estuary", "org.apache.iceberg.spark.SparkCatalog")
         .config("spark.sql.catalog.estuary.type", "rest")
         .config("spark.sql.catalog.estuary.uri", c["catalog_url"])
