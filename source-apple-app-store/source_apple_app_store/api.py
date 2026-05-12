@@ -177,7 +177,7 @@ async def fetch_incremental_analytics(
 ) -> AsyncGenerator[AppleAnalyticsRow | LogCursor, None]:
     assert isinstance(log_cursor, datetime)
 
-    last_processed_date = log_cursor
+    last_processed_date = log_cursor.date()
 
     report_request_id = await _get_or_create_analytics_report_request(
         log,
