@@ -30,10 +30,33 @@ import (
 // safe). Do not raise this without a concrete throttling incident — bigger
 // numbers just delay the bounce; they do not improve correctness.
 const (
-	putEventsMaxBatch      = 10
-	putEventsMaxEntrySize  = 256 * 1024
-	putEventsRetryAttempts = 4
-	putEventsRetryBaseWait = 200 * time.Millisecond
+	// putEventsMaxBatch is the AWS-side hard cap on entries per PutEvents
+	// request; an 11th entry returns 413. See API reference Entries field:
+	// https://docs.aws.amazon.com/eventbridge/latest/APIReference/API_PutEvents.html
+	putEventsMaxBatch = 10
+	// putEventsMaxEntrySize and putEventsMaxRequestSize encode two
+	// documented limits that the AWS docs do not perfectly agree on:
+	//
+	//   - EventBridge User Guide says the 1 MB limit applies to the
+	//     request as a whole, with a single entry permitted to use the
+	//     full 1 MB if alone:
+	//     https://docs.aws.amazon.com/eventbridge/latest/userguide/eb-putevents.html#eb-putevent-size
+	//   - The Go SDK's PutEvents doc and older API reference language
+	//     state the per-entry limit is 256 KB:
+	//     https://pkg.go.dev/github.com/aws/aws-sdk-go-v2/service/eventbridge#Client.PutEvents
+	//
+	// We honor both, conservatively: each entry must fit in 256 KB and
+	// the sum of entries in a single PutEvents call must fit in 1 MB.
+	//
+	// Per the AWS-defined size calculation, each entry's size is
+	// len(Source) + len(DetailType) + len(Detail) (UTF-8 bytes); plus 14
+	// if Time is set; plus UTF-8 byte length of each Resources entry.
+	// This connector sets neither Time nor Resources, and EventBusName
+	// is not counted.
+	putEventsMaxEntrySize   = 256 * 1024
+	putEventsMaxRequestSize = 1024 * 1024
+	putEventsRetryAttempts  = 4
+	putEventsRetryBaseWait  = 200 * time.Millisecond
 	// storeConcurrency caps in-flight PutEvents calls per Store transaction.
 	// 8 * 10-entry batches stays well under default per-region PutEvents rate
 	// limits while keeping the pipeline filled across typical call latency;
@@ -75,13 +98,17 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	errGroup, ctx := errgroup.WithContext(it.Context())
 	errGroup.SetLimit(storeConcurrency)
 
-	var batch []types.PutEventsRequestEntry
+	var (
+		batch      []types.PutEventsRequestEntry
+		batchBytes int
+	)
 	flush := func() {
 		if len(batch) == 0 {
 			return
 		}
 		entries := batch
 		batch = nil
+		batchBytes = 0
 		errGroup.Go(func() error {
 			return t.putEvents(ctx, entries)
 		})
@@ -90,11 +117,18 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 	for it.Next(false) {
 		b := t.bindings[it.Binding]
 
-		if len(it.RawJSON) > putEventsMaxEntrySize {
+		entrySize := len(b.source) + len(b.detailType) + len(it.RawJSON)
+		if entrySize > putEventsMaxEntrySize {
 			return nil, fmt.Errorf(
-				"document for binding %d is %d bytes, exceeding the EventBridge per-entry limit of %d bytes",
-				it.Binding, len(it.RawJSON), putEventsMaxEntrySize,
+				"document for binding %d is %d bytes (source+detail-type+detail), exceeding the EventBridge PutEvents per-entry limit of %d bytes",
+				it.Binding, entrySize, putEventsMaxEntrySize,
 			)
+		}
+
+		// Flush before append if either the batch is full or adding this
+		// entry would push the request total over the 1 MB limit.
+		if len(batch) >= putEventsMaxBatch || batchBytes+entrySize > putEventsMaxRequestSize {
+			flush()
 		}
 
 		batch = append(batch, types.PutEventsRequestEntry{
@@ -103,10 +137,7 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			DetailType:   aws.String(b.detailType),
 			Detail:       aws.String(string(it.RawJSON)),
 		})
-
-		if len(batch) >= putEventsMaxBatch {
-			flush()
-		}
+		batchBytes += entrySize
 	}
 	flush()
 
