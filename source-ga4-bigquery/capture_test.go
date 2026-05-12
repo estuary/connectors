@@ -61,6 +61,17 @@ func newTestCapture(t testing.TB) *blackbox.TranscriptCapture {
 	return tc
 }
 
+// TestDiscoverPublicSample exercises Discover against the public GA4 sample
+// dataset and snapshots the full discovered binding (resource config, key,
+// and collection schema). The public sample only has events_YYYYMMDD tables,
+// so we expect exactly one binding.
+func TestDiscoverPublicSample(t *testing.T) {
+	tc := newTestCapture(t)
+	tc.Capture.DiscoveryFilter = regexp.MustCompile("/events$")
+	tc.DiscoverFull("Discover Public Sample")
+	cupaloy.SnapshotT(t, tc.Transcript.String())
+}
+
 // TestCapturePublicSample captures five days of events from the public GA4
 // sample and snapshots various aspects of the result. Note that this fetches
 // approximately 1GB of data from BigQuery.
