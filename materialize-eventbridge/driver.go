@@ -133,7 +133,7 @@ func (c config) credentialsProvider() (aws.CredentialsProvider, error) {
 
 type resource struct {
 	Source     string `json:"source" jsonschema:"title=Event Source,description=Source field set on every event published from this binding (e.g. \"my.app\")." jsonschema_extras:"x-collection-name=true,order=1"`
-	DetailType string `json:"detail_type" jsonschema:"title=Detail Type,description=DetailType field set on every event published from this binding (e.g. \"OrderPlaced\")." jsonschema_extras:"order=2"`
+	DetailType string `json:"detail_type" jsonschema:"title=Detail Type,description=DetailType field set on every event published from this binding (e.g. \"OrderPlaced\")." jsonschema_extras:"x-collection-name=true,order=2"`
 
 	// busName is populated from the endpoint config via WithDefaults so that
 	// Parameters() can produce the full [bus, source, detail_type] resource

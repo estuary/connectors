@@ -132,7 +132,8 @@
         "type": "string",
         "title": "Detail Type",
         "description": "DetailType field set on every event published from this binding (e.g. \"OrderPlaced\").",
-        "order": 2
+        "order": 2,
+        "x-collection-name": true
       }
     },
     "type": "object",
