@@ -172,7 +172,12 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 				},
 				sql.QuoteTransform(`"`, `""`),
 			))),
-		Literaler: sql.ToLiteralFn(sql.QuoteTransform("'", "''")),
+		// Redshift treats backslashes as escape characters in single-quoted
+		// string literals (with no STANDARD_CONFORMING_STRINGS option exposed,
+		// at least on Redshift Serverless). The literal 'foo\bar' parses to
+		// "fooar" — the backslash and following char are consumed. So we
+		// double every backslash in literal output to round-trip correctly.
+		Literaler: sql.ToLiteralFn(sql.QuoteTransformEscapedBackslash("'", "''")),
 		Placeholderer: sql.PlaceholderFn(func(index int) string {
 			// parameterIndex starts at 0, but postgres (and redshift, which is based on postgres)
 			// parameters start at $1
@@ -248,6 +253,22 @@ type loadTableParams struct {
 	VarCharLength int
 }
 
+// loadQueryParams is the template input for loadQuery and loadQueryNoFlowDocument.
+// Bounds is computed per-transaction from the observed load keys, allowing Redshift
+// to prune target-table blocks via zone maps on the join keys.
+type loadQueryParams struct {
+	sql.Table
+	Bounds []sql.MergeBound
+}
+
+func renderLoadQuery(table sql.Table, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
+	var w strings.Builder
+	if err := tpl.Execute(&w, &loadQueryParams{Table: table, Bounds: bounds}); err != nil {
+		return "", err
+	}
+	return w.String(), nil
+}
+
 type templates struct {
 	createTargetTable         *template.Template
 	createLoadTable           *template.Template
@@ -289,7 +310,10 @@ COMMENT ON COLUMN {{$.Identifier}}.{{$col.Identifier}} IS {{Literal $col.Comment
 {{- end}}
 {{ end }}
 
--- Idempotent creation of the load table for staging load keys.
+-- Idempotent creation of the load table for staging load keys. DISTSTYLE ALL
+-- replicates the staged keys to every compute slice so the join
+-- against the target table is node-local — Redshift's default EVEN distribution
+-- would otherwise require a full redistribution of one side of the join.
 
 {{ define "createLoadTable" }}
 CREATE TEMPORARY TABLE {{ template "temp_name" $.Target }} (
@@ -301,7 +325,8 @@ CREATE TEMPORARY TABLE {{ template "temp_name" $.Target }} (
 		{{- $key.DDL }}
 	{{- end }}
 {{- end }}
-);
+)
+DISTSTYLE ALL;
 {{ end }}
 
 -- Idempotent creation of the store table for staging new records.
@@ -371,15 +396,22 @@ WHERE {{ range $ind, $key := $.Keys }}
 
 -- Templated query which joins keys from the load table with the target table, and returns values. It
 -- deliberately skips the trailing semi-colon as these queries are composed with a UNION ALL.
+--
+-- The per-transaction min/max bounds from $.Bounds are emitted as additional
+-- predicates on the target alias r. They are logically redundant with the
+-- equality join against the staged keys, but allow Redshift to prune target
+-- blocks via zone maps on the key columns when the target table is sorted on
+-- them.
 
 {{ define "loadQuery" }}
 {{ if $.Document -}}
 SELECT {{ $.Binding }}, r.{{$.Document.Identifier}}
 	FROM {{ template "temp_name" . }} AS l
 	JOIN {{ $.Identifier}} AS r
-	{{- range $ind, $key := $.Keys }}
+	{{- range $ind, $bound := $.Bounds }}
 		{{ if $ind }} AND {{ else }} ON  {{ end -}}
-			l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+			l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+			{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 	{{- end }}
 {{- else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
@@ -416,9 +448,10 @@ OBJECT(
 ) as flow_document
 FROM {{ template "temp_name" . }} AS l
 JOIN {{ $.Identifier}} AS r
-{{- range $ind, $key := $.Keys }}
+{{- range $ind, $bound := $.Bounds }}
 	{{ if $ind }} AND {{ else }} ON  {{ end -}}
-		l.{{ $key.Identifier }} = r.{{ $key.Identifier }}
+		l.{{ $bound.Identifier }} = r.{{ $bound.Identifier }}
+		{{- if $bound.LiteralLower }} AND r.{{ $bound.Identifier }} >= {{ $bound.LiteralLower }} AND r.{{ $bound.Identifier }} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end }}
 {{ else -}}
 SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc

@@ -367,11 +367,12 @@ type binding struct {
 	storeFile               *stagedFile
 	deleteFile              *stagedFile
 	createLoadTableTemplate *template.Template
+	loadQueryTemplate       *template.Template
+	loadMergeBounds         *sql.MergeBoundsBuilder
 	createStoreTableSQL     string
 	createDeleteTableSQL    string
 	mergeIntoSQL            string
 	deleteQuerySQL          string
-	loadQuerySQL            string
 	copyIntoLoadTableSQL    string
 	copyIntoMergeTableSQL   string
 	copyIntoDeleteTableSQL  string
@@ -406,10 +407,11 @@ func (t *transactor) addBinding(
 	caseSensitiveIdentifierEnabled bool,
 ) error {
 	var b = &binding{
-		target:     target,
-		loadFile:   newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
-		storeFile:  newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.ColumnNames()),
-		deleteFile: newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		target:          target,
+		loadFile:        newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		storeFile:       newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.ColumnNames()),
+		deleteFile:      newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		loadMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, t.dialect.Literal),
 	}
 
 	if t.cfg.Advanced.NoFlowDocument {
@@ -443,10 +445,12 @@ func (t *transactor) addBinding(
 		*m.sql = sql.String()
 	}
 
-	// Choose appropriate templates based on configuration
-	var loadQueryTemplate = t.templates.loadQuery
+	// Choose appropriate load query template based on configuration. Rendering
+	// is deferred until each transaction so that the per-transaction key
+	// bounds can be embedded into the query.
+	b.loadQueryTemplate = t.templates.loadQuery
 	if t.cfg.Advanced.NoFlowDocument {
-		loadQueryTemplate = t.templates.loadQueryNoFlowDocument
+		b.loadQueryTemplate = t.templates.loadQueryNoFlowDocument
 	}
 
 	// Render templates that rely only on the target table.
@@ -458,7 +462,6 @@ func (t *transactor) addBinding(
 		{&b.createDeleteTableSQL, t.templates.createDeleteTable},
 		{&b.mergeIntoSQL, t.templates.mergeInto},
 		{&b.deleteQuerySQL, t.templates.deleteQuery},
-		{&b.loadQuerySQL, loadQueryTemplate},
 	} {
 		var err error
 		if *m.sql, err = sql.RenderTableTemplate(target, m.tpl); err != nil {
@@ -544,6 +547,8 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 		if err := b.loadFile.writeRow(ctx, converted); err != nil {
 			return fmt.Errorf("writing row for load: %w", err)
 		}
+
+		b.loadMergeBounds.NextKey(converted)
 	}
 	if it.Err() != nil {
 		return it.Err()
@@ -576,7 +581,11 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		}
 
-		subqueries = append(subqueries, b.loadQuerySQL)
+		loadQuerySQL, err := renderLoadQuery(b.target, b.loadQueryTemplate, b.loadMergeBounds.Build())
+		if err != nil {
+			return fmt.Errorf("rendering load query for binding[%d]: %w", idx, err)
+		}
+		subqueries = append(subqueries, loadQuerySQL)
 
 		var createLoadTableSQL strings.Builder
 		if err := b.createLoadTableTemplate.Execute(&createLoadTableSQL, loadTableParams{

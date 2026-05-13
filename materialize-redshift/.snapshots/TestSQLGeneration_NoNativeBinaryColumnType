@@ -145,23 +145,44 @@ WHEN NOT MATCHED THEN
 	VALUES (r."theKey", r."aValue", r.flow_published_at);
 --- End "a-schema".delta_updates mergeInto ---
 
---- Begin "a-schema".key_value loadQuery ---
+--- Begin "a-schema".key_value createDeleteTable ---
 
+CREATE TEMPORARY TABLE flow_temp_table_0_deleted (
+  key1 BIGINT,
+  key2 BOOLEAN,
+  "key!binary" TEXT
+);
+--- End "a-schema".key_value createDeleteTable ---
+
+--- Begin "a-schema".delta_updates createDeleteTable ---
+
+CREATE TEMPORARY TABLE flow_temp_table_1_deleted (
+  "theKey" TEXT
+);
+--- End "a-schema".delta_updates createDeleteTable ---
+
+--- Begin "a-schema".key_value deleteQuery ---
+
+DELETE FROM "a-schema".key_value
+USING flow_temp_table_0_deleted AS r
+WHERE "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = r."key!binary"
+--- End "a-schema".key_value deleteQuery ---
+
+--- Begin "a-schema".delta_updates deleteQuery ---
+
+
+--- End "a-schema".delta_updates deleteQuery ---
+
+--- Begin "a-schema".key_value loadQuery ---
 SELECT 0, r.flow_document
 	FROM flow_temp_table_0 AS l
 	JOIN "a-schema".key_value AS r
-		 ON  l.key1 = r.key1
+		 ON  l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100
 		 AND l.key2 = r.key2
-		 AND l."key!binary" = r."key!binary"
+		 AND l."key!binary" = r."key!binary" AND r."key!binary" >= 'aGVsbG8K' AND r."key!binary" <= 'Z29vZGJ5ZQo='
 --- End "a-schema".key_value loadQuery ---
 
---- Begin "a-schema".delta_updates loadQuery ---
-
-SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
---- End "a-schema".delta_updates loadQuery ---
-
 --- Begin "a-schema".key_value loadQueryNoFlowDocument ---
-
 SELECT 0,
 OBJECT(
 	'key1', r.key1,
@@ -192,58 +213,26 @@ OBJECT(
 ) as flow_document
 FROM flow_temp_table_0 AS l
 JOIN "a-schema".key_value AS r
-	 ON  l.key1 = r.key1
+	 ON  l.key1 = r.key1 AND r.key1 >= 10 AND r.key1 <= 100
 	 AND l.key2 = r.key2
-	 AND l."key!binary" = r."key!binary"
+	 AND l."key!binary" = r."key!binary" AND r."key!binary" >= 'aGVsbG8K' AND r."key!binary" <= 'Z29vZGJ5ZQo='
 
 --- End "a-schema".key_value loadQueryNoFlowDocument ---
-
---- Begin "a-schema".delta_updates loadQueryNoFlowDocument ---
-
-SELECT * FROM (SELECT -1, CAST(NULL AS SUPER) LIMIT 0) as nodoc
-
---- End "a-schema".delta_updates loadQueryNoFlowDocument ---
-
---- Begin "a-schema".key_value createDeleteTable ---
-
-CREATE TEMPORARY TABLE flow_temp_table_0_deleted (
-  key1 BIGINT,
-  key2 BOOLEAN,
-  "key!binary" TEXT
-);
---- End "a-schema".key_value createDeleteTable ---
-
---- Begin "a-schema".delta_updates createDeleteTable ---
-
-CREATE TEMPORARY TABLE flow_temp_table_1_deleted (
-  "theKey" TEXT
-);
---- End "a-schema".delta_updates createDeleteTable ---
-
---- Begin "a-schema".key_value deleteQuery ---
-
-DELETE FROM "a-schema".key_value
-USING flow_temp_table_0_deleted AS r
-WHERE "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = r."key!binary"
---- End "a-schema".key_value deleteQuery ---
-
---- Begin "a-schema".delta_updates deleteQuery ---
-
-
---- End "a-schema".delta_updates deleteQuery ---
 
 --- Begin "a-schema".key_value createLoadTable (no varchar length) ---
 CREATE TEMPORARY TABLE flow_temp_table_0 (
 	key1 BIGINT,
 	key2 BOOLEAN,
 	"key!binary" TEXT
-);
+)
+DISTSTYLE ALL;
 --- End "a-schema".key_value createLoadTable (no varchar length) ---
 
 --- Begin "a-schema".delta_updates createLoadTable (no varchar length) ---
 CREATE TEMPORARY TABLE flow_temp_table_1 (
 	"theKey" TEXT
-);
+)
+DISTSTYLE ALL;
 --- End "a-schema".delta_updates createLoadTable (no varchar length) ---
 
 --- Begin "a-schema".key_value createLoadTable (with varchar length) ---
@@ -251,13 +240,15 @@ CREATE TEMPORARY TABLE flow_temp_table_0 (
 	key1 BIGINT,
 	key2 BOOLEAN,
 	"key!binary" VARCHAR(400)
-);
+)
+DISTSTYLE ALL;
 --- End "a-schema".key_value createLoadTable (with varchar length) ---
 
 --- Begin "a-schema".delta_updates createLoadTable (with varchar length) ---
 CREATE TEMPORARY TABLE flow_temp_table_1 (
 	"theKey" VARCHAR(400)
-);
+)
+DISTSTYLE ALL;
 --- End "a-schema".delta_updates createLoadTable (with varchar length) ---
 
 --- Begin Copy From S3 Without Case Sensitive Identifiers or Truncation ---

@@ -43,13 +43,43 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 				testTemplates.createTargetTable,
 				testTemplates.createStoreTable,
 				testTemplates.mergeInto,
-				testTemplates.loadQuery,
-				testTemplates.loadQueryNoFlowDocument,
 				testTemplates.createDeleteTable,
 				testTemplates.deleteQuery,
 			},
 		},
 	)
+
+	// loadQuery and loadQueryNoFlowDocument are rendered with per-transaction
+	// MergeBound values, so they're driven through the loadQueryParams shape
+	// rather than the plain-Table TableTemplates path.
+	for _, tpl := range []*template.Template{
+		testTemplates.loadQuery,
+		testTemplates.loadQueryNoFlowDocument,
+	} {
+		tbl := tables[0]
+		require.False(t, tbl.DeltaUpdates)
+		bounds := []sql.MergeBound{
+			{
+				Column:       tbl.Keys[0],
+				LiteralLower: testDialect.Literal(int64(10)),
+				LiteralUpper: testDialect.Literal(int64(100)),
+			},
+			{
+				Column: tbl.Keys[1],
+				// No bounds — as would be the case for a boolean key.
+			},
+			{
+				Column:       tbl.Keys[2],
+				LiteralLower: testDialect.Literal("aGVsbG8K"),
+				LiteralUpper: testDialect.Literal("Z29vZGJ5ZQo="),
+			},
+		}
+
+		var testcase = tbl.Identifier + " " + tpl.Name()
+		snap.WriteString("--- Begin " + testcase + " ---")
+		require.NoError(t, tpl.Execute(snap, &loadQueryParams{Table: tbl, Bounds: bounds}))
+		snap.WriteString("--- End " + testcase + " ---\n\n")
+	}
 
 	for _, tbl := range tables {
 		tpl := testTemplates.createLoadTable
