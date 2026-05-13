@@ -20,6 +20,7 @@ import (
 	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/arrow-go/v18/parquet/metadata"
 	"github.com/apache/arrow-go/v18/parquet/schema"
+	"github.com/apache/arrow-go/v18/parquet/variant"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
 	iso8601 "github.com/senseyeio/duration"
@@ -108,12 +109,8 @@ func (rs rowSize) estSize(row []any) int {
 			out += len(v)
 		case json.RawMessage:
 			out += len(v)
-		case VariantValue:
-			out += len(v.Value) + len(v.Metadata)
-		case *VariantValue:
-			if v != nil {
-				out += len(v.Value) + len(v.Metadata)
-			}
+		case variant.Value:
+			out += len(v.Bytes()) + len(v.Metadata().Bytes())
 		case nil:
 			// No additional overhead is assumed for nil values.
 		default:
@@ -449,22 +446,17 @@ func (w *ParquetWriter) flushBuffer() error {
 			// Variant elements occupy two physical parquet columns: the first NextColumn() call
 			// above returned the "value" writer; we must finish writing it before requesting the
 			// "metadata" writer.
-			values, metadatas, defLevels, err := collectVariantBatch(colIdx, w.buffer)
-			if err != nil {
-				return fmt.Errorf("collecting variant column '%s': %w", f.Name, err)
-			}
-			if err := writeByteArrayBatch(cw.(*file.ByteArrayColumnChunkWriter), values, defLevels); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.ByteArrayColumnChunkWriter), getVariantValueVal); err != nil {
 				return fmt.Errorf("writing variant value column '%s': %w", f.Name, err)
 			}
-			metaCw, err := rgWriter.NextColumn()
-			if err != nil {
+			if err := cw.Close(); err != nil {
+				return fmt.Errorf("closing variant value column writer: %w", err)
+			}
+			if cw, err = rgWriter.NextColumn(); err != nil {
 				return fmt.Errorf("getting next column for variant metadata: %w", err)
 			}
-			if err := writeByteArrayBatch(metaCw.(*file.ByteArrayColumnChunkWriter), metadatas, defLevels); err != nil {
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.ByteArrayColumnChunkWriter), getVariantMetadataVal); err != nil {
 				return fmt.Errorf("writing variant metadata column '%s': %w", f.Name, err)
-			}
-			if err := metaCw.Close(); err != nil {
-				return fmt.Errorf("closing variant metadata column writer: %w", err)
 			}
 		case LogicalTypeDecimal:
 			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getDecimalVal); err != nil {
@@ -525,57 +517,27 @@ type columnBatchWriter[T parquetValue] interface {
 	WriteBatch(vals []T, defLvls []int16, repLvls []int16) (valueOffset int64, err error)
 }
 
-// VariantValue is the per-row input for a LogicalTypeVariant column. Value and Metadata are the
-// already-encoded Parquet Variant binary fields; this package writes them verbatim into the
-// "value" and "metadata" child columns of the variant group. JSON-to-Variant encoding is the
-// caller's responsibility.
-type VariantValue struct {
-	Value    []byte
-	Metadata []byte
+// Callers supply a parquet/variant.Value (typically from variant.ParseJSON or variant.Builder);
+// the writer unpacks its two byte slices into the "value" and "metadata" child columns of the
+// variant group. They share nullability: a nil row slot produces defLevel 0 on both children.
+func getVariantValueVal(val any) (got parquet.ByteArray, err error) {
+	switch v := val.(type) {
+	case variant.Value:
+		got = v.Bytes()
+	default:
+		err = fmt.Errorf("getVariantValueVal unhandled type: %T", v)
+	}
+	return
 }
 
-// collectVariantBatch walks the buffered rows for a variant column and returns the value+metadata
-// byte slices and their shared def-level vector. The two child columns of the variant group share
-// the same nullability: when the variant slot is nil, both children carry defLevel 0; otherwise
-// both carry defLevel 1.
-func collectVariantBatch(colIdx int, buf [][]any) ([]parquet.ByteArray, []parquet.ByteArray, []int16, error) {
-	var values []parquet.ByteArray
-	var metadatas []parquet.ByteArray
-	var defLevels []int16
-
-	for _, row := range buf {
-		v := row[colIdx]
-		switch tv := v.(type) {
-		case nil:
-			defLevels = append(defLevels, 0)
-		case VariantValue:
-			values = append(values, tv.Value)
-			metadatas = append(metadatas, tv.Metadata)
-			defLevels = append(defLevels, 1)
-		case *VariantValue:
-			if tv == nil {
-				defLevels = append(defLevels, 0)
-				continue
-			}
-			values = append(values, tv.Value)
-			metadatas = append(metadatas, tv.Metadata)
-			defLevels = append(defLevels, 1)
-		default:
-			return nil, nil, nil, fmt.Errorf("unhandled type %T for variant column", tv)
-		}
+func getVariantMetadataVal(val any) (got parquet.ByteArray, err error) {
+	switch v := val.(type) {
+	case variant.Value:
+		got = v.Metadata().Bytes()
+	default:
+		err = fmt.Errorf("getVariantMetadataVal unhandled type: %T", v)
 	}
-
-	return values, metadatas, defLevels, nil
-}
-
-func writeByteArrayBatch(w columnBatchWriter[parquet.ByteArray], vals []parquet.ByteArray, defLevels []int16) error {
-	written, err := w.WriteBatch(vals, defLevels, nil)
-	if err != nil {
-		return fmt.Errorf("writing batch of values: %w", err)
-	} else if int(written) != len(vals) {
-		return fmt.Errorf("written %d values vs. %d values in vals", written, len(vals))
-	}
-	return nil
+	return
 }
 
 type getValFn[T parquetValue] func(v any) (got T, err error)
@@ -933,6 +895,7 @@ func getIntervalVal(val any) (got parquet.FixedLenByteArray, err error) {
 }
 
 func getDecimalVal(val any) (got parquet.FixedLenByteArray, err error) {
+
 	switch v := val.(type) {
 	case decimal128.Num:
 		got = slices.Grow(got, 16)[:16]
