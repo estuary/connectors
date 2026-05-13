@@ -278,6 +278,33 @@ class Sage:
         async for rec in self._req_json(model, data):
             yield rec
 
+    async def fetch_created_since(
+        self, obj: str, since: AwareDatetime
+    ) -> AsyncGenerator[SageRecord, None]:
+        model = await self.get_model(obj)
+        formatted_since = since.astimezone(model.tz_dt.tzinfo).strftime(
+            "%m/%d/%Y %H:%M:%S"
+        )
+        data = get_creations_since_request(
+            self.config, self.session_id, obj, model.field_names, formatted_since
+        )
+        async for rec in self._req_json(model, data):
+            yield rec
+
+    async def fetch_created_at(
+        self,
+        obj: str,
+        at: AwareDatetime,
+        after: int | None,
+    ) -> AsyncGenerator[SageRecord, None]:
+        model = await self.get_model(obj)
+        formatted_at = at.astimezone(model.tz_dt.tzinfo).strftime("%m/%d/%Y %H:%M:%S")
+        data = get_creations_at_request(
+            self.config, self.session_id, obj, model.field_names, formatted_at, after
+        )
+        async for rec in self._req_json(model, data):
+            yield rec
+
     async def fetch_deleted(
         self, obj: str, since: AwareDatetime
     ) -> AsyncGenerator[SageRecord, None]:
@@ -672,6 +699,96 @@ def get_all_records_request(
           <select>
 {"\n".join(f"            <field>{field}</field>" for field in fields)}
           </select>{filter()}
+          <orderby>
+            <order>
+                <field>RECORDNO</field>
+                <ascending/>
+            </order>
+          </orderby>
+          <options>
+            <returnformat>json</returnformat>
+          </options>
+          <pagesize>{PAGE_SIZE}</pagesize>
+        </query>
+""".strip()
+
+    return function_with_session_id_xml(cfg, session_id, exec)
+
+
+def get_creations_since_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    object: str,
+    fields: list[str],
+    since: str,  # ex: 12/08/2024 10:46:26
+) -> str:
+    exec = f"""
+        <query>
+          <object>{object}</object>
+          <select>
+{"\n".join(f"            <field>{field}</field>" for field in fields)}
+          </select>
+          <filter>
+            <and>
+              <isnull>
+                <field>WHENMODIFIED</field>
+              </isnull>
+              <greaterthan>
+                <field>WHENCREATED</field>
+                <value>{since}</value>
+              </greaterthan>
+            </and>
+          </filter>
+          <orderby>
+            <order>
+                <field>WHENCREATED</field>
+                <ascending/>
+            </order>
+          </orderby>
+          <options>
+            <returnformat>json</returnformat>
+          </options>
+          <pagesize>{PAGE_SIZE}</pagesize>
+        </query>
+""".strip()
+
+    return function_with_session_id_xml(cfg, session_id, exec)
+
+
+def get_creations_at_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    object: str,
+    fields: list[str],
+    at: str,  # ex: 12/08/2024 10:46:26
+    after: int | None,
+) -> str:
+    def filter() -> str:
+        if after is None:
+            return ""
+        return f"""
+              <greaterthan>
+                <field>RECORDNO</field>
+                <value>{after}</value>
+              </greaterthan>"""
+
+    exec = f"""
+        <query>
+          <object>{object}</object>
+          <select>
+{"\n".join(f"            <field>{field}</field>" for field in fields)}
+          </select>
+          <filter>
+            <and>
+              <isnull>
+                <field>WHENMODIFIED</field>
+              </isnull>
+              <equalto>
+                <field>WHENCREATED</field>
+                <value>{at}</value>
+              </equalto>{filter()}
+            </and>
+          </filter>
           <orderby>
             <order>
                 <field>RECORDNO</field>

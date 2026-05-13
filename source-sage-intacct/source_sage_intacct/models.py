@@ -198,6 +198,28 @@ class IncrementalResource(BaseDocument, extra="allow"):
     RECORDNO: int
     WHENMODIFIED: AwareDatetime
 
+    def cursor_value(self) -> AwareDatetime:
+        return self.WHENMODIFIED
+
+
+# CreationRecord captures records that exist in Sage with a null WHENMODIFIED.
+# They cannot be captured by the WHENMODIFIED-keyed incremental query, so a
+# parallel sub-task keyed on WHENCREATED picks them up.
+class CreationRecord(BaseDocument, extra="allow"):
+    RECORDNO: int
+    WHENCREATED: AwareDatetime
+
+    def cursor_value(self) -> AwareDatetime:
+        return self.WHENCREATED
+
+
+def parse_backfill_record(raw: dict) -> "IncrementalResource | CreationRecord":
+    """Routes to IncrementalResource when WHENMODIFIED is present, else
+    CreationRecord."""
+    if raw.get("WHENMODIFIED") is not None:
+        return IncrementalResource.model_validate(raw)
+    return CreationRecord.model_validate(raw)
+
 
 class DeletionRecord(BaseDocument, extra="forbid"):
     RECORDNO: int = Field(alias="OBJECTKEY", serialization_alias="RECORDNO")
@@ -207,6 +229,9 @@ class DeletionRecord(BaseDocument, extra="forbid"):
     meta_: "DeletionRecord.Meta" = Field(
         default_factory=lambda: DeletionRecord.Meta(op="d")
     )
+
+    def cursor_value(self) -> AwareDatetime:
+        return self.WHENMODIFIED
 
     @field_validator("RECORDNO", mode="before")
     @classmethod
