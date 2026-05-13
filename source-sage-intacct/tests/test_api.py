@@ -7,8 +7,9 @@ import estuary_cdk.emitted_changes_cache as cache
 import pytest
 from pydantic import AwareDatetime, model_validator
 
-from source_sage_intacct.api import fetch_changes
+from source_sage_intacct.api import fetch_changes, fetch_creations, fetch_page
 from source_sage_intacct.models import (
+    CreationRecord,
     IncrementalResource,
 )
 from source_sage_intacct.sage import PAGE_SIZE, Sage, SageRecord
@@ -28,6 +29,31 @@ class MockRecord(SageRecord):
     def _normalize_values(cls, values: dict[str, Any]) -> dict[str, Any]:
         # This overrides the value normalization of the SageRecord model to
         # simplify testing the `fetch_changes` function.
+        return values
+
+
+class MockCreationRecord(SageRecord):
+    RECORDNO: int
+    WHENCREATED: AwareDatetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_values(cls, values: dict[str, Any]) -> dict[str, Any]:
+        return values
+
+
+class MockMixedRecord(SageRecord):
+    """Mirrors a real Sage record where WHENMODIFIED may be null. Used to
+    exercise `fetch_page`'s per-record routing between IncrementalResource
+    and CreationRecord."""
+
+    RECORDNO: int
+    WHENMODIFIED: AwareDatetime | None = None
+    WHENCREATED: AwareDatetime
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_values(cls, values: dict[str, Any]) -> dict[str, Any]:
         return values
 
 
@@ -364,3 +390,75 @@ async def test_fetch_changes_single_page_cycle(mock_sage, mock_logger):
         IncrementalResource(RECORDNO=3, WHENMODIFIED=datetime(2023, 1, 2, tzinfo=UTC)),
         datetime(2023, 1, 2, tzinfo=UTC),
     ]
+
+
+@pytest.mark.asyncio
+async def test_fetch_creations_basic(mock_sage, mock_logger):
+    cursor = datetime(2023, 1, 1, tzinfo=UTC)
+    records = [
+        MockCreationRecord(RECORDNO=1, WHENCREATED=datetime(2023, 1, 2, tzinfo=UTC)),
+        MockCreationRecord(RECORDNO=2, WHENCREATED=datetime(2023, 1, 3, tzinfo=UTC)),
+    ]
+    mock_sage.fetch_created_since.return_value = async_iter(records)
+
+    results = [
+        item
+        async for item in fetch_creations(
+            "customer", mock_sage, None, PAGE_SIZE, mock_logger, cursor
+        )
+    ]
+
+    assert mock_sage.fetch_created_since.call_count == 1
+    assert mock_sage.fetch_created_since.mock_calls == [call("customer", cursor)]
+    assert mock_sage.fetch_created_at.call_count == 0
+
+    assert results == [
+        CreationRecord(RECORDNO=1, WHENCREATED=datetime(2023, 1, 2, tzinfo=UTC)),
+        CreationRecord(RECORDNO=2, WHENCREATED=datetime(2023, 1, 3, tzinfo=UTC)),
+        datetime(2023, 1, 3, tzinfo=UTC),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_fetch_page_routes_by_whenmodified(mock_sage, mock_logger):
+    # fetch_page must route records with WHENMODIFIED to IncrementalResource
+    # and records without WHENMODIFIED to CreationRecord. The cutoff
+    # comparison uses cursor_value(), which falls back to WHENCREATED when
+    # WHENMODIFIED is absent.
+    cutoff = datetime(2024, 1, 1, tzinfo=UTC)
+    records = [
+        MockMixedRecord(
+            RECORDNO=1,
+            WHENMODIFIED=datetime(2023, 6, 1, tzinfo=UTC),
+            WHENCREATED=datetime(2023, 1, 1, tzinfo=UTC),
+        ),
+        MockMixedRecord(
+            RECORDNO=2,
+            WHENMODIFIED=None,
+            WHENCREATED=datetime(2023, 7, 1, tzinfo=UTC),
+        ),
+        # This record is after the cutoff (via its WHENCREATED) and should
+        # be skipped — leaves the door open for the incremental sub-tasks
+        # to capture it.
+        MockMixedRecord(
+            RECORDNO=3,
+            WHENMODIFIED=None,
+            WHENCREATED=datetime(2024, 6, 1, tzinfo=UTC),
+        ),
+    ]
+    mock_sage.fetch_all.return_value = async_iter(records)
+
+    results = [
+        item
+        async for item in fetch_page(
+            "customer", mock_sage, PAGE_SIZE, mock_logger, None, cutoff
+        )
+    ]
+
+    assert len(results) == 2
+    assert isinstance(results[0], IncrementalResource)
+    assert results[0].RECORDNO == 1
+    assert results[0].WHENMODIFIED == datetime(2023, 6, 1, tzinfo=UTC)
+    assert isinstance(results[1], CreationRecord)
+    assert results[1].RECORDNO == 2
+    assert results[1].WHENCREATED == datetime(2023, 7, 1, tzinfo=UTC)

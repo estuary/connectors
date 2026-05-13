@@ -1,18 +1,20 @@
 from datetime import UTC, datetime, timedelta
 from logging import Logger
-from typing import Any, AsyncGenerator, Callable, TypeVar, Union
+from typing import Any, AsyncGenerator, Callable, TypeVar
 
 import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.capture.common import LogCursor, PageCursor
 
 from .models import (
+    CreationRecord,
     DeletionRecord,
     IncrementalResource,
     SnapshotResource,
+    parse_backfill_record,
 )
 from .sage import Sage
 
-T = TypeVar("T", IncrementalResource, DeletionRecord)
+T = TypeVar("T", IncrementalResource, CreationRecord, DeletionRecord)
 
 
 # This function is kind of intense, but what it's doing is repeatedly issuing
@@ -57,20 +59,21 @@ async def _fetch_records_generic(
         this_count = 0
         async for rec in fetch_since(object, cursor):
             rec = cls.model_validate(rec.model_dump())
-            if last_record_ts and rec.WHENMODIFIED != last_record_ts:
+            rec_ts = rec.cursor_value()
+            if last_record_ts and rec_ts != last_record_ts:
                 # Got a timestamp change, which means the timestamp of the prior
                 # record has been fully read.
                 last_completed_ts = last_record_ts
 
-            if horizon and rec.WHENMODIFIED > now - horizon:
+            if horizon and rec_ts > now - horizon:
                 # Stop short if the record is too recent. This will trigger the
                 # "read fewer documents than the page size" condition a little
                 # further down.
                 break
 
             this_count += 1
-            last_record_ts = rec.WHENMODIFIED
-            if cache.should_yield(object, getattr(rec, id_field), rec.WHENMODIFIED):
+            last_record_ts = rec_ts
+            if cache.should_yield(object, getattr(rec, id_field), rec_ts):
                 yield rec
 
         total_count += this_count
@@ -102,7 +105,7 @@ async def _fetch_records_generic(
                 rec = cls.model_validate(rec.model_dump())
                 last_record_identifier = getattr(rec, id_field)
                 this_count += 1
-                if cache.should_yield(object, getattr(rec, id_field), rec.WHENMODIFIED):
+                if cache.should_yield(object, getattr(rec, id_field), rec.cursor_value()):
                     yield rec
 
             if this_count < page_size:
@@ -129,6 +132,27 @@ async def fetch_changes(
         cursor=cursor,
         fetch_since=sage.fetch_since,
         fetch_at=sage.fetch_at,
+    ):
+        yield item
+
+
+async def fetch_creations(
+    object: str,
+    sage: Sage,
+    horizon: timedelta | None,
+    page_size: int,
+    log: Logger,
+    cursor: LogCursor,
+) -> AsyncGenerator[CreationRecord | LogCursor, None]:
+    async for item in _fetch_records_generic(
+        object=object,
+        cls=CreationRecord,
+        id_field="RECORDNO",
+        horizon=horizon,
+        page_size=page_size,
+        cursor=cursor,
+        fetch_since=sage.fetch_created_since,
+        fetch_at=sage.fetch_created_at,
     ):
         yield item
 
@@ -164,18 +188,18 @@ async def fetch_page(
     log: Logger,
     page: PageCursor,
     cutoff: LogCursor,
-) -> AsyncGenerator[IncrementalResource | PageCursor, None]:
+) -> AsyncGenerator[IncrementalResource | CreationRecord | PageCursor, None]:
     assert isinstance(page, int | None)
     assert isinstance(cutoff, datetime)
 
     last: int | None = None
     count = 0
     async for rec in sage.fetch_all(object, page):
-        rec = IncrementalResource.model_validate(rec.model_dump())
-        last = rec.RECORDNO
+        doc = parse_backfill_record(rec.model_dump())
+        last = doc.RECORDNO
         count += 1
-        if rec.WHENMODIFIED < cutoff:
-            yield rec
+        if doc.cursor_value() < cutoff:
+            yield doc
 
     if count < page_size:
         return
