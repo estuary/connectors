@@ -83,8 +83,11 @@ func newRowSizing(sch ParquetSchema) rowSize {
 		case PrimitiveTypeBinary, LogicalTypeJson, LogicalTypeDecimal:
 			rs.fixed += 24 // slice header
 			rs.calcLen = append(rs.calcLen, idx)
-		case LogicalTypeString, LogicalTypeUuid, LogicalTypeDate, LogicalTypeTime, LogicalTypeTimestamp, LogicalTypeInterval:
+		case LogicalTypeString, LogicalTypeUuid, LogicalTypeDate, LogicalTypeTime, LogicalTypeTimestamp, LogicalTypeTimestampNanos, LogicalTypeInterval:
 			rs.fixed += 16 // string header
+			rs.calcLen = append(rs.calcLen, idx)
+		case LogicalTypeVariant:
+			rs.fixed += 48 // two slice headers, for the value and metadata byte slices
 			rs.calcLen = append(rs.calcLen, idx)
 		default:
 			panic(fmt.Sprintf("newRowSizing unknown type: %d", e.DataType))
@@ -105,6 +108,12 @@ func (rs rowSize) estSize(row []any) int {
 			out += len(v)
 		case json.RawMessage:
 			out += len(v)
+		case VariantValue:
+			out += len(v.Value) + len(v.Metadata)
+		case *VariantValue:
+			if v != nil {
+				out += len(v.Value) + len(v.Metadata)
+			}
 		case nil:
 			// No additional overhead is assumed for nil values.
 		default:
@@ -432,6 +441,31 @@ func (w *ParquetWriter) flushBuffer() error {
 			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampVal); err != nil {
 				return fmt.Errorf("writing timestamp column '%s': %w", f.Name, err)
 			}
+		case LogicalTypeTimestampNanos:
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampNanosVal); err != nil {
+				return fmt.Errorf("writing timestamp (nanos) column '%s': %w", f.Name, err)
+			}
+		case LogicalTypeVariant:
+			// Variant elements occupy two physical parquet columns: the first NextColumn() call
+			// above returned the "value" writer; we must finish writing it before requesting the
+			// "metadata" writer.
+			values, metadatas, defLevels, err := collectVariantBatch(colIdx, w.buffer)
+			if err != nil {
+				return fmt.Errorf("collecting variant column '%s': %w", f.Name, err)
+			}
+			if err := writeByteArrayBatch(cw.(*file.ByteArrayColumnChunkWriter), values, defLevels); err != nil {
+				return fmt.Errorf("writing variant value column '%s': %w", f.Name, err)
+			}
+			metaCw, err := rgWriter.NextColumn()
+			if err != nil {
+				return fmt.Errorf("getting next column for variant metadata: %w", err)
+			}
+			if err := writeByteArrayBatch(metaCw.(*file.ByteArrayColumnChunkWriter), metadatas, defLevels); err != nil {
+				return fmt.Errorf("writing variant metadata column '%s': %w", f.Name, err)
+			}
+			if err := metaCw.Close(); err != nil {
+				return fmt.Errorf("closing variant metadata column writer: %w", err)
+			}
 		case LogicalTypeDecimal:
 			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getDecimalVal); err != nil {
 				return fmt.Errorf("writing interval column '%s': %w", f.Name, err)
@@ -454,7 +488,7 @@ func (w *ParquetWriter) flushBuffer() error {
 	}
 
 	w.scratch.sizeBytes += int(rgWriter.TotalBytesWritten())
-	w.scratch.columnChunkCount += len(w.schema)
+	w.scratch.columnChunkCount += w.schema.physicalColumnCount()
 	w.buffer = w.buffer[:0]
 	w.bufferSizeBytes = 0
 
@@ -489,6 +523,59 @@ type columnBatchWriter[T parquetValue] interface {
 	// taken from the next value of vals. The returned valuesOffset indicates the number of physical
 	// values that were written, and it may be smaller than the number of conceptual rows written.
 	WriteBatch(vals []T, defLvls []int16, repLvls []int16) (valueOffset int64, err error)
+}
+
+// VariantValue is the per-row input for a LogicalTypeVariant column. Value and Metadata are the
+// already-encoded Parquet Variant binary fields; this package writes them verbatim into the
+// "value" and "metadata" child columns of the variant group. JSON-to-Variant encoding is the
+// caller's responsibility.
+type VariantValue struct {
+	Value    []byte
+	Metadata []byte
+}
+
+// collectVariantBatch walks the buffered rows for a variant column and returns the value+metadata
+// byte slices and their shared def-level vector. The two child columns of the variant group share
+// the same nullability: when the variant slot is nil, both children carry defLevel 0; otherwise
+// both carry defLevel 1.
+func collectVariantBatch(colIdx int, buf [][]any) ([]parquet.ByteArray, []parquet.ByteArray, []int16, error) {
+	var values []parquet.ByteArray
+	var metadatas []parquet.ByteArray
+	var defLevels []int16
+
+	for _, row := range buf {
+		v := row[colIdx]
+		switch tv := v.(type) {
+		case nil:
+			defLevels = append(defLevels, 0)
+		case VariantValue:
+			values = append(values, tv.Value)
+			metadatas = append(metadatas, tv.Metadata)
+			defLevels = append(defLevels, 1)
+		case *VariantValue:
+			if tv == nil {
+				defLevels = append(defLevels, 0)
+				continue
+			}
+			values = append(values, tv.Value)
+			metadatas = append(metadatas, tv.Metadata)
+			defLevels = append(defLevels, 1)
+		default:
+			return nil, nil, nil, fmt.Errorf("unhandled type %T for variant column", tv)
+		}
+	}
+
+	return values, metadatas, defLevels, nil
+}
+
+func writeByteArrayBatch(w columnBatchWriter[parquet.ByteArray], vals []parquet.ByteArray, defLevels []int16) error {
+	written, err := w.WriteBatch(vals, defLevels, nil)
+	if err != nil {
+		return fmt.Errorf("writing batch of values: %w", err)
+	} else if int(written) != len(vals) {
+		return fmt.Errorf("written %d values vs. %d values in vals", written, len(vals))
+	}
+	return nil
 }
 
 type getValFn[T parquetValue] func(v any) (got T, err error)
@@ -800,6 +887,22 @@ func getTimestampVal(val any) (got int64, err error) {
 		}
 	default:
 		err = fmt.Errorf("getTimestampVal unhandled type: %T", v)
+	}
+
+	return
+}
+
+func getTimestampNanosVal(val any) (got int64, err error) {
+	switch v := val.(type) {
+	case string:
+		v = strings.Replace(v, "z", "Z", 1)
+		if d, parseErr := time.Parse(time.RFC3339Nano, v); parseErr != nil {
+			err = fmt.Errorf("unable to parse string %q as timestamp: %w", v, parseErr)
+		} else {
+			got = d.UnixNano()
+		}
+	default:
+		err = fmt.Errorf("getTimestampNanosVal unhandled type: %T", v)
 	}
 
 	return

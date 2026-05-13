@@ -14,6 +14,21 @@ import (
 // required, and what are representation of the data type should be.
 type ParquetSchema []ParquetSchemaElement
 
+// physicalColumnCount reports the number of leaf parquet columns the schema produces. Most
+// elements correspond to one leaf column, but LogicalTypeVariant is a group with two children.
+func (s ParquetSchema) physicalColumnCount() int {
+	n := 0
+	for _, e := range s {
+		switch e.DataType {
+		case LogicalTypeVariant:
+			n += 2
+		default:
+			n++
+		}
+	}
+	return n
+}
+
 type ParquetSchemaElement struct {
 	Name     string
 	DataType ParquetDataType
@@ -56,19 +71,21 @@ type ParquetSchemaElement struct {
 type ParquetDataType int
 
 const (
-	PrimitiveTypeInteger ParquetDataType = iota // INT64 primitive type
-	PrimitiveTypeNumber                         // DOUBLE primitive type, which is a 64-bit float
-	PrimitiveTypeBoolean                        // BOOLEAN primitive type
-	PrimitiveTypeBinary                         // BYTE_ARRAY primitive type
-	LogicalTypeString                           // Extends BYTE_ARRAY
-	LogicalTypeJson                             // Extends BYTE_ARRAY
-	LogicalTypeDate                             // Extends BYTE_ARRAY
-	LogicalTypeTime                             // Extends INT64
-	LogicalTypeTimestamp                        // Extends INT64
-	LogicalTypeUuid                             // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
-	LogicalTypeDecimal                          // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
-	LogicalTypeInterval                         // Extends FIXED_LEN_BYTE_ARRAY, with a length of 12 bytes
-	LogicalTypeUnknown                          // Must always be nil
+	PrimitiveTypeInteger      ParquetDataType = iota // INT64 primitive type
+	PrimitiveTypeNumber                              // DOUBLE primitive type, which is a 64-bit float
+	PrimitiveTypeBoolean                             // BOOLEAN primitive type
+	PrimitiveTypeBinary                              // BYTE_ARRAY primitive type
+	LogicalTypeString                                // Extends BYTE_ARRAY
+	LogicalTypeJson                                  // Extends BYTE_ARRAY
+	LogicalTypeDate                                  // Extends BYTE_ARRAY
+	LogicalTypeTime                                  // Extends INT64
+	LogicalTypeTimestamp                             // Extends INT64, microsecond precision
+	LogicalTypeTimestampNanos                        // Extends INT64, nanosecond precision
+	LogicalTypeUuid                                  // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
+	LogicalTypeDecimal                               // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
+	LogicalTypeInterval                              // Extends FIXED_LEN_BYTE_ARRAY, with a length of 12 bytes
+	LogicalTypeUnknown                               // Must always be nil
+	LogicalTypeVariant                               // GROUP of two required BYTE_ARRAY children "value" and "metadata"
 )
 
 // makeNode translates a ParquetSchemaElement into an actual parquet schema node.
@@ -145,6 +162,25 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			-1,
 			fieldId,
 		))
+	case LogicalTypeTimestampNanos:
+		return schema.Must(schema.NewPrimitiveNodeLogical(
+			e.Name,
+			repetition,
+			schema.NewTimestampLogicalType(true, schema.TimeUnitNanos),
+			parquet.Types.Int64,
+			-1,
+			fieldId,
+		))
+	case LogicalTypeVariant:
+		value := schema.NewByteArrayNode("value", parquet.Repetitions.Required, -1)
+		metadata := schema.NewByteArrayNode("metadata", parquet.Repetitions.Required, -1)
+		return schema.MustGroup(schema.NewGroupNodeLogical(
+			e.Name,
+			repetition,
+			schema.FieldList{value, metadata},
+			schema.VariantLogicalType{},
+			fieldId,
+		))
 	case LogicalTypeInterval:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
 			e.Name,
@@ -183,6 +219,9 @@ type parquetSchemaConfig struct {
 	objectAsString   bool
 	timeAsString     bool
 	uuidAsString     bool
+	timestampAsNanos bool
+	objectAsVariant  bool
+	arrayAsVariant   bool
 }
 
 type ParquetSchemaOption func(*parquetSchemaConfig)
@@ -195,13 +234,37 @@ func WithParquetSchemaDurationAsString() ParquetSchemaOption {
 
 func WithParquetSchemaArrayAsString() ParquetSchemaOption {
 	return func(cfg *parquetSchemaConfig) {
+		if cfg.arrayAsVariant {
+			panic("cannot both WithParquetSchemaArrayAsString and WithParquetSchemaArrayAsVariant")
+		}
 		cfg.arrayAsString = true
+	}
+}
+
+func WithParquetSchemaArrayAsVariant() ParquetSchemaOption {
+	return func(cfg *parquetSchemaConfig) {
+		if cfg.arrayAsString {
+			panic("cannot both WithParquetSchemaArrayAsVariant and WithParquetSchemaArrayAsString")
+		}
+		cfg.arrayAsVariant = true
 	}
 }
 
 func WithParquetSchemaObjectAsString() ParquetSchemaOption {
 	return func(cfg *parquetSchemaConfig) {
+		if cfg.objectAsVariant {
+			panic("cannot both WithParquetSchemaObjectAsString and WithParquetSchemaObjectAsVariant")
+		}
 		cfg.objectAsString = true
+	}
+}
+
+func WithParquetSchemaObjectAsVariant() ParquetSchemaOption {
+	return func(cfg *parquetSchemaConfig) {
+		if cfg.objectAsString {
+			panic("cannot both WithParquetSchemaObjectAsVariant and WithParquetSchemaObjectAsString")
+		}
+		cfg.objectAsVariant = true
 	}
 }
 
@@ -214,6 +277,12 @@ func WithParquetTimeAsString() ParquetSchemaOption {
 func WithParquetUUIDAsString() ParquetSchemaOption {
 	return func(cfg *parquetSchemaConfig) {
 		cfg.uuidAsString = true
+	}
+}
+
+func WithParquetTimestampAsNanoseconds() ParquetSchemaOption {
+	return func(cfg *parquetSchemaConfig) {
+		cfg.timestampAsNanos = true
 	}
 }
 
@@ -250,7 +319,7 @@ func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts .
 		}
 
 		if hadType {
-			out.DataType = typeOrString(LogicalTypeJson, cfg.objectAsString)
+			out.DataType = typeOrVariant(typeOrString(LogicalTypeJson, cfg.objectAsString), cfg.objectAsVariant)
 			break
 		}
 
@@ -258,9 +327,9 @@ func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts .
 
 		switch t {
 		case "array":
-			out.DataType = typeOrString(LogicalTypeJson, cfg.arrayAsString)
+			out.DataType = typeOrVariant(typeOrString(LogicalTypeJson, cfg.arrayAsString), cfg.arrayAsVariant)
 		case "object":
-			out.DataType = typeOrString(LogicalTypeJson, cfg.objectAsString)
+			out.DataType = typeOrVariant(typeOrString(LogicalTypeJson, cfg.objectAsString), cfg.objectAsVariant)
 		case "boolean":
 			out.DataType = PrimitiveTypeBoolean
 		case "integer":
@@ -277,7 +346,11 @@ func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts .
 			case "date":
 				out.DataType = LogicalTypeDate
 			case "date-time":
-				out.DataType = LogicalTypeTimestamp
+				if cfg.timestampAsNanos {
+					out.DataType = LogicalTypeTimestampNanos
+				} else {
+					out.DataType = LogicalTypeTimestamp
+				}
 			case "duration":
 				out.DataType = typeOrString(LogicalTypeInterval, cfg.durationAsString)
 			case "time":
@@ -297,9 +370,16 @@ func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts .
 	return out
 }
 
-func typeOrString[T ParquetDataType](base T, shouldString bool) T {
+func typeOrString(base ParquetDataType, shouldString bool) ParquetDataType {
 	if shouldString {
-		return T(LogicalTypeString)
+		return LogicalTypeString
+	}
+	return base
+}
+
+func typeOrVariant(base ParquetDataType, shouldVariant bool) ParquetDataType {
+	if shouldVariant {
+		return LogicalTypeVariant
 	}
 	return base
 }

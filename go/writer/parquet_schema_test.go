@@ -103,6 +103,18 @@ func TestMakeNode(t *testing.T) {
 			},
 		},
 		{
+			name:         "LogicalTypeTimestampNanos",
+			elem:         ParquetSchemaElement{Name: "tsNanosField", DataType: LogicalTypeTimestampNanos, Required: false, FieldId: ptrTo(fid)},
+			wantPhysical: parquet.Types.Int64,
+			wantTypeLen:  -1,
+			checkLogical: func(t *testing.T, lt schema.LogicalType) {
+				tl, ok := lt.(schema.TimestampLogicalType)
+				require.True(t, ok, "expected TimestampLogicalType, got %T", lt)
+				require.True(t, tl.IsAdjustedToUTC())
+				require.Equal(t, schema.TimeUnitNanos, tl.TimeUnit())
+			},
+		},
+		{
 			name:         "LogicalTypeUuid",
 			elem:         ParquetSchemaElement{Name: "uuidField", DataType: LogicalTypeUuid, Required: true, FieldId: ptrTo(fid)},
 			wantPhysical: parquet.Types.FixedLenByteArray,
@@ -187,6 +199,7 @@ func TestMakeNodeNilFieldId(t *testing.T) {
 		LogicalTypeDate,
 		LogicalTypeTime,
 		LogicalTypeTimestamp,
+		LogicalTypeTimestampNanos,
 		LogicalTypeUuid,
 		LogicalTypeDecimal,
 		LogicalTypeInterval,
@@ -196,6 +209,49 @@ func TestMakeNodeNilFieldId(t *testing.T) {
 		t.Run(fmt.Sprintf("dataType=%d", dt), func(t *testing.T) {
 			node := makeNode(ParquetSchemaElement{Name: "f", DataType: dt, Required: true, Scale: 0})
 			require.EqualValues(t, -1, node.FieldID())
+		})
+	}
+}
+
+func TestMakeNodeVariant(t *testing.T) {
+	const fid = int32(7)
+
+	for _, required := range []bool{true, false} {
+		t.Run(fmt.Sprintf("required=%v", required), func(t *testing.T) {
+			node := makeNode(ParquetSchemaElement{
+				Name:     "variantField",
+				DataType: LogicalTypeVariant,
+				Required: required,
+				FieldId:  ptrTo(fid),
+			})
+
+			gn, ok := node.(*schema.GroupNode)
+			require.True(t, ok, "expected *schema.GroupNode, got %T", node)
+
+			require.Equal(t, "variantField", gn.Name())
+			require.EqualValues(t, fid, gn.FieldID())
+			wantRep := parquet.Repetitions.Optional
+			if required {
+				wantRep = parquet.Repetitions.Required
+			}
+			require.Equal(t, wantRep, gn.RepetitionType())
+
+			_, ok = gn.LogicalType().(schema.VariantLogicalType)
+			require.True(t, ok, "expected VariantLogicalType, got %T", gn.LogicalType())
+
+			require.Equal(t, 2, gn.NumFields())
+
+			valueNode, ok := gn.Field(0).(*schema.PrimitiveNode)
+			require.True(t, ok)
+			require.Equal(t, "value", valueNode.Name())
+			require.Equal(t, parquet.Types.ByteArray, valueNode.PhysicalType())
+			require.Equal(t, parquet.Repetitions.Required, valueNode.RepetitionType())
+
+			metadataNode, ok := gn.Field(1).(*schema.PrimitiveNode)
+			require.True(t, ok)
+			require.Equal(t, "metadata", metadataNode.Name())
+			require.Equal(t, parquet.Types.ByteArray, metadataNode.PhysicalType())
+			require.Equal(t, parquet.Repetitions.Required, metadataNode.RepetitionType())
 		})
 	}
 }
@@ -585,6 +641,59 @@ func TestProjectionToParquetSchemaElement(t *testing.T) {
 			wantRequired: true,
 		},
 		{
+			name: "WithParquetTimestampAsNanoseconds flips date-time to nanos",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists:  pf.Inference_MUST,
+					Types:   []string{"string"},
+					String_: &pf.Inference_String{Format: "date-time"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetTimestampAsNanoseconds()},
+			wantType:     LogicalTypeTimestampNanos,
+			wantRequired: true,
+		},
+		{
+			name: "WithParquetSchemaArrayAsVariant flips array to variant",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"array"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetSchemaArrayAsVariant()},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+		},
+		{
+			name: "WithParquetSchemaObjectAsVariant flips object to variant",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"object"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetSchemaObjectAsVariant()},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+		},
+		{
+			name: "WithParquetSchemaObjectAsVariant flips multi-type fallback to variant",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists: pf.Inference_MUST,
+					Types:  []string{"integer", "boolean"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetSchemaObjectAsVariant()},
+			wantType:     LogicalTypeVariant,
+			wantRequired: true,
+		},
+		{
 			name: "WithParquetUUIDAsString flips uuid to string",
 			projection: pf.Projection{
 				Field: "f",
@@ -606,6 +715,41 @@ func TestProjectionToParquetSchemaElement(t *testing.T) {
 			require.Equal(t, tt.projection.Field, got.Name)
 			require.Equal(t, tt.wantType, got.DataType)
 			require.Equal(t, tt.wantRequired, got.Required)
+		})
+	}
+}
+
+func TestProjectionToParquetSchemaElementConflictingOptionsPanic(t *testing.T) {
+	tests := []struct {
+		name      string
+		opts      []ParquetSchemaOption
+		wantPanic string
+	}{
+		{
+			name:      "object as string and as variant",
+			opts:      []ParquetSchemaOption{WithParquetSchemaObjectAsString(), WithParquetSchemaObjectAsVariant()},
+			wantPanic: "cannot both WithParquetSchemaObjectAsVariant and WithParquetSchemaObjectAsString",
+		},
+		{
+			name:      "array as string and as variant",
+			opts:      []ParquetSchemaOption{WithParquetSchemaArrayAsString(), WithParquetSchemaArrayAsVariant()},
+			wantPanic: "cannot both WithParquetSchemaArrayAsVariant and WithParquetSchemaArrayAsString",
+		},
+	}
+
+	proj := pf.Projection{
+		Field: "f",
+		Inference: pf.Inference{
+			Exists: pf.Inference_MUST,
+			Types:  []string{"object"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			require.PanicsWithValue(t, tt.wantPanic, func() {
+				ProjectionToParquetSchemaElement(proj, false, tt.opts...)
+			})
 		})
 	}
 }
