@@ -420,6 +420,17 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 	if err := s.db.WriteWatermark(ctx, fenceWatermark); err != nil {
 		return fmt.Errorf("error establishing watermark fence: %w", err)
 	}
+	// Query the post-write current SCN to give a rough lower bound on when in the
+	// replication stream the fence should appear. This is best-effort: a failure
+	// here doesn't fail the call.
+	var postWriteSCN SCN
+	if err := s.db.conn.QueryRowContext(ctx, "SELECT current_scn FROM V$DATABASE").Scan(&postWriteSCN); err != nil {
+		logrus.WithField("err", err).Warn("error fetching current SCN after watermark write")
+	}
+	logrus.WithFields(logrus.Fields{
+		"fenceWatermark": fenceWatermark,
+		"postWriteSCN":   postWriteSCN,
+	}).Info("wrote watermark fence")
 
 	// Stream replication events until the fence is reached.
 	var fenceReached = false
@@ -443,7 +454,15 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 					if actual == nil {
 						actual = event.After["WATERMARK"]
 					}
-					logrus.WithFields(logrus.Fields{"expected": fenceWatermark, "actual": actual}).Debug("watermark change")
+					var changeSCN SCN
+					if src, ok := event.Source.(*oracleSource); ok {
+						changeSCN = src.SCN
+					}
+					logrus.WithFields(logrus.Fields{
+						"expected": fenceWatermark,
+						"actual":   actual,
+						"scn":      changeSCN,
+					}).Info("watermark change observed")
 					if actual == fenceWatermark {
 						fenceReached = true
 					}
@@ -476,6 +495,28 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 	}
 	if err := s.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
 		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
+	}
+
+	// Confirm that the watermarks table is present in tableObjectMapping. If it isn't,
+	// its DATA_OBJ#/DATA_OBJD# won't appear in the logminer predicate and fence
+	// watermark writes will never be observed.
+	var watermarksFound = false
+	for _, mapping := range s.db.tableObjectMapping {
+		if mapping.streamID == watermarks {
+			logrus.WithFields(logrus.Fields{
+				"watermarksTable": watermarks,
+				"objectID":        mapping.objectID,
+				"dataObjectID":    mapping.dataObjectID,
+			}).Info("watermarks table covered by logminer predicate")
+			watermarksFound = true
+			break
+		}
+	}
+	if !watermarksFound {
+		logrus.WithFields(logrus.Fields{
+			"watermarksTable":   watermarks,
+			"objectMappingSize": len(s.db.tableObjectMapping),
+		}).Warn("watermarks table not in tableObjectMapping; logminer query predicate will not return watermark changes")
 	}
 
 	var streamCtx, streamCancel = context.WithCancel(ctx)
@@ -558,6 +599,16 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 		} else if endSCN, err = s.addLogFiles(ctx, startSCN, iterationMaxSCN); err != nil {
 			return err
 		}
+
+		logrus.WithFields(logrus.Fields{
+			"startSCN":            startSCN,
+			"endSCN":              endSCN,
+			"currentSCN":          currentSCN,
+			"iterationMaxSCN":     iterationMaxSCN,
+			"dictionaryMode":      s.dictionaryMode,
+			"pendingTransactions": len(s.pendingTransactions),
+			"specificXIDs":        len(transactions),
+		}).Info("logminer: starting iteration")
 
 		if err := s.startLogminer(ctx, startSCN, endSCN); err != nil {
 			return err
@@ -694,8 +745,10 @@ func (s *replicationStream) capturePendingTransaction(ctx context.Context, tx tr
 
 	var transactions = []string{tx.XID}
 	logrus.WithFields(logrus.Fields{
-		"tx": tx.XID,
-	}).Debug("capturing pending transaction")
+		"xid":      tx.XID,
+		"startSCN": startSCN,
+		"endSCN":   endSCN,
+	}).Info("capturing pending transaction")
 	return s.poll(ctx, startSCN, endSCN, transactions)
 }
 
@@ -839,9 +892,12 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"pending":   len(pendingTXs),
-		"rollbacks": len(excludeXIDs),
-	}).Debug("transactions")
+		"pending":         len(pendingTXs),
+		"rollbacks":       len(excludeXIDs),
+		"trackedPriorTxs": len(s.pendingTransactions),
+		"startSCN":        startSCN,
+		"endSCN":          endSCN,
+	}).Info("logminer: pending and rolled-back transactions")
 
 	return pendingTXs, excludeXIDs, nil
 }
@@ -910,7 +966,16 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		// further processing on it.
 		var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
 		if !s.tableActive(streamID) && !slices.Contains([]int{opStart, opCommit, opRollback}, msg.Op) {
-			logrus.WithField("streamID", streamID).Debug("logminer: received message for unknown table")
+			logrus.WithFields(logrus.Fields{
+				"streamID":     streamID,
+				"owner":        msg.Owner,
+				"tableName":    msg.TableName,
+				"objectID":     msg.ObjectID,
+				"dataObjectID": msg.DataObjectID,
+				"op":           msg.Op,
+				"scn":          msg.SCN,
+				"status":       msg.Status,
+			}).Info("logminer: received message for unknown table")
 			var isKnownTable = false
 			// if the table has been dropped, check their object identifier
 			if strings.HasPrefix(msg.TableName, "OBJ#") || (strings.HasPrefix(msg.TableName, "BIN$") && strings.HasSuffix(msg.TableName, "==$0") && len(msg.TableName) == 30) {
@@ -985,7 +1050,8 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		"startSCN":      startSCN,
 		"endSCN":        endSCN,
 		"finalSCN":      finalSCN,
-	}).Debug("received messages")
+		"excludedXIDs":  len(excludeXIDs),
+	}).Info("logminer: received messages")
 
 	return nil
 }

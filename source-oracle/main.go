@@ -279,7 +279,7 @@ type oracleDatabase struct {
 	pdbName            string                           // name of the Pluggable Database we are in, if this is a container Oracle instance
 	explained          map[sqlcapture.StreamID]struct{} // Tracks tables which have had an `EXPLAIN` run on them during this connector invocation
 	includeTxIDs       map[sqlcapture.StreamID]bool     // Tracks which tables should have XID properties in their replication metadata
-	tableObjectMapping map[string]tableObject           // A mapping from streamID to objectID, dataObjectID
+	tableObjectMapping map[string]tableObject           // A mapping from joinObjectID(objectID, dataObjectID) to the corresponding streamID + numeric IDs
 	featureFlags       map[string]bool                  // Parsed feature flag settings with defaults applied
 
 	backfillRowIDRanges map[sqlcapture.StreamID][]string // List of backfill chunk rowids
