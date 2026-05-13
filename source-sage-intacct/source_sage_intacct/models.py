@@ -85,7 +85,13 @@ class ApiResponse(BaseModel):
                 return " - ".join(parts) if parts else "unspecified Sage Intacct error"
 
             def is_permission_error(self) -> bool:
-                return self.errorno == "PL04000005"
+                if self.errorno == "PL04000005":
+                    return True
+                # AUDITHISTORY denials arrive without an `errorno`, so fall
+                # back to matching the literal description Sage emits.
+                if self.description2 and "do not have permission to view audit history" in self.description2.lower():
+                    return True
+                return False
 
         error: list[Error] | Error
 
