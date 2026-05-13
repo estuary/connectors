@@ -25,6 +25,11 @@ import (
 
 var featureFlagDefaults = map[string]bool{
 	"retain_existing_data_on_backfill": false,
+
+	// Enable this flag to avoid a one time backfill due to change in date
+	// format in the mapping (a581ab1b761816b2b93b525c63153aac3493d49a).  This
+	// flag should not be used on tasks created after this commit.
+	"ignore_mapping_format_changes": false,
 }
 
 type sshForwarding struct {
@@ -425,9 +430,10 @@ func (driver) NewTransactor(ctx context.Context, req pm.Request_Open, be *m.Bind
 }
 
 type materialization struct {
-	cfg        config
-	metaClient *client
-	dataClient *client
+	cfg          config
+	metaClient   *client
+	dataClient   *client
+	featureFlags map[string]bool
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, property] = &materialization{}
@@ -444,9 +450,10 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 	}
 
 	return &materialization{
-		cfg:        cfg,
-		metaClient: metaClient,
-		dataClient: dataClient,
+		cfg:          cfg,
+		metaClient:   metaClient,
+		dataClient:   dataClient,
+		featureFlags: featureFlags,
 	}, nil
 }
 
@@ -530,7 +537,9 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (property, boilerplate.ElementConverter) {
-	return propForProjection(&p.Projection, p.Inference.Types, fc), nil
+	prop := propForProjection(&p.Projection, p.Inference.Types, fc)
+	prop.IgnoreFormat = d.featureFlags["ignore_mapping_format_changes"]
+	return prop, nil
 }
 
 func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {
