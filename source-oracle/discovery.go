@@ -178,7 +178,7 @@ type tableObject struct {
 func getTableObjectMappings(ctx context.Context, watermarksTable string, conn *sql.DB, tables []*sqlcapture.DiscoveryInfo) (map[string]tableObject, error) {
 	var watermarksTableSplit = strings.Split(watermarksTable, ".")
 	var watermarkSchema = watermarksTableSplit[0]
-	var watermarkTableName = watermarksTableSplit[0]
+	var watermarkTableName = watermarksTableSplit[1]
 
 	var mapping = make(map[string]tableObject, len(tables))
 	var tablesCondition = ""
