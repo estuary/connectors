@@ -42,19 +42,19 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 			TableTemplates: []*template.Template{
 				testTemplates.createTargetTable,
 				testTemplates.createStoreTable,
-				testTemplates.mergeInto,
 				testTemplates.createDeleteTable,
 				testTemplates.deleteQuery,
 			},
 		},
 	)
 
-	// loadQuery and loadQueryNoFlowDocument are rendered with per-transaction
-	// MergeBound values, so they're driven through the loadQueryParams shape
-	// rather than the plain-Table TableTemplates path.
+	// loadQuery, loadQueryNoFlowDocument, and mergeInto are rendered with
+	// per-transaction MergeBound values, so they're driven through the
+	// queryParams shape rather than the plain-Table TableTemplates path.
 	for _, tpl := range []*template.Template{
 		testTemplates.loadQuery,
 		testTemplates.loadQueryNoFlowDocument,
+		testTemplates.mergeInto,
 	} {
 		tbl := tables[0]
 		require.False(t, tbl.DeltaUpdates)
@@ -77,7 +77,7 @@ func runSQLGen(t *testing.T, testDialect sql.Dialect, testTemplates templates) {
 
 		var testcase = tbl.Identifier + " " + tpl.Name()
 		snap.WriteString("--- Begin " + testcase + " ---")
-		require.NoError(t, tpl.Execute(snap, &loadQueryParams{Table: tbl, Bounds: bounds}))
+		require.NoError(t, tpl.Execute(snap, &queryParams{Table: tbl, Bounds: bounds}))
 		snap.WriteString("--- End " + testcase + " ---\n\n")
 	}
 

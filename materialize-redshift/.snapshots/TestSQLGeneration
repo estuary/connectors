@@ -121,30 +121,6 @@ CREATE TEMPORARY TABLE flow_temp_table_1 (
 );
 --- End "a-schema".delta_updates createStoreTable ---
 
---- Begin "a-schema".key_value mergeInto ---
-
-MERGE INTO "a-schema".key_value
-USING flow_temp_table_0 AS r
-ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = r."key!binary"
-WHEN MATCHED THEN
-	UPDATE SET "array" = r."array", "binary" = r."binary", boolean = r.boolean, field_with_projection = r.field_with_projection, flow_published_at = r.flow_published_at, integer = r.integer, "integerGt128Bit" = r."integerGt128Bit", "integerGt256Bit" = r."integerGt256Bit", "integerGt64Bit" = r."integerGt64Bit", "integerWithUserDDL" = r."integerWithUserDDL", multiple = r.multiple, "nonAsciiκόσμε" = r."nonAsciiκόσμε", number = r.number, "numberCastToString" = r."numberCastToString", object = r.object, string = r.string, "stringInteger" = r."stringInteger", "stringInteger18Chars" = r."stringInteger18Chars", "stringInteger38Chars" = r."stringInteger38Chars", "stringInteger39Chars" = r."stringInteger39Chars", "stringInteger66Chars" = r."stringInteger66Chars", "stringInteger77Chars" = r."stringInteger77Chars", "stringNumber" = r."stringNumber", flow_document = r.flow_document
-WHEN NOT MATCHED THEN
-	INSERT (key1, key2, "key!binary", "array", "binary", boolean, field_with_projection, flow_published_at, integer, "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", object, string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document)
-	VALUES (r.key1, r.key2, r."key!binary", r."array", r."binary", r.boolean, r.field_with_projection, r.flow_published_at, r.integer, r."integerGt128Bit", r."integerGt256Bit", r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r."nonAsciiκόσμε", r.number, r."numberCastToString", r.object, r.string, r."stringInteger", r."stringInteger18Chars", r."stringInteger38Chars", r."stringInteger39Chars", r."stringInteger66Chars", r."stringInteger77Chars", r."stringNumber", r.flow_document);
---- End "a-schema".key_value mergeInto ---
-
---- Begin "a-schema".delta_updates mergeInto ---
-
-MERGE INTO "a-schema".delta_updates
-USING flow_temp_table_1 AS r
-ON "a-schema".delta_updates."theKey" = r."theKey"
-WHEN MATCHED THEN
-	UPDATE SET "aValue" = r."aValue", flow_published_at = r.flow_published_at
-WHEN NOT MATCHED THEN
-	INSERT ("theKey", "aValue", flow_published_at)
-	VALUES (r."theKey", r."aValue", r.flow_published_at);
---- End "a-schema".delta_updates mergeInto ---
-
 --- Begin "a-schema".key_value createDeleteTable ---
 
 CREATE TEMPORARY TABLE flow_temp_table_0_deleted (
@@ -218,6 +194,17 @@ JOIN "a-schema".key_value AS r
 	 AND l."key!binary" = r."key!binary" AND r."key!binary" >= 'aGVsbG8K' AND r."key!binary" <= 'Z29vZGJ5ZQo='
 
 --- End "a-schema".key_value loadQueryNoFlowDocument ---
+
+--- Begin "a-schema".key_value mergeInto ---
+MERGE INTO "a-schema".key_value
+USING flow_temp_table_0 AS r
+ON "a-schema".key_value.key1 = r.key1 AND "a-schema".key_value.key1 >= 10 AND "a-schema".key_value.key1 <= 100 AND "a-schema".key_value.key2 = r.key2 AND "a-schema".key_value."key!binary" = r."key!binary" AND "a-schema".key_value."key!binary" >= 'aGVsbG8K' AND "a-schema".key_value."key!binary" <= 'Z29vZGJ5ZQo='
+WHEN MATCHED THEN
+	UPDATE SET "array" = r."array", "binary" = r."binary", boolean = r.boolean, field_with_projection = r.field_with_projection, flow_published_at = r.flow_published_at, integer = r.integer, "integerGt128Bit" = r."integerGt128Bit", "integerGt256Bit" = r."integerGt256Bit", "integerGt64Bit" = r."integerGt64Bit", "integerWithUserDDL" = r."integerWithUserDDL", multiple = r.multiple, "nonAsciiκόσμε" = r."nonAsciiκόσμε", number = r.number, "numberCastToString" = r."numberCastToString", object = r.object, string = r.string, "stringInteger" = r."stringInteger", "stringInteger18Chars" = r."stringInteger18Chars", "stringInteger38Chars" = r."stringInteger38Chars", "stringInteger39Chars" = r."stringInteger39Chars", "stringInteger66Chars" = r."stringInteger66Chars", "stringInteger77Chars" = r."stringInteger77Chars", "stringNumber" = r."stringNumber", flow_document = r.flow_document
+WHEN NOT MATCHED THEN
+	INSERT (key1, key2, "key!binary", "array", "binary", boolean, field_with_projection, flow_published_at, integer, "integerGt128Bit", "integerGt256Bit", "integerGt64Bit", "integerWithUserDDL", multiple, "nonAsciiκόσμε", number, "numberCastToString", object, string, "stringInteger", "stringInteger18Chars", "stringInteger38Chars", "stringInteger39Chars", "stringInteger66Chars", "stringInteger77Chars", "stringNumber", flow_document)
+	VALUES (r.key1, r.key2, r."key!binary", r."array", r."binary", r.boolean, r.field_with_projection, r.flow_published_at, r.integer, r."integerGt128Bit", r."integerGt256Bit", r."integerGt64Bit", r."integerWithUserDDL", r.multiple, r."nonAsciiκόσμε", r.number, r."numberCastToString", r.object, r.string, r."stringInteger", r."stringInteger18Chars", r."stringInteger38Chars", r."stringInteger39Chars", r."stringInteger66Chars", r."stringInteger77Chars", r."stringNumber", r.flow_document);
+--- End "a-schema".key_value mergeInto ---
 
 --- Begin "a-schema".key_value createLoadTable (no varchar length) ---
 CREATE TEMPORARY TABLE flow_temp_table_0 (

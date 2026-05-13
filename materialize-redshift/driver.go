@@ -369,9 +369,10 @@ type binding struct {
 	createLoadTableTemplate *template.Template
 	loadQueryTemplate       *template.Template
 	loadMergeBounds         *sql.MergeBoundsBuilder
+	mergeIntoTemplate       *template.Template
+	storeMergeBounds        *sql.MergeBoundsBuilder
 	createStoreTableSQL     string
 	createDeleteTableSQL    string
-	mergeIntoSQL            string
 	deleteQuerySQL          string
 	copyIntoLoadTableSQL    string
 	copyIntoMergeTableSQL   string
@@ -407,11 +408,12 @@ func (t *transactor) addBinding(
 	caseSensitiveIdentifierEnabled bool,
 ) error {
 	var b = &binding{
-		target:          target,
-		loadFile:        newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
-		storeFile:       newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.ColumnNames()),
-		deleteFile:      newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
-		loadMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, t.dialect.Literal),
+		target:           target,
+		loadFile:         newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		storeFile:        newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.ColumnNames()),
+		deleteFile:       newStagedFile(client, t.cfg.Bucket, t.cfg.effectiveBucketPath(), target.KeyNames()),
+		loadMergeBounds:  sql.NewMergeBoundsBuilder(target.Keys, t.dialect.Literal),
+		storeMergeBounds: sql.NewMergeBoundsBuilder(target.Keys, t.dialect.Literal),
 	}
 
 	if t.cfg.Advanced.NoFlowDocument {
@@ -445,13 +447,14 @@ func (t *transactor) addBinding(
 		*m.sql = sql.String()
 	}
 
-	// Choose appropriate load query template based on configuration. Rendering
-	// is deferred until each transaction so that the per-transaction key
-	// bounds can be embedded into the query.
+	// Choose appropriate load query template based on configuration. Load and
+	// merge templates are rendered per-transaction so that the observed key
+	// bounds can be embedded into each query.
 	b.loadQueryTemplate = t.templates.loadQuery
 	if t.cfg.Advanced.NoFlowDocument {
 		b.loadQueryTemplate = t.templates.loadQueryNoFlowDocument
 	}
+	b.mergeIntoTemplate = t.templates.mergeInto
 
 	// Render templates that rely only on the target table.
 	for _, m := range []struct {
@@ -460,7 +463,6 @@ func (t *transactor) addBinding(
 	}{
 		{&b.createStoreTableSQL, t.templates.createStoreTable},
 		{&b.createDeleteTableSQL, t.templates.createDeleteTable},
-		{&b.mergeIntoSQL, t.templates.mergeInto},
 		{&b.deleteQuerySQL, t.templates.deleteQuery},
 	} {
 		var err error
@@ -581,7 +583,7 @@ func (d *transactor) Load(it *m.LoadIterator, loaded func(int, json.RawMessage) 
 			continue
 		}
 
-		loadQuerySQL, err := renderLoadQuery(b.target, b.loadQueryTemplate, b.loadMergeBounds.Build())
+		loadQuerySQL, err := renderQueryWithBounds(b.target, b.loadQueryTemplate, b.loadMergeBounds.Build())
 		if err != nil {
 			return fmt.Errorf("rendering load query for binding[%d]: %w", idx, err)
 		}
@@ -720,6 +722,8 @@ func (d *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			if err != nil {
 				return nil, fmt.Errorf("converting store parameters: %w", err)
 			}
+
+			b.storeMergeBounds.NextKey(converted[:len(b.target.Keys)])
 		}
 
 		file.start()
@@ -890,13 +894,21 @@ func (d *transactor) commit(ctx context.Context, varcharColumnUpdates map[string
 				return fmt.Errorf("creating store table: %w", err)
 			}
 
+			mergeIntoSQL, err := renderQueryWithBounds(b.target, b.mergeIntoTemplate, b.storeMergeBounds.Build())
+			if err != nil {
+				return fmt.Errorf("rendering merge query: %w", err)
+			}
+
 			if _, err := txn.Exec(ctx, b.copyIntoMergeTableSQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
-			} else if _, err := txn.Exec(ctx, b.mergeIntoSQL); err != nil {
+			} else if _, err := txn.Exec(ctx, mergeIntoSQL); err != nil {
 				return fmt.Errorf("merging to table '%s': %w", b.target.Identifier, err)
 			}
 		} else {
-			// Can copy directly into the target table since all values are new.
+			// All store rows are new, so they can be copied directly into the
+			// target. Discard any tracked bounds so the next transaction starts
+			// fresh.
+			b.storeMergeBounds.Reset()
 			if _, err := txn.Exec(ctx, b.copyIntoTargetTableSQL); err != nil {
 				return handleCopyIntoErr(ctx, txn, d.cfg.Bucket, b.storeFile.prefix, b.target.Identifier, err)
 			}

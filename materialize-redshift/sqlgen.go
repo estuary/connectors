@@ -253,17 +253,18 @@ type loadTableParams struct {
 	VarCharLength int
 }
 
-// loadQueryParams is the template input for loadQuery and loadQueryNoFlowDocument.
-// Bounds is computed per-transaction from the observed load keys, allowing Redshift
-// to prune target-table blocks via zone maps on the join keys.
-type loadQueryParams struct {
+// queryParams is the template input for templates that need per-transaction
+// key bounds (loadQuery, loadQueryNoFlowDocument, mergeInto). Bounds is
+// computed from the observed keys for the transaction, allowing Redshift to
+// prune target-table blocks via zone maps on the key columns.
+type queryParams struct {
 	sql.Table
 	Bounds []sql.MergeBound
 }
 
-func renderLoadQuery(table sql.Table, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
+func renderQueryWithBounds(table sql.Table, tpl *template.Template, bounds []sql.MergeBound) (string, error) {
 	var w strings.Builder
-	if err := tpl.Execute(&w, &loadQueryParams{Table: table, Bounds: bounds}); err != nil {
+	if err := tpl.Execute(&w, &queryParams{Table: table, Bounds: bounds}); err != nil {
 		return "", err
 	}
 	return w.String(), nil
@@ -352,13 +353,19 @@ CREATE TEMPORARY TABLE {{ template "temp_name_deleted" . }} (
 -- Templated query which updates an existing row in the target table. Redshift does not support
 -- "WHEN MATCHED AND", so if/when deletion is implemented using a NULL document, a separate delete
 -- statement will be needed in addition to this merge statement.
+--
+-- The per-transaction min/max bounds from $.Bounds are emitted as additional
+-- predicates on the target side of the merge. Like the load query, these are
+-- redundant with the equality match but allow Redshift to prune target blocks
+-- via zone maps on the key columns when the target is sorted on them.
 
 {{ define "mergeInto" }}
 MERGE INTO {{ $.Identifier }}
 USING {{ template "temp_name" . }} AS r
-ON {{ range $ind, $key := $.Keys }}
+ON {{ range $ind, $bound := $.Bounds }}
 {{- if $ind }} AND {{end -}}
-	{{$.Identifier}}.{{$key.Identifier}} = r.{{$key.Identifier}}
+	{{$.Identifier}}.{{$bound.Identifier}} = r.{{$bound.Identifier}}
+	{{- if $bound.LiteralLower }} AND {{$.Identifier}}.{{$bound.Identifier}} >= {{ $bound.LiteralLower }} AND {{$.Identifier}}.{{$bound.Identifier}} <= {{ $bound.LiteralUpper }}{{ end }}
 {{- end}}
 WHEN MATCHED THEN
 	UPDATE SET {{ range $ind, $val := $.Values }}
