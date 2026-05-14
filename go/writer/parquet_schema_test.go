@@ -103,6 +103,18 @@ func TestMakeNode(t *testing.T) {
 			},
 		},
 		{
+			name:         "LogicalTypeTimestampNanos",
+			elem:         ParquetSchemaElement{Name: "tsNanosField", DataType: LogicalTypeTimestampNanos, Required: false, FieldId: ptrTo(fid)},
+			wantPhysical: parquet.Types.Int64,
+			wantTypeLen:  -1,
+			checkLogical: func(t *testing.T, lt schema.LogicalType) {
+				tl, ok := lt.(schema.TimestampLogicalType)
+				require.True(t, ok, "expected TimestampLogicalType, got %T", lt)
+				require.True(t, tl.IsAdjustedToUTC())
+				require.Equal(t, schema.TimeUnitNanos, tl.TimeUnit())
+			},
+		},
+		{
 			name:         "LogicalTypeUuid",
 			elem:         ParquetSchemaElement{Name: "uuidField", DataType: LogicalTypeUuid, Required: true, FieldId: ptrTo(fid)},
 			wantPhysical: parquet.Types.FixedLenByteArray,
@@ -187,6 +199,7 @@ func TestMakeNodeNilFieldId(t *testing.T) {
 		LogicalTypeDate,
 		LogicalTypeTime,
 		LogicalTypeTimestamp,
+		LogicalTypeTimestampNanos,
 		LogicalTypeUuid,
 		LogicalTypeDecimal,
 		LogicalTypeInterval,
@@ -596,6 +609,20 @@ func TestProjectionToParquetSchemaElement(t *testing.T) {
 			},
 			opts:         []ParquetSchemaOption{WithParquetUUIDAsString()},
 			wantType:     LogicalTypeString,
+			wantRequired: true,
+		},
+		{
+			name: "WithParquetTimestampAsNanoseconds flips date-time to nanos",
+			projection: pf.Projection{
+				Field: "f",
+				Inference: pf.Inference{
+					Exists:  pf.Inference_MUST,
+					Types:   []string{"string"},
+					String_: &pf.Inference_String{Format: "date-time"},
+				},
+			},
+			opts:         []ParquetSchemaOption{WithParquetTimestampAsNanoseconds()},
+			wantType:     LogicalTypeTimestampNanos,
 			wantRequired: true,
 		},
 	}
