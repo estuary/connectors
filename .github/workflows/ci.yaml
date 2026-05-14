@@ -129,6 +129,7 @@ jobs:
           - materialize-s3-parquet
           - materialize-slack
           - materialize-snowflake
+          - materialize-sns
           - materialize-spanner
           - materialize-sqlite
           - materialize-sqlserver

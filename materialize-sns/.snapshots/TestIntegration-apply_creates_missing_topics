@@ -1,0 +1,16 @@
+{
+  "fifo_topic_attributes": {
+    "ContentBasedDeduplication": "false",
+    "FifoTopic": "true"
+  },
+  "first_apply": {
+    "action_description": "created topic arn:aws:sns:us-east-1:000000000000:apply-std\ncreated topic arn:aws:sns:us-east-1:000000000000:apply-fifo.fifo"
+  },
+  "second_apply": {
+    "action_description": ""
+  },
+  "standard_topic_attributes": {
+    "ContentBasedDeduplication": "",
+    "FifoTopic": ""
+  }
+}
