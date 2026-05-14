@@ -174,7 +174,8 @@ var MaxReplicationLogFilesSize = 2 * 1024 * 1024 * 1024
 func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SCN) (SCN, error) {
 	logrus.WithFields(logrus.Fields{
 		"startSCN": startSCN,
-	}).Debug("adding log files")
+		"maxSCN":   maxSCN,
+	}).Info("logminer: selecting redo log files")
 
 	// See DBMS_LOGMNR_D.BUILD reference:
 	// https://docs.oracle.com/en/database/oracle/oracle-database/19/arpls/DBMS_LOGMNR_D.html#GUID-20E210F3-A566-46F1-B817-486723069AF4
@@ -240,8 +241,6 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SC
 			return 0, fmt.Errorf("scanning log file record: %w", err)
 		}
 
-		logrus.WithField("file", fmt.Sprintf("%+v", f)).Debug("adding log file")
-
 		// The current log file has the same sequence as the last archived log file
 		// in this case we prefer reading from the current log file. It is also possible for
 		// log files to have an ACTIVE and an ARCHIVED version at the same time, we prefer ACTIVE
@@ -255,6 +254,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SC
 			if f.Status == "CURRENT" || f.Status == "ACTIVE" {
 				// Remove the last archived log file from the list
 				redoFiles = redoFiles[:len(redoFiles)-1]
+				totalSizeBytes -= last.Bytes
 			} else if last.Status == "CURRENT" || last.Status == "ACTIVE" {
 				// Skip this file
 				continue
@@ -268,19 +268,42 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SC
 		}
 
 		redoFiles = append(redoFiles, f)
-
 		totalSizeBytes += f.Bytes
 
-		if totalSizeBytes >= MaxReplicationLogFilesSize || f.NextChange >= maxSCN {
-			if s.dictionaryMode == DictionaryModeOnline {
-				endSCN = f.NextChange
-				break
-			}
+		logrus.WithFields(logrus.Fields{
+			"name":           f.Name,
+			"status":         f.Status,
+			"sequence":       f.Sequence,
+			"firstChange":    f.FirstChange,
+			"nextChange":     f.NextChange,
+			"bytes":          f.Bytes,
+			"dictStart":      f.DictStart,
+			"dictEnd":        f.DictEnd,
+			"totalSizeBytes": totalSizeBytes,
+		}).Info("logminer: added redo log file")
 
-			// If we don't include a dictionary end file, we risk having an incomplete
-			// dictionary in extract mode
-			if f.DictEnd == "YES" {
+		if totalSizeBytes >= MaxReplicationLogFilesSize || f.NextChange >= maxSCN {
+			// In extract mode we only stop on a file whose DICTIONARY_END is 'YES' to
+			// keep the included files self-contained dictionary-wise. Online mode has
+			// no such constraint.
+			if s.dictionaryMode == DictionaryModeOnline || f.DictEnd == "YES" {
 				endSCN = f.NextChange
+				var reason string
+				switch {
+				case totalSizeBytes >= MaxReplicationLogFilesSize && f.NextChange >= maxSCN:
+					reason = "size cap reached and last file covers maxSCN"
+				case totalSizeBytes >= MaxReplicationLogFilesSize:
+					reason = "size cap reached"
+				default:
+					reason = "last file covers maxSCN"
+				}
+				logrus.WithFields(logrus.Fields{
+					"reason":         reason,
+					"totalSizeBytes": totalSizeBytes,
+					"files":          len(redoFiles),
+					"endSCN":         endSCN,
+					"maxSCN":         maxSCN,
+				}).Info("logminer: stopping log file selection")
 				break
 			}
 		}
@@ -290,19 +313,61 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SC
 		return 0, err
 	}
 
+	// We set NextChange to 0 when encountering Oracle's maximum SCN value which
+	// is too large to fit in our int64 type, and 0 also persists from the default
+	// when the loop exhausts all available files without breaking. Resolve to
+	// maxSCN here so coverage validation has the final endSCN to check against.
+	if endSCN == 0 {
+		endSCN = maxSCN
+	}
+
+	if err := validateLogFileCoverage(redoFiles, startSCN, endSCN); err != nil {
+		return 0, err
+	}
+
 	for _, f := range redoFiles {
 		if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.ADD_LOGFILE(:filename); END;", f.Name); err != nil {
 			return 0, fmt.Errorf("adding logfile %q (%s, %d, %s, %s) to logminer: %w", f.Name, f.Status, f.FirstChange, f.DictStart, f.DictEnd, err)
 		}
 	}
 
-	// We set NextChange to 0 when encountering Oracle's maximum SCN value which is too large to fit in our int64 type
-	// so we rectify that by setting endSCN to maxSCN here
-	if endSCN == 0 {
-		endSCN = maxSCN
+	return endSCN, nil
+}
+
+// validateLogFileCoverage verifies that the selected redo log files provide
+// continuous SCN coverage of [startSCN, endSCN]. Oracle's redo logs partition
+// SCN space such that adjacent files satisfy prev.NEXT_CHANGE# == next.FIRST_CHANGE#.
+// A gap in available files (most commonly because archive log retention deleted
+// a log we need) would otherwise cause LogMiner to silently return only the
+// events present in the files actually added, dropping events from the missing
+// log(s). Fail loudly so the cause is visible rather than silently losing data.
+func validateLogFileCoverage(redoFiles []redoFile, startSCN, endSCN SCN) error {
+	if len(redoFiles) == 0 {
+		return fmt.Errorf("no redo log files available to cover SCN range [%d, %d]", startSCN, endSCN)
 	}
 
-	return endSCN, nil
+	if redoFiles[0].FirstChange > startSCN {
+		return fmt.Errorf("redo log gap at start of SCN range: first file %q begins at FIRST_CHANGE#=%d, after startSCN=%d", redoFiles[0].Name, redoFiles[0].FirstChange, startSCN)
+	}
+
+	for i := 1; i < len(redoFiles); i++ {
+		var prev, curr = redoFiles[i-1], redoFiles[i]
+		// NextChange=0 is our sentinel for the CURRENT online log, which is open
+		// ended and so must be the final file in the list.
+		if prev.NextChange == 0 {
+			return fmt.Errorf("redo log file %q (FIRST_CHANGE#=%d) follows CURRENT-status file %q which has no NEXT_CHANGE#", curr.Name, curr.FirstChange, prev.Name)
+		}
+		if curr.FirstChange != prev.NextChange {
+			return fmt.Errorf("redo log SCN gap between %q (NEXT_CHANGE#=%d) and %q (FIRST_CHANGE#=%d)", prev.Name, prev.NextChange, curr.Name, curr.FirstChange)
+		}
+	}
+
+	var last = redoFiles[len(redoFiles)-1]
+	if last.NextChange != 0 && last.NextChange < endSCN {
+		return fmt.Errorf("redo log gap at end of SCN range: last file %q ends at NEXT_CHANGE#=%d, before endSCN=%d", last.Name, last.NextChange, endSCN)
+	}
+
+	return nil
 }
 
 func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN SCN) error {
