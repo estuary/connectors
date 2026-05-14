@@ -200,8 +200,17 @@ class SnapshotResource(BaseDocument, extra="allow"):
     RECORDNO: Optional[int] = Field(default=None, exclude=True)
 
 
-class IncrementalResource(BaseDocument, extra="allow"):
+# Document is the model used to derive the collection's write schema for
+# incremental bindings. Only RECORDNO is required because the three runtime
+# document shapes diverge on the rest: update docs carry WHENMODIFIED,
+# creation docs carry WHENCREATED without WHENMODIFIED, and deletion docs
+# carry WHENMODIFIED without WHENCREATED. Marking either timestamp required
+# would reject one of those shapes during write-schema validation.
+class Document(BaseDocument, extra="allow"):
     RECORDNO: int
+
+
+class IncrementalResource(Document):
     WHENMODIFIED: AwareDatetime
 
     def cursor_value(self) -> AwareDatetime:
@@ -211,8 +220,7 @@ class IncrementalResource(BaseDocument, extra="allow"):
 # CreationRecord captures records that exist in Sage with a null WHENMODIFIED.
 # They cannot be captured by the WHENMODIFIED-keyed incremental query, so a
 # parallel sub-task keyed on WHENCREATED picks them up.
-class CreationRecord(BaseDocument, extra="allow"):
-    RECORDNO: int
+class CreationRecord(Document):
     WHENCREATED: AwareDatetime
 
     def cursor_value(self) -> AwareDatetime:
