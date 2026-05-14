@@ -249,7 +249,7 @@ func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption
 // since the interface data word holds the pointer directly rather than boxing a 3-word slice header.
 func makeColumnBuffer(dt ParquetDataType, initialCap int) any {
 	switch dt {
-	case PrimitiveTypeInteger, LogicalTypeTime, LogicalTypeTimestamp:
+	case PrimitiveTypeInteger, LogicalTypeTime, LogicalTypeTimestamp, LogicalTypeTimestampNanos:
 		s := make([]int64, 0, initialCap)
 		return &s
 	case PrimitiveTypeNumber:
@@ -390,6 +390,8 @@ func (w *ParquetWriter) Write(row []any) error {
 			convErr = appendVal(w, colIdx, v, getTimeVal)
 		case LogicalTypeTimestamp:
 			convErr = appendVal(w, colIdx, v, getTimestampVal)
+		case LogicalTypeTimestampNanos:
+			convErr = appendVal(w, colIdx, v, getTimestampNanosVal)
 		case LogicalTypeDecimal:
 			convErr = appendVal(w, colIdx, v, getDecimalVal)
 		case LogicalTypeInterval:
@@ -555,7 +557,7 @@ func (w *ParquetWriter) flushBuffer() error {
 				return fmt.Errorf("writing timestamp column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeTimestampNanos:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampNanosVal); err != nil {
+			if err := writeColumn(cw.(*file.Int64ColumnChunkWriter), *w.buffer[colIdx].(*[]int64), defLvls); err != nil {
 				return fmt.Errorf("writing timestamp (nanos) column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeDecimal:
