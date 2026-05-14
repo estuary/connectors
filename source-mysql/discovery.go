@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"strings"
@@ -247,10 +248,10 @@ func (db *mysqlDatabase) TranslateDBToJSONType(column sqlcapture.ColumnInfo, isP
 			return nil, fmt.Errorf("unhandled MySQL type %q", typeName)
 		}
 		schema.nullable = column.IsNullable
-		schema.extras = make(map[string]interface{})
+		schema.extras = make(map[string]any)
 		switch columnType.Type {
 		case "enum":
-			var options []interface{}
+			var options []any
 			for _, val := range columnType.EnumValues {
 				options = append(options, val)
 			}
@@ -738,7 +739,7 @@ type columnSchema struct {
 	description     string
 	format          string
 	nullable        bool
-	extras          map[string]interface{}
+	extras          map[string]any
 	jsonType        string
 	minLength       *uint64
 	maxLength       *uint64
@@ -748,13 +749,11 @@ func (s columnSchema) toType() *jsonschema.Schema {
 	var out = &jsonschema.Schema{
 		Format:      s.format,
 		Description: s.description,
-		Extras:      make(map[string]interface{}),
+		Extras:      make(map[string]any),
 		MinLength:   s.minLength,
 		MaxLength:   s.maxLength,
 	}
-	for k, v := range s.extras {
-		out.Extras[k] = v
-	}
+	maps.Copy(out.Extras, s.extras)
 
 	if s.contentEncoding != "" {
 		out.Extras["contentEncoding"] = s.contentEncoding // New in 2019-09.

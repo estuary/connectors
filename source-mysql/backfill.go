@@ -313,7 +313,7 @@ type mysqlTableStatistics struct {
 	Err       error // Error from querying statistics, if any (cached to avoid performance concerns)
 }
 
-func (db *mysqlDatabase) queryTableStatistics(ctx context.Context, schema, table string) (*mysqlTableStatistics, error) {
+func (db *mysqlDatabase) queryTableStatistics(_ context.Context, schema, table string) (*mysqlTableStatistics, error) {
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 
 	// Initialize cache if needed
