@@ -173,24 +173,21 @@ func (d *Driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response
 		}
 		defer db.Close(ctx)
 
-		tableIDs, err := db.ListTables(ctx)
-		if err != nil {
-			return nil, fmt.Errorf("error listing database tables: %w", err)
-		}
-		discoveredTables, err := db.DiscoverTableDetails(ctx, tableIDs)
-		if err != nil {
-			return nil, fmt.Errorf("error discovering database tables: %w", err)
-		}
-
+		var requested = make([]TableID, 0, len(req.Capture.Bindings))
 		for _, binding := range req.Capture.Bindings {
 			var res Resource
 			if err := pf.UnmarshalStrict(binding.ResourceConfigJson, &res); err != nil {
 				return nil, fmt.Errorf("error parsing resource config: %w", err)
 			}
 			res.SetDefaults()
-
-			var streamID = JoinStreamID(res.Namespace, res.Stream)
-
+			requested = append(requested, TableID{Schema: res.Namespace, Table: res.Stream})
+		}
+		discoveredTables, err := db.DiscoverTableDetails(ctx, requested)
+		if err != nil {
+			return nil, fmt.Errorf("error discovering database tables: %w", err)
+		}
+		for _, req := range requested {
+			var streamID = JoinStreamID(req.Schema, req.Table)
 			if _, ok := discoveredTables[streamID]; !ok {
 				return nil, fmt.Errorf("could not find or access table %q", streamID)
 			}
@@ -206,10 +203,6 @@ func (d *Driver) Validate(ctx context.Context, req *pc.Request_Validate) (*pc.Re
 		return nil, fmt.Errorf("error connecting to database: %w", err)
 	}
 	defer db.Close(ctx)
-
-	if _, err := DiscoverCatalog(ctx, db); err != nil {
-		return nil, err
-	}
 
 	// Extract information about the previous state of various table bindings, so that we
 	// can more easily compare to the incoming to-be-validated state.
