@@ -13,24 +13,25 @@ import (
 type elasticPropertyType string
 
 const (
-	elasticTypeKeyword   elasticPropertyType = "keyword"
-	elasticTypeBoolean   elasticPropertyType = "boolean"
-	elasticTypeLong      elasticPropertyType = "long"
-	elasticTypeDouble    elasticPropertyType = "double"
-	elasticTypeText      elasticPropertyType = "text"
-	elasticTypeBinary    elasticPropertyType = "binary"
-	elasticTypeDate      elasticPropertyType = "date"
-	elasticTypeIp        elasticPropertyType = "ip"
+	elasticTypeKeyword      elasticPropertyType = "keyword"
+	elasticTypeBoolean      elasticPropertyType = "boolean"
+	elasticTypeLong         elasticPropertyType = "long"
+	elasticTypeDouble       elasticPropertyType = "double"
+	elasticTypeText         elasticPropertyType = "text"
+	elasticTypeBinary       elasticPropertyType = "binary"
+	elasticTypeDate         elasticPropertyType = "date"
+	elasticTypeIp           elasticPropertyType = "ip"
 	elasticTypeUnsignedLong elasticPropertyType = "unsigned_long"
 	elasticTypeFlattened    elasticPropertyType = "flattened"
 )
 
 type property struct {
-	Type        elasticPropertyType `json:"type"`
-	Coerce      bool                `json:"coerce,omitempty"`
-	Index       *bool               `json:"index,omitempty"`
-	IgnoreAbove int                 `json:"ignore_above,omitempty"`
-	Format      string              `json:"format,omitempty"`
+	Type         elasticPropertyType `json:"type"`
+	Coerce       bool                `json:"coerce,omitempty"`
+	Index        *bool               `json:"index,omitempty"`
+	IgnoreAbove  int                 `json:"ignore_above,omitempty"`
+	Format       string              `json:"format,omitempty"`
+	IgnoreFormat bool                `json:"-"`
 }
 
 func (p property) String() string {
@@ -38,6 +39,9 @@ func (p property) String() string {
 }
 
 func (p property) Compatible(existing boilerplate.ExistingField) bool {
+	if p.IgnoreFormat {
+		return strings.EqualFold(existing.Type, string(p.Type))
+	}
 	return strings.EqualFold(existing.Type, string(p.Type)) &&
 		strings.EqualFold(existing.Format, string(p.Format))
 }
