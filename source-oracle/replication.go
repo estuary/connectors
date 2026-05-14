@@ -282,7 +282,15 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SC
 			"totalSizeBytes": totalSizeBytes,
 		}).Info("logminer: added redo log file")
 
-		if totalSizeBytes >= MaxReplicationLogFilesSize || f.NextChange >= maxSCN {
+		var reachedSizeLimit = totalSizeBytes >= MaxReplicationLogFilesSize
+		var reachedMaxSCN = f.NextChange >= maxSCN
+		// advancesCursor guards against stopping on a file whose events are entirely
+		// at or below startSCN (e.g. an archive with NEXT_CHANGE# == startSCN). Setting
+		// endSCN to such a file's NextChange would make the next poll iteration re-fetch
+		// the same files and spin forever. NextChange == 0 is the CURRENT log open-ended
+		// sentinel and always counts as forward progress.
+		var advancesCursor = f.NextChange == 0 || f.NextChange > startSCN
+		if reachedMaxSCN || (reachedSizeLimit && advancesCursor) {
 			// In extract mode we only stop on a file whose DICTIONARY_END is 'YES' to
 			// keep the included files self-contained dictionary-wise. Online mode has
 			// no such constraint.
@@ -290,9 +298,9 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SC
 				endSCN = f.NextChange
 				var reason string
 				switch {
-				case totalSizeBytes >= MaxReplicationLogFilesSize && f.NextChange >= maxSCN:
+				case reachedSizeLimit && reachedMaxSCN:
 					reason = "size cap reached and last file covers maxSCN"
-				case totalSizeBytes >= MaxReplicationLogFilesSize:
+				case reachedSizeLimit:
 					reason = "size cap reached"
 				default:
 					reason = "last file covers maxSCN"
