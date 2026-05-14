@@ -140,7 +140,7 @@ type ParquetWriter struct {
 
 	schema        ParquetSchema
 	schemaRoot    *schema.GroupNode
-	sinkWriter    *file.Writer
+	sinkWriter    *mergeWriter
 	cwc           *countingWriteCloser
 	rs            rowSize
 	rowGroupCount int
@@ -215,6 +215,14 @@ func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption
 	schemaRoot := schema.MustGroup(schema.NewGroupNode("schema", parquet.Repetitions.Required, fields, -1))
 
 	cwc := &countingWriteCloser{w: w}
+	props, kvmeta := sinkWriterProperties(cfg)
+	// Matching arrow-go's *file.Writer constructor, we panic on the magic-bytes write failure
+	// rather than threading an error through NewParquetWriter — a sink that can't accept 4 bytes
+	// at construction time will fail again immediately on the first real write.
+	sinkWriter, err := newMergeWriter(cwc, schemaRoot, props, kvmeta)
+	if err != nil {
+		panic(fmt.Sprintf("creating sink writer: %s", err))
+	}
 
 	buffer := make([]any, len(sch))
 	defLevels := make([][]int16, len(sch))
@@ -228,7 +236,7 @@ func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption
 		cfg:        cfg,
 		schema:     sch,
 		schemaRoot: schemaRoot,
-		sinkWriter: file.NewParquetWriter(cwc, schemaRoot, writerOpts(cfg)...),
+		sinkWriter: sinkWriter,
 		cwc:        cwc,
 		rs:         newRowSizing(sch),
 		buffer:     buffer,
@@ -285,36 +293,41 @@ func resetColumnBuffer(s any) {
 	}
 }
 
-func writerOpts(cfg parquetConfig) []file.WriteOption {
-	propOpts := []parquet.WriterProperty{}
-
-	switch cfg.compression {
+func compressionCodec(c ParquetCompression) compress.Compression {
+	switch c {
 	case Uncompressed:
-		propOpts = append(propOpts, parquet.WithCompression(compress.Codecs.Uncompressed))
+		return compress.Codecs.Uncompressed
 	case Snappy:
-		propOpts = append(propOpts, parquet.WithCompression(compress.Codecs.Snappy))
+		return compress.Codecs.Snappy
 	case Gzip:
-		propOpts = append(propOpts, parquet.WithCompression(compress.Codecs.Gzip))
+		return compress.Codecs.Gzip
 	default:
-		panic(fmt.Sprintf("unknown compression setting: %d", cfg.compression))
+		panic(fmt.Sprintf("unknown compression setting: %d", c))
 	}
+}
 
-	if cfg.disableDictionaryEncoding {
-		propOpts = append(propOpts, parquet.WithDictionaryDefault(false))
+// sinkWriterProperties builds the WriterProperties used by the sink mergeWriter and the
+// KeyValueMetadata to embed in the file. Dictionary encoding is unconditionally disabled because
+// transferColumnValues copies pages verbatim from scratch into the sink, and the sink cannot
+// retroactively build a dictionary from already-encoded pages. The `disableDictionaryEncoding`
+// config field is therefore now a no-op kept only for API compatibility.
+func sinkWriterProperties(cfg parquetConfig) (*parquet.WriterProperties, metadata.KeyValueMetadata) {
+	propOpts := []parquet.WriterProperty{
+		parquet.WithCompression(compressionCodec(cfg.compression)),
+		parquet.WithDictionaryDefault(false),
 	}
+	props := parquet.NewWriterProperties(propOpts...)
 
-	out := []file.WriteOption{file.WithWriterProps(parquet.NewWriterProperties(propOpts...))}
+	var kv metadata.KeyValueMetadata
 	if len(cfg.metadata) > 0 {
-		meta := metadata.NewKeyValueMetadata()
+		kv = metadata.NewKeyValueMetadata()
 		for k, v := range cfg.metadata {
-			if err := meta.Append(k, v); err != nil {
+			if err := kv.Append(k, v); err != nil {
 				panic(fmt.Sprintf("invalid metadata: %s", err)) // only possible if the metadata keys/values contain invalid UTF-8
 			}
 		}
-		out = append(out, file.WithWriteMetadata(meta))
 	}
-
-	return out
+	return props, kv
 }
 
 // Write a row of data by buffering it in the writers's buffer, and if thresholds are
@@ -336,10 +349,13 @@ func (w *ParquetWriter) Write(row []any) error {
 		scratchOpts := []parquet.WriterProperty{
 			// Don't use dictionary encoding for the scratch file, since it is
 			// much slower to write than plain encoding with the small row
-			// groups of the scratch file.
+			// groups of the scratch file. Also avoids the dictionary-page
+			// splice problem when copying pages verbatim into the sink.
 			parquet.WithDictionaryDefault(false),
-			// Turning off stats calculations helps too, but just a tiny bit.
-			parquet.WithStats(false),
+			// Match the sink codec so transferColumnValues can copy page bytes
+			// without re-compressing. Stats default on so per-page min/max
+			// propagate via copied pages to the sink output.
+			parquet.WithCompression(compressionCodec(w.cfg.compression)),
 		}
 		w.scratch.writer = file.NewParquetWriter(w.scratch.file, w.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
 	}
@@ -575,17 +591,6 @@ type parquetValue interface {
 	int64 | int32 | float64 | bool | parquet.FixedLenByteArray | parquet.ByteArray
 }
 
-// columnBatchReader is a generic wrapper for reading a batch of values having type T from a column.
-// This interface is satisfied by any of the typed column readers from the Apache parquet package.
-type columnBatchReader[T parquetValue] interface {
-	// ReadBatch reads batchSize values from the column. values must be large enough to hold the
-	// number of values that will be read. defLvls and repLvls will be populated if not nil; they
-	// are not inputs to the operation but their populated values are necessary for interpreting the
-	// data read into values. total is the number of rows that were read; valuesRead is the actual
-	// number of physical values that were read excluding nulls.
-	ReadBatch(batchSize int64, values []T, defLvls []int16, repLvls []int16) (total int64, valuesRead int, err error)
-}
-
 // columnBatchWriter is a generic wrapper for writing a batch of values having type T to a column.
 // This interface is satisfied by any of the typed column writers from the Apache parquet package.
 type columnBatchWriter[T parquetValue] interface {
@@ -625,83 +630,59 @@ func writeColumn[T parquetValue](w columnBatchWriter[T], vals []T, defLevels []i
 	return nil
 }
 
-// transferColumnValues reads columns from the scratch file r and writes the values to w. The
-// scratch file may contain many row groups, and the corresponding column from each row group is
-// read and written in order to combine all of the row groups from the scratch file into a single
-// row group written to w.
-func transferColumnValues(r *file.Reader, w *file.Writer) error {
+// transferColumnValues merges the row groups of scratch file r into a single row group written to
+// w by copying compressed page bytes verbatim. This avoids the per-value decode/re-encode that the
+// previous implementation performed, including codec re-compression. Preconditions, all enforced
+// at scratch-writer construction in (*ParquetWriter).Write:
+//
+//   - The scratch writer disables dictionary encoding so we never see a DictionaryPage to splice
+//     (arrow-go's column writer cannot import a foreign dictionary page).
+//   - The scratch writer's compression codec equals the sink's, so copied page bytes are valid in
+//     the sink's column chunks.
+//
+// w is our own *mergeWriter, which natively accepts pre-encoded data pages and tracks row counts
+// explicitly via SetNumRows — no need to bypass arrow-go's *file.Writer with reflect/unsafe.
+func transferColumnValues(r *file.Reader, w *mergeWriter) error {
 	sch := r.MetaData().Schema
-	rgWriter := w.AppendRowGroup()
+	rgWriter, err := w.AppendRowGroup()
+	if err != nil {
+		return fmt.Errorf("appending row group: %w", err)
+	}
 
-	for c := 0; c < sch.NumColumns(); c++ {
+	totalRows := 0
+	for rgIdx := 0; rgIdx < r.NumRowGroups(); rgIdx++ {
+		totalRows += int(r.RowGroup(rgIdx).NumRows())
+	}
+	rgWriter.SetNumRows(totalRows)
+
+	for i := 0; i < sch.NumColumns(); i++ {
 		cw, err := rgWriter.NextColumn()
 		if err != nil {
 			return fmt.Errorf("getting next column writer: %w", err)
 		}
 
 		for rgIdx := 0; rgIdx < r.NumRowGroups(); rgIdx++ {
-			rgReader := r.RowGroup(rgIdx)
-			n := int(rgReader.NumRows())
-
-			cr, err := rgReader.Column(c)
+			pr, err := r.RowGroup(rgIdx).GetColumnPageReader(i)
 			if err != nil {
-				return fmt.Errorf("getting next column reader: %w", err)
+				return fmt.Errorf("getting page reader for col %d rg %d: %w", i, rgIdx, err)
 			}
-
-			switch cw := cw.(type) {
-			case *file.FixedLenByteArrayColumnChunkWriter:
-				if err := doTransfer(n, cr.(*file.FixedLenByteArrayColumnChunkReader), cw); err != nil {
-					return fmt.Errorf("transferring fixed length byte array column: %w", err)
+			for pr.Next() {
+				dp, ok := pr.Page().(file.DataPage)
+				if !ok {
+					return fmt.Errorf("unexpected non-data page in scratch col %d rg %d (%T)", i, rgIdx, pr.Page())
 				}
-			case *file.Float64ColumnChunkWriter:
-				if err := doTransfer(n, cr.(*file.Float64ColumnChunkReader), cw); err != nil {
-					return fmt.Errorf("transferring float64 column: %w", err)
+				if err := cw.WriteDataPage(dp); err != nil {
+					return fmt.Errorf("writing data page: %w", err)
 				}
-			case *file.ByteArrayColumnChunkWriter:
-				if err := doTransfer(n, cr.(*file.ByteArrayColumnChunkReader), cw); err != nil {
-					return fmt.Errorf("transferring byte array column: %w", err)
-				}
-			case *file.Int32ColumnChunkWriter:
-				if err := doTransfer(n, cr.(*file.Int32ColumnChunkReader), cw); err != nil {
-					return fmt.Errorf("transferring int32 column: %w", err)
-				}
-			case *file.Int64ColumnChunkWriter:
-				if err := doTransfer(n, cr.(*file.Int64ColumnChunkReader), cw); err != nil {
-					return fmt.Errorf("transferring int64 column: %w", err)
-				}
-			case *file.BooleanColumnChunkWriter:
-				if err := doTransfer(n, cr.(*file.BooleanColumnChunkReader), cw); err != nil {
-					return fmt.Errorf("transferring boolean column: %w", err)
-				}
-			default:
-				return fmt.Errorf("unhandled physical type %q (writer type %T)", sch.Column(c).PhysicalType(), cw)
+			}
+			if err := pr.Err(); err != nil {
+				return fmt.Errorf("page reader error col %d rg %d: %w", i, rgIdx, err)
 			}
 		}
 	}
 
 	if err := rgWriter.Close(); err != nil {
 		return fmt.Errorf("closing row group writer: %w", err)
-	}
-
-	return nil
-}
-
-func doTransfer[T parquetValue](numRows int, r columnBatchReader[T], w columnBatchWriter[T]) error {
-	vals := make([]T, numRows)
-	defLvls := make([]int16, numRows)
-	rowsRead, valuesRead, err := r.ReadBatch(int64(numRows), vals, defLvls, nil)
-	if err != nil {
-		return fmt.Errorf("reading batch: %w", err)
-	}
-
-	vals = vals[:valuesRead]
-
-	if int(rowsRead) != numRows {
-		return fmt.Errorf("read %d rows vs. expected %d", rowsRead, numRows)
-	} else if valuesWritten, err := w.WriteBatch(vals, defLvls, nil); err != nil {
-		return fmt.Errorf("writing batch of values: %w", err)
-	} else if int(valuesWritten) != len(vals) {
-		return fmt.Errorf("written %d values vs. %d values in vals", valuesWritten, len(vals))
 	}
 
 	return nil
