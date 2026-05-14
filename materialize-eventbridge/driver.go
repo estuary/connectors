@@ -5,11 +5,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsConfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/eventbridge"
+	awsiam "github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/aws-sdk-go-v2/service/sts"
 	"github.com/estuary/connectors/go/auth/iam"
 	cerrors "github.com/estuary/connectors/go/connector-errors"
 	m "github.com/estuary/connectors/go/materialize"
@@ -17,6 +21,7 @@ import (
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
 	pm "github.com/estuary/flow/go/protocols/materialize"
+	log "github.com/sirupsen/logrus"
 	"github.com/invopop/jsonschema"
 )
 
@@ -269,9 +274,12 @@ func (d *materialization) PopulateInfoSchema(ctx context.Context, is *boilerplat
 
 func (d *materialization) CheckPrerequisites(ctx context.Context) *cerrors.PrereqErr {
 	prereqs := &cerrors.PrereqErr{}
-	if err := describeBus(ctx, d.client, d.cfg.EventBusName); err != nil {
+	busARN, err := describeBus(ctx, d.client, d.cfg.EventBusName)
+	if err != nil {
 		prereqs.Err(err)
+		return prereqs
 	}
+	checkPutEventsPermission(ctx, d.cfg, busARN, prereqs)
 	return prereqs
 }
 
@@ -387,9 +395,67 @@ func (d *materialization) SnapshotTestResource(ctx context.Context, path []strin
 
 func (d *materialization) Close(ctx context.Context) {}
 
-func describeBus(ctx context.Context, client *eventbridge.Client, name string) error {
-	if _, err := client.DescribeEventBus(ctx, &eventbridge.DescribeEventBusInput{Name: &name}); err != nil {
-		return fmt.Errorf("describing event bus %q: %w", name, err)
+func describeBus(ctx context.Context, client *eventbridge.Client, name string) (string, error) {
+	out, err := client.DescribeEventBus(ctx, &eventbridge.DescribeEventBusInput{Name: &name})
+	if err != nil {
+		return "", fmt.Errorf("describing event bus %q: %w", name, err)
 	}
-	return nil
+	return aws.ToString(out.Arn), nil
+}
+
+func checkPutEventsPermission(ctx context.Context, cfg config, busARN string, prereqs *cerrors.PrereqErr) {
+	awsCfg, err := awsConfigFor(ctx, cfg)
+	if err != nil {
+		log.WithField("error", err).Warn("could not build AWS config for permission check; skipping")
+		return
+	}
+
+	callerOut, err := sts.NewFromConfig(awsCfg).GetCallerIdentity(ctx, &sts.GetCallerIdentityInput{})
+	if err != nil {
+		log.WithField("error", err).Warn("GetCallerIdentity failed; skipping write-permission check")
+		return
+	}
+
+	principalARN := iamPrincipalARN(aws.ToString(callerOut.Arn))
+	simOut, err := awsiam.NewFromConfig(awsCfg).SimulatePrincipalPolicy(ctx, &awsiam.SimulatePrincipalPolicyInput{
+		PolicySourceArn: &principalARN,
+		ActionNames:     []string{"events:PutEvents"},
+		ResourceArns:    []string{busARN},
+	})
+	if err != nil {
+		log.WithField("error", err).Warn("SimulatePrincipalPolicy failed; skipping write-permission check")
+		return
+	}
+
+	for _, result := range simOut.EvaluationResults {
+		if result.EvalDecision != iamtypes.PolicyEvaluationDecisionTypeAllowed {
+			prereqs.Err(fmt.Errorf("principal %s does not have events:PutEvents permission on bus %s", principalARN, busARN))
+			return
+		}
+	}
+}
+
+// iamPrincipalARN converts an STS assumed-role ARN to the IAM role ARN that
+// SimulatePrincipalPolicy requires. Other ARN forms are returned unchanged.
+//
+// Example:
+//
+//	arn:aws:sts::123456789012:assumed-role/MyRole/session
+//	→ arn:aws:iam::123456789012:role/MyRole
+func iamPrincipalARN(arnStr string) string {
+	// ARN structure: arn:partition:service:region:account:resource
+	parts := strings.SplitN(arnStr, ":", 6)
+	if len(parts) != 6 {
+		return arnStr
+	}
+	resource := parts[5]
+	if !strings.HasPrefix(resource, "assumed-role/") {
+		return arnStr
+	}
+	// resource is "assumed-role/RoleName/SessionName"
+	roleParts := strings.SplitN(resource, "/", 3)
+	if len(roleParts) < 2 {
+		return arnStr
+	}
+	return fmt.Sprintf("arn:%s:iam::%s:role/%s", parts[1], parts[4], roleParts[1])
 }
