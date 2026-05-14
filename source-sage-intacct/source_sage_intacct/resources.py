@@ -16,8 +16,8 @@ from .api import (
 )
 from .models import (
     ConnectorState,
+    Document,
     EndpointConfig,
-    IncrementalResource,
     ResourceConfig,
     ResourceState,
     SagePermissionError,
@@ -171,7 +171,7 @@ async def incremental_resource(
     return common.Resource(
         name=obj,
         key=["/RECORDNO"],
-        model=IncrementalResource,
+        model=Document,
         open=open,
         initial_state=ResourceState(
             inc={
