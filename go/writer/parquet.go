@@ -368,39 +368,77 @@ func (w *ParquetWriter) Write(row []any) error {
 		}
 		w.defLevels[colIdx] = append(w.defLevels[colIdx], 1)
 
-		var convErr error
 		switch f.DataType {
 		case PrimitiveTypeInteger:
-			convErr = appendVal(w, colIdx, v, getIntVal)
+			var q int64
+			if q, err = getIntVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		case PrimitiveTypeNumber:
-			convErr = appendVal(w, colIdx, v, getNumberVal)
+			var q float64
+			if q, err = getNumberVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		case PrimitiveTypeBoolean:
-			convErr = appendVal(w, colIdx, v, getBooleanVal)
+			var q bool
+			if q, err = getBooleanVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		case PrimitiveTypeBinary:
-			convErr = appendVal(w, colIdx, v, getBinaryVal)
+			var q parquet.ByteArray
+			if q, err = getBinaryVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		case LogicalTypeJson:
-			convErr = appendVal(w, colIdx, v, getJsonVal)
+			var q parquet.ByteArray
+			if q, err = getJsonVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		case LogicalTypeString:
-			convErr = appendVal(w, colIdx, v, getStringVal)
+			var q parquet.ByteArray
+			if q, err = getStringVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		case LogicalTypeUuid:
-			convErr = appendVal(w, colIdx, v, getUuidVal)
+			var q parquet.FixedLenByteArray
+			if q, err = getUuidVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		case LogicalTypeDate:
-			convErr = appendVal(w, colIdx, v, getDateVal)
+			var q int32
+			if q, err = getDateVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		case LogicalTypeTime:
-			convErr = appendVal(w, colIdx, v, getTimeVal)
+			var q int64
+			if q, err = getTimeVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		case LogicalTypeTimestamp:
-			convErr = appendVal(w, colIdx, v, getTimestampVal)
+			var q int64
+			if q, err = getTimestampVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		case LogicalTypeTimestampNanos:
-			convErr = appendVal(w, colIdx, v, getTimestampNanosVal)
+			var q int64
+			if q, err = getTimestampNanosVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		case LogicalTypeDecimal:
-			convErr = appendVal(w, colIdx, v, getDecimalVal)
+			var q parquet.FixedLenByteArray
+			if q, err = getDecimalVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		case LogicalTypeInterval:
-			convErr = appendVal(w, colIdx, v, getIntervalVal)
+			var q parquet.FixedLenByteArray
+			if q, err = getIntervalVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
 		default:
 			panic(fmt.Sprintf("attempted to write unknown type of column '%s': %d", f.Name, f.DataType))
 		}
-		if convErr != nil {
-			return fmt.Errorf("converting value for column '%s': %w (type %T)", f.Name, convErr, v)
+		if err != nil {
+			return fmt.Errorf("converting value for column '%s': %w (type %T)", f.Name, err, v)
 		}
 	}
 	w.bufferSizeBytes += w.rs.estSize(row)
@@ -434,6 +472,13 @@ func (w *ParquetWriter) Write(row []any) error {
 	}
 
 	return nil
+}
+
+// appendVal appends v to the column's typed buffer slice. The caller is
+// responsible for handling nil values and maintaining defLevels.
+func appendVal[T parquetValue](w *ParquetWriter, colIdx int, v T) {
+	sp := w.buffer[colIdx].(*[]T)
+	*sp = append(*sp, v)
 }
 
 // Written returns the number of bytes written to the output writer. This value increases only as
@@ -610,20 +655,6 @@ type columnBatchWriter[T parquetValue] interface {
 	// taken from the next value of vals. The returned valuesOffset indicates the number of physical
 	// values that were written, and it may be smaller than the number of conceptual rows written.
 	WriteBatch(vals []T, defLvls []int16, repLvls []int16) (valueOffset int64, err error)
-}
-
-type getValFn[T parquetValue] func(v any) (got T, err error)
-
-// appendVal converts v with getVal and appends the result to the column's typed buffer slice. The
-// caller is responsible for handling nil values and maintaining defLevels.
-func appendVal[T parquetValue](w *ParquetWriter, colIdx int, v any, getVal getValFn[T]) error {
-	got, err := getVal(v)
-	if err != nil {
-		return err
-	}
-	sp := w.buffer[colIdx].(*[]T)
-	*sp = append(*sp, got)
-	return nil
 }
 
 func writeColumn[T parquetValue](w columnBatchWriter[T], vals []T, defLevels []int16) error {
