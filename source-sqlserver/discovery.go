@@ -20,11 +20,41 @@ type discoveryOptions struct {
 	DiscoverOnlyEnabled bool // Only discover tables with CDC capture instances
 }
 
-// DiscoverTables queries the database for information about tables available for capture.
-func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
+// ListTables returns identifiers for all tables visible for capture after the
+// connector's configured discovery filters are applied.
+func (db *sqlserverDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableID, error) {
 	var opts = discoveryOptions{
 		UppercaseQueries:    db.featureFlags["uppercase_discovery_queries"],
 		DiscoverOnlyEnabled: db.config.Advanced.DiscoverOnlyEnabled,
+	}
+	var tables, err = getTables(ctx, db.conn, opts)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database tables: %w", err)
+	}
+	var ids = make([]sqlcapture.TableID, 0, len(tables))
+	for _, table := range tables {
+		ids = append(ids, sqlcapture.TableID{Schema: table.Schema, Table: table.Name})
+	}
+	return ids, nil
+}
+
+// DiscoverTableDetails queries the database for detailed schema information
+// about the specified tables.
+func (db *sqlserverDatabase) DiscoverTableDetails(ctx context.Context, requested []sqlcapture.TableID) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
+	var opts = discoveryOptions{
+		UppercaseQueries:    db.featureFlags["uppercase_discovery_queries"],
+		DiscoverOnlyEnabled: db.config.Advanced.DiscoverOnlyEnabled,
+	}
+
+	// Replication needs the watermarks table in the result map even when no binding
+	// references it, so we ensure it's in the requested list.
+	if !db.featureFlags["read_only"] {
+		var w = db.WatermarksTable()
+		if !slices.ContainsFunc(requested, func(t sqlcapture.TableID) bool {
+			return sqlcapture.JoinStreamID(t.Schema, t.Table) == w
+		}) {
+			requested = append([]sqlcapture.TableID{{Schema: w.Schema, Table: w.Table}}, requested...)
+		}
 	}
 
 	// Get lists of all tables, columns and primary keys in the database
@@ -51,18 +81,27 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 
 	// Aggregate column information into DiscoveryInfo structs using a map
 	// from fully-qualified table names to the corresponding info.
-	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo)
+	var tableDetails = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(tables))
 	for _, table := range tables {
-		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
+		tableDetails[sqlcapture.JoinStreamID(table.Schema, table.Name)] = table
+	}
+	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(requested))
+	for _, req := range requested {
+		var streamID = sqlcapture.JoinStreamID(req.Schema, req.Table)
 
 		// Depending on feature flag settings, we may normalize multiple table names
 		// to the same StreamID. This is a problem and other parts of discovery won't
 		// be able to handle it gracefully, so it's a fatal error.
 		if other, ok := tableMap[streamID]; ok {
 			return nil, fmt.Errorf("table name collision between %q and %q",
-				fmt.Sprintf("%s.%s", table.Schema, table.Name),
+				fmt.Sprintf("%s.%s", req.Schema, req.Table),
 				fmt.Sprintf("%s.%s", other.Schema, other.Name),
 			)
+		}
+
+		var table, ok = tableDetails[streamID]
+		if !ok {
+			continue // Requested table is not present in the database or was excluded by the connector's discovery filters.
 		}
 
 		if streamID == db.WatermarksTable() {
@@ -73,6 +112,7 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 		table.EmitSourcedSchemas = db.featureFlags["emit_sourced_schemas"]
 		tableMap[streamID] = table
 	}
+
 	for _, column := range columns {
 		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
 		var info, ok = tableMap[streamID]

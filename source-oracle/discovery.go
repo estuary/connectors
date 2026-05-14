@@ -12,8 +12,32 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// DiscoverTables queries the database for information about tables available for capture.
-func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
+// ListTables returns identifiers for all tables visible for capture after the
+// connector's configured discovery filters are applied.
+func (db *oracleDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableID, error) {
+	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database tables: %w", err)
+	}
+	var ids = make([]sqlcapture.TableID, 0, len(tables))
+	for _, table := range tables {
+		ids = append(ids, sqlcapture.TableID{Schema: table.Schema, Table: table.Name})
+	}
+	return ids, nil
+}
+
+// DiscoverTableDetails queries the database for detailed schema information
+// about the specified tables.
+func (db *oracleDatabase) DiscoverTableDetails(ctx context.Context, requested []sqlcapture.TableID) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
+	// Replication needs the watermarks table in the result map even when no binding
+	// references it, so we ensure it's in the requested list.
+	var w = db.WatermarksTable()
+	if !slices.ContainsFunc(requested, func(t sqlcapture.TableID) bool {
+		return sqlcapture.JoinStreamID(t.Schema, t.Table) == w
+	}) {
+		requested = append([]sqlcapture.TableID{{Schema: w.Schema, Table: w.Table}}, requested...)
+	}
+
 	// Get lists of all tables, columns and primary keys in the database
 	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
 	if err != nil {
@@ -33,9 +57,17 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.St
 	// Aggregate column and primary key information into DiscoveryInfo structs
 	// using a map from fully-qualified "<schema>.<name>" table names to
 	// the corresponding DiscoveryInfo.
-	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo)
+	var tableDetails = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(tables))
 	for _, table := range tables {
-		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
+		tableDetails[sqlcapture.JoinStreamID(table.Schema, table.Name)] = table
+	}
+	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(requested))
+	for _, req := range requested {
+		var streamID = sqlcapture.JoinStreamID(req.Schema, req.Table)
+		var table, ok = tableDetails[streamID]
+		if !ok {
+			continue // Requested table is not present in the database or was excluded by the connector's discovery filters.
+		}
 		if streamID == db.WatermarksTable() {
 			// We want to exclude the watermarks table from the output bindings, but we still discover it
 			table.OmitBinding = true
@@ -44,6 +76,7 @@ func (db *oracleDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.St
 		table.EmitSourcedSchemas = db.featureFlags["emit_sourced_schemas"]
 		tableMap[streamID] = table
 	}
+
 	for _, column := range columns {
 		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
 		var info, ok = tableMap[streamID]

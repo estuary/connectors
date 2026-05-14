@@ -280,8 +280,12 @@ type Database interface {
 	// position if non-nil.
 	// The `backfillComplete` boolean will be true after scanning the final chunk of the table.
 	ScanTableChunk(ctx context.Context, info *DiscoveryInfo, state *TableState, callback func(event ChangeEvent) error) (backfillComplete bool, nextResumeCursor []byte, err error)
-	// DiscoverTables queries the database for the latest information about tables available for capture.
-	DiscoverTables(ctx context.Context) (map[StreamID]*DiscoveryInfo, error)
+	// ListTables returns all tables visible for capture after the connector's
+	// configured discovery filters are applied.
+	ListTables(ctx context.Context) ([]TableID, error)
+	// DiscoverTableDetails fetches detailed schema info for the specified
+	// tables. Implementations may chunk internally.
+	DiscoverTableDetails(ctx context.Context, tables []TableID) (map[StreamID]*DiscoveryInfo, error)
 	// TranslateDBToJSONType returns JSON schema information about the provided database column type.
 	TranslateDBToJSONType(column ColumnInfo, isPrimaryKey bool) (*jsonschema.Schema, error)
 	// Returns the JSON schema of the source-specific metadata object

@@ -173,9 +173,13 @@ func (d *Driver) Apply(ctx context.Context, req *pc.Request_Apply) (*pc.Response
 		}
 		defer db.Close(ctx)
 
-		discoveredTables, err := db.DiscoverTables(ctx)
+		tableIDs, err := db.ListTables(ctx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error listing database tables: %w", err)
+		}
+		discoveredTables, err := db.DiscoverTableDetails(ctx, tableIDs)
+		if err != nil {
+			return nil, fmt.Errorf("error discovering database tables: %w", err)
 		}
 
 		for _, binding := range req.Capture.Bindings {

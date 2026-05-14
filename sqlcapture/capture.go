@@ -177,7 +177,11 @@ var (
 func (c *Capture) Run(ctx context.Context) (err error) {
 	// Perform discovery and log the full results for convenience. This info
 	// will be needed when activating all currently-active bindings below.
-	discovery, err := c.Database.DiscoverTables(ctx)
+	tableIDs, err := c.Database.ListTables(ctx)
+	if err != nil {
+		return fmt.Errorf("error listing database tables: %w", err)
+	}
+	discovery, err := c.Database.DiscoverTableDetails(ctx, tableIDs)
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
 	} else if err := c.emitSourcedSchemas(discovery); err != nil {
@@ -245,7 +249,11 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	for ctx.Err() == nil {
 		if time.Now().After(rediscoverAfter) {
 			log.Debug("rediscovering database tables")
-			discovery, err = c.Database.DiscoverTables(ctx)
+			tableIDs, err = c.Database.ListTables(ctx)
+			if err != nil {
+				return fmt.Errorf("error listing database tables: %w", err)
+			}
+			discovery, err = c.Database.DiscoverTableDetails(ctx, tableIDs)
 			if err != nil {
 				return fmt.Errorf("error discovering database tables: %w", err)
 			} else if err := c.emitSourcedSchemas(discovery); err != nil {
