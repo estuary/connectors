@@ -43,6 +43,7 @@ use-case and workflow.
 
 var (
 	logLevel = flag.String("log_level", "info", "The log level to print at.")
+	profile  = flag.String("profile", "", "Use a non-default flowctl profile.")
 
 	taskType     = flag.String("type", "", "The type of catalog spec to list (typically 'capture' or 'materialization'). If unspecified the task listing will not be filtered by type.")
 	imageName    = flag.String("connector", "", "The connector image name to filter on. Can be a full URL like 'ghcr.io/estuary/source-mysql' or a short name like 'source-mysql', and in the latter case the name will be expanded into a full URL including all variants. If unspecified the task list will not be filtered by connector.")
@@ -129,7 +130,11 @@ type taskSpec struct {
 }
 
 func listTasks(ctx context.Context, taskType string, imageNames []string, namePrefix string) ([]*taskSpec, error) {
-	var command = []string{"flowctl", "raw", "get", "--table=live_specs", "--query", "select=catalog_name,connector_image_name,spec"}
+	var command = []string{"flowctl"}
+	if profile != nil && *profile != "" {
+		command = append(command, "--profile", *profile)
+	}
+	command = append(command, "raw", "get", "--table=live_specs", "--query", "select=catalog_name,connector_image_name,spec")
 
 	if taskType != "" {
 		command = append(command, "--query", fmt.Sprintf("spec_type=eq.%s", taskType))
@@ -211,6 +216,9 @@ func pullTaskSpec(ctx context.Context, taskName string) error {
 
 func flowctl(ctx context.Context, args ...string) error {
 	log.WithField("command", args).Debug("executing flowctl command")
+	if profile != nil && *profile != "" {
+		args = append([]string{"--profile", *profile}, args...)
+	}
 	var _, err = exec.CommandContext(ctx, "flowctl", args...).Output()
 	return err
 }
