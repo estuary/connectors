@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -508,14 +509,16 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 	var rowValues = make([]any, len(columnNames)+1)
 	var serializedDocument []byte
 
-	// When capturing with ORA_ROWSCN (txid), since this cursor is not unique for rows,
-	// we need to ensure we only emit a checkpoint after we have captured all of the rows
-	// with the same SCN
-	var scnCursor = len(cursorNames) == 1 && cursorNames[0] == "TXID"
-	var lastSCN any
-	if scnCursor && state.CursorValues != nil {
-		lastSCN = state.CursorValues[0]
-	}
+	// Partial-progress checkpoint state. We only checkpoint at boundaries between
+	// distinct cursor values, persisting the previous row's cursor: that guarantees
+	// every row sharing the persisted cursor has been emitted, so the next poll's
+	// `WHERE cursor > @persisted` resume query won't skip rows which happen to
+	// share a cursor value with the checkpoint. This subsumes the previous
+	// special case for ORA_ROWSCN (TXID) cursors, where the same property was
+	// hand-rolled to deal with rows sharing the same SCN.
+	var documentsSinceLastCheckpoint int
+	var prevCursorValues []any
+	var isFullRefresh = len(cursorNames) == 0
 
 	var count int
 	for rows.Next() {
@@ -531,6 +534,39 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 			}
 			rowValues[idx] = translatedVal
 		}
+
+		// Extract this row's cursor values into a fresh slice. Done before document
+		// emission so we can use the values for the partial-progress decision below.
+		var currentCursorValues []any
+		if !isFullRefresh {
+			currentCursorValues = make([]any, len(cursorIndices))
+			for i, j := range cursorIndices {
+				currentCursorValues[i] = rowValues[j]
+			}
+		}
+
+		// Emit a partial-progress checkpoint *before* this row when enough rows have
+		// accumulated since the last checkpoint, and (for incremental bindings) the
+		// cursor value is about to change. For full-refresh bindings the persisted
+		// cursor is empty and resume semantics don't apply, so the boundary check
+		// reduces to "every K rows".
+		if documentsSinceLastCheckpoint >= documentsPerCheckpoint {
+			var shouldEmit = false
+			if isFullRefresh {
+				shouldEmit = true
+			} else if prevCursorValues != nil && !cursorValuesEqual(prevCursorValues, currentCursorValues) {
+				state.CursorValues = prevCursorValues
+				shouldEmit = true
+			}
+
+			if shouldEmit {
+				if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+					return err
+				}
+				documentsSinceLastCheckpoint = 0
+			}
+		}
+
 		rowValues[len(rowValues)-1] = &documentMetadata{
 			Polled: pollTime,
 			Index:  count,
@@ -549,47 +585,16 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 			return fmt.Errorf("error emitting document: %w", err)
 		}
 
-		if len(cursorValues) != len(cursorNames) {
-			// Allocate a new values list if needed. This is done inside of the loop, so
-			// an empty result set will be a no-op even when the previous state is nil.
-			cursorValues = make([]any, len(cursorNames))
-		}
-		for i, j := range cursorIndices {
-			cursorValues[i] = rowValues[j]
-		}
-
-		// If ORA_ROWSCN is our cursor, only emit a checkpoint when we have captured all of the rows with the same SCN
-		if scnCursor {
-			if lastSCN == nil {
-				lastSCN = cursorValues[0]
-			} else if lastSCN != cursorValues[0] {
-				state.CursorValues = []any{lastSCN}
-				lastSCN = cursorValues[0]
-			}
-		} else {
-			state.CursorValues = cursorValues
-		}
-
+		prevCursorValues = currentCursorValues
 		count++
-		if count%documentsPerCheckpoint == 0 {
-			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
-				return err
-			}
-		}
+		documentsSinceLastCheckpoint++
+
 		if count%100000 == 1 {
 			log.WithFields(log.Fields{
 				"name":  res.Name,
 				"count": count,
 			}).Info("processing query results")
 		}
-	}
-
-	if scnCursor && lastSCN != nil {
-		// After having completed a query, emit a final checkpoint with the last seen SCN
-		// Since the query is not paginated (i.e. we query all available results), the SCN
-		// should be the latest available SCN in that table. Any new updates to the table which may
-		// update the data will have a higher SCN
-		state.CursorValues = []any{lastSCN}
 	}
 
 	log.WithFields(log.Fields{
@@ -601,10 +606,27 @@ func (c *capture) poll(ctx context.Context, binding *bindingInfo) error {
 		return fmt.Errorf("error processing results iterator: %w", err)
 	}
 	state.LastPolled = pollTime
+	if prevCursorValues != nil {
+		// Advance the persisted cursor to the final emitted row. Within the loop
+		// CursorValues is only updated at distinct-value boundaries to avoid losing
+		// rows on a mid-query restart, so the end-of-poll checkpoint is the one
+		// place where we accept the rest-of-batch-redo cost in exchange for the
+		// cursor advancing past the most recent row.
+		state.CursorValues = prevCursorValues
+	}
 	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 		return err
 	}
 	return nil
+}
+
+// cursorValuesEqual reports whether two cursor tuples are element-wise equal.
+// Uses reflect.DeepEqual so it handles whatever scan types the driver returns,
+// including []byte and time.Time.
+func cursorValuesEqual(a, b []any) bool {
+	return slices.EqualFunc(a, b, func(x, y any) bool {
+		return reflect.DeepEqual(x, y)
+	})
 }
 
 func (c *capture) streamStateCheckpoint(sk boilerplate.StateKey, state *streamState) error {
