@@ -39,6 +39,15 @@ def _ms_to_dt(ms: int) -> datetime:
 def base_url(host: PendoHost) -> str:
     return f"https://{host}/api/v1"
 
+def _escape_filter_string(value: str) -> str:
+    # Pendo's filter grammar is documented as "basic C expression syntax" but doesn't
+    # spell out string escape rules, so we only escape the two characters we know
+    # break the filter: "  and \. Order matters, so we escape backslashes
+    # first so the \" we insert isn't re-escaped into \\".
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
 def _generate_time_series(
         period: str,
         lower_bound: int,
@@ -89,7 +98,7 @@ def generate_events_body(
     #                    there are more events in Pendo with the same lastTime than we can retrieve in
     #                    a single API query.
     if last_seen_id:
-        filter_condition = f"guideTimestamp == {lower_bound} && {identifying_field} >= \"{last_seen_id}\""
+        filter_condition = f"guideTimestamp == {lower_bound} && {identifying_field} >= {_escape_filter_string(last_seen_id)}"
     else:
         filter_condition = f"guideTimestamp >= {lower_bound}"
         if upper_bound:
@@ -161,7 +170,7 @@ def generate_event_aggregates_body(
     #              hour: The bottom of the hour for the aggregate. Ensures we don't get "in-progress"
     #                    aggregates for the current hour.
     if last_seen_id:
-        filter_condition = f"lastTime == {lower_bound} && {identifying_field} >= \"{last_seen_id}\" && hour < {current_hour}"
+        filter_condition = f"lastTime == {lower_bound} && {identifying_field} >= {_escape_filter_string(last_seen_id)} && hour < {current_hour}"
     else:
         filter_condition = f"lastTime >= {lower_bound} && hour < {current_hour}"
         if upper_bound:
@@ -227,7 +236,7 @@ def generate_resources_body(
     #                    there are more resources in Pendo with the same updated_at_field than we can retrieve in
     #                    a single API query.
     if last_seen_id:
-        filter_condition = f"{updated_at_field} == {lower_bound} && {identifying_field} >= \"{last_seen_id}\""
+        filter_condition = f"{updated_at_field} == {lower_bound} && {identifying_field} >= {_escape_filter_string(last_seen_id)}"
     else:
         filter_condition = f"{updated_at_field} >= {lower_bound}"
         if upper_bound:
