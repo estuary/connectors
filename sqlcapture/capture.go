@@ -75,6 +75,16 @@ func (c *Capture) BindingsCurrentlyActive() []*Binding {
 	return c.BindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill, TableStateActive)
 }
 
+// bindingTableIDs returns a TableID for every binding configured on this capture,
+// suitable for passing to Database.DiscoverTableDetails.
+func (c *Capture) bindingTableIDs() []TableID {
+	var ids = make([]TableID, 0, len(c.Bindings))
+	for _, binding := range c.Bindings {
+		ids = append(ids, TableID{Schema: binding.Resource.Namespace, Table: binding.Resource.Stream})
+	}
+	return ids
+}
+
 // BindingsCurrentlyBackfilling returns all the bindings undergoing some sort of backfill.
 func (c *Capture) BindingsCurrentlyBackfilling() []*Binding {
 	return c.BindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill)
@@ -175,13 +185,9 @@ var (
 
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) (err error) {
-	// Perform discovery and log the full results for convenience. This info
-	// will be needed when activating all currently-active bindings below.
-	tableIDs, err := c.Database.ListTables(ctx)
-	if err != nil {
-		return fmt.Errorf("error listing database tables: %w", err)
-	}
-	discovery, err := c.Database.DiscoverTableDetails(ctx, tableIDs)
+	// Fetch detailed schema info for the tables that this capture's bindings
+	// reference. We don't need details for every table in the database here.
+	discovery, err := c.Database.DiscoverTableDetails(ctx, c.bindingTableIDs())
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
 	} else if err := c.emitSourcedSchemas(discovery); err != nil {
@@ -249,11 +255,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	for ctx.Err() == nil {
 		if time.Now().After(rediscoverAfter) {
 			log.Debug("rediscovering database tables")
-			tableIDs, err = c.Database.ListTables(ctx)
-			if err != nil {
-				return fmt.Errorf("error listing database tables: %w", err)
-			}
-			discovery, err = c.Database.DiscoverTableDetails(ctx, tableIDs)
+			discovery, err = c.Database.DiscoverTableDetails(ctx, c.bindingTableIDs())
 			if err != nil {
 				return fmt.Errorf("error discovering database tables: %w", err)
 			} else if err := c.emitSourcedSchemas(discovery); err != nil {
