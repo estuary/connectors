@@ -18,8 +18,26 @@ type discoveryOptions struct {
 	DiscoverOnlyEnabled bool // Only discover tables with Change Tracking enabled
 }
 
-// DiscoverTables queries the database for information about tables available for capture.
-func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
+// ListTables returns identifiers for all tables visible for capture after the
+// connector's configured discovery filters are applied.
+func (db *sqlserverDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableID, error) {
+	var opts = discoveryOptions{
+		DiscoverOnlyEnabled: !db.config.Advanced.DiscoverNonEnabled,
+	}
+	var tables, err = getTables(ctx, db.conn, opts)
+	if err != nil {
+		return nil, fmt.Errorf("unable to list database tables: %w", err)
+	}
+	var ids = make([]sqlcapture.TableID, 0, len(tables))
+	for _, table := range tables {
+		ids = append(ids, sqlcapture.TableID{Schema: table.Schema, Table: table.Name})
+	}
+	return ids, nil
+}
+
+// DiscoverTableDetails queries the database for detailed schema information
+// about the specified tables.
+func (db *sqlserverDatabase) DiscoverTableDetails(ctx context.Context, requested []sqlcapture.TableID) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
 	var opts = discoveryOptions{
 		DiscoverOnlyEnabled: !db.config.Advanced.DiscoverNonEnabled,
 	}
@@ -44,18 +62,27 @@ func (db *sqlserverDatabase) DiscoverTables(ctx context.Context) (map[sqlcapture
 
 	// Aggregate column information into DiscoveryInfo structs using a map
 	// from fully-qualified table names to the corresponding info.
-	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo)
+	var tableDetails = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(tables))
 	for _, table := range tables {
-		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
+		tableDetails[sqlcapture.JoinStreamID(table.Schema, table.Name)] = table
+	}
+	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(requested))
+	for _, req := range requested {
+		var streamID = sqlcapture.JoinStreamID(req.Schema, req.Table)
 
 		// Depending on feature flag settings, we may normalize multiple table names
 		// to the same StreamID. This is a problem and other parts of discovery won't
 		// be able to handle it gracefully, so it's a fatal error.
 		if other, ok := tableMap[streamID]; ok {
 			return nil, fmt.Errorf("table name collision between %q and %q",
-				fmt.Sprintf("%s.%s", table.Schema, table.Name),
+				fmt.Sprintf("%s.%s", req.Schema, req.Table),
 				fmt.Sprintf("%s.%s", other.Schema, other.Name),
 			)
+		}
+
+		var table, ok = tableDetails[streamID]
+		if !ok {
+			continue // Requested table is not present in the database or was excluded by the connector's discovery filters.
 		}
 
 		table.UseSchemaInference = true
