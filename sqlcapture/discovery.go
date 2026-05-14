@@ -114,8 +114,8 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	var sourceSchema = db.SourceMetadataSchema(fullWriteSchema)
 
 	if db.HistoryMode() && fullWriteSchema {
-		sourceSchema.Extras = map[string]interface{}{
-			"reduce": map[string]interface{}{
+		sourceSchema.Extras = map[string]any{
+			"reduce": map[string]any{
 				"strategy":    "lastWriteWins",
 				"associative": false,
 			},

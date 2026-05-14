@@ -140,8 +140,8 @@ type OldChangeEvent struct {
 	Operation ChangeOp
 	RowKey    []byte
 	Source    SourceMetadata
-	Before    map[string]interface{}
-	After     map[string]interface{}
+	Before    map[string]any
+	After     map[string]any
 }
 
 func (OldChangeEvent) IsDatabaseEvent() {}
@@ -390,12 +390,12 @@ type DiscoveryInfo struct {
 // database, and is used during discovery to automatically generate catalog
 // information.
 type ColumnInfo struct {
-	Name        string      // The name of the column.
-	Index       int         // The ordinal position of this column in a row.
-	TableName   string      // The name of the table to which this column belongs.
-	TableSchema string      // The schema of the table to which this column belongs.
-	IsNullable  bool        // True if the column can contain nulls.
-	DataType    interface{} // The datatype of this column. May be a string name or a more complex struct.
-	Description *string     // Stored description of the column, if any.
-	OmitColumn  bool        // True if the column should be omitted from discovery JSON schema generation.
+	Name        string  // The name of the column.
+	Index       int     // The ordinal position of this column in a row.
+	TableName   string  // The name of the table to which this column belongs.
+	TableSchema string  // The schema of the table to which this column belongs.
+	IsNullable  bool    // True if the column can contain nulls.
+	DataType    any     // The datatype of this column. May be a string name or a more complex struct.
+	Description *string // Stored description of the column, if any.
+	OmitColumn  bool    // True if the column should be omitted from discovery JSON schema generation.
 }

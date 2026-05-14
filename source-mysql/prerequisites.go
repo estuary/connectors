@@ -132,7 +132,7 @@ func (db *mysqlDatabase) SetupTablePrerequisites(ctx context.Context, tables []s
 	return errs
 }
 
-func (db *mysqlDatabase) setupTablePrerequisite(ctx context.Context, schema, table string) error {
+func (db *mysqlDatabase) setupTablePrerequisite(_ context.Context, schema, table string) error {
 	var streamID = sqlcapture.JoinStreamID(schema, table)
 
 	results, err := db.conn.Execute(fmt.Sprintf("SELECT * FROM `%s`.`%s` LIMIT 0;", schema, table))

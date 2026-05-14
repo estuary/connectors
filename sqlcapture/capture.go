@@ -173,8 +173,6 @@ type Capture struct {
 
 const (
 	automatedDiagnosticsTimeout = 5 * time.Minute  // How long to wait *after the point where the fence was requested* before triggering automated diagnostics.
-	streamIdleWarning           = 60 * time.Second // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
-	streamProgressInterval      = 60 * time.Second // After `streamProgressInterval` the replication streaming code may log a progress report.
 	rediscoverInterval          = 5 * time.Minute  // The capture will re-run discovery and reinitialize missing/pending tables this frequently.
 	periodicChecksInterval      = 10 * time.Minute // The capture may run some database-specific sanity checks periodically at this interval.
 )
