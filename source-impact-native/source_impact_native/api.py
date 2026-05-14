@@ -413,8 +413,12 @@ async def fetch_snapshot_child(
 
 
 def _s_to_dt(date: str):
-    date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S%z")
-    return date
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%f%z", "%Y-%m-%dT%H:%M:%S%z"):
+        try:
+            return datetime.strptime(date, fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"unrecognized datetime format: {date}")
 
 def _cursor_dt(name, logcursor):
     new_logcursor = logcursor.strftime("%Y-%m-%dT%H:%M:%S%z")
