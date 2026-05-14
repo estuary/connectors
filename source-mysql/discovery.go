@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"maps"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -26,15 +27,85 @@ const (
 	discoveryChunkSize = 100
 )
 
+type discoveryFilters struct {
+	IncludeSchemas []string `json:"include_schemas,omitempty" jsonschema:"title=Include Schemas,description=If specified only tables in the listed schemas will be discovered. Combined as a union with the 'Discovery Schema Selection' setting under Advanced Options."`
+	ExcludeSchemas []string `json:"exclude_schemas,omitempty" jsonschema:"title=Exclude Schemas,description=Tables in the listed schemas will be excluded from discovery."`
+	TablePatterns  []string `json:"table_patterns,omitempty"  jsonschema:"title=Table Name Patterns,description=If specified only tables whose name matches at least one of these regular expressions will be discovered. Patterns are anchored to the full table name."`
+}
+
+// Validate checks that the configured discovery filters are well-formed. The
+// only thing that can actually be invalid here is a malformed regex in the
+// table name patterns list.
+func (f *discoveryFilters) Validate() error {
+	var _, err = f.compileTablePatterns()
+	return err
+}
+
+// compileTablePatterns compiles each configured table name pattern with
+// implicit anchoring against the full table name, so a pattern like "foo_bar"
+// matches only the table literally named "foo_bar". Returns an error if any
+// pattern fails to compile.
+func (f *discoveryFilters) compileTablePatterns() ([]*regexp.Regexp, error) {
+	var patterns = make([]*regexp.Regexp, 0, len(f.TablePatterns))
+	for _, raw := range f.TablePatterns {
+		var re, err = regexp.Compile("^(?:" + raw + ")$")
+		if err != nil {
+			return nil, fmt.Errorf("invalid table name pattern %q: %w", raw, err)
+		}
+		patterns = append(patterns, re)
+	}
+	return patterns, nil
+}
+
+// apply filters the input table list by the configured exclude-schemas and
+// table-name patterns. The include-schemas list is intentionally not consulted
+// here: it is expected to have already been pushed into the listTables query.
+func (f *discoveryFilters) apply(tables []sqlcapture.TableID) ([]sqlcapture.TableID, error) {
+	var patterns, err = f.compileTablePatterns()
+	if err != nil {
+		return nil, err
+	}
+	var excluded = make(map[string]struct{}, len(f.ExcludeSchemas))
+	for _, schema := range f.ExcludeSchemas {
+		excluded[schema] = struct{}{}
+	}
+	var filtered = make([]sqlcapture.TableID, 0, len(tables))
+	for _, t := range tables {
+		if _, ok := excluded[t.Schema]; ok {
+			continue
+		}
+		if len(patterns) > 0 && !matchesAny(t.Table, patterns) {
+			continue
+		}
+		filtered = append(filtered, t)
+	}
+	return filtered, nil
+}
+
+func matchesAny(s string, patterns []*regexp.Regexp) bool {
+	for _, p := range patterns {
+		if p.MatchString(s) {
+			return true
+		}
+	}
+	return false
+}
+
 // ListTables returns identifiers for all tables visible for capture after the
 // connector's configured discovery filters are applied.
 func (db *mysqlDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableID, error) {
-	var tables, err = listTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas)
+	var includeSchemas = slices.Concat(db.config.DiscoveryFilters.IncludeSchemas, db.config.Advanced.DiscoverSchemas)
+	slices.Sort(includeSchemas)
+	includeSchemas = slices.Compact(includeSchemas)
+
+	var tables, err = listTables(ctx, db.conn, includeSchemas)
 	if err != nil {
 		return nil, fmt.Errorf("error listing tables: %w", err)
 	}
-	// TODO(wgd): Apply additional name-based discovery filters (regex includes
-	// and excludes from the endpoint config) once those config options exist.
+	tables, err = db.config.DiscoveryFilters.apply(tables)
+	if err != nil {
+		return nil, fmt.Errorf("error applying discovery filters: %w", err)
+	}
 	return tables, nil
 }
 
