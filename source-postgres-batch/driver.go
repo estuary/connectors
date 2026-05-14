@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"regexp"
 	"slices"
 	"strings"
@@ -655,6 +656,15 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 	var rowValues = make([]any, len(columnNames)+1)
 	var serializedDocument []byte
 
+	// Partial-progress checkpoint state. For incremental bindings we only checkpoint
+	// at boundaries between distinct cursor values, persisting the previous row's
+	// cursor: that guarantees every row sharing the persisted cursor has been emitted,
+	// so the next poll's `WHERE cursor > @persisted` resume query won't skip rows
+	// which happen to share a cursor value with the checkpoint. Full-refresh bindings
+	// don't have this constraint and just checkpoint every K rows.
+	var documentsSinceLastCheckpoint int
+	var prevCursorValues []any
+
 	var queryResultsCount int
 	for rows.Next() {
 		if err := rows.Scan(columnPointers...); err != nil {
@@ -669,6 +679,41 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 			}
 			rowValues[idx] = translatedVal
 		}
+
+		// Extract this row's cursor values into a fresh slice. Done before document
+		// emission so we can use the values for the partial-progress decision below.
+		var currentCursorValues []any
+		if !isFullRefresh {
+			currentCursorValues = make([]any, len(cursorIndices))
+			for i, j := range cursorIndices {
+				currentCursorValues[i] = rowValues[j]
+			}
+		}
+
+		// Emit a partial-progress checkpoint *before* this row when enough rows have
+		// accumulated since the last checkpoint, and (for incremental bindings) the
+		// cursor value is about to change. For full-refresh bindings the persisted
+		// cursor is empty and resume semantics don't apply, so the boundary check
+		// reduces to "every K rows".
+		if documentsSinceLastCheckpoint >= documentsPerCheckpoint {
+			var shouldEmit = false
+			if isFullRefresh {
+				shouldEmit = true
+			} else if prevCursorValues != nil && !cursorValuesEqual(prevCursorValues, currentCursorValues) {
+				// Update CursorValues and DocumentCount in lockstep
+				state.CursorValues = prevCursorValues
+				state.DocumentCount = nextRowID
+				shouldEmit = true
+			}
+
+			if shouldEmit {
+				if err := c.streamStateCheckpoint(stateKey, state); err != nil {
+					return err
+				}
+				documentsSinceLastCheckpoint = 0
+			}
+		}
+
 		var metadata = &documentMetadata{
 			RowID:  nextRowID,
 			Polled: pollTime,
@@ -700,35 +745,11 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 			return fmt.Errorf("error emitting document: %w", err)
 		}
 
-		if len(cursorValues) != len(cursorNames) {
-			// Allocate a new values list if needed. This is done inside of the loop, so
-			// an empty result set will be a no-op even when the previous state is nil.
-			cursorValues = make([]any, len(cursorNames))
-		}
-		for i, j := range cursorIndices {
-			cursorValues[i] = rowValues[j]
-		}
-		state.CursorValues = cursorValues
-
+		prevCursorValues = currentCursorValues
 		queryResultsCount++
 		nextRowID++
+		documentsSinceLastCheckpoint++
 
-		if queryResultsCount%documentsPerCheckpoint == 0 {
-			// When a full-refresh binding outputs into a collection with key `/_meta/row_id`
-			// we rely on the persisted DocumentCount not being updated until after the whole
-			// update query completes successfully, so that we can infer deletions of any rows
-			// between the last rowID of the latest query and the persisted DocumentCount.
-			//
-			// But when emitting partial-progress updates on a _non_ full-refresh binding, we
-			// need to update the persisted DocumentCount on each partial progress checkpoint
-			// so that the rowID the next poll resumes from will match the persisted cursor.
-			if !isFullRefresh {
-				state.DocumentCount = nextRowID
-			}
-			if err := c.streamStateCheckpoint(stateKey, state); err != nil {
-				return err
-			}
-		}
 		if queryResultsCount%100000 == 1 {
 			log.WithFields(log.Fields{
 				"name":  res.Name,
@@ -775,10 +796,27 @@ func (c *capture) pollCustomQuery(ctx context.Context, binding *bindingInfo) err
 	}
 
 	state.DocumentCount = nextRowID // Always update persisted count on successful completion
+	if prevCursorValues != nil {
+		// Advance the persisted cursor to the final emitted row. Within the loop
+		// CursorValues is only updated at distinct-value boundaries to avoid losing
+		// rows on a mid-query restart, so the end-of-poll checkpoint is the one
+		// place where we accept the rest-of-batch-redo cost in exchange for the
+		// cursor advancing past the most recent row.
+		state.CursorValues = prevCursorValues
+	}
 	if err := c.streamStateCheckpoint(stateKey, state); err != nil {
 		return err
 	}
 	return nil
+}
+
+// cursorValuesEqual reports whether two cursor tuples are element-wise equal.
+// Uses reflect.DeepEqual so it handles whatever scan types the driver returns,
+// including []byte and time.Time.
+func cursorValuesEqual(a, b []any) bool {
+	return slices.EqualFunc(a, b, func(x, y any) bool {
+		return reflect.DeepEqual(x, y)
+	})
 }
 
 func (c *capture) pollIncremental(ctx context.Context, binding *bindingInfo) error {
