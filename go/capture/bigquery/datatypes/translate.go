@@ -80,6 +80,10 @@ func TranslateValue(val any, fieldSchema *bigquery.FieldSchema) (any, error) {
 	case float64:
 		if math.IsNaN(val) {
 			return "NaN", nil
+		} else if math.IsInf(val, +1) {
+			return "Infinity", nil
+		} else if math.IsInf(val, -1) {
+			return "-Infinity", nil
 		}
 	}
 	return val, nil

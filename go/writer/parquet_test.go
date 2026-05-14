@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/apache/arrow-go/v18/parquet"
 	"github.com/apache/arrow-go/v18/parquet/file"
@@ -60,6 +61,62 @@ func TestParquetWriter(t *testing.T) {
 			cupaloy.SnapshotT(t, duckdbReadFile(t, sink.Name(), "JSON"))
 		})
 	}
+}
+
+func TestParquetWriterTimestampNanos(t *testing.T) {
+	dir := t.TempDir()
+	sink, err := os.CreateTemp(dir, "*.parquet")
+	require.NoError(t, err)
+
+	sch := ParquetSchema{
+		{Name: "tsField", DataType: LogicalTypeTimestampNanos, Required: false},
+	}
+
+	rows := []string{"2024-01-02T03:04:05.123456789Z", "1970-01-01T00:00:00.000000001Z", ""}
+
+	w := NewParquetWriter(sink, sch)
+	for _, ts := range rows {
+		var val any
+		if ts != "" {
+			val = ts
+		}
+		require.NoError(t, w.Write([]any{val}))
+	}
+	require.NoError(t, w.Close())
+
+	f, err := file.OpenParquetFile(sink.Name(), false)
+	require.NoError(t, err)
+	defer f.Close()
+
+	require.Equal(t, 1, f.MetaData().Schema.NumColumns())
+
+	col := f.MetaData().Schema.Column(0)
+	require.Equal(t, parquet.Types.Int64, col.PhysicalType())
+	tsLogical, ok := col.LogicalType().(schema.TimestampLogicalType)
+	require.True(t, ok)
+	require.Equal(t, schema.TimeUnitNanos, tsLogical.TimeUnit())
+
+	rg := f.RowGroup(0)
+	require.EqualValues(t, len(rows), rg.NumRows())
+
+	cr, err := rg.Column(0)
+	require.NoError(t, err)
+	vals := make([]int64, len(rows))
+	def := make([]int16, len(rows))
+	_, _, err = cr.(*file.Int64ColumnChunkReader).ReadBatch(int64(len(rows)), vals, def, nil)
+	require.NoError(t, err)
+
+	require.Equal(t, int16(1), def[0])
+	require.Equal(t, int16(1), def[1])
+	require.Equal(t, int16(0), def[2])
+
+	wantTs0, err := time.Parse(time.RFC3339Nano, rows[0])
+	require.NoError(t, err)
+	require.Equal(t, wantTs0.UnixNano(), vals[0])
+
+	wantTs1, err := time.Parse(time.RFC3339Nano, rows[1])
+	require.NoError(t, err)
+	require.Equal(t, wantTs1.UnixNano(), vals[1])
 }
 
 // This is a regression test for a bug in arrow-go 18.5.2, added test so we
