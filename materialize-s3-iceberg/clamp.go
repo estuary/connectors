@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strconv"
 	"strings"
@@ -18,6 +19,16 @@ import (
 const (
 	pyMinYear = 1
 	pyMaxYear = 9999
+)
+
+// Bounds of an int64 nanoseconds-since-epoch Iceberg `timestamptz_ns` column.
+// Outside this range, time.Time.UnixNano() (called from
+// go/writer.getTimestampNanosVal) silently wraps, producing nonsense values.
+// The bounds correspond exactly to math.MinInt64 / math.MaxInt64 nanoseconds
+// since 1970-01-01T00:00:00Z.
+var (
+	nsMinTime = time.Unix(0, math.MinInt64).UTC()
+	nsMaxTime = time.Unix(0, math.MaxInt64).UTC()
 )
 
 // dateLikeRe matches YYYY-MM-DD with any digit-count year (Postgres can emit
@@ -65,6 +76,30 @@ func clampDate(v tuple.TupleElement) (any, error) {
 		return fmt.Sprintf("%04d-12-31", pyMaxYear), nil
 	case year < pyMinYear:
 		return fmt.Sprintf("%04d-01-01", pyMinYear), nil
+	}
+	return s, nil
+}
+
+// clampTimestampNanos parses v as an RFC3339Nano timestamp and clamps it to
+// the int64 nanoseconds-since-epoch range supported by Iceberg
+// `timestamptz_ns` columns. Boundary times are returned in RFC3339Nano form so
+// downstream parsing in go/writer.getTimestampNanosVal succeeds without
+// overflow.
+func clampTimestampNanos(v tuple.TupleElement) (any, error) {
+	s, ok := v.(string)
+	if !ok {
+		return v, nil
+	}
+
+	t, err := time.Parse(time.RFC3339Nano, strings.Replace(s, "z", "Z", 1))
+	if err != nil {
+		return nil, fmt.Errorf("could not parse %q as RFC3339 timestamp: %w", s, err)
+	}
+	switch t = t.UTC(); {
+	case t.After(nsMaxTime):
+		return nsMaxTime.Format(time.RFC3339Nano), nil
+	case t.Before(nsMinTime):
+		return nsMinTime.Format(time.RFC3339Nano), nil
 	}
 	return s, nil
 }

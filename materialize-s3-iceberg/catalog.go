@@ -115,7 +115,7 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 		Properties: res.AdditionalTableProperties,
 	}
 
-	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
+	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, c.cfg.Advanced.NanosecondTimestamps)
 	if err != nil {
 		return "", nil, err
 	}
@@ -179,7 +179,7 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(p.Projection.Projection, fc)
+		s, err := projectionToParquetSchemaElement(p.Projection.Projection, fc, c.cfg.Advanced.NanosecondTimestamps)
 		if err != nil {
 			return "", nil, err
 		}

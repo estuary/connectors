@@ -25,6 +25,7 @@ from pyiceberg.types import (
     LongType,
     NestedField,
     StringType,
+    TimestamptzNanoType,
     TimestamptzType,
     TimeType,
     UUIDType,
@@ -50,6 +51,8 @@ def _field_to_type(typ_str: str) -> IcebergType:
             return DoubleType()
         case "timestamptz":
             return TimestamptzType()
+        case "timestamptz_ns":
+            return TimestamptzNanoType()
         case "date":
             return DateType()
         case "time":
@@ -196,6 +199,7 @@ class IcebergColumn(BaseModel):
         "long",  # 64 bit integer
         "double",  # 64 bit float
         "timestamptz",
+        "timestamptz_ns",
         "date",
         "time",
         "uuid",
@@ -335,6 +339,11 @@ def create_table(
             if k == TableProperties.DEFAULT_NAME_MAPPING:
                 continue
             properties[k] = v
+    # timestamptz_ns is an Iceberg v3 type; pyiceberg defaults to v2. Adding a
+    # v3 column to an existing v2 table is rejected by pyiceberg, so the
+    # connector relies on Compatible() to surface the mismatch at apply time.
+    if any(f.type == "timestamptz_ns" for f in table_create.fields):
+        properties[TableProperties.FORMAT_VERSION] = "3"
     catalog.create_table(table, schema, table_create.location, properties=properties)
     log(f"create_table: created table {table}")
 

@@ -78,7 +78,8 @@ type catalogConfig struct {
 }
 
 type advancedConfig struct {
-	FeatureFlags string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	FeatureFlags         string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support."`
+	NanosecondTimestamps bool   `json:"nanosecond_timestamps,omitempty" jsonschema:"-"`
 }
 
 func (c config) s3StoreConfig() filesink.S3StoreConfig {
@@ -408,7 +409,7 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
-	s, err := projectionToParquetSchemaElement(p.Projection, fc)
+	s, err := projectionToParquetSchemaElement(p.Projection, fc, d.cfg.Advanced.NanosecondTimestamps)
 	if err != nil {
 		return mappedType{}, nil
 	}
@@ -417,6 +418,8 @@ func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (map
 	switch parquetTypeToIcebergType(s.DataType) {
 	case icebergTypeTimestamptz:
 		elementConverter = clampTimestamp
+	case icebergTypeTimestamptzNs:
+		elementConverter = clampTimestampNanos
 	case icebergTypeDate:
 		elementConverter = clampDate
 	}
@@ -469,7 +472,7 @@ func (d *materialization) NewTransactor(
 
 	for i := range mappedBindings {
 		b := &mappedBindings[i]
-		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
+		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, d.cfg.Advanced.NanosecondTimestamps)
 		if err != nil {
 			return nil, err
 		}

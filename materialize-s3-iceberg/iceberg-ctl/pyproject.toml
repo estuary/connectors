@@ -7,7 +7,7 @@ authors = ["Will Baker <wbaker@gmail.com>"]
 [tool.poetry.dependencies]
 pydantic = "^2"
 python = "^3.11"
-pyiceberg = {extras = ["glue", "pyarrow", "s3fs"], version = "^0.7.0"}
+pyiceberg = {extras = ["glue", "pyarrow", "s3fs"], version = "^0.10.0"}
 click = "^8.1.7"
 setuptools = "^78.1.1"
 asyncio = "^3.4.3"

@@ -139,6 +139,16 @@ class AdvancedConfig(BaseModel):
         title="Feature Flags",
         description="This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.",
     )
+    nanosecond_timestamps: bool = Field(
+        default=False,
+        title="Nanosecond Timestamps",
+        description=(
+            "Materialize date-time fields as Iceberg timestamptz_ns columns "
+            "(nanosecond precision, Iceberg v3) instead of timestamptz "
+            "(microsecond precision). Values outside the nanosecond range "
+            "(1677-09-21 .. 2262-04-11) are clamped."
+        ),
+    )
 
 
 class EndpointConfig(BaseModel):

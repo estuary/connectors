@@ -13,28 +13,39 @@ import (
 type icebergType string
 
 const (
-	icebergTypeBoolean     icebergType = "boolean"
-	icebergTypeString      icebergType = "string"
-	icebergTypeLong        icebergType = "long"   // 64 bit integer
-	icebergTypeDouble      icebergType = "double" // 64 bit float
-	icebergTypeTimestamptz icebergType = "timestamptz"
-	icebergTypeDate        icebergType = "date"
-	icebergTypeUuid        icebergType = "uuid"
-	icebergTypeBinary      icebergType = "binary"
+	icebergTypeBoolean       icebergType = "boolean"
+	icebergTypeString        icebergType = "string"
+	icebergTypeLong          icebergType = "long"   // 64 bit integer
+	icebergTypeDouble        icebergType = "double" // 64 bit float
+	icebergTypeTimestamptz   icebergType = "timestamptz"
+	icebergTypeTimestamptzNs icebergType = "timestamptz_ns"
+	icebergTypeDate          icebergType = "date"
+	icebergTypeUuid          icebergType = "uuid"
+	icebergTypeBinary        icebergType = "binary"
 )
 
-var schemaOptions = []writer.ParquetSchemaOption{
-	// Iceberg does not support column types corresponding to Parquet's JSON or INTERVAL types. Because
-	// of this, these fields will be materialized as strings.
-	writer.WithParquetSchemaArrayAsString(),
-	writer.WithParquetSchemaObjectAsString(),
-	writer.WithParquetSchemaDurationAsString(),
-	// Spark can't read Iceberg tables with "time" column types, see
-	// https://github.com/apache/iceberg/issues/9006. Prioritizing support for Spark seems important
-	// enough to force materializing these as strings.
-	writer.WithParquetTimeAsString(),
-	// Many commonly used versions of Spark also can't read Iceberg tables with "UUID" column types.
-	writer.WithParquetUUIDAsString(),
+// buildSchemaOptions returns the parquet schema options that govern how Flow
+// projections are translated into parquet columns. When nanoTs is true,
+// date-time fields are emitted as nanosecond-precision timestamps (mapped to
+// Iceberg timestamptz_ns) instead of microsecond timestamps.
+func buildSchemaOptions(nanoTs bool) []writer.ParquetSchemaOption {
+	opts := []writer.ParquetSchemaOption{
+		// Iceberg does not support column types corresponding to Parquet's JSON or INTERVAL types. Because
+		// of this, these fields will be materialized as strings.
+		writer.WithParquetSchemaArrayAsString(),
+		writer.WithParquetSchemaObjectAsString(),
+		writer.WithParquetSchemaDurationAsString(),
+		// Spark can't read Iceberg tables with "time" column types, see
+		// https://github.com/apache/iceberg/issues/9006. Prioritizing support for Spark seems important
+		// enough to force materializing these as strings.
+		writer.WithParquetTimeAsString(),
+		// Many commonly used versions of Spark also can't read Iceberg tables with "UUID" column types.
+		writer.WithParquetUUIDAsString(),
+	}
+	if nanoTs {
+		opts = append(opts, writer.WithParquetTimestampAsNanoseconds())
+	}
+	return opts
 }
 
 type fieldConfig struct {
@@ -51,7 +62,7 @@ func (fc fieldConfig) CastToString() bool {
 	return fc.IgnoreStringFormat
 }
 
-func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage) (writer.ParquetSchema, error) {
+func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage, nanoTs bool) (writer.ParquetSchema, error) {
 	out := []writer.ParquetSchemaElement{}
 
 	for _, f := range fields {
@@ -64,7 +75,7 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc)
+		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc, nanoTs)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +85,7 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 	return out, nil
 }
 
-func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig) (writer.ParquetSchemaElement, error) {
+func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig, nanoTs bool) (writer.ParquetSchemaElement, error) {
 	if fc.IgnoreStringFormat {
 		if p.Inference.String_ == nil {
 			return writer.ParquetSchemaElement{}, fmt.Errorf("cannot set ignoreStringFormat on non-string field %q", p.Field)
@@ -82,7 +93,7 @@ func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig) (writer.P
 		p.Inference.String_.Format = ""
 	}
 
-	return writer.ProjectionToParquetSchemaElement(p, false, schemaOptions...), nil
+	return writer.ProjectionToParquetSchemaElement(p, false, buildSchemaOptions(nanoTs)...), nil
 }
 
 func parquetTypeToIcebergType(pqt writer.ParquetDataType) icebergType {
@@ -101,6 +112,8 @@ func parquetTypeToIcebergType(pqt writer.ParquetDataType) icebergType {
 		return icebergTypeDate
 	case writer.LogicalTypeTimestamp:
 		return icebergTypeTimestamptz
+	case writer.LogicalTypeTimestampNanos:
+		return icebergTypeTimestamptzNs
 	case writer.LogicalTypeUuid:
 		return icebergTypeUuid
 	default:

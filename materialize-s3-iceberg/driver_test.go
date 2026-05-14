@@ -115,6 +115,10 @@ func TestIntegration(t *testing.T) {
 		runTimestampOverflowRegression(t, cfg)
 	})
 
+	t.Run("ts-ns-regression", func(t *testing.T) {
+		runTimestampNsRegression(t, cfg)
+	})
+
 	t.Run("date-overflow-regression", func(t *testing.T) {
 		runDateOverflowRegression(t, cfg)
 	})
@@ -276,6 +280,83 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 		s3Path,
 	)
 	require.NoError(t, err, "append-files should accept a date within Iceberg's range")
+}
+
+// runTimestampNsRegression exercises end-to-end writes against an Iceberg v3
+// table with a timestamptz_ns column: clamps an out-of-range input, writes a
+// parquet file using the LogicalTypeTimestampNanos column type, uploads it
+// to S3, and appends it via iceberg-ctl. Verifies that pyiceberg accepts
+// nanosecond parquet stats against a v3 table without OverflowError.
+func runTimestampNsRegression(t *testing.T, cfg config) {
+	ctx := context.Background()
+
+	const (
+		namespace = "tests"
+		table     = "ts_ns_regression"
+	)
+	fqn := namespace + "." + table
+
+	_, _ = runIcebergctl(ctx, &cfg, "drop-table", fqn)
+	if _, err := runIcebergctl(ctx, &cfg, "create-namespace", namespace); err != nil &&
+		!strings.Contains(err.Error(), "already exists") &&
+		!strings.Contains(err.Error(), "AlreadyExists") {
+		t.Fatalf("create-namespace: %v", err)
+	}
+
+	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
+
+	tcJson, err := json.Marshal(tableCreate{
+		Location: tblLocation,
+		Fields: []existingIcebergColumn{
+			{Name: "ts", Nullable: true, Type: icebergTypeTimestamptzNs},
+		},
+	})
+	require.NoError(t, err)
+	_, err = runIcebergctl(ctx, &cfg, "create-table", fqn, string(tcJson))
+	require.NoError(t, err)
+
+	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
+	parquetFile, err := os.Create(parquetPath)
+	require.NoError(t, err)
+	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
+		{Name: "ts", DataType: writer.LogicalTypeTimestampNanos, Required: false},
+	}, writer.WithParquetCompression(writer.Snappy))
+
+	// One out-of-range value (clamped to nsMaxTime) and one in-range value.
+	clamped, err := clampTimestampNanos("2500-01-01T00:00:00Z")
+	require.NoError(t, err)
+	require.NoError(t, pqw.Write([]any{clamped}))
+	require.NoError(t, pqw.Write([]any{"2025-06-15T12:00:00.123456789Z"}))
+	require.NoError(t, pqw.Close())
+
+	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
+	s3Key := strings.TrimPrefix(s3Path, "s3://"+cfg.Bucket+"/")
+
+	uploadFile, err := os.Open(parquetPath)
+	require.NoError(t, err)
+	defer uploadFile.Close()
+
+	s3client := s3.New(s3.Options{
+		Region:       cfg.Region,
+		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
+		BaseEndpoint: aws.String(cfg.S3Endpoint),
+		UsePathStyle: true,
+	})
+	_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(cfg.Bucket),
+		Key:    aws.String(s3Key),
+		Body:   uploadFile,
+	})
+	require.NoError(t, err)
+
+	_, err = runIcebergctl(ctx, &cfg, "append-files",
+		"acmeCo/tests/regression",
+		fqn,
+		"",
+		"deadbeefdeadbeef",
+		s3Path,
+	)
+	require.NoError(t, err, "append-files should accept ns-precision timestamps within Iceberg v3 range")
 }
 
 func loadTestConfig(t *testing.T) config {
