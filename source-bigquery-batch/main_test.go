@@ -433,6 +433,35 @@ func TestNumericTypes(t *testing.T) {
 	})
 }
 
+// TestSpecialFloatValues verifies that the special FLOAT64 values NaN, +Infinity,
+// and -Infinity are translated into JSON-safe string representations rather than
+// producing serialization errors.
+func TestSpecialFloatValues(t *testing.T) {
+	var ctx, cs, control = context.Background(), testCaptureSpec(t), testBigQueryClient(t)
+	var tableName, uniqueID = testTableName(t, uniqueTableID(t))
+	createTestTable(ctx, t, control, tableName, `(
+        id          INTEGER PRIMARY KEY NOT ENFORCED,
+        float_val   FLOAT64
+    )`)
+
+	cs.Bindings = discoverBindings(ctx, t, cs, regexp.MustCompile(uniqueID))
+	setCursorColumns(t, cs.Bindings[0], "id")
+	t.Run("Discovery", func(t *testing.T) { cupaloy.SnapshotT(t, summarizeBindings(t, cs.Bindings)) })
+
+	t.Run("Capture", func(t *testing.T) {
+		setShutdownAfterQuery(t, true)
+
+		require.NoError(t, executeSetupQuery(ctx, t, control, fmt.Sprintf(
+			`INSERT INTO %s VALUES `+
+				`(1, CAST('NaN' AS FLOAT64)), `+
+				`(2, CAST('Infinity' AS FLOAT64)), `+
+				`(3, CAST('-Infinity' AS FLOAT64)), `+
+				`(4, 1.5)`, tableName)))
+		cs.Capture(ctx, t, nil)
+		cupaloy.SnapshotT(t, cs.Summary())
+	})
+}
+
 // TestStringTypes exercises discovery and capture of the string types
 // STRING and STRING(L).
 func TestStringTypes(t *testing.T) {

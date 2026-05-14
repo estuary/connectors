@@ -1,0 +1,156 @@
+# ================================
+# Collection "acmeCo/test/specialfloatvalues_738713": 4 Documents
+# ================================
+{
+  "type": "object",
+  "required": [
+    "_meta",
+    "float_val",
+    "id"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "_meta": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "$id": "https://github.com/estuary/connectors/source-bigquery-batch/document-metadata",
+      "properties": {
+        "polled": {
+          "type": "string",
+          "format": "date-time",
+          "title": "Polled Timestamp",
+          "description": "The time at which the update query which produced this document as executed."
+        },
+        "index": {
+          "type": "integer",
+          "title": "Result Index",
+          "description": "The index of this document within the query execution which produced it."
+        },
+        "row_id": {
+          "type": "integer",
+          "title": "Row ID",
+          "description": "Row ID of the Document"
+        },
+        "op": {
+          "type": "string",
+          "enum": [
+            "c",
+            "u",
+            "d"
+          ],
+          "title": "Change Operation",
+          "description": "Operation type (c: Create / u: Update / d: Delete)",
+          "default": "u"
+        },
+        "source": {
+          "properties": {
+            "resource": {
+              "type": "string",
+              "description": "Resource name of the binding from which this document was captured."
+            },
+            "schema": {
+              "type": "string",
+              "description": "Database schema from which the document was read."
+            },
+            "table": {
+              "type": "string",
+              "description": "Database table from which the document was read."
+            },
+            "tag": {
+              "type": "string",
+              "description": "Optional 'Source Tag' property as defined in the endpoint configuration."
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "resource"
+          ]
+        }
+      },
+      "type": "object",
+      "required": [
+        "polled",
+        "index",
+        "row_id",
+        "source"
+      ],
+      "additionalProperties": false
+    },
+    "float_val": {
+      "format": "number",
+      "description": "(source type: FLOAT64)",
+      "type": [
+        "number",
+        "string"
+      ]
+    },
+    "id": {
+      "description": "(source type: INT64)",
+      "type": [
+        "integer"
+      ]
+    }
+  },
+  "x-infer-schema": true
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "specialfloatvalues_738713",
+      "schema": "testdata",
+      "table": "specialfloatvalues_738713"
+    }
+  },
+  "float_val": "-Infinity",
+  "id": 3
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "specialfloatvalues_738713",
+      "schema": "testdata",
+      "table": "specialfloatvalues_738713"
+    }
+  },
+  "float_val": "Infinity",
+  "id": 2
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "specialfloatvalues_738713",
+      "schema": "testdata",
+      "table": "specialfloatvalues_738713"
+    }
+  },
+  "float_val": "NaN",
+  "id": 1
+}
+{
+  "_meta": {
+    "polled": "<TIMESTAMP>",
+    "index": 99,
+    "row_id": 99,
+    "source": {
+      "resource": "specialfloatvalues_738713",
+      "schema": "testdata",
+      "table": "specialfloatvalues_738713"
+    }
+  },
+  "float_val": 1.5,
+  "id": 4
+}
+# ================================
+# Final State Checkpoint
+# ================================
+{"bindingStateV1":{"specialfloatvalues_738713":{"CursorNames":["id"],"CursorValues":[4],"DocumentCount":4,"LastPolled":"<TIMESTAMP>"}}}
+
