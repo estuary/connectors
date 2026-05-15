@@ -5,22 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/apache/iceberg-go"
 	"github.com/estuary/connectors/go/writer"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	pf "github.com/estuary/flow/go/protocols/flow"
-)
-
-type icebergType string
-
-const (
-	icebergTypeBoolean     icebergType = "boolean"
-	icebergTypeString      icebergType = "string"
-	icebergTypeLong        icebergType = "long"   // 64 bit integer
-	icebergTypeDouble      icebergType = "double" // 64 bit float
-	icebergTypeTimestamptz icebergType = "timestamptz"
-	icebergTypeDate        icebergType = "date"
-	icebergTypeUuid        icebergType = "uuid"
-	icebergTypeBinary      icebergType = "binary"
 )
 
 var schemaOptions = []writer.ParquetSchemaOption{
@@ -51,8 +39,8 @@ func (fc fieldConfig) CastToString() bool {
 	return fc.IgnoreStringFormat
 }
 
-func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage) (writer.ParquetSchema, error) {
-	out := []writer.ParquetSchemaElement{}
+func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage, nanoseconds bool) (writer.ParquetSchema, error) {
+	out := make(writer.ParquetSchema, 0, len(fields))
 
 	for _, f := range fields {
 		var fc fieldConfig
@@ -64,7 +52,7 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc)
+		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc, nanoseconds)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +62,7 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 	return out, nil
 }
 
-func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig) (writer.ParquetSchemaElement, error) {
+func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig, nanoseconds bool) (writer.ParquetSchemaElement, error) {
 	if fc.IgnoreStringFormat {
 		if p.Inference.String_ == nil {
 			return writer.ParquetSchemaElement{}, fmt.Errorf("cannot set ignoreStringFormat on non-string field %q", p.Field)
@@ -82,42 +70,48 @@ func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig) (writer.P
 		p.Inference.String_.Format = ""
 	}
 
-	return writer.ProjectionToParquetSchemaElement(p, false, schemaOptions...), nil
+	opts := schemaOptions
+	if nanoseconds {
+		opts = append(opts, writer.WithParquetTimestampAsNanoseconds())
+	}
+	return writer.ProjectionToParquetSchemaElement(p, false, opts...), nil
 }
 
-func parquetTypeToIcebergType(pqt writer.ParquetDataType) icebergType {
+func parquetTypeToIcebergType(pqt writer.ParquetDataType) iceberg.Type {
 	switch pqt {
 	case writer.PrimitiveTypeInteger:
-		return icebergTypeLong
+		return iceberg.PrimitiveTypes.Int64
 	case writer.PrimitiveTypeNumber:
-		return icebergTypeDouble
+		return iceberg.PrimitiveTypes.Float64
 	case writer.PrimitiveTypeBoolean:
-		return icebergTypeBoolean
+		return iceberg.PrimitiveTypes.Bool
 	case writer.PrimitiveTypeBinary:
-		return icebergTypeBinary
+		return iceberg.PrimitiveTypes.Binary
 	case writer.LogicalTypeString:
-		return icebergTypeString
+		return iceberg.PrimitiveTypes.String
 	case writer.LogicalTypeDate:
-		return icebergTypeDate
+		return iceberg.PrimitiveTypes.Date
 	case writer.LogicalTypeTimestamp:
-		return icebergTypeTimestamptz
+		return iceberg.PrimitiveTypes.TimestampTz
+	case writer.LogicalTypeTimestampNanos:
+		return iceberg.PrimitiveTypes.TimestampTzNs
 	case writer.LogicalTypeUuid:
-		return icebergTypeUuid
+		return iceberg.PrimitiveTypes.UUID
 	default:
 		panic(fmt.Sprintf("unhandled parquet data type: %T (%#v)", pqt, pqt))
 	}
 }
 
 type mappedType struct {
-	icebergType icebergType
+	icebergType iceberg.Type
 }
 
 func (mt mappedType) String() string {
-	return string(mt.icebergType)
+	return mt.icebergType.String()
 }
 
 func (mt mappedType) Compatible(existing boilerplate.ExistingField) bool {
-	return strings.EqualFold(existing.Type, string(mt.icebergType))
+	return strings.EqualFold(existing.Type, mt.icebergType.String())
 }
 
 func (mt mappedType) CanMigrate(existing boilerplate.ExistingField) bool {
