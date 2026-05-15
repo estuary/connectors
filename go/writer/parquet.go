@@ -853,13 +853,28 @@ func getIntervalVal(val any) (got parquet.FixedLenByteArray, err error) {
 	return
 }
 
+// nsMin and nsMax are the boundaries of the int64 Unix nanosecond range, corresponding to
+// math.MinInt64 and math.MaxInt64 nanoseconds since the epoch. Out-of-range timestamps are
+// clamped to these sentinels rather than overflowing.
+var (
+	nsMin = time.Unix(-9223372036, -854775808).UTC()
+	nsMax = time.Unix(9223372036, 854775807).UTC()
+)
+
 func getTimestampNanosVal(val any) (got int64, err error) {
 	switch v := val.(type) {
 	case string:
 		v = strings.Replace(v, "z", "Z", 1)
-		if d, parseErr := time.Parse(time.RFC3339Nano, v); parseErr != nil {
-			err = fmt.Errorf("unable to parse string %q as timestamp: %w", v, parseErr)
-		} else {
+		d, parseErr := time.Parse(time.RFC3339Nano, v)
+		if parseErr != nil {
+			return 0, fmt.Errorf("unable to parse string %q as timestamp: %w", v, parseErr)
+		}
+		switch {
+		case d.Before(nsMin):
+			got = math.MinInt64
+		case d.After(nsMax):
+			got = math.MaxInt64
+		default:
 			got = d.UnixNano()
 		}
 	default:

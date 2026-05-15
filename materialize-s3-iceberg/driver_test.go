@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
@@ -16,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	parquetfile "github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/iceberg-go"
 	icebergcatalog "github.com/apache/iceberg-go/catalog"
 	icebergtable "github.com/apache/iceberg-go/table"
@@ -103,6 +105,10 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("date-overflow-regression", func(t *testing.T) {
 		runDateOverflowRegression(t, cfg)
+	})
+
+	t.Run("ns-timestamp", func(t *testing.T) {
+		runNanosecondTimestampTest(t, cfg)
 	})
 
 	// Migration test is skipped because Iceberg does not support the type
@@ -272,6 +278,119 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 	))
 }
 
+
+// runNanosecondTimestampTest verifies that timestamptz_ns (Iceberg v3 format) columns:
+//   - write nanosecond-precision timestamps correctly
+//   - clamp out-of-range values (before 1677 / after 2262) to int64 min/max rather than overflowing
+//   - produce Parquet files that DuckDB can read with full nanosecond precision
+func runNanosecondTimestampTest(t *testing.T, cfg config) {
+	t.Helper()
+	ctx := context.Background()
+
+	cfg.Advanced.NanosecondTimestamps = true
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
+
+	const (
+		namespace = "tests"
+		table     = "ns_timestamp_test"
+	)
+	tableIdent := icebergtable.Identifier{namespace, table}
+
+	_ = cat.cat.DropTable(ctx, tableIdent)
+	if err := cat.createNamespace(ctx, namespace); err != nil &&
+		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) {
+		t.Fatalf("create-namespace: %v", err)
+	}
+
+	iceSchema := iceberg.NewSchema(0, iceberg.NestedField{
+		ID:       1,
+		Name:     "ts",
+		Type:     iceberg.PrimitiveTypes.TimestampTzNs,
+		Required: false,
+	})
+
+	nameMappingJSON, err := json.Marshal(iceSchema.NameMapping())
+	require.NoError(t, err)
+
+	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
+	_, err = cat.cat.CreateTable(ctx, tableIdent, iceSchema,
+		icebergcatalog.WithLocation(tblLocation),
+		icebergcatalog.WithProperties(iceberg.Properties{
+			icebergtable.DefaultNameMappingKey:  string(nameMappingJSON),
+			icebergtable.PropertyFormatVersion:  "3",
+		}),
+	)
+	require.NoError(t, err)
+
+	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
+	parquetFile, err := os.Create(parquetPath)
+	require.NoError(t, err)
+	pqw := writer.NewParquetWriter(parquetFile, writer.ParquetSchema{
+		{Name: "ts", DataType: writer.LogicalTypeTimestampNanos, Required: false},
+	}, writer.WithParquetCompression(writer.Snappy))
+	// in-range: sub-microsecond digits (789) must survive the round-trip
+	require.NoError(t, pqw.Write([]any{"2023-01-15T12:34:56.123456789Z"}))
+	// out-of-range past: clamps to math.MinInt64 rather than overflowing
+	require.NoError(t, pqw.Write([]any{"1000-01-01T00:00:00Z"}))
+	// out-of-range future: clamps to math.MaxInt64 rather than overflowing
+	require.NoError(t, pqw.Write([]any{"3000-01-01T00:00:00Z"}))
+	require.NoError(t, pqw.Close())
+	parquetFile.Close()
+
+	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
+	s3Key := strings.TrimPrefix(s3Path, "s3://"+cfg.Bucket+"/")
+
+	uploadFile, err := os.Open(parquetPath)
+	require.NoError(t, err)
+	defer uploadFile.Close()
+
+	s3client := s3.New(s3.Options{
+		Region:       cfg.Region,
+		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
+		BaseEndpoint: aws.String(cfg.S3Endpoint),
+		UsePathStyle: true,
+	})
+	_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(cfg.Bucket),
+		Key:    aws.String(s3Key),
+		Body:   uploadFile,
+	})
+	require.NoError(t, err)
+
+	require.NoError(t, cat.appendFiles(ctx,
+		"acmeCo/tests/ns-timestamp",
+		tableIdent,
+		[]string{s3Path},
+		"",
+		"deadbeefdeadbeef",
+	))
+
+	// Verify nanosecond precision by reading the raw int64 values from the Parquet file.
+	// DuckDB maps nanosecond Parquet timestamps to TIMESTAMPTZ (microsecond precision),
+	// dropping sub-microsecond digits — so we read the encoded bytes directly instead.
+	pqf, err := os.Open(parquetPath)
+	require.NoError(t, err)
+	defer pqf.Close()
+
+	pqr, err := parquetfile.NewParquetReader(pqf)
+	require.NoError(t, err)
+	defer pqr.Close()
+
+	col, err := pqr.RowGroup(0).Column(0)
+	require.NoError(t, err)
+
+	int64Col := col.(*parquetfile.Int64ColumnChunkReader)
+	vals := make([]int64, 3)
+	defLevels := make([]int16, 3)
+	_, valuesRead, err := int64Col.ReadBatch(3, vals, defLevels, nil)
+	require.NoError(t, err)
+	require.Equal(t, 3, valuesRead)
+	// 2023-01-15T12:34:56.123456789Z → unix nanoseconds
+	require.Equal(t, int64(1673786096123456789), vals[0], "in-range: sub-microsecond precision lost")
+	require.Equal(t, int64(math.MinInt64), vals[1], "out-of-range past not clamped to MinInt64")
+	require.Equal(t, int64(math.MaxInt64), vals[2], "out-of-range future not clamped to MaxInt64")
+}
 
 func loadTestConfig(t *testing.T) config {
 	t.Helper()

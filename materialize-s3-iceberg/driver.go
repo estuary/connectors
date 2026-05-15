@@ -123,7 +123,8 @@ func (catalogConfig) JSONSchema() *jsonschema.Schema {
 }
 
 type advancedConfig struct {
-	FeatureFlags *string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.,nullable"`
+	FeatureFlags         *string `json:"feature_flags,omitempty" jsonschema:"title=Feature Flags,description=This property is intended for Estuary internal use. You should only modify this field as directed by Estuary support.,nullable"`
+	NanosecondTimestamps bool    `json:"nanosecond_timestamps,omitempty" jsonschema:"title=Nanosecond Timestamps,description=Use nanosecond precision (Iceberg format v3) for date-time columns instead of microsecond precision (format v2). Toggling this on an existing materialization triggers a backfill because Iceberg has no in-place promotion between the two timestamp encodings."`
 }
 
 func (c config) s3StoreConfig() filesink.S3StoreConfig {
@@ -329,7 +330,6 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 	if err != nil {
 		return nil, fmt.Errorf("creating iceberg catalog: %w", err)
 	}
-
 	return &materialization{
 		cfg:     cfg,
 		catalog: catalog,
@@ -459,7 +459,7 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mappedType, boilerplate.ElementConverter) {
-	s, err := projectionToParquetSchemaElement(p.Projection, fc)
+	s, err := projectionToParquetSchemaElement(p.Projection, fc, d.cfg.Advanced.NanosecondTimestamps)
 	if err != nil {
 		return mappedType{}, nil
 	}
@@ -512,7 +512,7 @@ func (d *materialization) NewTransactor(
 
 	for i := range mappedBindings {
 		b := &mappedBindings[i]
-		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
+		pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, d.cfg.Advanced.NanosecondTimestamps)
 		if err != nil {
 			return nil, err
 		}

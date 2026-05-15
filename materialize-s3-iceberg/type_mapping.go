@@ -39,8 +39,8 @@ func (fc fieldConfig) CastToString() bool {
 	return fc.IgnoreStringFormat
 }
 
-func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage) (writer.ParquetSchema, error) {
-	out := []writer.ParquetSchemaElement{}
+func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJsonMap map[string]json.RawMessage, nanoseconds bool) (writer.ParquetSchema, error) {
+	out := make(writer.ParquetSchema, 0, len(fields))
 
 	for _, f := range fields {
 		var fc fieldConfig
@@ -52,7 +52,7 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc)
+		s, err := projectionToParquetSchemaElement(*collection.GetProjection(f), fc, nanoseconds)
 		if err != nil {
 			return nil, err
 		}
@@ -62,7 +62,7 @@ func parquetSchema(fields []string, collection pf.CollectionSpec, fieldConfigJso
 	return out, nil
 }
 
-func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig) (writer.ParquetSchemaElement, error) {
+func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig, nanoseconds bool) (writer.ParquetSchemaElement, error) {
 	if fc.IgnoreStringFormat {
 		if p.Inference.String_ == nil {
 			return writer.ParquetSchemaElement{}, fmt.Errorf("cannot set ignoreStringFormat on non-string field %q", p.Field)
@@ -70,7 +70,11 @@ func projectionToParquetSchemaElement(p pf.Projection, fc fieldConfig) (writer.P
 		p.Inference.String_.Format = ""
 	}
 
-	return writer.ProjectionToParquetSchemaElement(p, false, schemaOptions...), nil
+	opts := schemaOptions
+	if nanoseconds {
+		opts = append(opts, writer.WithParquetTimestampAsNanoseconds())
+	}
+	return writer.ProjectionToParquetSchemaElement(p, false, opts...), nil
 }
 
 func parquetTypeToIcebergType(pqt writer.ParquetDataType) iceberg.Type {
@@ -89,6 +93,8 @@ func parquetTypeToIcebergType(pqt writer.ParquetDataType) iceberg.Type {
 		return iceberg.PrimitiveTypes.Date
 	case writer.LogicalTypeTimestamp:
 		return iceberg.PrimitiveTypes.TimestampTz
+	case writer.LogicalTypeTimestampNanos:
+		return iceberg.PrimitiveTypes.TimestampTzNs
 	case writer.LogicalTypeUuid:
 		return iceberg.PrimitiveTypes.UUID
 	default:

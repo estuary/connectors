@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	parquetfile "github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/iceberg-go"
 	icebergcatalog "github.com/apache/iceberg-go/catalog"
 	icebergglue "github.com/apache/iceberg-go/catalog/glue"
@@ -297,7 +298,7 @@ func (c *catalog) createNamespace(ctx context.Context, namespace string) error {
 func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_Binding, res resource) (string, boilerplate.ActionApplyFn, error) {
 	location := tablePath(c.cfg.Bucket, c.cfg.Prefix, b.ResourcePath[0], b.ResourcePath[1], c.locationStyle)
 
-	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
+	parquetSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap, c.cfg.Advanced.NanosecondTimestamps)
 	if err != nil {
 		return "", nil, err
 	}
@@ -322,6 +323,9 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 		}
 		props := iceberg.Properties{
 			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
+		}
+		if c.cfg.Advanced.NanosecondTimestamps {
+			props[icebergtable.PropertyFormatVersion] = "3"
 		}
 		for k, v := range res.AdditionalTableProperties {
 			// Never let a user-supplied key override the name mapping.
@@ -376,7 +380,7 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 			}
 		}
 
-		s, err := projectionToParquetSchemaElement(p.Projection.Projection, fc)
+		s, err := projectionToParquetSchemaElement(p.Projection.Projection, fc, c.cfg.Advanced.NanosecondTimestamps)
 		if err != nil {
 			return "", nil, err
 		}
@@ -470,7 +474,7 @@ func (c *catalog) appendFiles(
 		}
 
 		tx := tbl.NewTransaction()
-		if err := tx.AddFiles(ctx, filePaths, nil, false); err != nil {
+		if err := c.stageFiles(ctx, tbl, tx, filePaths); err != nil {
 			err = fmt.Errorf("staging files for %q: %w", fqn, err)
 			if attempt >= maxAttempts {
 				return err
@@ -499,6 +503,64 @@ func (c *catalog) appendFiles(
 		logger.WithField("attempt", attempt).Info("append_files: committed")
 		return nil
 	}
+}
+
+// stageFiles adds parquet files to an in-progress transaction. For nanosecond-timestamp
+// tables, it bypasses iceberg-go's AddFiles (which rejects ns-precision Arrow schemas) by
+// reading file metadata directly and calling AddDataFiles instead.
+//
+// This is an upstream bug, fixed in https://github.com/apache/iceberg-go/pull/1081
+// Once fixed, we can remove this workaround and use iceberg-go's AddFiles directly.
+func (c *catalog) stageFiles(ctx context.Context, tbl *icebergtable.Table, tx *icebergtable.Transaction, filePaths []string) error {
+	if !c.cfg.Advanced.NanosecondTimestamps {
+		return tx.AddFiles(ctx, filePaths, nil, false)
+	}
+
+	// For timestamptz_ns tables: iceberg-go's AddFiles reads each Parquet file via Arrow,
+	// and its Arrow→Iceberg converter panics on nanosecond timestamps. Use AddDataFiles
+	// with metadata read directly from the Parquet footer instead.
+	fs, err := tbl.FS(ctx)
+	if err != nil {
+		return fmt.Errorf("getting file IO: %w", err)
+	}
+
+	dataFiles := make([]iceberg.DataFile, 0, len(filePaths))
+	for _, path := range filePaths {
+		f, err := fs.Open(path)
+		if err != nil {
+			return fmt.Errorf("opening %s: %w", path, err)
+		}
+
+		pqr, err := parquetfile.NewParquetReader(f)
+		if err != nil {
+			f.Close()
+			return fmt.Errorf("reading parquet metadata from %s: %w", path, err)
+		}
+		rowCount := pqr.NumRows()
+		pqr.Close()
+
+		fi, err := f.Stat()
+		f.Close()
+		if err != nil {
+			return fmt.Errorf("stat %s: %w", path, err)
+		}
+
+		df, err := iceberg.NewDataFileBuilder(
+			*iceberg.UnpartitionedSpec,
+			iceberg.EntryContentData,
+			path,
+			iceberg.ParquetFile,
+			nil, nil, nil,
+			rowCount,
+			fi.Size(),
+		)
+		if err != nil {
+			return fmt.Errorf("building data file for %s: %w", path, err)
+		}
+		dataFiles = append(dataFiles, df.Build())
+	}
+
+	return tx.AddDataFiles(ctx, dataFiles, nil)
 }
 
 func sleepCtx(ctx context.Context, d time.Duration) error {
