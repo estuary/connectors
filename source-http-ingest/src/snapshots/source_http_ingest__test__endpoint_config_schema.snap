@@ -101,6 +101,37 @@ expression: schema
           ]
         },
         {
+          "title": "Zoom",
+          "properties": {
+            "maxSignatureAge": {
+              "title": "Max Signature Age",
+              "description": "Maximum age of a signed request in seconds before it is rejected. Defaults to 300 (5 minutes).",
+              "type": "integer",
+              "default": 300,
+              "maximum": 259200,
+              "minimum": 1,
+              "order": 2
+            },
+            "provider": {
+              "type": "string",
+              "const": "zoom",
+              "default": "zoom",
+              "order": 0
+            },
+            "publicKey": {
+              "title": "Secret Token",
+              "description": "Zoom webhook secret token used as the HMAC-SHA256 key.",
+              "type": "string",
+              "order": 1,
+              "secret": true
+            }
+          },
+          "required": [
+            "provider",
+            "publicKey"
+          ]
+        },
+        {
           "title": "Custom",
           "properties": {
             "algorithm": {
