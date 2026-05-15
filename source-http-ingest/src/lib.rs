@@ -205,11 +205,17 @@ fn webhook_signature_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
                         "description": "HTTP header containing the base64-encoded signature.",
                         "order": 3
                     },
+                    "signingStringTemplate": {
+                        "type": "string",
+                        "title": "Signing String Template",
+                        "description": "Template used to construct the string that is signed. Must include {PAYLOAD}, may include {TIMESTAMP}. Example: \"{TIMESTAMP}:{PAYLOAD}\".",
+                        "order": 4
+                    },
                     "timestampHeader": {
                         "type": "string",
                         "title": "Timestamp Header",
                         "description": "Optional HTTP header containing the timestamp.",
-                        "order": 4
+                        "order": 5
                     },
                     "maxSignatureAge": {
                         "type": "integer",
@@ -218,10 +224,10 @@ fn webhook_signature_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
                         "default": 300,
                         "minimum": 1,
                         "maximum": 259200,
-                        "order": 5
+                        "order": 6
                     }
                 },
-                "required": ["provider", "algorithm", "publicKey", "signatureHeader"]
+                "required": ["provider", "algorithm", "publicKey", "signatureHeader", "signingStringTemplate"]
             }
         ]
     }))

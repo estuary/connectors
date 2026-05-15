@@ -119,7 +119,7 @@ expression: schema
               "default": 300,
               "maximum": 259200,
               "minimum": 1,
-              "order": 5
+              "order": 6
             },
             "provider": {
               "type": "string",
@@ -141,18 +141,25 @@ expression: schema
               "type": "string",
               "order": 3
             },
+            "signingStringTemplate": {
+              "title": "Signing String Template",
+              "description": "Template used to construct the string that is signed. Must include {PAYLOAD}, may include {TIMESTAMP}. Example: \"{TIMESTAMP}:{PAYLOAD}\".",
+              "type": "string",
+              "order": 4
+            },
             "timestampHeader": {
               "title": "Timestamp Header",
               "description": "Optional HTTP header containing the timestamp.",
               "type": "string",
-              "order": 4
+              "order": 5
             }
           },
           "required": [
             "provider",
             "algorithm",
             "publicKey",
-            "signatureHeader"
+            "signatureHeader",
+            "signingStringTemplate"
           ]
         }
       ],

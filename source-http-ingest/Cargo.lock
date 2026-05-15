@@ -2271,6 +2271,7 @@ dependencies = [
  "models",
  "p256",
  "proto-flow",
+ "regex",
  "reqwest",
  "schemars",
  "serde",
