@@ -81,6 +81,9 @@ func (t *transactor) Store(it *m.StoreIterator) (m.StartCommitFunc, error) {
 			return nil
 		})
 	}
+	if err := it.Err(); err != nil {
+		return nil, err
+	}
 
 	// Wait for all messages to be delivered.
 	return nil, errGroup.Wait()

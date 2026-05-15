@@ -17,9 +17,13 @@ import (
 // DiscoverCatalog queries the database and generates discovered bindings
 // describing the available tables and their columns.
 func DiscoverCatalog(ctx context.Context, db Database) ([]*pc.Response_Discovered_Binding, error) {
-	tables, err := db.DiscoverTables(ctx)
+	tableIDs, err := db.ListTables(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error listing database tables: %w", err)
+	}
+	tables, err := db.DiscoverTableDetails(ctx, tableIDs)
+	if err != nil {
+		return nil, fmt.Errorf("error discovering database tables: %w", err)
 	}
 
 	var catalog []*pc.Response_Discovered_Binding
@@ -110,8 +114,8 @@ func generateCollectionSchema(db Database, table *DiscoveryInfo, fullWriteSchema
 	var sourceSchema = db.SourceMetadataSchema(fullWriteSchema)
 
 	if db.HistoryMode() && fullWriteSchema {
-		sourceSchema.Extras = map[string]interface{}{
-			"reduce": map[string]interface{}{
+		sourceSchema.Extras = map[string]any{
+			"reduce": map[string]any{
 				"strategy":    "lastWriteWins",
 				"associative": false,
 			},

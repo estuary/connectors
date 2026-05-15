@@ -278,6 +278,33 @@ class Sage:
         async for rec in self._req_json(model, data):
             yield rec
 
+    async def fetch_created_since(
+        self, obj: str, since: AwareDatetime
+    ) -> AsyncGenerator[SageRecord, None]:
+        model = await self.get_model(obj)
+        formatted_since = since.astimezone(model.tz_dt.tzinfo).strftime(
+            "%m/%d/%Y %H:%M:%S"
+        )
+        data = get_creations_since_request(
+            self.config, self.session_id, obj, model.field_names, formatted_since
+        )
+        async for rec in self._req_json(model, data):
+            yield rec
+
+    async def fetch_created_at(
+        self,
+        obj: str,
+        at: AwareDatetime,
+        after: int | None,
+    ) -> AsyncGenerator[SageRecord, None]:
+        model = await self.get_model(obj)
+        formatted_at = at.astimezone(model.tz_dt.tzinfo).strftime("%m/%d/%Y %H:%M:%S")
+        data = get_creations_at_request(
+            self.config, self.session_id, obj, model.field_names, formatted_at, after
+        )
+        async for rec in self._req_json(model, data):
+            yield rec
+
     async def fetch_deleted(
         self, obj: str, since: AwareDatetime
     ) -> AsyncGenerator[SageRecord, None]:
@@ -336,6 +363,24 @@ class Sage:
         self.deletion_model = model
 
         return model
+
+    async def probe_query_permission(self, obj: str) -> None:
+        """Issues a cheap QUERY probe against `obj`. Returns silently if the
+        authenticated user can QUERY it; raises SagePermissionError with
+        the Sage error message attached on a PL04000005 denial."""
+        await self._maybe_refresh_session()
+
+        data = permission_probe_request(self.config, self.session_id, obj)
+        bs = await self.http.request(
+            self.log,
+            endpoint_url,
+            method="POST",
+            headers={"Content-Type": "application/xml"},
+            form=data,
+        )
+
+        parsed = ApiResponse.model_validate(xmltodict.parse(bs))
+        parsed.raise_for_error()
 
     async def _req_xml(
         self, cls: type[XMLRecord], data: Any, skip_refresh=False
@@ -519,6 +564,27 @@ def get_user_by_id_request(cfg: EndpointConfig, session_id: str, user_id: str) -
     return function_with_session_id_xml(cfg, session_id, exec)
 
 
+def permission_probe_request(
+    cfg: EndpointConfig, session_id: str, object: str
+) -> str:
+    # A `pagesize=1` query is the cheapest way to surface a PL04000005
+    # permission denial: Sage checks permissions before retrieval, so the
+    # error fires regardless of whether the query would match any rows.
+    # `lookup` / `inspect` can't substitute here because they bypass
+    # permissions entirely.
+    exec = f"""
+        <query>
+          <object>{object}</object>
+          <select>
+            <field>RECORDNO</field>
+          </select>
+          <pagesize>1</pagesize>
+        </query>
+""".strip()
+
+    return function_with_session_id_xml(cfg, session_id, exec)
+
+
 def object_definition_request(cfg: EndpointConfig, session_id: str, object: str) -> str:
     exec = f"""
         <lookup>
@@ -633,6 +699,96 @@ def get_all_records_request(
           <select>
 {"\n".join(f"            <field>{field}</field>" for field in fields)}
           </select>{filter()}
+          <orderby>
+            <order>
+                <field>RECORDNO</field>
+                <ascending/>
+            </order>
+          </orderby>
+          <options>
+            <returnformat>json</returnformat>
+          </options>
+          <pagesize>{PAGE_SIZE}</pagesize>
+        </query>
+""".strip()
+
+    return function_with_session_id_xml(cfg, session_id, exec)
+
+
+def get_creations_since_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    object: str,
+    fields: list[str],
+    since: str,  # ex: 12/08/2024 10:46:26
+) -> str:
+    exec = f"""
+        <query>
+          <object>{object}</object>
+          <select>
+{"\n".join(f"            <field>{field}</field>" for field in fields)}
+          </select>
+          <filter>
+            <and>
+              <isnull>
+                <field>WHENMODIFIED</field>
+              </isnull>
+              <greaterthan>
+                <field>WHENCREATED</field>
+                <value>{since}</value>
+              </greaterthan>
+            </and>
+          </filter>
+          <orderby>
+            <order>
+                <field>WHENCREATED</field>
+                <ascending/>
+            </order>
+          </orderby>
+          <options>
+            <returnformat>json</returnformat>
+          </options>
+          <pagesize>{PAGE_SIZE}</pagesize>
+        </query>
+""".strip()
+
+    return function_with_session_id_xml(cfg, session_id, exec)
+
+
+def get_creations_at_request(
+    cfg: EndpointConfig,
+    session_id: str,
+    object: str,
+    fields: list[str],
+    at: str,  # ex: 12/08/2024 10:46:26
+    after: int | None,
+) -> str:
+    def filter() -> str:
+        if after is None:
+            return ""
+        return f"""
+              <greaterthan>
+                <field>RECORDNO</field>
+                <value>{after}</value>
+              </greaterthan>"""
+
+    exec = f"""
+        <query>
+          <object>{object}</object>
+          <select>
+{"\n".join(f"            <field>{field}</field>" for field in fields)}
+          </select>
+          <filter>
+            <and>
+              <isnull>
+                <field>WHENMODIFIED</field>
+              </isnull>
+              <equalto>
+                <field>WHENCREATED</field>
+                <value>{at}</value>
+              </equalto>{filter()}
+            </and>
+          </filter>
           <orderby>
             <order>
                 <field>RECORDNO</field>

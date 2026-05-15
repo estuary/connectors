@@ -3,24 +3,17 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
-	"math"
-	"math/big"
 	"strings"
 	"text/template"
-	"time"
 
 	"cloud.google.com/go/bigquery"
-	"cloud.google.com/go/civil"
-	"github.com/estuary/connectors/go/auth/iam"
+	bqclient "github.com/estuary/connectors/go/capture/bigquery/client"
 	"github.com/estuary/connectors/go/common"
 	"github.com/estuary/connectors/go/schedule"
 	schemagen "github.com/estuary/connectors/go/schema-gen"
 	boilerplate "github.com/estuary/connectors/source-boilerplate"
-	"github.com/invopop/jsonschema"
 	log "github.com/sirupsen/logrus"
-	"golang.org/x/oauth2"
 	"google.golang.org/api/option"
 )
 
@@ -34,65 +27,14 @@ var featureFlagDefaults = map[string]bool{
 	"emit_sourced_schemas": true,
 }
 
-type AuthType string
-
-const (
-	CredentialsJSON AuthType = "CredentialsJSON"
-	GCPIAM          AuthType = "GCPIAM"
-)
-
-type CredentialsJSONConfig struct {
-	CredentialsJSON string `json:"credentials_json" jsonschema:"title=Service Account JSON,description=The JSON credentials of the service account to use for authorization." jsonschema_extras:"secret=true,multiline=true,order=0"`
-}
-
-type CredentialsConfig struct {
-	AuthType AuthType `json:"auth_type"`
-
-	CredentialsJSONConfig
-	iam.IAMConfig
-}
-
-func (CredentialsConfig) JSONSchema() *jsonschema.Schema {
-	subSchemas := []schemagen.OneOfSubSchemaT{
-		schemagen.OneOfSubSchema("Credentials JSON", CredentialsJSONConfig{}, string(CredentialsJSON)),
-	}
-	subSchemas = append(subSchemas,
-		schemagen.OneOfSubSchema("GCP IAM", iam.GCPConfig{}, string(GCPIAM)))
-
-	return schemagen.OneOfSchema("Authentication", "", "auth_type", string(CredentialsJSON), subSchemas...)
-}
-
-func (c *CredentialsConfig) Validate() error {
-	switch c.AuthType {
-	case CredentialsJSON:
-		if c.CredentialsJSON == "" {
-			return errors.New("missing 'credentials_json'")
-		}
-
-		// Sanity check: Are the provided credentials valid JSON? A common error is to upload
-		// credentials that are not valid JSON, and the resulting error is fairly cryptic if fed
-		// directly to bigquery.NewClient.
-		if !json.Valid([]byte(c.CredentialsJSON)) {
-			return fmt.Errorf("service account credentials must be valid JSON, and the provided credentials were not")
-		}
-		return nil
-	case GCPIAM:
-		if err := c.ValidateIAM(); err != nil {
-			return err
-		}
-		return nil
-	}
-	return fmt.Errorf("unknown 'auth_type'")
-}
-
 // Config tells the connector how to connect to and interact with the source database.
 type Config struct {
 	ProjectID       string `json:"project_id" jsonschema:"title=Project ID,description=Google Cloud Project ID that owns the BigQuery dataset(s)." jsonschema_extras:"order=0"`
 	CredentialsJSON string `json:"credentials_json" jsonschema:"-" jsonschema_extras:"secret=true,multiline=true,order=1"`
 	Dataset         string `json:"dataset" jsonschema:"title=Dataset,description=BigQuery dataset to discover tables within." jsonschema_extras:"order=2"`
 
-	Credentials *CredentialsConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=3"`
-	Advanced    advancedConfig     `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+	Credentials *bqclient.Credentials `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"x-iam-auth=true,order=3"`
+	Advanced    advancedConfig        `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
 
 type advancedConfig struct {
@@ -148,130 +90,19 @@ func (c *Config) SetDefaults() {
 	}
 }
 
-const (
-	// Google Cloud DATETIME columns support microsecond precision at most
-	datetimeFormatMicros = "2006-01-02T15:04:05.000000"
-)
-
-func translateBigQueryValue(val any, fieldSchema *bigquery.FieldSchema) (any, error) {
-	// Arrays are represented as their element schema with `Repeated = true` set, so
-	// to translate them we need to check `Repeated` before anything else.
-	if fieldSchema.Repeated {
-		if vals, ok := val.([]bigquery.Value); ok {
-			// Construct the non-repeated element schema
-			var elementSchema = *fieldSchema
-			elementSchema.Repeated = false
-
-			// Translate array elements with the element schema
-			var translated = make([]any, len(vals))
-			for idx, val := range vals {
-				var tval, err = translateBigQueryValue(val, &elementSchema)
-				if err != nil {
-					return nil, fmt.Errorf("error translating array index %d: %w", idx, err)
-				}
-				translated[idx] = tval
-			}
-			return translated, nil
-		} else {
-			return val, nil
-		}
-	}
-
-	switch fieldSchema.Type {
-	case "RECORD":
-		if vals, ok := val.([]bigquery.Value); ok {
-			if len(vals) > len(fieldSchema.Schema) {
-				return nil, fmt.Errorf("more values than record fields (%d > %d)", len(vals), len(fieldSchema.Schema))
-			}
-			var translated = make(map[string]any)
-			for idx, val := range vals {
-				var fieldName = fieldSchema.Schema[idx].Name
-				var tval, err = translateBigQueryValue(val, fieldSchema.Schema[idx])
-				if err != nil {
-					return nil, fmt.Errorf("error translating record field %q: %w", fieldName, err)
-				}
-				translated[fieldName] = tval
-			}
-			return translated, nil
-		} else {
-			return val, nil
-		}
-	}
-
-	switch val := val.(type) {
-	case *big.Rat:
-		n, exact := val.FloatPrec()
-		if !exact {
-			// Add three additional digits of precision to inexact representations.
-			// The amount is arbitrary but was chosen so 1/3 becomes "0.333" instead of "0"
-			// In theory it should never apply anyway since BigQuery seems to always return
-			// rationals with a power-of-ten denominator.
-			n += 3
-		}
-		return val.FloatString(n), nil
-	case civil.DateTime:
-		return val.In(time.UTC).Format(datetimeFormatMicros), nil
-	case string:
-		if fieldSchema.Type == "JSON" && json.Valid([]byte(val)) {
-			return json.RawMessage([]byte(val)), nil
-		}
-	case float64:
-		if math.IsNaN(val) {
-			return "NaN", nil
-		}
-	}
-	return val, nil
-}
-
-func (c *Config) CredentialsClientOption() (option.ClientOption, error) {
-	if c.Credentials == nil {
-		return option.WithCredentialsJSON([]byte(c.CredentialsJSON)), nil
-	}
-
-	switch c.Credentials.AuthType {
-	case CredentialsJSON:
-		return option.WithCredentialsJSON([]byte(c.Credentials.CredentialsJSON)), nil
-	case GCPIAM:
-		return option.WithTokenSource(oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: c.Credentials.GoogleToken()},
-		)), nil
-	}
-	return nil, fmt.Errorf("unknown 'auth_type'")
-}
-
 func connectBigQuery(ctx context.Context, cfg *Config) (*bigquery.Client, error) {
-	log.WithFields(log.Fields{
-		"project_id": cfg.ProjectID,
-	}).Info("connecting to database")
-
-	credOption, err := cfg.CredentialsClientOption()
+	credOption, err := cfg.credentialsClientOption()
 	if err != nil {
 		return nil, err
 	}
-	var clientOpts = []option.ClientOption{
-		credOption,
-		option.WithUserAgent("EstuaryFlow (GPN:Estuary;)"),
-	}
-	client, err := bigquery.NewClient(ctx, cfg.ProjectID, clientOpts...)
-	if err != nil {
-		return nil, fmt.Errorf("creating bigquery client: %w", err)
-	}
-
-	if err := executeQuery(ctx, client, "SELECT true;"); err != nil {
-		return nil, fmt.Errorf("error executing no-op query: %w", err)
-	}
-	return client, nil
+	return bqclient.Connect(ctx, cfg.ProjectID, credOption)
 }
 
-func executeQuery(ctx context.Context, client *bigquery.Client, query string) error {
-	if job, err := client.Query(query).Run(ctx); err != nil {
-		return err
-	} else if js, err := job.Wait(ctx); err != nil {
-		return err
-	} else if js.Err() != nil {
-		return js.Err()
+func (c *Config) credentialsClientOption() (option.ClientOption, error) {
+	if c.Credentials == nil {
+		return option.WithCredentialsJSON([]byte(c.CredentialsJSON)), nil
 	}
-	return nil
+	return c.Credentials.ClientOption()
 }
 
 func selectQueryTemplate(res *Resource) (string, error) {
@@ -299,16 +130,8 @@ const tableQueryTemplate = `{{if not .CursorFields -}}
 {{- end}}`
 
 var templateFuncs = template.FuncMap{
-	"quoteTableName":  quoteTableName,
-	"quoteIdentifier": quoteIdentifier,
-}
-
-func quoteTableName(schema, table string) string {
-	return quoteIdentifier(schema) + "." + quoteIdentifier(table)
-}
-
-func quoteIdentifier(name string) string {
-	return "`" + strings.ReplaceAll(name, "`", "\\`") + "`"
+	"quoteTableName":  bqclient.QuoteTableName,
+	"quoteIdentifier": bqclient.QuoteIdentifier,
 }
 
 func generateBigQueryResource(cfg *Config, resourceName, schemaName, tableName, tableType string) (*Resource, error) {

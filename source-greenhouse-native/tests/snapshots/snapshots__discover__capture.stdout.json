@@ -1516,7 +1516,7 @@
     "recommendedName": "demographic_questions",
     "resourceConfig": {
       "name": "demographic_questions",
-      "interval": "PT5M"
+      "interval": "PT15M"
     },
     "documentSchema": {
       "$defs": {
@@ -1544,33 +1544,13 @@
           "type": "object"
         }
       },
-      "additionalProperties": true,
       "properties": {
         "_meta": {
           "$ref": "#/$defs/Meta",
           "description": "Document metadata"
-        },
-        "id": {
-          "title": "Id",
-          "type": "integer"
-        },
-        "created_at": {
-          "format": "date-time",
-          "title": "Created At",
-          "type": "string"
-        },
-        "updated_at": {
-          "format": "date-time",
-          "title": "Updated At",
-          "type": "string"
         }
       },
-      "required": [
-        "id",
-        "created_at",
-        "updated_at"
-      ],
-      "title": "GreenhouseResource",
+      "title": "BaseDocument",
       "type": "object",
       "x-infer-schema": true,
       "if": {
@@ -1598,7 +1578,7 @@
       }
     },
     "key": [
-      "/id"
+      "/_meta/row_id"
     ]
   },
   {

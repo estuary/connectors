@@ -17,6 +17,7 @@ from typing import (
     TypeVar,
     cast,
 )
+from typing_extensions import override
 
 from pydantic import AwareDatetime, BaseModel, Field, NonNegativeInt
 
@@ -38,6 +39,7 @@ from ..flow import (
 from ..pydantic_polyfill import GenericModel
 from ..utils import json_merge_patch
 from . import Task, request, response
+from .webhook.match import CollectionMatchingSpec, UrlMatch
 
 LogCursor = tuple[str | int] | AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
@@ -189,6 +191,21 @@ class ResourceConfig(BaseResourceConfig):
 
 
 _ResourceConfig = TypeVar("_ResourceConfig", bound=ResourceConfig)
+
+
+class WebhookResourceConfig(BaseResourceConfig):
+    PATH_POINTERS: ClassVar[list[str]] = ["/name"]
+
+    name: str = Field(description="Name of this resource")
+    match_rule: CollectionMatchingSpec = Field(
+        default_factory=lambda: UrlMatch(value="*"),
+        description="Matching spec for routing incoming webhooks to this collection",
+        discriminator="type",
+    )
+
+    @override
+    def path(self) -> list[str]:
+        return [self.name]
 
 
 CRON_REGEX = (
@@ -473,6 +490,7 @@ class Resource(Generic[_BaseDocument, _BaseResourceConfig, _BaseResourceState]):
     schema_inference: bool
     reduction_strategy: ReductionStrategy | None = None
     disable: bool = False
+    requires_explicit_acks: bool = False
 
 
 @dataclass(kw_only=True)
@@ -481,12 +499,16 @@ class SnapshotResource(Resource[_BaseDocument, _BaseResourceConfig, ResourceStat
     work well with the rest of the CDK and Estuary Flow platform.
 
     Sets key to /_meta/row_id (required for CDK deletion inference),
-    initial_state to an empty ResourceState, and reduction_strategy to
-    lastWriteWins — the invariant choices for all snapshot bindings.
+    initial_state to an empty ResourceState, model to BaseDocument
+    with schema_inference enabled (snapshot bindings rely on schema
+    inference rather than a typed model) — the invariant choices
+    for snapshot bindings.
     """
 
     key: list[str] = field(default_factory=lambda: ["/_meta/row_id"])
     initial_state: ResourceState = field(default_factory=ResourceState)
+    model: type[BaseDocument] | Resource.FixedSchema = BaseDocument
+    schema_inference: bool = True
 
 
 def discovered(
@@ -558,8 +580,6 @@ def resolve_bindings(
     errors: list[str] = []
 
     # Check for routing conflicts between webhook match rules.
-    from .webhook.resources import WebhookResourceConfig
-
     webhook_match_rules = [
         resource.initial_config.match_rule
         for resource in resources
@@ -751,7 +771,11 @@ def open(
             # TaskGroup stays alive until graceful shutdown begins.
             await task.stopping.event.wait()
 
-    return (response.Opened(explicitAcknowledgements=False), _run)
+    requires_explicit_acks = any(
+        rsc.requires_explicit_acks for _, rsc in resolved_bindings
+    )
+
+    return (response.Opened(explicitAcknowledgements=requires_explicit_acks), _run)
 
 
 def open_binding(

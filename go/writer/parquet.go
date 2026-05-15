@@ -83,7 +83,7 @@ func newRowSizing(sch ParquetSchema) rowSize {
 		case PrimitiveTypeBinary, LogicalTypeJson, LogicalTypeDecimal:
 			rs.fixed += 24 // slice header
 			rs.calcLen = append(rs.calcLen, idx)
-		case LogicalTypeString, LogicalTypeUuid, LogicalTypeDate, LogicalTypeTime, LogicalTypeTimestamp, LogicalTypeInterval:
+		case LogicalTypeString, LogicalTypeUuid, LogicalTypeDate, LogicalTypeTime, LogicalTypeTimestamp, LogicalTypeTimestampNanos, LogicalTypeInterval:
 			rs.fixed += 16 // string header
 			rs.calcLen = append(rs.calcLen, idx)
 		default:
@@ -431,6 +431,10 @@ func (w *ParquetWriter) flushBuffer() error {
 		case LogicalTypeTimestamp:
 			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampVal); err != nil {
 				return fmt.Errorf("writing timestamp column '%s': %w", f.Name, err)
+			}
+		case LogicalTypeTimestampNanos:
+			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampNanosVal); err != nil {
+				return fmt.Errorf("writing timestamp (nanos) column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeDecimal:
 			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getDecimalVal); err != nil {
@@ -824,6 +828,22 @@ func getIntervalVal(val any) (got parquet.FixedLenByteArray, err error) {
 		}
 	default:
 		err = fmt.Errorf("getIntervalVal unhandled type: %T", v)
+	}
+
+	return
+}
+
+func getTimestampNanosVal(val any) (got int64, err error) {
+	switch v := val.(type) {
+	case string:
+		v = strings.Replace(v, "z", "Z", 1)
+		if d, parseErr := time.Parse(time.RFC3339Nano, v); parseErr != nil {
+			err = fmt.Errorf("unable to parse string %q as timestamp: %w", v, parseErr)
+		} else {
+			got = d.UnixNano()
+		}
+	default:
+		err = fmt.Errorf("getTimestampNanosVal unhandled type: %T", v)
 	}
 
 	return

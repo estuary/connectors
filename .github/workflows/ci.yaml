@@ -77,6 +77,7 @@ jobs:
           - source-dropbox
           - source-dynamodb
           - source-firestore
+          - source-ga4-bigquery
           - source-gcs
           - source-google-drive
           - source-google-pubsub
@@ -129,6 +130,7 @@ jobs:
           - materialize-s3-parquet
           - materialize-slack
           - materialize-snowflake
+          - materialize-sns
           - materialize-spanner
           - materialize-sqlite
           - materialize-sqlserver
@@ -220,6 +222,7 @@ jobs:
       - name: Go Connector ${{ matrix.connector }} Database Tests
         if: |
           contains(fromJson('[
+            "source-ga4-bigquery",
             "source-postgres",
             "source-redshift-batch",
             "source-sqlserver",

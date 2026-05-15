@@ -19,7 +19,7 @@
         "oneOf": [
           {
             "$schema": "https://json-schema.org/draft/2020-12/schema",
-            "$id": "https://github.com/estuary/connectors/source-bigquery-batch/credentials-json-config",
+            "$id": "https://github.com/estuary/connectors/go/capture/bigquery/client/credentials-json-config",
             "properties": {
               "auth_type": {
                 "type": "string",

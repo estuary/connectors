@@ -64,7 +64,8 @@ const (
 	LogicalTypeJson                             // Extends BYTE_ARRAY
 	LogicalTypeDate                             // Extends BYTE_ARRAY
 	LogicalTypeTime                             // Extends INT64
-	LogicalTypeTimestamp                        // Extends INT64
+	LogicalTypeTimestamp                        // Extends INT64, microsecond precision
+	LogicalTypeTimestampNanos                   // Extends INT64, nanosecond precision
 	LogicalTypeUuid                             // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
 	LogicalTypeDecimal                          // Extends FIXED_LEN_BYTE_ARRAY, with a length of 16 bytes
 	LogicalTypeInterval                         // Extends FIXED_LEN_BYTE_ARRAY, with a length of 12 bytes
@@ -145,6 +146,15 @@ func makeNode(e ParquetSchemaElement) schema.Node {
 			-1,
 			fieldId,
 		))
+	case LogicalTypeTimestampNanos:
+		return schema.Must(schema.NewPrimitiveNodeLogical(
+			e.Name,
+			repetition,
+			schema.NewTimestampLogicalType(true, schema.TimeUnitNanos),
+			parquet.Types.Int64,
+			-1,
+			fieldId,
+		))
 	case LogicalTypeInterval:
 		return schema.Must(schema.NewPrimitiveNodeLogical(
 			e.Name,
@@ -183,6 +193,7 @@ type parquetSchemaConfig struct {
 	objectAsString   bool
 	timeAsString     bool
 	uuidAsString     bool
+	timestampAsNanos bool
 }
 
 type ParquetSchemaOption func(*parquetSchemaConfig)
@@ -214,6 +225,12 @@ func WithParquetTimeAsString() ParquetSchemaOption {
 func WithParquetUUIDAsString() ParquetSchemaOption {
 	return func(cfg *parquetSchemaConfig) {
 		cfg.uuidAsString = true
+	}
+}
+
+func WithParquetTimestampAsNanoseconds() ParquetSchemaOption {
+	return func(cfg *parquetSchemaConfig) {
+		cfg.timestampAsNanos = true
 	}
 }
 
@@ -277,7 +294,11 @@ func ProjectionToParquetSchemaElement(p pf.Projection, castToString bool, opts .
 			case "date":
 				out.DataType = LogicalTypeDate
 			case "date-time":
-				out.DataType = LogicalTypeTimestamp
+				if cfg.timestampAsNanos {
+					out.DataType = LogicalTypeTimestampNanos
+				} else {
+					out.DataType = LogicalTypeTimestamp
+				}
 			case "duration":
 				out.DataType = typeOrString(LogicalTypeInterval, cfg.durationAsString)
 			case "time":

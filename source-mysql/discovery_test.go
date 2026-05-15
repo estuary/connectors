@@ -4,8 +4,11 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
+
+	"github.com/estuary/connectors/sqlcapture"
 )
 
 func TestSecondaryIndexDiscovery(t *testing.T) {
@@ -64,6 +67,181 @@ func TestTrickyEnumValues(t *testing.T) {
 	var tb, ctx, uniqueID = mysqlTestBackend(t), context.Background(), uniqueTableID(t)
 	tb.CreateTable(ctx, t, uniqueID, `(id INTEGER PRIMARY KEY, category ENUM('A', 'B (Parentheses)', '', 'Internal''Quote', 'Internal,Comma', 'Internal\nNewline', 'Internal;Semicolon', '   Leading Spaces', 'Trailing Spaces   ', 'Z'))`)
 	tb.CaptureSpec(ctx, t).VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+}
+
+// TestDiscoveryFiltersApply exercises the post-query filtering logic for
+// various combinations of exclude-schemas and table patterns. The
+// include-schemas list is intentionally not covered here, since it is pushed
+// into the listTables query rather than handled by apply().
+func TestDiscoveryFiltersApply(t *testing.T) {
+	var input = []sqlcapture.TableID{
+		{Schema: "a", Table: "users"},
+		{Schema: "a", Table: "users_evt"},
+		{Schema: "a", Table: "events_log"},
+		{Schema: "b", Table: "users"},
+		{Schema: "b", Table: "users_evt"},
+		{Schema: "internal", Table: "secret"},
+	}
+	var cases = []struct {
+		name     string
+		filters  discoveryFilters
+		expected []sqlcapture.TableID
+	}{
+		{
+			name:     "Passthrough",
+			filters:  discoveryFilters{},
+			expected: input,
+		},
+		{
+			name:    "ExcludeOneSchema",
+			filters: discoveryFilters{ExcludeSchemas: []string{"internal"}},
+			expected: []sqlcapture.TableID{
+				{Schema: "a", Table: "users"},
+				{Schema: "a", Table: "users_evt"},
+				{Schema: "a", Table: "events_log"},
+				{Schema: "b", Table: "users"},
+				{Schema: "b", Table: "users_evt"},
+			},
+		},
+		{
+			name:    "ExcludeMultipleSchemas",
+			filters: discoveryFilters{ExcludeSchemas: []string{"internal", "b"}},
+			expected: []sqlcapture.TableID{
+				{Schema: "a", Table: "users"},
+				{Schema: "a", Table: "users_evt"},
+				{Schema: "a", Table: "events_log"},
+			},
+		},
+		{
+			// A literal basename pattern matches only the exact table name,
+			// proving that patterns are implicitly anchored. The "users_evt"
+			// tables must not be included by the "users" pattern.
+			name:    "BasenameLiteral",
+			filters: discoveryFilters{TablePatterns: []string{"users"}},
+			expected: []sqlcapture.TableID{
+				{Schema: "a", Table: "users"},
+				{Schema: "b", Table: "users"},
+			},
+		},
+		{
+			name:    "BasenameWildcard",
+			filters: discoveryFilters{TablePatterns: []string{"*_evt"}},
+			expected: []sqlcapture.TableID{
+				{Schema: "a", Table: "users_evt"},
+				{Schema: "b", Table: "users_evt"},
+			},
+		},
+		{
+			name:    "MultiplePatternsOR",
+			filters: discoveryFilters{TablePatterns: []string{"users", "secret"}},
+			expected: []sqlcapture.TableID{
+				{Schema: "a", Table: "users"},
+				{Schema: "b", Table: "users"},
+				{Schema: "internal", Table: "secret"},
+			},
+		},
+		{
+			// A pattern containing a '.' is qualified and matches against
+			// schema and table independently.
+			name:    "QualifiedLiteral",
+			filters: discoveryFilters{TablePatterns: []string{"a.users"}},
+			expected: []sqlcapture.TableID{
+				{Schema: "a", Table: "users"},
+			},
+		},
+		{
+			name:    "QualifiedWildcardTable",
+			filters: discoveryFilters{TablePatterns: []string{"a.*"}},
+			expected: []sqlcapture.TableID{
+				{Schema: "a", Table: "users"},
+				{Schema: "a", Table: "users_evt"},
+				{Schema: "a", Table: "events_log"},
+			},
+		},
+		{
+			name:    "QualifiedWildcardSchema",
+			filters: discoveryFilters{TablePatterns: []string{"*.users"}},
+			expected: []sqlcapture.TableID{
+				{Schema: "a", Table: "users"},
+				{Schema: "b", Table: "users"},
+			},
+		},
+		{
+			name: "ExcludeAndPattern",
+			filters: discoveryFilters{
+				ExcludeSchemas: []string{"b"},
+				TablePatterns:  []string{"*_evt", "events_*"},
+			},
+			expected: []sqlcapture.TableID{
+				{Schema: "a", Table: "users_evt"},
+				{Schema: "a", Table: "events_log"},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var got, err = tc.filters.apply(input)
+			if err != nil {
+				t.Fatalf("apply() unexpected error: %v", err)
+			}
+			if !slices.Equal(got, tc.expected) {
+				t.Errorf("apply() = %v, want %v", got, tc.expected)
+			}
+		})
+	}
+}
+
+// TestDiscoveryFiltersValidate checks that malformed table patterns are
+// caught at config-validation time.
+func TestDiscoveryFiltersValidate(t *testing.T) {
+	var cases = []struct {
+		name    string
+		filters discoveryFilters
+		wantErr bool
+	}{
+		{"Empty", discoveryFilters{}, false},
+		{"GoodPatterns", discoveryFilters{TablePatterns: []string{"foo", "bar_*", "a.b"}}, false},
+		{"EmptyTableComponent", discoveryFilters{TablePatterns: []string{"foo."}}, true},
+		{"TrailingBackslash", discoveryFilters{TablePatterns: []string{`foo\`}}, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var err = tc.filters.Validate()
+			if (err != nil) != tc.wantErr {
+				t.Errorf("Validate() err = %v, wantErr = %v", err, tc.wantErr)
+			}
+		})
+	}
+}
+
+// TestTablePatterns exercises end-to-end discovery against a live database
+// with various TablePatterns configurations.
+func TestTablePatterns(t *testing.T) {
+	var tb, ctx, uniqueID = mysqlTestBackend(t), context.Background(), uniqueTableID(t)
+	tb.CreateTable(ctx, t, uniqueID+"_alpha_evt", "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.CreateTable(ctx, t, uniqueID+"_beta_evt", "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.CreateTable(ctx, t, uniqueID+"_alpha_log", "(id INTEGER PRIMARY KEY, data TEXT)")
+	tb.CreateTable(ctx, t, uniqueID+"_beta_log", "(id INTEGER PRIMARY KEY, data TEXT)")
+
+	t.Run("Default", func(t *testing.T) {
+		var cs = tb.CaptureSpec(ctx, t)
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+	t.Run("EventsOnly", func(t *testing.T) {
+		var cs = tb.CaptureSpec(ctx, t)
+		cs.EndpointSpec.(*Config).DiscoveryFilters.TablePatterns = []string{`*_evt`}
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+	t.Run("AlphaOnly", func(t *testing.T) {
+		var cs = tb.CaptureSpec(ctx, t)
+		cs.EndpointSpec.(*Config).DiscoveryFilters.TablePatterns = []string{`*_alpha_evt`, `*_alpha_log`}
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
+	t.Run("NoMatch", func(t *testing.T) {
+		var cs = tb.CaptureSpec(ctx, t)
+		cs.EndpointSpec.(*Config).DiscoveryFilters.TablePatterns = []string{`nonexistent`}
+		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
+	})
 }
 
 // TestSchemaWhitelist tests table discovery with an explicit whitelist of schema names

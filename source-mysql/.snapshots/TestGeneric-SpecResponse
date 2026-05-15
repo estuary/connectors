@@ -36,6 +36,38 @@
         "default": false,
         "order": 4
       },
+      "discoveryFilters": {
+        "properties": {
+          "include_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Include Schemas",
+            "description": "If specified only tables in the listed schemas will be discovered. Combined as a union with the 'Discovery Schema Selection' setting under Advanced Options."
+          },
+          "exclude_schemas": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Exclude Schemas",
+            "description": "Tables in the listed schemas will be excluded from discovery."
+          },
+          "table_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Table Patterns",
+            "description": "If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "Discovery Filters",
+        "description": "Options that restrict which tables are visible to discovery."
+      },
       "advanced": {
         "properties": {
           "dbname": {

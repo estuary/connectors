@@ -65,13 +65,44 @@ class EndpointConfig(BaseModel):
 ConnectorState = GenericConnectorState[ResourceState]
 
 
+class SagePermissionError(Exception):
+    """Raised when a Sage Intacct API call fails because the authenticated
+    user's role lacks permission for the requested operation."""
+
+
 class ApiResponse(BaseModel):
     class ErrorMessage(BaseModel):
         class Error(BaseModel):
-            errorno: str
-            description2: str
+            errorno: str | None = None
+            description2: str | None = None
+
+            def __str__(self) -> str:
+                parts = []
+                if self.errorno:
+                    parts.append(f"Error: {self.errorno}")
+                if self.description2:
+                    parts.append(self.description2)
+                return " - ".join(parts) if parts else "unspecified Sage Intacct error"
+
+            def is_permission_error(self) -> bool:
+                if self.errorno == "PL04000005":
+                    return True
+                # AUDITHISTORY denials arrive without an `errorno`, so fall
+                # back to matching the literal description Sage emits.
+                if self.description2 and "do not have permission to view audit history" in self.description2.lower():
+                    return True
+                return False
 
         error: list[Error] | Error
+
+        def _errors(self) -> list["ApiResponse.ErrorMessage.Error"]:
+            return self.error if isinstance(self.error, list) else [self.error]
+
+        def __str__(self) -> str:
+            return str(self._errors()[0])
+
+        def is_permission_error(self) -> bool:
+            return any(e.is_permission_error() for e in self._errors())
 
     class Response(BaseModel):
         class Operation(BaseModel):
@@ -96,18 +127,10 @@ class ApiResponse(BaseModel):
 
     def raise_for_error(self):
         if self.response.errormessage:
-            if isinstance(self.response.errormessage.error, list):
-                error = self.response.errormessage.error[0]
-            else:
-                error = self.response.errormessage.error
-            raise ValidationError([f"Error: {error.errorno} - {error.description2}"])
+            self._raise(self.response.errormessage)
 
         if self.response.operation and self.response.operation.errormessage:
-            if isinstance(self.response.operation.errormessage.error, list):
-                error = self.response.operation.errormessage.error[0]
-            else:
-                error = self.response.operation.errormessage.error
-            raise ValidationError([f"Error: {error.errorno} - {error.description2}"])
+            self._raise(self.response.operation.errormessage)
 
         if self.response.operation:
             if self.response.operation.authentication.status != "success":
@@ -118,10 +141,19 @@ class ApiResponse(BaseModel):
                 )
 
             if self.response.operation.result:
+                if self.response.operation.result.errormessage:
+                    self._raise(self.response.operation.result.errormessage)
+
                 if self.response.operation.result.status != "success":
                     raise ValidationError(
                         [f"result status: {self.response.operation.result.status}"]
                     )
+
+    @staticmethod
+    def _raise(err: "ApiResponse.ErrorMessage") -> None:
+        if err.is_permission_error():
+            raise SagePermissionError(str(err))
+        raise ValidationError([str(err)])
 
 
 class GenerateApiSessionResponse(BaseModel):
@@ -168,9 +200,39 @@ class SnapshotResource(BaseDocument, extra="allow"):
     RECORDNO: Optional[int] = Field(default=None, exclude=True)
 
 
-class IncrementalResource(BaseDocument, extra="allow"):
+# Document is the model used to derive the collection's write schema for
+# incremental bindings. Only RECORDNO is required because the three runtime
+# document shapes diverge on the rest: update docs carry WHENMODIFIED,
+# creation docs carry WHENCREATED without WHENMODIFIED, and deletion docs
+# carry WHENMODIFIED without WHENCREATED. Marking either timestamp required
+# would reject one of those shapes during write-schema validation.
+class Document(BaseDocument, extra="allow"):
     RECORDNO: int
+
+
+class IncrementalResource(Document):
     WHENMODIFIED: AwareDatetime
+
+    def cursor_value(self) -> AwareDatetime:
+        return self.WHENMODIFIED
+
+
+# CreationRecord captures records that exist in Sage with a null WHENMODIFIED.
+# They cannot be captured by the WHENMODIFIED-keyed incremental query, so a
+# parallel sub-task keyed on WHENCREATED picks them up.
+class CreationRecord(Document):
+    WHENCREATED: AwareDatetime
+
+    def cursor_value(self) -> AwareDatetime:
+        return self.WHENCREATED
+
+
+def parse_backfill_record(raw: dict) -> "IncrementalResource | CreationRecord":
+    """Routes to IncrementalResource when WHENMODIFIED is present, else
+    CreationRecord."""
+    if raw.get("WHENMODIFIED") is not None:
+        return IncrementalResource.model_validate(raw)
+    return CreationRecord.model_validate(raw)
 
 
 class DeletionRecord(BaseDocument, extra="forbid"):
@@ -181,6 +243,9 @@ class DeletionRecord(BaseDocument, extra="forbid"):
     meta_: "DeletionRecord.Meta" = Field(
         default_factory=lambda: DeletionRecord.Meta(op="d")
     )
+
+    def cursor_value(self) -> AwareDatetime:
+        return self.WHENMODIFIED
 
     @field_validator("RECORDNO", mode="before")
     @classmethod

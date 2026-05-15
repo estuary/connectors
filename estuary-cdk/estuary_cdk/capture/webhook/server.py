@@ -14,8 +14,9 @@ from estuary_cdk.capture.common import (
     Resource,
     ResourceState,
     Task,
+    WebhookResourceConfig,
 )
-from estuary_cdk.capture.webhook.resources import WebhookDocument, WebhookResourceConfig
+from estuary_cdk.capture.webhook.resources import WebhookDocument, WebhookResource
 
 _rejecting_key = web.AppKey("rejecting", bool)
 
@@ -155,9 +156,7 @@ def build_webhook_app(
             for doc in enriched_docs:
                 task.captured(doc.binding, doc.doc)
 
-            await task.checkpoint(
-                state=ConnectorState()  # pyright: ignore[reportUnknownArgumentType]
-            )
+            await task.checkpoint(state=ConnectorState())
 
         return web.json_response({"published": len(enriched_docs)})
 
@@ -168,7 +167,7 @@ def build_webhook_app(
 
 def start_webhook_server(
     binding_index_mapping: Mapping[
-        int, Resource[WebhookDocument, WebhookResourceConfig, ResourceState]
+        int, WebhookResource[WebhookDocument, WebhookResourceConfig]
     ],
     task: Task,
 ):
@@ -199,6 +198,8 @@ def start_webhook_server(
                 task._output,  # pyright: ignore[reportPrivateUsage]
                 task.stopping,
                 webhook_tg,
+                task.transactor,
+                requires_ack=True,
             )
 
             app = build_webhook_app(binding_index_mapping, webhook_task)

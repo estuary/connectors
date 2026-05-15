@@ -75,6 +75,16 @@ func (c *Capture) BindingsCurrentlyActive() []*Binding {
 	return c.BindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill, TableStateActive)
 }
 
+// bindingTableIDs returns a TableID for every binding configured on this capture,
+// suitable for passing to Database.DiscoverTableDetails.
+func (c *Capture) bindingTableIDs() []TableID {
+	var ids = make([]TableID, 0, len(c.Bindings))
+	for _, binding := range c.Bindings {
+		ids = append(ids, TableID{Schema: binding.Resource.Namespace, Table: binding.Resource.Stream})
+	}
+	return ids
+}
+
 // BindingsCurrentlyBackfilling returns all the bindings undergoing some sort of backfill.
 func (c *Capture) BindingsCurrentlyBackfilling() []*Binding {
 	return c.BindingsInState(TableStatePreciseBackfill, TableStateUnfilteredBackfill, TableStateKeylessBackfill)
@@ -163,8 +173,6 @@ type Capture struct {
 
 const (
 	automatedDiagnosticsTimeout = 5 * time.Minute  // How long to wait *after the point where the fence was requested* before triggering automated diagnostics.
-	streamIdleWarning           = 60 * time.Second // After `streamIdleWarning` has elapsed since the last replication event, we log a warning.
-	streamProgressInterval      = 60 * time.Second // After `streamProgressInterval` the replication streaming code may log a progress report.
 	rediscoverInterval          = 5 * time.Minute  // The capture will re-run discovery and reinitialize missing/pending tables this frequently.
 	periodicChecksInterval      = 10 * time.Minute // The capture may run some database-specific sanity checks periodically at this interval.
 )
@@ -175,9 +183,9 @@ var (
 
 // Run is the top level entry point of the capture process.
 func (c *Capture) Run(ctx context.Context) (err error) {
-	// Perform discovery and log the full results for convenience. This info
-	// will be needed when activating all currently-active bindings below.
-	discovery, err := c.Database.DiscoverTables(ctx)
+	// Fetch detailed schema info for the tables that this capture's bindings
+	// reference. We don't need details for every table in the database here.
+	discovery, err := c.Database.DiscoverTableDetails(ctx, c.bindingTableIDs())
 	if err != nil {
 		return fmt.Errorf("error discovering database tables: %w", err)
 	} else if err := c.emitSourcedSchemas(discovery); err != nil {
@@ -245,7 +253,7 @@ func (c *Capture) Run(ctx context.Context) (err error) {
 	for ctx.Err() == nil {
 		if time.Now().After(rediscoverAfter) {
 			log.Debug("rediscovering database tables")
-			discovery, err = c.Database.DiscoverTables(ctx)
+			discovery, err = c.Database.DiscoverTableDetails(ctx, c.bindingTableIDs())
 			if err != nil {
 				return fmt.Errorf("error discovering database tables: %w", err)
 			} else if err := c.emitSourcedSchemas(discovery); err != nil {

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"database/sql"
 	"encoding/base64"
@@ -167,6 +168,7 @@ type redoFile struct {
 	DictStart   string
 	DictEnd     string
 	Bytes       int
+	Thread      int
 }
 
 var MaxReplicationLogFilesSize = 2 * 1024 * 1024 * 1024
@@ -174,7 +176,8 @@ var MaxReplicationLogFilesSize = 2 * 1024 * 1024 * 1024
 func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SCN) (SCN, error) {
 	logrus.WithFields(logrus.Fields{
 		"startSCN": startSCN,
-	}).Debug("adding log files")
+		"maxSCN":   maxSCN,
+	}).Info("logminer: selecting redo log files")
 
 	// See DBMS_LOGMNR_D.BUILD reference:
 	// https://docs.oracle.com/en/database/oracle/oracle-database/19/arpls/DBMS_LOGMNR_D.html#GUID-20E210F3-A566-46F1-B817-486723069AF4
@@ -213,80 +216,149 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SC
 		"minArchiveSCN": minArchiveSCN,
 	}).Debug("starting SCN for log files based on dictionary starting point")
 
-	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE#, L.FIRST_CHANGE#, CASE WHEN L.STATUS = 'CURRENT' THEN 0 ELSE L.NEXT_CHANGE# END as NEXT_CHANGE#, 'NO' as DICT_START, 'NO' as DICT_END, MAX(L.BYTES) FROM V$LOGFILE LF, V$LOG L
+	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE#, L.FIRST_CHANGE#, CASE WHEN L.STATUS = 'CURRENT' THEN 0 ELSE L.NEXT_CHANGE# END as NEXT_CHANGE#, 'NO' as DICT_START, 'NO' as DICT_END, MAX(L.BYTES), L.THREAD# FROM V$LOGFILE LF, V$LOG L
 		LEFT JOIN V$ARCHIVED_LOG A ON A.FIRST_CHANGE# = L.FIRST_CHANGE# AND A.NEXT_CHANGE# = L.NEXT_CHANGE#
     WHERE (A.STATUS <> 'A' OR A.FIRST_CHANGE# IS NULL) AND L.GROUP# = LF.GROUP# AND L.STATUS <> 'UNUSED'
 		GROUP BY LF.GROUP#, L.FIRST_CHANGE#, L.NEXT_CHANGE#, L.STATUS, L.ARCHIVED, L.SEQUENCE#, L.THREAD#`
 
-	var archivedLogFiles = `SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE#, A.FIRST_CHANGE#, A.NEXT_CHANGE#, A.DICTIONARY_BEGIN as DICT_START, A.DICTIONARY_END as DICT_END, A.BLOCKS*A.BLOCK_SIZE as BYTES FROM V$ARCHIVED_LOG A
+	var archivedLogFiles = `SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE#, A.FIRST_CHANGE#, A.NEXT_CHANGE#, A.DICTIONARY_BEGIN as DICT_START, A.DICTIONARY_END as DICT_END, A.BLOCKS*A.BLOCK_SIZE as BYTES, A.THREAD# FROM V$ARCHIVED_LOG A
     WHERE A.NAME IS NOT NULL AND A.ARCHIVED = 'YES' AND A.STATUS = 'A' AND A.NEXT_CHANGE# >= :1 AND
     DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
 
-	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles + " ORDER BY SEQUENCE#"
+	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles
 	rows, err := s.conn.QueryContext(ctx, fullQuery, minArchiveSCN)
 	if err != nil {
 		return 0, fmt.Errorf("fetching log file list: %w", err)
 	}
 	defer rows.Close()
 
-	var totalSizeBytes int
-	var endSCN SCN
-	var redoSequence int
-	var redoFiles []redoFile
+	var candidates []redoFile
 	for rows.Next() {
 		var f redoFile
-
-		if err := rows.Scan(&f.Status, &f.Name, &f.Sequence, &f.FirstChange, &f.NextChange, &f.DictStart, &f.DictEnd, &f.Bytes); err != nil {
+		if err := rows.Scan(&f.Status, &f.Name, &f.Sequence, &f.FirstChange, &f.NextChange, &f.DictStart, &f.DictEnd, &f.Bytes, &f.Thread); err != nil {
 			return 0, fmt.Errorf("scanning log file record: %w", err)
 		}
+		candidates = append(candidates, f)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, err
+	}
 
-		logrus.WithField("file", fmt.Sprintf("%+v", f)).Debug("adding log file")
-
-		// The current log file has the same sequence as the last archived log file
-		// in this case we prefer reading from the current log file. It is also possible for
-		// log files to have an ACTIVE and an ARCHIVED version at the same time, we prefer ACTIVE
-		if f.Sequence == redoSequence {
-			var last = redoFiles[len(redoFiles)-1]
-			logrus.WithFields(logrus.Fields{
-				"this": fmt.Sprintf("%+v", f),
-				"last": fmt.Sprintf("%+v", last),
-			}).Debug("found two log files with the same sequence number, keeping CURRENT or ACTIVE")
-
-			if f.Status == "CURRENT" || f.Status == "ACTIVE" {
-				// Remove the last archived log file from the list
-				redoFiles = redoFiles[:len(redoFiles)-1]
-			} else if last.Status == "CURRENT" || last.Status == "ACTIVE" {
-				// Skip this file
-				continue
-			} else {
-				return 0, fmt.Errorf("found two log files with the same sequence number, but neither is CURRENT or ACTIVE: %+v, %+v", f, last)
-			}
+	candidates, err = resolveDuplicateSequences(candidates)
+	if err != nil {
+		return 0, err
+	}
+	// Sort by FIRST_CHANGE# so that any prefix of the slice gives each thread a
+	// contiguous chain (within a thread, FIRST_CHANGE# is monotonic and equivalent
+	// to SEQUENCE# order). The Thread and Sequence tiebreakers are just for
+	// deterministic ordering when two threads happen to have files starting at
+	// the same SCN.
+	slices.SortFunc(candidates, func(a, b redoFile) int {
+		if c := cmp.Compare(a.FirstChange, b.FirstChange); c != 0 {
+			return c
 		}
-
-		if f.Sequence > redoSequence {
-			redoSequence = f.Sequence
+		if c := cmp.Compare(a.Thread, b.Thread); c != 0 {
+			return c
 		}
+		return cmp.Compare(a.Sequence, b.Sequence)
+	})
 
+	// Every thread that appears in the candidate set has produced redo in the
+	// SCN range we care about and must contribute to coverage. The cluster-wide
+	// covered SCN is the min across threads of their per-thread tails, but only
+	// once every expected thread has at least one file included; before that, we
+	// have no meaningful global coverage.
+	var expectedThreads = make(map[int]struct{})
+	for _, f := range candidates {
+		expectedThreads[f.Thread] = struct{}{}
+	}
+
+	var totalSizeBytes int
+	var endSCN SCN
+	var redoFiles []redoFile
+	var threadTails = make(map[int]SCN)
+	for _, f := range candidates {
 		redoFiles = append(redoFiles, f)
-
 		totalSizeBytes += f.Bytes
 
-		if totalSizeBytes >= MaxReplicationLogFilesSize || f.NextChange >= maxSCN {
-			if s.dictionaryMode == DictionaryModeOnline {
-				endSCN = f.NextChange
-				break
-			}
+		// Track this thread's tail. A CURRENT file is open-ended (NextChange == 0
+		// sentinel); represent that as math.MaxInt64 so it doesn't drag min() down.
+		if f.NextChange == 0 {
+			threadTails[f.Thread] = math.MaxInt64
+		} else {
+			threadTails[f.Thread] = f.NextChange
+		}
 
-			// If we don't include a dictionary end file, we risk having an incomplete
-			// dictionary in extract mode
-			if f.DictEnd == "YES" {
-				endSCN = f.NextChange
+		// globalCoveredSCN is the highest SCN through which every expected thread
+		// has contiguous coverage. Undefined (0) until every thread has a tail.
+		var globalCoveredSCN SCN
+		if len(threadTails) == len(expectedThreads) {
+			globalCoveredSCN = math.MaxInt64
+			for _, tail := range threadTails {
+				if tail < globalCoveredSCN {
+					globalCoveredSCN = tail
+				}
+			}
+		}
+
+		logrus.WithFields(logrus.Fields{
+			"name":             f.Name,
+			"status":           f.Status,
+			"sequence":         f.Sequence,
+			"thread":           f.Thread,
+			"firstChange":      f.FirstChange,
+			"nextChange":       f.NextChange,
+			"bytes":            f.Bytes,
+			"dictStart":        f.DictStart,
+			"dictEnd":          f.DictEnd,
+			"totalSizeBytes":   totalSizeBytes,
+			"globalCoveredSCN": globalCoveredSCN,
+		}).Info("logminer: added redo log file")
+
+		var reachedSizeLimit = totalSizeBytes >= MaxReplicationLogFilesSize
+		var reachedMaxSCN = globalCoveredSCN >= maxSCN
+		// advancesCursor guards against stopping before global coverage has
+		// progressed past startSCN (e.g. early in iteration before all threads
+		// have contributed, or when included files only cover SCNs at or below
+		// startSCN). Setting endSCN to such a value would make the next poll
+		// iteration re-fetch the same files and spin forever.
+		var advancesCursor = globalCoveredSCN > startSCN
+		if reachedMaxSCN || (reachedSizeLimit && advancesCursor) {
+			// In extract mode we only stop on a file whose DICTIONARY_END is 'YES' to
+			// keep the included files self-contained dictionary-wise. Online mode has
+			// no such constraint.
+			if s.dictionaryMode == DictionaryModeOnline || f.DictEnd == "YES" {
+				endSCN = min(globalCoveredSCN, maxSCN)
+				var reason string
+				switch {
+				case reachedSizeLimit && reachedMaxSCN:
+					reason = "size cap reached and coverage reaches maxSCN"
+				case reachedSizeLimit:
+					reason = "size cap reached"
+				default:
+					reason = "coverage reaches maxSCN"
+				}
+				logrus.WithFields(logrus.Fields{
+					"reason":         reason,
+					"totalSizeBytes": totalSizeBytes,
+					"files":          len(redoFiles),
+					"endSCN":         endSCN,
+					"maxSCN":         maxSCN,
+				}).Info("logminer: stopping log file selection")
 				break
 			}
 		}
 	}
 
-	if err := rows.Err(); err != nil {
+	// If the loop exhausted all candidates without breaking, endSCN is still
+	// zero. Default to maxSCN so coverage validation has a concrete value to
+	// check; validation will fail loudly if the included files don't actually
+	// cover that far.
+	if endSCN == 0 {
+		endSCN = maxSCN
+	}
+
+	if err := validateLogFileCoverage(redoFiles, startSCN, endSCN); err != nil {
 		return 0, err
 	}
 
@@ -296,13 +368,95 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SC
 		}
 	}
 
-	// We set NextChange to 0 when encountering Oracle's maximum SCN value which is too large to fit in our int64 type
-	// so we rectify that by setting endSCN to maxSCN here
-	if endSCN == 0 {
-		endSCN = maxSCN
+	return endSCN, nil
+}
+
+// validateLogFileCoverage verifies that the selected redo log files provide
+// continuous SCN coverage of [startSCN, endSCN] for every thread that appears
+// in the file set. Oracle's redo logs partition SCN space per-thread such that
+// adjacent files within a thread satisfy prev.NEXT_CHANGE# == next.FIRST_CHANGE#.
+// In RAC, each instance writes its own thread of redo, and SCN ranges across
+// threads overlap arbitrarily; the adjacency invariant only holds within a
+// single thread. A gap in available files (most commonly because archive log
+// retention deleted a log we need) would otherwise cause LogMiner to silently
+// return only the events present in the files actually added, dropping events
+// from the missing log(s). Fail loudly so the cause is visible rather than
+// silently losing data.
+func validateLogFileCoverage(redoFiles []redoFile, startSCN, endSCN SCN) error {
+	if len(redoFiles) == 0 {
+		return fmt.Errorf("no redo log files available to cover SCN range [%d, %d]", startSCN, endSCN)
 	}
 
-	return endSCN, nil
+	// Partition by thread and validate each thread's chain independently. We
+	// rely on the caller having sorted by FIRST_CHANGE#, which means within
+	// each thread the files are in SEQUENCE# order.
+	var byThread = make(map[int][]redoFile)
+	for _, f := range redoFiles {
+		byThread[f.Thread] = append(byThread[f.Thread], f)
+	}
+
+	for thread, files := range byThread {
+		if files[0].FirstChange > startSCN {
+			return fmt.Errorf("redo log gap at start of SCN range for thread %d: first file %q begins at FIRST_CHANGE#=%d, after startSCN=%d", thread, files[0].Name, files[0].FirstChange, startSCN)
+		}
+		for i := 1; i < len(files); i++ {
+			var prev, curr = files[i-1], files[i]
+			// NextChange=0 is our sentinel for the CURRENT online log, which is open
+			// ended and so must be the final file in its thread.
+			if prev.NextChange == 0 {
+				return fmt.Errorf("redo log file %q (FIRST_CHANGE#=%d) follows CURRENT-status file %q in thread %d, which has no NEXT_CHANGE#", curr.Name, curr.FirstChange, prev.Name, thread)
+			}
+			if curr.FirstChange != prev.NextChange {
+				return fmt.Errorf("redo log SCN gap in thread %d between %q (NEXT_CHANGE#=%d) and %q (FIRST_CHANGE#=%d)", thread, prev.Name, prev.NextChange, curr.Name, curr.FirstChange)
+			}
+		}
+		var last = files[len(files)-1]
+		if last.NextChange != 0 && last.NextChange < endSCN {
+			return fmt.Errorf("redo log gap at end of SCN range for thread %d: last file %q ends at NEXT_CHANGE#=%d, before endSCN=%d", thread, last.Name, last.NextChange, endSCN)
+		}
+	}
+
+	return nil
+}
+
+// resolveDuplicateSequences collapses cases where the same (THREAD#, SEQUENCE#)
+// pair appears as both a live entry (CURRENT or ACTIVE) and an ARCHIVED entry,
+// which happens during the window where an ACTIVE log has been copied to archive
+// but not yet retired. The live entry is preferred. If two entries share a key
+// and neither is live (or both are), we treat that as a structural error. In
+// RAC, SEQUENCE# values are per-thread independent counters, so we must include
+// THREAD# in the key to avoid collapsing unrelated files from different threads.
+func resolveDuplicateSequences(files []redoFile) ([]redoFile, error) {
+	type threadSeq struct{ Thread, Sequence int }
+	var isLive = func(f redoFile) bool { return f.Status == "CURRENT" || f.Status == "ACTIVE" }
+	var byKey = make(map[threadSeq]redoFile)
+	for _, f := range files {
+		var key = threadSeq{f.Thread, f.Sequence}
+		var existing, ok = byKey[key]
+		if !ok {
+			byKey[key] = f
+			continue
+		}
+		var kept, dropped redoFile
+		switch {
+		case isLive(f) && !isLive(existing):
+			kept, dropped = f, existing
+		case isLive(existing) && !isLive(f):
+			kept, dropped = existing, f
+		default:
+			return nil, fmt.Errorf("found two log files for thread %d sequence %d, cannot disambiguate: %+v, %+v", f.Thread, f.Sequence, existing, f)
+		}
+		logrus.WithFields(logrus.Fields{
+			"kept":    fmt.Sprintf("%+v", kept),
+			"dropped": fmt.Sprintf("%+v", dropped),
+		}).Debug("found two log files with the same thread and sequence number, keeping CURRENT or ACTIVE")
+		byKey[key] = kept
+	}
+	var out = make([]redoFile, 0, len(byKey))
+	for _, f := range byKey {
+		out = append(out, f)
+	}
+	return out, nil
 }
 
 func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN SCN) error {
@@ -420,6 +574,17 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 	if err := s.db.WriteWatermark(ctx, fenceWatermark); err != nil {
 		return fmt.Errorf("error establishing watermark fence: %w", err)
 	}
+	// Query the post-write current SCN to give a rough lower bound on when in the
+	// replication stream the fence should appear. This is best-effort: a failure
+	// here doesn't fail the call.
+	var postWriteSCN SCN
+	if err := s.db.conn.QueryRowContext(ctx, "SELECT current_scn FROM V$DATABASE").Scan(&postWriteSCN); err != nil {
+		logrus.WithField("err", err).Warn("error fetching current SCN after watermark write")
+	}
+	logrus.WithFields(logrus.Fields{
+		"fenceWatermark": fenceWatermark,
+		"postWriteSCN":   postWriteSCN,
+	}).Info("wrote watermark fence")
 
 	// Stream replication events until the fence is reached.
 	var fenceReached = false
@@ -443,7 +608,15 @@ func (s *replicationStream) StreamToFence(ctx context.Context, fenceAfter time.D
 					if actual == nil {
 						actual = event.After["WATERMARK"]
 					}
-					logrus.WithFields(logrus.Fields{"expected": fenceWatermark, "actual": actual}).Debug("watermark change")
+					var changeSCN SCN
+					if src, ok := event.Source.(*oracleSource); ok {
+						changeSCN = src.SCN
+					}
+					logrus.WithFields(logrus.Fields{
+						"expected": fenceWatermark,
+						"actual":   actual,
+						"scn":      changeSCN,
+					}).Info("watermark change observed")
 					if actual == fenceWatermark {
 						fenceReached = true
 					}
@@ -476,6 +649,28 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 	}
 	if err := s.ActivateTable(ctx, watermarks, watermarksInfo.PrimaryKey, watermarksInfo, nil); err != nil {
 		return fmt.Errorf("error activating replication for watermarks table %q: %w", watermarks, err)
+	}
+
+	// Confirm that the watermarks table is present in tableObjectMapping. If it isn't,
+	// its DATA_OBJ#/DATA_OBJD# won't appear in the logminer predicate and fence
+	// watermark writes will never be observed.
+	var watermarksFound = false
+	for _, mapping := range s.db.tableObjectMapping {
+		if mapping.streamID == watermarks {
+			logrus.WithFields(logrus.Fields{
+				"watermarksTable": watermarks,
+				"objectID":        mapping.objectID,
+				"dataObjectID":    mapping.dataObjectID,
+			}).Info("watermarks table covered by logminer predicate")
+			watermarksFound = true
+			break
+		}
+	}
+	if !watermarksFound {
+		logrus.WithFields(logrus.Fields{
+			"watermarksTable":   watermarks,
+			"objectMappingSize": len(s.db.tableObjectMapping),
+		}).Warn("watermarks table not in tableObjectMapping; logminer query predicate will not return watermark changes")
 	}
 
 	var streamCtx, streamCancel = context.WithCancel(ctx)
@@ -558,6 +753,16 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 		} else if endSCN, err = s.addLogFiles(ctx, startSCN, iterationMaxSCN); err != nil {
 			return err
 		}
+
+		logrus.WithFields(logrus.Fields{
+			"startSCN":            startSCN,
+			"endSCN":              endSCN,
+			"currentSCN":          currentSCN,
+			"iterationMaxSCN":     iterationMaxSCN,
+			"dictionaryMode":      s.dictionaryMode,
+			"pendingTransactions": len(s.pendingTransactions),
+			"specificXIDs":        len(transactions),
+		}).Info("logminer: starting iteration")
 
 		if err := s.startLogminer(ctx, startSCN, endSCN); err != nil {
 			return err
@@ -694,8 +899,10 @@ func (s *replicationStream) capturePendingTransaction(ctx context.Context, tx tr
 
 	var transactions = []string{tx.XID}
 	logrus.WithFields(logrus.Fields{
-		"tx": tx.XID,
-	}).Debug("capturing pending transaction")
+		"xid":      tx.XID,
+		"startSCN": startSCN,
+		"endSCN":   endSCN,
+	}).Info("capturing pending transaction")
 	return s.poll(ctx, startSCN, endSCN, transactions)
 }
 
@@ -839,9 +1046,12 @@ func (s *replicationStream) pendingAndRollbackedTransactions(ctx context.Context
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"pending":   len(pendingTXs),
-		"rollbacks": len(excludeXIDs),
-	}).Debug("transactions")
+		"pending":         len(pendingTXs),
+		"rollbacks":       len(excludeXIDs),
+		"trackedPriorTxs": len(s.pendingTransactions),
+		"startSCN":        startSCN,
+		"endSCN":          endSCN,
+	}).Info("logminer: pending and rolled-back transactions")
 
 	return pendingTXs, excludeXIDs, nil
 }
@@ -910,7 +1120,16 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		// further processing on it.
 		var streamID = sqlcapture.JoinStreamID(msg.Owner, msg.TableName)
 		if !s.tableActive(streamID) && !slices.Contains([]int{opStart, opCommit, opRollback}, msg.Op) {
-			logrus.WithField("streamID", streamID).Debug("logminer: received message for unknown table")
+			logrus.WithFields(logrus.Fields{
+				"streamID":     streamID,
+				"owner":        msg.Owner,
+				"tableName":    msg.TableName,
+				"objectID":     msg.ObjectID,
+				"dataObjectID": msg.DataObjectID,
+				"op":           msg.Op,
+				"scn":          msg.SCN,
+				"status":       msg.Status,
+			}).Info("logminer: received message for unknown table")
 			var isKnownTable = false
 			// if the table has been dropped, check their object identifier
 			if strings.HasPrefix(msg.TableName, "OBJ#") || (strings.HasPrefix(msg.TableName, "BIN$") && strings.HasSuffix(msg.TableName, "==$0") && len(msg.TableName) == 30) {
@@ -985,7 +1204,8 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 		"startSCN":      startSCN,
 		"endSCN":        endSCN,
 		"finalSCN":      finalSCN,
-	}).Debug("received messages")
+		"excludedXIDs":  len(excludeXIDs),
+	}).Info("logminer: received messages")
 
 	return nil
 }

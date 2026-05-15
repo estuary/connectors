@@ -49,6 +49,13 @@ var featureFlagDefaults = map[string]bool{
 	//   - Recommended Collection Names
 	//   - Internal StreamIDs
 	"case_sensitive_table_names": false,
+
+	// When true, all prerequisite checks (both global and per-table) are skipped. This is intended
+	// as an escape hatch for situations where the checks themselves are buggy or do not apply.
+	"skip_prerequisites": false,
+
+	// When true, per-table prerequisite checks are skipped. Implied by `skip_prerequisites`.
+	"skip_table_prerequisites": false,
 }
 
 type sshForwarding struct {
@@ -145,7 +152,9 @@ type Config struct {
 	Password    string         `json:"password" jsonschema:"title=Login Password,description=Password for the specified database user." jsonschema_extras:"secret=true,order=2"`
 	Timezone    string         `json:"timezone,omitempty" jsonschema:"title=Timezone,description=Timezone to use when capturing datetime columns. Should normally be left blank to use the database's 'time_zone' system variable. Only required if the 'time_zone' system variable cannot be read and columns with type datetime are being captured. Must be a valid IANA time zone name or +HH:MM offset. Takes precedence over the 'time_zone' system variable if both are set (go.estuary.dev/80J6rX)." jsonschema_extras:"order=3"`
 	HistoryMode bool           `json:"historyMode" jsonschema:"default=false,description=Capture change events without reducing them to a final state." jsonschema_extras:"order=4"`
-	Advanced    advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
+
+	DiscoveryFilters discoveryFilters `json:"discoveryFilters,omitempty" jsonschema:"title=Discovery Filters,description=Options that restrict which tables are visible to discovery."`
+	Advanced         advancedConfig   `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 
 	NetworkTunnel *tunnelConfig `json:"networkTunnel,omitempty" jsonschema:"title=Network Tunnel,description=Connect to your system through an SSH server that acts as a bastion host for your network."`
 }
@@ -198,6 +207,9 @@ func (c *Config) Validate() error {
 		if _, err := time.ParseDuration(c.Advanced.StatementTimeout); err != nil {
 			return fmt.Errorf("invalid statement timeout %q: %w", c.Advanced.StatementTimeout, err)
 		}
+	}
+	if err := c.DiscoveryFilters.Validate(); err != nil {
+		return err
 	}
 	return nil
 }

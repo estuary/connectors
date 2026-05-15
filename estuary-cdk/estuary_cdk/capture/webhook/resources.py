@@ -1,7 +1,7 @@
 from collections.abc import Sequence
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import ClassVar, Generic, TypeVar
-from typing_extensions import override
+from typing import Generic, TypeVar
 from uuid import uuid4
 from pydantic import BaseModel, Field
 from estuary_cdk.capture.common import (
@@ -9,14 +9,13 @@ from estuary_cdk.capture.common import (
     BaseResourceConfig,
     Resource,
     ResourceState,
+    WebhookResourceConfig,
     open_binding,
 )
 from estuary_cdk.capture.task import Task
 from estuary_cdk.capture.webhook.match import (
     CollectionDiscriminatorSpec,
-    CollectionMatchingSpec,
     UrlDiscriminator,
-    UrlMatch,
 )
 from estuary_cdk.flow import CaptureBinding
 
@@ -40,21 +39,21 @@ class WebhookDocument(BaseDocument):
 
 
 _WebhookDocument = TypeVar("_WebhookDocument", bound=WebhookDocument)
+_WebhookResourceConfig = TypeVar("_WebhookResourceConfig", bound=BaseResourceConfig)
 
 
-class WebhookResourceConfig(BaseResourceConfig):
-    PATH_POINTERS: ClassVar[list[str]] = ["/name"]
+@dataclass(kw_only=True)
+class WebhookResource(
+    Resource[_WebhookDocument, _WebhookResourceConfig, ResourceState]
+):
+    """A Resource for webhook bindings with standard defaults."""
 
-    name: str = Field(description="Name of this resource")
-    match_rule: CollectionMatchingSpec = Field(
-        default_factory=lambda: UrlMatch(value="*"),
-        description="Matching spec for routing incoming webhooks to this collection",
-        discriminator="type",
+    key: list[str] = field(default_factory=lambda: ["/_meta/webhookId"])
+    model: type[_WebhookDocument] | Resource.FixedSchema = field(
+        default=WebhookDocument  # pyright: ignore[reportAssignmentType]
     )
-
-    @override
-    def path(self) -> list[str]:
-        return [self.name]
+    initial_state: ResourceState = field(default_factory=ResourceState)
+    requires_explicit_acks: bool = True
 
 
 def open_webhook_binding(
@@ -65,7 +64,7 @@ def open_webhook_binding(
     all_bindings: Sequence[
         tuple[
             CaptureBinding[BaseResourceConfig],
-            Resource[_WebhookDocument, BaseResourceConfig, ResourceState],
+            Resource[BaseDocument, BaseResourceConfig, ResourceState],
         ]
     ],
 ):
@@ -82,10 +81,12 @@ def open_webhook_binding(
     if task.stopping.webhook_task is None:
         from estuary_cdk.capture.webhook.server import start_webhook_server
 
-        webhook_bindings = {
+        webhook_bindings: dict[
+            int, WebhookResource[WebhookDocument, WebhookResourceConfig]
+        ] = {
             idx: rsc
             for idx, (_, rsc) in enumerate(all_bindings)
-            if isinstance(rsc.initial_config, WebhookResourceConfig)
+            if isinstance(rsc, WebhookResource)
         }
         start_webhook_server(webhook_bindings, task)
 
@@ -113,15 +114,14 @@ class WebhookCaptureSpec(BaseModel, Generic[_WebhookDocument]):
 
     def create_resources(
         self,
-    ) -> list[Resource[_WebhookDocument, WebhookResourceConfig, ResourceState]]:
+    ) -> list[WebhookResource[_WebhookDocument, WebhookResourceConfig]]:
         if self.discriminator == CATCH_ALL_DISCRIMINATOR:
             return [
-                Resource(
+                WebhookResource(
                     name=self.name,
                     key=self.key,
                     model=self.document_model,
                     open=open_webhook_binding,  # pyright: ignore[reportArgumentType]
-                    initial_state=ResourceState(),
                     initial_config=WebhookResourceConfig(
                         name=self.name,
                         match_rule=CATCH_ALL_DISCRIMINATOR.for_value("*"),
@@ -131,12 +131,10 @@ class WebhookCaptureSpec(BaseModel, Generic[_WebhookDocument]):
             ]
 
         return [
-            Resource(
+            WebhookResource(
                 name=f"{self.name}_{rule.display_name}",
-                key=["/_meta/webhookId"],
                 model=self.document_model,
                 open=open_webhook_binding,  # pyright: ignore[reportArgumentType]
-                initial_state=ResourceState(),
                 initial_config=WebhookResourceConfig(
                     name=f"{self.name}_{rule.display_name}",
                     match_rule=rule,

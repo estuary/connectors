@@ -15,8 +15,8 @@ import (
 	"sync"
 	"time"
 
-	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/common"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	"github.com/estuary/connectors/go/encrow"
 	"github.com/estuary/connectors/go/mysql/jsonpath"
 	"github.com/estuary/connectors/sqlcapture"
