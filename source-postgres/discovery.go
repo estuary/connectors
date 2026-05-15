@@ -371,7 +371,7 @@ var postgresTypeToJSON = map[string]columnSchema{
 	// at the wire so downstream connectors (e.g. materialize-postgres) can
 	// recreate the original column type instead of collapsing both onto json.
 	"json":     {contentMediaType: "application/json"},
-	"jsonb":    {contentMediaType: "application/vnd.postgresql.jsonb+json"},
+	"jsonb":    {contentMediaType: "application/vnd.estuary.postgresql.jsonb+json"},
 	"jsonpath": {jsonTypes: []string{"string"}},
 
 	// Domain-Specific Types

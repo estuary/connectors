@@ -39,7 +39,7 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 	// as JSONB at the destination instead of collapsing onto JSON. Anything
 	// without the annotation defaults to JSON, preserving the historical
 	// behavior for existing materializations and non-Postgres sources.
-	jsonbContentMediaType := "application/vnd.postgresql.jsonb+json"
+	jsonbContentMediaType := "application/vnd.estuary.postgresql.jsonb+json"
 	jsonOrJsonb := func(jsonMapper, jsonbMapper sql.MapProjectionFn) sql.MapProjectionFn {
 		return func(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
 			if p.Inference.String_ != nil && p.Inference.String_.ContentType == jsonbContentMediaType {
