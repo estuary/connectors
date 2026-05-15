@@ -70,7 +70,7 @@ func TestTrickyEnumValues(t *testing.T) {
 }
 
 // TestDiscoveryFiltersApply exercises the post-query filtering logic for
-// various combinations of exclude-schemas and table-name patterns. The
+// various combinations of exclude-schemas and table patterns. The
 // include-schemas list is intentionally not covered here, since it is pushed
 // into the listTables query rather than handled by apply().
 func TestDiscoveryFiltersApply(t *testing.T) {
@@ -113,14 +113,22 @@ func TestDiscoveryFiltersApply(t *testing.T) {
 			},
 		},
 		{
-			// A bare literal pattern matches only the exact table name, proving
-			// that the pattern is implicitly anchored. The "users_evt" tables
-			// must not be included by the "users" pattern.
-			name:    "LiteralPatternIsAnchored",
+			// A literal basename pattern matches only the exact table name,
+			// proving that patterns are implicitly anchored. The "users_evt"
+			// tables must not be included by the "users" pattern.
+			name:    "BasenameLiteral",
 			filters: discoveryFilters{TablePatterns: []string{"users"}},
 			expected: []sqlcapture.TableID{
 				{Schema: "a", Table: "users"},
 				{Schema: "b", Table: "users"},
+			},
+		},
+		{
+			name:    "BasenameWildcard",
+			filters: discoveryFilters{TablePatterns: []string{"*_evt"}},
+			expected: []sqlcapture.TableID{
+				{Schema: "a", Table: "users_evt"},
+				{Schema: "b", Table: "users_evt"},
 			},
 		},
 		{
@@ -133,31 +141,36 @@ func TestDiscoveryFiltersApply(t *testing.T) {
 			},
 		},
 		{
-			// A single pattern with top-level alternation must still anchor
-			// against the full table name. Without the implicit `(?:...)`
-			// wrapper this would parse as "^users" OR "secret$", which would
-			// incorrectly match "users_evt".
-			name:    "AlternationInSinglePattern",
-			filters: discoveryFilters{TablePatterns: []string{"users|secret"}},
+			// A pattern containing a '.' is qualified and matches against
+			// schema and table independently.
+			name:    "QualifiedLiteral",
+			filters: discoveryFilters{TablePatterns: []string{"a.users"}},
 			expected: []sqlcapture.TableID{
 				{Schema: "a", Table: "users"},
-				{Schema: "b", Table: "users"},
-				{Schema: "internal", Table: "secret"},
 			},
 		},
 		{
-			name:    "WildcardSuffix",
-			filters: discoveryFilters{TablePatterns: []string{".*_evt"}},
+			name:    "QualifiedWildcardTable",
+			filters: discoveryFilters{TablePatterns: []string{"a.*"}},
 			expected: []sqlcapture.TableID{
+				{Schema: "a", Table: "users"},
 				{Schema: "a", Table: "users_evt"},
-				{Schema: "b", Table: "users_evt"},
+				{Schema: "a", Table: "events_log"},
+			},
+		},
+		{
+			name:    "QualifiedWildcardSchema",
+			filters: discoveryFilters{TablePatterns: []string{"*.users"}},
+			expected: []sqlcapture.TableID{
+				{Schema: "a", Table: "users"},
+				{Schema: "b", Table: "users"},
 			},
 		},
 		{
 			name: "ExcludeAndPattern",
 			filters: discoveryFilters{
 				ExcludeSchemas: []string{"b"},
-				TablePatterns:  []string{".*_evt", "events_.*"},
+				TablePatterns:  []string{"*_evt", "events_*"},
 			},
 			expected: []sqlcapture.TableID{
 				{Schema: "a", Table: "users_evt"},
@@ -178,8 +191,8 @@ func TestDiscoveryFiltersApply(t *testing.T) {
 	}
 }
 
-// TestDiscoveryFiltersValidate checks that the table-pattern regex compilation
-// catches malformed patterns at config-validation time.
+// TestDiscoveryFiltersValidate checks that malformed table patterns are
+// caught at config-validation time.
 func TestDiscoveryFiltersValidate(t *testing.T) {
 	var cases = []struct {
 		name    string
@@ -187,8 +200,9 @@ func TestDiscoveryFiltersValidate(t *testing.T) {
 		wantErr bool
 	}{
 		{"Empty", discoveryFilters{}, false},
-		{"GoodPatterns", discoveryFilters{TablePatterns: []string{"foo", "bar.*", "alpha|beta"}}, false},
-		{"BadPattern", discoveryFilters{TablePatterns: []string{"["}}, true},
+		{"GoodPatterns", discoveryFilters{TablePatterns: []string{"foo", "bar_*", "a.b"}}, false},
+		{"EmptyTableComponent", discoveryFilters{TablePatterns: []string{"foo."}}, true},
+		{"TrailingBackslash", discoveryFilters{TablePatterns: []string{`foo\`}}, true},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -215,12 +229,12 @@ func TestTablePatterns(t *testing.T) {
 	})
 	t.Run("EventsOnly", func(t *testing.T) {
 		var cs = tb.CaptureSpec(ctx, t)
-		cs.EndpointSpec.(*Config).DiscoveryFilters.TablePatterns = []string{`.*_evt`}
+		cs.EndpointSpec.(*Config).DiscoveryFilters.TablePatterns = []string{`*_evt`}
 		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
 	})
-	t.Run("AlphaAlternation", func(t *testing.T) {
+	t.Run("AlphaOnly", func(t *testing.T) {
 		var cs = tb.CaptureSpec(ctx, t)
-		cs.EndpointSpec.(*Config).DiscoveryFilters.TablePatterns = []string{`.*_alpha_evt|.*_alpha_log`}
+		cs.EndpointSpec.(*Config).DiscoveryFilters.TablePatterns = []string{`*_alpha_evt`, `*_alpha_log`}
 		cs.VerifyDiscover(ctx, t, regexp.MustCompile(uniqueID))
 	})
 	t.Run("NoMatch", func(t *testing.T) {

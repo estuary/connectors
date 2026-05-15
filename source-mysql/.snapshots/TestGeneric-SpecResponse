@@ -59,8 +59,8 @@
               "type": "string"
             },
             "type": "array",
-            "title": "Table Name Patterns",
-            "description": "If specified only tables whose name matches at least one of these regular expressions will be discovered. Patterns are anchored to the full table name."
+            "title": "Table Patterns",
+            "description": "If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards."
           }
         },
         "additionalProperties": false,
