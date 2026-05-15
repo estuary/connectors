@@ -46,19 +46,41 @@ impl SignatureEncoding {
     }
 }
 
-type SignatureParser = Box<dyn Fn(&str) -> Result<Vec<u8>> + Send + Sync>;
+type HeaderExtractor = Box<dyn Fn(&str) -> Result<String> + Send + Sync>;
 
-fn parser_encoded(encoding: SignatureEncoding) -> SignatureParser {
-    Box::new(move |raw| encoding.decode(raw))
+fn extract_identity() -> HeaderExtractor {
+    Box::new(|raw| Ok(raw.to_string()))
 }
 
-fn parser_prefixed(prefix: &'static str, encoding: SignatureEncoding) -> SignatureParser {
+fn extract_prefixed(prefix: &'static str) -> HeaderExtractor {
     Box::new(move |raw| {
-        let stripped = raw.trim().strip_prefix(prefix).with_context(|| {
-            format!("Signature did not start with expected prefix '{}'", prefix)
-        })?;
-        encoding.decode(stripped)
+        raw.trim()
+            .strip_prefix(prefix)
+            .map(str::to_string)
+            .with_context(|| {
+                format!(
+                    "Header value did not start with expected prefix '{}'",
+                    prefix
+                )
+            })
     })
+}
+
+fn extract_regex(pattern: &'static str) -> HeaderExtractor {
+    let re = Regex::new(pattern).expect("invalid regex pattern");
+    Box::new(move |raw| {
+        let cap = re
+            .captures(raw)
+            .context("Regex did not match header value")?;
+        let val = cap.get(1).context("Regex must contain a capture group")?;
+        Ok(val.as_str().to_string())
+    })
+}
+
+#[derive(Debug, Clone, Copy)]
+enum TimestampUnit {
+    Seconds,
+    Milliseconds,
 }
 
 #[derive(Debug, Clone)]
@@ -146,6 +168,14 @@ pub enum WebhookSignatureConfig {
         max_signature_age: u64,
     },
 
+    #[serde(rename = "knock")]
+    Knock {
+        #[serde(rename = "publicKey")]
+        public_key: String,
+        #[serde(default = "default_max_signature_age", rename = "maxSignatureAge")]
+        max_signature_age: u64,
+    },
+
     #[serde(rename = "twilio")]
     Twilio {
         #[serde(rename = "publicKey")]
@@ -191,25 +221,52 @@ impl WebhookSignatureVerifier for NoopVerifier {
 }
 
 /// Utility to protect against replay attacks.
-#[derive(Debug)]
 struct TimestampVerifier {
     header: String,
+    extract: HeaderExtractor,
+    unit: TimestampUnit,
     max_age: TimeDelta,
+}
+
+impl std::fmt::Debug for TimestampVerifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TimestampVerifier")
+            .field("header", &self.header)
+            .field("unit", &self.unit)
+            .field("max_age", &self.max_age)
+            .finish_non_exhaustive()
+    }
 }
 
 impl TimestampVerifier {
     fn new(header: String, max_age_seconds: u64) -> Result<Self> {
+        Self::with_options(
+            header,
+            max_age_seconds,
+            extract_identity(),
+            TimestampUnit::Seconds,
+        )
+    }
+
+    fn with_options(
+        header: String,
+        max_age_seconds: u64,
+        extract: HeaderExtractor,
+        unit: TimestampUnit,
+    ) -> Result<Self> {
         if header.trim().is_empty() {
             anyhow::bail!("Timestamp header name was provided but was empty");
         }
         Ok(Self {
             header,
+            extract,
+            unit,
             max_age: TimeDelta::seconds(max_age_seconds as i64),
         })
     }
 
-    fn as_bytes<'a>(&self, header_map: &'a HeaderMap) -> Result<&'a [u8]> {
-        let val = header_map
+    fn value(&self, header_map: &HeaderMap) -> Result<String> {
+        let raw = header_map
             .get(&self.header)
             .with_context(|| {
                 format!(
@@ -217,22 +274,24 @@ impl TimestampVerifier {
                     &self.header
                 )
             })?
-            .as_bytes();
-
-        Ok(val)
+            .to_str()
+            .context("Timestamp header is not valid UTF-8")?;
+        (self.extract)(raw)
     }
 
     fn verify(&self, header_map: &HeaderMap) -> Result<()> {
-        let ts_bytes = self.as_bytes(header_map)?;
-        let ts_str = str::from_utf8(ts_bytes).context("Timestamp header is not valid UTF-8")?;
+        let ts_str = self.value(header_map)?;
         let ts_unix: i64 = ts_str.parse().with_context(|| {
             format!(
                 "Failed to parse timestamp header as integer: \"{}\"",
                 ts_str
             )
         })?;
-        let ts = DateTime::from_timestamp(ts_unix, 0)
-            .with_context(|| format!("Invalid Unix timestamp: \"{}\"", ts_unix))?;
+        let ts = match self.unit {
+            TimestampUnit::Seconds => DateTime::from_timestamp(ts_unix, 0),
+            TimestampUnit::Milliseconds => DateTime::from_timestamp_millis(ts_unix),
+        }
+        .with_context(|| format!("Invalid Unix timestamp: \"{}\"", ts_unix))?;
         let age = Utc::now().signed_duration_since(ts);
 
         if age > self.max_age {
@@ -337,16 +396,15 @@ impl WebhookSignatureVerifier for EcdsaVerifier {
             })?
         };
 
-        let payload = {
-            let timestamp = self
-                .timestamp_verifier
-                .as_ref()
-                .map(|tv| tv.as_bytes(headers))
-                .transpose()?;
-
-            self.template.render(&body, timestamp)
-        }
-        .with_context(|| "Failed to build the hash value")?;
+        let ts_str = self
+            .timestamp_verifier
+            .as_ref()
+            .map(|tv| tv.value(headers))
+            .transpose()?;
+        let payload = self
+            .template
+            .render(&body, ts_str.as_deref().map(str::as_bytes))
+            .with_context(|| "Failed to build the hash value")?;
 
         self.verifying_key.verify(&payload, &signature).context(
             "Signature verification failed. Check that the public key matches your webhook provider's key",
@@ -366,7 +424,8 @@ impl WebhookSignatureVerifier for EcdsaVerifier {
 struct HmacSha256Verifier {
     mac: Hmac<Sha256>,
     signature_header: String,
-    parse_signature: SignatureParser,
+    signature_extractor: HeaderExtractor,
+    signature_encoding: SignatureEncoding,
     timestamp_verifier: Option<TimestampVerifier>,
     template: SigningStringTemplate,
 }
@@ -385,7 +444,8 @@ impl HmacSha256Verifier {
     pub fn new(
         key: &str,
         signature_header: String,
-        parse_signature: SignatureParser,
+        signature_extractor: HeaderExtractor,
+        signature_encoding: SignatureEncoding,
         timestamp_verifier: Option<TimestampVerifier>,
         template: &str,
     ) -> anyhow::Result<Self> {
@@ -417,7 +477,8 @@ impl HmacSha256Verifier {
         Ok(Self {
             mac,
             signature_header,
-            parse_signature,
+            signature_extractor,
+            signature_encoding,
             timestamp_verifier,
             template,
         })
@@ -442,17 +503,18 @@ impl WebhookSignatureVerifier for HmacSha256Verifier {
                 )
             })?;
 
-        let sig_bytes = (self.parse_signature)(raw)?;
+        let extracted = (self.signature_extractor)(raw)?;
+        let sig_bytes = self.signature_encoding.decode(&extracted)?;
 
-        let signed = {
-            let timestamp = self
-                .timestamp_verifier
-                .as_ref()
-                .map(|tv| tv.as_bytes(headers))
-                .transpose()?;
-            self.template.render(&body, timestamp)
-        }
-        .with_context(|| "Failed to build the hash value")?;
+        let ts_str = self
+            .timestamp_verifier
+            .as_ref()
+            .map(|tv| tv.value(headers))
+            .transpose()?;
+        let signed = self
+            .template
+            .render(&body, ts_str.as_deref().map(str::as_bytes))
+            .with_context(|| "Failed to build the hash value")?;
 
         let mut mac = self.mac.clone();
         mac.update(&signed);
@@ -490,9 +552,31 @@ impl TryFrom<WebhookSignatureConfig> for Box<dyn WebhookSignatureVerifier> {
                 Ok(Box::new(HmacSha256Verifier::new(
                     &public_key,
                     "x-zm-signature".to_string(),
-                    parser_prefixed("v0=", SignatureEncoding::Hex),
+                    extract_prefixed("v0="),
+                    SignatureEncoding::Hex,
                     Some(timestamp_verifier),
                     "v0:{TIMESTAMP}:{PAYLOAD}",
+                )?))
+            }
+
+            WebhookSignatureConfig::Knock {
+                public_key,
+                max_signature_age,
+            } => {
+                let timestamp_verifier = TimestampVerifier::with_options(
+                    "x-knock-signature".to_string(),
+                    max_signature_age,
+                    extract_regex(r"(?:^|,)t=([^,]+)"),
+                    TimestampUnit::Milliseconds,
+                )?;
+
+                Ok(Box::new(HmacSha256Verifier::new(
+                    &public_key,
+                    "x-knock-signature".to_string(),
+                    extract_regex(r"(?:^|,)s=([^,]+)"),
+                    SignatureEncoding::Base64,
+                    Some(timestamp_verifier),
+                    "{TIMESTAMP}.{PAYLOAD}",
                 )?))
             }
 
@@ -540,7 +624,8 @@ impl TryFrom<WebhookSignatureConfig> for Box<dyn WebhookSignatureVerifier> {
                     Ok(Box::new(HmacSha256Verifier::new(
                         &public_key,
                         signature_header,
-                        parser_encoded(signature_encoding),
+                        extract_identity(),
+                        signature_encoding,
                         tv,
                         &template,
                     )?))
@@ -1131,7 +1216,8 @@ mod test {
 
     fn make_hmac_verifier(
         with_timestamp: bool,
-        parser: SignatureParser,
+        extractor: HeaderExtractor,
+        encoding: SignatureEncoding,
     ) -> Box<dyn WebhookSignatureVerifier> {
         let (tv, template) = if with_timestamp {
             (
@@ -1148,7 +1234,8 @@ mod test {
             HmacSha256Verifier::new(
                 str::from_utf8(HMAC_SECRET).unwrap(),
                 "X-Signature".to_string(),
-                parser,
+                extractor,
+                encoding,
                 tv,
                 template,
             )
@@ -1173,7 +1260,7 @@ mod test {
             val
         };
 
-        let verifier = make_hmac_verifier(true, parser_encoded(SignatureEncoding::Hex));
+        let verifier = make_hmac_verifier(true, extract_identity(), SignatureEncoding::Hex);
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_ref(), body);
@@ -1190,7 +1277,7 @@ mod test {
             val
         };
 
-        let verifier = make_hmac_verifier(false, parser_encoded(SignatureEncoding::Hex));
+        let verifier = make_hmac_verifier(false, extract_identity(), SignatureEncoding::Hex);
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_ref(), body);
@@ -1207,7 +1294,7 @@ mod test {
             val
         };
 
-        let verifier = make_hmac_verifier(false, parser_encoded(SignatureEncoding::Base64));
+        let verifier = make_hmac_verifier(false, extract_identity(), SignatureEncoding::Base64);
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_ok());
     }
@@ -1223,7 +1310,7 @@ mod test {
             val
         };
 
-        let verifier = make_hmac_verifier(false, parser_prefixed("v0=", SignatureEncoding::Hex));
+        let verifier = make_hmac_verifier(false, extract_prefixed("v0="), SignatureEncoding::Hex);
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_ok());
     }
@@ -1239,12 +1326,12 @@ mod test {
             val
         };
 
-        let verifier = make_hmac_verifier(false, parser_prefixed("v0=", SignatureEncoding::Hex));
+        let verifier = make_hmac_verifier(false, extract_prefixed("v0="), SignatureEncoding::Hex);
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_err());
         assert_snapshot!(
             result.unwrap_err(),
-            @"Signature did not start with expected prefix 'v0='"
+            @"Header value did not start with expected prefix 'v0='"
         );
     }
 
@@ -1260,7 +1347,7 @@ mod test {
             val
         };
 
-        let verifier = make_hmac_verifier(false, parser_encoded(SignatureEncoding::Hex));
+        let verifier = make_hmac_verifier(false, extract_identity(), SignatureEncoding::Hex);
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_err());
         assert_snapshot!(
@@ -1274,7 +1361,7 @@ mod test {
         let body = b"test body content";
         let headers = axum::http::HeaderMap::new();
 
-        let verifier = make_hmac_verifier(false, parser_encoded(SignatureEncoding::Hex));
+        let verifier = make_hmac_verifier(false, extract_identity(), SignatureEncoding::Hex);
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_err());
         assert_snapshot!(
@@ -1294,7 +1381,7 @@ mod test {
             val
         };
 
-        let verifier = make_hmac_verifier(true, parser_encoded(SignatureEncoding::Hex));
+        let verifier = make_hmac_verifier(true, extract_identity(), SignatureEncoding::Hex);
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_err());
         assert_snapshot!(
@@ -1313,7 +1400,7 @@ mod test {
             val
         };
 
-        let verifier = make_hmac_verifier(false, parser_encoded(SignatureEncoding::Hex));
+        let verifier = make_hmac_verifier(false, extract_identity(), SignatureEncoding::Hex);
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_err());
         assert_snapshot!(
@@ -1332,7 +1419,7 @@ mod test {
             val
         };
 
-        let verifier = make_hmac_verifier(false, parser_encoded(SignatureEncoding::Base64));
+        let verifier = make_hmac_verifier(false, extract_identity(), SignatureEncoding::Base64);
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_err());
         assert_snapshot!(
@@ -1362,7 +1449,7 @@ mod test {
             val
         };
 
-        let verifier = make_hmac_verifier(true, parser_encoded(SignatureEncoding::Hex));
+        let verifier = make_hmac_verifier(true, extract_identity(), SignatureEncoding::Hex);
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_err());
         assert_snapshot!(
@@ -1392,7 +1479,7 @@ mod test {
             val
         };
 
-        let verifier = make_hmac_verifier(true, parser_encoded(SignatureEncoding::Hex));
+        let verifier = make_hmac_verifier(true, extract_identity(), SignatureEncoding::Hex);
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_err());
         assert_snapshot!(
@@ -1406,7 +1493,8 @@ mod test {
         let result = HmacSha256Verifier::new(
             str::from_utf8(HMAC_SECRET).unwrap(),
             "X-Signature".to_string(),
-            parser_encoded(SignatureEncoding::Hex),
+            extract_identity(),
+            SignatureEncoding::Hex,
             None,
             "{TIMESTAMP}{PAYLOAD}",
         );
@@ -1423,7 +1511,8 @@ mod test {
         let result = HmacSha256Verifier::new(
             str::from_utf8(HMAC_SECRET).unwrap(),
             "X-Signature".to_string(),
-            parser_encoded(SignatureEncoding::Hex),
+            extract_identity(),
+            SignatureEncoding::Hex,
             Some(tv),
             "{TIMESTAMP}-no-payload",
         );
@@ -1456,6 +1545,73 @@ mod test {
         };
         let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_ok());
+    }
+
+    fn knock_signed_payload(ts: &str, body: &[u8]) -> String {
+        format!("{}.{}", ts, str::from_utf8(body).unwrap())
+    }
+
+    #[test]
+    fn test_knock_config_conversion_and_verifies() {
+        let ts = Utc::now().timestamp_millis().to_string();
+        let body = br#"{"event":"x"}"#;
+        let sig = BASE64_STANDARD.encode(hmac_sign(knock_signed_payload(&ts, body).as_bytes()));
+        let composite = format!("t={},s={}", ts, sig);
+
+        let config = WebhookSignatureConfig::Knock {
+            public_key: str::from_utf8(HMAC_SECRET).unwrap().to_string(),
+            max_signature_age: default_max_signature_age(),
+        };
+        let verifier: Box<dyn WebhookSignatureVerifier> = config.try_into().unwrap();
+
+        let headers = {
+            let mut val = axum::http::HeaderMap::new();
+            val.insert("x-knock-signature", composite.parse().unwrap());
+            val
+        };
+        let result = verifier.verify_request(&headers, Bytes::copy_from_slice(body));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_knock_signature_expired_timestamp() {
+        let ts = Utc
+            .with_ymd_and_hms(2000, 1, 1, 0, 0, 0)
+            .unwrap()
+            .timestamp_millis()
+            .to_string();
+        let body = br#"{"event":"x"}"#;
+        let sig = BASE64_STANDARD.encode(hmac_sign(knock_signed_payload(&ts, body).as_bytes()));
+        let composite = format!("t={},s={}", ts, sig);
+
+        let config = WebhookSignatureConfig::Knock {
+            public_key: str::from_utf8(HMAC_SECRET).unwrap().to_string(),
+            max_signature_age: default_max_signature_age(),
+        };
+        let verifier: Box<dyn WebhookSignatureVerifier> = config.try_into().unwrap();
+
+        let headers = {
+            let mut val = axum::http::HeaderMap::new();
+            val.insert("x-knock-signature", composite.parse().unwrap());
+            val
+        };
+        let result = verifier.verify_request(&headers, Bytes::copy_from_slice(body));
+        assert!(result.is_err());
+        assert_snapshot!(
+            result.unwrap_err(),
+            @"Signature expired. Signed at: 2000-01-01 00:00:00 UTC"
+        );
+    }
+
+    #[test]
+    fn test_extract_regex_no_match() {
+        let extractor = extract_regex(r"(?:^|,)t=([^,]+)");
+        let result = (extractor)("s=abc,other=stuff");
+        assert!(result.is_err());
+        assert_snapshot!(
+            result.unwrap_err(),
+            @"Regex did not match header value"
+        );
     }
 
     #[test]
