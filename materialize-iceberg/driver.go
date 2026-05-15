@@ -363,12 +363,9 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 		location = &base
 	}
 
-	var properties map[string]string
-	if len(res.Config.AdditionalTableProperties) > 0 {
-		properties = make(map[string]string)
-		for k, v := range res.Config.AdditionalTableProperties {
-			properties[k] = v
-		}
+	properties := defaultTableProperties()
+	for k, v := range res.Config.AdditionalTableProperties {
+		properties[k] = v
 	}
 
 	return fmt.Sprintf("created table %q.%q as %s", ns, name, schema.String()), func(ctx context.Context) error {
@@ -398,6 +395,37 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 
 		return nil
 	}, nil
+}
+
+// defaultTableProperties returns the Iceberg table properties this connector
+// applies at table creation.
+//
+// Strict downstream readers - notably Snowflake reading an Iceberg table from
+// S3 - refuse to import a `required` column whose manifest null_value_counts
+// entry is absent: `errno=100478, non-nullable column without default
+// missing data`. They will not assume an absent count is 0.
+//
+// Iceberg's `MetricsConfig` only applies its default metrics mode (which
+// populates value_counts and null_value_counts in the manifest) to the first
+// `write.metadata.metrics.max-inferred-column-defaults` columns. The default
+// of 100 fires for wide tables, dropping all subsequent columns from the
+// manifest entirely. Flow projections of nested JSON paths (e.g.
+// `ad_group_ad.ad.responsive_search_ad.headlines`) make this worse: dots in
+// Iceberg field names are interpreted as nested struct paths in some code
+// paths, which makes per-column `write.metadata.metrics.column.<name>`
+// overrides ineffective and pulls the cap forward (a customer schema with
+// 141 dotted projections saw the cap land at ID 65, matching the Snowflake
+// error pointing at columnId 66).
+//
+// Setting the cap to a very large number forces the inferred default mode
+// to apply to every column. We keep Iceberg's default mode (`truncate(16)`),
+// so query-planner min/max pruning is preserved for short string columns
+// at modest manifest metadata cost. Customers can still override the cap or
+// individual columns via AdditionalTableProperties.
+func defaultTableProperties() map[string]string {
+	return map[string]string{
+		"write.metadata.metrics.max-inferred-column-defaults": "100000",
+	}
 }
 
 func (d *materialization) DeleteResource(ctx context.Context, resourcePath []string) (string, boilerplate.ActionApplyFn, error) {
