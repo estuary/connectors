@@ -15,6 +15,11 @@ import (
 func (db *mysqlDatabase) SetupPrerequisites(ctx context.Context) []error {
 	var errs []error
 
+	if db.featureFlags["skip_prerequisites"] {
+		logrus.Warn("skipping all prerequisite checks because the 'skip_prerequisites' feature flag is set")
+		return nil
+	}
+
 	// Our version checking may have been overly conservative, so let's err in the
 	// other direction for a while and disengage the check entirely.
 	if err := db.prerequisiteVersion(ctx); err != nil {
@@ -124,6 +129,10 @@ func (db *mysqlDatabase) prerequisiteUserPermissions(ctx context.Context) error 
 
 func (db *mysqlDatabase) SetupTablePrerequisites(ctx context.Context, tables []sqlcapture.TableID) map[sqlcapture.TableID]error {
 	var errs = make(map[sqlcapture.TableID]error)
+	if db.featureFlags["skip_prerequisites"] || db.featureFlags["skip_table_prerequisites"] {
+		logrus.Warn("skipping per-table prerequisite checks because the 'skip_prerequisites' or 'skip_table_prerequisites' feature flag is set")
+		return errs
+	}
 	for _, table := range tables {
 		if err := db.setupTablePrerequisite(ctx, table.Schema, table.Table); err != nil {
 			errs[table] = err
