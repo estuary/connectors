@@ -176,6 +176,34 @@ fn webhook_signature_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
                 "required": ["provider", "publicKey"]
             },
             {
+                "title": "Zoom",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "const": "zoom",
+                        "default": "zoom",
+                        "order": 0
+                    },
+                    "publicKey": {
+                        "type": "string",
+                        "title": "Secret Token",
+                        "description": "Zoom webhook secret token used as the HMAC-SHA256 key.",
+                        "secret": true,
+                        "order": 1
+                    },
+                    "maxSignatureAge": {
+                        "type": "integer",
+                        "title": "Max Signature Age",
+                        "description": "Maximum age of a signed request in seconds before it is rejected. Defaults to 300 (5 minutes).",
+                        "default": 300,
+                        "minimum": 1,
+                        "maximum": 259200,
+                        "order": 2
+                    }
+                },
+                "required": ["provider", "publicKey"]
+            },
+            {
                 "title": "Custom",
                 "properties": {
                     "provider": {

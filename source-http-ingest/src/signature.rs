@@ -52,6 +52,15 @@ fn parser_encoded(encoding: SignatureEncoding) -> SignatureParser {
     Box::new(move |raw| encoding.decode(raw))
 }
 
+fn parser_prefixed(prefix: &'static str, encoding: SignatureEncoding) -> SignatureParser {
+    Box::new(move |raw| {
+        let stripped = raw.trim().strip_prefix(prefix).with_context(|| {
+            format!("Signature did not start with expected prefix '{}'", prefix)
+        })?;
+        encoding.decode(stripped)
+    })
+}
+
 #[derive(Debug, Clone)]
 enum TemplateSegment {
     Literal(String),
@@ -119,20 +128,6 @@ impl TryFrom<&str> for SigningStringTemplate {
     }
 }
 
-/// Platform-specific settings. These are invariant across all users of the same source.
-#[derive(Debug, Clone)]
-pub struct SignatureProviderSettings {
-    pub signature_header: &'static str,
-    pub timestamp_header: Option<&'static str>,
-    pub template: &'static str,
-}
-
-const TWILIO_SETTINGS: SignatureProviderSettings = SignatureProviderSettings {
-    signature_header: "X-Twilio-Email-Event-Webhook-Signature",
-    timestamp_header: Some("X-Twilio-Email-Event-Webhook-Timestamp"),
-    template: "{TIMESTAMP}{PAYLOAD}",
-};
-
 fn default_max_signature_age() -> u64 {
     300
 }
@@ -142,6 +137,14 @@ fn default_max_signature_age() -> u64 {
 pub enum WebhookSignatureConfig {
     #[serde(rename = "none")]
     None {},
+
+    #[serde(rename = "zoom")]
+    Zoom {
+        #[serde(rename = "publicKey")]
+        public_key: String,
+        #[serde(default = "default_max_signature_age", rename = "maxSignatureAge")]
+        max_signature_age: u64,
+    },
 
     #[serde(rename = "twilio")]
     Twilio {
@@ -475,21 +478,38 @@ impl TryFrom<WebhookSignatureConfig> for Box<dyn WebhookSignatureVerifier> {
         match config {
             WebhookSignatureConfig::None {} => Ok(Box::new(NoopVerifier {})),
 
+            WebhookSignatureConfig::Zoom {
+                public_key,
+                max_signature_age,
+            } => {
+                let timestamp_verifier = TimestampVerifier::new(
+                    "x-zm-request-timestamp".to_string(),
+                    max_signature_age,
+                )?;
+
+                Ok(Box::new(HmacSha256Verifier::new(
+                    &public_key,
+                    "x-zm-signature".to_string(),
+                    parser_prefixed("v0=", SignatureEncoding::Hex),
+                    Some(timestamp_verifier),
+                    "v0:{TIMESTAMP}:{PAYLOAD}",
+                )?))
+            }
+
             WebhookSignatureConfig::Twilio {
                 public_key,
                 max_signature_age,
             } => {
                 let timestamp_verifier = TimestampVerifier::new(
-                    // .unwrap() call is operating on a constant
-                    TWILIO_SETTINGS.timestamp_header.unwrap().to_string(),
+                    "X-Twilio-Email-Event-Webhook-Timestamp".to_string(),
                     max_signature_age,
                 )?;
 
                 Ok(Box::new(EcdsaVerifier::new(
                     &public_key,
-                    TWILIO_SETTINGS.signature_header.to_string(),
+                    "X-Twilio-Email-Event-Webhook-Signature".to_string(),
                     Some(timestamp_verifier),
-                    TWILIO_SETTINGS.template,
+                    "{TIMESTAMP}{PAYLOAD}",
                 )?))
             }
 
@@ -1193,6 +1213,42 @@ mod test {
     }
 
     #[test]
+    fn test_hmac_signature_valid_with_prefix() {
+        let body = b"test body content";
+        let signature = format!("v0={}", hex::encode(hmac_sign(body)));
+
+        let headers = {
+            let mut val = axum::http::HeaderMap::new();
+            val.insert("X-Signature", signature.parse().unwrap());
+            val
+        };
+
+        let verifier = make_hmac_verifier(false, parser_prefixed("v0=", SignatureEncoding::Hex));
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_hmac_signature_prefix_missing() {
+        let body = b"test body content";
+        let signature = hex::encode(hmac_sign(body));
+
+        let headers = {
+            let mut val = axum::http::HeaderMap::new();
+            val.insert("X-Signature", signature.parse().unwrap());
+            val
+        };
+
+        let verifier = make_hmac_verifier(false, parser_prefixed("v0=", SignatureEncoding::Hex));
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
+        assert!(result.is_err());
+        assert_snapshot!(
+            result.unwrap_err(),
+            @"Signature did not start with expected prefix 'v0='"
+        );
+    }
+
+    #[test]
     fn test_hmac_signature_invalid() {
         let body = b"test body content";
         let wrong_body = b"different content";
@@ -1376,6 +1432,30 @@ mod test {
             result.unwrap_err(),
             @r#"Hash message format must include at least {PAYLOAD}. Supported placeholders: {PAYLOAD}, {TIMESTAMP}. Ex: "{TIMESTAMP}:{PAYLOAD}""#
         );
+    }
+
+    #[test]
+    fn test_zoom_config_conversion_and_verifies() {
+        let now = Utc::now().timestamp().to_string();
+        let body = b"zoom event body";
+
+        let signed = format!("v0:{}:{}", now, str::from_utf8(body).unwrap());
+        let signature = format!("v0={}", hex::encode(hmac_sign(signed.as_bytes())));
+
+        let config = WebhookSignatureConfig::Zoom {
+            public_key: str::from_utf8(HMAC_SECRET).unwrap().to_string(),
+            max_signature_age: default_max_signature_age(),
+        };
+        let verifier: Box<dyn WebhookSignatureVerifier> = config.try_into().unwrap();
+
+        let headers = {
+            let mut val = axum::http::HeaderMap::new();
+            val.insert("x-zm-signature", signature.parse().unwrap());
+            val.insert("x-zm-request-timestamp", now.parse().unwrap());
+            val
+        };
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
+        assert!(result.is_ok());
     }
 
     #[test]
