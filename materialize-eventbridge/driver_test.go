@@ -26,6 +26,8 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"os/exec"
 	"sort"
@@ -39,6 +41,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	sqstypes "github.com/aws/aws-sdk-go-v2/service/sqs/types"
 	"github.com/bradleyjkemp/cupaloy"
+	cerrors "github.com/estuary/connectors/go/connector-errors"
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	bptest "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	pm "github.com/estuary/flow/go/protocols/materialize"
@@ -327,4 +330,141 @@ func drainAllMessages(ctx context.Context, sq *sqs.Client, queueURL string) ([]r
 		}
 	}
 	return out, nil
+}
+
+func TestCheckPutEventsPermission(t *testing.T) {
+	t.Parallel()
+
+	const (
+		callerIdentityXML = `<GetCallerIdentityResponse xmlns="https://sts.amazonaws.com/doc/2011-06-15/">
+  <GetCallerIdentityResult>
+    <Arn>arn:aws:iam::123456789012:user/test-user</Arn>
+    <UserId>AIDATEST</UserId>
+    <Account>123456789012</Account>
+  </GetCallerIdentityResult>
+  <ResponseMetadata><RequestId>test-req-id</RequestId></ResponseMetadata>
+</GetCallerIdentityResponse>`
+
+		simulateAllowedXML = `<SimulatePrincipalPolicyResponse xmlns="https://iam.amazonaws.com/doc/2010-05-08/">
+  <SimulatePrincipalPolicyResult>
+    <IsTruncated>false</IsTruncated>
+    <EvaluationResults>
+      <member>
+        <EvalActionName>events:PutEvents</EvalActionName>
+        <EvalDecision>allowed</EvalDecision>
+        <EvalResourceName>arn:aws:events:us-east-1:123456789012:event-bus/test-bus</EvalResourceName>
+        <MatchedStatements/><MissingContextValues/>
+      </member>
+    </EvaluationResults>
+  </SimulatePrincipalPolicyResult>
+  <ResponseMetadata><RequestId>test-req-id</RequestId></ResponseMetadata>
+</SimulatePrincipalPolicyResponse>`
+
+		simulateDeniedXML = `<SimulatePrincipalPolicyResponse xmlns="https://iam.amazonaws.com/doc/2010-05-08/">
+  <SimulatePrincipalPolicyResult>
+    <IsTruncated>false</IsTruncated>
+    <EvaluationResults>
+      <member>
+        <EvalActionName>events:PutEvents</EvalActionName>
+        <EvalDecision>implicitDeny</EvalDecision>
+        <EvalResourceName>arn:aws:events:us-east-1:123456789012:event-bus/test-bus</EvalResourceName>
+        <MatchedStatements/><MissingContextValues/>
+      </member>
+    </EvaluationResults>
+  </SimulatePrincipalPolicyResult>
+  <ResponseMetadata><RequestId>test-req-id</RequestId></ResponseMetadata>
+</SimulatePrincipalPolicyResponse>`
+
+		accessDeniedXML = `<ErrorResponse>
+  <Error>
+    <Type>Sender</Type>
+    <Code>AccessDenied</Code>
+    <Message>User is not authorized</Message>
+  </Error>
+  <RequestId>test-req-id</RequestId>
+</ErrorResponse>`
+
+		testBusARN = "arn:aws:events:us-east-1:123456789012:event-bus/test-bus"
+	)
+
+	makeServer := func(failGetCallerIdentity, failSimulate bool, decision string) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if err := r.ParseForm(); err != nil {
+				http.Error(w, "bad form", http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("Content-Type", "text/xml")
+			switch r.FormValue("Action") {
+			case "GetCallerIdentity":
+				if failGetCallerIdentity {
+					w.WriteHeader(http.StatusForbidden)
+					fmt.Fprint(w, accessDeniedXML)
+					return
+				}
+				fmt.Fprint(w, callerIdentityXML)
+			case "SimulatePrincipalPolicy":
+				if failSimulate {
+					w.WriteHeader(http.StatusForbidden)
+					fmt.Fprint(w, accessDeniedXML)
+					return
+				}
+				if decision == "allowed" {
+					fmt.Fprint(w, simulateAllowedXML)
+				} else {
+					fmt.Fprint(w, simulateDeniedXML)
+				}
+			}
+		}))
+	}
+
+	makeCfg := func(endpoint string) config {
+		return config{
+			Region:       "us-east-1",
+			EventBusName: "test-bus",
+			Credentials: &CredentialsConfig{
+				AuthType: AWSAccessKey,
+				AccessKeyCredentials: AccessKeyCredentials{
+					AWSAccessKeyID:     "test",
+					AWSSecretAccessKey: "test",
+				},
+			},
+			Advanced: advancedConfig{Endpoint: endpoint},
+		}
+	}
+
+	t.Run("allowed", func(t *testing.T) {
+		t.Parallel()
+		srv := makeServer(false, false, "allowed")
+		defer srv.Close()
+		prereqs := &cerrors.PrereqErr{}
+		checkPutEventsPermission(context.Background(), makeCfg(srv.URL), testBusARN, prereqs)
+		require.Equal(t, 0, prereqs.Len())
+	})
+
+	t.Run("denied", func(t *testing.T) {
+		t.Parallel()
+		srv := makeServer(false, false, "implicitDeny")
+		defer srv.Close()
+		prereqs := &cerrors.PrereqErr{}
+		checkPutEventsPermission(context.Background(), makeCfg(srv.URL), testBusARN, prereqs)
+		require.Equal(t, 1, prereqs.Len())
+	})
+
+	t.Run("GetCallerIdentity_forbidden", func(t *testing.T) {
+		t.Parallel()
+		srv := makeServer(true, false, "")
+		defer srv.Close()
+		prereqs := &cerrors.PrereqErr{}
+		checkPutEventsPermission(context.Background(), makeCfg(srv.URL), testBusARN, prereqs)
+		require.Equal(t, 0, prereqs.Len())
+	})
+
+	t.Run("SimulatePrincipalPolicy_forbidden", func(t *testing.T) {
+		t.Parallel()
+		srv := makeServer(false, true, "")
+		defer srv.Close()
+		prereqs := &cerrors.PrereqErr{}
+		checkPutEventsPermission(context.Background(), makeCfg(srv.URL), testBusARN, prereqs)
+		require.Equal(t, 0, prereqs.Len())
+	})
 }
