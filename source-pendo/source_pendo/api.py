@@ -319,6 +319,11 @@ async def _fetch_events_between(
 
     body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, upper_bound=upper_bound_ts)
 
+    log.debug("Making API request", {
+        "url": url,
+        "body": body,
+    })
+
     _, response_body = await http.request_stream(log, url, method="POST", json=body)
     processor = IncrementalJsonProcessor(
         response_body(),
@@ -353,6 +358,11 @@ async def _fetch_events_between(
         # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
             body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, last_seen_id=last_seen_id)
+
+            log.debug("Making API request", {
+                "url": url,
+                "body": body,
+            })
 
             _, response_body = await http.request_stream(log, url, method="POST", json=body)
             processor = IncrementalJsonProcessor(
@@ -495,6 +505,11 @@ async def _fetch_aggregated_events_between(
 
     body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, upper_bound=upper_bound_ts)
 
+    log.debug("Making API request", {
+        "url": url,
+        "body": body,
+    })
+
     _, response_body = await http.request_stream(log, url, method="POST", json=body)
     processor = IncrementalJsonProcessor(
         response_body(),
@@ -529,6 +544,11 @@ async def _fetch_aggregated_events_between(
         # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
             body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, last_seen_id=last_seen_id)
+
+            log.debug("Making API request", {
+                "url": url,
+                "body": body,
+            })
 
             _, response_body = await http.request_stream(log, url, method="POST", json=body)
             processor = IncrementalJsonProcessor(
@@ -691,6 +711,11 @@ async def _fetch_resources_between(
 
     body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, upper_bound=upper_bound_ts)
 
+    log.debug("Making API request", {
+        "url": url,
+        "body": body,
+    })
+
     _, response_body = await http.request_stream(log, url, method="POST", json=body)
     processor = IncrementalJsonProcessor(
         response_body(),
@@ -725,6 +750,11 @@ async def _fetch_resources_between(
         # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
             body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, last_seen_id=last_seen_id)
+
+            log.debug("Making API request", {
+                "url": url,
+                "body": body,
+            })
 
             _, response_body = await http.request_stream(log, url, method="POST", json=body)
             processor = IncrementalJsonProcessor(
