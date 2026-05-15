@@ -20,6 +20,7 @@ import (
 	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/arrow-go/v18/parquet/metadata"
 	"github.com/apache/arrow-go/v18/parquet/schema"
+	"github.com/apache/arrow-go/v18/parquet/variant"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
 	iso8601 "github.com/senseyeio/duration"
@@ -86,6 +87,9 @@ func newRowSizing(sch ParquetSchema) rowSize {
 		case LogicalTypeString, LogicalTypeUuid, LogicalTypeDate, LogicalTypeTime, LogicalTypeTimestamp, LogicalTypeTimestampNanos, LogicalTypeInterval:
 			rs.fixed += 16 // string header
 			rs.calcLen = append(rs.calcLen, idx)
+		case LogicalTypeVariant:
+			rs.fixed += 48 // two slice headers, for the value and metadata byte slices
+			rs.calcLen = append(rs.calcLen, idx)
 		default:
 			panic(fmt.Sprintf("newRowSizing unknown type: %d", e.DataType))
 		}
@@ -105,6 +109,8 @@ func (rs rowSize) estSize(row []any) int {
 			out += len(v)
 		case json.RawMessage:
 			out += len(v)
+		case variant.Value:
+			out += len(v.Bytes()) + len(v.Metadata().Bytes())
 		case nil:
 			// No additional overhead is assumed for nil values.
 		default:
@@ -154,9 +160,14 @@ type ParquetWriter struct {
 		columnChunkCount int
 	}
 
-	// buffer contains rows of values that are pending to be written as a row group to the scratch
-	// file when bufferSizeBytes exceeds the threshold.
-	buffer          [][]any
+	// buffer holds column-oriented values pending to be written as a row group to the scratch file
+	// when bufferSizeBytes exceeds the threshold. Each entry is a strongly-typed slice (e.g.
+	// *[]int64, *[]parquet.ByteArray) matching the column's parquet physical type, and contains only
+	// non-null values for that column. defLevels[colIdx] runs parallel to the row order with 0 for
+	// null and 1 for present, so its length always equals bufferRowCount.
+	buffer          []any
+	defLevels       [][]int16
+	bufferRowCount  int
 	bufferSizeBytes int
 }
 
@@ -211,6 +222,14 @@ func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption
 
 	cwc := &countingWriteCloser{w: w}
 
+	buffer := make([]any, len(sch))
+	defLevels := make([][]int16, len(sch))
+	const initialCap = 1000
+	for i, e := range sch {
+		buffer[i] = makeColumnBuffer(e.DataType, initialCap)
+		defLevels[i] = make([]int16, 0, initialCap)
+	}
+
 	return &ParquetWriter{
 		cfg:        cfg,
 		schema:     sch,
@@ -218,6 +237,70 @@ func NewParquetWriter(w io.WriteCloser, sch ParquetSchema, opts ...ParquetOption
 		sinkWriter: file.NewParquetWriter(cwc, schemaRoot, writerOpts(cfg)...),
 		cwc:        cwc,
 		rs:         newRowSizing(sch),
+		buffer:     buffer,
+		defLevels:  defLevels,
+	}
+}
+
+type variantColumnBuffer struct {
+	values, metas []parquet.ByteArray
+}
+
+// makeColumnBuffer returns a pointer to an empty strongly-typed slice for the given column type.
+// Storing a pointer (one word) in the []any buffer avoids a heap allocation on every append,
+// since the interface data word holds the pointer directly rather than boxing a 3-word slice header.
+func makeColumnBuffer(dt ParquetDataType, initialCap int) any {
+	switch dt {
+	case PrimitiveTypeInteger, LogicalTypeTime, LogicalTypeTimestamp, LogicalTypeTimestampNanos:
+		s := make([]int64, 0, initialCap)
+		return &s
+	case PrimitiveTypeNumber:
+		s := make([]float64, 0, initialCap)
+		return &s
+	case PrimitiveTypeBoolean:
+		s := make([]bool, 0, initialCap)
+		return &s
+	case PrimitiveTypeBinary, LogicalTypeJson, LogicalTypeString:
+		s := make([]parquet.ByteArray, 0, initialCap)
+		return &s
+	case LogicalTypeUuid, LogicalTypeDecimal, LogicalTypeInterval:
+		s := make([]parquet.FixedLenByteArray, 0, initialCap)
+		return &s
+	case LogicalTypeDate:
+		s := make([]int32, 0, initialCap)
+		return &s
+	case LogicalTypeVariant:
+		s := variantColumnBuffer{
+			values: make([]parquet.ByteArray, 0, initialCap),
+			metas:  make([]parquet.ByteArray, 0, initialCap),
+		}
+		return &s
+	default:
+		panic(fmt.Sprintf("makeColumnBuffer unknown type: %d", dt))
+	}
+}
+
+// resetColumnBuffer truncates the slice pointed to by s to length 0 while preserving its
+// underlying capacity so subsequent buffer cycles can reuse the allocation.
+func resetColumnBuffer(s any) {
+	switch sp := s.(type) {
+	case *[]int64:
+		*sp = (*sp)[:0]
+	case *[]int32:
+		*sp = (*sp)[:0]
+	case *[]float64:
+		*sp = (*sp)[:0]
+	case *[]bool:
+		*sp = (*sp)[:0]
+	case *[]parquet.ByteArray:
+		*sp = (*sp)[:0]
+	case *[]parquet.FixedLenByteArray:
+		*sp = (*sp)[:0]
+	case *variantColumnBuffer:
+		sp.values = sp.values[:0]
+		sp.metas = sp.metas[:0]
+	default:
+		panic(fmt.Sprintf("resetColumnBuffer unknown type: %T", s))
 	}
 }
 
@@ -280,8 +363,97 @@ func (w *ParquetWriter) Write(row []any) error {
 		w.scratch.writer = file.NewParquetWriter(w.scratch.file, w.schemaRoot, file.WithWriterProps(parquet.NewWriterProperties(scratchOpts...)))
 	}
 
-	w.buffer = append(w.buffer, row)
+	for colIdx, f := range w.schema {
+		v := row[colIdx]
+		if v == nil {
+			w.defLevels[colIdx] = append(w.defLevels[colIdx], 0)
+			continue
+		}
+		w.defLevels[colIdx] = append(w.defLevels[colIdx], 1)
+
+		switch f.DataType {
+		case PrimitiveTypeInteger:
+			var q int64
+			if q, err = getIntVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case PrimitiveTypeNumber:
+			var q float64
+			if q, err = getNumberVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case PrimitiveTypeBoolean:
+			var q bool
+			if q, err = getBooleanVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case PrimitiveTypeBinary:
+			var q parquet.ByteArray
+			if q, err = getBinaryVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeJson:
+			var q parquet.ByteArray
+			if q, err = getJsonVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeString:
+			var q parquet.ByteArray
+			if q, err = getStringVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeUuid:
+			var q parquet.FixedLenByteArray
+			if q, err = getUuidVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeDate:
+			var q int32
+			if q, err = getDateVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeTime:
+			var q int64
+			if q, err = getTimeVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeTimestamp:
+			var q int64
+			if q, err = getTimestampVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeTimestampNanos:
+			var q int64
+			if q, err = getTimestampNanosVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeVariant:
+			var vv variant.Value
+			vv, err = getVariantVal(v)
+			if err == nil {
+				sp := w.buffer[colIdx].(*variantColumnBuffer)
+				sp.values = append(sp.values, vv.Bytes())
+				sp.metas = append(sp.metas, vv.Metadata().Bytes())
+			}
+		case LogicalTypeDecimal:
+			var q parquet.FixedLenByteArray
+			if q, err = getDecimalVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		case LogicalTypeInterval:
+			var q parquet.FixedLenByteArray
+			if q, err = getIntervalVal(v); err == nil {
+				appendVal(w, colIdx, q)
+			}
+		default:
+			panic(fmt.Sprintf("attempted to write unknown type of column '%s': %d", f.Name, f.DataType))
+		}
+		if err != nil {
+			return fmt.Errorf("converting value for column '%s': %w (type %T)", f.Name, err, v)
+		}
+	}
 	w.bufferSizeBytes += w.rs.estSize(row)
+	w.bufferRowCount += 1
 	w.scratch.rowCount += 1
 
 	if w.bufferSizeBytes >= maxBufferSize {
@@ -311,6 +483,13 @@ func (w *ParquetWriter) Write(row []any) error {
 	}
 
 	return nil
+}
+
+// appendVal appends v to the column's typed buffer slice. The caller is
+// responsible for handling nil values and maintaining defLevels.
+func appendVal[T parquetValue](w *ParquetWriter, colIdx int, v T) {
+	sp := w.buffer[colIdx].(*[]T)
+	*sp = append(*sp, v)
 }
 
 // Written returns the number of bytes written to the output writer. This value increases only as
@@ -378,70 +557,86 @@ func (w *ParquetWriter) flushScratchFile() error {
 
 // flushBuffer writes the current buffered rows as a single row group to the scratch file.
 func (w *ParquetWriter) flushBuffer() error {
-	if len(w.buffer) == 0 {
+	if w.bufferRowCount == 0 {
 		return nil
 	}
 
 	rgWriter := w.scratch.writer.AppendRowGroup()
 
-	// Transpose the buffered rows into the scratch file row group by writing them column-by-column.
 	for colIdx, f := range w.schema {
 		cw, err := rgWriter.NextColumn()
 		if err != nil {
 			return fmt.Errorf("getting next column: %w", err)
 		}
 
+		defLvls := w.defLevels[colIdx]
+
 		switch f.DataType {
 		case PrimitiveTypeInteger:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getIntVal); err != nil {
+			if err := writeColumn(cw.(*file.Int64ColumnChunkWriter), *w.buffer[colIdx].(*[]int64), defLvls); err != nil {
 				return fmt.Errorf("writing integer column '%s': %w", f.Name, err)
 			}
 		case PrimitiveTypeNumber:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Float64ColumnChunkWriter), getNumberVal); err != nil {
+			if err := writeColumn(cw.(*file.Float64ColumnChunkWriter), *w.buffer[colIdx].(*[]float64), defLvls); err != nil {
 				return fmt.Errorf("writing number column '%s': %w", f.Name, err)
 			}
 		case PrimitiveTypeBoolean:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.BooleanColumnChunkWriter), getBooleanVal); err != nil {
+			if err := writeColumn(cw.(*file.BooleanColumnChunkWriter), *w.buffer[colIdx].(*[]bool), defLvls); err != nil {
 				return fmt.Errorf("writing boolean column '%s': %w", f.Name, err)
 			}
 		case PrimitiveTypeBinary:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.ByteArrayColumnChunkWriter), getBinaryVal); err != nil {
+			if err := writeColumn(cw.(*file.ByteArrayColumnChunkWriter), *w.buffer[colIdx].(*[]parquet.ByteArray), defLvls); err != nil {
 				return fmt.Errorf("writing byte array column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeJson:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.ByteArrayColumnChunkWriter), getJsonVal); err != nil {
+			if err := writeColumn(cw.(*file.ByteArrayColumnChunkWriter), *w.buffer[colIdx].(*[]parquet.ByteArray), defLvls); err != nil {
 				return fmt.Errorf("writing byte array (json) column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeString:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.ByteArrayColumnChunkWriter), getStringVal); err != nil {
+			if err := writeColumn(cw.(*file.ByteArrayColumnChunkWriter), *w.buffer[colIdx].(*[]parquet.ByteArray), defLvls); err != nil {
 				return fmt.Errorf("writing byte array (string) column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeUuid:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getUuidVal); err != nil {
+			if err := writeColumn(cw.(*file.FixedLenByteArrayColumnChunkWriter), *w.buffer[colIdx].(*[]parquet.FixedLenByteArray), defLvls); err != nil {
 				return fmt.Errorf("writing uuid column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeDate:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int32ColumnChunkWriter), getDateVal); err != nil {
+			if err := writeColumn(cw.(*file.Int32ColumnChunkWriter), *w.buffer[colIdx].(*[]int32), defLvls); err != nil {
 				return fmt.Errorf("writing date column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeTime:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimeVal); err != nil {
+			if err := writeColumn(cw.(*file.Int64ColumnChunkWriter), *w.buffer[colIdx].(*[]int64), defLvls); err != nil {
 				return fmt.Errorf("writing time column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeTimestamp:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampVal); err != nil {
+			if err := writeColumn(cw.(*file.Int64ColumnChunkWriter), *w.buffer[colIdx].(*[]int64), defLvls); err != nil {
 				return fmt.Errorf("writing timestamp column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeTimestampNanos:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.Int64ColumnChunkWriter), getTimestampNanosVal); err != nil {
+			if err := writeColumn(cw.(*file.Int64ColumnChunkWriter), *w.buffer[colIdx].(*[]int64), defLvls); err != nil {
 				return fmt.Errorf("writing timestamp (nanos) column '%s': %w", f.Name, err)
 			}
+		case LogicalTypeVariant:
+			// Variant occupies two physical columns.
+			sp := w.buffer[colIdx].(*variantColumnBuffer)
+			if err := writeColumn(cw.(*file.ByteArrayColumnChunkWriter), sp.values, defLvls); err != nil {
+				return fmt.Errorf("writing variant value column '%s': %w", f.Name, err)
+			}
+			if err := cw.Close(); err != nil {
+				return fmt.Errorf("closing variant value column writer: %w", err)
+			}
+			if cw, err = rgWriter.NextColumn(); err != nil {
+				return fmt.Errorf("getting next column for variant metadata: %w", err)
+			}
+			if err := writeColumn(cw.(*file.ByteArrayColumnChunkWriter), sp.metas, defLvls); err != nil {
+				return fmt.Errorf("writing variant metadata column '%s': %w", f.Name, err)
+			}
 		case LogicalTypeDecimal:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getDecimalVal); err != nil {
-				return fmt.Errorf("writing interval column '%s': %w", f.Name, err)
+			if err := writeColumn(cw.(*file.FixedLenByteArrayColumnChunkWriter), *w.buffer[colIdx].(*[]parquet.FixedLenByteArray), defLvls); err != nil {
+				return fmt.Errorf("writing decimal column '%s': %w", f.Name, err)
 			}
 		case LogicalTypeInterval:
-			if err := writeColumn(colIdx, w.buffer, cw.(*file.FixedLenByteArrayColumnChunkWriter), getIntervalVal); err != nil {
+			if err := writeColumn(cw.(*file.FixedLenByteArrayColumnChunkWriter), *w.buffer[colIdx].(*[]parquet.FixedLenByteArray), defLvls); err != nil {
 				return fmt.Errorf("writing interval column '%s': %w", f.Name, err)
 			}
 		default:
@@ -458,8 +653,14 @@ func (w *ParquetWriter) flushBuffer() error {
 	}
 
 	w.scratch.sizeBytes += int(rgWriter.TotalBytesWritten())
-	w.scratch.columnChunkCount += len(w.schema)
-	w.buffer = w.buffer[:0]
+	for _, f := range w.schema {
+		w.scratch.columnChunkCount += f.physicalColumnCount()
+	}
+	for i := range w.buffer {
+		resetColumnBuffer(w.buffer[i])
+		w.defLevels[i] = w.defLevels[i][:0]
+	}
+	w.bufferRowCount = 0
 	w.bufferSizeBytes = 0
 
 	return nil
@@ -495,33 +696,7 @@ type columnBatchWriter[T parquetValue] interface {
 	WriteBatch(vals []T, defLvls []int16, repLvls []int16) (valueOffset int64, err error)
 }
 
-type getValFn[T parquetValue] func(v any) (got T, err error)
-
-func writeColumn[T parquetValue](
-	colIdx int,
-	buf [][]any,
-	w columnBatchWriter[T],
-	getVal getValFn[T],
-) error {
-	var vals []T
-	var defLevels []int16
-
-	for _, row := range buf {
-		v := row[colIdx]
-		switch tv := v.(type) {
-		case nil:
-			defLevels = append(defLevels, 0)
-		default:
-			got, err := getVal(tv)
-			if err != nil {
-				return fmt.Errorf("getting typed value for value: %w (type %T)", err, tv)
-			}
-
-			vals = append(vals, got)
-			defLevels = append(defLevels, 1)
-		}
-	}
-
+func writeColumn[T parquetValue](w columnBatchWriter[T], vals []T, defLevels []int16) error {
 	if valuesWritten, err := w.WriteBatch(vals, defLevels, nil); err != nil {
 		return fmt.Errorf("writing batch of values: %w", err)
 	} else if int(valuesWritten) != len(vals) {
@@ -861,4 +1036,27 @@ func getDecimalVal(val any) (got parquet.FixedLenByteArray, err error) {
 	}
 
 	return
+}
+
+func getVariantVal(val any) (variant.Value, error) {
+	switch typed := val.(type) {
+	case variant.Value:
+		return typed, nil
+	case int64:
+		return variant.Of(typed)
+	case float64:
+		return variant.Of(typed)
+	case string:
+		return variant.Of(typed)
+	case bool:
+		return variant.Of(typed)
+	case []byte:
+		return variant.Of(typed)
+	case json.RawMessage:
+		return variant.ParseJSONBytes([]byte(typed), false)
+	case decimal128.Num:
+		return variant.Of(variant.DecimalValue[decimal128.Num]{Value: typed})
+	default:
+		return variant.Value{}, fmt.Errorf("unhandled variant type: %T", typed)
+	}
 }
