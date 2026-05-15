@@ -187,14 +187,14 @@ fn webhook_signature_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
                     "algorithm": {
                         "type": "string",
                         "title": "Algorithm",
-                        "enum": ["ecdsa"],
-                        "default": "ecdsa",
+                        "enum": ["hmac_sha256", "ecdsa"],
+                        "default": "hmac_sha256",
                         "order": 1
                     },
                     "publicKey": {
                         "type": "string",
                         "title": "Public Key",
-                        "description": "PEM-encoded public key.",
+                        "description": "PEM-encoded public key for ECDSA, or shared secret for HMAC.",
                         "secret": true,
                         "multiline": true,
                         "order": 2
@@ -202,20 +202,28 @@ fn webhook_signature_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
                     "signatureHeader": {
                         "type": "string",
                         "title": "Signature Header",
-                        "description": "HTTP header containing the base64-encoded signature.",
+                        "description": "HTTP header containing the signature.",
                         "order": 3
+                    },
+                    "signatureEncoding": {
+                        "type": "string",
+                        "title": "Signature Encoding",
+                        "description": "Encoding of the signature value in the header. Defaults to hex.",
+                        "enum": ["hex", "base64"],
+                        "default": "hex",
+                        "order": 4
                     },
                     "signingStringTemplate": {
                         "type": "string",
                         "title": "Signing String Template",
                         "description": "Template used to construct the string that is signed. Must include {PAYLOAD}, may include {TIMESTAMP}. Example: \"{TIMESTAMP}:{PAYLOAD}\".",
-                        "order": 4
+                        "order": 5
                     },
                     "timestampHeader": {
                         "type": "string",
                         "title": "Timestamp Header",
                         "description": "Optional HTTP header containing the timestamp.",
-                        "order": 5
+                        "order": 6
                     },
                     "maxSignatureAge": {
                         "type": "integer",
@@ -224,7 +232,7 @@ fn webhook_signature_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
                         "default": 300,
                         "minimum": 1,
                         "maximum": 259200,
-                        "order": 6
+                        "order": 7
                     }
                 },
                 "required": ["provider", "algorithm", "publicKey", "signatureHeader", "signingStringTemplate"]
