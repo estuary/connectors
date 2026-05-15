@@ -60,7 +60,7 @@ func TestSQLGeneration(t *testing.T) {
 func buildJSONBTestTable(t *testing.T) sql.Table {
 	t.Helper()
 
-	const jsonbMediaType = "application/vnd.postgresql.jsonb+json"
+	const jsonbMediaType = "application/vnd.estuary.postgresql.jsonb+json"
 	multipleTypes := []string{"object", "string", "array", "number", "boolean", "null"}
 
 	mkValue := func(field, contentType string) sql.Column {
