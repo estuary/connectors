@@ -430,7 +430,7 @@ impl Handler {
             }
         }
 
-        let body = match self.signature_verifier.verify(&request_headers, body) {
+        let body = match self.signature_verifier.verify_request(&request_headers, body) {
             Ok(b) => b,
             Err(err) => {
                 return Ok(err_response(StatusCode::UNAUTHORIZED, err, matched_path));

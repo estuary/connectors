@@ -7,6 +7,7 @@ use bytes::Bytes;
 use chrono::{DateTime, TimeDelta, Utc};
 use p256::ecdsa::{signature::Verifier, Signature, VerifyingKey};
 use p256::pkcs8::DecodePublicKey;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
@@ -16,15 +17,85 @@ pub enum SignatureAlgorithm {
     Ecdsa,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct EcdsaProviderSettings<'a> {
-    pub signature_header: &'a str,
-    pub timestamp_header: Option<&'a str>,
+#[derive(Debug, Clone)]
+enum TemplateSegment {
+    Literal(String),
+    Timestamp,
+    Payload,
 }
 
-const TWILIO_SETTINGS: EcdsaProviderSettings = EcdsaProviderSettings {
+#[derive(Debug, Clone)]
+struct SigningStringTemplate(Vec<TemplateSegment>);
+
+impl SigningStringTemplate {
+    fn render(&self, request_body: &[u8], timestamp: Option<&[u8]>) -> Result<Vec<u8>> {
+        let mut out = Vec::with_capacity(request_body.len() + 32);
+        for seg in &self.0 {
+            match seg {
+                TemplateSegment::Literal(b) => out.extend_from_slice(b.as_bytes()),
+                TemplateSegment::Payload => out.extend_from_slice(request_body),
+                TemplateSegment::Timestamp => out.extend_from_slice(
+                    timestamp.context("template requires timestamp but none provided")?,
+                ),
+            }
+        }
+        Ok(out)
+    }
+}
+
+impl TryFrom<&str> for SigningStringTemplate {
+    type Error = anyhow::Error;
+
+    fn try_from(input: &str) -> Result<Self> {
+        let regex = Regex::new(r"\{(PAYLOAD|TIMESTAMP)\}").unwrap();
+        let mut segments = Vec::new();
+        let mut cursor = 0;
+
+        for cap in regex.captures_iter(input) {
+            let m = cap.get(0).unwrap();
+            if m.start() > cursor {
+                segments.push(TemplateSegment::Literal(
+                    input[cursor..m.start()].to_string(),
+                ));
+            }
+            segments.push(match &cap[1] {
+                "PAYLOAD" => TemplateSegment::Payload,
+                "TIMESTAMP" => TemplateSegment::Timestamp,
+                _ => unreachable!(),
+            });
+            cursor = m.end();
+        }
+        if cursor < input.len() {
+            segments.push(TemplateSegment::Literal(input[cursor..].to_string()));
+        }
+
+        if !segments
+            .iter()
+            .any(|s| matches!(s, TemplateSegment::Payload))
+        {
+            bail!(
+                "Hash message format must include at least {{PAYLOAD}}. \
+                Supported placeholders: {{PAYLOAD}}, {{TIMESTAMP}}. \
+                Ex: \"{{TIMESTAMP}}:{{PAYLOAD}}\""
+            );
+        }
+
+        Ok(SigningStringTemplate(segments))
+    }
+}
+
+/// Platform-specific settings. These are invariant across all users of the same source.
+#[derive(Debug, Clone)]
+pub struct SignatureProviderSettings {
+    pub signature_header: &'static str,
+    pub timestamp_header: Option<&'static str>,
+    pub template: &'static str,
+}
+
+const TWILIO_SETTINGS: SignatureProviderSettings = SignatureProviderSettings {
     signature_header: "X-Twilio-Email-Event-Webhook-Signature",
     timestamp_header: Some("X-Twilio-Email-Event-Webhook-Timestamp"),
+    template: "{TIMESTAMP}{PAYLOAD}",
 };
 
 fn default_max_signature_age() -> u64 {
@@ -56,6 +127,8 @@ pub enum WebhookSignatureConfig {
         timestamp_header: Option<String>,
         #[serde(default = "default_max_signature_age", rename = "maxSignatureAge")]
         max_signature_age: u64,
+        #[serde(rename = "signingStringTemplate")]
+        template: String,
     },
 }
 
@@ -66,24 +139,25 @@ impl Default for WebhookSignatureConfig {
 }
 
 pub trait WebhookSignatureVerifier: Send + Sync {
-    fn verify(&self, headers: &HeaderMap, body: Bytes) -> Result<Bytes>;
+    fn verify_request(&self, headers: &HeaderMap, body: Bytes) -> Result<Bytes>;
 }
 
 struct NoopVerifier;
 
 impl WebhookSignatureVerifier for NoopVerifier {
-    fn verify(&self, _: &HeaderMap, body: Bytes) -> Result<Bytes> {
+    fn verify_request(&self, _: &HeaderMap, body: Bytes) -> Result<Bytes> {
         Ok(body)
     }
 }
 
+/// Utility to protect against replay attacks.
 #[derive(Debug)]
-struct TimestampParser {
+struct TimestampVerifier {
     header: String,
     max_age: TimeDelta,
 }
 
-impl TimestampParser {
+impl TimestampVerifier {
     fn new(header: String, max_age_seconds: u64) -> Result<Self> {
         if header.trim().is_empty() {
             anyhow::bail!("Timestamp header name was provided but was empty");
@@ -136,22 +210,38 @@ impl TimestampParser {
 struct EcdsaVerifier {
     verifying_key: VerifyingKey,
     signature_header: String,
-    timestamp_parser: Option<TimestampParser>,
+    timestamp_verifier: Option<TimestampVerifier>,
+    template: SigningStringTemplate,
 }
 
 impl EcdsaVerifier {
     pub fn new(
         public_key: &str,
         signature_header: String,
-        timestamp_parser: Option<TimestampParser>,
+        timestamp_verifier: Option<TimestampVerifier>,
+        template: &str,
     ) -> anyhow::Result<Self> {
+        let public_key = public_key.trim();
+        if public_key.is_empty() {
+            anyhow::bail!("Public key is required but was empty");
+        }
+
         if signature_header.trim().is_empty() {
             anyhow::bail!("Signature header name is required but was empty");
         }
 
-        let public_key = public_key.trim();
-        if public_key.is_empty() {
-            anyhow::bail!("Public key is required but was empty");
+        let template = SigningStringTemplate::try_from(template)?;
+
+        if timestamp_verifier.is_none()
+            && template
+                .0
+                .iter()
+                .any(|s| matches!(s, TemplateSegment::Timestamp))
+        {
+            anyhow::bail!(
+                "{{TIMESTAMP}} placeholder was defined in hashed message format \
+                but no timestamp parsing details were included"
+            )
         }
 
         let verifying_key = {
@@ -178,13 +268,14 @@ impl EcdsaVerifier {
         Ok(Self {
             verifying_key,
             signature_header,
-            timestamp_parser,
+            timestamp_verifier,
+            template,
         })
     }
 }
 
 impl WebhookSignatureVerifier for EcdsaVerifier {
-    fn verify(&self, headers: &HeaderMap, body: Bytes) -> Result<Bytes> {
+    fn verify_request(&self, headers: &HeaderMap, body: Bytes) -> Result<Bytes> {
         let signature = {
             let b64 = headers.get(&self.signature_header).with_context(|| {
                 format!(
@@ -207,15 +298,15 @@ impl WebhookSignatureVerifier for EcdsaVerifier {
         };
 
         let payload = {
-            let mut value = Vec::new();
+            let timestamp = self
+                .timestamp_verifier
+                .as_ref()
+                .map(|tv| tv.as_bytes(headers))
+                .transpose()?;
 
-            if let Some(v) = &self.timestamp_parser {
-                value.extend(v.as_bytes(headers)?);
-            }
-            value.extend(&body);
-
-            value
-        };
+            self.template.render(&body, timestamp)
+        }
+        .with_context(|| "Failed to build the hash value")?;
 
         self.verifying_key.verify(&payload, &signature).context(
             "Signature verification failed. Check that the public key matches your webhook provider's key",
@@ -224,7 +315,7 @@ impl WebhookSignatureVerifier for EcdsaVerifier {
         // Verify timestamp freshness after the cryptographic signature check.
         // This prevents unauthenticated callers from probing the server's
         // max-age window via crafted timestamp headers.
-        if let Some(v) = &self.timestamp_parser {
+        if let Some(v) = &self.timestamp_verifier {
             v.verify(headers)?;
         }
 
@@ -243,7 +334,7 @@ impl TryFrom<WebhookSignatureConfig> for Box<dyn WebhookSignatureVerifier> {
                 public_key,
                 max_signature_age,
             } => {
-                let timestamp_parser = TimestampParser::new(
+                let timestamp_verifier = TimestampVerifier::new(
                     // .unwrap() call is operating on a constant
                     TWILIO_SETTINGS.timestamp_header.unwrap().to_string(),
                     max_signature_age,
@@ -252,7 +343,8 @@ impl TryFrom<WebhookSignatureConfig> for Box<dyn WebhookSignatureVerifier> {
                 Ok(Box::new(EcdsaVerifier::new(
                     &public_key,
                     TWILIO_SETTINGS.signature_header.to_string(),
-                    Some(timestamp_parser),
+                    Some(timestamp_verifier),
+                    TWILIO_SETTINGS.template,
                 )?))
             }
 
@@ -262,15 +354,17 @@ impl TryFrom<WebhookSignatureConfig> for Box<dyn WebhookSignatureVerifier> {
                 signature_header,
                 timestamp_header,
                 max_signature_age,
+                template,
             } => match algorithm {
                 SignatureAlgorithm::Ecdsa => {
                     let tv = timestamp_header
-                        .map(|h| TimestampParser::new(h, max_signature_age))
+                        .map(|h| TimestampVerifier::new(h, max_signature_age))
                         .transpose()?;
                     Ok(Box::new(EcdsaVerifier::new(
                         &public_key,
                         signature_header,
                         tv,
+                        &template,
                     )?))
                 }
             },
@@ -314,13 +408,25 @@ mod test {
     }
 
     fn make_ecdsa_verifier(with_timestamp: bool) -> Box<dyn WebhookSignatureVerifier> {
-        let tv = if with_timestamp {
-            Some(TimestampParser::new("X-Timestamp".into(), default_max_signature_age()).unwrap())
+        let (tv, template) = if with_timestamp {
+            (
+                Some(
+                    TimestampVerifier::new("X-Timestamp".into(), default_max_signature_age())
+                        .unwrap(),
+                ),
+                "{TIMESTAMP}{PAYLOAD}",
+            )
         } else {
-            None
+            (None, "{PAYLOAD}")
         };
         Box::new(
-            EcdsaVerifier::new(&test_verifying_key_pem(), "X-Signature".to_string(), tv).unwrap(),
+            EcdsaVerifier::new(
+                &test_verifying_key_pem(),
+                "X-Signature".to_string(),
+                tv,
+                template,
+            )
+            .unwrap(),
         )
     }
 
@@ -328,9 +434,20 @@ mod test {
         max_age_seconds: Option<u64>,
     ) -> Box<dyn WebhookSignatureVerifier> {
         let tv =
-            max_age_seconds.map(|age| TimestampParser::new("X-Timestamp".into(), age).unwrap());
+            max_age_seconds.map(|age| TimestampVerifier::new("X-Timestamp".into(), age).unwrap());
+        let template = if tv.is_some() {
+            "{TIMESTAMP}{PAYLOAD}"
+        } else {
+            "{PAYLOAD}"
+        };
         Box::new(
-            EcdsaVerifier::new(&test_verifying_key_pem(), "X-Signature".to_string(), tv).unwrap(),
+            EcdsaVerifier::new(
+                &test_verifying_key_pem(),
+                "X-Signature".to_string(),
+                tv,
+                template,
+            )
+            .unwrap(),
         )
     }
 
@@ -342,13 +459,25 @@ mod test {
     }
 
     fn make_ecdsa_verifier_b64(with_timestamp: bool) -> Box<dyn WebhookSignatureVerifier> {
-        let tv = if with_timestamp {
-            Some(TimestampParser::new("X-Timestamp".into(), default_max_signature_age()).unwrap())
+        let (tv, template) = if with_timestamp {
+            (
+                Some(
+                    TimestampVerifier::new("X-Timestamp".into(), default_max_signature_age())
+                        .unwrap(),
+                ),
+                "{TIMESTAMP}{PAYLOAD}",
+            )
         } else {
-            None
+            (None, "{PAYLOAD}")
         };
         Box::new(
-            EcdsaVerifier::new(&test_verifying_key_b64(), "X-Signature".to_string(), tv).unwrap(),
+            EcdsaVerifier::new(
+                &test_verifying_key_b64(),
+                "X-Signature".to_string(),
+                tv,
+                template,
+            )
+            .unwrap(),
         )
     }
 
@@ -372,7 +501,7 @@ mod test {
         };
 
         let verifier = make_ecdsa_verifier(true);
-        let result = verifier.verify(&headers, Bytes::from_static(body));
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_ref(), body);
@@ -391,7 +520,7 @@ mod test {
         };
 
         let verifier = make_ecdsa_verifier(false);
-        let result = verifier.verify(&headers, Bytes::from_static(body));
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_ref(), body);
@@ -412,7 +541,7 @@ mod test {
         };
 
         let verifier = make_ecdsa_verifier(false);
-        let result = verifier.verify(&headers, Bytes::from_static(body));
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
 
         assert!(result.is_err());
         assert_snapshot!(
@@ -427,7 +556,7 @@ mod test {
         let headers = axum::http::HeaderMap::new();
 
         let verifier = make_ecdsa_verifier(false);
-        let result = verifier.verify(&headers, Bytes::from_static(body));
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
 
         assert!(result.is_err());
         assert_snapshot!(
@@ -449,7 +578,7 @@ mod test {
         };
 
         let verifier = make_ecdsa_verifier(true);
-        let result = verifier.verify(&headers, Bytes::from_static(body));
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
 
         assert!(result.is_err());
         assert_snapshot!(
@@ -470,7 +599,7 @@ mod test {
         };
 
         let verifier = make_ecdsa_verifier(false);
-        let result = verifier.verify(&headers, Bytes::from_static(body));
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
 
         assert!(result.is_err());
         assert_snapshot!(
@@ -494,7 +623,7 @@ mod test {
         };
 
         let verifier = make_ecdsa_verifier(false);
-        let result = verifier.verify(&headers, Bytes::from_static(body));
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
 
         assert!(result.is_err());
         assert_snapshot!(
@@ -523,6 +652,7 @@ mod test {
             signature_header: "X-Custom-Sig".to_string(),
             timestamp_header: Some("X-Custom-Ts".to_string()),
             max_signature_age: default_max_signature_age(),
+            template: "{TIMESTAMP}{PAYLOAD}".to_string(),
         };
         let verifier: Result<Box<dyn WebhookSignatureVerifier>, _> = config.try_into();
         assert!(verifier.is_ok());
@@ -548,7 +678,8 @@ mod test {
                 "algorithm": "ecdsa",
                 "publicKey": {},
                 "signatureHeader": "X-Sig",
-                "timestampHeader": "X-Ts"
+                "timestampHeader": "X-Ts",
+                "signingStringTemplate": "{{TIMESTAMP}}.{{PAYLOAD}}"
             }}"#,
             serde_json::to_string(&pem_key).unwrap()
         );
@@ -576,7 +707,7 @@ mod test {
         };
 
         let verifier = make_ecdsa_verifier_with_age(Some(3600));
-        let result = verifier.verify(&headers, Bytes::from_static(body));
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_ok());
     }
 
@@ -604,7 +735,7 @@ mod test {
         };
 
         let verifier = make_ecdsa_verifier_with_age(Some(1));
-        let result = verifier.verify(&headers, Bytes::from_static(body));
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
         assert!(result.is_err());
         assert_snapshot!(
             result.unwrap_err(),
@@ -621,7 +752,8 @@ mod test {
                 "algorithm": "ecdsa",
                 "publicKey": {},
                 "signatureHeader": "X-Sig",
-                "maxSignatureAge": 3600
+                "maxSignatureAge": 3600,
+                "signingStringTemplate": "{{PAYLOAD}}"
             }}"#,
             serde_json::to_string(&pem_key).unwrap()
         );
@@ -638,7 +770,12 @@ mod test {
 
     #[test]
     fn test_ecdsa_raw_b64_key_parses() {
-        let result = EcdsaVerifier::new(&test_verifying_key_b64(), "X-Signature".to_string(), None);
+        let result = EcdsaVerifier::new(
+            &test_verifying_key_b64(),
+            "X-Signature".to_string(),
+            None,
+            "{PAYLOAD}",
+        );
         assert!(result.is_ok());
     }
 
@@ -654,7 +791,7 @@ mod test {
         };
 
         let verifier = make_ecdsa_verifier_b64(false);
-        let result = verifier.verify(&headers, Bytes::from_static(body));
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
 
         assert!(result.is_ok());
         assert_eq!(result.unwrap().as_ref(), body);
@@ -662,7 +799,12 @@ mod test {
 
     #[test]
     fn test_ecdsa_raw_b64_key_invalid_base64() {
-        let result = EcdsaVerifier::new("not-valid-base64", "X-Signature".to_string(), None);
+        let result = EcdsaVerifier::new(
+            "not-valid-base64",
+            "X-Signature".to_string(),
+            None,
+            "{PAYLOAD}",
+        );
         assert!(result.is_err());
         assert_snapshot!(
             result.unwrap_err(),
@@ -673,11 +815,130 @@ mod test {
     #[test]
     fn test_ecdsa_raw_b64_key_invalid_der() {
         let garbage_der = BASE64_STANDARD.encode(b"this is not valid DER");
-        let result = EcdsaVerifier::new(&garbage_der, "X-Signature".to_string(), None);
+        let result = EcdsaVerifier::new(&garbage_der, "X-Signature".to_string(), None, "{PAYLOAD}");
         assert!(result.is_err());
         assert_snapshot!(
             result.unwrap_err(),
             @"Failed to parse base64-decoded bytes as a P-256 ECDSA public key in SPKI DER format"
         );
+    }
+
+    #[test]
+    fn test_template_rejects_missing_payload() {
+        let result = SigningStringTemplate::try_from("{TIMESTAMP}-only");
+        assert!(result.is_err());
+        assert_snapshot!(
+            result.unwrap_err(),
+            @r#"Hash message format must include at least {PAYLOAD}. Supported placeholders: {PAYLOAD}, {TIMESTAMP}. Ex: "{TIMESTAMP}:{PAYLOAD}""#
+        );
+    }
+
+    #[test]
+    fn test_template_rejects_empty() {
+        let result = SigningStringTemplate::try_from("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_template_rejects_literal_only() {
+        let result = SigningStringTemplate::try_from("no placeholders here");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_template_accepts_payload_only() {
+        let template = SigningStringTemplate::try_from("{PAYLOAD}").unwrap();
+        let built = template.render(b"hello", None).unwrap();
+        assert_eq!(built, b"hello");
+    }
+
+    #[test]
+    fn test_template_interleaves_literals() {
+        let template = SigningStringTemplate::try_from("v1:{TIMESTAMP}.{PAYLOAD}").unwrap();
+        let built = template.render(b"body", Some(b"12345")).unwrap();
+        assert_eq!(built, b"v1:12345.body");
+    }
+
+    #[test]
+    fn test_template_payload_before_timestamp() {
+        let template = SigningStringTemplate::try_from("{PAYLOAD}|{TIMESTAMP}").unwrap();
+        let built = template.render(b"body", Some(b"99")).unwrap();
+        assert_eq!(built, b"body|99");
+    }
+
+    #[test]
+    fn test_template_build_fails_when_timestamp_missing() {
+        let template = SigningStringTemplate::try_from("{TIMESTAMP}{PAYLOAD}").unwrap();
+        let result = template.render(b"body", None);
+        assert!(result.is_err());
+        assert_snapshot!(
+            result.unwrap_err(),
+            @"template requires timestamp but none provided"
+        );
+    }
+
+    #[test]
+    fn test_ecdsa_rejects_timestamp_placeholder_without_verifier() {
+        let result = EcdsaVerifier::new(
+            &test_verifying_key_pem(),
+            "X-Signature".to_string(),
+            None,
+            "{TIMESTAMP}{PAYLOAD}",
+        );
+        assert!(result.is_err());
+        assert_snapshot!(
+            result.unwrap_err(),
+            @"{TIMESTAMP} placeholder was defined in hashed message format but no timestamp parsing details were included"
+        );
+    }
+
+    #[test]
+    fn test_ecdsa_rejects_template_without_payload() {
+        let tv = TimestampVerifier::new("X-Timestamp".into(), default_max_signature_age()).unwrap();
+        let result = EcdsaVerifier::new(
+            &test_verifying_key_pem(),
+            "X-Signature".to_string(),
+            Some(tv),
+            "{TIMESTAMP}-no-payload",
+        );
+        assert!(result.is_err());
+        assert_snapshot!(
+            result.unwrap_err(),
+            @r#"Hash message format must include at least {PAYLOAD}. Supported placeholders: {PAYLOAD}, {TIMESTAMP}. Ex: "{TIMESTAMP}:{PAYLOAD}""#
+        );
+    }
+
+    #[test]
+    fn test_ecdsa_verifies_with_custom_template() {
+        let body = b"webhook payload";
+        let timestamp = Utc::now().timestamp().to_string();
+
+        let signature = {
+            let mut payload = Vec::new();
+            payload.extend_from_slice(b"v1:");
+            payload.extend_from_slice(timestamp.as_bytes());
+            payload.extend_from_slice(b".");
+            payload.extend_from_slice(body);
+            sign_payload(&payload)
+        };
+
+        let headers = {
+            let mut val = axum::http::HeaderMap::new();
+            val.insert("X-Signature", signature.parse().unwrap());
+            val.insert("X-Timestamp", timestamp.parse().unwrap());
+            val
+        };
+
+        let tv = TimestampVerifier::new("X-Timestamp".into(), default_max_signature_age()).unwrap();
+        let verifier = EcdsaVerifier::new(
+            &test_verifying_key_pem(),
+            "X-Signature".to_string(),
+            Some(tv),
+            "v1:{TIMESTAMP}.{PAYLOAD}",
+        )
+        .unwrap();
+
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
+        assert!(result.is_ok());
     }
 }
