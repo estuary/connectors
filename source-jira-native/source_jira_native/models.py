@@ -5,7 +5,7 @@ from typing import Any, ClassVar, Literal, Optional
 from estuary_cdk.capture.common import (
     BasicAuth,
     BaseDocument,
-    ResourceConfig,
+    ResourceConfigWithSchedule,
     ResourceState,
 )
 from estuary_cdk.capture.common import (
