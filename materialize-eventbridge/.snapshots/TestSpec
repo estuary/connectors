@@ -124,16 +124,17 @@
       "source": {
         "type": "string",
         "title": "Event Source",
-        "description": "Source field set on every event published from this binding (e.g. \"my.app\").",
+        "description": "Source field set on every event published from this binding",
+        "default": "estuary.flow",
         "order": 1,
         "x-collection-name": true
       },
       "detail_type": {
         "type": "string",
         "title": "Detail Type",
-        "description": "DetailType field set on every event published from this binding (e.g. \"OrderPlaced\").",
-        "order": 2,
-        "x-collection-name": true
+        "description": "DetailType field set on every event published from this binding",
+        "default": "Document Published",
+        "order": 2
       }
     },
     "type": "object",
