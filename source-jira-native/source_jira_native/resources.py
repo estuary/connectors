@@ -33,7 +33,7 @@ from .models import (
     MyPermissionsResponse,
     ProjectChildStream,
     Projects,
-    ResourceConfig,
+    ResourceConfigWithSchedule,
     ResourceState,
     ScreenTabFields,
     SprintIssues,
@@ -298,7 +298,7 @@ def full_refresh_resources(
 
     def open(
             stream: type[FullRefreshStream],
-            binding: CaptureBinding[ResourceConfig],
+            binding: CaptureBinding[ResourceConfigWithSchedule],
             binding_index: int,
             state: ResourceState,
             task: Task,
@@ -323,7 +323,7 @@ def full_refresh_resources(
                 model=FullRefreshResource,
                 open=functools.partial(open, stream),
                 initial_state=ResourceState(),
-                initial_config=ResourceConfig(
+                initial_config=ResourceConfigWithSchedule(
                     name=stream.name, interval=timedelta(minutes=60)
                 ),
                 schema_inference=True,
@@ -339,7 +339,7 @@ def issues(
 ) -> common.Resource:
 
     async def open(
-        binding: CaptureBinding[ResourceConfig],
+        binding: CaptureBinding[ResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
@@ -388,7 +388,7 @@ def issues(
             },
             backfill=ResourceState.Backfill(cutoff=cutoff, next_page=dt_to_str(start))
         ),
-        initial_config=ResourceConfig(
+        initial_config=ResourceConfigWithSchedule(
             name="issues", interval=timedelta(minutes=5)
         ),
         schema_inference=True,
@@ -402,7 +402,7 @@ def issue_child_resources(
 
     async def open(
         stream: type[IssueChildStream],
-        binding: CaptureBinding[ResourceConfig],
+        binding: CaptureBinding[ResourceConfigWithSchedule],
         binding_index: int,
         state: ResourceState,
         task: Task,
@@ -456,7 +456,7 @@ def issue_child_resources(
                     },
                     backfill=ResourceState.Backfill(cutoff=cutoff, next_page=dt_to_str(start))
                 ),
-                initial_config=ResourceConfig(
+                initial_config=ResourceConfigWithSchedule(
                     name=stream.name, interval=timedelta(minutes=5)
                 ),
                 schema_inference=True,
