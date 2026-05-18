@@ -309,6 +309,7 @@ impl TimestampVerifier {
 struct EcdsaVerifier {
     verifying_key: VerifyingKey,
     signature_header: String,
+    signature_encoding: SignatureEncoding,
     timestamp_verifier: Option<TimestampVerifier>,
     template: SigningStringTemplate,
 }
@@ -317,6 +318,7 @@ impl EcdsaVerifier {
     pub fn new(
         public_key: &str,
         signature_header: String,
+        signature_encoding: SignatureEncoding,
         timestamp_verifier: Option<TimestampVerifier>,
         template: &str,
     ) -> anyhow::Result<Self> {
@@ -367,6 +369,7 @@ impl EcdsaVerifier {
         Ok(Self {
             verifying_key,
             signature_header,
+            signature_encoding,
             timestamp_verifier,
             template,
         })
@@ -375,19 +378,27 @@ impl EcdsaVerifier {
 
 impl WebhookSignatureVerifier for EcdsaVerifier {
     fn verify_request(&self, headers: &HeaderMap, body: Bytes) -> Result<Bytes> {
+        if body.is_empty() {
+            bail!("Refusing to verify signature over an empty request body");
+        }
+
         let signature = {
-            let b64 = headers.get(&self.signature_header).with_context(|| {
-                format!(
-                    "A signature value was expected at header {} but was not found",
-                    self.signature_header,
-                )
-            })?;
-            let bytes = BASE64_STANDARD.decode(b64).with_context(|| {
-                format!(
-                    "Failed to decode base64 signature from header '{}'",
-                    self.signature_header
-                )
-            })?;
+            let raw = headers
+                .get(&self.signature_header)
+                .with_context(|| {
+                    format!(
+                        "A signature value was expected at header {} but was not found",
+                        self.signature_header,
+                    )
+                })?
+                .to_str()
+                .with_context(|| {
+                    format!(
+                        "Signature header '{}' is not valid UTF-8",
+                        self.signature_header
+                    )
+                })?;
+            let bytes = self.signature_encoding.decode(raw)?;
             Signature::from_der(&bytes).with_context(|| {
                 format!(
                     "Failed to parse DER-encoded ECDSA signature from header '{}'",
@@ -472,7 +483,8 @@ impl HmacSha256Verifier {
             )
         }
 
-        let mac: Hmac<Sha256> = Hmac::new_from_slice(key.as_bytes())?;
+        let mac: Hmac<Sha256> = Hmac::new_from_slice(key.as_bytes())
+            .context("Failed to initialize HMAC with the provided secret")?;
 
         Ok(Self {
             mac,
@@ -487,6 +499,10 @@ impl HmacSha256Verifier {
 
 impl WebhookSignatureVerifier for HmacSha256Verifier {
     fn verify_request(&self, headers: &HeaderMap, body: Bytes) -> Result<Bytes> {
+        if body.is_empty() {
+            bail!("Refusing to verify signature over an empty request body");
+        }
+
         let raw = headers
             .get(&self.signature_header)
             .with_context(|| {
@@ -592,6 +608,7 @@ impl TryFrom<WebhookSignatureConfig> for Box<dyn WebhookSignatureVerifier> {
                 Ok(Box::new(EcdsaVerifier::new(
                     &public_key,
                     "X-Twilio-Email-Event-Webhook-Signature".to_string(),
+                    SignatureEncoding::Base64,
                     Some(timestamp_verifier),
                     "{TIMESTAMP}{PAYLOAD}",
                 )?))
@@ -613,6 +630,7 @@ impl TryFrom<WebhookSignatureConfig> for Box<dyn WebhookSignatureVerifier> {
                     Ok(Box::new(EcdsaVerifier::new(
                         &public_key,
                         signature_header,
+                        signature_encoding,
                         tv,
                         &template,
                     )?))
@@ -640,7 +658,8 @@ mod test {
     use super::*;
     use chrono::TimeZone;
     use insta::assert_snapshot;
-    use p256::pkcs8::EncodePublicKey;
+    use p256::ecdsa::signature::Signer;
+    use p256::pkcs8::{EncodePublicKey, LineEnding};
 
     const TEST_PRIVATE_KEY_B64: &str = "eis1jT5PECEyQ1RldoeYqa7L3O3+DxEiM0RVZneImao=";
 
@@ -657,14 +676,11 @@ mod test {
 
     /// Helper to create a signed payload for testing
     fn sign_payload(payload: &[u8]) -> String {
-        use p256::ecdsa::signature::Signer;
-
         let signature: Signature = test_signing_key().sign(payload);
         BASE64_STANDARD.encode(signature.to_der())
     }
 
     fn test_verifying_key_pem() -> String {
-        use p256::pkcs8::LineEnding;
         test_verifying_key()
             .to_public_key_pem(LineEnding::LF)
             .expect("failed to encode public key as PEM")
@@ -686,6 +702,7 @@ mod test {
             EcdsaVerifier::new(
                 &test_verifying_key_pem(),
                 "X-Signature".to_string(),
+                SignatureEncoding::Base64,
                 tv,
                 template,
             )
@@ -707,6 +724,7 @@ mod test {
             EcdsaVerifier::new(
                 &test_verifying_key_pem(),
                 "X-Signature".to_string(),
+                SignatureEncoding::Base64,
                 tv,
                 template,
             )
@@ -737,6 +755,7 @@ mod test {
             EcdsaVerifier::new(
                 &test_verifying_key_b64(),
                 "X-Signature".to_string(),
+                SignatureEncoding::Base64,
                 tv,
                 template,
             )
@@ -867,7 +886,7 @@ mod test {
         assert!(result.is_err());
         assert_snapshot!(
             result.unwrap_err(),
-            @"Failed to decode base64 signature from header 'X-Signature'"
+            @"Failed to base64-decode signature"
         )
     }
 
@@ -1037,6 +1056,7 @@ mod test {
         let result = EcdsaVerifier::new(
             &test_verifying_key_b64(),
             "X-Signature".to_string(),
+            SignatureEncoding::Base64,
             None,
             "{PAYLOAD}",
         );
@@ -1066,6 +1086,7 @@ mod test {
         let result = EcdsaVerifier::new(
             "not-valid-base64",
             "X-Signature".to_string(),
+            SignatureEncoding::Base64,
             None,
             "{PAYLOAD}",
         );
@@ -1079,7 +1100,13 @@ mod test {
     #[test]
     fn test_ecdsa_raw_b64_key_invalid_der() {
         let garbage_der = BASE64_STANDARD.encode(b"this is not valid DER");
-        let result = EcdsaVerifier::new(&garbage_der, "X-Signature".to_string(), None, "{PAYLOAD}");
+        let result = EcdsaVerifier::new(
+            &garbage_der,
+            "X-Signature".to_string(),
+            SignatureEncoding::Base64,
+            None,
+            "{PAYLOAD}",
+        );
         assert!(result.is_err());
         assert_snapshot!(
             result.unwrap_err(),
@@ -1146,6 +1173,7 @@ mod test {
         let result = EcdsaVerifier::new(
             &test_verifying_key_pem(),
             "X-Signature".to_string(),
+            SignatureEncoding::Base64,
             None,
             "{TIMESTAMP}{PAYLOAD}",
         );
@@ -1162,6 +1190,7 @@ mod test {
         let result = EcdsaVerifier::new(
             &test_verifying_key_pem(),
             "X-Signature".to_string(),
+            SignatureEncoding::Base64,
             Some(tv),
             "{TIMESTAMP}-no-payload",
         );
@@ -1197,6 +1226,7 @@ mod test {
         let verifier = EcdsaVerifier::new(
             &test_verifying_key_pem(),
             "X-Signature".to_string(),
+            SignatureEncoding::Base64,
             Some(tv),
             "v1:{TIMESTAMP}.{PAYLOAD}",
         )
@@ -1633,5 +1663,86 @@ mod test {
             }
             _ => panic!("expected Custom variant"),
         }
+    }
+
+    #[test]
+    fn test_hmac_rejects_empty_body() {
+        let now = Utc::now().timestamp().to_string();
+
+        let mut signed = Vec::new();
+        signed.extend(now.as_bytes());
+        let signature = hex::encode(hmac_sign(&signed));
+
+        let headers = {
+            let mut val = axum::http::HeaderMap::new();
+            val.insert("X-Signature", signature.parse().unwrap());
+            val.insert("X-Timestamp", now.parse().unwrap());
+            val
+        };
+
+        let verifier = make_hmac_verifier(true, extract_identity(), SignatureEncoding::Hex);
+        let result = verifier.verify_request(&headers, Bytes::new());
+        assert!(result.is_err());
+        assert_snapshot!(
+            result.unwrap_err(),
+            @"Refusing to verify signature over an empty request body"
+        );
+    }
+
+    #[test]
+    fn test_ecdsa_rejects_empty_body() {
+        let signature = sign_payload(b"");
+
+        let headers = {
+            let mut val = axum::http::HeaderMap::new();
+            val.insert("X-Signature", signature.parse().unwrap());
+            val
+        };
+
+        let verifier = make_ecdsa_verifier(false);
+        let result = verifier.verify_request(&headers, Bytes::new());
+        assert!(result.is_err());
+        assert_snapshot!(
+            result.unwrap_err(),
+            @"Refusing to verify signature over an empty request body"
+        );
+    }
+
+    #[test]
+    fn test_noop_accepts_empty_body() {
+        let config = WebhookSignatureConfig::None {};
+        let verifier: Box<dyn WebhookSignatureVerifier> = config.try_into().unwrap();
+        let result = verifier.verify_request(&axum::http::HeaderMap::new(), Bytes::new());
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 0);
+    }
+
+    #[test]
+    fn test_ecdsa_custom_hex_encoding() {
+        let body = b"webhook payload";
+        let signature_hex = {
+            let sig: Signature = test_signing_key().sign(body);
+            hex::encode(sig.to_der())
+        };
+
+        let headers = {
+            let mut val = axum::http::HeaderMap::new();
+            val.insert("X-Signature", signature_hex.parse().unwrap());
+            val
+        };
+
+        let config = WebhookSignatureConfig::Custom {
+            algorithm: SignatureAlgorithm::Ecdsa,
+            public_key: test_verifying_key_pem(),
+            signature_header: "X-Signature".to_string(),
+            signature_encoding: SignatureEncoding::Hex,
+            timestamp_header: None,
+            max_signature_age: default_max_signature_age(),
+            template: "{PAYLOAD}".to_string(),
+        };
+        let verifier: Box<dyn WebhookSignatureVerifier> = config.try_into().unwrap();
+
+        let result = verifier.verify_request(&headers, Bytes::from_static(body));
+        assert!(result.is_ok());
     }
 }
