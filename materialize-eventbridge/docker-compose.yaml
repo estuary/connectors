@@ -1,0 +1,32 @@
+version: '3.7'
+
+# LocalStack provides a local stand-in for AWS services. We need both
+# `events` (EventBridge itself, which receives `PutEvents` calls from the
+# connector) and `sqs` (the integration test rig configures an EventBridge
+# rule that forwards events to an SQS queue, then drains the queue to
+# verify delivery — EventBridge has no read API of its own).
+#
+# Pin to v3 because v4+ requires a LocalStack auth token. Same rationale as
+# source-kinesis/docker-compose.yaml.
+
+services:
+  eventbridge:
+    image: localstack/localstack:3
+    environment:
+      - SERVICES=events,sqs
+      - DEFAULT_REGION=us-east-1
+      - DEBUG=0
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:4566/_localstack/health | grep -q '\"events\": \"\\(running\\|available\\)\"' && curl -fs http://localhost:4566/_localstack/health | grep -q '\"sqs\": \"\\(running\\|available\\)\"'"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - flow-test
+
+networks:
+  flow-test:
+    name: flow-test
+    external: true

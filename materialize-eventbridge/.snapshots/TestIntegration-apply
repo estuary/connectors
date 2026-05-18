@@ -1,0 +1,174 @@
+Task: acmeCo/tests/materialize-eventbridge/local
+
+Big Schema Initial Constraints:
+{"Field":"_meta/flow_truncated","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"arrayField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"boolField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
+{"Field":"flow_published_at","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"intField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"key","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"EventBridge ignores keys; including them in the payload is optional"}
+{"Field":"multipleField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"nullField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"numField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"objField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringDateField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringDateTimeField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringDurationField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringEmailField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringHostnameField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIdnEmailField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIdnHostnameField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIntegerField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIpv4Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIpv6Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIriField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIriReferenceField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringJsonPointerField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringMacAddr8Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringMacAddrField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringNumberField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringRegexField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringRelativeJsonPointerField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringTimeField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUint32Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUint64Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUriField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUriReferenceField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUriTemplateField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUuidField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+
+Big Schema Re-validated Constraints:
+{"Field":"_meta/flow_truncated","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"arrayField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"boolField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
+{"Field":"flow_published_at","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"intField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"key","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"multipleField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"nullField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"numField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"objField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringDateField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringDateTimeField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringDurationField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringEmailField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringHostnameField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIdnEmailField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIdnHostnameField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIntegerField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIpv4Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIpv6Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIriField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIriReferenceField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringJsonPointerField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringMacAddr8Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringMacAddrField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringNumberField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringRegexField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringRelativeJsonPointerField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringTimeField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUint32Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUint64Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUriField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUriReferenceField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUriTemplateField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUuidField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+
+Big Schema Changed Types Constraints:
+{"Field":"_meta/flow_truncated","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"arrayField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"boolField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
+{"Field":"flow_published_at","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"intField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"key","Type":3,"TypeString":"LOCATION_RECOMMENDED","Reason":"This location is part of the current materialization"}
+{"Field":"multipleField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"nullField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"numField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"objField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringDateField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringDateTimeField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringDurationField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringEmailField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringHostnameField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIdnEmailField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIdnHostnameField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIntegerField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIpv4Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIpv6Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIriField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIriReferenceField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringJsonPointerField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringMacAddr8Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringMacAddrField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringNumberField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringRegexField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringRelativeJsonPointerField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringTimeField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUint32Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUint64Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUriField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUriReferenceField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUriTemplateField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUuidField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+
+Big Schema Materialized Resource Schema With All Fields Required:
+
+Big Schema Materialized Resource Schema With No Fields Required:
+
+Big Schema Changed Types With Backfill Constraints:
+{"Field":"_meta/flow_truncated","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"arrayField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"boolField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"flow_document","Type":2,"TypeString":"LOCATION_REQUIRED","Reason":"The root document must be materialized"}
+{"Field":"flow_published_at","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"intField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"key","Type":4,"TypeString":"FIELD_OPTIONAL","Reason":"EventBridge ignores keys; including them in the payload is optional"}
+{"Field":"multipleField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"nullField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"numField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"objField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringDateField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringDateTimeField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringDurationField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringEmailField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringHostnameField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIdnEmailField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIdnHostnameField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIntegerField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIpv4Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIpv6Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIriField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringIriReferenceField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringJsonPointerField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringMacAddr8Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringMacAddrField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringNumberField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringRegexField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringRelativeJsonPointerField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringTimeField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUint32Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUint64Field","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUriField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUriReferenceField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUriTemplateField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+{"Field":"stringUuidField","Type":5,"TypeString":"FIELD_FORBIDDEN","Reason":"EventBridge only materializes the full document"}
+
+Big Schema Materialized Resource Schema Changed Types With Backfill:
+
+add a single field:
+
+remove a single optional field:
+
+remove a single required field:
+
+add and remove many fields:
+
+Challenging Field Names Materialized Columns:
+

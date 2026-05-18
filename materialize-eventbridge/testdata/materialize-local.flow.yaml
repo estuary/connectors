@@ -1,0 +1,23 @@
+import:
+  - ../../materialize-boilerplate/testdata/integration/collections.materialize.flow.yaml
+
+materializations:
+  acmeCo/tests/materialize-eventbridge/local:
+    endpoint:
+      local:
+        command: ["go", "run", "."]
+        protobuf: true
+        config: config.local.yaml
+    bindings:
+    - resource:
+        source: flow.test
+        detail_type: simple_standard
+      source: tests/simple
+      fields:
+        recommended: true
+    - resource:
+        source: flow.test
+        detail_type: data_types
+      source: tests/data-types
+      fields:
+        recommended: true

@@ -1,0 +1,17 @@
+region: ENC[AES256_GCM,data:4+HCTq9F1dvi,iv:MLCxFWmfjUMYrP33SfjxhJu7uuNGTywd7+xxbxhfyi0=,tag:5RrAM5pRik3T0X+cea2SQg==,type:str]
+event_bus_name: ENC[AES256_GCM,data:iYJF/qVeq/JJgEu3Drw6O6c=,iv:a64AohBk2IJdhOqXwh7sb9cfF/5jBhpKLfClulE9CuY=,tag:0ay5RtylJmWe2ssXa10CyA==,type:str]
+credentials:
+    auth_type: ENC[AES256_GCM,data:rKeUF5/Rn2XRdui5,iv:SLBaSHTa4mGpu+QtAHZ6/MQQC2aoHevktr2UVo2RYeU=,tag:V5xYpOlSQZhXLe9BUYRr8Q==,type:str]
+    aws_access_key_id: ENC[AES256_GCM,data:VI2XsizJ57Jepc/WFCDAd8uyaZ8=,iv:hiKiHf2oGA8IcXPhoiG7EBM837cB+ZYJhHt4jmYY3ec=,tag:9ZxUVZgpUfixH9BfjhV+Sw==,type:str]
+    aws_secret_access_key: ENC[AES256_GCM,data:F6iPbwxkajxxNvHoDzHnxu6+LxPQo1dX+2fGU61eOnGA0RZUJL3MGA==,iv:86cGHsVSEzMkSYHnLI+vKZeWKCURvvQrAnFjhssk1dY=,tag:ZY1xJjZRbYA9cAIQxuW7eA==,type:str]
+advanced:
+    feature_flags: ENC[AES256_GCM,data:0OVMqoR5KoAkm/hNZMFAqyOc0mSUpvJqd2tNf4WdZJ6c5KiMXKU=,iv:0xKG0tQjvIvF0xVUvvSMCe62CCZIYIm2j9MLP9fDUmc=,tag:66xBi+/yYDA8uwFnTLVwUg==,type:str]
+sops:
+    gcp_kms:
+        - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
+          created_at: "2026-05-04T19:54:50Z"
+          enc: CiUAdmEdwtqjtbRcsM5Lo4VH8aH+oqePjCfGPwIcainLyWJqJKcpEkkAJFAC3bv+VsPta4rF5Mng6IGGPr+UK51uCwIiLkNoLZjzKE/HlPHDQZOThJ86cffrslf8sJOu0ppJCk2qfMFrP9V7fOuLmjdq
+    lastmodified: "2026-05-04T19:54:50Z"
+    mac: ENC[AES256_GCM,data:ee3IVXnG3GaL3uEZ2Yt2TT8+Dl/zdd70VWWHls/g/dQ7JCtN9CaIrNIafiNxNcK0FvxWMKfk2R8sOnsEVgtFXND9Y8okfQ9I98QBJEYrsNOB2SQqTJZv3Si+bxe3wrv5JgrV3Ew71AHhtVxZnOp70+57iEJJBRbyxQJgGyXilY4=,iv:RJPxKdE+EAsrT6q6i1ovG+AIMuR7t1LazDndRzO3PcE=,tag:QcaOvZRSZpbmj3ZKmIz1Rg==,type:str]
+    unencrypted_suffix: _unencrypted
+    version: 3.12.1
