@@ -1,14 +1,16 @@
-from datetime import datetime, timedelta, UTC
-from decimal import Decimal
-from estuary_cdk.http import HTTPSession
-from logging import Logger
-from typing import Iterable, Any, Callable, Awaitable, AsyncGenerator
 import json
+from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from logging import Logger
+from typing import Any, AsyncGenerator, Awaitable, Callable, Iterable
 
 from estuary_cdk.capture.common import (
-    PageCursor,
     LogCursor,
+    PageCursor,
 )
+from estuary_cdk.http import HTTPSession
+
+from source_impact_native.models import ActionInquiries, Actions
 
 API = "https://api.impact.com"
 API_CATALOG = "Advertisers"
@@ -40,11 +42,11 @@ async def fetch_incremental(
         result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
         for results in result[f"{_cls.NAME}"]:
-            if _s_to_dt(results[f"{_cls.REP_KEY}"]) > log_cursor:
-                max_ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
+            if _s_to_dt(results[f"{_cls.REP_KEY}"]) >= log_cursor:
+                max_ts = max(max_ts, _s_to_dt(results[f"{_cls.REP_KEY}"]))
                 doc = _cls.model_validate_json(json.dumps(results))
                 yield doc
-        
+
             elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < log_cursor:
                 iterating = False
                 break
@@ -88,7 +90,6 @@ async def fetch_backfill(
         if _s_to_dt(results[f"{_cls.REP_KEY}"]) == config_start_date:
             doc = _cls.model_validate_json(json.dumps(results))
             yield doc
-            return
         elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < config_start_date:
             return
         elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < cutoff:
@@ -104,7 +105,7 @@ async def fetch_backfill(
 
 async def fetch_incremental_actions(
     cls_parent,
-    cls,
+    cls: Actions | ActionInquiries,
     account_sid,
     http: HTTPSession,
     log: Logger,
@@ -116,6 +117,8 @@ async def fetch_incremental_actions(
     This method does not use the action updates endpoint. Instead, we only call for the basic Actions endpoint, which returns recent data since the last 7 days.
     we do this since the action updates endpoint returns data in a totally diffent object, which does not match the original Actions endpoint.
     """
+    assert isinstance(log_cursor, datetime)
+
     headers = {'Accept': 'application/json'}
 
     campaign_list = set()
@@ -124,24 +127,24 @@ async def fetch_incremental_actions(
     async for campaign in campaigns:
         campaign_list.add(campaign.Id)
 
+    max_ts = log_cursor
+
     for campaign in campaign_list:
 
         iterating = True
 
         url = f"{API}/{API_CATALOG}/{account_sid}/{cls.NAME}"
         parameters = {"CampaignId": campaign}
-        max_ts = log_cursor
 
         _cls: Any = cls  # Silence mypy false-positive
 
         while iterating:
             result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
-
             for results in result[f"{cls.NAME}"]:
-                if _s_to_dt(results[f"CreationDate"]) > log_cursor:
-                    max_ts = _s_to_dt(results[f"CreationDate"])
+                if _s_to_dt(results["CreationDate"]) >= log_cursor:
                     doc = _cls.model_validate_json(json.dumps(results))
+                    max_ts = max(max_ts, doc.CreationDate)
                     yield doc
 
             if result.get("@nextpageuri"):
@@ -214,9 +217,8 @@ async def fetch_backfill_actions(
                     if _s_to_dt(results[f"CreationDate"]) == config_start_date:
                         doc = _cls.model_validate_json(json.dumps(results))
                         yield doc
-                        iterating = False
-                        break
                     elif _s_to_dt(results[f"CreationDate"]) < config_start_date:
+                        iterating = False
                         break
                     elif _s_to_dt(results[f"CreationDate"]) < cutoff:
                         doc = _cls.model_validate_json(json.dumps(results))
@@ -297,11 +299,11 @@ async def fetch_incremental_child(
             result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
 
             for results in result[f"{_cls.NAME}"]:
-                if _s_to_dt(results[f"{_cls.REP_KEY}"]) > log_cursor:
-                    max_ts = _s_to_dt(results[f"{_cls.REP_KEY}"])
+                if _s_to_dt(results[f"{_cls.REP_KEY}"]) >= log_cursor:
+                    max_ts = max(max_ts, _s_to_dt(results[f"{_cls.REP_KEY}"]))
                     doc = _cls.model_validate_json(json.dumps(results))
                     yield doc
-            
+
                 elif _s_to_dt(results[f"{_cls.REP_KEY}"]) < log_cursor:
                     iterating = False
                     break

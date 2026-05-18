@@ -44,10 +44,16 @@
         "Id": {
           "title": "Id",
           "type": "string"
+        },
+        "CreationDate": {
+          "format": "date-time",
+          "title": "Creationdate",
+          "type": "string"
         }
       },
       "required": [
-        "Id"
+        "Id",
+        "CreationDate"
       ],
       "title": "Actions",
       "type": "object",
@@ -125,10 +131,16 @@
         "Id": {
           "title": "Id",
           "type": "string"
+        },
+        "CreationDate": {
+          "format": "date-time",
+          "title": "Creationdate",
+          "type": "string"
         }
       },
       "required": [
-        "Id"
+        "Id",
+        "CreationDate"
       ],
       "title": "ActionInquiries",
       "type": "object",
