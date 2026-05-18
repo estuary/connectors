@@ -51,6 +51,7 @@ class Actions(BaseDocument, extra="allow"):
     PRIMARY_KEY: ClassVar[str] = "/Id"
 
     Id: str
+    CreationDate: datetime
 
 class ActionInquiries(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "ActionInquiries"
@@ -61,6 +62,7 @@ class ActionInquiries(BaseDocument, extra="allow"):
     PRIMARY_KEY: ClassVar[str] = "/Id"
 
     Id: str
+    CreationDate: datetime
 
 class Ads(BaseDocument, extra="allow"):
     NAME: ClassVar[str] = "Ads"
