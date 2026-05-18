@@ -412,9 +412,8 @@ async def fetch_snapshot_child(
 
 
 
-def _s_to_dt(date: str):
-    date = datetime.strptime(date, "%Y-%m-%dT%H:%M:%S%z")
-    return date
+def _s_to_dt(date: str) -> datetime:
+    return datetime.fromisoformat(date)
 
 def _cursor_dt(name, logcursor):
     new_logcursor = logcursor.strftime("%Y-%m-%dT%H:%M:%S%z")

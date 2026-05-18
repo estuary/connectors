@@ -39,6 +39,15 @@ def _ms_to_dt(ms: int) -> datetime:
 def base_url(host: PendoHost) -> str:
     return f"https://{host}/api/v1"
 
+def _escape_filter_string(value: str) -> str:
+    # Pendo's filter grammar is documented as "basic C expression syntax" but doesn't
+    # spell out string escape rules, so we only escape the two characters we know
+    # break the filter: "  and \. Order matters, so we escape backslashes
+    # first so the \" we insert isn't re-escaped into \\".
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
+
+
 def _generate_time_series(
         period: str,
         lower_bound: int,
@@ -89,7 +98,7 @@ def generate_events_body(
     #                    there are more events in Pendo with the same lastTime than we can retrieve in
     #                    a single API query.
     if last_seen_id:
-        filter_condition = f"guideTimestamp == {lower_bound} && {identifying_field} >= \"{last_seen_id}\""
+        filter_condition = f"guideTimestamp == {lower_bound} && {identifying_field} >= {_escape_filter_string(last_seen_id)}"
     else:
         filter_condition = f"guideTimestamp >= {lower_bound}"
         if upper_bound:
@@ -161,7 +170,7 @@ def generate_event_aggregates_body(
     #              hour: The bottom of the hour for the aggregate. Ensures we don't get "in-progress"
     #                    aggregates for the current hour.
     if last_seen_id:
-        filter_condition = f"lastTime == {lower_bound} && {identifying_field} >= \"{last_seen_id}\" && hour < {current_hour}"
+        filter_condition = f"lastTime == {lower_bound} && {identifying_field} >= {_escape_filter_string(last_seen_id)} && hour < {current_hour}"
     else:
         filter_condition = f"lastTime >= {lower_bound} && hour < {current_hour}"
         if upper_bound:
@@ -227,7 +236,7 @@ def generate_resources_body(
     #                    there are more resources in Pendo with the same updated_at_field than we can retrieve in
     #                    a single API query.
     if last_seen_id:
-        filter_condition = f"{updated_at_field} == {lower_bound} && {identifying_field} >= \"{last_seen_id}\""
+        filter_condition = f"{updated_at_field} == {lower_bound} && {identifying_field} >= {_escape_filter_string(last_seen_id)}"
     else:
         filter_condition = f"{updated_at_field} >= {lower_bound}"
         if upper_bound:
@@ -319,6 +328,11 @@ async def _fetch_events_between(
 
     body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, upper_bound=upper_bound_ts)
 
+    log.debug("Making API request", {
+        "url": url,
+        "body": body,
+    })
+
     _, response_body = await http.request_stream(log, url, method="POST", json=body)
     processor = IncrementalJsonProcessor(
         response_body(),
@@ -353,6 +367,11 @@ async def _fetch_events_between(
         # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
             body = generate_events_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, last_seen_id=last_seen_id)
+
+            log.debug("Making API request", {
+                "url": url,
+                "body": body,
+            })
 
             _, response_body = await http.request_stream(log, url, method="POST", json=body)
             processor = IncrementalJsonProcessor(
@@ -495,6 +514,11 @@ async def _fetch_aggregated_events_between(
 
     body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, upper_bound=upper_bound_ts)
 
+    log.debug("Making API request", {
+        "url": url,
+        "body": body,
+    })
+
     _, response_body = await http.request_stream(log, url, method="POST", json=body)
     processor = IncrementalJsonProcessor(
         response_body(),
@@ -529,6 +553,11 @@ async def _fetch_aggregated_events_between(
         # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
             body = generate_event_aggregates_body(entity=entity, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, last_seen_id=last_seen_id)
+
+            log.debug("Making API request", {
+                "url": url,
+                "body": body,
+            })
 
             _, response_body = await http.request_stream(log, url, method="POST", json=body)
             processor = IncrementalJsonProcessor(
@@ -691,6 +720,11 @@ async def _fetch_resources_between(
 
     body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, upper_bound=upper_bound_ts)
 
+    log.debug("Making API request", {
+        "url": url,
+        "body": body,
+    })
+
     _, response_body = await http.request_stream(log, url, method="POST", json=body)
     processor = IncrementalJsonProcessor(
         response_body(),
@@ -725,6 +759,11 @@ async def _fetch_resources_between(
         # with the same timestamp. So we fetch the remaining documents with this timestamp before returning.
         while True:
             body = generate_resources_body(entity=entity, updated_at_field=updated_at_field, identifying_field=identifying_field, lower_bound=lower_bound_ts, limit=limit, last_seen_id=last_seen_id)
+
+            log.debug("Making API request", {
+                "url": url,
+                "body": body,
+            })
 
             _, response_body = await http.request_stream(log, url, method="POST", json=body)
             processor = IncrementalJsonProcessor(

@@ -176,6 +176,62 @@ fn webhook_signature_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
                 "required": ["provider", "publicKey"]
             },
             {
+                "title": "Zoom",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "const": "zoom",
+                        "default": "zoom",
+                        "order": 0
+                    },
+                    "publicKey": {
+                        "type": "string",
+                        "title": "Secret Token",
+                        "description": "Zoom webhook secret token used as the HMAC-SHA256 key.",
+                        "secret": true,
+                        "order": 1
+                    },
+                    "maxSignatureAge": {
+                        "type": "integer",
+                        "title": "Max Signature Age",
+                        "description": "Maximum age of a signed request in seconds before it is rejected. Defaults to 300 (5 minutes).",
+                        "default": 300,
+                        "minimum": 1,
+                        "maximum": 259200,
+                        "order": 2
+                    }
+                },
+                "required": ["provider", "publicKey"]
+            },
+            {
+                "title": "Knock",
+                "properties": {
+                    "provider": {
+                        "type": "string",
+                        "const": "knock",
+                        "default": "knock",
+                        "order": 0
+                    },
+                    "publicKey": {
+                        "type": "string",
+                        "title": "Signing Key",
+                        "description": "Knock webhook signing key used as the HMAC-SHA256 secret.",
+                        "secret": true,
+                        "order": 1
+                    },
+                    "maxSignatureAge": {
+                        "type": "integer",
+                        "title": "Max Signature Age",
+                        "description": "Maximum age of a signed request in seconds before it is rejected. Defaults to 300 (5 minutes).",
+                        "default": 300,
+                        "minimum": 1,
+                        "maximum": 259200,
+                        "order": 2
+                    }
+                },
+                "required": ["provider", "publicKey"]
+            },
+            {
                 "title": "Custom",
                 "properties": {
                     "provider": {
@@ -187,14 +243,14 @@ fn webhook_signature_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
                     "algorithm": {
                         "type": "string",
                         "title": "Algorithm",
-                        "enum": ["ecdsa"],
-                        "default": "ecdsa",
+                        "enum": ["hmac_sha256", "ecdsa"],
+                        "default": "hmac_sha256",
                         "order": 1
                     },
                     "publicKey": {
                         "type": "string",
                         "title": "Public Key",
-                        "description": "PEM-encoded public key.",
+                        "description": "PEM-encoded public key for ECDSA, or shared secret for HMAC.",
                         "secret": true,
                         "multiline": true,
                         "order": 2
@@ -202,14 +258,28 @@ fn webhook_signature_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
                     "signatureHeader": {
                         "type": "string",
                         "title": "Signature Header",
-                        "description": "HTTP header containing the base64-encoded signature.",
+                        "description": "HTTP header containing the signature.",
                         "order": 3
+                    },
+                    "signatureEncoding": {
+                        "type": "string",
+                        "title": "Signature Encoding",
+                        "description": "Encoding of the signature value in the header. Defaults to hex.",
+                        "enum": ["hex", "base64"],
+                        "default": "hex",
+                        "order": 4
+                    },
+                    "signingStringTemplate": {
+                        "type": "string",
+                        "title": "Signing String Template",
+                        "description": "Template used to construct the string that is signed. Must include {PAYLOAD}, may include {TIMESTAMP}. Example: \"{TIMESTAMP}:{PAYLOAD}\".",
+                        "order": 5
                     },
                     "timestampHeader": {
                         "type": "string",
                         "title": "Timestamp Header",
                         "description": "Optional HTTP header containing the timestamp.",
-                        "order": 4
+                        "order": 6
                     },
                     "maxSignatureAge": {
                         "type": "integer",
@@ -218,10 +288,10 @@ fn webhook_signature_schema(_gen: &mut generate::SchemaGenerator) -> Schema {
                         "default": 300,
                         "minimum": 1,
                         "maximum": 259200,
-                        "order": 5
+                        "order": 7
                     }
                 },
-                "required": ["provider", "algorithm", "publicKey", "signatureHeader"]
+                "required": ["provider", "algorithm", "publicKey", "signatureHeader", "signingStringTemplate"]
             }
         ]
     }))
