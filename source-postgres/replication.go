@@ -898,6 +898,17 @@ func (s *replicationStream) decodeChangeEvent(
 	}
 	// If this change event is on a table we're not capturing, skip doing any further processing on it.
 	if !active {
+		// Tally the discard so that ReplicationDiagnostics can later surface tables that
+		// we're receiving (and throwing away) significant volumes of replication events on.
+		if streamID, ok := s.streamIDFromRelationID(relID); ok {
+			s.db.discardCounts.Lock()
+			if s.db.discardCounts.byStream == nil {
+				s.db.discardCounts.byStream = make(map[sqlcapture.StreamID]int64)
+			}
+			s.db.discardCounts.byStream[streamID]++
+			s.db.discardCounts.Unlock()
+		}
+
 		// Return a KeepaliveEvent to indicate that we're actively receiving and discarding
 		// change data. This avoids situations where a sufficiently large transaction full
 		// of changes on a not-currently-active table causes the fenced streaming watchdog

@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/feature/rds/auth"
@@ -409,6 +410,12 @@ type postgresDatabase struct {
 	tablesPublished map[sqlcapture.StreamID]bool     // Tracks which tables are part of the configured publication
 
 	tableStatistics map[sqlcapture.StreamID]*postgresTableStatistics // Tracks table statistics for the current connector invocation
+
+	// Counts of replication events discarded because the table isn't currently active.
+	discardCounts struct {
+		sync.Mutex
+		byStream map[sqlcapture.StreamID]int64
+	}
 
 	featureFlags          map[string]bool // Parsed feature flag settings with defaults applied
 	initialBackfillCursor string          // When set, this cursor will be used instead of the current WAL end when a backfill resets the cursor
