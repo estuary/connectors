@@ -21,11 +21,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/estuary/connectors/go/writer"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	"github.com/estuary/connectors/materialize-iceberg/catalog"
 	"github.com/estuary/connectors/materialize-iceberg/python"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -186,6 +187,10 @@ func TestIntegration(t *testing.T) {
 	t.Run("date-overflow-regression", func(t *testing.T) {
 		runDateOverflowRegression(t)
 	})
+
+	t.Run("add-required-column-regression", func(t *testing.T) {
+		runAddRequiredColumnRegression(t)
+	})
 }
 
 // runTimestampOverflowRegression checks whether a year-10000 timestamp - the
@@ -259,7 +264,7 @@ func runTimestampOverflowRegression(t *testing.T) {
 		}},
 	}
 	body, err := json.Marshal(struct {
-		Action string             `json:"action"`
+		Action string            `json:"action"`
 		Input  python.MergeInput `json:"input"`
 	}{Action: "merge", Input: mergeInput})
 	require.NoError(t, err)
@@ -365,4 +370,189 @@ func runDateOverflowRegression(t *testing.T) {
 	}
 	require.NoError(t, json.Unmarshal(respBody, &result))
 	require.Truef(t, result.Success, "merge failed: %s", result.Error)
+}
+
+// runAddRequiredColumnRegression reproduces the Snowflake-rejection failure
+// mode reported for the `html_body` column: errno 100478, "Invalid parquet
+// file: non-nullable column without default missing data".
+//
+// The trigger is schema evolution, not value size. When the connector adds a
+// projection whose inference says MUST-exist (or it becomes a primary key) to
+// a table that already has data files, `appendProjectionsAsFields` in
+// type_mapping.go writes the new field with `required: true`. Pre-existing
+// data files have no data for the new field id, and the resulting manifest
+// entries have no `null_value_counts` entry for it. Snowflake (and any other
+// reader that refuses to assume "absent ⇒ 0" for a required column) then
+// rejects the table.
+//
+// The test creates a table with `id` only, inserts a row, then evolves the
+// schema by adding `payload` as a required column - the same kind of update
+// `UpdateResource` issues via `catalog.AddSchemaUpdate` + `SetCurrentSchemaUpdate`
+// - and asserts that the manifest entry carries `null_value_counts` for the
+// new field id. Pre-fix the assertion fails because the metric maps for the
+// pre-existing data file have no entry for field id 2.
+func runAddRequiredColumnRegression(t *testing.T) {
+	ctx := context.Background()
+
+	creds, err := readPolarisCreds()
+	require.NoError(t, err)
+	credential := creds.ClientID + ":" + creds.ClientSecret
+	scope := "PRINCIPAL_ROLE:flow_user_role"
+
+	cat, err := catalog.New(ctx, "http://localhost:9802/api/catalog", "quickstart_catalog",
+		catalog.WithClientCredential(credential, "v1/oauth/tokens", &scope))
+	require.NoError(t, err)
+
+	s3client := s3.New(s3.Options{
+		Region:       "us-east-1",
+		Credentials:  credentials.NewStaticCredentialsProvider("flow", "flow", ""),
+		BaseEndpoint: aws.String("http://localhost:9800"),
+		UsePathStyle: true,
+	})
+
+	const (
+		ns      = "add_required_column_regression"
+		tblName = "payload"
+	)
+
+	// Start with id only.
+	schemaV0 := iceberg.NewSchemaWithIdentifiers(0, []int{1},
+		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: true},
+	)
+	_ = cat.DeleteTable(ctx, ns, tblName)
+	// CreateNamespace is idempotent for our purposes - an "already exists"
+	// just means leftover state from a prior run.
+	_ = cat.CreateNamespace(ctx, ns)
+	require.NoError(t, cat.CreateTable(ctx, ns, tblName, schemaV0, nil, nil, nil))
+	t.Cleanup(func() { _ = cat.DeleteTable(context.Background(), ns, tblName) })
+
+	// Insert a row through the production CSV → Spark merge daemon path, so
+	// the table has a real data file written by Spark (matching what
+	// happens in production before the schema evolves).
+	csvPath := filepath.Join(t.TempDir(), "data.csv.gz")
+	csvFile, err := os.Create(csvPath)
+	require.NoError(t, err)
+	csvw := writer.NewCsvWriter(csvFile, []string{"id"},
+		writer.WithCsvSkipHeaders(), writer.WithCsvQuoteChar('`'))
+	require.NoError(t, csvw.Write([]any{"row1"}))
+	require.NoError(t, csvw.Close())
+	csvBody, err := os.ReadFile(csvPath)
+	require.NoError(t, err)
+	csvKey := "staging/add-required-col-" + uuid.New().String() + ".csv.gz"
+	_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String("warehouse"),
+		Key:    aws.String(csvKey),
+		Body:   bytes.NewReader(csvBody),
+	})
+	require.NoError(t, err)
+
+	mergeInput := python.MergeInput{
+		Bindings: []python.MergeBinding{{
+			Binding: 0,
+			Query:   fmt.Sprintf("INSERT INTO estuary.%s.%s SELECT id FROM merge_view_0", ns, tblName),
+			Columns: []python.NestedField{{Name: "id", Type: "string"}},
+			Files:   []string{"s3://warehouse/" + csvKey},
+		}},
+	}
+	body, err := json.Marshal(struct {
+		Action string            `json:"action"`
+		Input  python.MergeInput `json:"input"`
+	}{Action: "merge", Input: mergeInput})
+	require.NoError(t, err)
+
+	resp, err := http.Post("http://localhost:9806/run", "application/json", bytes.NewReader(body))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equalf(t, http.StatusOK, resp.StatusCode, "daemon response: %s", respBody)
+
+	var result struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(respBody, &result))
+	require.Truef(t, result.Success, "initial merge failed: %s", result.Error)
+
+	// Evolve the schema: add `payload` as required. Mirror the connector's
+	// UpdateResource path - AddSchemaUpdate + SetCurrentSchemaUpdate on the
+	// catalog with an AssertCurrentSchemaID requirement (see driver.go's
+	// UpdateResource and type_mapping.go's computeSchemaForUpdatedTable).
+	tbl, err := cat.GetTable(ctx, ns, tblName)
+	require.NoError(t, err)
+	current := tbl.Metadata.CurrentSchema()
+	schemaV1 := iceberg.NewSchemaWithIdentifiers(current.ID+1, []int{1},
+		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: true},
+		iceberg.NestedField{ID: 2, Name: "payload", Type: iceberg.PrimitiveTypes.String, Required: true},
+	)
+	require.NoError(t, cat.UpdateTable(ctx, ns, tblName,
+		[]catalog.TableRequirement{catalog.AssertCurrentSchemaID(current.ID)},
+		[]catalog.TableUpdate{
+			catalog.AddSchemaUpdate(schemaV1),
+			catalog.SetCurrentSchemaUpdate(schemaV1.ID),
+		},
+	))
+
+	// payloadFieldID is the iceberg field id assigned to the `payload`
+	// column above. Manifest metric maps key off this id.
+	const payloadFieldID = 2
+
+	// Walk the current snapshot's manifests via the iceberg-go avro
+	// readers, fed directly from the same MinIO that holds the data files.
+	tblAfter, err := cat.GetTable(ctx, ns, tblName)
+	require.NoError(t, err)
+	snap := tblAfter.Metadata.CurrentSnapshot()
+	require.NotNilf(t, snap, "no current snapshot for %s.%s", ns, tblName)
+
+	openS3 := func(s3URI string) io.ReadCloser {
+		require.True(t, strings.HasPrefix(s3URI, "s3://warehouse/"),
+			"unexpected s3 uri: %s", s3URI)
+		key := strings.TrimPrefix(s3URI, "s3://warehouse/")
+		out, err := s3client.GetObject(ctx, &s3.GetObjectInput{
+			Bucket: aws.String("warehouse"),
+			Key:    aws.String(key),
+		})
+		require.NoError(t, err)
+		return out.Body
+	}
+
+	mlBody := openS3(snap.ManifestList)
+	defer mlBody.Close()
+	manifests, err := iceberg.ReadManifestList(mlBody)
+	require.NoError(t, err)
+	require.NotEmptyf(t, manifests, "no manifests for %s.%s", ns, tblName)
+
+	hasValueCount, hasNullCount, hasLowerBound, hasUpperBound := true, true, true, true
+	entriesSeen := 0
+	for _, mf := range manifests {
+		mfBody := openS3(mf.FilePath())
+		entries, err := iceberg.ReadManifest(mf, mfBody, true)
+		mfBody.Close()
+		require.NoError(t, err)
+		for _, e := range entries {
+			df := e.DataFile()
+			if _, ok := df.ValueCounts()[payloadFieldID]; !ok {
+				hasValueCount = false
+			}
+			if _, ok := df.NullValueCounts()[payloadFieldID]; !ok {
+				hasNullCount = false
+			}
+			if _, ok := df.LowerBoundValues()[payloadFieldID]; !ok {
+				hasLowerBound = false
+			}
+			if _, ok := df.UpperBoundValues()[payloadFieldID]; !ok {
+				hasUpperBound = false
+			}
+			entriesSeen++
+		}
+	}
+	require.NotZerof(t, entriesSeen, "no manifest entries for %s.%s", ns, tblName)
+
+	t.Logf("manifest metric maps for required payload column added after data: ValueCounts=%v NullValueCounts=%v LowerBounds=%v UpperBounds=%v",
+		hasValueCount, hasNullCount, hasLowerBound, hasUpperBound)
+
+	// The decisive assertion: a required column with a missing
+	// null_value_counts entry is exactly what Snowflake refuses with errno
+	// 100478. The other maps are logged for diagnostic context.
+	assert.True(t, hasNullCount, "manifest should have null_value_counts for required `payload` column added after data")
 }
