@@ -89,6 +89,28 @@ func (c *client) TruncateTable(ctx context.Context, path []string) (string, boil
 	}, nil
 }
 
+var migrationSteps = []sql.ColumnMigrationStep{
+	sql.StdMigrationSteps[0],
+	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
+		stmts := make([]string, 0, len(instructions))
+		for _, ins := range instructions {
+			stmt := fmt.Sprintf("UPDATE %s SET %s = %s WHERE %s IS NOT NULL;",
+				table.Identifier,
+				ins.TempColumnIdentifier,
+				ins.TypeMigration.CastSQL(ins.TypeMigration),
+				ins.TypeMigration.Identifier,
+			)
+
+			stmts = append(stmts, stmt)
+		}
+
+		return stmts, nil
+	},
+	sql.StdMigrationSteps[2],
+	sql.StdMigrationSteps[3],
+	sql.StdMigrationSteps[4],
+}
+
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	// Redshift only allows a single column to be added per ALTER TABLE statement. Also, we will
 	// never need to drop nullability constraints, since Redshift does not allow dropping
@@ -108,7 +130,7 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges); err != nil {
+		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges, migrationSteps...); err != nil {
 			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 		} else {
 			stmts = append(stmts, steps...)
