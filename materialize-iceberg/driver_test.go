@@ -191,6 +191,10 @@ func TestIntegration(t *testing.T) {
 	t.Run("add-required-column-regression", func(t *testing.T) {
 		runAddRequiredColumnRegression(t)
 	})
+
+	t.Run("demote-required-column-regression", func(t *testing.T) {
+		runDemoteRequiredColumnRegression(t)
+	})
 }
 
 // runTimestampOverflowRegression checks whether a year-10000 timestamp - the
@@ -555,4 +559,182 @@ func runAddRequiredColumnRegression(t *testing.T) {
 	// null_value_counts entry is exactly what Snowflake refuses with errno
 	// 100478. The other maps are logged for diagnostic context.
 	assert.True(t, hasNullCount, "manifest should have null_value_counts for required `payload` column added after data")
+}
+
+// runDemoteRequiredColumnRegression covers the inverse direction of
+// runAddRequiredColumnRegression: a column that was MUST-exist when the table
+// was created later has its inference relax (a document arrives without it,
+// or the inferred-schema engine demotes it). This flows through the
+// boilerplate's `NewlyNullableFields` path, and `computeSchemaForUpdatedTable`
+// in type_mapping.go flips the existing field's `required` to false before
+// issuing `AddSchemaUpdate` + `SetCurrentSchemaUpdate`. The expected outcome
+// is benign: the parquet for the pre-demotion data file is unchanged, so its
+// manifest entry still carries every metric map for `payload`. This test
+// pins that expectation so a future change to the demotion path can't
+// regress the per-column metric maps for pre-existing data.
+func runDemoteRequiredColumnRegression(t *testing.T) {
+	ctx := context.Background()
+
+	creds, err := readPolarisCreds()
+	require.NoError(t, err)
+	credential := creds.ClientID + ":" + creds.ClientSecret
+	scope := "PRINCIPAL_ROLE:flow_user_role"
+
+	cat, err := catalog.New(ctx, "http://localhost:9802/api/catalog", "quickstart_catalog",
+		catalog.WithClientCredential(credential, "v1/oauth/tokens", &scope))
+	require.NoError(t, err)
+
+	s3client := s3.New(s3.Options{
+		Region:       "us-east-1",
+		Credentials:  credentials.NewStaticCredentialsProvider("flow", "flow", ""),
+		BaseEndpoint: aws.String("http://localhost:9800"),
+		UsePathStyle: true,
+	})
+
+	const (
+		ns      = "demote_required_column_regression"
+		tblName = "payload"
+	)
+
+	// Start with `payload` required - mirrors a table created when
+	// inference said the field is MUST-exist.
+	schemaV0 := iceberg.NewSchemaWithIdentifiers(0, []int{1},
+		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: true},
+		iceberg.NestedField{ID: 2, Name: "payload", Type: iceberg.PrimitiveTypes.String, Required: true},
+	)
+	_ = cat.DeleteTable(ctx, ns, tblName)
+	_ = cat.CreateNamespace(ctx, ns)
+	require.NoError(t, cat.CreateTable(ctx, ns, tblName, schemaV0, nil, nil, nil))
+	t.Cleanup(func() { _ = cat.DeleteTable(context.Background(), ns, tblName) })
+
+	// Insert one row with both columns populated through the production
+	// CSV → Spark merge daemon path.
+	csvPath := filepath.Join(t.TempDir(), "data.csv.gz")
+	csvFile, err := os.Create(csvPath)
+	require.NoError(t, err)
+	csvw := writer.NewCsvWriter(csvFile, []string{"id", "payload"},
+		writer.WithCsvSkipHeaders(), writer.WithCsvQuoteChar('`'))
+	require.NoError(t, csvw.Write([]any{"row1", "hello"}))
+	require.NoError(t, csvw.Close())
+	csvBody, err := os.ReadFile(csvPath)
+	require.NoError(t, err)
+	csvKey := "staging/demote-required-col-" + uuid.New().String() + ".csv.gz"
+	_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String("warehouse"),
+		Key:    aws.String(csvKey),
+		Body:   bytes.NewReader(csvBody),
+	})
+	require.NoError(t, err)
+
+	mergeInput := python.MergeInput{
+		Bindings: []python.MergeBinding{{
+			Binding: 0,
+			Query:   fmt.Sprintf("INSERT INTO estuary.%s.%s SELECT id, payload FROM merge_view_0", ns, tblName),
+			Columns: []python.NestedField{{Name: "id", Type: "string"}, {Name: "payload", Type: "string"}},
+			Files:   []string{"s3://warehouse/" + csvKey},
+		}},
+	}
+	body, err := json.Marshal(struct {
+		Action string            `json:"action"`
+		Input  python.MergeInput `json:"input"`
+	}{Action: "merge", Input: mergeInput})
+	require.NoError(t, err)
+
+	resp, err := http.Post("http://localhost:9806/run", "application/json", bytes.NewReader(body))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equalf(t, http.StatusOK, resp.StatusCode, "daemon response: %s", respBody)
+
+	var result struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(respBody, &result))
+	require.Truef(t, result.Success, "initial merge failed: %s", result.Error)
+
+	// Evolve the schema by demoting `payload` to optional. Mirrors what
+	// `computeSchemaForUpdatedTable` does when boilerplate hands it a
+	// `NewlyNullableFields` entry: keep every existing field as-is but flip
+	// the matching field's `required` to false.
+	tbl, err := cat.GetTable(ctx, ns, tblName)
+	require.NoError(t, err)
+	current := tbl.Metadata.CurrentSchema()
+	schemaV1 := iceberg.NewSchemaWithIdentifiers(current.ID+1, []int{1},
+		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: true},
+		iceberg.NestedField{ID: 2, Name: "payload", Type: iceberg.PrimitiveTypes.String, Required: false},
+	)
+	require.NoError(t, cat.UpdateTable(ctx, ns, tblName,
+		[]catalog.TableRequirement{catalog.AssertCurrentSchemaID(current.ID)},
+		[]catalog.TableUpdate{
+			catalog.AddSchemaUpdate(schemaV1),
+			catalog.SetCurrentSchemaUpdate(schemaV1.ID),
+		},
+	))
+
+	const payloadFieldID = 2
+
+	tblAfter, err := cat.GetTable(ctx, ns, tblName)
+	require.NoError(t, err)
+	snap := tblAfter.Metadata.CurrentSnapshot()
+	require.NotNilf(t, snap, "no current snapshot for %s.%s", ns, tblName)
+
+	openS3 := func(s3URI string) io.ReadCloser {
+		require.True(t, strings.HasPrefix(s3URI, "s3://warehouse/"),
+			"unexpected s3 uri: %s", s3URI)
+		key := strings.TrimPrefix(s3URI, "s3://warehouse/")
+		out, err := s3client.GetObject(ctx, &s3.GetObjectInput{
+			Bucket: aws.String("warehouse"),
+			Key:    aws.String(key),
+		})
+		require.NoError(t, err)
+		return out.Body
+	}
+
+	mlBody := openS3(snap.ManifestList)
+	defer mlBody.Close()
+	manifests, err := iceberg.ReadManifestList(mlBody)
+	require.NoError(t, err)
+	require.NotEmptyf(t, manifests, "no manifests for %s.%s", ns, tblName)
+
+	hasValueCount, hasNullCount, hasLowerBound, hasUpperBound := true, true, true, true
+	entriesSeen := 0
+	for _, mf := range manifests {
+		mfBody := openS3(mf.FilePath())
+		entries, err := iceberg.ReadManifest(mf, mfBody, true)
+		mfBody.Close()
+		require.NoError(t, err)
+		for _, e := range entries {
+			df := e.DataFile()
+			if _, ok := df.ValueCounts()[payloadFieldID]; !ok {
+				hasValueCount = false
+			}
+			if _, ok := df.NullValueCounts()[payloadFieldID]; !ok {
+				hasNullCount = false
+			}
+			if _, ok := df.LowerBoundValues()[payloadFieldID]; !ok {
+				hasLowerBound = false
+			}
+			if _, ok := df.UpperBoundValues()[payloadFieldID]; !ok {
+				hasUpperBound = false
+			}
+			entriesSeen++
+		}
+	}
+	require.NotZerof(t, entriesSeen, "no manifest entries for %s.%s", ns, tblName)
+
+	t.Logf("manifest metric maps for payload column demoted to optional after data: ValueCounts=%v NullValueCounts=%v LowerBounds=%v UpperBounds=%v",
+		hasValueCount, hasNullCount, hasLowerBound, hasUpperBound)
+
+	// Demotion mustn't strip per-column metric maps for pre-existing data
+	// files - those data files actually have the values, so the manifest
+	// entries should retain every metric map. If any of these go missing
+	// it implies the demotion path is mutating manifest metadata in
+	// addition to the schema, which would be a regression in its own
+	// right.
+	assert.True(t, hasValueCount, "manifest should retain value_counts for payload after demotion to optional")
+	assert.True(t, hasNullCount, "manifest should retain null_value_counts for payload after demotion to optional")
+	assert.True(t, hasLowerBound, "manifest should retain lower_bounds for payload after demotion to optional")
+	assert.True(t, hasUpperBound, "manifest should retain upper_bounds for payload after demotion to optional")
 }
