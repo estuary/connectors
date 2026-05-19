@@ -21,9 +21,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/estuary/connectors/go/writer"
-	boilerplate "github.com/estuary/connectors/materialize-boilerplate/testutil"
+	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
+	boilertest "github.com/estuary/connectors/materialize-boilerplate/testutil"
 	"github.com/estuary/connectors/materialize-iceberg/catalog"
 	"github.com/estuary/connectors/materialize-iceberg/python"
+	pf "github.com/estuary/flow/go/protocols/flow"
 	"github.com/google/uuid"
 	"github.com/segmentio/encoding/json"
 	"github.com/stretchr/testify/assert"
@@ -169,15 +171,15 @@ func TestIntegration(t *testing.T) {
 	}
 
 	t.Run("materialize", func(t *testing.T) {
-		boilerplate.RunMaterializationTestParallel(t, newMaterialization, materializeSpec, makeResourceFn, actionDescSanitizers)
+		boilertest.RunMaterializationTestParallel(t, newMaterialization, materializeSpec, makeResourceFn, actionDescSanitizers)
 	})
 
 	t.Run("apply", func(t *testing.T) {
-		boilerplate.RunApplyTestParallel(t, &Driver{}, newMaterialization, applySpec, makeResourceFn)
+		boilertest.RunApplyTestParallel(t, &Driver{}, newMaterialization, applySpec, makeResourceFn)
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		boilerplate.RunMigrationTestParallel(t, newMaterialization, migrateSpec, makeResourceFn, nil)
+		boilertest.RunMigrationTestParallel(t, newMaterialization, migrateSpec, makeResourceFn, nil)
 	})
 
 	t.Run("ts-overflow-regression", func(t *testing.T) {
@@ -478,17 +480,30 @@ func runAddRequiredColumnRegression(t *testing.T) {
 	require.NoError(t, json.Unmarshal(respBody, &result))
 	require.Truef(t, result.Success, "initial merge failed: %s", result.Error)
 
-	// Evolve the schema: add `payload` as required. Mirror the connector's
-	// UpdateResource path - AddSchemaUpdate + SetCurrentSchemaUpdate on the
-	// catalog with an AssertCurrentSchemaID requirement (see driver.go's
-	// UpdateResource and type_mapping.go's computeSchemaForUpdatedTable).
+	// Evolve the schema through the connector's own code path. The
+	// boilerplate hands UpdateResource a BindingUpdate with NewProjections;
+	// the connector calls computeSchemaForUpdatedTable to derive the next
+	// schema and submits it via cat.UpdateTable. Exercising that function
+	// here means the test reflects exactly what the connector emits.
 	tbl, err := cat.GetTable(ctx, ns, tblName)
 	require.NoError(t, err)
 	current := tbl.Metadata.CurrentSchema()
-	schemaV1 := iceberg.NewSchemaWithIdentifiers(current.ID+1, []int{1},
-		iceberg.NestedField{ID: 1, Name: "id", Type: iceberg.PrimitiveTypes.String, Required: true},
-		iceberg.NestedField{ID: 2, Name: "payload", Type: iceberg.PrimitiveTypes.String, Required: true},
-	)
+
+	newPayload := boilerplate.MappedProjection[mapped]{
+		Projection: boilerplate.Projection{
+			Projection: pf.Projection{Field: "payload"},
+			// MustExist=true is the production trigger - the source
+			// collection's required array includes the new field, and its
+			// types doesn't include "null", so MustExist comes back true.
+			MustExist: true,
+		},
+		Mapped: mapped{type_: iceberg.PrimitiveTypes.String, Name: "payload"},
+	}
+	bindingUpdate := boilerplate.BindingUpdate[config, resource, mapped]{
+		NewProjections: []boilerplate.MappedProjection[mapped]{newPayload},
+	}
+	schemaV1 := computeSchemaForUpdatedTable(current.Fields()[len(current.Fields())-1].ID, current, bindingUpdate)
+
 	require.NoError(t, cat.UpdateTable(ctx, ns, tblName,
 		[]catalog.TableRequirement{catalog.AssertCurrentSchemaID(current.ID)},
 		[]catalog.TableUpdate{
@@ -497,9 +512,19 @@ func runAddRequiredColumnRegression(t *testing.T) {
 		},
 	))
 
-	// payloadFieldID is the iceberg field id assigned to the `payload`
-	// column above. Manifest metric maps key off this id.
-	const payloadFieldID = 2
+	// Locate the `payload` field in the schema the connector produced -
+	// the field id is whatever computeSchemaForUpdatedTable assigned, not
+	// a hard-coded 2.
+	var payloadField *iceberg.NestedField
+	for _, f := range schemaV1.Fields() {
+		if f.Name == "payload" {
+			f := f
+			payloadField = &f
+			break
+		}
+	}
+	require.NotNil(t, payloadField, "computeSchemaForUpdatedTable did not produce a payload field")
+	payloadFieldID := payloadField.ID
 
 	// Walk the current snapshot's manifests via the iceberg-go avro
 	// readers, fed directly from the same MinIO that holds the data files.
@@ -552,13 +577,21 @@ func runAddRequiredColumnRegression(t *testing.T) {
 	}
 	require.NotZerof(t, entriesSeen, "no manifest entries for %s.%s", ns, tblName)
 
-	t.Logf("manifest metric maps for required payload column added after data: ValueCounts=%v NullValueCounts=%v LowerBounds=%v UpperBounds=%v",
+	t.Logf("computeSchemaForUpdatedTable produced payload: Required=%v (fieldID=%d)", payloadField.Required, payloadFieldID)
+	t.Logf("manifest metric maps for payload column added after data: ValueCounts=%v NullValueCounts=%v LowerBounds=%v UpperBounds=%v",
 		hasValueCount, hasNullCount, hasLowerBound, hasUpperBound)
 
-	// The decisive assertion: a required column with a missing
-	// null_value_counts entry is exactly what Snowflake refuses with errno
-	// 100478. The other maps are logged for diagnostic context.
-	assert.True(t, hasNullCount, "manifest should have null_value_counts for required `payload` column added after data")
+	// Snowflake's errno 100478 fires when a `required` column lacks
+	// null_value_counts in the manifest. If the connector emits the new
+	// field as Optional - the post-fix state - Snowflake doesn't care that
+	// the metric maps are empty for pre-existing data files, because the
+	// column is allowed to be null. The test passes either way provided
+	// the connector never produces the (Required, no-null_value_counts)
+	// combination.
+	if payloadField.Required {
+		assert.True(t, hasNullCount,
+			"a Required column added to an existing table requires null_value_counts in the manifest; the connector should have emitted Optional instead")
+	}
 }
 
 // runDemoteRequiredColumnRegression covers the inverse direction of
