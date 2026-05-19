@@ -11,6 +11,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/segmentio/encoding/json"
@@ -172,9 +173,9 @@ type Capture struct {
 }
 
 const (
-	automatedDiagnosticsTimeout = 5 * time.Minute  // How long to wait *after the point where the fence was requested* before triggering automated diagnostics.
-	rediscoverInterval          = 5 * time.Minute  // The capture will re-run discovery and reinitialize missing/pending tables this frequently.
-	periodicChecksInterval      = 10 * time.Minute // The capture may run some database-specific sanity checks periodically at this interval.
+	rediscoverInterval        = 5 * time.Minute  // The capture will re-run discovery and reinitialize missing/pending tables this frequently.
+	periodicChecksInterval    = 10 * time.Minute // The capture may run some database-specific sanity checks periodically at this interval.
+	streamingProgressInterval = 5 * time.Minute  // How often to log progress and diagnostics during a long-running streaming cycle.
 )
 
 var (
@@ -543,38 +544,62 @@ func (c *Capture) activatePendingStreams(ctx context.Context, discovery map[Stre
 func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStream, fenceAfter time.Duration, reportFlush bool) error {
 	log.WithField("fenceAfter", fenceAfter.String()).Debug("streaming to fence")
 
-	// Log a warning and perform replication diagnostics if we don't observe the next fence within a few minutes
-	var diagnosticsTimeout = time.AfterFunc(fenceAfter+automatedDiagnosticsTimeout, func() {
-		log.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
-		if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
-			log.WithField("err", err).Error("replication diagnostics error")
+	// Counters and an interval-start timestamp shared between the deferred final
+	// log and the periodic ticker. Each log call swaps the counters back to zero
+	// and resets the interval timer, so reported counts and rates always reflect
+	// the slice of time since the previous log. This keeps long-running cycles
+	// observable without inviting double-counting when reading consecutive lines.
+	var intervalStarted = time.Now()
+	var flushCount atomic.Int64
+	var changeCount atomic.Int64
+	var otherCount atomic.Int64
+	var changeBytes atomic.Int64
+	var logProgress = func(msg string) {
+		var intervalTime = time.Since(intervalStarted)
+		intervalStarted = time.Now()
+		var bytes = changeBytes.Swap(0)
+		var throughputMBps = float64(bytes) / (1000000 * intervalTime.Seconds())
+		log.WithFields(log.Fields{
+			"change":   changeCount.Swap(0),
+			"flush":    flushCount.Swap(0),
+			"other":    otherCount.Swap(0),
+			"duration": intervalTime.String(),
+			"rate":     fmt.Sprintf("%.02f MBps", throughputMBps),
+		}).Info(msg)
+	}
+
+	// Periodically log progress so that we retain some observability even when a
+	// streaming cycle takes much longer than expected. The WaitGroup ensures the
+	// ticker goroutine is no longer running before the deferred final log fires,
+	// so the two callers of logProgress never overlap on the shared interval state.
+	var progressDone = make(chan struct{})
+	var progressWG sync.WaitGroup
+	progressWG.Go(func() {
+		var ticker = time.NewTicker(streamingProgressInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-progressDone:
+				return
+			case <-ticker.C:
+				logProgress("processing replication events")
+				log.Warn("replication streaming has been ongoing for an unexpectedly long amount of time, running replication diagnostics")
+				if err := c.Database.ReplicationDiagnostics(ctx); err != nil {
+					log.WithField("err", err).Error("replication diagnostics error")
+				}
+			}
 		}
 	})
-	defer diagnosticsTimeout.Stop()
-
-	// When streaming completes (because we've either reached the fence or encountered an error),
-	// log the number of events which have been processed and some other statistics.
-	var streamingStarted = time.Now() // Time at which the current streaming cycle began
-	var flushCount int                // Flush events
-	var changeCount int               // Change events
-	var otherCount int                // All other events
-	var changeBytes int               // Count of change document bytes emitted
 	defer func() {
-		var streamingTime = time.Since(streamingStarted)
-		var throughputMBps = float64(changeBytes) / (1000000 * streamingTime.Seconds())
-		log.WithFields(log.Fields{
-			"change":   changeCount,
-			"flush":    flushCount,
-			"other":    otherCount,
-			"duration": streamingTime.String(),
-			"rate":     fmt.Sprintf("%.02f MBps", throughputMBps),
-		}).Info("processed replication events")
+		close(progressDone)
+		progressWG.Wait()
+		logProgress("processed replication events")
 	}()
 
 	if err := replStream.StreamToFence(ctx, fenceAfter, func(event DatabaseEvent) error {
 		// Commit events update the checkpoint cursor and may trigger a state update.
 		if event, ok := event.(CommitEvent); ok {
-			flushCount++
+			flushCount.Add(1)
 			var cursorJSON, err = event.AppendJSON(nil)
 			if err != nil {
 				return fmt.Errorf("error serializing commit cursor: %w", err)
@@ -591,15 +616,15 @@ func (c *Capture) streamToFence(ctx context.Context, replStream ReplicationStrea
 		// The core event dispatch happens in handleReplicationEvent but it's useful to
 		// count changes separately from other stuff here.
 		if _, ok := event.(ChangeEvent); ok {
-			changeCount++
+			changeCount.Add(1)
 		} else {
-			otherCount++
+			otherCount.Add(1)
 		}
 
 		if size, err := c.handleReplicationEvent(event); err != nil {
 			return err
 		} else {
-			changeBytes += size
+			changeBytes.Add(int64(size))
 		}
 		return nil
 	}); err != nil {
