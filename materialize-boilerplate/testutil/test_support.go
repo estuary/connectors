@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"runtime"
 	"slices"
 	"strconv"
@@ -1007,6 +1006,13 @@ func RunFlowctl(t *testing.T, args ...string) []byte {
 	// and the CI
 	os.Setenv("TZ", "UTC")
 	cmd := exec.Command("flowctl", args...)
+	cmd.Env = append(cmd.Environ(),
+		// Set the LOG_FORMAT to text instead of color for better to avoid
+		// escaping of ansi control characters and better compatibility with
+		// dumb terminals.
+		"LOG_FORMAT=text",
+	)
+
 	stdout, err := cmd.StdoutPipe()
 	require.NoError(t, err)
 	stderr, err := cmd.StderrPipe()
@@ -1015,12 +1021,11 @@ func RunFlowctl(t *testing.T, args ...string) []byte {
 
 	var wg sync.WaitGroup
 	wg.Add(1)
-	ansiEscape := regexp.MustCompile(`\\x1b\[[0-9;]*m`)
 	go func() {
 		defer wg.Done()
 		scanner := bufio.NewScanner(stderr)
 		for scanner.Scan() {
-			t.Log(ansiEscape.ReplaceAllString(scanner.Text(), ""))
+			t.Log(scanner.Text())
 		}
 	}()
 
