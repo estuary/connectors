@@ -183,8 +183,22 @@ func computeSchemaForUpdatedTable(
 		tempMigrateProjections = append(tempMigrateProjections, temp)
 	}
 
+	firstNewFieldIdx := len(nextFields)
 	_, lastId := appendProjectionsAsFields(&nextFields, update.NewProjections, currentHighestID)
 	appendProjectionsAsFields(&nextFields, tempMigrateProjections, lastId)
+
+	// Iceberg's spec requires an `initial-default` for a `required` column
+	// added to an existing table, and the connector doesn't supply one. A
+	// strict reader (Snowflake errno 100478 - "non-nullable column without
+	// default missing data") refuses such tables because the manifest
+	// entries for pre-existing data files carry no value_counts /
+	// null_value_counts for the new field id. Force every newly-appended
+	// field to optional regardless of `MustExist`. The same applies to the
+	// migration dance's temporary columns - they are added against
+	// existing data files that have nothing for them.
+	for i := firstNewFieldIdx; i < len(nextFields); i++ {
+		nextFields[i].Required = false
+	}
 
 	return iceberg.NewSchemaWithIdentifiers(current.ID+1, current.IdentifierFieldIDs, nextFields...)
 }

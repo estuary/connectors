@@ -24,7 +24,7 @@ table {
 	13: new: optional string
 	14: dateToStr_flow_tmp: optional string
 	15: intToDecimal_flow_tmp: optional decimal(38, 0)
-	16: decimalToFloat_flow_tmp: required double
+	16: decimalToFloat_flow_tmp: optional double
 	17: timestampToStr_flow_tmp: optional string
 }
 
@@ -37,6 +37,6 @@ table {
 	13: new: optional string
 	14: dateToStr: optional string
 	15: intToDecimal: optional decimal(38, 0)
-	16: decimalToFloat: required double
+	16: decimalToFloat: optional double
 	17: timestampToStr: optional string
 }
