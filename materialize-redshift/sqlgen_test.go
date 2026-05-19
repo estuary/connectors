@@ -145,3 +145,23 @@ func TestTruncatedIdentifier(t *testing.T) {
 		})
 	}
 }
+
+func TestIdentifierer(t *testing.T) {
+	tests := []struct {
+		name       string
+		identifier []string
+		expected   string
+	}{
+		{
+			name:       "reserved undocumented",
+			identifier: []string{"queryid"},
+			expected:   `"queryid"`,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			actual := testDialect.Identifier(tt.identifier...)
+			require.Equal(t, tt.expected, actual)
+		})
+	}
+}
