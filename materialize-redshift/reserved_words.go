@@ -127,6 +127,7 @@ var REDSHIFT_RESERVED_WORDS = []string{
 	"pivot",
 	"placing",
 	"primary",
+	"queryid",
 	"raw",
 	"readratio",
 	"recover",
