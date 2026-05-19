@@ -577,7 +577,8 @@ INSERT INTO {{ template "storeTableNameIdentifier" . }} (
 {{ define "queryStoreParts" }}
 SELECT DISTINCT partition_id FROM system.parts
 WHERE table = {{ template "storeTableNameString" . }}
-  AND database = ? AND active;
+  AND database = ? AND active
+SETTINGS select_sequential_consistency = 1;
 {{ end }}
 
 {{ define "moveStorePartition" }}

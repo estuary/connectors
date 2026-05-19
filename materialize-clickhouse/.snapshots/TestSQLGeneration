@@ -198,14 +198,16 @@ INSERT INTO flow_temp_store_0_delta_updates (theKey, aValue, flow_published_at)
 
 SELECT DISTINCT partition_id FROM system.parts
 WHERE table = 'flow_temp_store_0_key_value'
-  AND database = ? AND active;
+  AND database = ? AND active
+SETTINGS select_sequential_consistency = 1;
 --- End key_value queryStoreParts ---
 
 --- Begin delta_updates queryStoreParts ---
 
 SELECT DISTINCT partition_id FROM system.parts
 WHERE table = 'flow_temp_store_0_delta_updates'
-  AND database = ? AND active;
+  AND database = ? AND active
+SETTINGS select_sequential_consistency = 1;
 --- End delta_updates queryStoreParts ---
 
 --- Begin key_value moveStorePartition ---
