@@ -249,8 +249,8 @@
     "documentationUrl": "https://go.estuary.dev/source-facebook-marketing-native",
     "oauth2": {
       "provider": "facebook",
-      "authUrlTemplate": "https://www.facebook.com/v23.0/dialog/oauth?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&scope=ads_management,ads_read,read_insights,business_management&state={{#urlencode}}{{{  state }}}{{/urlencode}}",
-      "accessTokenUrlTemplate": "https://graph.facebook.com/v23.0/oauth/access_token?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}",
+      "authUrlTemplate": "https://www.facebook.com/v25.0/dialog/oauth?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&scope=ads_management,ads_read,read_insights,business_management&state={{#urlencode}}{{{  state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://graph.facebook.com/v25.0/oauth/access_token?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}",
       "accessTokenResponseMap": {
         "access_token": "/access_token"
       }

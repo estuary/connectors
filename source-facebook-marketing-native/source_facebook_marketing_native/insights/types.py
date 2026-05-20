@@ -186,6 +186,10 @@ class AsyncJobStatusResponse(BaseModel):
     async_status: AsyncJobStatus
     async_percent_completion: int
     error: FacebookError | None = None
+    error_code: int | None = None
+    error_subcode: int | None = None
+    error_user_title: str | None = None
+    error_user_msg: str | None = None
 
     model_config = ConfigDict(extra="allow")
 
