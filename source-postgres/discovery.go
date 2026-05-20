@@ -15,98 +15,133 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// discoveryChunkSize is the number of tables per chunk in DiscoverTableDetails.
+const discoveryChunkSize = 100
+
+// tableIDsInClause builds a parenthesized list of pgx-style row-constructor
+// placeholders and the corresponding argument slice, suitable for use in a
+// query predicate of the form `WHERE (table_schema, table_name) IN (...)`.
+//
+// Verified empirically that PostgreSQL plans this row-constructor form as a
+// BitmapOr of per-tuple index probes on the relevant catalog index, so this
+// should be efficient even on massive catalogs.
+func tableIDsInClause(tables []sqlcapture.TableID) (string, []any) {
+	var placeholders = make([]string, len(tables))
+	var args = make([]any, 0, len(tables)*2)
+	for i, t := range tables {
+		placeholders[i] = fmt.Sprintf("($%d, $%d)", 2*i+1, 2*i+2)
+		args = append(args, t.Schema, t.Table)
+	}
+	return strings.Join(placeholders, ", "), args
+}
+
 // ListTables returns identifiers for all tables visible for capture after the
 // connector's configured discovery filters are applied.
 func (db *postgresDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableID, error) {
-	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas, db.config.Advanced.CaptureAsPartitions)
+	tables, err := listTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas, db.config.Advanced.CaptureAsPartitions)
 	if err != nil {
-		return nil, fmt.Errorf("unable to list database tables: %w", err)
+		return nil, err
 	}
-	var ids = make([]sqlcapture.TableID, 0, len(tables))
-	for _, table := range tables {
-		ids = append(ids, sqlcapture.TableID{Schema: table.Schema, Table: table.Name})
+
+	// Exclude the watermarks table from discovery. The connector may write to
+	// it during backfills but it should never be surfaced as a bindable source.
+	var watermarks = db.WatermarksTable()
+	tables = slices.DeleteFunc(tables, func(t sqlcapture.TableID) bool {
+		return sqlcapture.JoinStreamID(t.Schema, t.Table) == watermarks
+	})
+
+	// Exclude tables not in the configured publication unless the user has
+	// explicitly opted in to discovering them.
+	if !db.config.Advanced.DiscoverUnpublishedTables {
+		publicationStatus, err := listPublishedTables(ctx, db.conn, db.config.Advanced.PublicationName)
+		if err != nil {
+			return nil, err
+		}
+		tables = slices.DeleteFunc(tables, func(t sqlcapture.TableID) bool {
+			return !publicationStatus[sqlcapture.JoinStreamID(t.Schema, t.Table)]
+		})
 	}
-	return ids, nil
+
+	return tables, nil
 }
 
-// DiscoverTableDetails queries the database for detailed schema information
-// about the specified tables.
+// DiscoverTableDetails queries the database for detailed schema information about
+// the specified tables. The per-table metadata queries are chunked into batches.
 func (db *postgresDatabase) DiscoverTableDetails(ctx context.Context, requested []sqlcapture.TableID) (map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, error) {
-	// Get lists of all tables, columns and primary keys in the database
-	var tables, err = getTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas, db.config.Advanced.CaptureAsPartitions)
-	if err != nil {
-		return nil, fmt.Errorf("unable to list database tables: %w", err)
-	}
-	columns, err := getColumns(ctx, db.conn)
-	if err != nil {
-		return nil, fmt.Errorf("unable to list database columns: %w", err)
-	}
-	primaryKeys, err := getPrimaryKeys(ctx, db.conn)
-	if err != nil {
-		return nil, fmt.Errorf("unable to list database primary keys: %w", err)
-	}
-	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn)
-	if err != nil {
-		return nil, fmt.Errorf("unable to list database secondary indexes: %w", err)
-	}
-	generatedColumns, err := getGeneratedColumns(ctx, db.conn)
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if !errors.As(err, &pgErr) || pgErr.Code != "42703" {
-			// Failure is expected on pre-12 versions of PostgreSQL which don't have
-			// the 'attgenerated' column. Other errors should still be logged but
-			// also probably don't warrant a fatal error.
-			logrus.WithError(err).Warn("unable to list database generated columns")
-		}
-		generatedColumns = make(map[sqlcapture.StreamID][]string) // Empty map makes downstream logic simpler
-	}
-
-	// Column descriptions just add a bit of user-friendliness. They're so unimportant
-	// that failure to list them shouldn't even be a fatal error.
-	columnDescriptions, err := getColumnDescriptions(ctx, db.conn)
-	if err != nil {
-		logrus.WithField("err", err).Warn("error fetching column descriptions")
-	}
-
-	// Aggregate column and primary key information into DiscoveryInfo structs
-	// using a map from fully-qualified "<schema>.<name>" table names to
-	// the corresponding DiscoveryInfo.
-	var tableDetails = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(tables))
-	for _, table := range tables {
-		tableDetails[sqlcapture.JoinStreamID(table.Schema, table.Name)] = table
-	}
 	var tableMap = make(map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, len(requested))
-	for _, req := range requested {
-		var streamID = sqlcapture.JoinStreamID(req.Schema, req.Table)
-		var table, ok = tableDetails[streamID]
-		if !ok {
-			continue // Requested table is not present in the database or was excluded by the connector's discovery filters.
+	for i := 0; i < len(requested); i += discoveryChunkSize {
+		var end = min(i+discoveryChunkSize, len(requested))
+		if err := db.extendTableDetails(ctx, tableMap, requested[i:end]); err != nil {
+			return nil, err
 		}
-		if streamID == db.WatermarksTable() {
-			// We want to exclude the watermarks table from the output bindings, but we still discover it
-			table.OmitBinding = true
+	}
+
+	// Determine whether the database sorts the keys of each table in a
+	// predictable order or not. The term "predictable" here specifically
+	// means "able to be reproduced using bytewise lexicographic ordering of
+	// the serialized row keys generated by this connector".
+	for _, info := range tableMap {
+		for _, colName := range info.PrimaryKey {
+			if !predictableColumnOrder(info.Columns[colName].DataType) {
+				info.UnpredictableKeyOrdering = true
+			}
 		}
+	}
+
+	if logrus.IsLevelEnabled(logrus.DebugLevel) {
+		for id, info := range tableMap {
+			logrus.WithFields(logrus.Fields{
+				"stream":     id,
+				"keyColumns": info.PrimaryKey,
+			}).Debug("discovered table")
+		}
+	}
+
+	return tableMap, nil
+}
+
+// extendTableDetails runs the per-chunk discovery queries (tables, columns,
+// column descriptions, primary keys, generated columns, secondary indexes) for
+// one batch of requested tables and merges the results into dst.
+func (db *postgresDatabase) extendTableDetails(ctx context.Context, dst map[sqlcapture.StreamID]*sqlcapture.DiscoveryInfo, requested []sqlcapture.TableID) error {
+	tables, err := getTables(ctx, db.conn, requested)
+	if err != nil {
+		return fmt.Errorf("unable to list database tables: %w", err)
+	}
+	for _, table := range tables {
+		var streamID = sqlcapture.JoinStreamID(table.Schema, table.Name)
 		table.UseSchemaInference = db.featureFlags["use_schema_inference"]
 		table.EmitSourcedSchemas = db.featureFlags["emit_sourced_schemas"]
-		tableMap[streamID] = table
+		dst[streamID] = table
+	}
+
+	columns, err := getColumns(ctx, db.conn, requested)
+	if err != nil {
+		return fmt.Errorf("unable to list database columns: %w", err)
 	}
 	for _, column := range columns {
 		var streamID = sqlcapture.JoinStreamID(column.TableSchema, column.TableName)
-		var info, ok = tableMap[streamID]
+		var info, ok = dst[streamID]
 		if !ok {
 			continue
 		}
-
 		if info.Columns == nil {
 			info.Columns = make(map[string]sqlcapture.ColumnInfo)
 		}
 		info.Columns[column.Name] = column
 		info.ColumnNames = append(info.ColumnNames, column.Name)
-		tableMap[streamID] = info
+		dst[streamID] = info
+	}
+
+	// Column descriptions just add a bit of user-friendliness. They're so unimportant
+	// that failure to list them shouldn't even be a fatal error.
+	columnDescriptions, err := getColumnDescriptions(ctx, db.conn, requested)
+	if err != nil {
+		logrus.WithField("err", err).Warn("error fetching column descriptions")
 	}
 	for _, desc := range columnDescriptions {
 		var streamID = sqlcapture.JoinStreamID(desc.TableSchema, desc.TableName)
-		if info, ok := tableMap[streamID]; ok {
+		if info, ok := dst[streamID]; ok {
 			if column, ok := info.Columns[desc.ColumnName]; ok {
 				logrus.WithFields(logrus.Fields{
 					"table":  streamID,
@@ -117,14 +152,16 @@ func (db *postgresDatabase) DiscoverTableDetails(ctx context.Context, requested 
 				column.Description = &description
 				info.Columns[desc.ColumnName] = column
 			}
-			tableMap[streamID] = info
+			dst[streamID] = info
 		}
 	}
 
+	primaryKeys, err := getPrimaryKeys(ctx, db.conn, requested)
+	if err != nil {
+		return fmt.Errorf("unable to list database primary keys: %w", err)
+	}
 	for streamID, key := range primaryKeys {
-		// The `getColumns()` query implements the "exclude system schemas" logic,
-		// so here we ignore primary key information for tables we don't care about.
-		var info, ok = tableMap[streamID]
+		var info, ok = dst[streamID]
 		if !ok {
 			continue
 		}
@@ -133,15 +170,29 @@ func (db *postgresDatabase) DiscoverTableDetails(ctx context.Context, requested 
 			"key":   key,
 		}).Trace("queried primary key")
 		info.PrimaryKey = key
-		tableMap[streamID] = info
+		dst[streamID] = info
 	}
 
-	// Add generated columns information
-	for streamID, table := range tableMap {
-		if details, ok := table.ExtraDetails.(*postgresTableDiscoveryDetails); ok {
-			details.GeneratedColumns = generatedColumns[streamID]
+	generatedColumns, err := getGeneratedColumns(ctx, db.conn, requested)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if !errors.As(err, &pgErr) || pgErr.Code != "42703" {
+			// Failure is expected on pre-12 versions of PostgreSQL which don't have
+			// the 'attgenerated' column. Other errors should still be logged but
+			// also probably don't warrant a fatal error.
+			logrus.WithError(err).Warn("unable to list database generated columns")
 		}
-		for _, columnName := range generatedColumns[streamID] {
+		generatedColumns = nil
+	}
+	for streamID, columnNames := range generatedColumns {
+		var table, ok = dst[streamID]
+		if !ok {
+			continue
+		}
+		if details, ok := table.ExtraDetails.(*postgresTableDiscoveryDetails); ok {
+			details.GeneratedColumns = columnNames
+		}
+		for _, columnName := range columnNames {
 			logrus.WithFields(logrus.Fields{
 				"table":  streamID,
 				"column": columnName,
@@ -154,8 +205,12 @@ func (db *postgresDatabase) DiscoverTableDetails(ctx context.Context, requested 
 
 	// For tables which have no primary key but have a valid secondary index,
 	// fill in that secondary index as the 'primary key' for our purposes.
+	secondaryIndexes, err := getSecondaryIndexes(ctx, db.conn, requested)
+	if err != nil {
+		return fmt.Errorf("unable to list database secondary indexes: %w", err)
+	}
 	for streamID, indexColumns := range secondaryIndexes {
-		var info, ok = tableMap[streamID]
+		var info, ok = dst[streamID]
 		if !ok || info.PrimaryKey != nil {
 			continue
 		}
@@ -194,41 +249,7 @@ func (db *postgresDatabase) DiscoverTableDetails(ctx context.Context, requested 
 		}
 	}
 
-	// Determine whether the database sorts the keys of a each table in a
-	// predictable order or not. The term "predictable" here specifically
-	// means "able to be reproduced using bytewise lexicographic ordering of
-	// the serialized row keys generated by this connector".
-	for _, info := range tableMap {
-		for _, colName := range info.PrimaryKey {
-			if !predictableColumnOrder(info.Columns[colName].DataType) {
-				info.UnpredictableKeyOrdering = true
-			}
-		}
-	}
-
-	// Filter discovery to only published tables unless explicitly configured otherwise.
-	if !db.config.Advanced.DiscoverUnpublishedTables {
-		publicationStatus, err := listPublishedTables(ctx, db.conn, db.config.Advanced.PublicationName)
-		if err != nil {
-			return nil, err
-		}
-		for streamID, info := range tableMap {
-			if !publicationStatus[streamID] {
-				info.OmitBinding = true
-			}
-		}
-	}
-
-	if logrus.IsLevelEnabled(logrus.DebugLevel) {
-		for id, info := range tableMap {
-			logrus.WithFields(logrus.Fields{
-				"stream":     id,
-				"keyColumns": info.PrimaryKey,
-			}).Debug("discovered table")
-		}
-	}
-
-	return tableMap, nil
+	return nil
 }
 
 // Returns true if the bytewise lexicographic ordering of serialized row keys for
@@ -402,10 +423,14 @@ type postgresTableDiscoveryDetails struct {
 	GeneratedColumns []string // List of the names of generated columns in this table, in no particular order.
 }
 
-func getTables(ctx context.Context, conn *pgxpool.Pool, selectedSchemas []string, captureAsPartitions bool) ([]*sqlcapture.DiscoveryInfo, error) {
+// listTables performs the raw enumeration query of all tables in the database,
+// optionally restricted to a list of specified schemas. System schemas and
+// temporary or unlogged tables are always excluded.
+func listTables(ctx context.Context, conn *pgxpool.Pool, selectedSchemas []string, captureAsPartitions bool) ([]sqlcapture.TableID, error) {
 	logrus.Debug("listing all tables in the database")
 
 	var query = new(strings.Builder)
+	var args []any
 	fmt.Fprintf(query, "SELECT n.nspname, c.relname")
 	fmt.Fprintf(query, "  FROM pg_catalog.pg_class c")
 	fmt.Fprintf(query, "  JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)")
@@ -420,63 +445,89 @@ func getTables(ctx context.Context, conn *pgxpool.Pool, selectedSchemas []string
 		fmt.Fprintf(query, "    AND NOT c.relispartition")
 		fmt.Fprintf(query, "    AND c.relkind IN ('r', 'p')") // Both ordinary and partitioned tables
 	}
+	if len(selectedSchemas) > 0 {
+		args = append(args, selectedSchemas)
+		fmt.Fprintf(query, "    AND n.nspname = ANY($%d)", len(args))
+	}
 	fmt.Fprintf(query, ";")
 
-	var tables []*sqlcapture.DiscoveryInfo
-	var rows, err = conn.Query(ctx, query.String())
+	var rows, err = conn.Query(ctx, query.String(), args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
 	defer rows.Close()
+	var tables []sqlcapture.TableID
 	for rows.Next() {
 		var tableSchema, tableName string
 		if err := rows.Scan(&tableSchema, &tableName); err != nil {
 			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
-		var omitBinding = false
-		if len(selectedSchemas) > 0 && !slices.Contains(selectedSchemas, tableSchema) {
-			logrus.WithFields(logrus.Fields{
-				"schema": tableSchema,
-				"table":  tableName,
-			}).Debug("table in filtered schema")
-			omitBinding = true
+		tables = append(tables, sqlcapture.TableID{Schema: tableSchema, Table: tableName})
+	}
+	return tables, rows.Err()
+}
+
+// getTables fetches table-level discovery metadata for a specific set of
+// tables.
+func getTables(ctx context.Context, conn *pgxpool.Pool, requested []sqlcapture.TableID) ([]*sqlcapture.DiscoveryInfo, error) {
+	if len(requested) == 0 {
+		return nil, nil
+	}
+	var inClause, args = tableIDsInClause(requested)
+	var query = fmt.Sprintf(
+		`SELECT n.nspname, c.relname`+
+			`  FROM pg_catalog.pg_class c`+
+			`  JOIN pg_catalog.pg_namespace n ON (n.oid = c.relnamespace)`+
+			`  WHERE (n.nspname, c.relname) IN (%s);`, inClause)
+
+	var rows, err = conn.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("error executing query: %w", err)
+	}
+	defer rows.Close()
+	var tables []*sqlcapture.DiscoveryInfo
+	for rows.Next() {
+		var tableSchema, tableName string
+		if err := rows.Scan(&tableSchema, &tableName); err != nil {
+			return nil, fmt.Errorf("error scanning result row: %w", err)
 		}
 		tables = append(tables, &sqlcapture.DiscoveryInfo{
 			Schema:       tableSchema,
 			Name:         tableName,
 			BaseTable:    true, // PostgreSQL discovery queries only ever list 'BASE TABLE' entities
-			OmitBinding:  omitBinding,
 			ExtraDetails: &postgresTableDiscoveryDetails{},
 		})
 	}
 	return tables, rows.Err()
 }
 
-const queryDiscoverColumns = `
-  SELECT nc.nspname as table_schema,
-         c.relname as table_name,
-		 a.attnum as ordinal_position,
-		 a.attname as column_name,
-		 NOT (a.attnotnull OR (t.typtype = 'd' AND t.typnotnull)) AS is_nullable,
-		 COALESCE(bt.typname, t.typname) AS udt_name,
-		 t.typtype::text AS typtype,
-		 a.atttypmod-4 as char_max_length
-	FROM pg_catalog.pg_attribute a
-	JOIN pg_catalog.pg_type t ON a.atttypid = t.oid
-	JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
-	JOIN pg_catalog.pg_namespace nc ON c.relnamespace = nc.oid
-	LEFT JOIN (pg_catalog.pg_type bt JOIN pg_namespace nbt ON bt.typnamespace = nbt.oid)
-	       ON t.typtype = 'd'::"char" AND t.typbasetype = bt.oid
-    WHERE NOT pg_is_other_temp_schema(nc.oid)
-	  AND a.attnum > 0
-	  AND NOT a.attisdropped
-	  AND (c.relkind = ANY (ARRAY['r'::"char", 'v'::"char", 'f'::"char", 'p'::"char"]))
-	ORDER BY nc.nspname, c.relname, a.attnum;`
+func getColumns(ctx context.Context, conn *pgxpool.Pool, requested []sqlcapture.TableID) ([]sqlcapture.ColumnInfo, error) {
+	if len(requested) == 0 {
+		return nil, nil
+	}
+	var inClause, args = tableIDsInClause(requested)
+	var query = fmt.Sprintf(`
+	  SELECT nc.nspname as table_schema,
+	         c.relname as table_name,
+			 a.attnum as ordinal_position,
+			 a.attname as column_name,
+			 NOT (a.attnotnull OR (t.typtype = 'd' AND t.typnotnull)) AS is_nullable,
+			 COALESCE(bt.typname, t.typname) AS udt_name,
+			 t.typtype::text AS typtype,
+			 a.atttypmod-4 as char_max_length
+		FROM pg_catalog.pg_attribute a
+		JOIN pg_catalog.pg_type t ON a.atttypid = t.oid
+		JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
+		JOIN pg_catalog.pg_namespace nc ON c.relnamespace = nc.oid
+		LEFT JOIN (pg_catalog.pg_type bt JOIN pg_namespace nbt ON bt.typnamespace = nbt.oid)
+		       ON t.typtype = 'd'::"char" AND t.typbasetype = bt.oid
+	    WHERE (nc.nspname, c.relname) IN (%s)
+	      AND a.attnum > 0
+		  AND NOT a.attisdropped
+		ORDER BY nc.nspname, c.relname, a.attnum;`, inClause)
 
-func getColumns(ctx context.Context, conn *pgxpool.Pool) ([]sqlcapture.ColumnInfo, error) {
-	logrus.Debug("listing all columns in the database")
 	var columns []sqlcapture.ColumnInfo
-	var rows, err = conn.Query(ctx, queryDiscoverColumns)
+	var rows, err = conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
@@ -700,36 +751,41 @@ func (t postgresCompositeType) JSONSchema(isColumnNullable, isPrimaryKey bool, f
 	return colSchema.toType(), nil
 }
 
-// Query copied from pgjdbc's method PgDatabaseMetaData.getPrimaryKeys() with
-// the always-NULL `TABLE_CAT` column omitted.
-//
-// See: https://github.com/pgjdbc/pgjdbc/blob/master/pgjdbc/src/main/java/org/postgresql/jdbc/PgDatabaseMetaData.java#L2134
-const queryDiscoverPrimaryKeys = `
-  SELECT result.TABLE_SCHEM, result.TABLE_NAME, result.COLUMN_NAME, result.KEY_SEQ
-  FROM (
-    SELECT n.nspname AS TABLE_SCHEM,
-      ct.relname AS TABLE_NAME, a.attname AS COLUMN_NAME,
-      (information_schema._pg_expandarray(i.indkey)).n AS KEY_SEQ, ci.relname AS PK_NAME,
-      information_schema._pg_expandarray(i.indkey) AS KEYS, a.attnum AS A_ATTNUM
-    FROM pg_catalog.pg_class ct
-      JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)
-      JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)
-      JOIN pg_catalog.pg_index i ON (a.attrelid = i.indrelid)
-      JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)
-    WHERE i.indisprimary
-  ) result
-  WHERE result.A_ATTNUM = (result.KEYS).x
-  ORDER BY result.table_name, result.pk_name, result.key_seq;
-`
-
 // getPrimaryKeys queries the database to produce a map from table names to
 // primary keys. Table names are fully qualified as "<schema>.<name>", and
 // primary keys are represented as a list of column names, in the order that
 // they form the table's primary key.
-func getPrimaryKeys(ctx context.Context, conn *pgxpool.Pool) (map[sqlcapture.StreamID][]string, error) {
-	logrus.Debug("listing all primary-key columns in the database")
+//
+// Query adapted from pgjdbc's method PgDatabaseMetaData.getPrimaryKeys() with
+// the always-NULL `TABLE_CAT` column omitted and a (schema, table) IN-clause
+// added to keep per-chunk response size bounded.
+//
+// See: https://github.com/pgjdbc/pgjdbc/blob/master/pgjdbc/src/main/java/org/postgresql/jdbc/PgDatabaseMetaData.java#L2134
+func getPrimaryKeys(ctx context.Context, conn *pgxpool.Pool, requested []sqlcapture.TableID) (map[sqlcapture.StreamID][]string, error) {
+	if len(requested) == 0 {
+		return nil, nil
+	}
+	var inClause, args = tableIDsInClause(requested)
+	var query = fmt.Sprintf(`
+	  SELECT result.TABLE_SCHEM, result.TABLE_NAME, result.COLUMN_NAME, result.KEY_SEQ
+	  FROM (
+	    SELECT n.nspname AS TABLE_SCHEM,
+	      ct.relname AS TABLE_NAME, a.attname AS COLUMN_NAME,
+	      (information_schema._pg_expandarray(i.indkey)).n AS KEY_SEQ, ci.relname AS PK_NAME,
+	      information_schema._pg_expandarray(i.indkey) AS KEYS, a.attnum AS A_ATTNUM
+	    FROM pg_catalog.pg_class ct
+	      JOIN pg_catalog.pg_attribute a ON (ct.oid = a.attrelid)
+	      JOIN pg_catalog.pg_namespace n ON (ct.relnamespace = n.oid)
+	      JOIN pg_catalog.pg_index i ON (a.attrelid = i.indrelid)
+	      JOIN pg_catalog.pg_class ci ON (ci.oid = i.indexrelid)
+	    WHERE i.indisprimary AND (n.nspname, ct.relname) IN (%s)
+	  ) result
+	  WHERE result.A_ATTNUM = (result.KEYS).x
+	  ORDER BY result.table_name, result.pk_name, result.key_seq;
+	`, inClause)
+
 	var keys = make(map[sqlcapture.StreamID][]string)
-	var rows, err = conn.Query(ctx, queryDiscoverPrimaryKeys)
+	var rows, err = conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
@@ -749,34 +805,37 @@ func getPrimaryKeys(ctx context.Context, conn *pgxpool.Pool) (map[sqlcapture.Str
 	return keys, rows.Err()
 }
 
-const queryDiscoverSecondaryIndices = `
-SELECT r.table_schema, r.table_name, r.index_name, (r.index_keys).n, r.column_name
-FROM (
-  SELECT tn.nspname AS table_schema,
-         tc.relname AS table_name,
-	     ic.relname AS index_name,
-	     information_schema._pg_expandarray(ix.indkey) AS index_keys,
-		 a.attnum AS column_number,
-		 a.attname AS column_name
-  FROM pg_catalog.pg_index ix
-       JOIN pg_catalog.pg_class ic ON (ic.oid = ix.indexrelid)
-	   JOIN pg_catalog.pg_class tc ON (tc.oid = ix.indrelid)
-	   JOIN pg_catalog.pg_namespace tn ON (tn.oid = tc.relnamespace)
-	   JOIN pg_catalog.pg_attribute a ON (a.attrelid = tc.oid)
-  WHERE ix.indisunique AND ix.indexprs IS NULL AND tc.relkind = 'r'
-    AND NOT ix.indisprimary
-  ORDER BY tc.relname, ic.relname
-) r
-WHERE r.column_number = (r.index_keys).x
-ORDER BY r.table_schema, r.table_name, r.index_name, (r.index_keys).n
-`
+func getSecondaryIndexes(ctx context.Context, conn *pgxpool.Pool, requested []sqlcapture.TableID) (map[sqlcapture.StreamID]map[string][]string, error) {
+	if len(requested) == 0 {
+		return nil, nil
+	}
+	var inClause, args = tableIDsInClause(requested)
+	var query = fmt.Sprintf(`
+	SELECT r.table_schema, r.table_name, r.index_name, (r.index_keys).n, r.column_name
+	FROM (
+	  SELECT tn.nspname AS table_schema,
+	         tc.relname AS table_name,
+		     ic.relname AS index_name,
+		     information_schema._pg_expandarray(ix.indkey) AS index_keys,
+			 a.attnum AS column_number,
+			 a.attname AS column_name
+	  FROM pg_catalog.pg_index ix
+	       JOIN pg_catalog.pg_class ic ON (ic.oid = ix.indexrelid)
+		   JOIN pg_catalog.pg_class tc ON (tc.oid = ix.indrelid)
+		   JOIN pg_catalog.pg_namespace tn ON (tn.oid = tc.relnamespace)
+		   JOIN pg_catalog.pg_attribute a ON (a.attrelid = tc.oid)
+	  WHERE ix.indisunique AND ix.indexprs IS NULL AND tc.relkind = 'r'
+	    AND NOT ix.indisprimary
+	    AND (tn.nspname, tc.relname) IN (%s)
+	  ORDER BY tc.relname, ic.relname
+	) r
+	WHERE r.column_number = (r.index_keys).x
+	ORDER BY r.table_schema, r.table_name, r.index_name, (r.index_keys).n
+	`, inClause)
 
-func getSecondaryIndexes(ctx context.Context, conn *pgxpool.Pool) (map[sqlcapture.StreamID]map[string][]string, error) {
-	logrus.Debug("listing secondary indexes")
-	// Run the 'list secondary indexes' query and aggregate results into
-	// a `map[StreamID]map[IndexName][]ColumnName`
+	// Aggregate results into a `map[StreamID]map[IndexName][]ColumnName`.
 	var streamIndexColumns = make(map[sqlcapture.StreamID]map[string][]string)
-	var rows, err = conn.Query(ctx, queryDiscoverSecondaryIndices)
+	var rows, err = conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
@@ -802,20 +861,23 @@ func getSecondaryIndexes(ctx context.Context, conn *pgxpool.Pool) (map[sqlcaptur
 	return streamIndexColumns, rows.Err()
 }
 
-const queryListGeneratedColumns = `
-	SELECT n.nspname AS table_schema,
-       c.relname AS table_name,
-       a.attname AS column_name
-	FROM pg_catalog.pg_attribute a
-	JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
-	JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
-	WHERE a.attgenerated = 's'
-	ORDER BY n.nspname, c.relname, a.attname;
-`
+func getGeneratedColumns(ctx context.Context, conn *pgxpool.Pool, requested []sqlcapture.TableID) (map[sqlcapture.StreamID][]string, error) {
+	if len(requested) == 0 {
+		return nil, nil
+	}
+	var inClause, args = tableIDsInClause(requested)
+	var query = fmt.Sprintf(`
+		SELECT n.nspname AS table_schema,
+	       c.relname AS table_name,
+	       a.attname AS column_name
+		FROM pg_catalog.pg_attribute a
+		JOIN pg_catalog.pg_class c ON a.attrelid = c.oid
+		JOIN pg_catalog.pg_namespace n ON c.relnamespace = n.oid
+		WHERE a.attgenerated = 's' AND (n.nspname, c.relname) IN (%s)
+		ORDER BY n.nspname, c.relname, a.attname;
+	`, inClause)
 
-func getGeneratedColumns(ctx context.Context, conn *pgxpool.Pool) (map[sqlcapture.StreamID][]string, error) {
-	logrus.Debug("listing generated columns")
-	var rows, err = conn.Query(ctx, queryListGeneratedColumns)
+	var rows, err = conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error querying generated columns: %w", err)
 	}
@@ -836,18 +898,6 @@ func getGeneratedColumns(ctx context.Context, conn *pgxpool.Pool) (map[sqlcaptur
 	return generatedColumns, nil
 }
 
-const queryColumnDescriptions = `
-    SELECT * FROM (
-		SELECT
-		    isc.table_schema,
-			isc.table_name,
-			isc.column_name,
-			pg_catalog.col_description(format('"%s"."%s"',isc.table_schema,isc.table_name)::regclass::oid,isc.ordinal_position) description
-		FROM information_schema.columns isc
-		WHERE isc.table_schema NOT IN ('pg_catalog', 'pg_internal', 'information_schema', 'catalog_history', 'cron', 'pglogical')
-	) as descriptions WHERE description != '';
-`
-
 type columnDescription struct {
 	TableSchema string
 	TableName   string
@@ -855,9 +905,25 @@ type columnDescription struct {
 	Description string
 }
 
-func getColumnDescriptions(ctx context.Context, conn *pgxpool.Pool) ([]columnDescription, error) {
+func getColumnDescriptions(ctx context.Context, conn *pgxpool.Pool, requested []sqlcapture.TableID) ([]columnDescription, error) {
+	if len(requested) == 0 {
+		return nil, nil
+	}
+	var inClause, args = tableIDsInClause(requested)
+	var query = fmt.Sprintf(`
+	    SELECT * FROM (
+			SELECT
+			    isc.table_schema,
+				isc.table_name,
+				isc.column_name,
+				pg_catalog.col_description(format('"%%s"."%%s"',isc.table_schema,isc.table_name)::regclass::oid,isc.ordinal_position) description
+			FROM information_schema.columns isc
+			WHERE (isc.table_schema, isc.table_name) IN (%s)
+		) as descriptions WHERE description != '';
+	`, inClause)
+
 	var descriptions []columnDescription
-	var rows, err = conn.Query(ctx, queryColumnDescriptions)
+	var rows, err = conn.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("error executing query: %w", err)
 	}
