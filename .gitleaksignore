@@ -1,0 +1,13 @@
+# Documentation references — not real secrets.
+# These are example/placeholder strings shown to users so they know what to
+# look for in their own credential files (e.g. "your key starts with
+# `-----BEGIN PRIVATE KEY-----`").
+docs/reference/Connectors/capture-connectors/alloydb.md:private-key:116
+docs/reference/Connectors/capture-connectors/apple-app-store.md:private-key:83
+docs/reference/Connectors/capture-connectors/snowflake.md:private-key:182
+docs/reference/Connectors/materialization-connectors/MySQL/amazon-rds-mysql.md:private-key:41
+docs/reference/Connectors/materialization-connectors/MySQL/google-cloud-sql-mysql.md:private-key:33
+docs/reference/Connectors/materialization-connectors/alloydb.md:private-key:72
+docs/reference/Connectors/materialization-connectors/PostgreSQL/google-cloud-sql-postgres.md:private-key:32
+docs/reference/Connectors/materialization-connectors/PostgreSQL/amazon-rds-postgres.md:private-key:37
+docs/reference/Connectors/materialization-connectors/Snowflake.md:private-key:180
