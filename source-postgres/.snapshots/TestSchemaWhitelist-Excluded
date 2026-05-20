@@ -1,0 +1,3 @@
+sql> CREATE TABLE test.schemawhitelist_excluded_533051 (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables ===
+

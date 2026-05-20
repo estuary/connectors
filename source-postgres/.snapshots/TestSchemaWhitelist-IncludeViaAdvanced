@@ -1,0 +1,4 @@
+sql> CREATE TABLE test.schemawhitelist_includeviaadvanced_595331 (id INTEGER PRIMARY KEY, data TEXT)
+=== Discover: Discover Tables ===
+acmeCo/test_capture/test/schemawhitelist_includeviaadvanced_595331
+

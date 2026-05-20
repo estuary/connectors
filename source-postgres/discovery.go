@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/estuary/connectors/go/tableglob"
 	"github.com/estuary/connectors/sqlcapture"
 	"github.com/invopop/jsonschema"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -17,6 +18,62 @@ import (
 
 // discoveryChunkSize is the number of tables per chunk in DiscoverTableDetails.
 const discoveryChunkSize = 100
+
+type discoveryFilters struct {
+	IncludeSchemas            []string `json:"include_schemas,omitempty" jsonschema:"title=Include Schemas,description=If specified only tables in the listed schemas will be discovered. Combined as a union with the 'Discovery Schema Selection' setting under Advanced Options."`
+	ExcludeSchemas            []string `json:"exclude_schemas,omitempty" jsonschema:"title=Exclude Schemas,description=Tables in the listed schemas will be excluded from discovery."`
+	TablePatterns             []string `json:"table_patterns,omitempty"  jsonschema:"title=Table Patterns,description=If specified only tables matching at least one of these glob patterns will be discovered. A pattern containing a '.' matches against the qualified 'schema.table' name. A pattern without a '.' matches the unqualified table name in any schema. Use '*' or '?' as wildcards."`
+	DiscoverUnpublishedTables bool     `json:"discover_unpublished_tables,omitempty" jsonschema:"title=Discover Unpublished Tables,description=When set the capture will discover all tables including those not currently in the publication. Combined as a union with the equivalent setting under Advanced Options."`
+}
+
+// Validate checks that the configured discovery filters are well-formed. The
+// only thing that can actually be invalid here is a malformed table pattern.
+func (f *discoveryFilters) Validate() error {
+	for _, raw := range f.TablePatterns {
+		if _, err := tableglob.Compile(raw); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// apply filters the input table list by the configured exclude-schemas and
+// table patterns. The include-schemas list is intentionally not consulted
+// here: it is expected to have already been pushed into the listTables query.
+func (f *discoveryFilters) apply(tables []sqlcapture.TableID) ([]sqlcapture.TableID, error) {
+	var patterns = make([]*tableglob.Pattern, 0, len(f.TablePatterns))
+	for _, raw := range f.TablePatterns {
+		var p, err = tableglob.Compile(raw)
+		if err != nil {
+			return nil, err
+		}
+		patterns = append(patterns, p)
+	}
+	var excluded = make(map[string]struct{}, len(f.ExcludeSchemas))
+	for _, schema := range f.ExcludeSchemas {
+		excluded[schema] = struct{}{}
+	}
+	var filtered = make([]sqlcapture.TableID, 0, len(tables))
+	for _, t := range tables {
+		if _, ok := excluded[t.Schema]; ok {
+			continue
+		}
+		if len(patterns) > 0 && !matchesAnyPattern(patterns, t) {
+			continue
+		}
+		filtered = append(filtered, t)
+	}
+	return filtered, nil
+}
+
+func matchesAnyPattern(patterns []*tableglob.Pattern, t sqlcapture.TableID) bool {
+	for _, p := range patterns {
+		if p.MatchTable(t.Schema, t.Table) {
+			return true
+		}
+	}
+	return false
+}
 
 // tableIDsInClause builds a parenthesized list of pgx-style row-constructor
 // placeholders and the corresponding argument slice, suitable for use in a
@@ -38,9 +95,19 @@ func tableIDsInClause(tables []sqlcapture.TableID) (string, []any) {
 // ListTables returns identifiers for all tables visible for capture after the
 // connector's configured discovery filters are applied.
 func (db *postgresDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableID, error) {
-	tables, err := listTables(ctx, db.conn, db.config.Advanced.DiscoverSchemas, db.config.Advanced.CaptureAsPartitions)
+	// Union the new DiscoveryFilters.IncludeSchemas with the legacy
+	// Advanced.DiscoverSchemas whitelist and push the result into listTables.
+	var includeSchemas = slices.Concat(db.config.DiscoveryFilters.IncludeSchemas, db.config.Advanced.DiscoverSchemas)
+	slices.Sort(includeSchemas)
+	includeSchemas = slices.Compact(includeSchemas)
+
+	tables, err := listTables(ctx, db.conn, includeSchemas, db.config.Advanced.CaptureAsPartitions)
 	if err != nil {
 		return nil, err
+	}
+	tables, err = db.config.DiscoveryFilters.apply(tables)
+	if err != nil {
+		return nil, fmt.Errorf("error applying discovery filters: %w", err)
 	}
 
 	// Exclude the watermarks table from discovery. The connector may write to
@@ -51,8 +118,10 @@ func (db *postgresDatabase) ListTables(ctx context.Context) ([]sqlcapture.TableI
 	})
 
 	// Exclude tables not in the configured publication unless the user has
-	// explicitly opted in to discovering them.
-	if !db.config.Advanced.DiscoverUnpublishedTables {
+	// explicitly opted in to discovering them. The new DiscoveryFilters setting
+	// and the legacy Advanced one are OR'd together for back-compat.
+	var discoverUnpublished = db.config.Advanced.DiscoverUnpublishedTables || db.config.DiscoveryFilters.DiscoverUnpublishedTables
+	if !discoverUnpublished {
 		publicationStatus, err := listPublishedTables(ctx, db.conn, db.config.Advanced.PublicationName)
 		if err != nil {
 			return nil, err
