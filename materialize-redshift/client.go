@@ -92,19 +92,24 @@ func (c *client) TruncateTable(ctx context.Context, path []string) (string, boil
 var migrationSteps = []sql.ColumnMigrationStep{
 	sql.StdMigrationSteps[0],
 	func(dialect sql.Dialect, table sql.Table, instructions []sql.MigrationInstruction) ([]string, error) {
-		stmts := make([]string, 0, len(instructions))
-		for _, ins := range instructions {
-			stmt := fmt.Sprintf("UPDATE %s SET %s = %s WHERE %s IS NOT NULL;",
-				table.Identifier,
-				ins.TempColumnIdentifier,
-				ins.TypeMigration.CastSQL(ins.TypeMigration),
-				ins.TypeMigration.Identifier,
-			)
+		var query strings.Builder
+		query.WriteString(fmt.Sprintf("UPDATE %s SET ", table.Identifier))
 
-			stmts = append(stmts, stmt)
+		var where strings.Builder
+		where.WriteString(" WHERE ")
+
+		for i, ins := range instructions {
+			if i > 0 {
+				query.WriteString(", ")
+				where.WriteString(" OR ")
+			}
+			query.WriteString(fmt.Sprintf("%s = %s", ins.TempColumnIdentifier, ins.TypeMigration.CastSQL(ins.TypeMigration)))
+			where.WriteString(fmt.Sprintf("%s IS NOT NULL", ins.TypeMigration.Identifier))
 		}
 
-		return stmts, nil
+		query.WriteString(where.String())
+
+		return []string{query.String()}, nil
 	},
 	sql.StdMigrationSteps[2],
 	sql.StdMigrationSteps[3],
