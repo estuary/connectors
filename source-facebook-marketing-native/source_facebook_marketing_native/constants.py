@@ -1,6 +1,4 @@
-from typing import Any
-
-API_VERSION = "v23.0"
+API_VERSION = "v25.0"
 BASE_URL = f"https://graph.facebook.com/{API_VERSION}"
 
 

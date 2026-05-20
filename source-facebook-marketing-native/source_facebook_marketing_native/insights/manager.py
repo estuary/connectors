@@ -672,14 +672,20 @@ class FacebookInsightsJobManager:
                     return
 
                 elif status.async_status == AsyncJobStatus.JOB_FAILED:
-                    error_msg = f"{desc}: job failed at {status.async_percent_completion}% (job_id={job_id})"
+                    parts = [f"{desc}: job failed at {status.async_percent_completion}% (job_id={job_id})"]
+                    if status.error_user_title:
+                        parts.append(f"reason: {status.error_user_title}")
+                    if status.error_user_msg:
+                        parts.append(status.error_user_msg)
+                    error_msg = " — ".join(parts)
                     log.error(error_msg)
 
                     raise FacebookAPIError(
                         error=FacebookError(
                             message=error_msg,
                             type=InternalJobErrorType.JOB_FAILURE,
-                            code=100,
+                            code=status.error_code or 100,
+                            error_subcode=status.error_subcode,
                         )
                     )
 
