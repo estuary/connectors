@@ -14,19 +14,14 @@ name: Delayed tag
 # After picking a candidate PR per connector we also ask Claude Sonnet to
 # check whether any *later* PR touching the same directory is a roll-forward
 # fix of the candidate — i.e. a hotfix patching a regression the candidate
-# introduced. Currently advisory: the verdict is logged but does not yet drop
-# flagged connectors from the plan.
+# introduced. Connectors where Claude returns "hold" are excluded from
+# tagging: ':delayed' is supposed to be more stable, so we must not knowingly
+# ship a bug that was already fixed in a subsequent PR.
 
 on:
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
-  # While this workflow is in dry-run mode, also trigger on pull-requests that
-  # touch the workflow itself so we can iterate on it without merging to main.
-  pull_request:
-    branches: [main]
-    paths:
-      - '.github/workflows/delayed-tag.yaml'
 
 concurrency:
   group: ${{ github.workflow }}
@@ -40,6 +35,8 @@ permissions:
 jobs:
   publish_delayed:
     runs-on: ubuntu-24.04
+    env:
+      CLAUDE_MODEL: claude-sonnet-4-6
     steps:
       - uses: actions/checkout@v4
         with:
@@ -190,7 +187,6 @@ jobs:
               # Did this PR touch any file under DIR/? Anchored substring match.
               case "|${PR_PATHS}|" in
                 *"|${DIR}/"*) ;;
-                "${DIR}/"*)   ;;
                 *) continue ;;
               esac
 
@@ -226,32 +222,34 @@ jobs:
 
           echo "Planned $(wc -l < /tmp/plan.tsv) delayed tag(s); $(wc -l < /tmp/later.tsv) (image, later-PR) pairs for roll-forward check"
 
-      - name: Check for roll-forward fixes via Claude (advisory)
-        # DRY RUN: for each planned delayed tag, ask Claude Sonnet whether any
-        # LATER PR touching the connector's directory is a roll-forward fix of
-        # the CHOSEN PR — i.e. patches a regression introduced by CHOSEN, as
-        # opposed to an unrelated change. Git reverts are already filtered out
-        # in the plan step; this catches the case where a bug is fixed forward
-        # instead of reverted.
+      - name: Check for roll-forward fixes via Claude
+        # For each planned delayed tag, ask Claude Sonnet whether any LATER PR
+        # touching the connector's directory is a roll-forward fix of the CHOSEN
+        # PR — i.e. patches a regression introduced by CHOSEN, as opposed to an
+        # unrelated change. Git reverts are already filtered out in the plan
+        # step; this catches bugs that were fixed forward instead of reverted.
         #
-        # Currently advisory: the verdict is logged per connector but does not
-        # drop rows from /tmp/plan.tsv. To enforce, post-process the verdicts
-        # file before the tag step.
+        # Connectors where Claude returns "hold" are written to /tmp/held.txt
+        # and excluded from /tmp/safe_plan.tsv, which the tag step reads.
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -uo pipefail
+          : > /tmp/held.txt
+          : > /tmp/claude_verdicts.tsv
+
           if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
             echo "::warning::ANTHROPIC_API_KEY not set; skipping roll-forward check"
+            cp /tmp/plan.tsv /tmp/safe_plan.tsv
             exit 0
           fi
           if [ ! -s /tmp/later.tsv ]; then
             echo "no LATER PRs across any connector; nothing to check"
+            cp /tmp/plan.tsv /tmp/safe_plan.tsv
             exit 0
           fi
 
-          : > /tmp/claude_verdicts.tsv
           flagged=0; checked=0
 
           # Per-PR diff cap (in lines). Sonnet 4.6 has 200K context, but we
@@ -305,7 +303,7 @@ jobs:
             } > /tmp/claude_prompt.txt
 
             jq -n --rawfile p /tmp/claude_prompt.txt '{
-              model: "claude-sonnet-4-6",
+              model: env.CLAUDE_MODEL,
               max_tokens: 1024,
               messages: [{role: "user", content: $p}]
             }' > /tmp/claude_req.json
@@ -328,26 +326,32 @@ jobs:
 
             if [ "${VERDICT}" = "hold" ]; then
               flagged=$((flagged + 1))
-              echo "::warning::${IMAGE}: HOLD on PR #${CHOSEN_PR} — ${REASON}"
+              echo "::warning::${IMAGE}: HOLD — ${REASON}"
+              echo "${IMAGE}" >> /tmp/held.txt
             else
-              echo "  ${IMAGE}: safe — ${REASON:-no LATER PR flagged}"
+              echo "  ${IMAGE}: safe — ${REASON:-no roll-forward fix detected}"
             fi
             printf '%s\t%s\t%s\n' "${IMAGE}" "${VERDICT}" "${REASON}" >> /tmp/claude_verdicts.tsv
           done < /tmp/plan.tsv
 
-          echo "Claude checked ${checked} connector(s); flagged ${flagged} for HOLD (advisory, not enforced)"
+          echo "Claude checked ${checked} connector(s); held ${flagged}"
+
+          # Build safe_plan.tsv by dropping held connectors from plan.tsv.
+          while IFS=$'\t' read -r IMAGE SHA PR_NUM; do
+            if grep -qxF "${IMAGE}" /tmp/held.txt; then
+              echo "  excluded from tagging: ${IMAGE} (held by Claude)"
+            else
+              printf '%s\t%s\t%s\n' "${IMAGE}" "${SHA}" "${PR_NUM}"
+            fi
+          done < /tmp/plan.tsv > /tmp/safe_plan.tsv
+          echo "Tagging $(wc -l < /tmp/safe_plan.tsv)/$(wc -l < /tmp/plan.tsv) connector(s) after hold filter"
 
       - name: Tag images as ':delayed'
-        # DRY RUN: the only mutating call in this step (the `docker buildx
-        # imagetools create` line) is commented out. Everything else — the
-        # inspect probes, the per-image log lines, counters, and the summary —
-        # still executes, so the workflow logs are a faithful preview of what
-        # the real run will publish. To enable: uncomment the docker line and
-        # delete the `tag_cmd=true` line just above it.
         run: |
           set -uo pipefail
           tagged=0; missing=0; failed=0
           : > /tmp/tagged.txt
+          : > /tmp/missing.txt
           while IFS=$'\t' read -r IMAGE SHA; do
             [ -z "${IMAGE}" ] && continue
             SRC="ghcr.io/estuary/${IMAGE}:${SHA}"
@@ -358,20 +362,19 @@ jobs:
             # when SRC is missing from the registry.
             if ! docker buildx imagetools inspect "${SRC}" >/dev/null 2>&1; then
               echo "skip ${IMAGE}: no image at ${SHA} (may have been pruned from registry)"
+              printf '%s\t%s\n' "${IMAGE}" "${SHA}" >> /tmp/missing.txt
               missing=$((missing + 1))
               continue
             fi
-            echo "would tag ${DST} -> ${SHA}"
-            tag_cmd=true  # DRY RUN — remove this line and uncomment the next to publish
-            # tag_cmd="docker buildx imagetools create --tag ${DST} ${SRC}"
-            if $tag_cmd >/dev/null; then
+            echo "tagging ${DST} -> ${SHA}"
+            if docker buildx imagetools create --tag "${DST}" "${SRC}" >/dev/null; then
               echo "${IMAGE}" >> /tmp/tagged.txt
               tagged=$((tagged + 1))
             else
               echo "::warning::failed to tag ${IMAGE}"
               failed=$((failed + 1))
             fi
-          done < /tmp/plan.tsv
+          done < /tmp/safe_plan.tsv
           echo "Summary: tagged=${tagged} missing=${missing} failed=${failed}"
           if [ "${failed}" -gt 0 ]; then
             exit 1
@@ -383,9 +386,6 @@ jobs:
           sudo apt install -y postgresql-client
 
       - name: Refresh connector_tags rows for ':delayed'
-        # DRY RUN: only the `| psql` pipe is commented out. The exact SQL we
-        # would run is still echoed per image, which is what we want preserved
-        # in the workflow logs for diagnostics.
         env:
           PGHOST: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
           PGUSER: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}
@@ -398,5 +398,64 @@ jobs:
             echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
                     WHERE connector_id IN (
                       SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${IMAGE}'
-                    ) AND image_tag = ':delayed';" # DRY RUN — append ` | psql` to publish
+                    ) AND image_tag = ':delayed';" | psql
           done < /tmp/tagged.txt
+
+      - name: Write job summary
+        if: always()
+        run: |
+          set -uo pipefail
+          {
+            echo "## Delayed Tag Run — $(date -u '+%Y-%m-%d')"
+            echo ""
+
+            TAGGED_COUNT=$(wc -l < /tmp/tagged.txt 2>/dev/null | tr -d ' ') || TAGGED_COUNT=0
+            HELD_COUNT=$(wc -l < /tmp/held.txt 2>/dev/null | tr -d ' ') || HELD_COUNT=0
+            MISSING_COUNT=$(wc -l < /tmp/missing.txt 2>/dev/null | tr -d ' ') || MISSING_COUNT=0
+
+            echo "| | Count |"
+            echo "|---|---|"
+            echo "| ✅ Tagged | ${TAGGED_COUNT} |"
+            echo "| 🔶 Held by Claude | ${HELD_COUNT} |"
+            echo "| ⚪ Missing from registry | ${MISSING_COUNT} |"
+            echo ""
+
+            if [ "${TAGGED_COUNT}" -gt 0 ]; then
+              echo "### ✅ Tagged"
+              echo ""
+              echo "| Connector | PR | SHA |"
+              echo "|-----------|-----|-----|"
+              while IFS= read -r IMAGE; do
+                [ -z "${IMAGE}" ] && continue
+                PR_NUM=$(awk -F'\t' -v img="${IMAGE}" '$1==img{print $3; exit}' /tmp/safe_plan.tsv)
+                SHA=$(awk -F'\t' -v img="${IMAGE}" '$1==img{print $2; exit}' /tmp/safe_plan.tsv)
+                echo "| \`${IMAGE}\` | [#${PR_NUM}](https://github.com/${GITHUB_REPOSITORY}/pull/${PR_NUM}) | \`${SHA}\` |"
+              done < /tmp/tagged.txt
+              echo ""
+            fi
+
+            if [ "${HELD_COUNT}" -gt 0 ]; then
+              echo "### 🔶 Held by Claude"
+              echo ""
+              echo "| Connector | Reason |"
+              echo "|-----------|--------|"
+              while IFS= read -r IMAGE; do
+                [ -z "${IMAGE}" ] && continue
+                REASON=$(awk -F'\t' -v img="${IMAGE}" '$1==img{print $3; exit}' /tmp/claude_verdicts.tsv)
+                echo "| \`${IMAGE}\` | ${REASON} |"
+              done < /tmp/held.txt
+              echo ""
+            fi
+
+            if [ "${MISSING_COUNT}" -gt 0 ]; then
+              echo "### ⚪ Missing from registry"
+              echo ""
+              echo "| Connector | SHA |"
+              echo "|-----------|-----|"
+              while IFS=$'\t' read -r IMAGE SHA; do
+                [ -z "${IMAGE}" ] && continue
+                echo "| \`${IMAGE}\` | \`${SHA}\` |"
+              done < /tmp/missing.txt
+              echo ""
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
