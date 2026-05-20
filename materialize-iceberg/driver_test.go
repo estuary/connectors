@@ -16,6 +16,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/apache/arrow-go/v18/parquet/file"
 	"github.com/apache/iceberg-go"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -668,17 +669,45 @@ func runDemoteRequiredColumnRegression(t *testing.T) {
 	assert.True(t, maps.hasNullCount, "manifest should retain null_value_counts for payload after demotion to optional")
 	assert.True(t, maps.hasLowerBound, "manifest should retain lower_bounds for payload after demotion to optional")
 	assert.True(t, maps.hasUpperBound, "manifest should retain upper_bounds for payload after demotion to optional")
+
+	// Parquet layer: the data file was written with payload populated, so
+	// every row group's column chunk should carry both null_count and
+	// min/max statistics. Demoting the iceberg field's required flag
+	// mustn't touch the parquet metadata at all.
+	require.Positivef(t, maps.parquetRowGroups, "no parquet row groups inspected for %s.%s", ns, tblName)
+	assert.Equal(t, maps.parquetRowGroups, maps.parquetRowGroupsWithColumn,
+		"every row group should contain the payload column in parquet")
+	assert.Equal(t, maps.parquetRowGroups, maps.parquetRowGroupsWithNullCount,
+		"every row group's payload column chunk should record null_count in parquet")
+	assert.Equal(t, maps.parquetRowGroups, maps.parquetRowGroupsWithMinMax,
+		"every row group's payload column chunk should record min/max in parquet")
 }
 
-// payloadMetricMaps records which of the five iceberg manifest per-column
-// metric maps carry an entry for a given field id, across every
-// ManifestEntry of the current snapshot.
+// payloadMetricMaps records two distinct layers of "did the writer record
+// stats for this column?" state. Snowflake's errno 100478 has historically
+// been described as a manifest-level check, but the parquet column chunk
+// statistics live in their own structure - the parquet footer - and can in
+// principle diverge from the iceberg manifest (iceberg's metrics-mode and
+// metrics-column-cap properties can drop manifest entries even when parquet
+// kept them; in the reverse direction, parquet truncating its Statistics on
+// wide values can drop parquet entries while iceberg's manifest separately
+// carries null_value_counts). Track both so a regression in either layer is
+// visible.
 type payloadMetricMaps struct {
+	// Iceberg manifest layer: presence flags for the DataFile per-column
+	// metric maps, keyed by iceberg field id, across every ManifestEntry.
 	hasColumnSize bool
 	hasValueCount bool
 	hasNullCount  bool
 	hasLowerBound bool
 	hasUpperBound bool
+
+	// Parquet layer: aggregated across every row group of every data file
+	// the manifest references.
+	parquetRowGroups              int
+	parquetRowGroupsWithColumn    int
+	parquetRowGroupsWithNullCount int
+	parquetRowGroupsWithMinMax    int
 }
 
 // inspectIcebergManifest walks the table's current snapshot via the
@@ -751,6 +780,16 @@ func inspectIcebergManifest(
 		return out.Body
 	}
 
+	// Look up the iceberg field name so we can match by name against
+	// parquet schema columns. (Parquet field-id metadata exists too, but
+	// the connector writes column names matching the iceberg field name,
+	// and name lookup keeps the test independent of iceberg-go's parquet
+	// schema-id annotation behavior.)
+	var fieldName string
+	if f, ok := tbl.Metadata.CurrentSchema().FindFieldByID(fieldID); ok {
+		fieldName = f.Name
+	}
+
 	mlBody := openS3(snap.ManifestList)
 	defer mlBody.Close()
 	manifests, err := iceberg.ReadManifestList(mlBody)
@@ -772,6 +811,8 @@ func inspectIcebergManifest(
 		require.NoError(t, err)
 		for _, e := range entries {
 			df := e.DataFile()
+
+			// Iceberg manifest layer.
 			if _, ok := df.ColumnSizes()[fieldID]; !ok {
 				maps.hasColumnSize = false
 			}
@@ -788,12 +829,79 @@ func inspectIcebergManifest(
 				maps.hasUpperBound = false
 			}
 			entriesSeen++
+
+			// Parquet layer.
+			inspectParquetColumn(t, ctx, s3client, df.FilePath(), fieldName, &maps)
 		}
 	}
 	require.NotZerof(t, entriesSeen, "no manifest entries for %s.%s", ns, tblName)
 
-	t.Logf("manifest metric maps for field id %d: ColumnSizes=%v ValueCounts=%v NullValueCounts=%v LowerBounds=%v UpperBounds=%v",
-		fieldID, maps.hasColumnSize, maps.hasValueCount, maps.hasNullCount, maps.hasLowerBound, maps.hasUpperBound)
+	t.Logf("manifest metric maps for field id %d (%q): ColumnSizes=%v ValueCounts=%v NullValueCounts=%v LowerBounds=%v UpperBounds=%v",
+		fieldID, fieldName, maps.hasColumnSize, maps.hasValueCount, maps.hasNullCount, maps.hasLowerBound, maps.hasUpperBound)
+	t.Logf("parquet column %q stats across all data files: row_groups=%d with_column=%d with_null_count=%d with_min_max=%d",
+		fieldName, maps.parquetRowGroups, maps.parquetRowGroupsWithColumn, maps.parquetRowGroupsWithNullCount, maps.parquetRowGroupsWithMinMax)
 
 	return maps
+}
+
+// inspectParquetColumn downloads a single data file from S3 and tallies, per
+// row group, whether the named column appears and whether its column-chunk
+// Statistics record HasMinMax and HasNullCount. Counters accumulate into the
+// caller's maps so a multi-data-file walk can summarize the whole snapshot.
+func inspectParquetColumn(
+	t *testing.T,
+	ctx context.Context,
+	s3client *s3.Client,
+	s3URI, columnName string,
+	maps *payloadMetricMaps,
+) {
+	t.Helper()
+	require.True(t, strings.HasPrefix(s3URI, "s3://warehouse/"),
+		"unexpected s3 uri: %s", s3URI)
+	key := strings.TrimPrefix(s3URI, "s3://warehouse/")
+	out, err := s3client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String("warehouse"),
+		Key:    aws.String(key),
+	})
+	require.NoError(t, err)
+	defer out.Body.Close()
+
+	local := filepath.Join(t.TempDir(), filepath.Base(key))
+	f, err := os.Create(local)
+	require.NoError(t, err)
+	if _, err := io.Copy(f, out.Body); err != nil {
+		f.Close()
+		require.NoError(t, err)
+	}
+	f.Close()
+
+	pf, err := file.OpenParquetFile(local, false)
+	require.NoError(t, err)
+	defer pf.Close()
+
+	colIdx := -1
+	for i := 0; i < pf.MetaData().Schema.NumColumns(); i++ {
+		if pf.MetaData().Schema.Column(i).Name() == columnName {
+			colIdx = i
+			break
+		}
+	}
+
+	for rg := 0; rg < pf.NumRowGroups(); rg++ {
+		maps.parquetRowGroups++
+		if colIdx == -1 {
+			continue
+		}
+		maps.parquetRowGroupsWithColumn++
+		cc, err := pf.MetaData().RowGroup(rg).ColumnChunk(colIdx)
+		require.NoError(t, err)
+		stats, err := cc.Statistics()
+		require.NoError(t, err)
+		if stats != nil && stats.HasNullCount() {
+			maps.parquetRowGroupsWithNullCount++
+		}
+		if stats != nil && stats.HasMinMax() {
+			maps.parquetRowGroupsWithMinMax++
+		}
+	}
 }
