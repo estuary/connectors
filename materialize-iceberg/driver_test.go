@@ -526,60 +526,8 @@ func runAddRequiredColumnRegression(t *testing.T) {
 	require.NotNil(t, payloadField, "computeSchemaForUpdatedTable did not produce a payload field")
 	payloadFieldID := payloadField.ID
 
-	// Walk the current snapshot's manifests via the iceberg-go avro
-	// readers, fed directly from the same MinIO that holds the data files.
-	tblAfter, err := cat.GetTable(ctx, ns, tblName)
-	require.NoError(t, err)
-	snap := tblAfter.Metadata.CurrentSnapshot()
-	require.NotNilf(t, snap, "no current snapshot for %s.%s", ns, tblName)
-
-	openS3 := func(s3URI string) io.ReadCloser {
-		require.True(t, strings.HasPrefix(s3URI, "s3://warehouse/"),
-			"unexpected s3 uri: %s", s3URI)
-		key := strings.TrimPrefix(s3URI, "s3://warehouse/")
-		out, err := s3client.GetObject(ctx, &s3.GetObjectInput{
-			Bucket: aws.String("warehouse"),
-			Key:    aws.String(key),
-		})
-		require.NoError(t, err)
-		return out.Body
-	}
-
-	mlBody := openS3(snap.ManifestList)
-	defer mlBody.Close()
-	manifests, err := iceberg.ReadManifestList(mlBody)
-	require.NoError(t, err)
-	require.NotEmptyf(t, manifests, "no manifests for %s.%s", ns, tblName)
-
-	hasValueCount, hasNullCount, hasLowerBound, hasUpperBound := true, true, true, true
-	entriesSeen := 0
-	for _, mf := range manifests {
-		mfBody := openS3(mf.FilePath())
-		entries, err := iceberg.ReadManifest(mf, mfBody, true)
-		mfBody.Close()
-		require.NoError(t, err)
-		for _, e := range entries {
-			df := e.DataFile()
-			if _, ok := df.ValueCounts()[payloadFieldID]; !ok {
-				hasValueCount = false
-			}
-			if _, ok := df.NullValueCounts()[payloadFieldID]; !ok {
-				hasNullCount = false
-			}
-			if _, ok := df.LowerBoundValues()[payloadFieldID]; !ok {
-				hasLowerBound = false
-			}
-			if _, ok := df.UpperBoundValues()[payloadFieldID]; !ok {
-				hasUpperBound = false
-			}
-			entriesSeen++
-		}
-	}
-	require.NotZerof(t, entriesSeen, "no manifest entries for %s.%s", ns, tblName)
-
 	t.Logf("computeSchemaForUpdatedTable produced payload: Required=%v (fieldID=%d)", payloadField.Required, payloadFieldID)
-	t.Logf("manifest metric maps for payload column added after data: ValueCounts=%v NullValueCounts=%v LowerBounds=%v UpperBounds=%v",
-		hasValueCount, hasNullCount, hasLowerBound, hasUpperBound)
+	maps := inspectIcebergManifest(t, ctx, cat, s3client, ns, tblName, payloadFieldID)
 
 	// Snowflake's errno 100478 fires when a `required` column lacks
 	// null_value_counts in the manifest. If the connector emits the new
@@ -589,7 +537,7 @@ func runAddRequiredColumnRegression(t *testing.T) {
 	// the connector never produces the (Required, no-null_value_counts)
 	// combination.
 	if payloadField.Required {
-		assert.True(t, hasNullCount,
+		assert.True(t, maps.hasNullCount,
 			"a Required column added to an existing table requires null_value_counts in the manifest; the connector should have emitted Optional instead")
 	}
 }
@@ -707,11 +655,89 @@ func runDemoteRequiredColumnRegression(t *testing.T) {
 	))
 
 	const payloadFieldID = 2
+	maps := inspectIcebergManifest(t, ctx, cat, s3client, ns, tblName, payloadFieldID)
 
-	tblAfter, err := cat.GetTable(ctx, ns, tblName)
+	// Demotion mustn't strip per-column metric maps for pre-existing data
+	// files - those data files actually have the values, so the manifest
+	// entries should retain every metric map. If any of these go missing
+	// it implies the demotion path is mutating manifest metadata in
+	// addition to the schema, which would be a regression in its own
+	// right.
+	assert.True(t, maps.hasColumnSize, "manifest should retain column_sizes for payload after demotion to optional")
+	assert.True(t, maps.hasValueCount, "manifest should retain value_counts for payload after demotion to optional")
+	assert.True(t, maps.hasNullCount, "manifest should retain null_value_counts for payload after demotion to optional")
+	assert.True(t, maps.hasLowerBound, "manifest should retain lower_bounds for payload after demotion to optional")
+	assert.True(t, maps.hasUpperBound, "manifest should retain upper_bounds for payload after demotion to optional")
+}
+
+// payloadMetricMaps records which of the five iceberg manifest per-column
+// metric maps carry an entry for a given field id, across every
+// ManifestEntry of the current snapshot.
+type payloadMetricMaps struct {
+	hasColumnSize bool
+	hasValueCount bool
+	hasNullCount  bool
+	hasLowerBound bool
+	hasUpperBound bool
+}
+
+// inspectIcebergManifest walks the table's current snapshot via the
+// iceberg-go avro readers, logs enough table-metadata state to debug a
+// downstream-reader complaint (schemas list, format-version, snapshot's
+// schema_id, all fields' required state), and reports whether each per-column
+// metric map in the manifest's DataFile entries carries an entry for the
+// supplied field id. Snowflake's errno 100478 fires on (current schema says
+// required) + (manifest entry lacks null_value_counts for that field id), so
+// inspecting the iceberg manifest - not the parquet column-chunk Statistics -
+// is the right layer for this regression's assertions.
+func inspectIcebergManifest(
+	t *testing.T,
+	ctx context.Context,
+	cat *catalog.Catalog,
+	s3client *s3.Client,
+	ns, tblName string,
+	fieldID int,
+) payloadMetricMaps {
+	t.Helper()
+
+	tbl, err := cat.GetTable(ctx, ns, tblName)
 	require.NoError(t, err)
-	snap := tblAfter.Metadata.CurrentSnapshot()
+	snap := tbl.Metadata.CurrentSnapshot()
 	require.NotNilf(t, snap, "no current snapshot for %s.%s", ns, tblName)
+
+	// The V2-spec multi-schema mechanism is supposed to mean old data
+	// files survive a schema add: the prior schema stays in
+	// metadata.schemas, and the snapshot keeps its original schema_id -
+	// pointing at the schema its data files were actually written under,
+	// not the current one. On read, a spec-compliant projector resolves
+	// fields by id against the current schema and treats any field id
+	// missing from the data file as null (or default in V3). Pin those
+	// invariants so a regression in the catalog wrapper that drops prior
+	// schemas (or that mutates the snapshot's schema_id on schema add)
+	// would be loud here.
+	require.GreaterOrEqualf(t, len(tbl.Metadata.Schemas()), 2,
+		"schema evolution should retain the previous schema; got %d schemas", len(tbl.Metadata.Schemas()))
+	require.NotNilf(t, snap.SchemaID, "current snapshot should reference a schema id")
+	schemaIDs := make([]int, 0, len(tbl.Metadata.Schemas()))
+	for _, s := range tbl.Metadata.Schemas() {
+		schemaIDs = append(schemaIDs, s.ID)
+	}
+	require.Containsf(t, schemaIDs, *snap.SchemaID,
+		"snapshot's schema_id %d should reference one of the table's schemas %v", *snap.SchemaID, schemaIDs)
+
+	t.Logf("iceberg metadata: format-version=%d schemas=%v current-schema-id=%d last-column-id=%d snapshot-id=%d snapshot-schema-id=%d",
+		tbl.Metadata.Version(),
+		schemaIDs,
+		tbl.Metadata.CurrentSchema().ID,
+		tbl.Metadata.LastColumnID(),
+		snap.SnapshotID,
+		*snap.SchemaID)
+	for _, s := range tbl.Metadata.Schemas() {
+		for _, f := range s.Fields() {
+			t.Logf("  schema %d field %d: name=%s required=%v type=%s",
+				s.ID, f.ID, f.Name, f.Required, f.Type.String())
+		}
+	}
 
 	openS3 := func(s3URI string) io.ReadCloser {
 		require.True(t, strings.HasPrefix(s3URI, "s3://warehouse/"),
@@ -731,7 +757,13 @@ func runDemoteRequiredColumnRegression(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmptyf(t, manifests, "no manifests for %s.%s", ns, tblName)
 
-	hasValueCount, hasNullCount, hasLowerBound, hasUpperBound := true, true, true, true
+	maps := payloadMetricMaps{
+		hasColumnSize: true,
+		hasValueCount: true,
+		hasNullCount:  true,
+		hasLowerBound: true,
+		hasUpperBound: true,
+	}
 	entriesSeen := 0
 	for _, mf := range manifests {
 		mfBody := openS3(mf.FilePath())
@@ -740,34 +772,28 @@ func runDemoteRequiredColumnRegression(t *testing.T) {
 		require.NoError(t, err)
 		for _, e := range entries {
 			df := e.DataFile()
-			if _, ok := df.ValueCounts()[payloadFieldID]; !ok {
-				hasValueCount = false
+			if _, ok := df.ColumnSizes()[fieldID]; !ok {
+				maps.hasColumnSize = false
 			}
-			if _, ok := df.NullValueCounts()[payloadFieldID]; !ok {
-				hasNullCount = false
+			if _, ok := df.ValueCounts()[fieldID]; !ok {
+				maps.hasValueCount = false
 			}
-			if _, ok := df.LowerBoundValues()[payloadFieldID]; !ok {
-				hasLowerBound = false
+			if _, ok := df.NullValueCounts()[fieldID]; !ok {
+				maps.hasNullCount = false
 			}
-			if _, ok := df.UpperBoundValues()[payloadFieldID]; !ok {
-				hasUpperBound = false
+			if _, ok := df.LowerBoundValues()[fieldID]; !ok {
+				maps.hasLowerBound = false
+			}
+			if _, ok := df.UpperBoundValues()[fieldID]; !ok {
+				maps.hasUpperBound = false
 			}
 			entriesSeen++
 		}
 	}
 	require.NotZerof(t, entriesSeen, "no manifest entries for %s.%s", ns, tblName)
 
-	t.Logf("manifest metric maps for payload column demoted to optional after data: ValueCounts=%v NullValueCounts=%v LowerBounds=%v UpperBounds=%v",
-		hasValueCount, hasNullCount, hasLowerBound, hasUpperBound)
+	t.Logf("manifest metric maps for field id %d: ColumnSizes=%v ValueCounts=%v NullValueCounts=%v LowerBounds=%v UpperBounds=%v",
+		fieldID, maps.hasColumnSize, maps.hasValueCount, maps.hasNullCount, maps.hasLowerBound, maps.hasUpperBound)
 
-	// Demotion mustn't strip per-column metric maps for pre-existing data
-	// files - those data files actually have the values, so the manifest
-	// entries should retain every metric map. If any of these go missing
-	// it implies the demotion path is mutating manifest metadata in
-	// addition to the schema, which would be a regression in its own
-	// right.
-	assert.True(t, hasValueCount, "manifest should retain value_counts for payload after demotion to optional")
-	assert.True(t, hasNullCount, "manifest should retain null_value_counts for payload after demotion to optional")
-	assert.True(t, hasLowerBound, "manifest should retain lower_bounds for payload after demotion to optional")
-	assert.True(t, hasUpperBound, "manifest should retain upper_bounds for payload after demotion to optional")
+	return maps
 }
