@@ -42,7 +42,7 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 	jsonbContentMediaType := "application/vnd.estuary.postgresql.jsonb+json"
 	jsonOrJsonb := func(jsonMapper, jsonbMapper sql.MapProjectionFn) sql.MapProjectionFn {
 		return func(p *sql.Projection) (sql.DDLer, sql.CompatibleColumnTypes, sql.ElementConverter) {
-			if p.Inference.String_ != nil && p.Inference.String_.ContentType == jsonbContentMediaType {
+			if p.Inference.ContentMediaType == jsonbContentMediaType {
 				return jsonbMapper(p)
 			}
 			return jsonMapper(p)
