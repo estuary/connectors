@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import sys
 from dataclasses import dataclass
 from typing import Optional
 from urllib.parse import urlparse
@@ -75,7 +74,11 @@ def read_csv_opts(files: list[str], cols: list[NestedField]):
         "schema": fields_to_struct(cols),
         "quote": "`",
         "escape": "`",
-        "emptyValue": '""',
+        # Spark's default nullValue is "" (empty string). A backtick-quoted empty
+        # field `` is unquoted to "" which then matches nullValue, converting the
+        # empty string to NULL. Override with a sentinel that cannot appear in
+        # JSON-encoded data so that empty strings are preserved.
+        "nullValue": "\x00",
         "header": False,
         "inferSchema": False,
         "enforceSchema": False,

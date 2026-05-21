@@ -417,13 +417,26 @@ func (d *materialization) CreateResource(ctx context.Context, res boilerplate.Ma
 // 141 dotted projections saw the cap land at ID 65, matching the Snowflake
 // error pointing at columnId 66).
 //
-// Setting the cap to a very large number forces the inferred default mode
-// to apply to every column. We keep Iceberg's default mode (`truncate(16)`),
-// so query-planner min/max pruning is preserved for short string columns
-// at modest manifest metadata cost. Customers can still override the cap or
-// individual columns via AdditionalTableProperties.
+// defaultTableProperties returns Iceberg table properties that ensure column
+// metrics are always written. External engines (Snowflake, Bauplan) treat
+// absent null_value_counts as "unknown — might have nulls" and reject NOT NULL
+// columns even when no nulls exist.
+//
+// write.metadata.metrics.default = truncate(16): sets the global metrics mode
+// explicitly rather than relying on the inferred-default path. The inferred
+// path has a cap-based bug where dotted-name columns can consume extra slots,
+// causing late columns to silently receive "none" mode. Setting it explicitly
+// bypasses the cap entirely and applies truncate(16) to every column: it
+// writes null_value_counts (required for Bauplan/Snowflake NOT NULL checks) and
+// truncated min/max bounds (useful for query-planner pruning) without the large
+// storage cost of full untruncated bounds on long string columns.
+//
+// max-inferred-column-defaults: retained as belt-and-suspenders for per-column
+// overrides set via AdditionalTableProperties; without it, those properties
+// would also be subject to the cap.
 func defaultTableProperties() map[string]string {
 	return map[string]string{
+		"write.metadata.metrics.default":                       "truncate(16)",
 		"write.metadata.metrics.max-inferred-column-defaults": "100000",
 	}
 }
@@ -625,6 +638,39 @@ func (d *materialization) NewTransactor(
 		b.store.mergeBounds = newMergeBoundsBuilder(mapped.Keys)
 
 		t.bindings = append(t.bindings, b)
+	}
+
+	// Log Iceberg column ID mappings and metrics properties for each binding.
+	// Column IDs appear in external engine errors (e.g. "non-nullable column
+	// without default missing data for columnId 5") and are not otherwise
+	// visible in connector logs, making it hard to identify which column is
+	// affected without this mapping.
+	for _, b := range t.bindings {
+		ns := b.Mapped.ResourcePath[0]
+		name := b.Mapped.ResourcePath[1]
+		tbl, err := d.catalog.GetTable(ctx, ns, name)
+		if err != nil {
+			log.WithField("table", fmt.Sprintf("%s.%s", ns, name)).
+				WithError(err).
+				Warn("could not fetch table metadata for column ID diagnostics")
+			continue
+		}
+		ll := log.WithField("table", fmt.Sprintf("%s.%s", ns, name))
+		for _, f := range tbl.Metadata.CurrentSchema().Fields() {
+			ll.WithFields(log.Fields{
+				"columnId": f.ID,
+				"name":     f.Name,
+				"required": f.Required,
+				"type":     f.Type.String(),
+			}).Debug("iceberg column")
+		}
+		metricsProps := make(map[string]string)
+		for k, v := range tbl.Metadata.Properties() {
+			if strings.Contains(k, "metrics") {
+				metricsProps[k] = v
+			}
+		}
+		ll.WithField("metricsProps", metricsProps).Info("iceberg table metrics properties")
 	}
 
 	return t, nil

@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/exec"
@@ -17,6 +18,7 @@ import (
 	"time"
 
 	"github.com/apache/iceberg-go"
+	iceio "github.com/apache/iceberg-go/io"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -185,6 +187,10 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("date-overflow-regression", func(t *testing.T) {
 		runDateOverflowRegression(t)
+	})
+
+	t.Run("empty-string-null-count-regression", func(t *testing.T) {
+		runEmptyStringNullCountRegression(t)
 	})
 }
 
@@ -366,3 +372,190 @@ func runDateOverflowRegression(t *testing.T) {
 	require.NoError(t, json.Unmarshal(respBody, &result))
 	require.Truef(t, result.Success, "merge failed: %s", result.Error)
 }
+
+// runEmptyStringNullCountRegression verifies that empty strings written by the
+// Go connector survive the CSV → Spark → Iceberg pipeline without becoming
+// NULLs. The bug was "emptyValue": '""' in read_csv_opts, which set the marker
+// to two double-quote characters instead of the default empty string, causing
+// Spark to fall through to nullValue="" and convert every backtick-quoted empty
+// field to NULL.
+func runEmptyStringNullCountRegression(t *testing.T) {
+	ctx := context.Background()
+
+	creds, err := readPolarisCreds()
+	require.NoError(t, err)
+	credential := creds.ClientID + ":" + creds.ClientSecret
+	scope := "PRINCIPAL_ROLE:flow_user_role"
+
+	cat, err := catalog.New(ctx, "http://localhost:9802/api/catalog", "quickstart_catalog",
+		catalog.WithClientCredential(credential, "v1/oauth/tokens", &scope))
+	require.NoError(t, err)
+
+	const (
+		ns        = "empty_string_null_count"
+		tableName = "events"
+	)
+
+	_ = cat.DeleteTable(ctx, ns, tableName)
+	if err := cat.CreateNamespace(ctx, ns); err != nil {
+		t.Fatalf("create namespace: %v", err)
+	}
+
+	// Required (non-nullable) string column. Snowflake/Bauplan rejects the table
+	// if null_value_counts[body] > 0 because the column is declared NOT NULL.
+	schema := iceberg.NewSchemaWithIdentifiers(0, nil, iceberg.NestedField{
+		ID:       1,
+		Name:     "body",
+		Type:     iceberg.PrimitiveTypes.String,
+		Required: true,
+	})
+	require.NoError(t, cat.CreateTable(ctx, ns, tableName, schema, nil, nil, defaultTableProperties()))
+	t.Cleanup(func() { _ = cat.DeleteTable(context.Background(), ns, tableName) })
+
+	// Write one row where body is empty string using the same CsvWriter the
+	// connector uses (backtick quoting, no headers).
+	csvPath := filepath.Join(t.TempDir(), "data.csv.gz")
+	csvFile, err := os.Create(csvPath)
+	require.NoError(t, err)
+	csvw := writer.NewCsvWriter(csvFile, []string{"body"},
+		writer.WithCsvSkipHeaders(), writer.WithCsvQuoteChar('`'))
+	require.NoError(t, csvw.Write([]any{""}))
+	require.NoError(t, csvw.Close())
+
+	csvBody, err := os.ReadFile(csvPath)
+	require.NoError(t, err)
+
+	s3client := s3.New(s3.Options{
+		Region:       "us-east-1",
+		Credentials:  credentials.NewStaticCredentialsProvider("flow", "flow", ""),
+		BaseEndpoint: aws.String("http://localhost:9800"),
+		UsePathStyle: true,
+	})
+	csvKey := "staging/empty-string-" + uuid.New().String() + ".csv.gz"
+	_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String("warehouse"),
+		Key:    aws.String(csvKey),
+		Body:   bytes.NewReader(csvBody),
+	})
+	require.NoError(t, err)
+
+	mergeInput := python.MergeInput{
+		Bindings: []python.MergeBinding{{
+			Binding: 0,
+			Query:   fmt.Sprintf("INSERT INTO estuary.%s.%s SELECT body FROM merge_view_0", ns, tableName),
+			Columns: []python.NestedField{{Name: "body", Type: "string"}},
+			Files:   []string{"s3://warehouse/" + csvKey},
+		}},
+	}
+	reqBody, err := json.Marshal(struct {
+		Action string            `json:"action"`
+		Input  python.MergeInput `json:"input"`
+	}{Action: "merge", Input: mergeInput})
+	require.NoError(t, err)
+
+	mergeResp, err := http.Post("http://localhost:9806/run", "application/json", bytes.NewReader(reqBody))
+	require.NoError(t, err)
+	defer mergeResp.Body.Close()
+	mergeRespBody, err := io.ReadAll(mergeResp.Body)
+	require.NoError(t, err)
+	require.Equalf(t, http.StatusOK, mergeResp.StatusCode, "daemon response: %s", mergeRespBody)
+
+	var mergeResult struct {
+		Success bool   `json:"success"`
+		Error   string `json:"error"`
+	}
+	require.NoError(t, json.Unmarshal(mergeRespBody, &mergeResult))
+	require.Truef(t, mergeResult.Success, "merge failed: %s", mergeResult.Error)
+
+	// Load the updated table metadata to get the current snapshot's manifest list.
+	tbl, err := cat.GetTable(ctx, ns, tableName)
+	require.NoError(t, err)
+	snap := tbl.Metadata.CurrentSnapshot()
+	require.NotNil(t, snap, "expected a current snapshot after merge")
+
+	// Download and parse the manifest list (an Avro file pointed to by the snapshot).
+	fio := &testS3FileIO{client: s3client, ctx: ctx}
+	snapBucket, snapKey := s3UriToParts(snap.ManifestList)
+	snapObj, err := s3client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(snapBucket), Key: aws.String(snapKey)})
+	require.NoError(t, err)
+	snapBytes, err := io.ReadAll(snapObj.Body)
+	snapObj.Body.Close()
+	require.NoError(t, err)
+
+	manifests, err := iceberg.ReadManifestList(bytes.NewReader(snapBytes))
+	require.NoError(t, err)
+	require.NotEmpty(t, manifests, "snapshot has no manifest files")
+
+	// Walk every data-file entry and verify null_value_counts is present and zero
+	// for body (ID=1). Absent null_value_counts is distinct from zero: external
+	// engines (Bauplan, Snowflake) treat absent stats on a NOT NULL column as
+	// "unknown = might have nulls" and reject the table even when no nulls exist.
+	const bodyColumnID = 1
+	for _, mf := range manifests {
+		entries, err := mf.FetchEntries(fio, true)
+		require.NoError(t, err)
+		for _, entry := range entries {
+			nullCounts := entry.DataFile().NullValueCounts()
+			require.NotNilf(t, nullCounts,
+				"null_value_counts completely absent in %s — metrics not being tracked (metrics mode bug)",
+				mf.FilePath())
+			n := nullCounts[bodyColumnID]
+			require.Zerof(t, n,
+				"body column (id=%d) has %d null(s) in %s — empty strings are being written as NULLs (emptyValue bug)",
+				bodyColumnID, n, mf.FilePath())
+		}
+	}
+}
+
+// testS3FileIO is an iceio.IO backed by a local MinIO S3 instance. It is used
+// to open Iceberg manifest files when verifying null_value_counts in tests.
+type testS3FileIO struct {
+	client *s3.Client
+	ctx    context.Context
+}
+
+func (f *testS3FileIO) Open(name string) (iceio.File, error) {
+	bucket, key := s3UriToParts(name)
+	obj, err := f.client.GetObject(f.ctx, &s3.GetObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+	}
+	defer obj.Body.Close()
+	data, err := io.ReadAll(obj.Body)
+	if err != nil {
+		return nil, &fs.PathError{Op: "open", Path: name, Err: err}
+	}
+	return &s3BufFile{
+		Reader: bytes.NewReader(data),
+		name:   filepath.Base(name),
+		size:   int64(len(data)),
+	}, nil
+}
+
+func (f *testS3FileIO) Remove(name string) error { return nil }
+
+// s3BufFile implements iceio.File (fs.File + io.ReadSeekCloser + io.ReaderAt)
+// over an in-memory buffer downloaded from S3.
+type s3BufFile struct {
+	*bytes.Reader
+	name string
+	size int64
+}
+
+func (f *s3BufFile) Close() error               { return nil }
+func (f *s3BufFile) Stat() (fs.FileInfo, error) { return &s3FileInfo{name: f.name, size: f.size}, nil }
+
+type s3FileInfo struct {
+	name string
+	size int64
+}
+
+func (fi *s3FileInfo) Name() string       { return fi.name }
+func (fi *s3FileInfo) Size() int64        { return fi.size }
+func (fi *s3FileInfo) Mode() fs.FileMode  { return 0o444 }
+func (fi *s3FileInfo) ModTime() time.Time { return time.Time{} }
+func (fi *s3FileInfo) IsDir() bool        { return false }
+func (fi *s3FileInfo) Sys() any           { return nil }
