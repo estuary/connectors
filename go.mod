@@ -44,7 +44,7 @@ require (
 	github.com/dropbox/dropbox-sdk-go-unofficial/v6 v6.0.5
 	github.com/duckdb/duckdb-go/v2 v2.10502.0
 	github.com/elastic/go-elasticsearch/v8 v8.9.0
-	github.com/estuary/flow v0.6.4
+	github.com/estuary/flow v0.6.9
 	github.com/estuary/vitess v0.15.10
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/go-mysql-org/go-mysql v0.0.0-20250907131429-558ed11751bc
@@ -81,7 +81,7 @@ require (
 	github.com/tidwall/gjson v1.17.3
 	github.com/tidwall/sjson v1.2.5
 	github.com/wk8/go-ordered-map/v2 v2.1.8
-	go.gazette.dev/core v0.102.0
+	go.gazette.dev/core v0.103.1-0.20260505142537-ce718ada37ee
 	go.mongodb.org/mongo-driver v1.17.4
 	golang.org/x/crypto v0.49.0
 	golang.org/x/exp v0.0.0-20260312153236-7ab1446f8b90

@@ -64,18 +64,14 @@ func buildJSONBTestTable(t *testing.T) sql.Table {
 	multipleTypes := []string{"object", "string", "array", "number", "boolean", "null"}
 
 	mkValue := func(field, contentType string) sql.Column {
-		var stringInf *pf.Inference_String
-		if contentType != "" {
-			stringInf = &pf.Inference_String{ContentType: contentType}
-		}
 		p := sql.Projection{
 			Projection: pf.Projection{
 				Field: field,
 				Ptr:   "/" + field,
 				Inference: pf.Inference{
-					Types:   multipleTypes,
-					String_: stringInf,
-					Exists:  pf.Inference_MAY,
+					Types:            multipleTypes,
+					ContentMediaType: contentType,
+					Exists:           pf.Inference_MAY,
 				},
 			},
 		}
@@ -138,22 +134,15 @@ func TestDateTimeColumn(t *testing.T) {
 }
 
 func TestJSONBContentMediaType(t *testing.T) {
-	jsonbMediaType := "application/vnd.postgresql.jsonb+json"
+	jsonbMediaType := "application/vnd.estuary.postgresql.jsonb+json"
 
 	mapWithMediaType := func(types []string, contentType string) string {
-		var stringInf *pf.Inference_String
-		for _, ty := range types {
-			if ty == "string" {
-				stringInf = &pf.Inference_String{ContentType: contentType}
-				break
-			}
-		}
 		return testDialect.MapType(&sql.Projection{
 			Projection: pf.Projection{
 				Inference: pf.Inference{
-					Types:   types,
-					String_: stringInf,
-					Exists:  pf.Inference_MUST,
+					Types:            types,
+					ContentMediaType: contentType,
+					Exists:           pf.Inference_MUST,
 				},
 			},
 		}, sql.FieldConfig{}).DDL
