@@ -265,6 +265,80 @@ func TestValidate(t *testing.T) {
 		require.NotNil(t, cs)
 	})
 
+	t.Run("new binding with existing table - single root projection with incompatible column", func(t *testing.T) {
+		// Regression test for the customer's actual collection shape: only flow_document
+		// is declared as a root projection. Per the protocol contract documented at
+		// flow/crates/proto-flow/src/materialize.rs:359-364, connectors materializing the
+		// document as a single column must emit LOCATION_REQUIRED on a projection of the
+		// root JSON pointer so the control plane can enforce the slot.
+		//
+		// Today the first/selected root projection branch in validateMatchesExistingResource
+		// emits FIELD_REQUIRED, then overrides to INCOMPATIBLE when the existing column type
+		// is incompatible. INCOMPATIBLE without a live spec is silently dropped by the
+		// control plane (flow/crates/validation/src/field_selection.rs:269-287), so the
+		// publish proceeds with FieldSelection.Document = "" — degenerating to INSERT-only
+		// data corruption in connectors. The INCOMPATIBLE override originates from commit
+		// 8fa53e920 ("materialize-sql: don't allow migrations of the root document field"),
+		// which was a defensive change to prevent unsafe string->JSON migrations; the
+		// excludable-by-user side effect was unintended.
+		proposed := loadValidateSpec(t, "base.flow.proto")
+		binding := proposed.Bindings[0]
+
+		// Drop second_root so flow_document is the only root projection.
+		filtered := make([]pf.Projection, 0, len(binding.Collection.Projections))
+		for _, p := range binding.Collection.Projections {
+			if p.IsRootDocumentProjection() && p.Field != "flow_document" {
+				continue
+			}
+			filtered = append(filtered, p)
+		}
+		binding.Collection.Projections = filtered
+
+		transformPath := func(in []string) []string {
+			out := make([]string, 0, len(in))
+			for _, p := range in {
+				out = append(out, simpleTestTransform(p))
+			}
+			return out
+		}
+		is := NewInfoSchema(transformPath, simpleTestTransform, simpleTestTransform, false, false)
+		res := is.PushResource(transformPath([]string{"key_value"})...)
+		for _, f := range binding.FieldSelection.AllFields() {
+			proj := *binding.Collection.GetProjection(f)
+			fieldType := strings.Join(proj.Inference.Types, ",")
+			if f == binding.FieldSelection.Document {
+				fieldType = "string"
+			}
+			res.PushField(ExistingField{
+				Name:     simpleTestTransform(f),
+				Nullable: proj.Inference.Exists != pf.Inference_MUST || slices.Contains(proj.Inference.Types, "null"),
+				Type:     fieldType,
+			})
+		}
+
+		featureFlags := map[string]bool{
+			"allow_existing_tables_for_new_bindings": true,
+			"flow_document":                          true,
+		}
+		validator := NewValidator(testConstrainter{featureFlags: featureFlags}, is, 0, true, featureFlags)
+
+		cs, err := validator.ValidateBinding(
+			[]string{"key_value"},
+			false,
+			binding.Backfill, binding.Collection, binding.FieldSelection.FieldConfigJsonMap,
+			nil, // lastBinding == nil
+		)
+		require.NoError(t, err)
+
+		c, ok := cs["flow_document"]
+		require.True(t, ok, "no constraint emitted for flow_document")
+		require.Equalf(t,
+			pm.Response_Validated_Constraint_LOCATION_REQUIRED, c.Type,
+			"flow_document must carry LOCATION_REQUIRED so the control plane can enforce the root document slot; got %v: %s",
+			c.Type, c.Reason,
+		)
+	})
+
 	t.Run("folded fields are set when field names are transformed", func(t *testing.T) {
 		proposed := loadValidateSpec(t, "base.flow.proto")
 
