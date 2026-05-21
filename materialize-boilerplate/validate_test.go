@@ -266,21 +266,17 @@ func TestValidate(t *testing.T) {
 	})
 
 	t.Run("new binding with existing table - single root projection with incompatible column", func(t *testing.T) {
-		// Regression test for the customer's actual collection shape: only flow_document
-		// is declared as a root projection. Per the protocol contract documented at
-		// flow/crates/proto-flow/src/materialize.rs:359-364, connectors materializing the
-		// document as a single column must emit LOCATION_REQUIRED on a projection of the
-		// root JSON pointer so the control plane can enforce the slot.
+		// Regression test for the customer's collection shape: only flow_document is
+		// declared as a root projection. A connector storing the document as a single
+		// column must emit LOCATION_REQUIRED on the root JSON pointer so the control
+		// plane keeps the slot filled.
 		//
-		// Today the first/selected root projection branch in validateMatchesExistingResource
-		// emits FIELD_REQUIRED, then overrides to INCOMPATIBLE when the existing column type
-		// is incompatible. INCOMPATIBLE without a live spec is silently dropped by the
-		// control plane (flow/crates/validation/src/field_selection.rs:269-287), so the
-		// publish proceeds with FieldSelection.Document = "" — degenerating to INSERT-only
-		// data corruption in connectors. The INCOMPATIBLE override originates from commit
-		// 8fa53e920 ("materialize-sql: don't allow migrations of the root document field"),
-		// which was a defensive change to prevent unsafe string->JSON migrations; the
-		// excludable-by-user side effect was unintended.
+		// The selected-root branch historically emitted FIELD_REQUIRED, then overrode
+		// to INCOMPATIBLE when the existing column was the wrong type. Without a live
+		// spec the control plane silently drops INCOMPATIBLE, so the publish proceeded
+		// with FieldSelection.Document = "" — INSERT-only data corruption. The
+		// override was originally a defensive measure against unsafe string->JSON
+		// migrations; the excludable-by-user side effect was unintended.
 		proposed := loadValidateSpec(t, "base.flow.proto")
 		binding := proposed.Bindings[0]
 

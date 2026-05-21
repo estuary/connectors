@@ -206,19 +206,16 @@ func (v Validator) validateMatchesExistingResource(
 			// changes to a standard updates materialization. If there is no previously persisted
 			// spec, the first root document projection is selected as the root document.
 			if lastBinding == nil && len(docFields) == 1 {
-				// New binding adopted via `allow_existing_tables_for_new_bindings`. Emit
-				// LOCATION_REQUIRED so the control plane can enforce the root document slot
-				// (proto-flow/src/materialize.rs:359-364). Returning INCOMPATIBLE here when
-				// the existing column type doesn't match would silently drop in the
-				// no-live-spec path (validation/src/field_selection.rs:269-287), letting the
-				// user publish with no document column and INSERT-only data corruption.
+				// New binding adopted via `allow_existing_tables_for_new_bindings`. A
+				// connector storing the document as a single column must emit
+				// LOCATION_REQUIRED on the root JSON pointer so the control plane keeps
+				// the slot filled; bare INCOMPATIBLE is silently dropped without a live
+				// spec, letting the user publish with no document column and degenerate
+				// to INSERT-only corruption.
 				//
-				// A document-column type mismatch is not surfaced at validate time anymore
-				// in this case; the connector's Apply / runtime path will surface it instead.
-				// See materializer.go:654-657 — that loop does not check the Document column,
-				// so users with an incompatible flow_document column will see a runtime
-				// error rather than a publish-time one. A follow-up should extend the Apply
-				// check to also validate the document column.
+				// A type mismatch on the existing document column is not caught here;
+				// the Apply-time compatibility loop only iterates Values. A follow-up
+				// should extend Apply to validate the Document column too.
 				c = &pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
 					Reason: "The root document is required for a standard updates materialization",
