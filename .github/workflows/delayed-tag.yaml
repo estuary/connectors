@@ -26,14 +26,6 @@ on:
   schedule:
     - cron: '0 6 * * *'
   workflow_dispatch:
-  # While this workflow is in dry-run mode, also trigger on pull-requests that
-  # touch the workflow or script so we can iterate without merging to main.
-  pull_request:
-    branches: [main]
-    paths:
-      - '.github/workflows/delayed-tag.yaml'
-      - '.github/scripts/delayed_tag.py'
-      - '.github/scripts/test_delayed_tag.py'
 
 concurrency:
   group: ${{ github.workflow }}
@@ -42,7 +34,6 @@ concurrency:
 permissions:
   contents: read
   packages: write
-  pull-requests: read
 
 jobs:
   publish_delayed:
@@ -92,12 +83,6 @@ jobs:
         run: python3 .github/scripts/delayed_tag.py check
 
       - name: Tag images as ':delayed'
-        # DRY RUN: the only mutating call in this step (the `docker buildx
-        # imagetools create` line) is commented out. Everything else — the
-        # inspect probes, the per-image log lines, counters, and the summary —
-        # still executes, so the workflow logs are a faithful preview of what
-        # the real run will publish. To enable: uncomment the docker line and
-        # delete the `tag_cmd=true` line just above it.
         run: |
           set -uo pipefail
           tagged=0; missing=0; failed=0
@@ -117,10 +102,8 @@ jobs:
               missing=$((missing + 1))
               continue
             fi
-            echo "would tag ${DST} -> ${SHA}"
-            tag_cmd=true  # DRY RUN — remove this line and uncomment the next to publish
-            # tag_cmd="docker buildx imagetools create --tag ${DST} ${SRC}"
-            if $tag_cmd >/dev/null; then
+            if docker buildx imagetools create --tag "${DST}" "${SRC}" >/dev/null; then
+              echo "tagged ${DST} -> ${SHA}"
               echo "${IMAGE}" >> /tmp/tagged.txt
               tagged=$((tagged + 1))
             else
@@ -139,8 +122,6 @@ jobs:
           sudo apt install -y postgresql-client
 
       - name: Refresh connector_tags rows for ':delayed'
-        # DRY RUN: only the `| psql` pipe is commented out. The exact SQL we
-        # would run is still echoed per image.
         env:
           PGHOST: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_HOST }}
           PGUSER: ${{ secrets.POSTGRES_CONNECTOR_REFRESH_USER }}
@@ -153,7 +134,7 @@ jobs:
             echo "UPDATE connector_tags SET job_status='{\"type\": \"queued\"}'
                     WHERE connector_id IN (
                       SELECT id FROM connectors WHERE image_name='ghcr.io/estuary/${IMAGE}'
-                    ) AND image_tag = ':delayed';" # DRY RUN — append ` | psql` to publish
+                    ) AND image_tag = ':delayed';" | psql
           done < /tmp/tagged.txt
 
       - name: Write job summary
