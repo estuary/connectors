@@ -205,7 +205,25 @@ func (v Validator) validateMatchesExistingResource(
 			// Only the originally selected root document projection is allowed to be selected for
 			// changes to a standard updates materialization. If there is no previously persisted
 			// spec, the first root document projection is selected as the root document.
-			if (lastBinding != nil && p.Field == lastBinding.FieldSelection.Document) || (lastBinding == nil && len(docFields) == 1) {
+			if lastBinding == nil && len(docFields) == 1 {
+				// New binding adopted via `allow_existing_tables_for_new_bindings`. Emit
+				// LOCATION_REQUIRED so the control plane can enforce the root document slot
+				// (proto-flow/src/materialize.rs:359-364). Returning INCOMPATIBLE here when
+				// the existing column type doesn't match would silently drop in the
+				// no-live-spec path (validation/src/field_selection.rs:269-287), letting the
+				// user publish with no document column and INSERT-only data corruption.
+				//
+				// A document-column type mismatch is not surfaced at validate time anymore
+				// in this case; the connector's Apply / runtime path will surface it instead.
+				// See materializer.go:654-657 — that loop does not check the Document column,
+				// so users with an incompatible flow_document column will see a runtime
+				// error rather than a publish-time one. A follow-up should extend the Apply
+				// check to also validate the document column.
+				c = &pm.Response_Validated_Constraint{
+					Type:   pm.Response_Validated_Constraint_LOCATION_REQUIRED,
+					Reason: "The root document is required for a standard updates materialization",
+				}
+			} else if lastBinding != nil && p.Field == lastBinding.FieldSelection.Document {
 				c = &pm.Response_Validated_Constraint{
 					Type:   pm.Response_Validated_Constraint_FIELD_REQUIRED,
 					Reason: "This field is the document in the current materialization",
