@@ -137,7 +137,7 @@ func createRsDialect(caseSensitiveIdentifierEnabled bool, featureFlags map[strin
 				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(datetimeToSuperCast)),
 			},
 			"character varying": {
-				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(jsonQuoteCast)),
+				sql.NewMigrationSpec([]string{"super"}, sql.WithCastSQL(toJsonCast)),
 				sql.NewMigrationSpec([]string{"varbyte(1024000)"}, sql.WithCastSQL(stringToVarbyteCast)),
 			},
 			"binary varying": {
@@ -213,25 +213,8 @@ func stringToVarbyteCast(migration sql.ColumnTypeMigration) string {
 	return fmt.Sprintf(`TO_VARBYTE(%s, 'base64')`, migration.Identifier)
 }
 
-// varbyteToSuperCast converts a VARBYTE column into a SUPER value containing
-// the base64-encoded JSON string representation of the binary data. A direct
-// CAST from VARBYTE to SUPER is not supported by Redshift. FROM_VARBYTE may
-// emit base64 with embedded line breaks for large inputs, which would produce
-// invalid JSON when wrapped in a string literal, so the line breaks are
-// stripped before json_parse. CHR(10) is LF and CHR(13) is CR.
 func varbyteToSuperCast(migration sql.ColumnTypeMigration) string {
-	return fmt.Sprintf(`json_parse('"' || REPLACE(REPLACE(FROM_VARBYTE(%s, 'base64'), CHR(10), ''), CHR(13), '') || '"')`, migration.Identifier)
-}
-
-func jsonQuoteCast(migration sql.ColumnTypeMigration) string {
-	// The escape character (\) or double quotes (") in the input must be
-	// escaped so that the Redshift JSON parser doesn't try to interpret the
-	// input as JSON, which it may not be. There's no reasonable way to try to
-	// parse as JSON first and then escape if that doesn't work, which would be
-	// nicer for migrating from stringified JSON to actual JSON. Also note that
-	// CHR(92) is an escape (\), and it needs to be written in this weird way
-	// since Redshift does not support C-style escape sequences in SQL strings.
-	return fmt.Sprintf(`json_parse('"' || REPLACE(REPLACE(%s, CHR(92), CHR(92)||CHR(92)), '"', CHR(92)||'"') || '"')`, migration.Identifier)
+	return fmt.Sprintf(`CAST(FROM_VARBYTE(%s, 'base64') AS SUPER)`, migration.Identifier)
 }
 
 type copyFromS3Params struct {
