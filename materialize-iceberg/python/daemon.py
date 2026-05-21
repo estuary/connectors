@@ -89,8 +89,8 @@ class Handler(BaseHTTPRequestHandler):
 
         try:
             with _run_lock:
-                fn(_session, input_data)
-            self._respond(200, {"success": True})
+                logs = fn(_session, input_data) or []
+            self._respond(200, {"success": True, "logs": logs})
         except Exception as e:
             err = f"{e}\n{traceback.format_exc()}"
             print(f"spark daemon: job error: {err}", file=sys.stderr, flush=True)

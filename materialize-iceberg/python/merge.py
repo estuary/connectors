@@ -5,6 +5,7 @@ import sys
 
 from common import (
     NestedField,
+    LogEntry,
     common_args,
     get_spark_session,
     read_csv_opts,
@@ -12,8 +13,8 @@ from common import (
 )
 
 
-def _log_staging_null_counts(spark, binding_idx: int, columns: list[NestedField]) -> None:
-    """Log per-column null counts in the staging CSV view before the merge.
+def _staging_null_counts(spark, binding_idx: int, columns: list[NestedField]) -> list[LogEntry]:
+    """Return per-column null counts in the staging CSV view before the merge.
 
     Helps distinguish between "source data has real nulls" vs "statistics
     metadata is wrong" when diagnosing non-nullable column errors.
@@ -30,57 +31,66 @@ def _log_staging_null_counts(spark, binding_idx: int, columns: list[NestedField]
             for i in range(len(columns))
             if row[i] is not None and row[i] > 0
         }
-        print(
-            f"[iceberg-diag] binding={binding_idx} staging null counts "
-            f"({len(nulls)} columns with nulls out of {len(columns)} total): {nulls}",
-            file=sys.stderr, flush=True,
-        )
+        entry = {"msg": "staging null counts", "binding": binding_idx, "nullCounts": nulls}
     except Exception as e:
-        print(
-            f"[iceberg-diag] binding={binding_idx} could not check staging null counts: {e}",
-            file=sys.stderr, flush=True,
-        )
+        entry = {"msg": "could not check staging null counts", "binding": binding_idx, "error": str(e)}
+
+    print(f"[iceberg-diag] {entry}", file=sys.stderr, flush=True)
+    return [entry]
 
 
-def _log_iceberg_file_stats(spark, binding_idx: int, query: str) -> None:
-    """Log null_value_counts from Iceberg file metadata after the merge.
+def _iceberg_file_stats(spark, binding_idx: int, query: str) -> list[LogEntry]:
+    """Return null_value_counts from Iceberg file metadata after the merge.
 
-    Directly shows whether statistics are present and what null counts were
-    recorded per column ID — the numbers that appear in errors like
-    "non-nullable column (columnId N) without default has null values according
-    to file statistics."
+    Streams file rows one at a time to avoid loading the full result set into
+    memory. Prints every file to stderr immediately. Only files with non-zero
+    null counts are included in the returned list (passed to the Go connector);
+    this keeps the status payload small regardless of table size.
     """
     m = re.search(r"MERGE\s+INTO\s+((?:`[^`]+`\.){2}`[^`]+`)", query, re.IGNORECASE)
     if not m:
-        print(
-            f"[iceberg-diag] binding={binding_idx} could not parse table FQN from merge query",
-            file=sys.stderr, flush=True,
-        )
-        return
+        entry = {"msg": "could not parse table FQN from merge query", "binding": binding_idx}
+        print(f"[iceberg-diag] {entry}", file=sys.stderr, flush=True)
+        return [entry]
 
     table_fqn = m.group(1)
     try:
-        rows = spark.sql(
+        total = 0
+        files_with_nulls: list[LogEntry] = []
+        for row in spark.sql(
             f"SELECT file_path, null_value_counts FROM {table_fqn}.files"
-        ).collect()
-        print(
-            f"[iceberg-diag] binding={binding_idx} table={table_fqn}: "
-            f"{len(rows)} data file(s) in current snapshot",
-            file=sys.stderr, flush=True,
-        )
-        for row in rows:
-            print(
-                f"[iceberg-diag]   file={row.file_path} null_value_counts={row.null_value_counts}",
-                file=sys.stderr, flush=True,
-            )
+        ).toLocalIterator():
+            total += 1
+            entry = {
+                "msg": "iceberg file null_value_counts",
+                "binding": binding_idx,
+                "table": table_fqn,
+                "filePath": row.file_path,
+                "nullValueCounts": row.null_value_counts,
+            }
+            print(f"[iceberg-diag] {entry}", file=sys.stderr, flush=True)
+            if any(v > 0 for v in (row.null_value_counts or {}).values()):
+                files_with_nulls.append(entry)
+
+        summary = {
+            "msg": "iceberg file stats summary",
+            "binding": binding_idx,
+            "table": table_fqn,
+            "totalFiles": total,
+            "filesWithNulls": len(files_with_nulls),
+        }
+        print(f"[iceberg-diag] {summary}", file=sys.stderr, flush=True)
+        # Return summary + only the files that have non-zero null counts so the
+        # status payload stays small regardless of how many files the table has.
+        return [summary] + files_with_nulls
     except Exception as e:
-        print(
-            f"[iceberg-diag] binding={binding_idx} could not read file stats for {table_fqn}: {e}",
-            file=sys.stderr, flush=True,
-        )
+        entry = {"msg": "could not read iceberg file stats", "binding": binding_idx, "table": table_fqn, "error": str(e)}
+        print(f"[iceberg-diag] {entry}", file=sys.stderr, flush=True)
+        return [entry]
 
 
-def run(spark, input):
+def run(spark, input) -> list[LogEntry]:
+    logs: list[LogEntry] = []
     for binding in input["bindings"]:
         bindingIdx: int = binding["binding"]
         query: str = binding["query"]
@@ -91,7 +101,7 @@ def run(spark, input):
             f"merge_view_{bindingIdx}"
         )
 
-        _log_staging_null_counts(spark, bindingIdx, columns)
+        logs += _staging_null_counts(spark, bindingIdx, columns)
 
         try:
             spark.sql(query)
@@ -102,7 +112,9 @@ def run(spark, input):
         finally:
             spark.catalog.dropTempView(f"merge_view_{bindingIdx}")
 
-        _log_iceberg_file_stats(spark, bindingIdx, query)
+        logs += _iceberg_file_stats(spark, bindingIdx, query)
+
+    return logs
 
 
 if __name__ == "__main__":

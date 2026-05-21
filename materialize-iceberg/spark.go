@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	cerrors "github.com/estuary/connectors/go/connector-errors"
+	"github.com/estuary/connectors/materialize-iceberg/python"
 	"github.com/segmentio/encoding/json"
 	log "github.com/sirupsen/logrus"
 )
@@ -98,13 +99,11 @@ func (s *sparkClient) runJob(ctx context.Context, input any, entryPointURI, pyFi
 		return fmt.Errorf("spark job %q daemon returned %d: %s", jobName, resp.StatusCode, string(respBody))
 	}
 
-	var result struct {
-		Success bool   `json:"success"`
-		Error   string `json:"error"`
-	}
+	var result python.StatusOutput
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return fmt.Errorf("decoding daemon response for %q: %w (body: %s)", jobName, err, string(respBody))
 	}
+	python.ForwardLogs(result.Logs)
 	if !result.Success {
 		return fmt.Errorf("spark job %q failed: %s", jobName, result.Error)
 	}

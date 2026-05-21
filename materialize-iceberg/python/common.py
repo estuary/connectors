@@ -4,8 +4,13 @@ import argparse
 import json
 import os
 from dataclasses import dataclass
-from typing import Optional
+from typing import Any, Dict, Optional
 from urllib.parse import urlparse
+
+# A structured log entry returned by Python jobs and forwarded to the Go
+# connector's logger. Each entry must have a "msg" key; all other keys become
+# log fields.
+LogEntry = Dict[str, Any]
 
 import boto3
 import botocore
@@ -363,11 +368,11 @@ def run_with_status(
             input = json.loads(body.read().decode("utf-8"))
         s3.delete_object(Bucket=input_bucket_name, Key=input_file_path)
 
-        fn(input)
+        logs = fn(input) or []
         s3.put_object(
             Bucket=output_bucket_name,
             Key=output_file_path,
-            Body=json.dumps({"success": True}),
+            Body=json.dumps({"success": True, "logs": logs}),
         )
     except Exception as e:
         s3.put_object(

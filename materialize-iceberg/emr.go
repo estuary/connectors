@@ -197,6 +197,8 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 				return fmt.Errorf("job succeeded but could not get final status: %w", err)
 			} else if !status.Success {
 				return fmt.Errorf("job failed ran successfully but had error: %s", status.Error)
+			} else {
+				python.ForwardLogs(status.Logs)
 			}
 
 			return nil
@@ -204,6 +206,7 @@ func (e *emrClient) runJob(ctx context.Context, input any, entryPointUri, pyFile
 			if status, err := getStatus(); err != nil {
 				return fmt.Errorf("job failed with no status output: %s", runDetails)
 			} else {
+				python.ForwardLogs(status.Logs)
 				log.WithField("runDetails", runDetails).Error("emr job failed")
 				return fmt.Errorf("job failed: %s", status.Error)
 			}
