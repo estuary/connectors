@@ -40,7 +40,7 @@ This is primarily a Go monorepo with YAML configs. When editing Go code, always 
 - Integration tests are run as part of `go test -v ./$connector`. Feel free to always run the integration tests for both local and cloud connectors. The credentials are provided as part of the integration tests automatically so you do not need to manually read the credentials.
 - In order to test feature flags, you can set feature flags for sops-encrypted cloud credentials using `sops set` without reading the encrypted files.
 - When running integration tests, run the whole suite (`TestIntegration/*`), since running only one of them can lead to inconsistent snapshots at the moment.
-- When runnin tests, write the full output to a file, and then read the output from the file. Do not `tail` or `head` the test output as it is very large and you are likely not to find the important lines.
+- When running tests, write the full output to a file, and then read the output from the file. Do not `tail` or `head` the test output as it is very large and you are likely not to find the important lines.
 
 See [tests/README.md](tests/README.md) for test structure details.
 
