@@ -246,5 +246,6 @@ collections:
         uint064ToString: *string
         iriToString: *string
         iriReferenceToString: *string
+        stringToEnum: { type: string, enum: [active, inactive] }
       required: [id]
     key: [/id]

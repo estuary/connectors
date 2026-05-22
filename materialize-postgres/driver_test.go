@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os/exec"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -39,13 +40,31 @@ func TestIntegration(t *testing.T) {
 		}
 	}
 
+	// Enum type names embed the full table name, which includes the test-run-specific random
+	// suffix. The test framework strips the full rndSuffix via strings.ReplaceAll, but when
+	// the table name is truncated to 42 bytes inside the enum type name (hash mode), only a
+	// prefix of rndSuffix survives. We strip that truncated prefix here too.
+	// Additionally, the 8-hex hash in hash-mode type names is computed from the random table
+	// name and therefore changes per run; normalize it to a stable placeholder.
+	actionDescSanitizers := []func(string) string{
+		func(s string) string {
+			// Strip truncated test-suffix components (_<uuid8>_flow_test_<partial_ts>) that
+			// remain after the full rndSuffix has already been removed by the framework.
+			return regexp.MustCompile(`_[0-9a-f]{8}_flow_test_\d+`).ReplaceAllString(s, "")
+		},
+		func(s string) string {
+			// Normalize the content-addressed hash in hash-mode enum type names.
+			return regexp.MustCompile(`_[0-9a-f]{8}_flow_enum`).ReplaceAllString(s, "_<hash>_flow_enum")
+		},
+	}
+
 	require.NoError(t, exec.Command("docker", "compose", "-f", "docker-compose.yaml", "up", "--wait").Run())
 	t.Cleanup(func() {
 		exec.Command("docker", "compose", "-f", "docker-compose.yaml", "down", "-v").Run()
 	})
 
 	t.Run("materialize", func(t *testing.T) {
-		sql.RunMaterializationTest(t, newPostgresDriver(), "testdata/materialize.flow.yaml", makeResourceFn, nil)
+		sql.RunMaterializationTest(t, newPostgresDriver(), "testdata/materialize.flow.yaml", makeResourceFn, actionDescSanitizers)
 	})
 
 	t.Run("apply", func(t *testing.T) {
@@ -53,7 +72,7 @@ func TestIntegration(t *testing.T) {
 	})
 
 	t.Run("migrate", func(t *testing.T) {
-		sql.RunMigrationTest(t, newPostgresDriver(), "testdata/migrate.flow.yaml", makeResourceFn, nil)
+		sql.RunMigrationTest(t, newPostgresDriver(), "testdata/migrate.flow.yaml", makeResourceFn, actionDescSanitizers)
 	})
 
 	t.Run("fence", func(t *testing.T) {

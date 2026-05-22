@@ -18,6 +18,10 @@ type ExistingField struct {
 	CharacterMaxLength int
 	HasDefault         bool
 	Format             string
+	// Meta allows connectors to attach arbitrary endpoint-specific metadata to a
+	// field. Retrieve with a type assertion in connector-specific code (e.g.,
+	// CompatibleColumnType.Compatible).
+	Meta any
 }
 
 // Existing resource contains information about a materialized resource in an
@@ -63,12 +67,12 @@ func (r *ExistingResource) PushField(field ExistingField) {
 // GetField returns the ExistingField for a given Flow field name, or nil if it
 // is not found.
 func (r *ExistingResource) GetField(name string) *ExistingField {
-	for _, f := range r.fields {
-		translated := r.translateField(name)
-		if r.caseInsensitiveFields && strings.EqualFold(f.Name, translated) {
-			return &f
-		} else if f.Name == translated {
-			return &f
+	translated := r.translateField(name)
+	for i := range r.fields {
+		if r.caseInsensitiveFields && strings.EqualFold(r.fields[i].Name, translated) {
+			return &r.fields[i]
+		} else if r.fields[i].Name == translated {
+			return &r.fields[i]
 		}
 	}
 

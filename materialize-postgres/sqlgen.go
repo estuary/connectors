@@ -49,7 +49,7 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 			sql.STRING_INTEGER: sql.MapStatic("NUMERIC"),
 			sql.STRING_NUMBER:  sql.MapStatic("DECIMAL", sql.AlsoCompatibleWith("numeric")),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: primaryKeyTextType,
+				Fallback: MapEnum(primaryKeyTextType),
 				WithFormat: map[string]sql.MapProjectionFn{
 					"date":      dateMapping,
 					"date-time": datetimeMapping,
@@ -77,10 +77,21 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 			"date":                     {sql.NewMigrationSpec([]string{"text"})},
 			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},
 			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
-			"text":                     {sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast))},
-			"character varying":        {sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast))},
-			"bytea":                    {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(byteaToStringCast))},
-			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			// text/character varying → enum: create type + rename-based migration with CAST.
+			"text": {
+				sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast)),
+				sql.NewMigrationSpecTarget(EnumMigrationTarget{}),
+			},
+			"character varying": {
+				sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast)),
+				sql.NewMigrationSpecTarget(EnumMigrationTarget{}),
+			},
+			// user-defined (PG ENUM) → text: migrate incompatible USER-DEFINED columns.
+			// Value expansion for compatible enum columns is handled separately in
+			// client.AlterTable by checking all existing PgEnum columns.
+			"user-defined": {sql.NewMigrationSpec([]string{"text"})},
+			"bytea":  {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(byteaToStringCast))},
+			"*":      {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {

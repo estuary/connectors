@@ -5,6 +5,7 @@ import (
 	stdsql "database/sql"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -100,7 +101,59 @@ func (c *client) PopulateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 		}
 	}
 
-	return sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, catalog, resourcePaths)
+	// Standard table + column population.
+	if err := sql.StdPopulateInfoSchema(ctx, is, c.db, c.ep.Dialect, catalog, resourcePaths); err != nil {
+		return err
+	}
+
+	if len(resourcePaths) == 0 {
+		return nil
+	}
+
+	// Enrich USER-DEFINED columns with udt_name so PgEnum.Compatible can
+	// identify whether the existing column has the expected enum type.
+	schemas := make([]string, 0, len(resourcePaths))
+	for _, p := range resourcePaths {
+		loc := c.ep.Dialect.TableLocator(p)
+		schemas = append(schemas, c.ep.Dialect.Literal(loc.TableSchema))
+	}
+	slices.Sort(schemas)
+	schemas = slices.Compact(schemas)
+
+	rows, err := c.db.QueryContext(ctx, fmt.Sprintf(`
+		SELECT table_schema, table_name, column_name, udt_name
+		FROM information_schema.columns
+		WHERE table_catalog = %s AND table_schema IN (%s) AND data_type = 'USER-DEFINED'`,
+		c.ep.Dialect.Literal(catalog), strings.Join(schemas, ",")))
+	if err != nil {
+		return fmt.Errorf("querying udt names: %w", err)
+	}
+	defer rows.Close()
+
+	// Attach pgFieldMeta to USER-DEFINED ExistingFields for PgEnum.Compatible
+	for rows.Next() {
+		var ts, tn, cn, udt string
+		if err := rows.Scan(&ts, &tn, &cn, &udt); err != nil {
+			return err
+		}
+		if res := is.GetResource([]string{ts, tn}); res != nil {
+			if field := res.GetField(cn); field != nil {
+				field.Meta = pgFieldMeta{UDTName: udt}
+			}
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// PrepareTable resolves PgEnum type names before
+// materialize-sql renders the CREATE TABLE statement used as the action description.
+func (c *client) PrepareTable(table *sql.Table) error {
+	_, err := resolveEnumTypes(c.ep.Dialect, table)
+	return err
 }
 
 func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
@@ -115,6 +168,18 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 	}
 	defer txn.Rollback()
 
+	for _, col := range tc.Table.Columns() {
+		if e, ok := col.MappedType.TargetType.(*PgEnum); ok && e.TypeName != "" {
+			stmt, err := c.createEnumTypeSQL(e)
+			if err != nil {
+				return err
+			}
+			if _, err := txn.ExecContext(ctx, stmt); err != nil {
+				return fmt.Errorf("creating enum type %s: %w", e.TypeName, err)
+			}
+		}
+	}
+
 	if _, err := txn.ExecContext(ctx, tc.TableCreateSql); err != nil {
 		return fmt.Errorf("executing CREATE TABLE statement: %w", err)
 	}
@@ -123,7 +188,6 @@ func (c *client) CreateTable(ctx context.Context, tc sql.TableCreate) error {
 		if _, err := txn.ExecContext(ctx, res.AdditionalSql); err != nil {
 			return fmt.Errorf("executing additional SQL statement '%s': %w", res.AdditionalSql, err)
 		}
-
 		log.WithFields(log.Fields{
 			"table": tc.Identifier,
 			"query": res.AdditionalSql,
@@ -158,6 +222,40 @@ func (c *client) TruncateTable(ctx context.Context, path []string) (string, boil
 func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boilerplate.ActionApplyFn, error) {
 	var stmts []string
 
+	// CREATE TYPE for newly added enum columns
+	for i := range ta.AddColumns {
+		if e, ok := ta.AddColumns[i].MappedType.TargetType.(*PgEnum); ok {
+			stmt, err := c.createEnumTypeSQL(e)
+			if err != nil {
+				return "", nil, err
+			}
+			stmts = append(stmts, stmt)
+		}
+	}
+
+	// CREATE TYPE for enum migrations
+	for _, change := range ta.ColumnTypeChanges {
+		if e, ok := change.Column.MappedType.TargetType.(*PgEnum); ok {
+			stmt, err := c.createEnumTypeSQL(e)
+			if err != nil {
+				return "", nil, err
+			}
+			stmts = append(stmts, stmt)
+		}
+	}
+
+	// ALTER TYPE ADD VALUE for existing enum columns
+	for _, col := range ta.Table.Columns() {
+		e, ok := col.MappedType.TargetType.(*PgEnum)
+		if !ok || e.TypeName == "" {
+			continue
+		}
+		for _, v := range e.Values {
+			stmts = append(stmts, fmt.Sprintf(`ALTER TYPE %s ADD VALUE IF NOT EXISTS %s`,
+				e.TypeName, c.ep.Dialect.Literal(v)))
+		}
+	}
+
 	if len(ta.DropNotNulls) > 0 || len(ta.AddColumns) > 0 {
 		var alterColumnStmtBuilder strings.Builder
 		if err := c.templates.alterTableColumns.Execute(&alterColumnStmtBuilder, ta); err != nil {
@@ -185,6 +283,20 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 		}
 		return nil
 	}, nil
+}
+
+// createEnumTypeSQL returns a DO block that creates a PG enum type idempotently.
+func (c *client) createEnumTypeSQL(e *PgEnum) (string, error) {
+	if e.TypeName == "" {
+		return "", fmt.Errorf("internal: PgEnum TypeName not resolved for field %q", e.Field)
+	}
+	quotedVals := make([]string, len(e.Values))
+	for i, v := range e.Values {
+		quotedVals[i] = c.ep.Dialect.Literal(v)
+	}
+	return fmt.Sprintf(
+		`DO $$ BEGIN CREATE TYPE %s AS ENUM (%s); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+		e.TypeName, strings.Join(quotedVals, ", ")), nil
 }
 
 func (c *client) ListSchemas(ctx context.Context) ([]string, error) {

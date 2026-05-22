@@ -101,6 +101,8 @@ collections:
         stringUint64Field: { type: string, format: uint64, maxLength: 20 }
         stringIriField: { type: string, format: iri }
         stringIriReferenceField: { type: string, format: iri-reference }
+        enumField: { type: string, enum: [bar, baz, foo] }
+        enumNullableField: { type: [string, "null"], enum: [one, two] }
       required: [id]
       type: object
     key: [/id]

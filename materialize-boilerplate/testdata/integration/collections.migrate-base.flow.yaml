@@ -243,5 +243,6 @@ collections:
         uint064ToString: *uint064
         iriToString: *iri
         iriReferenceToString: *iriReference
+        stringToEnum: { type: string }
       required: [id]
     key: [/id]
