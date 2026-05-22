@@ -150,7 +150,26 @@ def _parquet_row_group_stats(
     HadoopInputFile = jvm.org.apache.parquet.hadoop.util.HadoopInputFile
     ParquetFileReader = jvm.org.apache.parquet.hadoop.ParquetFileReader
 
-    logs = []
+    try:
+        parquet_version_str = str(jvm.org.apache.parquet.Version.FULL_VERSION)
+    except Exception:
+        parquet_version_str = "unknown"
+    version_entry = {
+        "msg": "parquet library version",
+        "binding": binding_idx,
+        "parquetVersion": parquet_version_str,
+        # ParquetMetadataConverter.toParquetStatistics() omits null_count when
+        # withinLimit() fails — i.e. when min.len + max.len >= 4096 bytes. For
+        # large string columns (flow_document, html_body) every row group trips
+        # this, leaving an empty Statistics struct in the footer. Snowflake sees
+        # isNumNullsSet()=false on a NOT NULL column and errors. Fix: set
+        # spark.hadoop.parquet.statistics.truncate.length=16, which makes
+        # isSmallerThanWithTruncation(4096, 16) always pass (16+16=32<4096) so
+        # null_count and truncated min/max are always written.
+    }
+    print(f"[iceberg-diag] {version_entry}", file=sys.stderr, flush=True)
+
+    logs = [version_entry]
     for file_row in file_rows:
         file_path = file_row.file_path
         try:
@@ -169,6 +188,7 @@ def _parquet_row_group_stats(
 
         try:
             footer = reader.getFooter()
+            created_by = str(footer.getFileMetaData().getCreatedBy())
             row_groups = footer.getBlocks()
             num_rg = row_groups.size()
 
@@ -220,6 +240,7 @@ def _parquet_row_group_stats(
             "msg": "parquet row group stats",
             "binding": binding_idx,
             "filePath": file_path,
+            "createdBy": created_by,
             "stringColStats": col_stats,
         }
         print(f"[iceberg-diag] {entry}", file=sys.stderr, flush=True)
