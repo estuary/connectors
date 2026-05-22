@@ -85,16 +85,14 @@ def run(
                     PY_IO_IMPL: "pyiceberg.io.fsspec.FsspecFileIO",  # use S3 file IO instead of Arrow
                 }
 
-                # For local/S3-compatible setups the catalog server cannot vend STS creds,
-                # so we pass the user's access keys directly to pyiceberg and disable
-                # catalog credential vending. We key off `s3_endpoint` —
-                # production AWS users leave it blank and continue to receive
-                # vended credentials from the catalog as before.
-                direct_s3_creds = (
-                    cfg.s3_endpoint
-                    and cfg.credentials is not None
-                    and cfg.credentials.auth_type == "AWSAccessKey"
-                    and cfg.region
+                # Whenever the user supplied AWS access keys, bypass catalog
+                # credential vending and pass the keys straight to pyiceberg's
+                # S3 FileIO. This handles both S3-compatible setups (rustfs,
+                # MinIO) and non-vending REST catalogs (e.g. Nessie) on real
+                # AWS. `AWSIAM` users fall through to the catalog-vended path,
+                # which is the model AWS Lakekeeper / Polaris assume.
+                direct_s3_creds = bool(
+                    cfg.credentials.auth_type == "AWSAccessKey" and cfg.region
                 )
 
                 if direct_s3_creds:
@@ -103,7 +101,8 @@ def run(
                         cfg.credentials.aws_secret_access_key
                     )
                     properties["s3.region"] = cfg.region
-                    properties["s3.endpoint"] = cfg.s3_endpoint
+                    if cfg.s3_endpoint:
+                        properties["s3.endpoint"] = cfg.s3_endpoint
                 catalog = RestCatalog(
                     "default",
                     **{k: v for k, v in properties.items() if v is not None},
