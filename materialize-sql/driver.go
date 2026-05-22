@@ -153,6 +153,12 @@ func (s *sqlMaterialization[EC, RC]) CreateResource(ctx context.Context, binding
 		return "", nil, err
 	}
 
+	if p, ok := s.client.(TablePreparer); ok {
+		if err := p.PrepareTable(&table); err != nil {
+			return "", nil, fmt.Errorf("preparing table: %w", err)
+		}
+	}
+
 	createStatement, err := RenderTableTemplate(table, s.endpoint.CreateTableTemplate)
 	if err != nil {
 		return "", nil, err
@@ -292,6 +298,12 @@ func (s *sqlMaterialization[EC, RC]) UpdateResource(
 	table, err := getTable(s.endpoint, s.materializationName, bindingUpdate.Binding)
 	if err != nil {
 		return "", nil, err
+	}
+
+	if p, ok := s.client.(TablePreparer); ok {
+		if err := p.PrepareTable(&table); err != nil {
+			return "", nil, fmt.Errorf("preparing table: %w", err)
+		}
 	}
 
 	getColumn := func(field string) (Column, error) {
