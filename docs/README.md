@@ -24,6 +24,6 @@ docs/reference/Connectors/capture-connectors/PostgreSQL/
 ```
 
 The Docusaurus site that hosts these pages lives in
-[`estuary/documentation`](https://github.com/estuary/documentation), which
-sources this directory via git submodule.
+[`estuary/docs`](https://github.com/estuary/docs), which sources this
+directory via git submodule.
 
