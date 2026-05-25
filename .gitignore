@@ -1,3 +1,4 @@
+venv
 .claude/scheduled_tasks.lock
 tests/benchmark/materialize/runs/*
 !tests/benchmark/materialize/runs/baselines

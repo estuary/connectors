@@ -74,6 +74,8 @@ Resource: data_types
 
 {"Name":"arrayField","Nullable":true,"Type":"flattened"}
 {"Name":"boolField","Nullable":true,"Type":"boolean"}
+{"Name":"enumField","Nullable":true,"Type":"text"}
+{"Name":"enumNullableField","Nullable":true,"Type":"text"}
 {"Name":"flow_document","Nullable":true,"Type":"flattened"}
 {"Name":"flow_published_at","Nullable":true,"Type":"date"}
 {"Name":"id","Nullable":true,"Type":"long"}
