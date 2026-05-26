@@ -51,6 +51,7 @@ optional_scopes = [
     "crm.objects.custom.read",
     "crm.objects.feedback_submissions.read",
     "crm.objects.goals.read",
+    "crm.objects.marketing_events.read",
     "crm.objects.orders.read",
     "crm.schemas.custom.read",
     "marketing.campaigns.read",
@@ -178,7 +179,7 @@ class Names(StrEnum):
     orders = auto()
     carts = auto()
     partner_clients = auto()
-    marketing_event = auto()
+    marketing_events = auto()
     marketing_emails = auto()
     contact_lists = auto()
     contact_list_memberships = auto()
@@ -469,7 +470,7 @@ class Engagement(BaseCRMObject):
         Names.orders,
         Names.carts,
         Names.partner_clients,
-        Names.marketing_event,
+        Names.marketing_events,
     ]
 
     contacts: list[int] = []
@@ -487,7 +488,7 @@ class Engagement(BaseCRMObject):
     orders: list[int] = []
     carts: list[int] = []
     partner_clients: list[int] = []
-    marketing_event: list[int] = []
+    marketing_events: list[int] = []
 
 
 class Ticket(BaseCRMObject):

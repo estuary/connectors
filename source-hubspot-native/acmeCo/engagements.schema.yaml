@@ -180,11 +180,11 @@ properties:
       type: integer
     title: Partner Clients
     type: array
-  marketing_event:
+  marketing_events:
     default: []
     items:
       type: integer
-    title: Marketing Event
+    title: Marketing Events
     type: array
 required:
 - id

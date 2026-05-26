@@ -66,6 +66,11 @@ captures:
         name: marketing_emails
       target: acmeCo/marketing_emails
     - resource:
+        name: marketing_events
+        interval: PT5M
+      target: acmeCo/marketing_events
+      disable: true
+    - resource:
         name: contact_lists
         interval: PT3H
       target: acmeCo/contact_lists

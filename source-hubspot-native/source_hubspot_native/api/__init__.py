@@ -66,6 +66,7 @@ from .marketing_emails import (
     fetch_marketing_emails_page,
     fetch_recent_marketing_emails,
 )
+from .marketing_events import fetch_marketing_events
 from .object_with_associations import fetch_page_with_associations
 from .orders import (
     fetch_delayed_orders,
@@ -119,6 +120,7 @@ __all__ = [
     "fetch_form_submissions",
     "fetch_forms",
     "fetch_marketing_emails_page",
+    "fetch_marketing_events",
     "fetch_owners",
     "fetch_page_with_associations",
     "fetch_properties",

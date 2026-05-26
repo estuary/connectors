@@ -6,7 +6,14 @@ import re
 from typing import AsyncGenerator, Iterable
 
 from estuary_cdk.capture import Task
-from estuary_cdk.capture.common import BaseDocument, Resource, open_binding, ReductionStrategy, ResourceConfig
+from estuary_cdk.capture.common import (
+    BaseDocument,
+    Resource,
+    SnapshotResource,
+    open_binding,
+    ReductionStrategy,
+    ResourceConfig,
+)
 from estuary_cdk.flow import CaptureBinding
 from estuary_cdk.http import HTTPError, HTTPMixin, HTTPSession, TokenSource
 
@@ -43,6 +50,7 @@ from .api import (
     fetch_form_submissions,
     fetch_forms,
     fetch_marketing_emails_page,
+    fetch_marketing_events,
     fetch_owners,
     fetch_page_with_associations,
     fetch_properties,
@@ -143,6 +151,7 @@ async def _remove_permission_blocked_resources(
             fetch_recent_email_events(log, http, False, datetime.now(tz=UTC), None),
         ),
         (Names.forms, fetch_forms(http, log)),
+        (Names.marketing_events, fetch_marketing_events(http, log)),
         (Names.form_submissions, fetch_form_submissions(http, log, 0)),
         (
             Names.feedback_submissions,
@@ -354,6 +363,7 @@ async def all_resources(
         forms(http),
         form_submissions(http),
         marketing_emails(http),
+        marketing_events(http),
         feedback_submissions(http, with_history),
         contact_lists(http),
         contact_list_memberships(http),
@@ -637,6 +647,33 @@ def forms(http: HTTPSession) -> Resource:
         initial_state=ResourceState(),
         initial_config=ResourceConfig(name=Names.forms, interval=timedelta(minutes=5)),
         schema_inference=True,
+    )
+
+
+def marketing_events(
+    http: HTTPSession,
+) -> SnapshotResource[BaseDocument, ResourceConfig]:
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(fetch_marketing_events, http),
+        )
+
+    return SnapshotResource(
+        name=Names.marketing_events,
+        open=open,
+        initial_config=ResourceConfig(
+            name=Names.marketing_events, interval=timedelta(minutes=5)
+        ),
     )
 
 
