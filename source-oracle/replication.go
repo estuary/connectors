@@ -1108,6 +1108,7 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 	if err != nil {
 		return fmt.Errorf("logminer query: %w", err)
 	}
+	defer rows.Close()
 
 	var totalMessages = 0
 	var fullMessages = 0
@@ -1234,8 +1235,6 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 
 	if err := rows.Err(); err != nil {
 		return fmt.Errorf("rows error: %w", err)
-	} else if err := rows.Close(); err != nil {
-		return fmt.Errorf("rows close: %w", err)
 	}
 
 	var finalSCN SCN
