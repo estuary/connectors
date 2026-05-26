@@ -34,6 +34,28 @@ const OUT_DATE_FORMAT = "2006-01-02T15:04:05"
 const OUT_TS_FORMAT = "2006-01-02T15:04:05.999999999"
 const OUT_TSTZ_FORMAT = time.RFC3339Nano
 
+// configureReplicationSession applies the Oracle session settings required for
+// LogMiner: predictable NLS date/timestamp formats, and for CDB instances a
+// container switch to CDB$ROOT since LogMiner cannot run from within a PDB.
+func configureReplicationSession(ctx context.Context, conn *sql.Conn, pdbName string) error {
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET NLS_DATE_FORMAT = '%s'", ORACLE_DATE_FORMAT)); err != nil {
+		return fmt.Errorf("set NLS_DATE_FORMAT: %w", err)
+	}
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET NLS_TIMESTAMP_FORMAT = '%s'", ORACLE_TS_FORMAT)); err != nil {
+		return fmt.Errorf("set NLS_TIMESTAMP_FORMAT: %w", err)
+	}
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET NLS_TIMESTAMP_TZ_FORMAT = '%s'", ORACLE_TSTZ_FORMAT)); err != nil {
+		return fmt.Errorf("set NLS_TIMESTAMP_TZ_FORMAT: %w", err)
+	}
+
+	if pdbName != "" {
+		if _, err := conn.ExecContext(ctx, "ALTER SESSION SET CONTAINER=CDB$ROOT"); err != nil {
+			return fmt.Errorf("switching to CDB: %w", err)
+		}
+	}
+	return nil
+}
+
 func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.RawMessage) (sqlcapture.ReplicationStream, error) {
 	var dbConn, err = sql.Open("oracle", db.config.ToURI(db.config.Advanced.IncrementalChunkSize+1))
 	if err != nil {
@@ -43,22 +65,21 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %w", err)
 	}
-
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET NLS_DATE_FORMAT = '%s'", ORACLE_DATE_FORMAT)); err != nil {
-		return nil, fmt.Errorf("set NLS_DATE_FORMAT: %w", err)
-	}
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET NLS_TIMESTAMP_FORMAT = '%s'", ORACLE_TS_FORMAT)); err != nil {
-		return nil, fmt.Errorf("set NLS_TIMESTAMP_FORMAT: %w", err)
-	}
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET NLS_TIMESTAMP_TZ_FORMAT = '%s'", ORACLE_TSTZ_FORMAT)); err != nil {
-		return nil, fmt.Errorf("set NLS_TIMESTAMP_TZ_FORMAT: %w", err)
+	if err := configureReplicationSession(ctx, conn, db.pdbName); err != nil {
+		return nil, err
 	}
 
-	// Logminer cannot run on PDB instances, so we switch to the CDB
-	if db.pdbName != "" {
-		if _, err := conn.ExecContext(ctx, "ALTER SESSION SET CONTAINER=CDB$ROOT"); err != nil {
-			return nil, fmt.Errorf("switching to CDB: %w", err)
-		}
+	// A second pinned connection used exclusively for capturePendingTransaction's
+	// recursive poll. Keeping it on its own Oracle session means END_LOGMNR /
+	// ADD_LOGFILE / START_LOGMNR inside the recursive call don't disrupt the outer
+	// LogMiner cursor running on `conn`, which would otherwise drive the underlying
+	// driver into ErrBadConn and deadlock database/sql's connection cleanup.
+	innerConn, err := dbConn.Conn(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("unable to acquire inner connection: %w", err)
+	}
+	if err := configureReplicationSession(ctx, innerConn, db.pdbName); err != nil {
+		return nil, fmt.Errorf("configuring inner connection: %w", err)
 	}
 
 	// Decode start cursor from a JSON quoted string into its actual string contents
@@ -128,8 +149,9 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
 		dictionaryMode = DictionaryModeOnline
 	}
 	var stream = &replicationStream{
-		db:   db,
-		conn: conn,
+		db:        db,
+		conn:      conn,
+		innerConn: innerConn,
 
 		lastTxnEndSCN: startSCN,
 
@@ -502,8 +524,19 @@ func (s *oracleSource) Common() sqlcapture.SourceCommon {
 // A replicationStream represents the process of receiving Oracle
 // logminer events, and translating changes into a more friendly representation.
 type replicationStream struct {
-	db   *oracleDatabase
-	conn *sql.Conn // The Oracle connection
+	db *oracleDatabase
+
+	// conn is the Oracle session used by the outer LogMiner cursor driven from
+	// run().
+	//
+	// innerConn is a separate Oracle session used exclusively by
+	// capturePendingTransaction's recursive poll. Keeping the recursive call on
+	// its own session means END_LOGMNR / ADD_LOGFILE / START_LOGMNR don't disrupt
+	// the outer cursor's LogMiner state, and — because each *sql.Conn has its
+	// own closemu RWMutex — an ErrBadConn on one session can't deadlock
+	// database/sql's cleanup of the other.
+	conn      *sql.Conn
+	innerConn *sql.Conn
 
 	cancel context.CancelFunc            // Cancel function for the replication goroutine's context
 	errCh  chan error                    // Error channel for the final exit status of the replication goroutine
@@ -688,6 +721,7 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 		close(s.events)
 		s.transactionsStmt.Close()
 		s.conn.Close()
+		s.innerConn.Close()
 		s.errCh <- err
 	}()
 
@@ -723,12 +757,12 @@ func (s *replicationStream) run(ctx context.Context) error {
 // poll logminer for changes in [startSCN, endSCN]
 // if transactions is not empty, only messages for the given transactions are processed
 //
-// The `conn` parameter is the Oracle session used for all LogMiner queries and
-// session-state mutations issued by this poll. Today both the top-level call
-// from `run` and the recursive call from `capturePendingTransaction` pass
-// `s.conn`; a follow-up commit will use a separate connection for the recursive
-// case to avoid driving database/sql into a deadlock when ErrBadConn fires
-// while the outer cursor is mid-iteration.
+// `conn` is the Oracle session used for all LogMiner queries and
+// session-state mutations issued by this poll. The top-level call from `run`
+// passes `s.conn`; the recursive call from `capturePendingTransaction` passes
+// `s.innerConn` so that LogMiner state mutations don't disrupt the outer
+// cursor (which would otherwise drive database/sql into a deadlock when the
+// driver returns ErrBadConn while the outer cursor's Rows is mid-iteration).
 func (s *replicationStream) poll(ctx context.Context, conn *sql.Conn, minSCN, maxSCN SCN, transactions []string) error {
 	var startSCN = minSCN
 	logrus.WithFields(logrus.Fields{
@@ -910,7 +944,10 @@ func (s *replicationStream) capturePendingTransaction(ctx context.Context, tx tr
 		"startSCN": startSCN,
 		"endSCN":   endSCN,
 	}).Info("capturing pending transaction")
-	return s.poll(ctx, s.conn, startSCN, endSCN, transactions)
+	// Run the recursive poll on innerConn so its LogMiner state mutations
+	// (END_LOGMNR / ADD_LOGFILE / START_LOGMNR) don't disturb the outer cursor
+	// currently iterating on s.conn.
+	return s.poll(ctx, s.innerConn, startSCN, endSCN, transactions)
 }
 
 func (s *replicationStream) emitEvent(ctx context.Context, event sqlcapture.DatabaseEvent) error {
@@ -1326,6 +1363,7 @@ func (s *replicationStream) Close(ctx context.Context) error {
 	s.cancel()
 	s.transactionsStmt.Close()
 	s.conn.Close()
+	s.innerConn.Close()
 	return <-s.errCh
 }
 
