@@ -147,8 +147,8 @@ func (db *oracleDatabase) ReplicationStream(ctx context.Context, cpJSON json.Raw
 	return stream, nil
 }
 
-func (s *replicationStream) endLogminer(ctx context.Context) error {
-	if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.END_LOGMNR; END;"); err != nil {
+func (s *replicationStream) endLogminer(ctx context.Context, conn *sql.Conn) error {
+	if _, err := conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.END_LOGMNR; END;"); err != nil {
 		// ORA-01307: no LogMiner session is currently active
 		if strings.Contains(err.Error(), "ORA-01307") {
 			return nil
@@ -173,7 +173,7 @@ type redoFile struct {
 
 var MaxReplicationLogFilesSize = 2 * 1024 * 1024 * 1024
 
-func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SCN) (SCN, error) {
+func (s *replicationStream) addLogFiles(ctx context.Context, conn *sql.Conn, startSCN, maxSCN SCN) (SCN, error) {
 	logrus.WithFields(logrus.Fields{
 		"startSCN": startSCN,
 		"maxSCN":   maxSCN,
@@ -182,12 +182,12 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SC
 	// See DBMS_LOGMNR_D.BUILD reference:
 	// https://docs.oracle.com/en/database/oracle/oracle-database/19/arpls/DBMS_LOGMNR_D.html#GUID-20E210F3-A566-46F1-B817-486723069AF4
 	if s.dictionaryMode == DictionaryModeExtract {
-		if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR_D.BUILD (options => DBMS_LOGMNR_D.STORE_IN_REDO_LOGS); END;"); err != nil {
+		if _, err := conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR_D.BUILD (options => DBMS_LOGMNR_D.STORE_IN_REDO_LOGS); END;"); err != nil {
 			return 0, fmt.Errorf("extracting dictionary from logfile: %w", err)
 		}
 	}
 	// We only add the local version of archived log files to avoid duplicates
-	var row = s.conn.QueryRowContext(ctx, "SELECT DEST_ID FROM V$ARCHIVE_DEST_STATUS WHERE TYPE='LOCAL' AND STATUS='VALID' AND ROWNUM=1")
+	var row = conn.QueryRowContext(ctx, "SELECT DEST_ID FROM V$ARCHIVE_DEST_STATUS WHERE TYPE='LOCAL' AND STATUS='VALID' AND ROWNUM=1")
 	var localDestID int
 	if err := row.Scan(&localDestID); err != nil {
 		return 0, fmt.Errorf("querying archive log files destination: %w", err)
@@ -200,7 +200,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SC
 	if s.dictionaryMode == DictionaryModeExtract {
 		findEarliestLogSCNQuery += " AND DICTIONARY_BEGIN='YES'"
 	}
-	row = s.conn.QueryRowContext(ctx, findEarliestLogSCNQuery, startSCN)
+	row = conn.QueryRowContext(ctx, findEarliestLogSCNQuery, startSCN)
 	var minArchiveSCNScan sql.NullInt64
 	if err := row.Scan(&minArchiveSCNScan); err != nil {
 		return 0, fmt.Errorf("querying latest archive log to contain the dictionary for the SCN range: %w", err)
@@ -226,7 +226,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SC
     DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
 
 	var fullQuery = liveLogFiles + " UNION " + archivedLogFiles
-	rows, err := s.conn.QueryContext(ctx, fullQuery, minArchiveSCN)
+	rows, err := conn.QueryContext(ctx, fullQuery, minArchiveSCN)
 	if err != nil {
 		return 0, fmt.Errorf("fetching log file list: %w", err)
 	}
@@ -363,7 +363,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, startSCN, maxSCN SC
 	}
 
 	for _, f := range redoFiles {
-		if _, err := s.conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.ADD_LOGFILE(:filename); END;", f.Name); err != nil {
+		if _, err := conn.ExecContext(ctx, "BEGIN SYS.DBMS_LOGMNR.ADD_LOGFILE(:filename); END;", f.Name); err != nil {
 			return 0, fmt.Errorf("adding logfile %q (%s, %d, %s, %s) to logminer: %w", f.Name, f.Status, f.FirstChange, f.DictStart, f.DictEnd, err)
 		}
 	}
@@ -459,7 +459,7 @@ func resolveDuplicateSequences(files []redoFile) ([]redoFile, error) {
 	return out, nil
 }
 
-func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN SCN) error {
+func (s *replicationStream) startLogminer(ctx context.Context, conn *sql.Conn, startSCN, endSCN SCN) error {
 	var dictionaryOption = ""
 	if s.dictionaryMode == DictionaryModeExtract {
 		dictionaryOption = "DBMS_LOGMNR.DICT_FROM_REDO_LOGS + DBMS_LOGMNR.DDL_DICT_TRACKING"
@@ -472,7 +472,7 @@ func (s *replicationStream) startLogminer(ctx context.Context, startSCN, endSCN 
 		"endSCN":   endSCN,
 	}).Debug("starting logminer")
 	var startQuery = fmt.Sprintf("BEGIN SYS.DBMS_LOGMNR.START_LOGMNR(STARTSCN=>:scn,ENDSCN=>:end,OPTIONS=>%s); END;", dictionaryOption)
-	if _, err := s.conn.ExecContext(ctx, startQuery, startSCN, endSCN); err != nil {
+	if _, err := conn.ExecContext(ctx, startQuery, startSCN, endSCN); err != nil {
 		return fmt.Errorf("starting logminer: %w", err)
 	}
 
@@ -707,7 +707,7 @@ func (s *replicationStream) run(ctx context.Context) error {
 		case <-poll.C:
 		}
 
-		var err = s.poll(ctx, s.lastTxnEndSCN, math.MaxInt64, nil)
+		var err = s.poll(ctx, s.conn, s.lastTxnEndSCN, math.MaxInt64, nil)
 		if err != nil {
 			// ORA-01013: user requested cancel of current operation
 			// this means a cancellation of context happened, which we don't consider an error
@@ -722,7 +722,14 @@ func (s *replicationStream) run(ctx context.Context) error {
 
 // poll logminer for changes in [startSCN, endSCN]
 // if transactions is not empty, only messages for the given transactions are processed
-func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transactions []string) error {
+//
+// The `conn` parameter is the Oracle session used for all LogMiner queries and
+// session-state mutations issued by this poll. Today both the top-level call
+// from `run` and the recursive call from `capturePendingTransaction` pass
+// `s.conn`; a follow-up commit will use a separate connection for the recursive
+// case to avoid driving database/sql into a deadlock when ErrBadConn fires
+// while the outer cursor is mid-iteration.
+func (s *replicationStream) poll(ctx context.Context, conn *sql.Conn, minSCN, maxSCN SCN, transactions []string) error {
 	var startSCN = minSCN
 	logrus.WithFields(logrus.Fields{
 		"minSCN":       minSCN,
@@ -736,7 +743,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 		}
 
 		var currentSCN SCN
-		var row = s.conn.QueryRowContext(ctx, "SELECT current_scn FROM V$DATABASE")
+		var row = conn.QueryRowContext(ctx, "SELECT current_scn FROM V$DATABASE")
 		if err := row.Scan(&currentSCN); err != nil {
 			return fmt.Errorf("fetching current SCN: %w", err)
 		}
@@ -748,9 +755,9 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 			iterationMaxSCN = currentSCN
 		}
 
-		if err := s.endLogminer(ctx); err != nil {
+		if err := s.endLogminer(ctx, conn); err != nil {
 			return err
-		} else if endSCN, err = s.addLogFiles(ctx, startSCN, iterationMaxSCN); err != nil {
+		} else if endSCN, err = s.addLogFiles(ctx, conn, startSCN, iterationMaxSCN); err != nil {
 			return err
 		}
 
@@ -764,11 +771,11 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 			"specificXIDs":        len(transactions),
 		}).Info("logminer: starting iteration")
 
-		if err := s.startLogminer(ctx, startSCN, endSCN); err != nil {
+		if err := s.startLogminer(ctx, conn, startSCN, endSCN); err != nil {
 			return err
 		}
 
-		var stmt, debugQuery, err = s.generateLogminerQuery(ctx, transactions)
+		var stmt, debugQuery, err = s.generateLogminerQuery(ctx, conn, transactions)
 		if err != nil {
 			return err
 		}
@@ -803,7 +810,7 @@ func (s *replicationStream) poll(ctx context.Context, minSCN, maxSCN SCN, transa
 			if dictionaryMismatch && s.dictionaryMode == DictionaryModeOnline && s.smartMode {
 				logrus.WithField("error", err).Info("smart mode: encountered dictionary mismatch")
 				s.dictionaryMode = DictionaryModeExtract
-				if lastDDLSCN, err := s.maximumLastDDLSCN(ctx); err != nil {
+				if lastDDLSCN, err := s.maximumLastDDLSCN(ctx, conn); err != nil {
 					return err
 				} else {
 					s.lastDDLSCN = lastDDLSCN
@@ -903,7 +910,7 @@ func (s *replicationStream) capturePendingTransaction(ctx context.Context, tx tr
 		"startSCN": startSCN,
 		"endSCN":   endSCN,
 	}).Info("capturing pending transaction")
-	return s.poll(ctx, startSCN, endSCN, transactions)
+	return s.poll(ctx, s.conn, startSCN, endSCN, transactions)
 }
 
 func (s *replicationStream) emitEvent(ctx context.Context, event sqlcapture.DatabaseEvent) error {
@@ -964,7 +971,7 @@ type transaction struct {
 	StartSCN SCN
 }
 
-func (s *replicationStream) generateLogminerQuery(ctx context.Context, transactions []string) (*sql.Stmt, string, error) {
+func (s *replicationStream) generateLogminerQuery(ctx context.Context, conn *sql.Conn, transactions []string) (*sql.Stmt, string, error) {
 	var tableObjectMapping = s.db.tableObjectMapping
 
 	var conditions []string
@@ -996,7 +1003,7 @@ func (s *replicationStream) generateLogminerQuery(ctx context.Context, transacti
 
 	logrus.Debug("generated logminer query")
 
-	stmt, err := s.conn.PrepareContext(ctx, query)
+	stmt, err := conn.PrepareContext(ctx, query)
 
 	return stmt, query, err
 }
@@ -1237,12 +1244,12 @@ func (s *replicationStream) ActivateTable(ctx context.Context, streamID sqlcaptu
 }
 
 // This function is a no-op if there is no PDB name configured
-func (s *replicationStream) switchToCDB(ctx context.Context) error {
+func (s *replicationStream) switchToCDB(ctx context.Context, conn *sql.Conn) error {
 	if s.db.pdbName == "" {
 		return nil
 	}
 
-	if _, err := s.conn.ExecContext(ctx, "ALTER SESSION SET CONTAINER=CDB$ROOT"); err != nil {
+	if _, err := conn.ExecContext(ctx, "ALTER SESSION SET CONTAINER=CDB$ROOT"); err != nil {
 		return fmt.Errorf("switching to CDB: %w", err)
 	}
 
@@ -1250,12 +1257,12 @@ func (s *replicationStream) switchToCDB(ctx context.Context) error {
 }
 
 // This function is a no-op if there is no PDB name configured
-func (s *replicationStream) switchToPDB(ctx context.Context) error {
+func (s *replicationStream) switchToPDB(ctx context.Context, conn *sql.Conn) error {
 	if s.db.pdbName == "" {
 		return nil
 	}
 
-	if _, err := s.conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET CONTAINER=%s", s.db.pdbName)); err != nil {
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("ALTER SESSION SET CONTAINER=%s", s.db.pdbName)); err != nil {
 		return fmt.Errorf("switching to PDB %s: %w", s.db.pdbName, err)
 	}
 
@@ -1266,7 +1273,7 @@ func (s *replicationStream) switchToPDB(ctx context.Context) error {
 // by a DDL statement. This function returns the maximum of all of those times
 // across all tables. When we hit a dictionary mismatch, we stay on Extract mode until
 // we have covered all the latest DDLs on all tables before switching back to online mode
-func (s *replicationStream) maximumLastDDLSCN(ctx context.Context) (SCN, error) {
+func (s *replicationStream) maximumLastDDLSCN(ctx context.Context, conn *sql.Conn) (SCN, error) {
 	var tablesCondition = ""
 	var i = 0
 	for _, mapping := range s.db.tableObjectMapping {
@@ -1278,11 +1285,11 @@ func (s *replicationStream) maximumLastDDLSCN(ctx context.Context) (SCN, error) 
 	}
 	var query = fmt.Sprintf(`SELECT TIMESTAMP_TO_SCN(MAX(LAST_DDL_TIME)) last_ddl FROM ALL_OBJECTS WHERE %s`, tablesCondition)
 
-	if err := s.switchToPDB(ctx); err != nil {
+	if err := s.switchToPDB(ctx, conn); err != nil {
 		return 0, err
 	}
 
-	row := s.conn.QueryRowContext(ctx, query)
+	row := conn.QueryRowContext(ctx, query)
 
 	var maximumDDLSCN SCN
 	if err := row.Scan(&maximumDDLSCN); err != nil {
@@ -1291,7 +1298,7 @@ func (s *replicationStream) maximumLastDDLSCN(ctx context.Context) (SCN, error) 
 		// materialized into a SCN, in these scenarios we use current SCN
 		if strings.Contains(err.Error(), "ORA-08180") {
 			var currentSCN SCN
-			var row = s.conn.QueryRowContext(ctx, "SELECT current_scn FROM V$DATABASE")
+			var row = conn.QueryRowContext(ctx, "SELECT current_scn FROM V$DATABASE")
 			if err := row.Scan(&currentSCN); err != nil {
 				return 0, fmt.Errorf("fetching current SCN: %w", err)
 			}
@@ -1301,7 +1308,7 @@ func (s *replicationStream) maximumLastDDLSCN(ctx context.Context) (SCN, error) 
 		return 0, fmt.Errorf("fetching maximum last DDL SCN: %w", err)
 	}
 
-	if err := s.switchToCDB(ctx); err != nil {
+	if err := s.switchToCDB(ctx, conn); err != nil {
 		return 0, err
 	}
 
