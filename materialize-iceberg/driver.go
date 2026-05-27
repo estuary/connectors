@@ -320,7 +320,9 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 }
 
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (mapped, boilerplate.ElementConverter) {
-	return mapProjection(p, d.cfg.Advanced.LowercaseColumnNames)
+	m, converter := mapProjection(p, d.cfg.Advanced.LowercaseColumnNames)
+	m.Nullable = fc.Nullable
+	return m, converter
 }
 
 func (d *materialization) Setup(ctx context.Context, is *boilerplate.InfoSchema) (string, error) {

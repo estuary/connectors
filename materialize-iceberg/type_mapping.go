@@ -13,6 +13,7 @@ import (
 
 type fieldConfig struct {
 	CastToString_ bool `json:"castToString"`
+	Nullable      bool `json:"nullable"`
 }
 
 func (fc fieldConfig) Validate() error { return nil }
@@ -25,6 +26,10 @@ type mapped struct {
 	// name, depending on the materialization configuration. This is exported so
 	// it can be used in templates.
 	Name string
+	// Nullable overrides the field's inferred nullability, forcing it to be
+	// nullable even if the collection schema says it's always present and
+	// non-null. Primary key fields are always required regardless of this flag.
+	Nullable bool
 }
 
 func (m mapped) String() string {
@@ -240,7 +245,7 @@ func appendProjectionsAsFields(dst *[]iceberg.NestedField, ps []boilerplate.Mapp
 			ID:       id,
 			Name:     p.Mapped.Name,
 			Type:     p.Mapped.type_,
-			Required: p.MustExist || p.IsPrimaryKey,
+			Required: (p.MustExist && !p.Mapped.Nullable) || p.IsPrimaryKey,
 			Doc:      strings.ReplaceAll(p.Comment, "\n", " - "), // Glue catalogs don't support newlines in field comments
 		})
 		ids = append(ids, id)
