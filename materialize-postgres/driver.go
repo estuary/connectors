@@ -53,6 +53,7 @@ var featureFlagDefaults = map[string]bool{
 	"datetime_keys_as_string":          true,
 	"retain_existing_data_on_backfill": false,
 	"native_binary_column_type":        true,
+	"enum":                             true,
 }
 
 func ctxWithQueryTimeout(ctx context.Context) (context.Context, context.CancelFunc) {

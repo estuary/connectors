@@ -49,7 +49,12 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 			sql.STRING_INTEGER: sql.MapStatic("NUMERIC"),
 			sql.STRING_NUMBER:  sql.MapStatic("DECIMAL", sql.AlsoCompatibleWith("numeric")),
 			sql.STRING: sql.MapString(sql.StringMappings{
-				Fallback: MapEnum(primaryKeyTextType),
+				Fallback: func() sql.MapProjectionFn {
+					if featureFlags["enum"] {
+						return MapEnum(primaryKeyTextType)
+					}
+					return primaryKeyTextType
+				}(),
 				WithFormat: map[string]sql.MapProjectionFn{
 					"date":      dateMapping,
 					"date-time": datetimeMapping,
