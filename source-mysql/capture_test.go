@@ -369,27 +369,34 @@ func TestUnicodeText(t *testing.T) {
 	}
 
 	for idx, tc := range []struct {
-		Name    string
-		Options string
-		Inputs  []string
+		Name   string
+		Column string // The `data` column definition, e.g. "TEXT COLLATE latin1_swedish_ci".
+		Inputs []string
 	}{
-		{"latin1_swedish_ci", "COLLATE latin1_swedish_ci", latinTestStrings},                                    // Default in older MySQL and MariaDB releases
-		{"utf8mb4_0900_ai_ci", "COLLATE utf8mb4_0900_ai_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Default in modern MySQL releases
-		{"utf8mb4_general_ci", "COLLATE utf8mb4_general_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Default in Debian MariaDB
-		{"utf8mb3_general_ci", "COLLATE utf8mb3_general_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Testing 3-byte UTF-8 for completeness
-		{"ucs2_general_ci", "COLLATE ucs2_general_ci", slices.Concat(latinTestStrings, otherTestStrings)},       // Testing UCS-2 for completeness
+		{"latin1_swedish_ci", "TEXT COLLATE latin1_swedish_ci", latinTestStrings},                                    // Default in older MySQL and MariaDB releases
+		{"utf8mb4_0900_ai_ci", "TEXT COLLATE utf8mb4_0900_ai_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Default in modern MySQL releases
+		{"utf8mb4_general_ci", "TEXT COLLATE utf8mb4_general_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Default in Debian MariaDB
+		{"utf8mb3_general_ci", "TEXT COLLATE utf8mb3_general_ci", slices.Concat(latinTestStrings, otherTestStrings)}, // Testing 3-byte UTF-8 for completeness
+		{"ucs2_general_ci", "TEXT COLLATE ucs2_general_ci", slices.Concat(latinTestStrings, otherTestStrings)},       // Testing UCS-2 for completeness
 
 		// Testing binary charset/collation for completeness. Apparently what happens when you declare
 		// a column as `TEXT COLLATE binary` is that MySQL just gives you a `BLOB` column and then the
 		// bytes are the correct UTF-8 representation of the input text for both backfill and replication.
-		{"binary", "COLLATE binary", slices.Concat(latinTestStrings, otherTestStrings)},
+		{"binary", "TEXT COLLATE binary", slices.Concat(latinTestStrings, otherTestStrings)},
+
+		// CHAR/VARCHAR columns arrive via replication as a Go string rather than a byte slice.
+		// These cases exercise that path across UTF-8 and non-UTF-8 charsets.
+		{"latin1_varchar", "VARCHAR(255) COLLATE latin1_swedish_ci", latinTestStrings},
+		{"latin1_char", "CHAR(64) COLLATE latin1_swedish_ci", latinTestStrings},
+		{"ucs2_varchar", "VARCHAR(255) COLLATE ucs2_general_ci", slices.Concat(latinTestStrings, otherTestStrings)},
+		{"utf8mb4_varchar", "VARCHAR(255) COLLATE utf8mb4_general_ci", slices.Concat(latinTestStrings, otherTestStrings)},
 
 		// Default in MariaDB after v11.6.0. Cannot be tested against MySQL 8.4 but we have two other utf8mb4 charsets so that's okay.
-		// {"utf8mb4_uca1400_ai_ci", "COLLATE utf8mb4_uca1400_ai_ci", slices.Concat(latinTestStrings, otherTestStrings)},
+		// {"utf8mb4_uca1400_ai_ci", "TEXT COLLATE utf8mb4_uca1400_ai_ci", slices.Concat(latinTestStrings, otherTestStrings)},
 	} {
 		t.Run(tc.Name, func(t *testing.T) {
 			var uniqueID = fmt.Sprintf("78412948_%02d", idx)
-			var tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(id INTEGER PRIMARY KEY, data TEXT %s)", tc.Options))
+			var tableName = tb.CreateTable(ctx, t, uniqueID, fmt.Sprintf("(id INTEGER PRIMARY KEY, data %s)", tc.Column))
 			var cs = tb.CaptureSpec(ctx, t, regexp.MustCompile(uniqueID))
 			cs.Validator = &st.OrderedCaptureValidator{}
 
