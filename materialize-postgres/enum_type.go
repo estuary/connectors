@@ -11,6 +11,7 @@ import (
 
 	boilerplate "github.com/estuary/connectors/materialize-boilerplate"
 	sql "github.com/estuary/connectors/materialize-sql"
+	log "github.com/sirupsen/logrus"
 )
 
 // hashedEnumSuffix matches the "_<fieldPart>_<8hexchars>_flow_enum" tail of a hashed enum type
@@ -96,11 +97,11 @@ func MapEnum(fallback sql.MapProjectionFn) sql.MapProjectionFn {
 
 		data, err := json.Marshal(p.Inference.EnumJsonVec)
 		if err != nil {
-			return fallback(p)
+			log.WithField("field", p.Field).WithError(err).Fatal("marshaling EnumJsonVec")
 		}
 		var values []string
 		if err := json.Unmarshal(data, &values); err != nil {
-			return fallback(p)
+			log.WithField("field", p.Field).WithError(err).Fatal("unmarshaling enum values")
 		}
 		slices.Sort(values)
 		values = slices.Compact(values)
@@ -151,10 +152,11 @@ func enumTypeNameParts(dialect sql.Dialect, path []string, field string) (schema
 		// Hash mode: <tableName>_<truncatedField>_<8hexHash>_flow_enum
 		// Fixed overhead (2 separators + 8-char hash + "_flow_enum"): 20 bytes.
 		// Cap tableName to 42 bytes so the field portion gets at least 1 byte.
+		// Use the full pre-truncation names as hash input for better collision resistance.
 		const maxTableBytes = 42
-		tableName = truncateToBytes(tableName, maxTableBytes)
 		h := sha256.Sum256([]byte(tableName + "_" + field))
 		hash := fmt.Sprintf("%x", h[:4])
+		tableName = truncateToBytes(tableName, maxTableBytes)
 		fieldPart := truncateToBytes(field, 63-len([]byte(tableName))-20)
 		base = tableName + "_" + fieldPart + "_" + hash + "_flow_enum"
 	}

@@ -111,7 +111,6 @@ func TestEnumTypeNamePartsHashed(t *testing.T) {
 	require.LessOrEqual(t, len([]byte(base)), 63, "base must fit within Postgres 63-byte identifier limit")
 	require.True(t, strings.HasSuffix(base, "_flow_enum"), "base must end with _flow_enum")
 	require.NotEmpty(t, typeName)
-	_ = schema
 }
 
 func TestEnumTypeNamePartsLongTableName(t *testing.T) {
