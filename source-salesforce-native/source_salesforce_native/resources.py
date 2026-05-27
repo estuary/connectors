@@ -291,7 +291,7 @@ async def _object_to_resource(
 
 def _fetch_instance_url(log: Logger, config: EndpointConfig) -> str:
     if isinstance(config.credentials, UserPass):
-        _, instance_url = config.credentials.fetch_access_token_and_instance_url(config.is_sandbox)
+        _, instance_url = config.credentials.fetch_access_token_and_instance_url(config.is_sandbox, config.my_domain)
     else:
         instance_url = config.credentials.instance_url
 
@@ -302,8 +302,8 @@ def _fetch_instance_url(log: Logger, config: EndpointConfig) -> str:
 async def enabled_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig, bindings: list[common._ResolvableBinding]
 ) -> list[common.Resource]:
-    update_oauth_spec(config.is_sandbox)
-    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox)
+    update_oauth_spec(config.is_sandbox, config.my_domain)
+    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox, my_domain=config.my_domain)
     instance_url = _fetch_instance_url(log, config)
 
     enabled_binding_names: list[str] = []
@@ -343,8 +343,8 @@ async def enabled_resources(
 async def all_resources(
     log: Logger, http: HTTPMixin, config: EndpointConfig
 ) -> list[common.Resource]:
-    update_oauth_spec(config.is_sandbox)
-    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox)
+    update_oauth_spec(config.is_sandbox, config.my_domain)
+    http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox, my_domain=config.my_domain)
     instance_url = _fetch_instance_url(log, config)
 
     queryable_object_names = await _fetch_queryable_objects(log, http, instance_url)
