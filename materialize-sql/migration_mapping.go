@@ -92,4 +92,3 @@ func WithCastSQL(castSQL CastSQLFunc) MigrationSpecOption {
 		m.CastSQL = castSQL
 	}
 }
-
