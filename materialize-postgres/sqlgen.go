@@ -77,7 +77,7 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 			"date":                     {sql.NewMigrationSpec([]string{"text"})},
 			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},
 			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
-			// text/character varying → enum: create type + rename-based migration with CAST.
+			// text/character varying → enum: create type + direct ALTER COLUMN TYPE ... USING col::enum_type.
 			"text": {
 				sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast)),
 				sql.NewMigrationSpecTarget(EnumMigrationTarget{}),

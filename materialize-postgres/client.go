@@ -267,10 +267,35 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 	}
 
 	if len(ta.ColumnTypeChanges) > 0 {
-		if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, ta.ColumnTypeChanges); err != nil {
-			return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
-		} else {
-			stmts = append(stmts, steps...)
+		var enumChanges, otherChanges []sql.ColumnTypeMigration
+		for _, change := range ta.ColumnTypeChanges {
+			if _, ok := change.Column.MappedType.TargetType.(*PgEnum); ok {
+				enumChanges = append(enumChanges, change)
+			} else {
+				otherChanges = append(otherChanges, change)
+			}
+		}
+
+		for _, change := range enumChanges {
+			e := change.Column.MappedType.TargetType.(*PgEnum)
+			stmts = append(stmts, fmt.Sprintf(
+				"ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s::%s",
+				ta.Identifier, change.Identifier, e.TypeName, change.Identifier, e.TypeName,
+			))
+			if change.MustExist {
+				stmts = append(stmts, fmt.Sprintf(
+					"ALTER TABLE %s ALTER COLUMN %s SET NOT NULL",
+					ta.Identifier, change.Identifier,
+				))
+			}
+		}
+
+		if len(otherChanges) > 0 {
+			if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, otherChanges); err != nil {
+				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
+			} else {
+				stmts = append(stmts, steps...)
+			}
 		}
 	}
 
