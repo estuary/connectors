@@ -654,7 +654,10 @@ func decodeUTF8(bs []byte) (string, error) {
 }
 
 func decodeLatin1(bs []byte) (string, error) {
-	var decoder = charmap.ISO8859_1.NewDecoder()
+	// MySQL's `latin1` charset is actually Windows-1252, not ISO 8859-1. The two agree
+	// except in the 0x80-0x9F range, where cp1252 has printable characters which ISO 8859-1
+	// leaves as C1 control codes.
+	var decoder = charmap.Windows1252.NewDecoder()
 	var decodedBytes, err = decoder.Bytes(bs)
 	if err != nil {
 		return "", nil
