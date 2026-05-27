@@ -13,7 +13,6 @@ from typing import (
     Callable,
     ClassVar,
     Generic,
-    Literal,
     TypeVar,
     cast,
 )
@@ -40,6 +39,7 @@ from ..pydantic_polyfill import GenericModel
 from ..utils import json_merge_patch
 from . import Task, request, response
 from .webhook.match import CollectionMatchingSpec, UrlMatch
+from .document import _BaseDocument, AssociatedDocument, BaseDocument
 
 LogCursor = tuple[str | int] | AwareDatetime | NonNegativeInt
 """LogCursor is a cursor into a logical log of changes.
@@ -127,28 +127,8 @@ class SourcedSchema:
     widens inferred schemas to accommodate the current inferred schema along
     with any SourcedSchemas.
     """
+
     value: dict[str, Any]
-
-
-class BaseDocument(BaseModel):
-    class Meta(BaseModel):
-        op: Literal["c", "u", "d"] = Field(
-            default="u",
-            description="Operation type (c: Create, u: Update, d: Delete)",
-        )
-        row_id: int = Field(
-            default=-1,
-            description="Row ID of the Document, counting up from zero, or -1 if not known",
-        )
-
-    meta_: Meta = Field(
-        default_factory=lambda: BaseDocument.Meta(op="u"),
-        alias="_meta",
-        description="Document metadata",
-    )
-
-
-_BaseDocument = TypeVar("_BaseDocument", bound=BaseDocument)
 
 
 class BaseResourceConfig(abc.ABC, BaseModel, extra="forbid"):
@@ -314,19 +294,6 @@ class ConnectorState(GenericModel, Generic[_BaseResourceState], extra="forbid"):
 
 
 _ConnectorState = TypeVar("_ConnectorState", bound=ConnectorState)
-
-
-@dataclass
-class AssociatedDocument(Generic[_BaseDocument]):
-    """
-    Emitting AssociatedDocument allows you to represent capturing document for other bindings.
-    You might use this if your data model requires you to load "child" documents when capturing a "parent" document,
-    instead of independently loading the child data stream.
-    """
-
-    doc: _BaseDocument
-    binding: int
-
 
 FetchSnapshotFn = Callable[[Logger], AsyncGenerator[_BaseDocument | dict, None]]
 """
