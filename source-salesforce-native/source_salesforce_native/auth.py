@@ -5,10 +5,12 @@ from typing import Literal, TYPE_CHECKING
 
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
 )
 from estuary_cdk.capture.common import (
     BaseOAuth2Credentials,
+    ClientCredentialsOAuth2Credentials,
     OAuth2Spec,
 )
 from estuary_cdk.http import (
@@ -108,6 +110,35 @@ class UserPass(BaseModel):
         return (access_token, instance_url)
 
 
+class SalesforceClientCredentials(ClientCredentialsOAuth2Credentials):
+    # Salesforce's OAuth 2.0 Client Credentials flow is a server-to-server flow: the connector
+    # exchanges a Salesforce Connected App's / External Client App's Consumer Key/Secret for an
+    # access token minted as the app's configured "Run As" user. Both app types expose a Consumer
+    # Key/Secret and support this flow, and the connector treats them identically.
+    #
+    # The CDK's TokenSource performs the grant_type=client_credentials exchange.
+    # This model just supplies Salesforce-specific titles and discriminator.
+    #
+    # The flow requires posting to the org's My Domain token endpoint, which is why EndpointConfig
+    # requires my_domain when SalesforceClientCredentials is selected.
+    model_config = ConfigDict(title="Client Credentials")
+
+    credentials_title: Literal["Client Credentials"] = Field(
+        default="Client Credentials",
+        json_schema_extra={"type": "string", "order": 0},
+    )
+    client_id: str = Field(
+        title="Consumer Key",
+        description="The Consumer Key of the Connected App or External Client App.",
+        json_schema_extra={"secret": True, "order": 1},
+    )
+    client_secret: str = Field(
+        title="Consumer Secret",
+        description="The Consumer Secret of the Connected App or External Client App.",
+        json_schema_extra={"secret": True, "order": 2},
+    )
+
+
 class SalesforceOAuth2Credentials(BaseOAuth2Credentials):
     instance_url: str = Field(
         title="Instance URL",
@@ -148,13 +179,30 @@ else:
 class SalesforceTokenSource(TokenSource):
     class AccessTokenResponse(TokenSource.AccessTokenResponse):
         expires_in: int = 1 * 60 * 60
+        # Only the Client Credentials flow's token response carries the instance URL; the other auth
+        # methods source it elsewhere (UserPass from the SOAP login, OAuth from the persisted
+        # credentials) and never read this field. It's optional so parsing those responses doesn't
+        # require it; fetch_instance_url enforces a non-empty value for the Client Credentials path.
+        instance_url: str | None = None
 
     # These fields must be keyword-only because the parent TokenSource class has fields with default values.
     # In Python dataclasses, you cannot define fields without defaults after fields with defaults
     # unless the new fields are marked as keyword-only using dataclasses.field(kw_only=True).
-    credentials: UserPass | OAuth2Credentials = dataclasses.field(kw_only=True)
+    credentials: UserPass | OAuth2Credentials | SalesforceClientCredentials = dataclasses.field(kw_only=True)
     is_sandbox: bool = dataclasses.field(kw_only=True)
     my_domain: str = dataclasses.field(kw_only=True)
+
+    async def fetch_instance_url(self, log: Logger, session: HTTPSession) -> str:
+        # Used by the Client Credentials flow, whose instance URL is only known after the token
+        # exchange. This is only ever called on the Client Credentials path, so a missing
+        # instance_url is a hard error.
+        await self.fetch_token(log, session)
+        assert isinstance(self._access_token, self.AccessTokenResponse)
+        if not self._access_token.instance_url:
+            raise RuntimeError(
+                "Salesforce did not return an instance_url for the Client Credentials flow."
+            )
+        return self._access_token.instance_url
 
     async def fetch_token(self, log: Logger, session: HTTPSession) -> tuple[str, str]:
         if isinstance(self.credentials, UserPass):

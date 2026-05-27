@@ -39,6 +39,7 @@ from .api import (
     fetch_object_fields,
 )
 from .auth import (
+    SalesforceClientCredentials,
     SalesforceTokenSource,
     OAUTH2_SPEC,
     update_oauth_spec,
@@ -289,9 +290,14 @@ async def _object_to_resource(
         )
 
 
-def _fetch_instance_url(log: Logger, config: EndpointConfig) -> str:
+async def _fetch_instance_url(log: Logger, http: HTTPMixin, config: EndpointConfig) -> str:
     if isinstance(config.credentials, UserPass):
         _, instance_url = config.credentials.fetch_access_token_and_instance_url(config.is_sandbox, config.my_domain)
+    elif isinstance(config.credentials, SalesforceClientCredentials):
+        # The Client Credentials flow only learns the instance URL from the token response, so we
+        # resolve it through the token source (which performs the exchange via the CDK).
+        assert isinstance(http.token_source, SalesforceTokenSource)
+        instance_url = await http.token_source.fetch_instance_url(log, http)
     else:
         instance_url = config.credentials.instance_url
 
@@ -304,7 +310,7 @@ async def enabled_resources(
 ) -> list[common.Resource]:
     update_oauth_spec(config.is_sandbox, config.my_domain)
     http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox, my_domain=config.my_domain)
-    instance_url = _fetch_instance_url(log, config)
+    instance_url = await _fetch_instance_url(log, http, config)
 
     enabled_binding_names: list[str] = []
 
@@ -345,7 +351,7 @@ async def all_resources(
 ) -> list[common.Resource]:
     update_oauth_spec(config.is_sandbox, config.my_domain)
     http.token_source = SalesforceTokenSource(oauth_spec=OAUTH2_SPEC, credentials=config.credentials, is_sandbox=config.is_sandbox, my_domain=config.my_domain)
-    instance_url = _fetch_instance_url(log, config)
+    instance_url = await _fetch_instance_url(log, http, config)
 
     queryable_object_names = await _fetch_queryable_objects(log, http, instance_url)
 
