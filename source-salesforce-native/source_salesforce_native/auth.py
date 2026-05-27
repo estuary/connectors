@@ -21,22 +21,27 @@ from simple_salesforce.login import SalesforceLogin
 from .shared import VERSION
 
 
+# _OAUTH_LOGIN_ORIGIN is a mustache fragment rendered by the control plane that selects the OAuth login origin.
+# The org's My Domain host is used when provided, otherwise the standard login/test host is used.
+_OAUTH_LOGIN_ORIGIN = (
+    "https://"
+    r"{{#config.my_domain}}{{{config.my_domain}}}{{/config.my_domain}}"
+    r"{{^config.my_domain}}{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}.salesforce.com{{/config.my_domain}}"
+)
+
+
 OAUTH2_SPEC = OAuth2Spec(
     provider="salesforce",
     authUrlTemplate=(
-        "https://"
-        r"{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}"
-        ".salesforce.com/services/oauth2/authorize?"
-        r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
-        r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
-        r"&response_type=code"
-        r"&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
+        _OAUTH_LOGIN_ORIGIN + (
+            "/services/oauth2/authorize?"
+            r"client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}"
+            r"&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}"
+            r"&response_type=code"
+            r"&state={{#urlencode}}{{{ state }}}{{/urlencode}}"
+        )
     ),
-    accessTokenUrlTemplate=(
-        "https://"
-        r"{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}"
-        ".salesforce.com/services/oauth2/token"
-    ),
+    accessTokenUrlTemplate=_OAUTH_LOGIN_ORIGIN + "/services/oauth2/token",
     accessTokenHeaders={"content-type": "application/x-www-form-urlencoded"},
     accessTokenBody=(
         "grant_type=authorization_code"
@@ -52,8 +57,19 @@ OAUTH2_SPEC = OAuth2Spec(
 )
 
 # Mustache templates in accessTokenUrlTemplate are not interpolated within the connector, so update_oauth_spec reassigns it for use within the connector.
-def update_oauth_spec(is_sandbox: bool):
-    OAUTH2_SPEC.accessTokenUrlTemplate = f"https://{'test' if is_sandbox else 'login'}.salesforce.com/services/oauth2/token"
+def update_oauth_spec(is_sandbox: bool, my_domain: str):
+    # Refresh-token requests must hit the same host the tokens were issued from. When a My Domain
+    # is configured it's already a full host (e.g. mycompany.my.salesforce.com); otherwise use the
+    # standard login/test host.
+    host = my_domain or f"{'test' if is_sandbox else 'login'}.salesforce.com"
+    OAUTH2_SPEC.accessTokenUrlTemplate = f"https://{host}/services/oauth2/token"
+
+
+def _login_domain_from_my_domain(my_domain: str) -> str:
+    # simple_salesforce builds the SOAP login URL as https://{domain}.salesforce.com/..., so it
+    # wants just the subdomain. my_domain is validated by the EndpointConfig model as a full host ending in
+    # ".my.salesforce.com", so here we strip the ".salesforce.com" it re-appends.
+    return my_domain.removesuffix(".salesforce.com")
 
 
 class UserPass(BaseModel):
@@ -74,12 +90,15 @@ class UserPass(BaseModel):
         json_schema_extra={"secret": True, "order": 3},
     )
 
-    def fetch_access_token_and_instance_url(self, is_sandbox: bool) -> tuple[str, str]:
+    def fetch_access_token_and_instance_url(self, is_sandbox: bool, my_domain: str) -> tuple[str, str]:
+        # Log in through the org's My Domain when configured, otherwise use the standard login/test host.
+        domain = _login_domain_from_my_domain(my_domain) or ("test" if is_sandbox else "login")
+
         access_token, instance_url = SalesforceLogin(
             username=self.username,
             password=self.password,
             security_token=self.security_token,
-            domain="test" if is_sandbox else "login",
+            domain=domain,
             sf_version=VERSION,
         )
 
@@ -135,6 +154,7 @@ class SalesforceTokenSource(TokenSource):
     # unless the new fields are marked as keyword-only using dataclasses.field(kw_only=True).
     credentials: UserPass | OAuth2Credentials = dataclasses.field(kw_only=True)
     is_sandbox: bool = dataclasses.field(kw_only=True)
+    my_domain: str = dataclasses.field(kw_only=True)
 
     async def fetch_token(self, log: Logger, session: HTTPSession) -> tuple[str, str]:
         if isinstance(self.credentials, UserPass):
@@ -149,7 +169,7 @@ class SalesforceTokenSource(TokenSource):
                     return (self.authorization_token_type, self._access_token.access_token)
 
             self._fetched_at = int(current_time)
-            access_token, _ = self.credentials.fetch_access_token_and_instance_url(is_sandbox=self.is_sandbox)
+            access_token, _ = self.credentials.fetch_access_token_and_instance_url(is_sandbox=self.is_sandbox, my_domain=self.my_domain)
             self._access_token = SalesforceTokenSource.AccessTokenResponse(
                 access_token=access_token,
                 token_type=self.authorization_token_type,

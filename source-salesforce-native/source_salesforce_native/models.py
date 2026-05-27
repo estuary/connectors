@@ -54,6 +54,21 @@ class EndpointConfig(BaseModel):
         description="Toggle if you're using a Salesforce Sandbox.",
         default=False,
     )
+    my_domain: str = Field(
+        default="",
+        title="My Domain",
+        description=(
+            "Your Salesforce My Domain login host. Enter the full host ending in "
+            ".my.salesforce.com to login with your My Domain host. e.g. mycompany.my.salesforce.com, "
+            "acme--uat.sandbox.my.salesforce.com. Leave blank to log in via the "
+            "standard login/test endpoint."
+        ),
+        # The control plane interpolates this verbatim into the OAuth authorize/token URLs,
+        # so we require a clean host with no scheme or path. Both production (mycompany.my.salesforce.com)
+        # and sandbox (...sandbox.my.salesforce.com) My Domains end in ".my.salesforce.com".
+        # An empty string is allowed to keep the field optional.
+        pattern=r"^$|^[A-Za-z0-9][A-Za-z0-9.-]*\.my\.salesforce\.com$",
+    )
     credentials: OAuth2Credentials | UserPass = Field(
         discriminator="credentials_title",
         title="Authentication",

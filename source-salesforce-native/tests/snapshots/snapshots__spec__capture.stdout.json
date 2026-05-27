@@ -103,6 +103,13 @@
           "title": "Sandbox",
           "type": "boolean"
         },
+        "my_domain": {
+          "default": "",
+          "description": "Your Salesforce My Domain login host. Enter the full host ending in .my.salesforce.com to login with your My Domain host. e.g. mycompany.my.salesforce.com, acme--uat.sandbox.my.salesforce.com. Leave blank to log in via the standard login/test endpoint.",
+          "pattern": "^$|^[A-Za-z0-9][A-Za-z0-9.-]*\\.my\\.salesforce\\.com$",
+          "title": "My Domain",
+          "type": "string"
+        },
         "credentials": {
           "discriminator": {
             "mapping": {
@@ -178,8 +185,8 @@
     "documentationUrl": "https://go.estuary.dev/source-salesforce-native",
     "oauth2": {
       "provider": "salesforce",
-      "authUrlTemplate": "https://{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}.salesforce.com/services/oauth2/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
-      "accessTokenUrlTemplate": "https://{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}.salesforce.com/services/oauth2/token",
+      "authUrlTemplate": "https://{{#config.my_domain}}{{{config.my_domain}}}{{/config.my_domain}}{{^config.my_domain}}{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}.salesforce.com{{/config.my_domain}}/services/oauth2/authorize?client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&response_type=code&state={{#urlencode}}{{{ state }}}{{/urlencode}}",
+      "accessTokenUrlTemplate": "https://{{#config.my_domain}}{{{config.my_domain}}}{{/config.my_domain}}{{^config.my_domain}}{{#config.is_sandbox}}test{{/config.is_sandbox}}{{^config.is_sandbox}}login{{/config.is_sandbox}}.salesforce.com{{/config.my_domain}}/services/oauth2/token",
       "accessTokenBody": "grant_type=authorization_code&client_id={{#urlencode}}{{{ client_id }}}{{/urlencode}}&client_secret={{#urlencode}}{{{ client_secret }}}{{/urlencode}}&redirect_uri={{#urlencode}}{{{ redirect_uri }}}{{/urlencode}}&code={{#urlencode}}{{{ code }}}{{/urlencode}}",
       "accessTokenHeaders": {
         "content-type": "application/x-www-form-urlencoded"
