@@ -291,17 +291,14 @@ async def _object_to_resource(
 
 
 async def _fetch_instance_url(log: Logger, http: HTTPMixin, config: EndpointConfig) -> str:
-    if isinstance(config.credentials, UserPass):
-        _, instance_url = config.credentials.fetch_access_token_and_instance_url(config.is_sandbox, config.my_domain)
-    elif isinstance(config.credentials, SalesforceClientCredentials):
-        # The Client Credentials flow only learns the instance URL from the token response, so we
-        # resolve it through the token source (which performs the exchange via the CDK).
+    # UserPass and Client Credentials both learn the instance URL from the token exchange that the
+    # token source performs and caches (the SOAP login and the client_credentials token response,
+    # respectively). OAuth persists its instance URL in the config during the OAuth flow.
+    if isinstance(config.credentials, (UserPass, SalesforceClientCredentials)):
         assert isinstance(http.token_source, SalesforceTokenSource)
-        instance_url = await http.token_source.fetch_instance_url(log, http)
-    else:
-        instance_url = config.credentials.instance_url
+        return await http.token_source.fetch_instance_url(log, http)
 
-    return instance_url
+    return config.credentials.instance_url
 
 
 # enabled_resources returns resources for only enabled bindings.
