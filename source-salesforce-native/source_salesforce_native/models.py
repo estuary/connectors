@@ -20,7 +20,7 @@ from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
 
-from .auth import OAuth2Credentials, UserPass
+from .auth import OAuth2Credentials, SalesforceClientCredentials, UserPass
 from .shared import dt_to_str, str_to_dt
 
 
@@ -61,7 +61,7 @@ class EndpointConfig(BaseModel):
             "Your Salesforce My Domain login host. Enter the full host ending in "
             ".my.salesforce.com to login with your My Domain host. e.g. mycompany.my.salesforce.com, "
             "acme--uat.sandbox.my.salesforce.com. Leave blank to log in via the "
-            "standard login/test endpoint."
+            "standard login/test endpoint. Required when authenticating with Client Credentials."
         ),
         # The control plane interpolates this verbatim into the OAuth authorize/token URLs,
         # so we require a clean host with no scheme or path. Both production (mycompany.my.salesforce.com)
@@ -69,10 +69,22 @@ class EndpointConfig(BaseModel):
         # An empty string is allowed to keep the field optional.
         pattern=r"^$|^[A-Za-z0-9][A-Za-z0-9.-]*\.my\.salesforce\.com$",
     )
-    credentials: OAuth2Credentials | UserPass = Field(
+    credentials: OAuth2Credentials | UserPass | SalesforceClientCredentials = Field(
         discriminator="credentials_title",
         title="Authentication",
     )
+
+    @model_validator(mode="after")
+    def _require_my_domain_for_client_credentials(self) -> "EndpointConfig":
+        # Salesforce's Client Credentials flow must hit the org's My Domain token endpoint since
+        # login.salesforce.com doesn't support the client_credentials grant. The other auth
+        # methods can work with the standard login/test host, so My Domain stays optional for them.
+        if isinstance(self.credentials, SalesforceClientCredentials) and not self.my_domain:
+            raise ValueError(
+                "The My Domain field is required when using Client Credentials authentication."
+            )
+        return self
+
     class Advanced(BaseModel):
         window_size: Annotated[int, Field(
             description="Date window size for Bulk API 2.0 queries (in days). Typically left as the default unless Estuary Support or the connector logs indicate otherwise.",
