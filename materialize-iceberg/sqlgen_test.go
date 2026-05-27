@@ -23,19 +23,19 @@ func TestTemplates(t *testing.T) {
 	}
 
 	keys := []boilerplate.MappedProjection[mapped]{
-		{Projection: makeProjection("first-key"), Mapped: mapped{iceberg.StringType{}, "first-key"}},
-		{Projection: makeProjection("second-key"), Mapped: mapped{iceberg.BinaryType{}, "second-key"}},
-		{Projection: makeProjection("third-key"), Mapped: mapped{iceberg.Int64Type{}, "third-key"}},
+		{Projection: makeProjection("first-key"), Mapped: mapped{type_: iceberg.StringType{}, Name: "first-key"}},
+		{Projection: makeProjection("second-key"), Mapped: mapped{type_: iceberg.BinaryType{}, Name: "second-key"}},
+		{Projection: makeProjection("third-key"), Mapped: mapped{type_: iceberg.Int64Type{}, Name: "third-key"}},
 	}
 
 	values := []boilerplate.MappedProjection[mapped]{
-		{Projection: makeProjection("first-val"), Mapped: mapped{iceberg.StringType{}, "first-val"}},
-		{Projection: makeProjection("second-val"), Mapped: mapped{iceberg.StringType{}, "second-val"}},
-		{Projection: makeProjection("third-val"), Mapped: mapped{iceberg.BinaryType{}, "third-val"}},
-		{Projection: makeProjection("fourth-val"), Mapped: mapped{iceberg.StringType{}, "fourth-val"}},
+		{Projection: makeProjection("first-val"), Mapped: mapped{type_: iceberg.StringType{}, Name: "first-val"}},
+		{Projection: makeProjection("second-val"), Mapped: mapped{type_: iceberg.StringType{}, Name: "second-val"}},
+		{Projection: makeProjection("third-val"), Mapped: mapped{type_: iceberg.BinaryType{}, Name: "third-val"}},
+		{Projection: makeProjection("fourth-val"), Mapped: mapped{type_: iceberg.StringType{}, Name: "fourth-val"}},
 	}
 
-	doc := &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{iceberg.StringType{}, "flow_document"}}
+	doc := &boilerplate.MappedProjection[mapped]{Projection: makeProjection("flow_document"), Mapped: mapped{type_: iceberg.StringType{}, Name: "flow_document"}}
 
 	input := templateInput{
 		binding: binding{
