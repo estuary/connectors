@@ -179,11 +179,10 @@ else:
 class SalesforceTokenSource(TokenSource):
     class AccessTokenResponse(TokenSource.AccessTokenResponse):
         expires_in: int = 1 * 60 * 60
-        # Only the Client Credentials flow's token response carries the instance URL; the other auth
-        # methods source it elsewhere (UserPass from the SOAP login, OAuth from the persisted
-        # credentials) and never read this field. It's optional so parsing those responses doesn't
-        # require it; fetch_instance_url enforces a non-empty value for the Client Credentials path.
-        instance_url: str | None = None
+        # The UserPass and Client Credentials flows learn the instance URL from their token exchange
+        # (the SOAP login and the client_credentials token response, respectively) and stash it here.
+        # OAuth reads its instance URL from the persisted credentials and never uses this field.
+        instance_url: str
 
     # These fields must be keyword-only because the parent TokenSource class has fields with default values.
     # In Python dataclasses, you cannot define fields without defaults after fields with defaults
@@ -193,15 +192,10 @@ class SalesforceTokenSource(TokenSource):
     my_domain: str = dataclasses.field(kw_only=True)
 
     async def fetch_instance_url(self, log: Logger, session: HTTPSession) -> str:
-        # Used by the Client Credentials flow, whose instance URL is only known after the token
-        # exchange. This is only ever called on the Client Credentials path, so a missing
-        # instance_url is a hard error.
+        # Used by the UserPass and Client Credentials flows, whose instance URL is only known after
+        # the token exchange that fetch_token performs and caches on self._access_token.
         await self.fetch_token(log, session)
         assert isinstance(self._access_token, self.AccessTokenResponse)
-        if not self._access_token.instance_url:
-            raise RuntimeError(
-                "Salesforce did not return an instance_url for the Client Credentials flow."
-            )
         return self._access_token.instance_url
 
     async def fetch_token(self, log: Logger, session: HTTPSession) -> tuple[str, str]:
@@ -217,10 +211,11 @@ class SalesforceTokenSource(TokenSource):
                     return (self.authorization_token_type, self._access_token.access_token)
 
             self._fetched_at = int(current_time)
-            access_token, _ = self.credentials.fetch_access_token_and_instance_url(is_sandbox=self.is_sandbox, my_domain=self.my_domain)
+            access_token, instance_url = self.credentials.fetch_access_token_and_instance_url(is_sandbox=self.is_sandbox, my_domain=self.my_domain)
             self._access_token = SalesforceTokenSource.AccessTokenResponse(
                 access_token=access_token,
                 token_type=self.authorization_token_type,
+                instance_url=instance_url,
             )
             return (self.authorization_token_type, self._access_token.access_token)
         else:

@@ -128,13 +128,3 @@ async def test_fetch_instance_url_returns_value_from_token_response() -> None:
     )
     assert await ts.fetch_instance_url(_LOG, cast(HTTPSession, session)) == "https://mycompany.my.salesforce.com"
 
-
-@pytest.mark.asyncio
-async def test_fetch_instance_url_raises_when_missing() -> None:
-    # A token response without an instance_url must fail loudly rather than yield an empty URL.
-    ts = _client_credentials_token_source()
-    session = _FakeTokenEndpoint(
-        SalesforceTokenSource.AccessTokenResponse(access_token="tok", token_type="Bearer")
-    )
-    with pytest.raises(RuntimeError, match="instance_url"):
-        await ts.fetch_instance_url(_LOG, cast(HTTPSession, session))
