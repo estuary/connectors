@@ -719,9 +719,15 @@ func (s *replicationStream) StartReplication(ctx context.Context, discovery map[
 		// Context cancellation typically occurs only in tests, and for test stability
 		// it should be considered a clean shutdown and not necessarily an error.
 		close(s.events)
-		s.transactionsStmt.Close()
-		s.conn.Close()
-		s.innerConn.Close()
+		if cerr := s.transactionsStmt.Close(); cerr != nil {
+			logrus.WithError(cerr).Warn("closing transactions statement")
+		}
+		if cerr := s.conn.Close(); cerr != nil {
+			logrus.WithError(cerr).Warn("closing replication connection")
+		}
+		if cerr := s.innerConn.Close(); cerr != nil {
+			logrus.WithError(cerr).Warn("closing inner replication connection")
+		}
 		s.errCh <- err
 	}()
 
@@ -1108,7 +1114,11 @@ func (s *replicationStream) receiveMessages(ctx context.Context, startSCN, endSC
 	if err != nil {
 		return fmt.Errorf("logminer query: %w", err)
 	}
-	defer rows.Close()
+	defer func() {
+		if cerr := rows.Close(); cerr != nil {
+			logrus.WithError(cerr).Warn("closing logminer rows")
+		}
+	}()
 
 	var totalMessages = 0
 	var fullMessages = 0
@@ -1360,9 +1370,15 @@ func (s *replicationStream) Acknowledge(ctx context.Context, cursor json.RawMess
 func (s *replicationStream) Close(ctx context.Context) error {
 	logrus.Debug("replication stream close requested")
 	s.cancel()
-	s.transactionsStmt.Close()
-	s.conn.Close()
-	s.innerConn.Close()
+	if cerr := s.transactionsStmt.Close(); cerr != nil {
+		logrus.WithError(cerr).Warn("closing transactions statement")
+	}
+	if cerr := s.conn.Close(); cerr != nil {
+		logrus.WithError(cerr).Warn("closing replication connection")
+	}
+	if cerr := s.innerConn.Close(); cerr != nil {
+		logrus.WithError(cerr).Warn("closing inner replication connection")
+	}
 	return <-s.errCh
 }
 
