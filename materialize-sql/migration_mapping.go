@@ -48,6 +48,11 @@ type CastSQLFunc func(migration ColumnTypeMigration) string
 type MigrationSpec struct {
 	targets []MigrationTarget
 	CastSQL CastSQLFunc
+	// DirectCast indicates that a single ALTER TABLE ... ALTER COLUMN ... TYPE ... USING
+	// statement should be emitted instead of the standard multi-step rename migration.
+	// The connector's AlterTable implementation must check this flag and emit the
+	// appropriate DDL; StdColumnTypeMigrations always uses the rename approach.
+	DirectCast bool
 }
 
 func NewMigrationSpec(targetDDLs []string, opts ...MigrationSpecOption) MigrationSpec {
@@ -90,5 +95,15 @@ type MigrationSpecOption func(*MigrationSpec)
 func WithCastSQL(castSQL CastSQLFunc) MigrationSpecOption {
 	return func(m *MigrationSpec) {
 		m.CastSQL = castSQL
+	}
+}
+
+// WithDirectCast marks the migration as preferring a single ALTER TABLE ... ALTER COLUMN
+// ... TYPE ... USING statement over the standard multi-step rename approach.
+// The connector's AlterTable implementation must check MigrationSpec.DirectCast and
+// emit the appropriate DDL.
+func WithDirectCast() MigrationSpecOption {
+	return func(m *MigrationSpec) {
+		m.DirectCast = true
 	}
 }
