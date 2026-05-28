@@ -91,10 +91,16 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 				sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast)),
 				sql.NewMigrationSpecTarget(EnumMigrationTarget{}),
 			},
-			// user-defined (PG ENUM) → text: migrate incompatible USER-DEFINED columns.
+			// user-defined (PG ENUM) → text: migrate incompatible USER-DEFINED columns via a
+			// direct ALTER COLUMN TYPE (no rename needed — PG supports USING col::text).
 			// Value expansion for compatible enum columns is handled separately in
 			// client.AlterTable by checking all existing PgEnum columns.
-			"user-defined": {sql.NewMigrationSpec([]string{"text"})},
+			"user-defined": {sql.NewMigrationSpec([]string{"text"},
+				sql.WithDirectCast(),
+				sql.WithCastSQL(func(m sql.ColumnTypeMigration) string {
+					return fmt.Sprintf("%s::text", m.Identifier)
+				}),
+			)},
 			"bytea":  {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(byteaToStringCast))},
 			"*":      {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
 		},

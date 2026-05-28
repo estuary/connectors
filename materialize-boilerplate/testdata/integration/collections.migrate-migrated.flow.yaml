@@ -247,6 +247,7 @@ collections:
         iriToString: *string
         iriReferenceToString: *string
         stringToEnum: { type: string, enum: [active, inactive] }
+        enumToString: { type: string }
         enumToExtendedEnum: { type: string, enum: [active, inactive, pending] }
       required: [id]
     key: [/id]
