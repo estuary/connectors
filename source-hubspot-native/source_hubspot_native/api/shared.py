@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta, UTC
+import asyncio
+from datetime import UTC, datetime, timedelta
 from logging import Logger
 from typing import (
     Any,
@@ -9,7 +10,6 @@ from typing import (
 import estuary_cdk.emitted_changes_cache as cache
 from estuary_cdk.capture.common import LogCursor, Triggers
 from estuary_cdk.http import HTTPSession
-
 
 # Hubspot returns a 500 internal server error if querying for data at the EPOCH.
 EPOCH_PLUS_ONE_SECOND = datetime(1970, 1, 1, tzinfo=UTC) + timedelta(seconds=1)
@@ -181,10 +181,14 @@ async def fetch_delayed_changes(
     lower_bound = log_cursor
     horizon = now - DELAYED_LAG
 
-    # Don't poll unless at least MIN_DELAYED_WINDOW of data has accumulated
+    # Don't poll until at least MIN_DELAYED_WINDOW of data has accumulated
     # to prevent excessive API calls.
     if horizon - lower_bound < MIN_DELAYED_WINDOW:
-        return
+        await asyncio.sleep(
+            (MIN_DELAYED_WINDOW - (horizon - lower_bound)).total_seconds()
+        )
+        now = datetime.now(UTC)
+        horizon = now - DELAYED_LAG
 
     # Limit the window to prevent huge checkpoints when catching up.
     upper_bound = min(horizon, log_cursor + MAX_DELAYED_WINDOW)
