@@ -69,7 +69,6 @@ captures:
         name: marketing_events
         interval: PT5M
       target: acmeCo/marketing_events
-      disable: true
     - resource:
         name: contact_lists
         interval: PT3H

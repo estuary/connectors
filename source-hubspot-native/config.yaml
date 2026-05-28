@@ -1,8 +1,8 @@
 credentials:
-    client_id_sops: ENC[AES256_GCM,data:7CFfJgCiFUo8GWF4Ci7MeuBJ0Tq8eeFA4fIe0qg555kX34lt,iv:Abx2Mjc7Tb5MYhSMhqnTk/snqVVBLjSjq4cMvDCZ3A0=,tag:UR8r2TBbBviBx0LttqFonQ==,type:str]
-    client_secret_sops: ENC[AES256_GCM,data:Vc3Xh043LDXrWooyWhbh9+YOuASibJVg3bPWv8tsvQszFZ5r,iv:UExLGkPiozbS3upqtZmQ72e6OiH93WEmFDVe+V0lcMM=,tag:mUUo2wlQseFBcW1tU8ccyg==,type:str]
+    client_id_sops: ENC[AES256_GCM,data:OId3D9HuY6+HC6uZgYIJu3tn7qpIC09aj9lfU0SA5/PQM8fW,iv:HYu66hbaYZsGhhd7bmnsbX17JcofDU85bT6G+gIxTyU=,tag:0kKvAOeraz85XEpLiTKnLw==,type:str]
+    client_secret_sops: ENC[AES256_GCM,data:sUfbjsVC2txJG0E/DGhl91c6C2NmkUf8p/WCGFBQDVyIs+uU,iv:XmW0ZgF8i+a0p6Htjdj47FAgzAZLjhE1Grp4NFlHml4=,tag:qntEOKkL+/R5bbGuaYfgXQ==,type:str]
     credentials_title: OAuth Credentials
-    refresh_token_sops: ENC[AES256_GCM,data:2AXp8xWrfHqiQW5FPcjdi1pzzcG21i8tnrfPt47do3JdcCY2,iv:0mzg4yKeEH9RFMdo3FYQOJZNEDdCLAsKfrDICKG/fDE=,tag:4xzQS5vjtNMM/8IRWYCH0g==,type:str]
+    refresh_token_sops: ENC[AES256_GCM,data:Yq2q9VSlWmdhyNHNWcm2E23S6YnEqZPeb3VgIJc9iUgaIvtZ,iv:r1hL40FdQxcp89vRYZPj+ecDH7sCz/xC1mDHyN2tyQ0=,tag:xdHohKfwDQF9J6KOYguGMg==,type:str]
     token_expiry_date: "2024-02-01T17:01:21.703Z"
 capturePropertyHistory: true
 sops:
@@ -10,7 +10,7 @@ sops:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2024-02-01T17:08:49Z"
           enc: CiQAdmEdwu+udGkiZbfnnE8djh5o4P8p4Rm3WeXcN0XpcDF4sewSSQCVvC1zSqNDZIN7J2EPjuvJM4ILtloOm9w/OGsE4YwB2qH+sKsDDBYuIDDXtHml6w4wG0iksPY1Yxty0casvU6v02mfM3QOvyk=
-    lastmodified: "2026-01-15T01:13:55Z"
-    mac: ENC[AES256_GCM,data:caFXT7ckKWCy7sCHiXbVxDWXnvCPhJnG8x3kBIatWj/DwC1QQAD2NjXylcAGy/IPb1JULhuC4Wh8S3wrS1578RmCOuO/xDt4N8fXS5i1C0SgsDnFy3T6Qcf3vIcoXXIhKqXbwFNqeemt7JziNUKbGVLm23X7J5y8iri2zK9IyT8=,iv:r/sj8EV/f99h0rdFEtN8vahXCVrlCHuHDxtSa9EInvI=,tag:DbbExEFgAtxoWlU6LL0aaA==,type:str]
+    lastmodified: "2026-05-28T19:06:27Z"
+    mac: ENC[AES256_GCM,data:hF4nk4zDgqvY4QZolUtjsJ90vJJ9Y0qCvqtUxg1o+BkeBsuWZgiyKdnqUVEA7vRSX0M8aTtu7kMuNZRZEmuCaZ7jiqrnHq/PpnQ1gjlepjQccGH0ir1o8LZSHw9OhApoYS5XR29K34cXdPRpzfTgnDfkNcU1Fsw6mq+tNFVZ5e4=,iv:eaTuOEHygGhay3mya+VsbnJpwKhpGrrT2Jn/z/GZgX4=,tag:pK94WMQshBoEs/oiCVQjYg==,type:str]
     encrypted_suffix: _sops
     version: 3.10.2
