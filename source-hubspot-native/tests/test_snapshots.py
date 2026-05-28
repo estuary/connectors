@@ -4,13 +4,13 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
 from estuary_cdk.utils import compare_capture_records
 
 
 def test_capture(request, snapshot):
     FIELDS_TO_REDACT = [
         "url",
+        "updatedAt",
     ]
 
     PROPERTY_PATTERNS_TO_REDACT = [
@@ -51,7 +51,9 @@ def test_capture(request, snapshot):
             if field in record:
                 record[field] = "redacted"
 
-    snapshot_path = Path(request.fspath.dirname) / "snapshots" / "snapshots__capture__stdout.json"
+    snapshot_path = (
+        Path(request.fspath.dirname) / "snapshots" / "snapshots__capture__stdout.json"
+    )
     insta_mode = request.config.getoption("--insta", default=None)
 
     if insta_mode == "update" or not snapshot_path.exists():
