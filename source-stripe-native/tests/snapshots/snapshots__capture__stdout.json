@@ -284,6 +284,7 @@
             "cvc_check": "pass"
           },
           "country": "US",
+          "ds_transaction_id": null,
           "exp_month": 5,
           "exp_year": 2025,
           "extended_authorization": {
@@ -311,6 +312,7 @@
           },
           "regulated_status": "unregulated",
           "three_d_secure": null,
+          "transaction_link_id": null,
           "wallet": null
         },
         "type": "card"
@@ -499,6 +501,7 @@
       "livemode": false,
       "metadata": {},
       "object": "payment_method",
+      "shared_payment_granted_token": null,
       "type": "card"
     }
   ]
