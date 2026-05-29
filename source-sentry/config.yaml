@@ -2,12 +2,21 @@ credentials:
     credentials_title: Private App Credentials
     access_token_sops: ENC[AES256_GCM,data:01piCV0KEen8zImMSXmXuWYgIyPVLa6UEpawq/enkQg6hZp6jg/d4e8LJTM0+3QQQsWz+kCDfO8B0W+jxr1k7JShKRRTAcY=,iv:/GndinCqsT4jJDOwBQuszRkcypGSEXJFgG/u9pgzPnU=,tag:lxk7L8v7VDXfCic6oo8yQQ==,type:str]
 organization: estuary-94
+explore_queries:
+    - name: my_spans
+      dataset: spans
+      fields: span.description, span.duration, transaction, project, transaction.span_id
 sops:
+    kms: []
     gcp_kms:
         - resource_id: projects/estuary-theatre/locations/us-central1/keyRings/connector-keyring/cryptoKeys/connector-repository
           created_at: "2024-07-26T15:53:37Z"
           enc: CiQAdmEdwpmP0/Kcv6L1SnM3nPbsYLywIaUeOL1mz7cZjFUwWt0SSQD5lVw43Of1YI96anxUVo7d7ALi0DYnCNvxTHCgHX5ZeDBPlfXwLNpmYb6y3hJSsHG7NupwDQT/qIpUvlqQnq5IVkgJEFHPU1s=
-    lastmodified: "2025-09-24T17:44:03Z"
-    mac: ENC[AES256_GCM,data:eZsDkEfdI+F0e3wtIf4uYfRniTQ17C9YZa9RYZjjtZ5GXQSQZDTElXihldOBcyxh/Vyx1kYI4rp6B9ltL2TVZ8uBtPLJOtNTnjPHnXJf1Lk0cImXqshGhRG3E0/614LzSg6wcROFFHsS9MtobleN2wSHnMR3seguxwJnt6Kw95k=,iv:n8WQ8iD8EFIpvqppw1dhl+P/sxs2/yFgL5qruJCAj04=,tag:VCqN0P3Z10VFmq1+dmFcRA==,type:str]
+    azure_kv: []
+    hc_vault: []
+    age: []
+    lastmodified: "2026-05-29T21:23:20Z"
+    mac: ENC[AES256_GCM,data:9wiSGw/TY0d7HtpGH+FywcGoLFg3YEp+ghdSls8MhYOy8P5a7pFK7PiU0omjCoBtPuIJp7hVSEKXowSIBI30mCoiBqurW+iV+5I3/AgJVH5F+cQu3BfJJDGxYl+VIgnFfJSa+I2dlST2B4z9D/vZcw7IqGVHmtna+rMYkrgVlvM=,iv:6YjXpSZwVsodqG+Rxr743TCGU1NbkaiJ1L4sbHORG5Q=,tag:iupVTcuGf13XNNv2GEmmLw==,type:str]
+    pgp: []
     encrypted_suffix: _sops
     version: 3.10.2

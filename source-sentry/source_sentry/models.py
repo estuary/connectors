@@ -1,4 +1,5 @@
 from datetime import UTC, datetime, timedelta
+from enum import StrEnum
 from typing import Annotated, Any, ClassVar
 
 from estuary_cdk.capture.common import (
@@ -10,7 +11,14 @@ from estuary_cdk.capture.common import (
     ConnectorState as GenericConnectorState,
 )
 from estuary_cdk.flow import AccessToken
-from pydantic import AfterValidator, AwareDatetime, BaseModel, Field
+from pydantic import (
+    AfterValidator,
+    AwareDatetime,
+    BaseModel,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
@@ -18,6 +26,150 @@ EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 def default_start_date():
     dt = datetime.now(tz=UTC) - timedelta(days=30)
     return dt
+
+
+class Dataset(StrEnum):
+    SPANS = "spans"
+    ERRORS = "errors"
+    TRANSACTIONS = "transactions"
+
+
+# Primary key per dataset. `trace` and `id` are flat top-level fields in
+# Explore rows, so these JSON pointers are direct. Span IDs are unique only
+# within a trace, so spans key on (trace, id); error/transaction event IDs are
+# globally unique within the org.
+_DATASET_PK: dict[Dataset, list[str]] = {
+    Dataset.SPANS: ["/trace", "/id"],
+    Dataset.ERRORS: ["/id"],
+    Dataset.TRANSACTIONS: ["/id"],
+}
+
+# Fields the connector requires regardless of the user's field list: the PK
+# components and the `timestamp` cursor. Injected at validate-time if omitted.
+_REQUIRED_FIELDS: dict[Dataset, list[str]] = {
+    Dataset.SPANS: ["id", "trace", "timestamp"],
+    Dataset.ERRORS: ["id", "timestamp"],
+    Dataset.TRANSACTIONS: ["id", "timestamp"],
+}
+
+
+def dataset_pk(dataset: Dataset) -> list[str]:
+    return _DATASET_PK[dataset]
+
+
+def required_fields(dataset: Dataset) -> list[str]:
+    return _REQUIRED_FIELDS[dataset]
+
+
+# Explore query stream names are prefixed so they can never collide with a
+# built-in stream no matter what the user names them.
+CUSTOM_EXPLORE_NAME_PREFIX = "custom_explore_"
+
+
+def explore_query_stream_name(name: str) -> str:
+    """Resolve an explore query's configured name to its stream/binding name.
+    Idempotent so a user-typed prefix isn't doubled."""
+    if name.startswith(CUSTOM_EXPLORE_NAME_PREFIX):
+        return name
+    return CUSTOM_EXPLORE_NAME_PREFIX + name
+
+
+def _split_csv(value: str) -> list[str]:
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+class ExploreQuery(BaseModel):
+    name: str = Field(
+        title="Name",
+        description=f"Name for this Explore query stream. The connector prefixes it with '{CUSTOM_EXPLORE_NAME_PREFIX}' to form the stream name.",
+        min_length=1,
+    )
+    dataset: Dataset = Field(
+        title="Dataset",
+        description="Dataset to query. Can be one of 'spans', 'errors', or 'transactions'.",
+    )
+    fields: str = Field(
+        title="Fields",
+        description="Comma-separated field list to return, e.g. 'span.description, transaction, project'. The dataset's primary key fields and 'timestamp' are added automatically.",
+    )
+    query: str = Field(
+        default="",
+        title="Query",
+        description="Optional Sentry search query to filter rows. The connector manages the time window itself, so a 'timestamp:' clause is not allowed.",
+    )
+    projects: str = Field(
+        default="",
+        title="Projects",
+        description="Comma-separated project IDs to include. Leave empty to query all projects.",
+    )
+
+    @field_validator("query")
+    @classmethod
+    def _reject_timestamp_clause(cls, v: str) -> str:
+        if "timestamp:" in v:
+            raise ValueError(
+                "The 'timestamp' field is reserved: the connector manages the capture "
+                "window itself. Remove any 'timestamp:' clause from the explore query."
+            )
+        return v
+
+    @field_validator("projects")
+    @classmethod
+    def _validate_projects(cls, v: str) -> str:
+        for token in _split_csv(v):
+            if not token.isdigit():
+                raise ValueError(
+                    f"Project '{token}' is not a valid project ID; provide comma-separated numeric IDs."
+                )
+        return v
+
+    @property
+    def field_list(self) -> list[str]:
+        """User-specified fields followed by the required PK/cursor fields the
+        connector always queries."""
+        return list(dict.fromkeys(_split_csv(self.fields) + required_fields(self.dataset)))
+
+    @property
+    def project_ids(self) -> list[int]:
+        return [int(token) for token in _split_csv(self.projects)]
+
+
+class ExploreRow(BaseDocument, extra="allow"):
+    # Typed fields are the dataset's primary key components and the cursor, so
+    # Pydantic validates their presence on every row; the remaining fields are
+    # driven by the user's `fields` list (extra="allow" + schema inference).
+    # errors and transactions key on `id` alone and use this base directly.
+    id: str
+    timestamp: AwareDatetime
+
+
+class SpanExploreRow(ExploreRow):
+    # spans key on (trace, id); `trace` must be present, so validate it here.
+    trace: str
+
+
+# Mirrors _DATASET_PK: every JSON pointer in the PK must be a typed (required)
+# field on the corresponding row model, so a row missing a key component fails
+# validation instead of producing a document with a null key.
+_DATASET_ROW_MODEL: dict[Dataset, type[ExploreRow]] = {
+    Dataset.SPANS: SpanExploreRow,
+    Dataset.ERRORS: ExploreRow,
+    Dataset.TRANSACTIONS: ExploreRow,
+}
+
+
+def dataset_row_model(dataset: Dataset) -> type[ExploreRow]:
+    return _DATASET_ROW_MODEL[dataset]
+
+
+class ExploreMeta(BaseModel, extra="allow"):
+    # dataScanned indicated whether Sentry returned full or partial data.
+    dataScanned: str | None = None
+
+
+class ExploreResponse(BaseModel, extra="allow"):
+    data: list[ExploreRow]
+    meta: ExploreMeta
 
 
 class EndpointConfig(BaseModel):
@@ -50,12 +202,34 @@ class EndpointConfig(BaseModel):
                 le=timedelta(days=365),
             ),
         ]
+    explore_queries: list[ExploreQuery] = Field(
+        default_factory=list,
+        title="Explore Queries",
+        description="User-defined explore query streams. Each entry becomes its own incremental stream backed by Sentry's Explore events endpoint.",
+        json_schema_extra={"advanced": True, "order": 3},
+    )
+
+    @model_validator(mode="after")
+    def _validate_explore_query_names(self) -> "EndpointConfig":
+        # Names are prefixed (explore_query_stream_name) so they can't collide
+        # with a built-in stream; we only need to enforce uniqueness among
+        # explore queries, checked on the resolved stream names.
+        seen: set[str] = set()
+        for explore_query in self.explore_queries:
+            stream_name = explore_query_stream_name(explore_query.name)
+            if stream_name in seen:
+                raise ValueError(
+                    f"Duplicate explore query stream name '{stream_name}'; names must be "
+                    "unique among explore queries."
+                )
+            seen.add(stream_name)
+        return self
 
     advanced: Advanced = Field(
         default_factory=Advanced,  # type: ignore
         title="Advanced Config",
         description="Advanced settings for the connector.",
-        json_schema_extra={"advanced": True, "order": 3},
+        json_schema_extra={"advanced": True, "order": 4},
     )
 
 

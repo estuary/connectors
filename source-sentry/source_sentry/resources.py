@@ -8,19 +8,27 @@ from estuary_cdk.flow import AccessToken, CaptureBinding, ValidationError
 from estuary_cdk.http import HTTPError, HTTPMixin, TokenSource
 
 from .api import (
+    MAX_EXPLORE_FULL_FIDELITY_WINDOW,
+    backfill_explore_query,
     backfill_issues,
+    fetch_explore_query,
     fetch_issues,
     list_entity,
+    validate_explore_query,
 )
 from .models import (
     FULL_REFRESH_RESOURCES,
     EndpointConfig,
     Environment,
+    ExploreQuery,
     FullRefreshResource,
     Issue,
     ResourceConfig,
     ResourceState,
     SentryEntity,
+    dataset_pk,
+    dataset_row_model,
+    explore_query_stream_name,
 )
 
 
@@ -35,6 +43,29 @@ async def validate_credentials(http: HTTPMixin, config: EndpointConfig, log: Log
             msg = f"Invalid credentials. Please confirm the provided credentials are correct.\n\n{err.message}"
 
         raise ValidationError([msg])
+
+
+async def validate_explore_queries(
+    http: HTTPMixin, config: EndpointConfig, log: Logger
+):
+    """Probe each configured explore query with a single request so invalid
+    field names or query syntax are reported at config time."""
+    if not config.explore_queries:
+        return
+
+    http.token_source = TokenSource(oauth_spec=None, credentials=config.credentials)
+
+    errors: list[str] = []
+    for explore_query in config.explore_queries:
+        try:
+            await validate_explore_query(http, config.organization, explore_query, log)
+        except HTTPError as err:
+            errors.append(
+                f"Explore query '{explore_query_stream_name(explore_query.name)}' was rejected by Sentry: {err.message}"
+            )
+
+    if errors:
+        raise ValidationError(errors)
 
 
 T = TypeVar("T", bound=SentryEntity)
@@ -94,6 +125,31 @@ async def all_resources(
             ),
         )
 
+    def open_explore_query_binding(
+        explore_query: ExploreQuery,
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        _all_bindings,
+    ):
+        common.open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_changes=functools.partial(
+                fetch_explore_query, http, config.organization, explore_query
+            ),
+            fetch_page=functools.partial(
+                backfill_explore_query, http, config.organization, explore_query
+            ),
+        )
+
+    # Seed the incremental cursor 1 minute into the MAX_EXPLORE_FULL_FIDELITY_WINDOW
+    # to avoid tripping fetch_explore_query's stale cursor warning.
+    explore_cutoff = cutoff - MAX_EXPLORE_FULL_FIDELITY_WINDOW + timedelta(minutes=1)
+
     return [
         common.Resource(
             name=resource.resource_name,
@@ -125,4 +181,27 @@ async def all_resources(
             initial_config=ResourceConfig(name="Issues", interval=timedelta(minutes=5)),
             schema_inference=True,
         )
+    ] + [
+        common.Resource(
+            name=explore_query_stream_name(explore_query.name),
+            key=dataset_pk(explore_query.dataset),
+            model=dataset_row_model(explore_query.dataset),
+            open=functools.partial(open_explore_query_binding, explore_query),
+            initial_state=ResourceState(
+                backfill=ResourceState.Backfill(
+                    cutoff=explore_cutoff,
+                    next_page=start_date.isoformat(),
+                ),
+                inc=common.ResourceState.Incremental(
+                    # Time bounds are exclusive; start incremental at the later of
+                    # start_date and the full-fidelity window's edge.
+                    cursor=max(start_date, explore_cutoff) - timedelta(seconds=1),
+                ),
+            ),
+            initial_config=ResourceConfig(
+                name=explore_query_stream_name(explore_query.name), interval=timedelta(minutes=15)
+            ),
+            schema_inference=True,
+        )
+        for explore_query in config.explore_queries
     ]

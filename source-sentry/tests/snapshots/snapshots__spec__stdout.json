@@ -35,6 +35,53 @@
           },
           "title": "Advanced",
           "type": "object"
+        },
+        "Dataset": {
+          "enum": [
+            "spans",
+            "errors",
+            "transactions"
+          ],
+          "title": "Dataset",
+          "type": "string"
+        },
+        "ExploreQuery": {
+          "properties": {
+            "name": {
+              "description": "Name for this Explore query stream. The connector prefixes it with 'custom_explore_' to form the stream name.",
+              "minLength": 1,
+              "title": "Name",
+              "type": "string"
+            },
+            "dataset": {
+              "$ref": "#/$defs/Dataset",
+              "description": "Dataset to query. Can be one of 'spans', 'errors', or 'transactions'."
+            },
+            "fields": {
+              "description": "Comma-separated field list to return, e.g. 'span.description, transaction, project'. The dataset's primary key fields and 'timestamp' are added automatically.",
+              "title": "Fields",
+              "type": "string"
+            },
+            "query": {
+              "default": "",
+              "description": "Optional Sentry search query to filter rows. The connector manages the time window itself, so a 'timestamp:' clause is not allowed.",
+              "title": "Query",
+              "type": "string"
+            },
+            "projects": {
+              "default": "",
+              "description": "Comma-separated project IDs to include. Leave empty to query all projects.",
+              "title": "Projects",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "dataset",
+            "fields"
+          ],
+          "title": "ExploreQuery",
+          "type": "object"
         }
       },
       "properties": {
@@ -66,11 +113,21 @@
           "title": "Start Date",
           "type": "string"
         },
+        "explore_queries": {
+          "advanced": true,
+          "description": "User-defined explore query streams. Each entry becomes its own incremental stream backed by Sentry's Explore events endpoint.",
+          "items": {
+            "$ref": "#/$defs/ExploreQuery"
+          },
+          "order": 3,
+          "title": "Explore Queries",
+          "type": "array"
+        },
         "advanced": {
           "$ref": "#/$defs/Advanced",
           "advanced": true,
           "description": "Advanced settings for the connector.",
-          "order": 3,
+          "order": 4,
           "title": "Advanced Config"
         }
       },

@@ -7,6 +7,19 @@
         "row_id": 0,
         "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
       },
+      "id": "8972455",
+      "name": "estuary-dev-seed",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/Environments",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 1,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
       "id": "7000936",
       "name": "production",
       "stats": "redacted-object"
@@ -43,7 +56,9 @@
       ],
       "features": [
         "profile-functions-metrics-eap-ingestion",
+        "relay-measurements-smart-conversion",
         "similarity-embeddings",
+        "similarity-grouping-model-next",
         "similarity-indexing",
         "similarity-view"
       ],
@@ -124,7 +139,9 @@
       "environments": [],
       "features": [
         "profile-functions-metrics-eap-ingestion",
+        "relay-measurements-smart-conversion",
         "similarity-embeddings",
+        "similarity-grouping-model-next",
         "similarity-indexing",
         "similarity-view"
       ],
@@ -203,26 +220,29 @@
       ],
       "dateCreated": "2025-09-09T16:16:08.051867Z",
       "environments": [
+        "estuary-dev-seed",
         "production"
       ],
       "features": [
         "profile-functions-metrics-eap-ingestion",
+        "relay-measurements-smart-conversion",
         "releases",
         "similarity-embeddings",
+        "similarity-grouping-model-next",
         "similarity-indexing",
         "similarity-view"
       ],
       "firstEvent": "2025-09-09T16:48:59.193424Z",
-      "firstTransactionEvent": false,
+      "firstTransactionEvent": true,
       "hasAccess": true,
       "hasFeedbacks": false,
       "hasFlags": false,
       "hasInsightsAgentMonitoring": false,
       "hasInsightsAppStart": false,
       "hasInsightsAssets": false,
-      "hasInsightsCaches": false,
-      "hasInsightsDb": false,
-      "hasInsightsHttp": false,
+      "hasInsightsCaches": true,
+      "hasInsightsDb": true,
+      "hasInsightsHttp": true,
       "hasInsightsMCP": false,
       "hasInsightsQueues": false,
       "hasInsightsScreenLoad": false,
@@ -240,7 +260,9 @@
       "isBookmarked": false,
       "isMember": true,
       "latestDeploys": null,
-      "latestRelease": null,
+      "latestRelease": {
+        "version": "4207f22a318401f6721384d51acd662be89109ed"
+      },
       "name": "test-project",
       "platform": "python",
       "platforms": [],
@@ -301,6 +323,3534 @@
       "name": "Estuary",
       "slug": "estuary",
       "teamRole": "admin",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/Releases",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "authors": [],
+      "commitCount": 0,
+      "currentProjectMeta": {},
+      "data": {},
+      "dateCreated": "2026-05-18T18:26:30.511703Z",
+      "dateReleased": null,
+      "deployCount": 0,
+      "firstEvent": "2026-05-18T18:26:31Z",
+      "id": 1788166050,
+      "lastCommit": null,
+      "lastDeploy": null,
+      "lastEvent": "2026-05-18T18:26:43Z",
+      "newGroups": 1,
+      "owner": null,
+      "projects": [
+        {
+          "hasHealthData": false,
+          "id": 4509990551814144,
+          "name": "test-project",
+          "newGroups": 1,
+          "platform": "python",
+          "platforms": [],
+          "slug": "test-project"
+        }
+      ],
+      "ref": null,
+      "shortVersion": "4207f22a318401f6721384d51acd662be89109ed",
+      "status": "open",
+      "url": null,
+      "userAgent": null,
+      "version": "4207f22a318401f6721384d51acd662be89109ed",
+      "versionInfo": {
+        "buildHash": "4207f22a318401f6721384d51acd662be89109ed",
+        "description": "4207f22a3184",
+        "package": null,
+        "version": {
+          "raw": "4207f22a318401f6721384d51acd662be89109ed"
+        }
+      },
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/Issues",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "annotations": [],
+      "assignedTo": null,
+      "count": "6",
+      "culprit": "GET /healthz",
+      "filtered": null,
+      "firstSeen": "2026-05-18T18:26:31Z",
+      "hasSeen": false,
+      "id": "7490112871",
+      "inbox": null,
+      "integrationIssues": [],
+      "isBookmarked": false,
+      "isPublic": false,
+      "isSubscribed": false,
+      "isUnhandled": false,
+      "issueCategory": "error",
+      "issueType": "error",
+      "lastSeen": "2026-05-18T18:26:43Z",
+      "latestEventHasAttachments": false,
+      "level": "error",
+      "lifetime": {
+        "count": "6",
+        "firstSeen": "2026-05-18T18:26:31.494842Z",
+        "lastSeen": "2026-05-18T18:26:43Z",
+        "stats": null,
+        "userCount": 0
+      },
+      "logger": null,
+      "metadata": {
+        "filename": "seed_sentry.py",
+        "function": "run",
+        "in_app_frame_mix": "in-app-only",
+        "initial_priority": 75,
+        "sdk": {
+          "name": "sentry.python.aiohttp",
+          "name_normalized": "sentry.python"
+        },
+        "title": null,
+        "type": "RuntimeError",
+        "value": "seed error from GET /healthz"
+      },
+      "numComments": 0,
+      "owners": null,
+      "permalink": "https://estuary-94.sentry.io/issues/7490112871/",
+      "platform": "python",
+      "pluginActions": [],
+      "pluginIssues": [],
+      "priority": "high",
+      "priorityLockedAt": null,
+      "project": {
+        "id": "4509990551814144",
+        "name": "test-project",
+        "platform": "python",
+        "slug": "test-project"
+      },
+      "seerAutofixLastTriggered": null,
+      "seerExplorerAutofixLastTriggered": null,
+      "seerFixabilityScore": null,
+      "sentryAppIssues": [],
+      "shareId": null,
+      "shortId": "TEST-PROJECT-E",
+      "stats": "redacted-object",
+      "status": "unresolved",
+      "statusDetails": {},
+      "subscriptionDetails": null,
+      "substatus": "ongoing",
+      "title": "RuntimeError: seed error from GET /healthz",
+      "type": "error",
+      "userCount": 0
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "96f0313edcdac5f3",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #1160",
+      "span.duration": "39.958954",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "00660d702dbe473fa10ab767af90ed2a",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a574282a8f59aa9c",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a574282a8f59aa9c",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "106.158972",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "00660d702dbe473fa10ab767af90ed2a",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a574282a8f59aa9c",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "acfd91cda6f1b4f9",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #6449",
+      "span.duration": "34.192085",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "00660d702dbe473fa10ab767af90ed2a",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a574282a8f59aa9c",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "be0c910285ef7b63",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #9103",
+      "span.duration": "31.200886",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "00660d702dbe473fa10ab767af90ed2a",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a574282a8f59aa9c",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "84d94de5b0a077b6",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #2561",
+      "span.duration": "62.105894",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "065bd09d18c949a19d2acf770fbfeede",
+      "transaction": "cron.daily",
+      "transaction.span_id": "995b3acdbf2e32af",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8f1d09b94c64d402",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #6978",
+      "span.duration": "34.044981",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "065bd09d18c949a19d2acf770fbfeede",
+      "transaction": "cron.daily",
+      "transaction.span_id": "995b3acdbf2e32af",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "995b3acdbf2e32af",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "240.191936",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "065bd09d18c949a19d2acf770fbfeede",
+      "transaction": "cron.daily",
+      "transaction.span_id": "995b3acdbf2e32af",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b6233d4d4cf3be1b",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #2066",
+      "span.duration": "45.373917",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "065bd09d18c949a19d2acf770fbfeede",
+      "transaction": "cron.daily",
+      "transaction.span_id": "995b3acdbf2e32af",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b90da7c1570e7e9a",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #7576",
+      "span.duration": "60.006142",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "065bd09d18c949a19d2acf770fbfeede",
+      "transaction": "cron.daily",
+      "transaction.span_id": "995b3acdbf2e32af",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bb39993920bde3c1",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #4758",
+      "span.duration": "13.678074",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "065bd09d18c949a19d2acf770fbfeede",
+      "transaction": "cron.daily",
+      "transaction.span_id": "995b3acdbf2e32af",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bec29e032c82acff",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #4283",
+      "span.duration": "23.518085",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "065bd09d18c949a19d2acf770fbfeede",
+      "transaction": "cron.daily",
+      "transaction.span_id": "995b3acdbf2e32af",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "912628ca69dec471",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #4085",
+      "span.duration": "64.587831",
+      "timestamp": "2026-05-18T18:26:33Z",
+      "trace": "116b3cadf6c344cfae05a7ce8465cc8a",
+      "transaction": "cron.daily",
+      "transaction.span_id": "93ca5a4a6e46f42e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "93ca5a4a6e46f42e",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "259.381056",
+      "timestamp": "2026-05-18T18:26:33Z",
+      "trace": "116b3cadf6c344cfae05a7ce8465cc8a",
+      "transaction": "cron.daily",
+      "transaction.span_id": "93ca5a4a6e46f42e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9491e272ecf260e6",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #6984",
+      "span.duration": "51.283121",
+      "timestamp": "2026-05-18T18:26:33Z",
+      "trace": "116b3cadf6c344cfae05a7ce8465cc8a",
+      "transaction": "cron.daily",
+      "transaction.span_id": "93ca5a4a6e46f42e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "97694a039f78ffad",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #7265",
+      "span.duration": "12.05492",
+      "timestamp": "2026-05-18T18:26:33Z",
+      "trace": "116b3cadf6c344cfae05a7ce8465cc8a",
+      "transaction": "cron.daily",
+      "transaction.span_id": "93ca5a4a6e46f42e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "993eb4f7b4fca26d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #7456",
+      "span.duration": "76.561928",
+      "timestamp": "2026-05-18T18:26:33Z",
+      "trace": "116b3cadf6c344cfae05a7ce8465cc8a",
+      "transaction": "cron.daily",
+      "transaction.span_id": "93ca5a4a6e46f42e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "adb393bab7fe4661",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #8634",
+      "span.duration": "53.613901",
+      "timestamp": "2026-05-18T18:26:33Z",
+      "trace": "116b3cadf6c344cfae05a7ce8465cc8a",
+      "transaction": "cron.daily",
+      "transaction.span_id": "93ca5a4a6e46f42e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "85d4a0f830f48924",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #5006",
+      "span.duration": "56.918859",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "1f6f7ebac5874f78bea7b721ae9a7848",
+      "transaction": "GET /users",
+      "transaction.span_id": "b1e606d556ec2140",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b1e606d556ec2140",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "GET /users",
+      "span.duration": "208.83894",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "1f6f7ebac5874f78bea7b721ae9a7848",
+      "transaction": "GET /users",
+      "transaction.span_id": "b1e606d556ec2140",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b226e8580c4f647c",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #4401",
+      "span.duration": "53.580046",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "1f6f7ebac5874f78bea7b721ae9a7848",
+      "transaction": "GET /users",
+      "transaction.span_id": "b1e606d556ec2140",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bce5b4b432a94b6d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #9438",
+      "span.duration": "15.332937",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "1f6f7ebac5874f78bea7b721ae9a7848",
+      "transaction": "GET /users",
+      "transaction.span_id": "b1e606d556ec2140",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bd04719c3e549a9b",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #1854",
+      "span.duration": "18.168926",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "1f6f7ebac5874f78bea7b721ae9a7848",
+      "transaction": "GET /users",
+      "transaction.span_id": "b1e606d556ec2140",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bdfb1d6f01c5e3a5",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #9824",
+      "span.duration": "63.248873",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "1f6f7ebac5874f78bea7b721ae9a7848",
+      "transaction": "GET /users",
+      "transaction.span_id": "b1e606d556ec2140",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a3a464e1b47f0c0c",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #4738",
+      "span.duration": "40.612936",
+      "timestamp": "2026-05-18T18:26:29Z",
+      "trace": "228f9b09a1a3410ebaf99fe59ab12a6a",
+      "transaction": "POST /orders",
+      "transaction.span_id": "bdb447c1fe654504",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a944e15c8759f36a",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #5252",
+      "span.duration": "16.13307",
+      "timestamp": "2026-05-18T18:26:29Z",
+      "trace": "228f9b09a1a3410ebaf99fe59ab12a6a",
+      "transaction": "POST /orders",
+      "transaction.span_id": "bdb447c1fe654504",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bdb447c1fe654504",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /orders",
+      "span.duration": "57.394981",
+      "timestamp": "2026-05-18T18:26:29Z",
+      "trace": "228f9b09a1a3410ebaf99fe59ab12a6a",
+      "transaction": "POST /orders",
+      "transaction.span_id": "bdb447c1fe654504",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "945a44cd6ae8510c",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #9636",
+      "span.duration": "71.412086",
+      "timestamp": "2026-05-18T18:26:39Z",
+      "trace": "241035405c9e4f0d9ff20ce7a1aa0143",
+      "transaction": "POST /orders",
+      "transaction.span_id": "b99523d99f99dc74",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b23a0500b983ac52",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #9423",
+      "span.duration": "76.536894",
+      "timestamp": "2026-05-18T18:26:39Z",
+      "trace": "241035405c9e4f0d9ff20ce7a1aa0143",
+      "transaction": "POST /orders",
+      "transaction.span_id": "b99523d99f99dc74",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b99523d99f99dc74",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /orders",
+      "span.duration": "148.857117",
+      "timestamp": "2026-05-18T18:26:39Z",
+      "trace": "241035405c9e4f0d9ff20ce7a1aa0143",
+      "transaction": "POST /orders",
+      "transaction.span_id": "b99523d99f99dc74",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "816f7d83e2e5d357",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #6038",
+      "span.duration": "60.139894",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "2cbe93dc875340c1bed8e0fe6414b733",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "a7170e34fdec3eb4",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9a848c9815010fd1",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #9704",
+      "span.duration": "22.753",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "2cbe93dc875340c1bed8e0fe6414b733",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "a7170e34fdec3eb4",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a51c745ba069e20e",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #3955",
+      "span.duration": "41.970015",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "2cbe93dc875340c1bed8e0fe6414b733",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "a7170e34fdec3eb4",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a7170e34fdec3eb4",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /webhooks",
+      "span.duration": "210.008144",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "2cbe93dc875340c1bed8e0fe6414b733",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "a7170e34fdec3eb4",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b5b5067b879f9472",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #7839",
+      "span.duration": "67.667007",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "2cbe93dc875340c1bed8e0fe6414b733",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "a7170e34fdec3eb4",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "be80089279922ef2",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #3995",
+      "span.duration": "16.011953",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "2cbe93dc875340c1bed8e0fe6414b733",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "a7170e34fdec3eb4",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a901fb3c94651bc5",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #8202",
+      "span.duration": "17.350912",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "39438186064c4efa948def3594a2ed4e",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b398af08e7c834ae",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b398af08e7c834ae",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "145.910978",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "39438186064c4efa948def3594a2ed4e",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b398af08e7c834ae",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bc3f37b1062db50c",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #7134",
+      "span.duration": "70.592165",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "39438186064c4efa948def3594a2ed4e",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b398af08e7c834ae",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bcece0b2334bf056",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #5303",
+      "span.duration": "57.075024",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "39438186064c4efa948def3594a2ed4e",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b398af08e7c834ae",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8ce9bff1f4c30190",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #6753",
+      "span.duration": "25.807142",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "3cebc8dd6d7842e496ae09b394d4ef87",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "91a3a821e6783090",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "91a3a821e6783090",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /webhooks",
+      "span.duration": "103.141069",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "3cebc8dd6d7842e496ae09b394d4ef87",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "91a3a821e6783090",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bddf32cd6f04c8b0",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #4159",
+      "span.duration": "76.651096",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "3cebc8dd6d7842e496ae09b394d4ef87",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "91a3a821e6783090",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "81cc1fae33293bb9",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #4132",
+      "span.duration": "18.886089",
+      "timestamp": "2026-05-18T18:26:33Z",
+      "trace": "475d9aacf47141e39896dee12dcb9355",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b8e9ae7549e49f5e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "88f576243122c4ce",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #2892",
+      "span.duration": "78.402996",
+      "timestamp": "2026-05-18T18:26:33Z",
+      "trace": "475d9aacf47141e39896dee12dcb9355",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b8e9ae7549e49f5e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8bb580f8fb118064",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #4091",
+      "span.duration": "52.756071",
+      "timestamp": "2026-05-18T18:26:33Z",
+      "trace": "475d9aacf47141e39896dee12dcb9355",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b8e9ae7549e49f5e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "ae1e4ddac3146109",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #1523",
+      "span.duration": "67.199945",
+      "timestamp": "2026-05-18T18:26:56Z",
+      "trace": "475d9aacf47141e39896dee12dcb9355",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b8e9ae7549e49f5e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b8e9ae7549e49f5e",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "218.194962",
+      "timestamp": "2026-05-18T18:26:56Z",
+      "trace": "475d9aacf47141e39896dee12dcb9355",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b8e9ae7549e49f5e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "82305764a3afe8f6",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #6361",
+      "span.duration": "46.228886",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "53fb41413ff04c94823a6b2a4daae141",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a57869d9ae6e84b6",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8ba6730ebf952fc0",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #1090",
+      "span.duration": "32.844067",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "53fb41413ff04c94823a6b2a4daae141",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a57869d9ae6e84b6",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a51a4e90b6aefba9",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #9084",
+      "span.duration": "19.869089",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "53fb41413ff04c94823a6b2a4daae141",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a57869d9ae6e84b6",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a57869d9ae6e84b6",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "100.059986",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "53fb41413ff04c94823a6b2a4daae141",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a57869d9ae6e84b6",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "851d4f69a8d54f5f",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #3742",
+      "span.duration": "17.503023",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "56b176fd6dbb4d36a7c3b3032d5e3e85",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a76f34e79b05e68e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "864d053d14a963df",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #1555",
+      "span.duration": "67.764997",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "56b176fd6dbb4d36a7c3b3032d5e3e85",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a76f34e79b05e68e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8779301fb7b8674b",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #3023",
+      "span.duration": "67.778111",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "56b176fd6dbb4d36a7c3b3032d5e3e85",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a76f34e79b05e68e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "91ca819a47bb95fb",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #2060",
+      "span.duration": "24.662018",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "56b176fd6dbb4d36a7c3b3032d5e3e85",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a76f34e79b05e68e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a76f34e79b05e68e",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "292.727947",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "56b176fd6dbb4d36a7c3b3032d5e3e85",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a76f34e79b05e68e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b46fd835ce641147",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #2296",
+      "span.duration": "68.625927",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "56b176fd6dbb4d36a7c3b3032d5e3e85",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a76f34e79b05e68e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "be0ee8087fc04da4",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #2486",
+      "span.duration": "44.671059",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "56b176fd6dbb4d36a7c3b3032d5e3e85",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a76f34e79b05e68e",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9cc68247160834b6",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /webhooks",
+      "span.duration": "180.235863",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "5ba2af1fd5094b75b64c03f7b4be05f9",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "9cc68247160834b6",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9e608d21d5df7f76",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #4804",
+      "span.duration": "44.420958",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "5ba2af1fd5094b75b64c03f7b4be05f9",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "9cc68247160834b6",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bb23740da9e2abe6",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #2993",
+      "span.duration": "77.255964",
+      "timestamp": "2026-05-18T18:26:31Z",
+      "trace": "5ba2af1fd5094b75b64c03f7b4be05f9",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "9cc68247160834b6",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "815daa2df5b96e77",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #7260",
+      "span.duration": "67.768812",
+      "timestamp": "2026-05-18T18:26:39Z",
+      "trace": "5e9afc73fde84998a494a84c6a658de7",
+      "transaction": "POST /orders",
+      "transaction.span_id": "9c8a409569e6c0a3",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8a5ead994290acc8",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #3529",
+      "span.duration": "12.101173",
+      "timestamp": "2026-05-18T18:26:39Z",
+      "trace": "5e9afc73fde84998a494a84c6a658de7",
+      "transaction": "POST /orders",
+      "transaction.span_id": "9c8a409569e6c0a3",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9c8a409569e6c0a3",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /orders",
+      "span.duration": "128.114223",
+      "timestamp": "2026-05-18T18:26:39Z",
+      "trace": "5e9afc73fde84998a494a84c6a658de7",
+      "transaction": "POST /orders",
+      "transaction.span_id": "9c8a409569e6c0a3",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a67ac61e6c334e59",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #1746",
+      "span.duration": "46.795845",
+      "timestamp": "2026-05-18T18:26:39Z",
+      "trace": "5e9afc73fde84998a494a84c6a658de7",
+      "transaction": "POST /orders",
+      "transaction.span_id": "9c8a409569e6c0a3",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8509104927ca15c0",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "GET /users",
+      "span.duration": "154.444933",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "6f305d0a237f41c4bdb086f71a240d55",
+      "transaction": "GET /users",
+      "transaction.span_id": "8509104927ca15c0",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8581b4ec365995aa",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #7521",
+      "span.duration": "34.595013",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "6f305d0a237f41c4bdb086f71a240d55",
+      "transaction": "GET /users",
+      "transaction.span_id": "8509104927ca15c0",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8cf0fc369af77bdc",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #6653",
+      "span.duration": "22.463083",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "6f305d0a237f41c4bdb086f71a240d55",
+      "transaction": "GET /users",
+      "transaction.span_id": "8509104927ca15c0",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "939aca10aaa6a765",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #5121",
+      "span.duration": "18.574953",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "6f305d0a237f41c4bdb086f71a240d55",
+      "transaction": "GET /users",
+      "transaction.span_id": "8509104927ca15c0",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "96cf96114e825ace",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #8758",
+      "span.duration": "47.378063",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "6f305d0a237f41c4bdb086f71a240d55",
+      "transaction": "GET /users",
+      "transaction.span_id": "8509104927ca15c0",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9b4ae2d7df0c2abb",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #5884",
+      "span.duration": "27.384043",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "6f305d0a237f41c4bdb086f71a240d55",
+      "transaction": "GET /users",
+      "transaction.span_id": "8509104927ca15c0",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "868df3ff9453586d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #2312",
+      "span.duration": "18.599987",
+      "timestamp": "2026-05-18T18:26:37Z",
+      "trace": "6f6da06819a847dd97565487adf2d6bd",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "b097bd8ca0fec689",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a847d6d2c0f2f849",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #7024",
+      "span.duration": "62.566042",
+      "timestamp": "2026-05-18T18:26:37Z",
+      "trace": "6f6da06819a847dd97565487adf2d6bd",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "b097bd8ca0fec689",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b097bd8ca0fec689",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /webhooks",
+      "span.duration": "81.762075",
+      "timestamp": "2026-05-18T18:26:37Z",
+      "trace": "6f6da06819a847dd97565487adf2d6bd",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "b097bd8ca0fec689",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "89349e059e3c8035",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /orders",
+      "span.duration": "163.203001",
+      "timestamp": "2026-05-18T18:26:42Z",
+      "trace": "70d6145dbf644da8a818ff779b8e7e4b",
+      "transaction": "POST /orders",
+      "transaction.span_id": "89349e059e3c8035",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9b6a7273b6d0dbc2",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #8807",
+      "span.duration": "69.022894",
+      "timestamp": "2026-05-18T18:26:42Z",
+      "trace": "70d6145dbf644da8a818ff779b8e7e4b",
+      "transaction": "POST /orders",
+      "transaction.span_id": "89349e059e3c8035",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b03e3eaac3179969",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #7047",
+      "span.duration": "28.918982",
+      "timestamp": "2026-05-18T18:26:42Z",
+      "trace": "70d6145dbf644da8a818ff779b8e7e4b",
+      "transaction": "POST /orders",
+      "transaction.span_id": "89349e059e3c8035",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b3e79e487627ddb5",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #9445",
+      "span.duration": "64.329863",
+      "timestamp": "2026-05-18T18:26:42Z",
+      "trace": "70d6145dbf644da8a818ff779b8e7e4b",
+      "transaction": "POST /orders",
+      "transaction.span_id": "89349e059e3c8035",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "836c46463bfe3774",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #1079",
+      "span.duration": "51.410913",
+      "timestamp": "2026-05-18T18:27:06Z",
+      "trace": "75f06ed59a214329b60ea8b769dedb38",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "b2de947fb139a89d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a06713ffbe12aeb5",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #1052",
+      "span.duration": "32.222033",
+      "timestamp": "2026-05-18T18:26:43Z",
+      "trace": "75f06ed59a214329b60ea8b769dedb38",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "b2de947fb139a89d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b2de947fb139a89d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /webhooks",
+      "span.duration": "84.705114",
+      "timestamp": "2026-05-18T18:27:06Z",
+      "trace": "75f06ed59a214329b60ea8b769dedb38",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "b2de947fb139a89d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8254b518129ec9b1",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #2004",
+      "span.duration": "46.919107",
+      "timestamp": "2026-05-18T18:26:38Z",
+      "trace": "7ddf775f266c4d9f94411d4c218c13dc",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "8fc4ddc9e0108060",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8fc4ddc9e0108060",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /webhooks",
+      "span.duration": "195.567131",
+      "timestamp": "2026-05-18T18:26:38Z",
+      "trace": "7ddf775f266c4d9f94411d4c218c13dc",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "8fc4ddc9e0108060",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "afbdf591540d83bd",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #2019",
+      "span.duration": "71.157932",
+      "timestamp": "2026-05-18T18:26:38Z",
+      "trace": "7ddf775f266c4d9f94411d4c218c13dc",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "8fc4ddc9e0108060",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b79a57a21cb84a4a",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #9088",
+      "span.duration": "75.180054",
+      "timestamp": "2026-05-18T18:26:38Z",
+      "trace": "7ddf775f266c4d9f94411d4c218c13dc",
+      "transaction": "POST /webhooks",
+      "transaction.span_id": "8fc4ddc9e0108060",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "85e9499e41fc865d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #5645",
+      "span.duration": "16.638041",
+      "timestamp": "2026-05-18T18:26:29Z",
+      "trace": "801e0aa0886742848b804e49a6208845",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a5e2890ea1332a5c",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8c286638ec9efc9d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #6510",
+      "span.duration": "58.246851",
+      "timestamp": "2026-05-18T18:26:29Z",
+      "trace": "801e0aa0886742848b804e49a6208845",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a5e2890ea1332a5c",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a4cc471f8085d175",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #9734",
+      "span.duration": "69.844007",
+      "timestamp": "2026-05-18T18:26:29Z",
+      "trace": "801e0aa0886742848b804e49a6208845",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a5e2890ea1332a5c",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a5e2890ea1332a5c",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "146.538973",
+      "timestamp": "2026-05-18T18:26:29Z",
+      "trace": "801e0aa0886742848b804e49a6208845",
+      "transaction": "cron.daily",
+      "transaction.span_id": "a5e2890ea1332a5c",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "84f87ff172f71cc5",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "177.198887",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "871bb14759a1451d89c4948132e512ab",
+      "transaction": "cron.daily",
+      "transaction.span_id": "84f87ff172f71cc5",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "86246ecccfff2a6a",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #5767",
+      "span.duration": "36.423922",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "871bb14759a1451d89c4948132e512ab",
+      "transaction": "cron.daily",
+      "transaction.span_id": "84f87ff172f71cc5",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "88ce929c2998127a",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #2238",
+      "span.duration": "17.459154",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "871bb14759a1451d89c4948132e512ab",
+      "transaction": "cron.daily",
+      "transaction.span_id": "84f87ff172f71cc5",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9e3fae1a2d4d37fe",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #3486",
+      "span.duration": "41.604996",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "871bb14759a1451d89c4948132e512ab",
+      "transaction": "cron.daily",
+      "transaction.span_id": "84f87ff172f71cc5",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a30dccecc1402249",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #9268",
+      "span.duration": "69.759846",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "871bb14759a1451d89c4948132e512ab",
+      "transaction": "cron.daily",
+      "transaction.span_id": "84f87ff172f71cc5",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "abea0cb23e093f31",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #2791",
+      "span.duration": "10.741949",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "871bb14759a1451d89c4948132e512ab",
+      "transaction": "cron.daily",
+      "transaction.span_id": "84f87ff172f71cc5",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "80ceb1666c335d8e",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #5337",
+      "span.duration": "25.712013",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "89b89ac4cd294ae890d171eddbd97fc8",
+      "transaction": "POST /orders",
+      "transaction.span_id": "8767d79f425b5f92",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "84f57f3413e0335d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #8932",
+      "span.duration": "48.772097",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "89b89ac4cd294ae890d171eddbd97fc8",
+      "transaction": "POST /orders",
+      "transaction.span_id": "8767d79f425b5f92",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8767d79f425b5f92",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /orders",
+      "span.duration": "202.673197",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "89b89ac4cd294ae890d171eddbd97fc8",
+      "transaction": "POST /orders",
+      "transaction.span_id": "8767d79f425b5f92",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9861102902a4c8d7",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #5511",
+      "span.duration": "30.051947",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "89b89ac4cd294ae890d171eddbd97fc8",
+      "transaction": "POST /orders",
+      "transaction.span_id": "8767d79f425b5f92",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a8a75e13c30be6b9",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #3977",
+      "span.duration": "68.6481",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "89b89ac4cd294ae890d171eddbd97fc8",
+      "transaction": "POST /orders",
+      "transaction.span_id": "8767d79f425b5f92",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bac664430d81f6c7",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #3798",
+      "span.duration": "28.350115",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "89b89ac4cd294ae890d171eddbd97fc8",
+      "transaction": "POST /orders",
+      "transaction.span_id": "8767d79f425b5f92",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "91beb0a3048c3d3e",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #5404",
+      "span.duration": "71.767807",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "92e0b8a110c343f99e2b3ed9e370534e",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b21a762acf871b37",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "97a38b0a62427092",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #2984",
+      "span.duration": "25.814056",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "92e0b8a110c343f99e2b3ed9e370534e",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b21a762acf871b37",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "aa99ad009e09321f",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #7698",
+      "span.duration": "51.044941",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "92e0b8a110c343f99e2b3ed9e370534e",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b21a762acf871b37",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b017eb8af7c25b36",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #8991",
+      "span.duration": "43.527126",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "92e0b8a110c343f99e2b3ed9e370534e",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b21a762acf871b37",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b21a762acf871b37",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "193.499088",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "92e0b8a110c343f99e2b3ed9e370534e",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b21a762acf871b37",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9504616a924ceabc",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #7736",
+      "span.duration": "36.653996",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "947e54c5ea514b6ab607bf02d790beed",
+      "transaction": "POST /orders",
+      "transaction.span_id": "984cfd4d2e77fb4f",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "955d1cb5ad2ae23d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #3410",
+      "span.duration": "44.587851",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "947e54c5ea514b6ab607bf02d790beed",
+      "transaction": "POST /orders",
+      "transaction.span_id": "984cfd4d2e77fb4f",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "984cfd4d2e77fb4f",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /orders",
+      "span.duration": "178.013086",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "947e54c5ea514b6ab607bf02d790beed",
+      "transaction": "POST /orders",
+      "transaction.span_id": "984cfd4d2e77fb4f",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9fe3fd5d17084f73",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #9470",
+      "span.duration": "18.399954",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "947e54c5ea514b6ab607bf02d790beed",
+      "transaction": "POST /orders",
+      "transaction.span_id": "984cfd4d2e77fb4f",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b19a08cc61758d79",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #6886",
+      "span.duration": "41.985989000000004",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "947e54c5ea514b6ab607bf02d790beed",
+      "transaction": "POST /orders",
+      "transaction.span_id": "984cfd4d2e77fb4f",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b1f29ce5bab178eb",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #6664",
+      "span.duration": "14.022112",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "947e54c5ea514b6ab607bf02d790beed",
+      "transaction": "POST /orders",
+      "transaction.span_id": "984cfd4d2e77fb4f",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "be441d4b4ae09c19",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #8997",
+      "span.duration": "20.358086",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "947e54c5ea514b6ab607bf02d790beed",
+      "transaction": "POST /orders",
+      "transaction.span_id": "984cfd4d2e77fb4f",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9df0df6a2694a105",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #6692",
+      "span.duration": "68.753004",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "9b44ad7b4a4d42b3aafddc5495c07b98",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b1ddfc6d4c64eb15",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a31c2c9ab2e4d867",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #4421",
+      "span.duration": "13.057947",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "9b44ad7b4a4d42b3aafddc5495c07b98",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b1ddfc6d4c64eb15",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b1ddfc6d4c64eb15",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "83.113194",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "9b44ad7b4a4d42b3aafddc5495c07b98",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b1ddfc6d4c64eb15",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "95508449010e36ff",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "171.153069",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "a2e0873091bc4c27ae891652fbfa7faf",
+      "transaction": "cron.daily",
+      "transaction.span_id": "95508449010e36ff",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9c30760328b14eda",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #1245",
+      "span.duration": "23.981094",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "a2e0873091bc4c27ae891652fbfa7faf",
+      "transaction": "cron.daily",
+      "transaction.span_id": "95508449010e36ff",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b13a80d501fb203a",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #4342",
+      "span.duration": "76.280832",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "a2e0873091bc4c27ae891652fbfa7faf",
+      "transaction": "cron.daily",
+      "transaction.span_id": "95508449010e36ff",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b35b95460447594d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #6265",
+      "span.duration": "67.188025",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "a2e0873091bc4c27ae891652fbfa7faf",
+      "transaction": "cron.daily",
+      "transaction.span_id": "95508449010e36ff",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "83806f3c1c119d0f",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #7202",
+      "span.duration": "37.055016",
+      "timestamp": "2026-05-18T18:26:38Z",
+      "trace": "a79d637769c94a4aac122e998baeb4e6",
+      "transaction": "POST /orders",
+      "transaction.span_id": "b3c683153da60b18",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8fe49d2d8983a757",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #3606",
+      "span.duration": "51.043034",
+      "timestamp": "2026-05-18T18:26:38Z",
+      "trace": "a79d637769c94a4aac122e998baeb4e6",
+      "transaction": "POST /orders",
+      "transaction.span_id": "b3c683153da60b18",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a8f45eb6ad08638e",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #6915",
+      "span.duration": "32.808065",
+      "timestamp": "2026-05-18T18:26:38Z",
+      "trace": "a79d637769c94a4aac122e998baeb4e6",
+      "transaction": "POST /orders",
+      "transaction.span_id": "b3c683153da60b18",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b3c683153da60b18",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /orders",
+      "span.duration": "121.854067",
+      "timestamp": "2026-05-18T18:26:38Z",
+      "trace": "a79d637769c94a4aac122e998baeb4e6",
+      "transaction": "POST /orders",
+      "transaction.span_id": "b3c683153da60b18",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "91b62f6ffe3d3e77",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #3714",
+      "span.duration": "43.623924",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "ab5cf6dc33504911930cfdfe7b0feb97",
+      "transaction": "POST /orders",
+      "transaction.span_id": "a2c83205586bc3c5",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "94dc183b78b5826b",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #3283",
+      "span.duration": "24.017096",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "ab5cf6dc33504911930cfdfe7b0feb97",
+      "transaction": "POST /orders",
+      "transaction.span_id": "a2c83205586bc3c5",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a2c83205586bc3c5",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /orders",
+      "span.duration": "96.5271",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "ab5cf6dc33504911930cfdfe7b0feb97",
+      "transaction": "POST /orders",
+      "transaction.span_id": "a2c83205586bc3c5",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b9f291620aa491d1",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #6284",
+      "span.duration": "28.029919",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "ab5cf6dc33504911930cfdfe7b0feb97",
+      "transaction": "POST /orders",
+      "transaction.span_id": "a2c83205586bc3c5",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "899ad82800c65105",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #5037",
+      "span.duration": "78.99189",
+      "timestamp": "2026-05-18T18:26:39Z",
+      "trace": "ae531f815ca9476ca6a5f1cf4e69ce19",
+      "transaction": "GET /users",
+      "transaction.span_id": "b04eaae4d2a5e4b1",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "902fca71bd9d73e3",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #6798",
+      "span.duration": "32.451868",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "ae531f815ca9476ca6a5f1cf4e69ce19",
+      "transaction": "GET /users",
+      "transaction.span_id": "b04eaae4d2a5e4b1",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "93aa79f652428258",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #8189",
+      "span.duration": "47.143936",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "ae531f815ca9476ca6a5f1cf4e69ce19",
+      "transaction": "GET /users",
+      "transaction.span_id": "b04eaae4d2a5e4b1",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9d1e5b4edbf7ed6e",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #2890",
+      "span.duration": "36.4151",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "ae531f815ca9476ca6a5f1cf4e69ce19",
+      "transaction": "GET /users",
+      "transaction.span_id": "b04eaae4d2a5e4b1",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a87817bca6d77de0",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #6732",
+      "span.duration": "24.009943",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "ae531f815ca9476ca6a5f1cf4e69ce19",
+      "transaction": "GET /users",
+      "transaction.span_id": "b04eaae4d2a5e4b1",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b04eaae4d2a5e4b1",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "GET /users",
+      "span.duration": "220.551014",
+      "timestamp": "2026-05-18T18:26:39Z",
+      "trace": "ae531f815ca9476ca6a5f1cf4e69ce19",
+      "transaction": "GET /users",
+      "transaction.span_id": "b04eaae4d2a5e4b1",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "81b25177a8784e73",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /orders",
+      "span.duration": "98.585129",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "af6e622210694736884666e03c6139ce",
+      "transaction": "POST /orders",
+      "transaction.span_id": "81b25177a8784e73",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "876564d19dd4de18",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #8052",
+      "span.duration": "69.781065",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "af6e622210694736884666e03c6139ce",
+      "transaction": "POST /orders",
+      "transaction.span_id": "81b25177a8784e73",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "98ca1cf18336f6a9",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #3886",
+      "span.duration": "28.17893",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "af6e622210694736884666e03c6139ce",
+      "transaction": "POST /orders",
+      "transaction.span_id": "81b25177a8784e73",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "971c1df9bd3f879d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "116.966963",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "b25ff8b05b3c40fcaab228e44b048bc7",
+      "transaction": "cron.daily",
+      "transaction.span_id": "971c1df9bd3f879d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a26099a9e241f681",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #4006",
+      "span.duration": "47.770977",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "b25ff8b05b3c40fcaab228e44b048bc7",
+      "transaction": "cron.daily",
+      "transaction.span_id": "971c1df9bd3f879d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a66d337189eddeea",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #2832",
+      "span.duration": "68.608046",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "b25ff8b05b3c40fcaab228e44b048bc7",
+      "transaction": "cron.daily",
+      "transaction.span_id": "971c1df9bd3f879d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "815c0d349f47b829",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #1612",
+      "span.duration": "31.852961",
+      "timestamp": "2026-05-18T18:26:38Z",
+      "trace": "b31cecd484684b79b4ccbbe5e0d01608",
+      "transaction": "GET /users",
+      "transaction.span_id": "8407524456880238",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8407524456880238",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "GET /users",
+      "span.duration": "91.156006",
+      "timestamp": "2026-05-18T18:26:38Z",
+      "trace": "b31cecd484684b79b4ccbbe5e0d01608",
+      "transaction": "GET /users",
+      "transaction.span_id": "8407524456880238",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8e6ed1aff2f5c864",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #6012",
+      "span.duration": "58.336973",
+      "timestamp": "2026-05-18T18:26:38Z",
+      "trace": "b31cecd484684b79b4ccbbe5e0d01608",
+      "transaction": "GET /users",
+      "transaction.span_id": "8407524456880238",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "951004c1e40adda4",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #9146",
+      "span.duration": "65.17911",
+      "timestamp": "2026-05-18T18:26:42Z",
+      "trace": "c5c8ba3f1c854abe93336d470448cbae",
+      "transaction": "cron.daily",
+      "transaction.span_id": "acec95b6bea53179",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9dff0a8319558409",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #9244",
+      "span.duration": "77.584028",
+      "timestamp": "2026-05-18T18:26:42Z",
+      "trace": "c5c8ba3f1c854abe93336d470448cbae",
+      "transaction": "cron.daily",
+      "transaction.span_id": "acec95b6bea53179",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "acec95b6bea53179",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "211.886883",
+      "timestamp": "2026-05-18T18:26:42Z",
+      "trace": "c5c8ba3f1c854abe93336d470448cbae",
+      "transaction": "cron.daily",
+      "transaction.span_id": "acec95b6bea53179",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b61dd4c22c7964f7",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #2359",
+      "span.duration": "68.009853",
+      "timestamp": "2026-05-18T18:26:42Z",
+      "trace": "c5c8ba3f1c854abe93336d470448cbae",
+      "transaction": "cron.daily",
+      "transaction.span_id": "acec95b6bea53179",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "87c6c65c4982c804",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #4378",
+      "span.duration": "29.332161",
+      "timestamp": "2026-05-18T18:26:41Z",
+      "trace": "c6d326b9bce946348b327885503b34f7",
+      "transaction": "POST /orders",
+      "transaction.span_id": "a6886f12452fca4d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9b699b3107a3f912",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #9867",
+      "span.duration": "26.952982",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "c6d326b9bce946348b327885503b34f7",
+      "transaction": "POST /orders",
+      "transaction.span_id": "a6886f12452fca4d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a5caaa34e6c84112",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #5856",
+      "span.duration": "13.596058",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "c6d326b9bce946348b327885503b34f7",
+      "transaction": "POST /orders",
+      "transaction.span_id": "a6886f12452fca4d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a6886f12452fca4d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /orders",
+      "span.duration": "162.486076",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "c6d326b9bce946348b327885503b34f7",
+      "transaction": "POST /orders",
+      "transaction.span_id": "a6886f12452fca4d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b79caad6737ee546",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #7827",
+      "span.duration": "75.790167",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "c6d326b9bce946348b327885503b34f7",
+      "transaction": "POST /orders",
+      "transaction.span_id": "a6886f12452fca4d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bf9bc943afff97bf",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #5991",
+      "span.duration": "15.594006",
+      "timestamp": "2026-05-18T18:26:40Z",
+      "trace": "c6d326b9bce946348b327885503b34f7",
+      "transaction": "POST /orders",
+      "transaction.span_id": "a6886f12452fca4d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "89fced232caeda8b",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #1453",
+      "span.duration": "45.47286",
+      "timestamp": "2026-05-18T18:26:34Z",
+      "trace": "c72638ef0aad45b685d528f7d6b81174",
+      "transaction": "POST /orders",
+      "transaction.span_id": "9bf3cab204ec19bd",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8d27b63deddd8692",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #8754",
+      "span.duration": "54.682016",
+      "timestamp": "2026-05-18T18:26:34Z",
+      "trace": "c72638ef0aad45b685d528f7d6b81174",
+      "transaction": "POST /orders",
+      "transaction.span_id": "9bf3cab204ec19bd",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9bf3cab204ec19bd",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /orders",
+      "span.duration": "285.192013",
+      "timestamp": "2026-05-18T18:26:33Z",
+      "trace": "c72638ef0aad45b685d528f7d6b81174",
+      "transaction": "POST /orders",
+      "transaction.span_id": "9bf3cab204ec19bd",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a1a8cc8fa6c90759",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #7513",
+      "span.duration": "31.178951",
+      "timestamp": "2026-05-18T18:26:34Z",
+      "trace": "c72638ef0aad45b685d528f7d6b81174",
+      "transaction": "POST /orders",
+      "transaction.span_id": "9bf3cab204ec19bd",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a5eb950a3d2a49c3",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #3585",
+      "span.duration": "72.678089",
+      "timestamp": "2026-05-18T18:26:34Z",
+      "trace": "c72638ef0aad45b685d528f7d6b81174",
+      "transaction": "POST /orders",
+      "transaction.span_id": "9bf3cab204ec19bd",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "ac8f85757fec1085",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #7474",
+      "span.duration": "79.975843",
+      "timestamp": "2026-05-18T18:26:34Z",
+      "trace": "c72638ef0aad45b685d528f7d6b81174",
+      "transaction": "POST /orders",
+      "transaction.span_id": "9bf3cab204ec19bd",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9c48a28b8941cb36",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #2178",
+      "span.duration": "54.528952",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "d5f2178fef9f4381bf74b659da295bb1",
+      "transaction": "cron.daily",
+      "transaction.span_id": "bdadaa9df1920e6d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9e096a48f1792cc2",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #6089",
+      "span.duration": "16.91103",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "d5f2178fef9f4381bf74b659da295bb1",
+      "transaction": "cron.daily",
+      "transaction.span_id": "bdadaa9df1920e6d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a3599f1847ac4183",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #9270",
+      "span.duration": "59.856892",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "d5f2178fef9f4381bf74b659da295bb1",
+      "transaction": "cron.daily",
+      "transaction.span_id": "bdadaa9df1920e6d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a4cd3f42f5996045",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #1983",
+      "span.duration": "39.56604",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "d5f2178fef9f4381bf74b659da295bb1",
+      "transaction": "cron.daily",
+      "transaction.span_id": "bdadaa9df1920e6d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a4e800a598727d31",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #5084",
+      "span.duration": "49.573898",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "d5f2178fef9f4381bf74b659da295bb1",
+      "transaction": "cron.daily",
+      "transaction.span_id": "bdadaa9df1920e6d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bdadaa9df1920e6d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "222.038984",
+      "timestamp": "2026-05-18T18:26:32Z",
+      "trace": "d5f2178fef9f4381bf74b659da295bb1",
+      "transaction": "cron.daily",
+      "transaction.span_id": "bdadaa9df1920e6d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8bef2d2835cd7805",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #7126",
+      "span.duration": "21.942854",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "de07b3d2d5c646748e6548f2fbe79c99",
+      "transaction": "GET /users",
+      "transaction.span_id": "b46f4c710089940d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "923b2c33f672b310",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #4356",
+      "span.duration": "60.362101",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "de07b3d2d5c646748e6548f2fbe79c99",
+      "transaction": "GET /users",
+      "transaction.span_id": "b46f4c710089940d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "9e5832a45545cd80",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #6228",
+      "span.duration": "56.672096",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "de07b3d2d5c646748e6548f2fbe79c99",
+      "transaction": "GET /users",
+      "transaction.span_id": "b46f4c710089940d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a50f0c7dc7d5fb2f",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #5037",
+      "span.duration": "60.606956",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "de07b3d2d5c646748e6548f2fbe79c99",
+      "transaction": "GET /users",
+      "transaction.span_id": "b46f4c710089940d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b453b2b76db13e9b",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #6885",
+      "span.duration": "40.548086",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "de07b3d2d5c646748e6548f2fbe79c99",
+      "transaction": "GET /users",
+      "transaction.span_id": "b46f4c710089940d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b46f4c710089940d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "GET /users",
+      "span.duration": "241.997004",
+      "timestamp": "2026-05-18T18:26:30Z",
+      "trace": "de07b3d2d5c646748e6548f2fbe79c99",
+      "transaction": "GET /users",
+      "transaction.span_id": "b46f4c710089940d",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "89c79df6a3b233e1",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "182.781935",
+      "timestamp": "2026-05-18T18:26:37Z",
+      "trace": "e2515fe0af9749abb0b8944177eff9f1",
+      "transaction": "cron.daily",
+      "transaction.span_id": "89c79df6a3b233e1",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8a9d6f525e67fec9",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #6558",
+      "span.duration": "31.198025",
+      "timestamp": "2026-05-18T18:27:01Z",
+      "trace": "e2515fe0af9749abb0b8944177eff9f1",
+      "transaction": "cron.daily",
+      "transaction.span_id": "89c79df6a3b233e1",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "984cadea6450e9a9",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #4261",
+      "span.duration": "78.10688",
+      "timestamp": "2026-05-18T18:26:37Z",
+      "trace": "e2515fe0af9749abb0b8944177eff9f1",
+      "transaction": "cron.daily",
+      "transaction.span_id": "89c79df6a3b233e1",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "a475267da9a1944d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #7670",
+      "span.duration": "72.658062",
+      "timestamp": "2026-05-18T18:26:38Z",
+      "trace": "e2515fe0af9749abb0b8944177eff9f1",
+      "transaction": "cron.daily",
+      "transaction.span_id": "89c79df6a3b233e1",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "84cba126d6821c96",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "85.65402",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "eb448e9eb1764f968da50a35cd40649f",
+      "transaction": "cron.daily",
+      "transaction.span_id": "84cba126d6821c96",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "89e8e002d3b62be5",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #1268",
+      "span.duration": "36.540985",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "eb448e9eb1764f968da50a35cd40649f",
+      "transaction": "cron.daily",
+      "transaction.span_id": "84cba126d6821c96",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "aa4801c6f27a12e8",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #4373",
+      "span.duration": "47.634125",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "eb448e9eb1764f968da50a35cd40649f",
+      "transaction": "cron.daily",
+      "transaction.span_id": "84cba126d6821c96",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "93deb8f47d97293d",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "http.client call #1051",
+      "span.duration": "48.089981",
+      "timestamp": "2026-05-18T18:26:34Z",
+      "trace": "f152393d696d47cdb8b749cb877efc05",
+      "transaction": "POST /orders",
+      "transaction.span_id": "bacb9acdf1de1713",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "957ae45eb456ecd8",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #2095",
+      "span.duration": "61.257124",
+      "timestamp": "2026-05-18T18:26:34Z",
+      "trace": "f152393d696d47cdb8b749cb877efc05",
+      "transaction": "POST /orders",
+      "transaction.span_id": "bacb9acdf1de1713",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "98e8bac05c82cbd6",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #2898",
+      "span.duration": "40.032864",
+      "timestamp": "2026-05-18T18:26:34Z",
+      "trace": "f152393d696d47cdb8b749cb877efc05",
+      "transaction": "POST /orders",
+      "transaction.span_id": "bacb9acdf1de1713",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "abf2f48b41957d4f",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "task.queue call #8388",
+      "span.duration": "75.021029",
+      "timestamp": "2026-05-18T18:26:35Z",
+      "trace": "f152393d696d47cdb8b749cb877efc05",
+      "transaction": "POST /orders",
+      "transaction.span_id": "bacb9acdf1de1713",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b4f7fafaebb6ce2b",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "function call #7716",
+      "span.duration": "70.519924",
+      "timestamp": "2026-05-18T18:26:34Z",
+      "trace": "f152393d696d47cdb8b749cb877efc05",
+      "transaction": "POST /orders",
+      "transaction.span_id": "bacb9acdf1de1713",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bacb9acdf1de1713",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "POST /orders",
+      "span.duration": "368.375063",
+      "timestamp": "2026-05-18T18:26:34Z",
+      "trace": "f152393d696d47cdb8b749cb877efc05",
+      "transaction": "POST /orders",
+      "transaction.span_id": "bacb9acdf1de1713",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "bef8e75bc240c481",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cache.get call #4958",
+      "span.duration": "71.892977",
+      "timestamp": "2026-05-18T18:26:34Z",
+      "trace": "f152393d696d47cdb8b749cb877efc05",
+      "transaction": "POST /orders",
+      "transaction.span_id": "bacb9acdf1de1713",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "86f2b4d3af330891",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #5150",
+      "span.duration": "21.929026",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "f5bb7b47347e4f01a9ab06de98518d80",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b77c4f72fe28363a",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "8cb5c61ccf30b4db",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #2460",
+      "span.duration": "71.191072",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "f5bb7b47347e4f01a9ab06de98518d80",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b77c4f72fe28363a",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "ae509261e1028640",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "db.query call #5621",
+      "span.duration": "44.540167",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "f5bb7b47347e4f01a9ab06de98518d80",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b77c4f72fe28363a",
+      "stats": "redacted-object"
+    }
+  ],
+  [
+    "acmeCo/custom_explore_my_spans",
+    {
+      "_meta": {
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "id": "b77c4f72fe28363a",
+      "project": "test-project",
+      "project.name": "test-project",
+      "span.description": "cron.daily",
+      "span.duration": "140.676022",
+      "timestamp": "2026-05-18T18:26:36Z",
+      "trace": "f5bb7b47347e4f01a9ab06de98518d80",
+      "transaction": "cron.daily",
+      "transaction.span_id": "b77c4f72fe28363a",
       "stats": "redacted-object"
     }
   ]
