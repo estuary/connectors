@@ -195,6 +195,14 @@ func (t *Transcoder) transcodeBatch(count int, writeAll func() error) ([]*Transc
 	for i := 0; i < count; i++ {
 		resp, err := t.readResponse()
 		if err != nil {
+			// Pipe reads aren't context-aware, so an EOF here is ambiguous. It's
+			// either a real transcoder failure, or during shutdown the result
+			// of CommandContext killing the subprocess because t.ctx was cancelled.
+			// Propagate the context error in the latter case so a cancellation is
+			// reported as such.
+			if ctxErr := t.ctx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
 			// Check if write failed first - it may explain the read error
 			select {
 			case werr := <-writeErr:
@@ -209,6 +217,11 @@ func (t *Transcoder) transcodeBatch(count int, writeAll func() error) ([]*Transc
 	}
 
 	if err := <-writeErr; err != nil {
+		// As with the read path propagate the context error so a cancellation
+		// that interrupted the write is reported as such.
+		if ctxErr := t.ctx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
 		return nil, err
 	}
 	return responses, nil
