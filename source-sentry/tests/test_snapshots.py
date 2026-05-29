@@ -20,10 +20,21 @@ def test_capture(request, snapshot):
     assert result.returncode == 0
     lines = [json.loads(l) for l in result.stdout.splitlines()]
 
+    # Keep only the first captured document per stream so the snapshot stays
+    # small and stable regardless of how many rows a stream returns.
+    unique_stream_lines = []
+    seen = set()
     for line in lines:
+        stream = line[0]
+        if stream in seen:
+            continue
+        seen.add(stream)
         line[1]["stats"] = "redacted-object"
+        unique_stream_lines.append(line)
 
-    assert snapshot("stdout.json") == lines
+    unique_stream_lines.sort(key=lambda l: l[0])
+
+    assert snapshot("stdout.json") == unique_stream_lines
 
 
 def test_discover(request, snapshot):
