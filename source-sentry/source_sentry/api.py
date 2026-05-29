@@ -6,7 +6,7 @@ from logging import Logger
 from typing import Any, AsyncGenerator, Callable, Type, TypeVar
 
 from estuary_cdk.capture.common import LogCursor, PageCursor
-from estuary_cdk.http import HTTPSession
+from estuary_cdk.http import Headers, HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import BaseModel
 from requests.utils import parse_header_links
@@ -27,7 +27,7 @@ class HeaderLink(BaseModel):
     next_url: str
 
     @classmethod
-    def from_headers(cls, raw_headers: dict[str, Any]) -> HeaderLink:
+    def from_headers(cls, raw_headers: Headers) -> HeaderLink:
         next_header_link = next(
             (
                 link
