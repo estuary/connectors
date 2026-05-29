@@ -1,12 +1,11 @@
 from collections.abc import AsyncGenerator
 from logging import Logger
 
-from estuary_cdk.capture.common import BaseDocument
 from estuary_cdk.http import HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import BaseModel, JsonValue
 
-from ..models import PageResult
+from ..models import MarketingEvent, PageResult
 from .shared import (
     HUB,
 )
@@ -21,7 +20,7 @@ class _ResponseRemainder(BaseModel, extra="allow"):
 async def fetch_marketing_events(
     http: HTTPSession,
     log: Logger,
-) -> AsyncGenerator[BaseDocument, None]:
+) -> AsyncGenerator[MarketingEvent, None]:
     url = f"{HUB}/marketing/v3/marketing-events"
     after: str | None = None
 
@@ -37,7 +36,7 @@ async def fetch_marketing_events(
         processor = IncrementalJsonProcessor(
             body(),
             "results.item",
-            BaseDocument,
+            MarketingEvent,
             remainder_cls=_ResponseRemainder,
         )
 

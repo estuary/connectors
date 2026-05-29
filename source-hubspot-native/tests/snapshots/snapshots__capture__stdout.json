@@ -3206,6 +3206,37 @@
     }
   ],
   [
+    "acmeCo/marketing_events",
+    {
+      "_meta": {
+        "op": "c",
+        "row_id": 0,
+        "uuid": "DocUUIDPlaceholder-329Bb50aa48EAa9ef"
+      },
+      "appInfo": null,
+      "attendees": null,
+      "cancellations": null,
+      "createdAt": "2026-05-29T14:27:36.562Z",
+      "customProperties": [],
+      "endDateTime": "2026-05-29T04:00:00Z",
+      "eventCancelled": false,
+      "eventCompleted": false,
+      "eventDescription": "My description",
+      "eventName": "Test Marketing Event",
+      "eventOrganizer": "Nicolas Lazo",
+      "eventStatus": "PAST",
+      "eventStatusV2": "completed",
+      "eventType": "Test Event",
+      "eventUrl": null,
+      "externalEventId": null,
+      "noShows": 0,
+      "objectId": "559722810694",
+      "registrants": null,
+      "startDateTime": "2026-05-29T14:27:26.867Z",
+      "updatedAt": "redacted"
+    }
+  ],
+  [
     "acmeCo/orders",
     {
       "_meta": {
