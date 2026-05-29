@@ -19,6 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 const (
@@ -471,17 +472,25 @@ func getServerInfo(ctx context.Context, cfg config, client *mongo.Client, databa
 	}
 
 	var preImages bool
-	if changeStreams {
-		if preImages, err = supportsPreImages(ctx, client, database, buildInfo); err != nil {
-			return nil, fmt.Errorf("checking change stream pre-image support: %w", err)
-		}
-	}
-
 	var startAfter bool
-	if len(buildInfo.VersionArray) >= 3 && (buildInfo.VersionArray[0] > 4 || buildInfo.VersionArray[0] == 4 && buildInfo.VersionArray[1] >= 2) {
-		// The startAfter parameter is supported by MongoDB versions 4.2 and
-		// later.
-		startAfter = true
+	if changeStreams {
+		support, err := probeChangeStreamSupport(ctx, client, database)
+		if err != nil {
+			return nil, fmt.Errorf("probing change stream support: %w", err)
+		}
+
+		if !support.producesResumeToken {
+			// Without a post-batch resume token the connector cannot advance its
+			// resume token while idle, so it can't checkpoint reliably.
+			// Capture in batch mode instead.
+			log.Info("server supports opening change streams but does not produce resume tokens; collections will be captured in batch mode")
+			changeStreams = false
+		} else {
+			startAfter = support.supportsStartAfter
+			if preImages, err = supportsPreImages(ctx, client, database, buildInfo); err != nil {
+				return nil, fmt.Errorf("checking change stream pre-image support: %w", err)
+			}
+		}
 	}
 
 	return &serverInfo{
@@ -501,6 +510,65 @@ func supportsChangeStreams(ctx context.Context, client *mongo.Client, database s
 	}
 
 	return true, nil
+}
+
+// changeStreamSupport describes change-stream capabilities that can't be
+// reliably inferred from the reported server version and so must be probed
+// directly.
+type changeStreamSupport struct {
+	// producesResumeToken indicates the server emits a post-batch resume token.
+	// The connector relies on PBRTs to advance its resume token even when
+	// no events are arriving, so a server that never produces one cannot be
+	// captured via change streams and must use batch mode instead.
+	producesResumeToken bool
+	// supportsStartAfter indicates the server accepts the change stream
+	// `startAfter` resume option, which is preferred over `resumeAfter`. Some
+	// MongoDB-compatible servers - notably Amazon DocumentDB, which reports a
+	// version (e.g. 5.0.0) that would otherwise imply support - handle change
+	// streams and `resumeAfter` but reject `startAfter` as an unknown field.
+	supportsStartAfter bool
+}
+
+// probeChangeStreamSupport determines change-stream capabilities by attempting
+// them rather than trusting the reported server version. It must only be called
+// once the server is known to support opening change streams.
+func probeChangeStreamSupport(ctx context.Context, client *mongo.Client, database string) (changeStreamSupport, error) {
+	var out changeStreamSupport
+
+	// Open a change stream to obtain a post-batch resume token. MongoDB returns
+	// one in the initial aggregate response, so it is available without
+	// iterating.
+	probe, err := client.Database(database).Watch(ctx, mongo.Pipeline{})
+	if err != nil {
+		return out, fmt.Errorf("opening change stream: %w", err)
+	}
+	token := probe.ResumeToken()
+	if err := probe.Close(ctx); err != nil {
+		return out, fmt.Errorf("closing change stream: %w", err)
+	}
+	if token == nil {
+		// No PBRT. Change streams are unusable for consistent capture, and there
+		// is no token with which to test startAfter.
+		return out, nil
+	}
+	out.producesResumeToken = true
+
+	// startAfter requires a resume token, so test it with the one just obtained.
+	cs, err := client.Database(database).Watch(ctx, mongo.Pipeline{}, options.ChangeStream().SetStartAfter(token))
+	if err != nil {
+		var cmdErr mongo.CommandError
+		if errors.As(err, &cmdErr) && strings.Contains(cmdErr.Message, "startAfter") {
+			log.WithField("error", err).Debug("server does not support the change stream 'startAfter' option. 'resumeAfter' will be used instead")
+			return out, nil
+		}
+		return out, fmt.Errorf("opening change stream with startAfter: %w", err)
+	}
+	if err := cs.Close(ctx); err != nil {
+		return out, fmt.Errorf("closing change stream: %w", err)
+	}
+	out.supportsStartAfter = true
+
+	return out, nil
 }
 
 // supportsPreImages returns true if the server supports pre-images. To support
