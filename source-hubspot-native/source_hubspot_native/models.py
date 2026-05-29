@@ -875,3 +875,7 @@ class Order(BaseCRMObject):
 class Campaign(BaseDocument, extra="allow"):
     id: str
     updatedAt: AwareDatetime
+
+
+class MarketingEvent(BaseDocument, extra="allow"):
+    pass

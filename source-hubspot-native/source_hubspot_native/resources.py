@@ -92,6 +92,7 @@ from .models import (
     Goals,
     LineItem,
     MarketingEmail,
+    MarketingEvent,
     Names,
     Order,
     Owner,
@@ -652,7 +653,7 @@ def forms(http: HTTPSession) -> Resource:
 
 def marketing_events(
     http: HTTPSession,
-) -> SnapshotResource[BaseDocument, ResourceConfig]:
+) -> SnapshotResource[MarketingEvent, ResourceConfig]:
     def open(
         binding: CaptureBinding[ResourceConfig],
         binding_index: int,
