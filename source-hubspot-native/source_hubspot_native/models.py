@@ -688,6 +688,12 @@ class OldRecentEngagements(BaseModel):
     total: int
 
 
+class EngagementsModifiedAfter(BaseModel):
+    results: list[OldRecentEngagements.Item]
+    hasMore: bool
+    after: str | None = None
+
+
 class OldRecentTicket(BaseModel):
     timestamp: int
     objectId: int
