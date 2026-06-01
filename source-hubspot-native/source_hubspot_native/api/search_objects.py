@@ -26,6 +26,7 @@ async def fetch_search_objects(
     until: datetime | None,
     _: PageCursor,
     last_modified_property_name: str = "hs_lastmodifieddate",
+    should_crash_on_unordered_results: bool = True,
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
     """
     Retrieve all records between 'since' and 'until' (or the present time).
@@ -110,10 +111,16 @@ async def fetch_search_objects(
                 continue
 
             if this_mod_time < max_updated:
-                log.error("search query input", input)
-                raise Exception(
-                    f"search query returned records out of order for {r.id} with {this_mod_time} < {max_updated}"
-                )
+                if should_crash_on_unordered_results:
+                    log.error("search query input", input)
+                    raise Exception(
+                        f"search query returned records out of order for {r.id} with {this_mod_time} < {max_updated}"
+                    )
+                # The realtime stream is best-effort and allowed to be
+                # incomplete, so an out-of-order result is skipped rather
+                # than treated as fatal. The delayed stream will capture
+                # any records the realtime stream skips.
+                continue
 
             max_updated = this_mod_time
             output_items.add((this_mod_time, str(r.id)))
