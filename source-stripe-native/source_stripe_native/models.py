@@ -533,6 +533,21 @@ class Payouts(BaseStripeObjectWithEvents):
     }
 
 
+# Stripe's docs for GET /v1/prices claim it "returns a list of your active
+# prices," but the bare list endpoint actually returns both active and
+# inactive prices. The `active` query param only filters when explicitly set;
+# omitting it captures everything — verified empirically on 2026-06-01 against
+# an account with an archived price.
+class Prices(BaseStripeObjectWithEvents):
+    NAME: ClassVar[str] = "Prices"
+    SEARCH_NAME: ClassVar[str] = "prices"
+    EVENT_TYPES: ClassVar[dict[str, Literal["c", "u", "d"]]] = {
+        "price.created": "c",
+        "price.updated": "u",
+        "price.deleted": "d",
+    }
+
+
 class Plans(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "Plans"
     SEARCH_NAME: ClassVar[str] = "plans"
@@ -780,6 +795,7 @@ STREAMS = [
     },
     {"stream": PaymentIntent},
     {"stream": Payouts},
+    {"stream": Prices},
     {"stream": Plans},
     {"stream": Products},
     {"stream": PromotionCode},

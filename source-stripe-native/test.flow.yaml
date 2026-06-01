@@ -136,6 +136,11 @@ captures:
         schedule: ''
       target: acmeCo/Payouts
     - resource:
+        name: Prices
+        interval: PT5M
+        schedule: ''
+      target: acmeCo/Prices
+    - resource:
         name: Plans
         interval: PT5M
         schedule: ''
