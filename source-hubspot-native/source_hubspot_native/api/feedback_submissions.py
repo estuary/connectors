@@ -16,19 +16,21 @@ from .object_with_associations import fetch_changes_with_associations
 from .search_objects import fetch_search_objects
 
 
-def fetch_recent_feedback_submissions(
+def _fetch_feedback_submissions(
     log: Logger,
     http: HTTPSession,
     with_history: bool,
     since: datetime,
     until: datetime | None,
+    should_crash_on_unordered_results: bool,
 ) -> AsyncGenerator[tuple[datetime, str, FeedbackSubmission], None]:
 
     async def do_fetch(
         page: PageCursor, count: int
     ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         return await fetch_search_objects(
-            Names.feedback_submissions, log, http, since, until, page
+            Names.feedback_submissions, log, http, since, until, page,
+            should_crash_on_unordered_results=should_crash_on_unordered_results,
         )
 
     return fetch_changes_with_associations(
@@ -43,7 +45,23 @@ def fetch_recent_feedback_submissions(
     )
 
 
+def fetch_recent_feedback_submissions(
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
+) -> AsyncGenerator[tuple[datetime, str, FeedbackSubmission], None]:
+    return _fetch_feedback_submissions(
+        log, http, with_history, since, until,
+        should_crash_on_unordered_results=False,
+    )
+
+
 def fetch_delayed_feedback_submissions(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
 ) -> AsyncGenerator[tuple[datetime, str, FeedbackSubmission], None]:
-    return fetch_recent_feedback_submissions(log, http, with_history, since, until)
+    return _fetch_feedback_submissions(
+        log, http, with_history, since, until,
+        should_crash_on_unordered_results=True,
+    )

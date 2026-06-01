@@ -28,7 +28,8 @@ def fetch_recent_line_items(
         page: PageCursor, count: int
     ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         return await fetch_search_objects(
-            Names.line_items, log, http, since, until, page
+            Names.line_items, log, http, since, until, page,
+            should_crash_on_unordered_results=False,
         )
 
     return fetch_changes_with_associations(
