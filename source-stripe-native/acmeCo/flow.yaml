@@ -115,6 +115,10 @@ collections:
     schema: Plans.schema.yaml
     key:
     - /id
+  acmeCo/Prices:
+    schema: Prices.schema.yaml
+    key:
+    - /id
   acmeCo/Products:
     schema: Products.schema.yaml
     key:
