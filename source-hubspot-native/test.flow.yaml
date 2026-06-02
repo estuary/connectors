@@ -70,6 +70,10 @@ captures:
         interval: PT5M
       target: acmeCo/marketing_events
     - resource:
+        name: marketing_event_participants
+        interval: PT5M
+      target: acmeCo/marketing_event_participants
+    - resource:
         name: contact_lists
         interval: PT3H
       target: acmeCo/contact_lists
