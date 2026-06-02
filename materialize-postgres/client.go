@@ -290,20 +290,11 @@ func (c *client) AlterTable(ctx context.Context, ta sql.TableAlter) (string, boi
 			}
 		}
 
-		var renameMigrations []sql.ColumnTypeMigration
-		for _, change := range otherChanges {
-			if change.DirectCast && !change.ProgressColumnExists {
-				// Single ALTER TABLE ... ALTER COLUMN ... TYPE ... USING — no temp column needed.
-				stmts = append(stmts, fmt.Sprintf(
-					"ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s",
-					ta.Identifier, change.Identifier, change.BareDDL, change.CastSQL(change),
-				))
-			} else {
-				renameMigrations = append(renameMigrations, change)
-			}
-		}
-		if len(renameMigrations) > 0 {
-			if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, renameMigrations); err != nil {
+		// Non-enum changes are handled by the shared migration logic, which emits a
+		// direct ALTER ... TYPE ... USING for DirectCast specs (see Dialect.DirectCastSQL)
+		// and falls back to the rename approach otherwise.
+		if len(otherChanges) > 0 {
+			if steps, err := sql.StdColumnTypeMigrations(ctx, c.ep.Dialect, ta.Table, otherChanges); err != nil {
 				return "", nil, fmt.Errorf("rendering column migration steps: %w", err)
 			} else {
 				stmts = append(stmts, steps...)

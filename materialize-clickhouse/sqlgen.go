@@ -261,14 +261,26 @@ var clickHouseDialect = func(database string) sql.Dialect {
 		TypeMapper:          mapper,
 		MaxColumnCharLength: 256,
 		MigratableTypes: sql.MigrationSpecs{
-			"int64":                {sql.NewMigrationSpec([]string{"float64", "int128", "int256", "string"})},
-			"int128":               {sql.NewMigrationSpec([]string{"float64", "int256", "string"})},
-			"int256":               {sql.NewMigrationSpec([]string{"float64", "string"})},
+			"int64": {
+				sql.NewMigrationSpec([]string{"float64", "int128", "int256"}, sql.WithDirectCast()),
+				sql.NewMigrationSpec([]string{"string"}),
+			},
+			"int128": {
+				sql.NewMigrationSpec([]string{"float64", "int256"}, sql.WithDirectCast()),
+				sql.NewMigrationSpec([]string{"string"}),
+			},
+			"int256": {
+				sql.NewMigrationSpec([]string{"float64"}, sql.WithDirectCast()),
+				sql.NewMigrationSpec([]string{"string"}),
+			},
 			"float64":              {sql.NewMigrationSpec([]string{"string"})},
 			"bool":                 {sql.NewMigrationSpec([]string{"string"})},
 			"date32":               {sql.NewMigrationSpec([]string{"string"})},
 			"datetime64(6, 'utc')": {sql.NewMigrationSpec([]string{"string"}, sql.WithCastSQL(datetimeToStringCast))},
 			"*":                    {sql.NewMigrationSpec([]string{"string"})},
+		},
+		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
+			return fmt.Sprintf("ALTER TABLE %s MODIFY COLUMN %s %s SETTINGS mutations_sync = 1", table.Identifier, m.Identifier, m.NullableDDL)
 		},
 	}
 }

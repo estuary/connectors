@@ -559,9 +559,31 @@ func StdColumnTypeMigrations(ctx context.Context, dialect Dialect, table Table, 
 		return nil, fmt.Errorf("must have at least %d steps", len(StdMigrationSteps))
 	}
 
+	// Migrations whose spec is marked DirectCast are emitted as a single in-place
+	// ALTER ... TYPE statement instead of the multi-step rename. An interrupted
+	// rename (the temporary column already exists) must still finish via the rename
+	// path, otherwise the existing temporary column would be orphaned.
+	var directStmts []string
+	var renameMigrations []ColumnTypeMigration
+	for _, migration := range migrations {
+		if migration.DirectCast && !migration.ProgressColumnExists {
+			if dialect.DirectCastSQL == nil {
+				return nil, fmt.Errorf("migration spec for %q is marked DirectCast but dialect has no DirectCastSQL", migration.Field)
+			}
+			log.WithFields(log.Fields{
+				"table": table.Identifier,
+				"ddl":   migration.DDL,
+				"field": migration.Field,
+			}).Info("rendering query for column migration using direct cast")
+			directStmts = append(directStmts, dialect.DirectCastSQL(table, migration))
+		} else {
+			renameMigrations = append(renameMigrations, migration)
+		}
+	}
+
 	var stepInstructions = make(map[int][]MigrationInstruction)
 
-	for _, migration := range migrations {
+	for _, migration := range renameMigrations {
 		var step = 0
 		if migration.ProgressColumnExists && migration.OriginalColumnExists {
 			step = 1
@@ -600,7 +622,7 @@ func StdColumnTypeMigrations(ctx context.Context, dialect Dialect, table Table, 
 		}
 	}
 
-	return renderedSteps, nil
+	return append(directStmts, renderedSteps...), nil
 }
 
 func ToLocatePathFn(fn TableLocatorFn) boilerplate.LocatePathFn {

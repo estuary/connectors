@@ -76,19 +76,19 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"numeric":                  {sql.NewMigrationSpec([]string{"double precision", "text"})},
-			"bigint":                   {sql.NewMigrationSpec([]string{"double precision", "numeric", "text"})},
-			"double precision":         {sql.NewMigrationSpec([]string{"text"})},
-			"date":                     {sql.NewMigrationSpec([]string{"text"})},
-			"time without time zone":   {sql.NewMigrationSpec([]string{"text"})},
-			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(datetimeToStringCast))},
+			"numeric":                  {sql.NewMigrationSpec([]string{"double precision", "text"}, sql.WithDirectCast())},
+			"bigint":                   {sql.NewMigrationSpec([]string{"double precision", "numeric", "text"}, sql.WithDirectCast())},
+			"double precision":         {sql.NewMigrationSpec([]string{"text"}, sql.WithDirectCast())},
+			"date":                     {sql.NewMigrationSpec([]string{"text"}, sql.WithDirectCast())},
+			"time without time zone":   {sql.NewMigrationSpec([]string{"text"}, sql.WithDirectCast())},
+			"timestamp with time zone": {sql.NewMigrationSpec([]string{"text"}, sql.WithDirectCast(), sql.WithCastSQL(datetimeToStringCast))},
 			// text/character varying → enum: create type + direct ALTER COLUMN TYPE ... USING col::enum_type.
 			"text": {
-				sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast)),
+				sql.NewMigrationSpec([]string{"bytea"}, sql.WithDirectCast(), sql.WithCastSQL(stringToByteaCast)),
 				sql.NewMigrationSpecTarget(EnumMigrationTarget{}),
 			},
 			"character varying": {
-				sql.NewMigrationSpec([]string{"bytea"}, sql.WithCastSQL(stringToByteaCast)),
+				sql.NewMigrationSpec([]string{"bytea"}, sql.WithDirectCast(), sql.WithCastSQL(stringToByteaCast)),
 				sql.NewMigrationSpecTarget(EnumMigrationTarget{}),
 			},
 			// user-defined (PG ENUM) → text: migrate incompatible USER-DEFINED columns via a
@@ -101,8 +101,12 @@ func createPgDialect(featureFlags map[string]bool) sql.Dialect {
 					return fmt.Sprintf("%s::text", m.Identifier)
 				}),
 			)},
-			"bytea":  {sql.NewMigrationSpec([]string{"text"}, sql.WithCastSQL(byteaToStringCast))},
-			"*":      {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			"bytea": {sql.NewMigrationSpec([]string{"text"}, sql.WithDirectCast(), sql.WithCastSQL(byteaToStringCast))},
+			"*":     {sql.NewMigrationSpec([]string{"json"}, sql.WithDirectCast(), sql.WithCastSQL(toJsonCast))},
+		},
+		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
+			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s",
+				table.Identifier, m.Identifier, m.BareDDL, m.CastSQL(m))
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {
