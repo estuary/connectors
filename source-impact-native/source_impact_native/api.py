@@ -281,7 +281,7 @@ async def fetch_incremental_child(
     async for campaign in campaigns:
         campaign_list.add(campaign.Id)
 
-    
+    max_ts = log_cursor
 
     for campaign in campaign_list:
         iterating = True
@@ -293,7 +293,6 @@ async def fetch_incremental_child(
         headers = {'Accept': 'application/json'}
         if _cls.START_DATE_INCREMENTAL:
             parameters = {f"{_cls.START_DATE_INCREMENTAL}": _cursor_dt(cls.NAME, log_cursor)}
-        max_ts = log_cursor
 
         while iterating:
             result = json.loads(await http.request(log, url, method="GET", params=parameters, headers=headers))
