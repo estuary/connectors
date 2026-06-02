@@ -456,6 +456,17 @@ class EarlyFraudWarning(BaseStripeObjectWithEvents):
     }
 
 
+# Stripe documents no value_list* event types and no `updated` field
+# on the resource (verified 2026-06-01).
+# Value lists are mutable (rename, item add/remove, delete), so the
+# scheduled backfill in SCHEDULED_BACKFILL_STREAMS is required to
+# eventually observe updates and deletes — incremental on `created`
+# alone only catches new lists.
+class ValueLists(BaseStripeObjectNoEvents):
+    NAME: ClassVar[str] = "ValueLists"
+    SEARCH_NAME: ClassVar[str] = "radar/value_lists"
+
+
 class InvoiceItems(BaseStripeObjectWithEvents):
     NAME: ClassVar[str] = "InvoiceItems"
     SEARCH_NAME: ClassVar[str] = "invoiceitems"
@@ -828,6 +839,7 @@ STREAMS = [
     {"stream": Files},
     {"stream": FilesLink},
     {"stream": BalanceTransactions},
+    {"stream": ValueLists},
 ]
 
 # Regional streams are streams that don't have any children and are only accessible in certain regions.
@@ -867,4 +879,12 @@ SCHEDULED_BACKFILL_STREAMS = [
     "ExternalAccountCards",
     "ExternalBankAccount",
     "Persons",
+    "ValueLists",
+]
+
+# Streams whose discovered binding is recommended disabled, so a capture only
+# replicates them if the user explicitly enables the binding. Existing captures
+# that already enabled the binding are unaffected.
+DISABLED_BY_DEFAULT_STREAMS = [
+    "ValueLists",
 ]

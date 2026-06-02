@@ -32,6 +32,7 @@ from .api import (
 )
 from .models import (
     CONNECTED_ACCOUNT_EXEMPT_STREAMS,
+    DISABLED_BY_DEFAULT_STREAMS,
     REGIONAL_STREAMS,
     SCHEDULED_BACKFILL_STREAMS,
     SPLIT_CHILD_STREAM_NAMES,
@@ -481,6 +482,7 @@ def _build_resource(
             schedule=DEFAULT_SCHEDULE if needs_schedule else "",
         ),
         schema_inference=True,
+        disable=name in DISABLED_BY_DEFAULT_STREAMS,
     )
 
 
