@@ -234,7 +234,7 @@ class Contracts(BaseDocument, extra="allow"):
     START_DATE_INCREMENTAL: ClassVar[str] = "DateLastUpdatedAfter"
     START_DATE: ClassVar[str] = "StartDateAfter"
     END_DATE: ClassVar[str] = "EndDateBefore"
-    REP_KEY: ClassVar[str] = "DateCreated"
+    REP_KEY: ClassVar[str] = "DateLastUpdated"
     PRIMARY_KEY: ClassVar[str] = "/Id"
 
     Id: str
