@@ -115,13 +115,13 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"float":     {sql.NewMigrationSpec([]string{textType}, nocast)},
-			"bigint":    {sql.NewMigrationSpec([]string{textType}, nocast), sql.NewMigrationSpec([]string{"double precision"})},
-			"date":      {sql.NewMigrationSpec([]string{textType}, nocast)},
-			"time":      {sql.NewMigrationSpec([]string{textType}, nocast)},
+			"float":     {sql.NewMigrationSpec([]string{textType}, nocast, sql.WithDirectCast())},
+			"bigint":    {sql.NewMigrationSpec([]string{textType}, nocast, sql.WithDirectCast()), sql.NewMigrationSpec([]string{"double precision"}, sql.WithDirectCast())},
+			"date":      {sql.NewMigrationSpec([]string{textType}, nocast, sql.WithDirectCast())},
+			"time":      {sql.NewMigrationSpec([]string{textType}, nocast, sql.WithDirectCast())},
 			"datetime2": {sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(datetimeToStringCast))},
 			"varchar": {
-				sql.NewMigrationSpecTarget(&StringSizeMigrationTarget{}, nocast),
+				sql.NewMigrationSpecTarget(&StringSizeMigrationTarget{}, nocast, sql.WithDirectCast()),
 				sql.NewMigrationSpec([]string{"varbinary(900)", "varbinary(max)"}, sql.WithCastSQL(stringToVarbinaryCast)),
 			},
 			"nvarchar": {
@@ -130,7 +130,10 @@ func createSqlServerDialect(collation string, defaultSchema string, featureFlags
 			"varbinary": {
 				sql.NewMigrationSpec([]string{textType}, sql.WithCastSQL(varbinaryToStringCast)),
 			},
-			"*": {sql.NewMigrationSpec([]string{textType}, nocast)},
+			"*": {sql.NewMigrationSpec([]string{textType}, nocast, sql.WithDirectCast())},
+		},
+		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
+			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s %s", table.Identifier, m.Identifier, m.BareDDL)
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			if len(path) == 1 {

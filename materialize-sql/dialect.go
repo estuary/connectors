@@ -29,6 +29,14 @@ type Dialect struct {
 	// which the key type can be migrated to.
 	// For example, "decimal": {"string"} means decimal columns can be migrated to string type
 	MigratableTypes MigrationSpecs
+
+	// DirectCastSQL renders a single-statement, in-place column type change for a
+	// migration whose spec is marked DirectCast (see WithDirectCast). It is required
+	// for any dialect that enables a DirectCast spec — there is no implicit default,
+	// and StdColumnTypeMigrations errors if it encounters a DirectCast migration while
+	// this is nil. The Postgres/DuckDB form is
+	// "ALTER TABLE t ALTER COLUMN c TYPE t USING <expr>"; BigQuery uses "SET DATA TYPE".
+	DirectCastSQL func(table Table, migration ColumnTypeMigration) string
 }
 
 // TableLocatorer produces an InfoTableLocation for a given path.

@@ -75,16 +75,20 @@ func createDuckDialect(featureFlags map[string]bool) sql.Dialect {
 
 	return sql.Dialect{
 		MigratableTypes: sql.MigrationSpecs{
-			"double":                   {sql.NewMigrationSpec([]string{"varchar"})},
-			"bigint":                   {sql.NewMigrationSpec([]string{"double", "hugeint", "varchar"})},
-			"hugeint":                  {sql.NewMigrationSpec([]string{"double", "varchar"})},
-			"date":                     {sql.NewMigrationSpec([]string{"varchar"})},
-			"timestamp with time zone": {sql.NewMigrationSpec([]string{"varchar"}, sql.WithCastSQL(datetimeToStringCast))},
-			"time":                     {sql.NewMigrationSpec([]string{"varchar"})},
-			"uuid":                     {sql.NewMigrationSpec([]string{"varchar"})},
-			"varchar":                  {sql.NewMigrationSpec([]string{"blob"}, sql.WithCastSQL(stringToBlobCast))},
-			"blob":                     {sql.NewMigrationSpec([]string{"varchar"}, sql.WithCastSQL(blobToStringCast))},
-			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithCastSQL(toJsonCast))},
+			"double":                   {sql.NewMigrationSpec([]string{"varchar"}, sql.WithDirectCast())},
+			"bigint":                   {sql.NewMigrationSpec([]string{"double", "hugeint", "varchar"}, sql.WithDirectCast())},
+			"hugeint":                  {sql.NewMigrationSpec([]string{"double", "varchar"}, sql.WithDirectCast())},
+			"date":                     {sql.NewMigrationSpec([]string{"varchar"}, sql.WithDirectCast())},
+			"timestamp with time zone": {sql.NewMigrationSpec([]string{"varchar"}, sql.WithDirectCast(), sql.WithCastSQL(datetimeToStringCast))},
+			"time":                     {sql.NewMigrationSpec([]string{"varchar"}, sql.WithDirectCast())},
+			"uuid":                     {sql.NewMigrationSpec([]string{"varchar"}, sql.WithDirectCast())},
+			"varchar":                  {sql.NewMigrationSpec([]string{"blob"}, sql.WithDirectCast(), sql.WithCastSQL(stringToBlobCast))},
+			"blob":                     {sql.NewMigrationSpec([]string{"varchar"}, sql.WithDirectCast(), sql.WithCastSQL(blobToStringCast))},
+			"*":                        {sql.NewMigrationSpec([]string{"json"}, sql.WithDirectCast(), sql.WithCastSQL(toJsonCast))},
+		},
+		DirectCastSQL: func(table sql.Table, m sql.ColumnTypeMigration) string {
+			return fmt.Sprintf("ALTER TABLE %s ALTER COLUMN %s TYPE %s USING %s",
+				table.Identifier, m.Identifier, m.BareDDL, m.CastSQL(m))
 		},
 		TableLocatorer: sql.TableLocatorFn(func(path []string) sql.InfoTableLocation {
 			return sql.InfoTableLocation{TableSchema: path[1], TableName: path[2]}
