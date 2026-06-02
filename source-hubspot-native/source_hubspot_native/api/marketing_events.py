@@ -5,12 +5,10 @@ from estuary_cdk.http import HTTPSession
 from estuary_cdk.incremental_json_processor import IncrementalJsonProcessor
 from pydantic import BaseModel, JsonValue
 
-from ..models import MarketingEvent, PageResult
-from .shared import (
-    HUB,
-)
+from ..models import MarketingEvent, MarketingEventParticipant, PageResult
+from .shared import HUB
 
-MARKETING_EVENTS_PAGE_SIZE = 100
+PAGE_SIZE = 100
 
 
 class _ResponseRemainder(BaseModel, extra="allow"):
@@ -24,9 +22,7 @@ async def fetch_marketing_events(
     url = f"{HUB}/marketing/v3/marketing-events"
     after: str | None = None
 
-    input: dict[str, JsonValue] = {
-        "limit": MARKETING_EVENTS_PAGE_SIZE,
-    }
+    input: dict[str, JsonValue] = {"limit": PAGE_SIZE}
 
     while True:
         if after:
@@ -48,3 +44,39 @@ async def fetch_marketing_events(
             return
 
         after = paging.next.after
+
+
+async def fetch_marketing_event_participants(
+    http: HTTPSession,
+    log: Logger,
+) -> AsyncGenerator[MarketingEventParticipant, None]:
+    event_ids = [event.objectId async for event in fetch_marketing_events(http, log)]
+
+    for event_id in event_ids:
+        url = (
+            f"{HUB}/marketing/v3/marketing-events/participations/"
+            f"{event_id}/breakdown"
+        )
+        after: str | None = None
+        input: dict[str, JsonValue] = {"limit": PAGE_SIZE}
+
+        while True:
+            if after:
+                input["after"] = after
+
+            _, body = await http.request_stream(log, url, method="GET", params=input)
+            processor = IncrementalJsonProcessor(
+                body(),
+                "results.item",
+                MarketingEventParticipant,
+                remainder_cls=_ResponseRemainder,
+            )
+
+            async for participant in processor:
+                yield participant
+
+            paging = processor.get_remainder().paging
+            if not paging:
+                break
+
+            after = paging.next.after

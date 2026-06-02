@@ -180,6 +180,7 @@ class Names(StrEnum):
     carts = auto()
     partner_clients = auto()
     marketing_events = auto()
+    marketing_event_participants = auto()
     marketing_emails = auto()
     contact_lists = auto()
     contact_list_memberships = auto()
@@ -884,4 +885,8 @@ class Campaign(BaseDocument, extra="allow"):
 
 
 class MarketingEvent(BaseDocument, extra="allow"):
+    objectId: str
+
+
+class MarketingEventParticipant(BaseDocument, extra="allow"):
     pass

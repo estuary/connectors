@@ -50,6 +50,7 @@ from .api import (
     fetch_form_submissions,
     fetch_forms,
     fetch_marketing_emails_page,
+    fetch_marketing_event_participants,
     fetch_marketing_events,
     fetch_owners,
     fetch_page_with_associations,
@@ -93,6 +94,7 @@ from .models import (
     LineItem,
     MarketingEmail,
     MarketingEvent,
+    MarketingEventParticipant,
     Names,
     Order,
     Owner,
@@ -153,6 +155,10 @@ async def _remove_permission_blocked_resources(
         ),
         (Names.forms, fetch_forms(http, log)),
         (Names.marketing_events, fetch_marketing_events(http, log)),
+        (
+            Names.marketing_event_participants,
+            fetch_marketing_event_participants(http, log),
+        ),
         (Names.form_submissions, fetch_form_submissions(http, log, 0)),
         (
             Names.feedback_submissions,
@@ -365,6 +371,7 @@ async def all_resources(
         form_submissions(http),
         marketing_emails(http),
         marketing_events(http),
+        marketing_event_participants(http),
         feedback_submissions(http, with_history),
         contact_lists(http),
         contact_list_memberships(http),
@@ -674,6 +681,33 @@ def marketing_events(
         open=open,
         initial_config=ResourceConfig(
             name=Names.marketing_events, interval=timedelta(minutes=5)
+        ),
+    )
+
+
+def marketing_event_participants(
+    http: HTTPSession,
+) -> SnapshotResource[MarketingEventParticipant, ResourceConfig]:
+    def open(
+        binding: CaptureBinding[ResourceConfig],
+        binding_index: int,
+        state: ResourceState,
+        task: Task,
+        all_bindings,
+    ):
+        open_binding(
+            binding,
+            binding_index,
+            state,
+            task,
+            fetch_snapshot=functools.partial(fetch_marketing_event_participants, http),
+        )
+
+    return SnapshotResource(
+        name=Names.marketing_event_participants,
+        open=open,
+        initial_config=ResourceConfig(
+            name=Names.marketing_event_participants, interval=timedelta(minutes=15)
         ),
     )
 

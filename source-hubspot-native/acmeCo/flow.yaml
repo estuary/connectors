@@ -49,6 +49,10 @@ collections:
     schema: marketing_emails.schema.yaml
     key:
     - /id
+  acmeCo/marketing_event_participants:
+    schema: marketing_event_participants.schema.yaml
+    key:
+    - /_meta/row_id
   acmeCo/marketing_events:
     schema: marketing_events.schema.yaml
     key:
