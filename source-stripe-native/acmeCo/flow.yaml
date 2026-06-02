@@ -171,3 +171,7 @@ collections:
     schema: UsageRecords.schema.yaml
     key:
     - /subscription_item
+  acmeCo/ValueLists:
+    schema: ValueLists.schema.yaml
+    key:
+    - /id
