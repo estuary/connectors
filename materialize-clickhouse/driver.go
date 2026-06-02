@@ -67,6 +67,7 @@ type config struct {
 	Database    string           `json:"database" jsonschema:"title=Database,description=Name of the ClickHouse database to materialize to." jsonschema_extras:"order=1"`
 	HardDelete  bool             `json:"hardDelete,omitempty" jsonschema:"title=Hard Delete,description=If this option is enabled items deleted in the source will also be deleted from the destination. By default this is disabled and _meta/op in the destination will signify whether rows have been deleted (soft-delete).,default=false" jsonschema_extras:"order=2"`
 	Credentials credentialConfig `json:"credentials" jsonschema:"title=Authentication" jsonschema_extras:"order=3"`
+	Schedule    m.ScheduleConfig `json:"syncSchedule,omitempty" jsonschema:"title=Sync Schedule,description=Configure schedule of transactions for the materialization."`
 
 	Advanced advancedConfig `json:"advanced,omitempty" jsonschema:"title=Advanced Options,description=Options for advanced users. You should not typically need to modify these." jsonschema_extras:"advanced=true"`
 }
@@ -88,6 +89,10 @@ func (c config) Validate() error {
 		}
 	}
 	if err := c.Credentials.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.Schedule.Validate(); err != nil {
 		return err
 	}
 
@@ -185,6 +190,13 @@ func newClickHouseDriver() *sql.Driver[config, tableConfig] {
 				NewTransactor:       newTransactor,
 				ConcurrentApply:     false,
 				NoFlowDocument:      cfg.Advanced.NoFlowDocument,
+				Options: m.MaterializeOptions{
+					ExtendedLogging: true,
+					AckSchedule: &m.AckScheduleOption{
+						Config: cfg.Schedule,
+						Jitter: []byte(cfg.Address + cfg.Database),
+					},
+				},
 			}, nil
 		},
 		PreReqs: preReqs,
