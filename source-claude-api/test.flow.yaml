@@ -1,0 +1,24 @@
+import:
+- acmeCo/flow.yaml
+captures:
+  acmeCo/source-claude-api:
+    endpoint:
+      local:
+        command:
+        - python
+        - -m
+        - source_claude_api
+        config: config.yaml
+    bindings:
+    - resource:
+        name: Organization
+        interval: PT1H
+      target: acmeCo/Organization
+    - resource:
+        name: Users
+        interval: PT1H
+      target: acmeCo/Users
+    - resource:
+        name: ClaudeCodeUsageReport
+        interval: PT6H
+      target: acmeCo/ClaudeCodeUsageReport
