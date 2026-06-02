@@ -67,6 +67,58 @@ we got unlucky with task restart timing. The window of concern here is minutes a
 impacts new tasks, so just try to perform the two operations close together and keep an eye
 on whether any new tasks were created during the process.
 
+## Verifying Feature Impact
+
+Before changing a default behavior or rolling out a feature, you usually need to know
+*which* production collections have the characteristic that triggers the new behavior,
+and *which* live materialization tasks read those collections. Historically this was
+done with hand-written SQL against the `live_specs` table, which is dangerously
+error-prone.
+
+The `verify-affected.sh` script minimises error and adds two
+independent reviews to every run. It connects to the control plane via the
+`DATABASE_URL` environment variable (a `postgresql://...` string), and runs a fixed,
+tested query that links collections to the materializations which *actually read them*
+via the `reads_from` dependency array. The connector's variants are resolved automatically,
+the query runs inside a read-only transaction, and the expected `live_specs` columns are verified up front so schema drift fails loudly.
+
+The only thing you supply is the predicate that selects "affected" collections, in one
+of two ways:
+
+ - `--check=<name>`: a curated, snapshot-tested check from the registry in
+   `scripts/verify-affected/checks.go` (run `--list-checks` to see them). These are the
+   trusted path — adding a new one is a PR with a snapshot test.
+ - `--check-sql="<expr>"`: an ad-hoc SQL boolean over the collection row (alias `c`),
+   for one-off investigations.
+
+Every run is gated by **two pairs of eyes**:
+
+ 1. A local **Claude Opus 4.8** review of the rendered query and its results, which
+    validates the logic (does it select the right collections, and only the tasks that
+    read them?). This is a **hard gate**: a `CONCERNS` verdict blocks the run unless you
+    pass `--override-ai-review`.
+ 2. An explicit **human sign-off** — interactive confirmation, or `--approver="<name>"`
+    for a non-interactive record.
+
+Both reviews, the rendered SQL, the resolved variants, and the full affected-task list
+are written to a markdown audit report. Typical usage, as the pre-flight step before the
+bulk-editing workflow below:
+
+```bash
+# Requires DATABASE_URL to point at the control-plane Postgres database.
+$ export DATABASE_URL='postgresql://...'
+# List the curated checks.
+$ ../scripts/verify-affected.sh --list-checks
+# Verify which materialize-postgres tasks read enum-using collections.
+$ ../scripts/verify-affected.sh --connector=materialize-postgres --check=uses-enum
+# ... or an ad-hoc predicate (also reviewed):
+$ ../scripts/verify-affected.sh --connector=materialize-postgres \
+        --check-sql="c.spec::text LIKE '%\"enum\":%'"
+```
+
+Once you have the reviewed, signed-off list of affected tasks, feed the same connector
+into the bulk-editing workflow below.
+
 ## Bulk Editing Process
 
 There are a couple of scripts I've written which make it easier to add a feature flag
