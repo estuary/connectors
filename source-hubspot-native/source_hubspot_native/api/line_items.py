@@ -12,7 +12,10 @@ from ..models import (
     LineItem,
     Names,
 )
-from .object_with_associations import fetch_changes_with_associations
+from .object_with_associations import (
+    fetch_changes_with_associations,
+    fetch_chunked_changes_with_associations,
+)
 from .search_objects import fetch_search_objects
 
 
@@ -39,7 +42,7 @@ def fetch_recent_line_items(
 
 def fetch_delayed_line_items(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
-) -> AsyncGenerator[tuple[datetime, str, LineItem], None]:
+) -> AsyncGenerator[tuple[datetime, str, LineItem] | datetime, None]:
 
     async def do_fetch(
         page: PageCursor, count: int
@@ -48,6 +51,6 @@ def fetch_delayed_line_items(
             Names.line_items, log, http, since, until, page
         )
 
-    return fetch_changes_with_associations(
+    return fetch_chunked_changes_with_associations(
         Names.line_items, LineItem, do_fetch, log, http, with_history, since, until
     )

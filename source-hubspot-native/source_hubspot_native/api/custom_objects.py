@@ -13,7 +13,10 @@ from ..models import (
     CustomObjectSchema,
     PageResult,
 )
-from .object_with_associations import fetch_changes_with_associations
+from .object_with_associations import (
+    fetch_changes_with_associations,
+    fetch_chunked_changes_with_associations,
+)
 from .search_objects import fetch_search_objects
 from .shared import HUB
 
@@ -47,14 +50,14 @@ def fetch_delayed_custom_objects(
     with_history: bool,
     since: datetime,
     until: datetime,
-) -> AsyncGenerator[tuple[datetime, str, CustomObject], None]:
+) -> AsyncGenerator[tuple[datetime, str, CustomObject] | datetime, None]:
 
     async def do_fetch(
         page: PageCursor, count: int
     ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
         return await fetch_search_objects(object_name, log, http, since, until, page)
 
-    return fetch_changes_with_associations(
+    return fetch_chunked_changes_with_associations(
         object_name, CustomObject, do_fetch, log, http, with_history, since, until
     )
 

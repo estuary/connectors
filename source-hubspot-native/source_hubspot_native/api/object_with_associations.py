@@ -47,6 +47,18 @@ fetchers do so when their window is exhausted.
 """
 
 
+# An alias of _FetchIdsFn, identical to the type checker. The distinct name and
+# docstring document the stronger contract that fetch_chunked_changes_with_associations
+# relies on. They are not enforced, so it's on each fetcher to honor it.
+_OrderedFetchIdsFn = _FetchIdsFn
+"""
+A _FetchIdsFn whose pages never leave gaps: every record at or before a page's
+newest timestamp is in that page or an earlier one, and successive pages advance
+in time. This is what lets fetch_chunked_changes_with_associations treat each
+page's newest timestamp as a safe intermediate checkpoint.
+"""
+
+
 async def fetch_page_with_associations(
     # Closed over via functools.partial:
     cls: type[CRMObject],
@@ -339,3 +351,31 @@ async def fetch_changes_with_associations(
 
     async for res in _emit_batches(log, cls, http, with_history, object_name, recent):
         yield res
+
+
+async def fetch_chunked_changes_with_associations(
+    object_name: str,
+    cls: type[CRMObject],
+    fetcher: _OrderedFetchIdsFn,
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
+) -> AsyncGenerator[tuple[datetime, str, CRMObject] | datetime, None]:
+    """
+    Like fetch_changes_with_associations, but emits each fetcher page's documents
+    as its own chunk and then yields the chunk's newest timestamp as an intermediate
+    checkpoint boundary. This lets a delayed stream checkpoint progress within a
+    large window instead of processing the whole window as one atomic, un-checkpointed unit.
+    """
+    async for chunk, has_more in _fetch_id_chunks(fetcher, since, until):
+        async for res in _emit_batches(
+            log, cls, http, with_history, object_name, chunk
+        ):
+            yield res
+
+        # Emit an intermediate checkpoint. fetch_delayed_changes handles emitting
+        # the final checkpoint once all chunks have been read.
+        if has_more and chunk:
+            yield max(ts for ts, _ in chunk)

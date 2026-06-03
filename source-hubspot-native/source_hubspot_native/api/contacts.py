@@ -13,7 +13,10 @@ from ..models import (
     Names,
     OldRecentContacts,
 )
-from .object_with_associations import fetch_changes_with_associations
+from .object_with_associations import (
+    fetch_changes_with_associations,
+    fetch_chunked_changes_with_associations,
+)
 from .search_objects import fetch_search_objects
 from .shared import (
     ms_to_dt,
@@ -67,7 +70,7 @@ def fetch_recent_contacts(
 
 def fetch_delayed_contacts(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
-) -> AsyncGenerator[tuple[datetime, str, Contact], None]:
+) -> AsyncGenerator[tuple[datetime, str, Contact] | datetime, None]:
 
     async def do_fetch(
         page: PageCursor, count: int
@@ -76,6 +79,6 @@ def fetch_delayed_contacts(
             Names.contacts, log, http, since, until, page, "lastmodifieddate"
         )
 
-    return fetch_changes_with_associations(
+    return fetch_chunked_changes_with_associations(
         Names.contacts, Contact, do_fetch, log, http, with_history, since, until
     )
