@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,6 +13,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -72,7 +74,30 @@ func TestIntegration(t *testing.T) {
 
 	d := true
 	makeResourceFn := func(table string, delta bool) resource {
-		return resource{Table: table, Delta: &d}
+		r := resource{Table: table, Delta: &d}
+		// The harness suffixes the table name with a random run identifier, so
+		// match on the configured prefix to attach partition specs.
+		switch {
+		case strings.HasPrefix(table, "dt_part_bucket"):
+			r.PartitionFields = []partitionField{
+				{Field: "id", Transform: "bucket[4]"},
+			}
+		case strings.HasPrefix(table, "dt_part_truncate"):
+			r.PartitionFields = []partitionField{
+				{Field: "stringField", Transform: "truncate[4]"},
+			}
+		case strings.HasPrefix(table, "dt_part_date"):
+			r.PartitionFields = []partitionField{
+				{Field: "stringDateField", Transform: "identity"},
+			}
+		case strings.HasPrefix(table, "dt_part_multi"):
+			r.PartitionFields = []partitionField{
+				{Field: "boolField", Transform: "identity"},
+				{Field: "stringDateTimeField", Transform: "identity"},
+				{Field: "id", Transform: "bucket[2]"},
+			}
+		}
+		return r
 	}
 
 	// Sanitize S3 file paths and table hashes that contain random UUIDs.
@@ -103,6 +128,18 @@ func TestIntegration(t *testing.T) {
 
 	t.Run("date-overflow-regression", func(t *testing.T) {
 		runDateOverflowRegression(t, cfg)
+	})
+
+	t.Run("partition-append-regression", func(t *testing.T) {
+		runPartitionAppendRegression(t, cfg)
+	})
+
+	t.Run("partition-temporal-regression", func(t *testing.T) {
+		runTemporalPartitionRegression(t, cfg)
+	})
+
+	t.Run("partition-spec-mismatch-regression", func(t *testing.T) {
+		runPartitionSpecMismatchRegression(t, cfg)
 	})
 
 	// Migration test is skipped because Iceberg does not support the type
@@ -272,6 +309,293 @@ func runDateOverflowRegression(t *testing.T, cfg config) {
 	))
 }
 
+// runPartitionAppendRegression exercises the partitioned append path end to end:
+// it creates a table with a bucket partition spec (a non-linear transform that
+// AddFiles cannot infer), appends parquet files with explicit partition values
+// via appendDataFiles, and verifies that a re-append with the same checkpoint is
+// idempotent (produces no new snapshot).
+func runPartitionAppendRegression(t *testing.T, cfg config) {
+	ctx := context.Background()
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
+
+	const (
+		namespace = "tests"
+		table     = "partition_append_regression"
+	)
+	tableIdent := icebergtable.Identifier{namespace, table}
+
+	_ = cat.cat.DropTable(ctx, tableIdent)
+	if err := cat.createNamespace(ctx, namespace); err != nil &&
+		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) {
+		t.Fatalf("create-namespace: %v", err)
+	}
+
+	pqSchema := writer.ParquetSchema{{Name: "id", DataType: writer.PrimitiveTypeInteger, Required: false}}
+	spec, cols, err := buildPartitionSpec([]string{"id"}, pqSchema, []partitionField{
+		{Field: "id", Transform: "bucket[4]"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, spec)
+
+	schema := iceberg.NewSchema(0, iceberg.NestedField{
+		ID:       1,
+		Name:     "id",
+		Type:     iceberg.PrimitiveTypes.Int64,
+		Required: false,
+	})
+	nameMappingJSON, err := json.Marshal(schema.NameMapping())
+	require.NoError(t, err)
+
+	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
+	_, err = cat.cat.CreateTable(ctx, tableIdent, schema,
+		icebergcatalog.WithLocation(tblLocation),
+		icebergcatalog.WithProperties(iceberg.Properties{
+			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
+		}),
+		icebergcatalog.WithPartitionSpec(spec),
+	)
+	require.NoError(t, err)
+
+	s3client := s3.New(s3.Options{
+		Region:       cfg.Region,
+		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
+		BaseEndpoint: aws.String(cfg.S3Endpoint),
+		UsePathStyle: true,
+	})
+
+	writeFile := func(id int64) fileEntry {
+		parquetPath := filepath.Join(t.TempDir(), fmt.Sprintf("data-%d.parquet", id))
+		f, err := os.Create(parquetPath)
+		require.NoError(t, err)
+		pqw := writer.NewParquetWriter(f, pqSchema, writer.WithParquetCompression(writer.Snappy))
+		require.NoError(t, pqw.Write([]any{id}))
+		require.NoError(t, pqw.Close())
+
+		fi, err := os.Stat(parquetPath)
+		require.NoError(t, err)
+
+		s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
+		s3Key := strings.TrimPrefix(s3Path, "s3://"+cfg.Bucket+"/")
+		up, err := os.Open(parquetPath)
+		require.NoError(t, err)
+		defer up.Close()
+		_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket: aws.String(cfg.Bucket),
+			Key:    aws.String(s3Key),
+			Body:   up,
+		})
+		require.NoError(t, err)
+
+		_, fieldData, err := partitionValues([]any{id}, cols)
+		require.NoError(t, err)
+		part := make(map[string]json.RawMessage, len(fieldData))
+		for fid, v := range fieldData {
+			raw, err := json.Marshal(v)
+			require.NoError(t, err)
+			part[strconv.Itoa(fid)] = raw
+		}
+		return fileEntry{S3Path: s3Path, RecordCount: 1, FileSize: fi.Size(), Partition: part}
+	}
+
+	files := []fileEntry{writeFile(1), writeFile(7)}
+
+	require.NoError(t, cat.appendDataFiles(ctx,
+		"acmeCo/tests/regression", tableIdent, files, cols, "", "deadbeefdeadbeef"))
+
+	tbl1, err := cat.cat.LoadTable(ctx, tableIdent)
+	require.NoError(t, err)
+	snap1 := tbl1.CurrentSnapshot()
+	require.NotNil(t, snap1)
+
+	// A re-append with the same next-checkpoint must be a no-op.
+	require.NoError(t, cat.appendDataFiles(ctx,
+		"acmeCo/tests/regression", tableIdent, files, cols, "", "deadbeefdeadbeef"))
+	tbl2, err := cat.cat.LoadTable(ctx, tableIdent)
+	require.NoError(t, err)
+	snap2 := tbl2.CurrentSnapshot()
+	require.NotNil(t, snap2)
+	require.Equal(t, snap1.SnapshotID, snap2.SnapshotID, "re-append with same checkpoint must not create a new snapshot")
+}
+
+// runTemporalPartitionRegression exercises the year/month/day/hour/void
+// transforms end to end against the real catalog: it creates a table partitioned
+// by every temporal transform (plus void), appends a parquet file with the
+// computed partition values via appendDataFiles, and verifies the commit
+// succeeds and is idempotent. This covers the int32-result transforms (which
+// carry no avro logical type) and void (which always produces a null partition).
+func runTemporalPartitionRegression(t *testing.T, cfg config) {
+	ctx := context.Background()
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
+
+	const (
+		namespace = "tests"
+		table     = "partition_temporal_regression"
+	)
+	tableIdent := icebergtable.Identifier{namespace, table}
+
+	_ = cat.cat.DropTable(ctx, tableIdent)
+	if err := cat.createNamespace(ctx, namespace); err != nil &&
+		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) {
+		t.Fatalf("create-namespace: %v", err)
+	}
+
+	pqSchema := writer.ParquetSchema{
+		{Name: "d", DataType: writer.LogicalTypeDate, Required: false},
+		{Name: "ts", DataType: writer.LogicalTypeTimestamp, Required: false},
+	}
+	allFields := []string{"d", "ts"}
+	spec, cols, err := buildPartitionSpec(allFields, pqSchema, []partitionField{
+		{Field: "d", Transform: "year"},
+		{Field: "d", Transform: "month"},
+		{Field: "d", Transform: "day"},
+		{Field: "ts", Transform: "hour"},
+		{Field: "d", Transform: "void"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, spec)
+
+	schema := iceberg.NewSchema(0,
+		iceberg.NestedField{ID: 1, Name: "d", Type: iceberg.PrimitiveTypes.Date, Required: false},
+		iceberg.NestedField{ID: 2, Name: "ts", Type: iceberg.PrimitiveTypes.TimestampTz, Required: false},
+	)
+	nameMappingJSON, err := json.Marshal(schema.NameMapping())
+	require.NoError(t, err)
+
+	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
+	_, err = cat.cat.CreateTable(ctx, tableIdent, schema,
+		icebergcatalog.WithLocation(tblLocation),
+		icebergcatalog.WithProperties(iceberg.Properties{
+			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
+		}),
+		icebergcatalog.WithPartitionSpec(spec),
+	)
+	require.NoError(t, err)
+
+	parquetPath := filepath.Join(t.TempDir(), "data.parquet")
+	f, err := os.Create(parquetPath)
+	require.NoError(t, err)
+	pqw := writer.NewParquetWriter(f, pqSchema, writer.WithParquetCompression(writer.Snappy))
+	row := []any{"2023-07-15", "2023-07-15T13:45:00Z"}
+	require.NoError(t, pqw.Write(row))
+	require.NoError(t, pqw.Close())
+	fi, err := os.Stat(parquetPath)
+	require.NoError(t, err)
+
+	s3client := s3.New(s3.Options{
+		Region:       cfg.Region,
+		Credentials:  credentials.NewStaticCredentialsProvider(cfg.Credentials.AWSAccessKeyID, cfg.Credentials.AWSSecretAccessKey, ""),
+		BaseEndpoint: aws.String(cfg.S3Endpoint),
+		UsePathStyle: true,
+	})
+	s3Path := strings.TrimSuffix(tblLocation, "/") + "/data/" + uuid.New().String() + ".parquet"
+	s3Key := strings.TrimPrefix(s3Path, "s3://"+cfg.Bucket+"/")
+	up, err := os.Open(parquetPath)
+	require.NoError(t, err)
+	defer up.Close()
+	_, err = s3client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(cfg.Bucket),
+		Key:    aws.String(s3Key),
+		Body:   up,
+	})
+	require.NoError(t, err)
+
+	_, fieldData, err := partitionValues(row, cols)
+	require.NoError(t, err)
+	part := make(map[string]json.RawMessage, len(fieldData))
+	for fid, v := range fieldData {
+		raw, err := json.Marshal(v)
+		require.NoError(t, err)
+		part[strconv.Itoa(fid)] = raw
+	}
+	files := []fileEntry{{S3Path: s3Path, RecordCount: 1, FileSize: fi.Size(), Partition: part}}
+
+	require.NoError(t, cat.appendDataFiles(ctx,
+		"acmeCo/tests/regression", tableIdent, files, cols, "", "deadbeefdeadbeef"))
+
+	tbl1, err := cat.cat.LoadTable(ctx, tableIdent)
+	require.NoError(t, err)
+	snap1 := tbl1.CurrentSnapshot()
+	require.NotNil(t, snap1)
+
+	// Re-append with the same checkpoint must be a no-op.
+	require.NoError(t, cat.appendDataFiles(ctx,
+		"acmeCo/tests/regression", tableIdent, files, cols, "", "deadbeefdeadbeef"))
+	tbl2, err := cat.cat.LoadTable(ctx, tableIdent)
+	require.NoError(t, err)
+	require.Equal(t, snap1.SnapshotID, tbl2.CurrentSnapshot().SnapshotID, "re-append with same checkpoint must not create a new snapshot")
+}
+
+// runPartitionSpecMismatchRegression verifies, against the real catalog, that the
+// partition spec written when creating a table round-trips to a spec that
+// compares equal to a freshly-built one for the same config (so a matching
+// config is not falsely rejected on restart), and that a changed config — a
+// different parameter, or dropping partitioning — is detected as a hard error.
+func runPartitionSpecMismatchRegression(t *testing.T, cfg config) {
+	ctx := context.Background()
+
+	cat, err := newCatalog(ctx, cfg, NestedLocationStyle)
+	require.NoError(t, err)
+
+	const (
+		namespace = "tests"
+		table     = "partition_mismatch_regression"
+	)
+	tableIdent := icebergtable.Identifier{namespace, table}
+
+	_ = cat.cat.DropTable(ctx, tableIdent)
+	if err := cat.createNamespace(ctx, namespace); err != nil &&
+		!errors.Is(err, icebergcatalog.ErrNamespaceAlreadyExists) {
+		t.Fatalf("create-namespace: %v", err)
+	}
+
+	pqSchema := writer.ParquetSchema{{Name: "id", DataType: writer.PrimitiveTypeInteger, Required: false}}
+	allFields := []string{"id"}
+	specBucket4, _, err := buildPartitionSpec(allFields, pqSchema, []partitionField{
+		{Field: "id", Transform: "bucket[4]"},
+	})
+	require.NoError(t, err)
+
+	schema := iceberg.NewSchema(0, iceberg.NestedField{
+		ID:       1,
+		Name:     "id",
+		Type:     iceberg.PrimitiveTypes.Int64,
+		Required: false,
+	})
+	nameMappingJSON, err := json.Marshal(schema.NameMapping())
+	require.NoError(t, err)
+
+	tblLocation := tablePath(cfg.Bucket, cfg.Prefix, namespace, table, NestedLocationStyle)
+	_, err = cat.cat.CreateTable(ctx, tableIdent, schema,
+		icebergcatalog.WithLocation(tblLocation),
+		icebergcatalog.WithProperties(iceberg.Properties{
+			icebergtable.DefaultNameMappingKey: string(nameMappingJSON),
+		}),
+		icebergcatalog.WithPartitionSpec(specBucket4),
+	)
+	require.NoError(t, err)
+
+	// A matching config must round-trip without being flagged — otherwise every
+	// restart of a partitioned task (NewTransactor) would fail.
+	require.NoError(t, cat.verifyPartitionSpec(ctx, tableIdent, specBucket4))
+
+	// A changed transform parameter is a hard error.
+	specBucket8, _, err := buildPartitionSpec(allFields, pqSchema, []partitionField{
+		{Field: "id", Transform: "bucket[8]"},
+	})
+	require.NoError(t, err)
+	require.Error(t, cat.verifyPartitionSpec(ctx, tableIdent, specBucket8))
+
+	// Dropping partitioning entirely is a hard error.
+	require.Error(t, cat.verifyPartitionSpec(ctx, tableIdent, nil))
+
+	// A non-existent table is a no-op: CreateResource will create it with the
+	// configured spec.
+	require.NoError(t, cat.verifyPartitionSpec(ctx, icebergtable.Identifier{namespace, "partition_mismatch_absent"}, specBucket4))
+}
 
 func loadTestConfig(t *testing.T) config {
 	t.Helper()

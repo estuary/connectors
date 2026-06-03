@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/apache/iceberg-go"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	awsHttp "github.com/aws/smithy-go/transport/http"
@@ -234,11 +235,21 @@ func parse8601(in string) (time.Duration, error) {
 	return dur, nil
 }
 
+// partitionField is one entry in a table's Iceberg partition spec.
+type partitionField struct {
+	Field string `json:"field" jsonschema:"title=Field,description=Name of a materialized (selected) field to partition by."`
+	// Transform is an Iceberg partition transform string as accepted by
+	// iceberg.ParseTransform: identity, bucket[N], truncate[W], year, month,
+	// day, hour, or void.
+	Transform string `json:"transform" jsonschema:"title=Transform,description=Iceberg partition transform to apply to the field. One of: identity; bucket[N]; truncate[W]; year; month; day; hour; or void.,default=identity"`
+}
+
 type resource struct {
 	Table                     string            `json:"table" jsonschema:"title=Table,description=Name of the database table." jsonschema_extras:"x-collection-name=true"`
 	Namespace                 string            `json:"namespace,omitempty" jsonschema:"title=Alternative Namespace,description=Alternative namespace for this table (optional)."`
 	Delta                     *bool             `json:"delta_updates,omitempty" jsonschema:"default=true,title=Delta Update,description=Should updates to this table be done via delta updates. Currently this connector only supports delta updates."`
 	AdditionalTableProperties map[string]string `json:"additional_table_properties,omitempty" jsonschema:"title=Additional Table Properties,description=Additional Iceberg table properties to set when the table is created. These are set only at creation time and cannot be changed afterwards. Example: {'write.parquet.compression-codec': 'zstd'}"`
+	PartitionFields           []partitionField  `json:"partition_fields,omitempty" jsonschema:"title=Partition Fields,description=Iceberg partition spec for this table. Set only at table creation time; changing it on an existing table requires recreating the table."`
 }
 
 func pathToFQN(p []string) string {
@@ -261,6 +272,27 @@ func (r resource) Validate() error {
 		return fmt.Errorf("namespace %q must not contain dots", r.Namespace)
 	} else if r.Delta != nil && !*r.Delta {
 		return fmt.Errorf("connector only supports delta update mode: delta update must be enabled")
+	}
+
+	// Whether a partition field references a selected field and whether its
+	// transform applies to that field's type can only be checked once the
+	// resolved schema is available; those checks live in buildPartitionSpec.
+	seen := make(map[partitionField]struct{}, len(r.PartitionFields))
+	for _, pf := range r.PartitionFields {
+		if pf.Field == "" {
+			return fmt.Errorf("partition field is missing 'field'")
+		}
+		transform, err := iceberg.ParseTransform(pf.Transform)
+		if err != nil {
+			return fmt.Errorf("partition field %q: %w", pf.Field, err)
+		}
+		if err := validatePartitionTransform(transform); err != nil {
+			return fmt.Errorf("partition field %q: %w", pf.Field, err)
+		}
+		if _, ok := seen[pf]; ok {
+			return fmt.Errorf("duplicate partition field: field %q, transform %q", pf.Field, pf.Transform)
+		}
+		seen[pf] = struct{}{}
 	}
 
 	return nil
@@ -517,22 +549,35 @@ func (d *materialization) NewTransactor(
 			return nil, err
 		}
 
+		partitionSpec, partitionCols, err := buildPartitionSpec(b.FieldSelection.AllFields(), pqSchema, b.Config.PartitionFields)
+		if err != nil {
+			return nil, err
+		}
+
 		resourcePaths = append(resourcePaths, b.ResourcePath)
 		bindings = append(bindings, binding{
-			path:     b.ResourcePath,
-			pqSchema: pqSchema,
-			stateKey: b.StateKey,
-			mapped:   b,
+			path:          b.ResourcePath,
+			pqSchema:      pqSchema,
+			stateKey:      b.StateKey,
+			mapped:        b,
+			partitionSpec: partitionSpec,
+			partitionCols: partitionCols,
 		})
 	}
 
-	tablePaths, err := d.catalog.tablePaths(ctx, resourcePaths)
+	tables, err := d.catalog.loadResourceTables(ctx, resourcePaths)
 	if err != nil {
-		return nil, fmt.Errorf("looking up table paths: %w", err)
+		return nil, fmt.Errorf("looking up tables: %w", err)
 	}
 
 	for idx := range bindings {
-		bindings[idx].catalogTablePath = tablePaths[idx]
+		bindings[idx].catalogTablePath = tables[idx].Location()
+		// The partition spec is immutable after creation; refuse to write if the
+		// table's spec no longer matches the configured one.
+		existing := tables[idx].Spec()
+		if err := partitionSpecMismatch(&existing, bindings[idx].partitionSpec); err != nil {
+			return nil, fmt.Errorf("table %q %w", pathToFQN(bindings[idx].path), err)
+		}
 	}
 
 	s3store, err := filesink.NewS3Store(ctx, d.cfg.s3StoreConfig())

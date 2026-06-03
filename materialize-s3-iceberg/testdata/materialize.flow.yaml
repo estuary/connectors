@@ -31,3 +31,38 @@ materializations:
         recommended: true
         exclude:
           - stringUint64Field
+    # Partitioned bindings. The partition spec is attached by makeResourceFn in
+    # driver_test.go (keyed on the table name), because the test harness rebuilds
+    # the resource config rather than using the one in this file.
+    - resource:
+        table: dt_part_bucket
+        delta_updates: true
+      source: tests/data-types
+      fields:
+        recommended: true
+        exclude:
+          - stringUint64Field
+    - resource:
+        table: dt_part_truncate
+        delta_updates: true
+      source: tests/data-types
+      fields:
+        recommended: true
+        exclude:
+          - stringUint64Field
+    - resource:
+        table: dt_part_date
+        delta_updates: true
+      source: tests/data-types
+      fields:
+        recommended: true
+        exclude:
+          - stringUint64Field
+    - resource:
+        table: dt_part_multi
+        delta_updates: true
+      source: tests/data-types
+      fields:
+        recommended: true
+        exclude:
+          - stringUint64Field

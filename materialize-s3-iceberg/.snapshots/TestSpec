@@ -315,6 +315,32 @@
         "type": "object",
         "title": "Additional Table Properties",
         "description": "Additional Iceberg table properties to set when the table is created. These are set only at creation time and cannot be changed afterwards. Example: {'write.parquet.compression-codec': 'zstd'}"
+      },
+      "partition_fields": {
+        "items": {
+          "properties": {
+            "field": {
+              "type": "string",
+              "title": "Field",
+              "description": "Name of a materialized (selected) field to partition by."
+            },
+            "transform": {
+              "type": "string",
+              "title": "Transform",
+              "description": "Iceberg partition transform to apply to the field. One of: identity; bucket[N]; truncate[W]; year; month; day; hour; or void.",
+              "default": "identity"
+            }
+          },
+          "additionalProperties": false,
+          "type": "object",
+          "required": [
+            "field",
+            "transform"
+          ]
+        },
+        "type": "array",
+        "title": "Partition Fields",
+        "description": "Iceberg partition spec for this table. Set only at table creation time; changing it on an existing table requires recreating the table."
       }
     },
     "type": "object",
