@@ -148,26 +148,50 @@ func (c *client) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSch
 	return nil
 }
 
-func (c *client) isServerless(ctx context.Context) (bool, error) {
+// serverInfo describes the cluster on the other end of the connection, as
+// reported by the root info endpoint. It is used to distinguish Elasticsearch
+// from OpenSearch (an API-compatible fork), and Elastic Cloud serverless from
+// self-managed clusters.
+type serverInfo struct {
+	// Distribution is "opensearch" for OpenSearch clusters and empty (the field
+	// is absent) for Elasticsearch.
+	Distribution string
+	// BuildFlavor is "serverless" for Elastic Cloud serverless clusters.
+	BuildFlavor string
+}
+
+func (i serverInfo) isOpenSearch() bool {
+	return strings.EqualFold(i.Distribution, "opensearch")
+}
+
+func (i serverInfo) isServerless() bool {
+	return strings.EqualFold(i.BuildFlavor, "serverless")
+}
+
+func (c *client) info(ctx context.Context) (serverInfo, error) {
 	res, err := c.es.Info(c.es.Info.WithContext(ctx))
 	if err != nil {
-		return false, fmt.Errorf("getting serverless status: %w", err)
+		return serverInfo{}, fmt.Errorf("getting server info: %w", err)
 	}
 	defer res.Body.Close()
 	if res.IsError() {
-		return false, fmt.Errorf("getting serverless status error response [%s] %s", res.Status(), res.String())
+		return serverInfo{}, fmt.Errorf("getting server info error response [%s] %s", res.Status(), res.String())
 	}
 
 	type infoResponse struct {
 		Version struct {
-			BuildFlavor string `json:"build_flavor"`
+			Distribution string `json:"distribution"`
+			BuildFlavor  string `json:"build_flavor"`
 		} `json:"version"`
 	}
 
 	var info infoResponse
 	if err := json.NewDecoder(res.Body).Decode(&info); err != nil {
-		return false, fmt.Errorf("decoding serverless status response: %w", err)
+		return serverInfo{}, fmt.Errorf("decoding server info response: %w", err)
 	}
 
-	return strings.EqualFold(info.Version.BuildFlavor, "serverless"), nil
+	return serverInfo{
+		Distribution: info.Version.Distribution,
+		BuildFlavor:  info.Version.BuildFlavor,
+	}, nil
 }

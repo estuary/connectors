@@ -28,6 +28,32 @@ services:
     networks:
       - flow-test
 
+  # OpenSearch is an API-compatible fork of Elasticsearch. The same connector
+  # supports both (it auto-detects OpenSearch and adapts a few field mapping
+  # types), and the integration test exercises both side by side.
+  opensearch:
+    image: "opensearchproject/opensearch:2.13.0"
+    environment:
+      - "discovery.type=single-node"
+      # Disable the security plugin for ease of testing, matching the
+      # elasticsearch service which disables TLS and uses simple auth.
+      - "DISABLE_SECURITY_PLUGIN=true"
+      - "cluster.routing.allocation.disk.threshold_enabled=false"
+      - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
+    deploy:
+      resources:
+        limits:
+          memory: 4g
+    healthcheck:
+      test: curl -s http://localhost:9200 >/dev/null || exit 1
+      interval: 1s
+      timeout: 1s
+      retries: 60
+    ports:
+      - "9201:9200"
+    networks:
+      - flow-test
+
 networks:
   flow-test:
     name: flow-test
