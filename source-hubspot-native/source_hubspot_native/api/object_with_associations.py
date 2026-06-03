@@ -35,12 +35,15 @@ _FetchIdsFn = Callable[
     Awaitable[tuple[Iterable[tuple[datetime, str]], PageCursor]],
 ]
 """
-Returns a stream of object IDs that can be used to fetch the full object details
-along with its associations. Used in `fetch_changes_with_associations`.
+Returns a page of object IDs that can be used to fetch the full object details
+along with its associations, plus a PageCursor for the next page (or a falsy
+value, e.g. None, when no more pages remain). Used by
+`fetch_changes_with_associations`.
 
-IDs may be returned in any order, but iteration will be stopped upon seeing an
-entry that's as-old or older than the datetime cursor. Entries newer than the
-until datetime will be discarded.
+IDs may be returned in any order. The fetcher is responsible for signaling
+completion via a falsy next_page: fetchers that page newest-first should do so
+once they reach an entry as-old-or-older than `since`, and window-bounded
+fetchers do so when their window is exhausted.
 """
 
 
@@ -222,9 +225,9 @@ async def _fetch_id_chunks(
     since: datetime,
     until: datetime | None,
 ) -> AsyncGenerator[tuple[list[tuple[datetime, str]], bool], None]:
-    # Walk pages of recent IDs until we see one which is as-old
-    # as `since`, or no pages remain. Each fetcher page is yielded as its own
-    # chunk, along with whether more pages remain.
+    # Walk pages of IDs until the fetcher reports no more pages remain via a falsy
+    # next_page. Each fetcher page is yielded as its own chunk, along with
+    # whether more pages remain.
     next_page: PageCursor = None
     count = 0
 
@@ -245,8 +248,6 @@ async def _fetch_id_chunks(
                 # changes stream only runs every 5 minutes or so it shouldn't be
                 # a huge load on the connector.
                 chunk.append((ts, id))
-            else:
-                next_page = None
 
         yield chunk, bool(next_page)
 
