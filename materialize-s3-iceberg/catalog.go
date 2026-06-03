@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"os"
@@ -326,14 +327,20 @@ func (c *catalog) populateInfoSchema(ctx context.Context, is *boilerplate.InfoSc
 	return nil
 }
 
-// tablePaths returns the registered storage path for each resource path in a
-// list, in the same order as the input.
-func (c *catalog) tablePaths(ctx context.Context, resourcePaths [][]string) ([]string, error) {
+// loadResourceTables loads the table for each resource path in parallel,
+// preserving input order.
+func (c *catalog) loadResourceTables(ctx context.Context, resourcePaths [][]string) ([]*icebergtable.Table, error) {
 	idents := make([]icebergtable.Identifier, len(resourcePaths))
 	for i, p := range resourcePaths {
 		idents[i] = p
 	}
-	loaded, err := c.loadTables(ctx, idents)
+	return c.loadTables(ctx, idents)
+}
+
+// tablePaths returns the registered storage path for each resource path in a
+// list, in the same order as the input.
+func (c *catalog) tablePaths(ctx context.Context, resourcePaths [][]string) ([]string, error) {
+	loaded, err := c.loadResourceTables(ctx, resourcePaths)
 	if err != nil {
 		return nil, err
 	}
@@ -383,9 +390,19 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 	}
 	schema := iceberg.NewSchema(0, fields...)
 
+	spec, _, err := buildPartitionSpec(b.FieldSelection.AllFields(), parquetSchema, res.PartitionFields)
+	if err != nil {
+		return "", nil, err
+	}
+
 	fqn := pathToFQN(b.ResourcePath)
 
-	return fmt.Sprintf("create table %q", fqn), func(ctx context.Context) error {
+	action := fmt.Sprintf("create table %q", fqn)
+	if spec != nil {
+		action += fmt.Sprintf(" partitioned by %s", spec)
+	}
+
+	return action, func(ctx context.Context) error {
 		nameMappingJSON, err := json.Marshal(schema.NameMapping())
 		if err != nil {
 			return fmt.Errorf("marshaling name mapping: %w", err)
@@ -401,10 +418,15 @@ func (c *catalog) CreateResource(ctx context.Context, b *pf.MaterializationSpec_
 			props[k] = v
 		}
 
-		if _, err := c.cat.CreateTable(ctx, b.ResourcePath, schema,
+		opts := []icebergcatalog.CreateTableOpt{
 			icebergcatalog.WithLocation(location),
 			icebergcatalog.WithProperties(props),
-		); err != nil {
+		}
+		if spec != nil {
+			opts = append(opts, icebergcatalog.WithPartitionSpec(spec))
+		}
+
+		if _, err := c.cat.CreateTable(ctx, b.ResourcePath, schema, opts...); err != nil {
 			return fmt.Errorf("creating table %q: %w", fqn, err)
 		}
 
@@ -424,7 +446,23 @@ func (c *catalog) DeleteResource(ctx context.Context, path []string) (string, bo
 	}, nil
 }
 
-func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.BindingUpdate[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
+func (c *catalog) UpdateResource(ctx context.Context, bindingUpdate boilerplate.BindingUpdate[config, resource, mappedType]) (string, boilerplate.ActionApplyFn, error) {
+	b := bindingUpdate.Binding
+
+	// The partition spec is immutable after creation, so reject a changed
+	// partition_fields config before any other alteration is attempted.
+	pqSchema, err := parquetSchema(b.FieldSelection.AllFields(), b.Collection, b.FieldSelection.FieldConfigJsonMap)
+	if err != nil {
+		return "", nil, err
+	}
+	desiredSpec, _, err := buildPartitionSpec(b.FieldSelection.AllFields(), pqSchema, b.Config.PartitionFields)
+	if err != nil {
+		return "", nil, err
+	}
+	if err := c.verifyPartitionSpec(ctx, b.ResourcePath, desiredSpec); err != nil {
+		return "", nil, err
+	}
+
 	if len(bindingUpdate.NewProjections) == 0 && len(bindingUpdate.NewlyNullableFields) == 0 {
 		// Nothing to do, since only adding new columns or dropping nullability
 		// constraints is supported currently.
@@ -488,6 +526,140 @@ func (c *catalog) UpdateResource(_ context.Context, bindingUpdate boilerplate.Bi
 
 		return nil
 	}, nil
+}
+
+// verifyPartitionSpec loads the table and returns a hard error if its partition
+// spec is not compatible with the desired spec (nil means unpartitioned). It is
+// a no-op when the table does not yet exist, since CreateResource will create it
+// with the desired spec.
+func (c *catalog) verifyPartitionSpec(ctx context.Context, resourcePath []string, desired *iceberg.PartitionSpec) error {
+	tbl, err := c.cat.LoadTable(ctx, resourcePath)
+	if err != nil {
+		if errors.Is(err, icebergcatalog.ErrNoSuchTable) {
+			return nil
+		}
+		return fmt.Errorf("loading table %q: %w", pathToFQN(resourcePath), err)
+	}
+	existing := tbl.Spec()
+	if err := partitionSpecMismatch(&existing, desired); err != nil {
+		return fmt.Errorf("table %q %w", pathToFQN(resourcePath), err)
+	}
+	return nil
+}
+
+// appendDataFiles appends pre-built parquet files to a partitioned table,
+// supplying explicit partition values for each file. Unlike appendFiles (which
+// infers partition values from parquet statistics and cannot handle non-linear
+// transforms like bucket), this builds DataFile objects directly and stages them
+// with Transaction.AddDataFiles. It mirrors appendFiles' idempotency (via the
+// flow_checkpoints_v1 property) and retry behavior.
+func (c *catalog) appendDataFiles(
+	ctx context.Context,
+	materialization string,
+	tablePath []string,
+	files []fileEntry,
+	cols []partitionColumn,
+	prevCheckpoint string,
+	nextCheckpoint string,
+) error {
+	fqn := pathToFQN(tablePath)
+
+	logger := log.WithFields(log.Fields{
+		"table":           fqn,
+		"materialization": materialization,
+		"prev_checkpoint": prevCheckpoint,
+		"next_checkpoint": nextCheckpoint,
+		"num_files":       len(files),
+	})
+	logger.Info("append_data_files: starting")
+
+	const maxAttempts = 3
+	for attempt := 1; ; attempt++ {
+		retry := func(err error) (bool, error) {
+			if attempt >= maxAttempts {
+				return false, err
+			}
+			logger.WithError(err).WithField("attempt", attempt).Warn("append_data_files: retrying")
+			if err := sleepCtx(ctx, time.Duration(attempt*2)*time.Second); err != nil {
+				return false, err
+			}
+			return true, nil
+		}
+
+		tbl, err := c.cat.LoadTable(ctx, tablePath)
+		if err != nil {
+			if ok, err := retry(fmt.Errorf("loading table %q: %w", fqn, err)); ok {
+				continue
+			} else {
+				return err
+			}
+		}
+
+		checkpoints := map[string]string{}
+		if raw, ok := tbl.Properties()[flowCheckpointsKey]; ok && raw != "" {
+			if err := json.Unmarshal([]byte(raw), &checkpoints); err != nil {
+				return fmt.Errorf("parsing %s on %q: %w", flowCheckpointsKey, fqn, err)
+			}
+		}
+
+		if checkpoints[materialization] == nextCheckpoint {
+			logger.WithField("attempt", attempt).Info("append_data_files: already at next-checkpoint, skipping")
+			return nil
+		}
+
+		checkpoints[materialization] = nextCheckpoint
+		newProps, err := json.Marshal(checkpoints)
+		if err != nil {
+			return fmt.Errorf("marshaling checkpoints: %w", err)
+		}
+
+		spec := tbl.Spec()
+		logicalTypes := partitionLogicalTypes(cols)
+		dataFiles := make([]iceberg.DataFile, 0, len(files))
+		for _, fe := range files {
+			fieldData, err := fe.partitionData(cols)
+			if err != nil {
+				return fmt.Errorf("decoding partition data for %q: %w", fe.S3Path, err)
+			}
+			b, err := iceberg.NewDataFileBuilder(
+				spec,
+				iceberg.EntryContentData,
+				fe.S3Path,
+				iceberg.ParquetFile,
+				fieldData,
+				logicalTypes,
+				nil, // fieldIDToFixedSize
+				fe.RecordCount,
+				fe.FileSize,
+			)
+			if err != nil {
+				return fmt.Errorf("building data file for %q: %w", fe.S3Path, err)
+			}
+			dataFiles = append(dataFiles, b.Build())
+		}
+
+		tx := tbl.NewTransaction()
+		if err := tx.AddDataFiles(ctx, dataFiles, nil); err != nil {
+			if ok, err := retry(fmt.Errorf("staging data files for %q: %w", fqn, err)); ok {
+				continue
+			} else {
+				return err
+			}
+		}
+		if err := tx.SetProperties(iceberg.Properties{flowCheckpointsKey: string(newProps)}); err != nil {
+			return fmt.Errorf("setting %s on %q: %w", flowCheckpointsKey, fqn, err)
+		}
+		if _, err := tx.Commit(ctx); err != nil {
+			if ok, err := retry(fmt.Errorf("committing append on %q: %w", fqn, err)); ok {
+				continue
+			} else {
+				return err
+			}
+		}
+
+		logger.WithField("attempt", attempt).Info("append_data_files: committed")
+		return nil
+	}
 }
 
 func (c *catalog) appendFiles(
