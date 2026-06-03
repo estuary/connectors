@@ -217,27 +217,22 @@ async def fetch_batch_with_associations(
     return batch
 
 
-async def fetch_changes_with_associations(
-    object_name: str,
-    cls: type[CRMObject],
+async def _fetch_id_chunks(
     fetcher: _FetchIdsFn,
-    log: Logger,
-    http: HTTPSession,
-    with_history: bool,
     since: datetime,
     until: datetime | None,
-) -> AsyncGenerator[tuple[datetime, str, CRMObject], None]:
-
+) -> AsyncGenerator[tuple[list[tuple[datetime, str]], bool], None]:
     # Walk pages of recent IDs until we see one which is as-old
-    # as `since`, or no pages remain.
-    recent: list[tuple[datetime, str]] = []
+    # as `since`, or no pages remain. Each fetcher page is yielded as its own
+    # chunk, along with whether more pages remain.
     next_page: PageCursor = None
     count = 0
 
     while True:
-        iter, next_page = await fetcher(next_page, count)
+        ids, next_page = await fetcher(next_page, count)
 
-        for ts, id in iter:
+        chunk: list[tuple[datetime, str]] = []
+        for ts, id in ids:
             count += 1
             if until and ts > until:
                 continue
@@ -249,45 +244,64 @@ async def fetch_changes_with_associations(
                 # top-level filtering works in production. Since the delayed
                 # changes stream only runs every 5 minutes or so it shouldn't be
                 # a huge load on the connector.
-                recent.append((ts, id))
+                chunk.append((ts, id))
             else:
                 next_page = None
+
+        yield chunk, bool(next_page)
 
         if not next_page:
             break
 
+
+async def _fetch_batch_with_retries(
+    log: Logger,
+    cls: type[CRMObject],
+    http: HTTPSession,
+    with_history: bool,
+    object_name: str,
+    batch: list[tuple[datetime, str]],
+) -> Iterable[tuple[datetime, str, CRMObject]]:
+    # Enable lookup of datetimes for IDs from the result batch.
+    dts = {id: dt for dt, id in batch}
+
+    attempt = 1
+    while True:
+        try:
+            documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
+                log, cls, http, with_history, object_name, [id for _, id in batch]
+            )
+            break
+        except Exception as e:
+            if attempt == 5:
+                raise
+            log.warning(
+                "failed to fetch batch with associations (will retry)",
+                {"error": str(e), "attempt": attempt},
+            )
+            await asyncio.sleep(attempt * 2)
+            attempt += 1
+
+    return ((dts[str(doc.id)], str(doc.id), doc) for doc in documents.results)
+
+
+async def _emit_batches(
+    log: Logger,
+    cls: type[CRMObject],
+    http: HTTPSession,
+    with_history: bool,
+    object_name: str,
+    recent: list[tuple[datetime, str]],
+) -> AsyncGenerator[tuple[datetime, str, CRMObject], None]:
     recent.sort()  # Oldest updates first.
-
-    async def _do_batch_fetch(
-        batch: list[tuple[datetime, str]],
-    ) -> Iterable[tuple[datetime, str, CRMObject]]:
-        # Enable lookup of datetimes for IDs from the result batch.
-        dts = {id: dt for dt, id in batch}
-
-        attempt = 1
-        while True:
-            try:
-                documents: BatchResult[CRMObject] = await fetch_batch_with_associations(
-                    log, cls, http, with_history, object_name, [id for _, id in batch]
-                )
-                break
-            except Exception as e:
-                if attempt == 5:
-                    raise
-                log.warning(
-                    "failed to fetch batch with associations (will retry)",
-                    {"error": str(e), "attempt": attempt},
-                )
-                await asyncio.sleep(attempt * 2)
-                attempt += 1
-
-        return ((dts[str(doc.id)], str(doc.id), doc) for doc in documents.results)
 
     async def _batches_gen() -> (
         AsyncGenerator[Awaitable[Iterable[tuple[datetime, str, CRMObject]]], None]
     ):
         for batch_it in itertools.batched(recent, 50 if with_history else 100):
-            yield _do_batch_fetch(list(batch_it))
+            yield _fetch_batch_with_retries(
+                log, cls, http, with_history, object_name, list(batch_it)
+            )
 
     total = len(recent)
     if total >= 10_000:
@@ -305,3 +319,22 @@ async def fetch_changes_with_associations(
                     {"count": count, "total": total},
                 )
             yield ts, id, doc
+
+
+async def fetch_changes_with_associations(
+    object_name: str,
+    cls: type[CRMObject],
+    fetcher: _FetchIdsFn,
+    log: Logger,
+    http: HTTPSession,
+    with_history: bool,
+    since: datetime,
+    until: datetime | None,
+) -> AsyncGenerator[tuple[datetime, str, CRMObject], None]:
+
+    recent: list[tuple[datetime, str]] = []
+    async for chunk, _ in _fetch_id_chunks(fetcher, since, until):
+        recent.extend(chunk)
+
+    async for res in _emit_batches(log, cls, http, with_history, object_name, recent):
+        yield res
