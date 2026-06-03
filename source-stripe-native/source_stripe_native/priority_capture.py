@@ -2,7 +2,7 @@ import asyncio
 import heapq
 from datetime import datetime, timedelta, UTC
 from enum import IntEnum
-from typing import Dict, cast, NamedTuple, List, Optional, Union, Protocol
+from typing import Dict, cast, NamedTuple, List, Optional, Union
 from dataclasses import dataclass, field
 
 from estuary_cdk.capture import Task
@@ -21,18 +21,7 @@ from estuary_cdk.capture.common import (
     FetchSnapshotFn,
 )
 
-# To avoid storing all fetch_changes and fetch_page function in memory, factory functions
-# are used to create the fetch functions on demand for a specific account.
-class FetchChangesFnFactory(Protocol):
-    """Factory function for creating incremental fetch functions for a specific account."""
-    def __call__(self, account_id: str) -> FetchChangesFn[BaseDocument]:
-        ...
-
-
-class FetchPageFnFactory(Protocol):
-    """Factory function for creating backfill fetch functions for a specific account."""
-    def __call__(self, account_id: str) -> Optional[Union[FetchPageFn[BaseDocument], RecurringFetchPageFn[BaseDocument]]]:
-        ...
+from .protocols import FetchChangesFnFactory, FetchPageFnFactory
 
 
 class PriorityLevel(IntEnum):
