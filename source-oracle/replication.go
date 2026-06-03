@@ -191,6 +191,11 @@ type redoFile struct {
 	DictEnd     string
 	Bytes       int
 	Thread      int
+	// ResetlogsID identifies the database incarnation this log belongs to. It
+	// changes when the database is opened with RESETLOGS, which discards redo
+	// and forks a new timeline. Used by validateLogFileCoverage to distinguish
+	// a benign restart gap from a data-losing incarnation change.
+	ResetlogsID int
 }
 
 var MaxReplicationLogFilesSize = 2 * 1024 * 1024 * 1024
@@ -238,12 +243,15 @@ func (s *replicationStream) addLogFiles(ctx context.Context, conn *sql.Conn, sta
 		"minArchiveSCN": minArchiveSCN,
 	}).Debug("starting SCN for log files based on dictionary starting point")
 
-	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE#, L.FIRST_CHANGE#, CASE WHEN L.STATUS = 'CURRENT' THEN 0 ELSE L.NEXT_CHANGE# END as NEXT_CHANGE#, 'NO' as DICT_START, 'NO' as DICT_END, MAX(L.BYTES), L.THREAD# FROM V$LOGFILE LF, V$LOG L
+	// Live logs always belong to the current database incarnation, so
+	// their RESETLOGS_ID is taken from V$DATABASE_INCARNATION rather than the log
+	// view itself (V$LOG does not expose it).
+	var liveLogFiles = `SELECT L.STATUS as STATUS, MIN(LF.MEMBER) as NAME, L.SEQUENCE#, L.FIRST_CHANGE#, CASE WHEN L.STATUS = 'CURRENT' THEN 0 ELSE L.NEXT_CHANGE# END as NEXT_CHANGE#, 'NO' as DICT_START, 'NO' as DICT_END, MAX(L.BYTES), L.THREAD#, (SELECT MAX(DI.RESETLOGS_ID) FROM V$DATABASE_INCARNATION DI WHERE DI.STATUS = 'CURRENT') as RESETLOGS_ID FROM V$LOGFILE LF, V$LOG L
 		LEFT JOIN V$ARCHIVED_LOG A ON A.FIRST_CHANGE# = L.FIRST_CHANGE# AND A.NEXT_CHANGE# = L.NEXT_CHANGE#
     WHERE (A.STATUS <> 'A' OR A.FIRST_CHANGE# IS NULL) AND L.GROUP# = LF.GROUP# AND L.STATUS <> 'UNUSED'
 		GROUP BY LF.GROUP#, L.FIRST_CHANGE#, L.NEXT_CHANGE#, L.STATUS, L.ARCHIVED, L.SEQUENCE#, L.THREAD#`
 
-	var archivedLogFiles = `SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE#, A.FIRST_CHANGE#, A.NEXT_CHANGE#, A.DICTIONARY_BEGIN as DICT_START, A.DICTIONARY_END as DICT_END, A.BLOCKS*A.BLOCK_SIZE as BYTES, A.THREAD# FROM V$ARCHIVED_LOG A
+	var archivedLogFiles = `SELECT 'ARCHIVED' as STATUS, A.NAME AS NAME, A.SEQUENCE#, A.FIRST_CHANGE#, A.NEXT_CHANGE#, A.DICTIONARY_BEGIN as DICT_START, A.DICTIONARY_END as DICT_END, A.BLOCKS*A.BLOCK_SIZE as BYTES, A.THREAD#, A.RESETLOGS_ID FROM V$ARCHIVED_LOG A
     WHERE A.NAME IS NOT NULL AND A.ARCHIVED = 'YES' AND A.STATUS = 'A' AND A.NEXT_CHANGE# >= :1 AND
     DEST_ID IN (` + strconv.Itoa(localDestID) + `)`
 
@@ -257,7 +265,7 @@ func (s *replicationStream) addLogFiles(ctx context.Context, conn *sql.Conn, sta
 	var candidates []redoFile
 	for rows.Next() {
 		var f redoFile
-		if err := rows.Scan(&f.Status, &f.Name, &f.Sequence, &f.FirstChange, &f.NextChange, &f.DictStart, &f.DictEnd, &f.Bytes, &f.Thread); err != nil {
+		if err := rows.Scan(&f.Status, &f.Name, &f.Sequence, &f.FirstChange, &f.NextChange, &f.DictStart, &f.DictEnd, &f.Bytes, &f.Thread, &f.ResetlogsID); err != nil {
 			return 0, fmt.Errorf("scanning log file record: %w", err)
 		}
 		candidates = append(candidates, f)
@@ -429,6 +437,25 @@ func validateLogFileCoverage(redoFiles []redoFile, startSCN, endSCN SCN) error {
 				return fmt.Errorf("redo log file %q (FIRST_CHANGE#=%d) follows CURRENT-status file %q in thread %d, which has no NEXT_CHANGE#", curr.Name, curr.FirstChange, prev.Name, thread)
 			}
 			if curr.FirstChange != prev.NextChange {
+				// A forward SCN gap between two logs that are consecutive in
+				// SEQUENCE# and share an incarnation should be benign; it's the signature
+				// of a database restart. An unbroken SEQUENCE# chain means no log is
+				// missing, and matching RESETLOGS_ID rules out an OPEN RESETLOGS that
+				// would discard redos. So unlike a true gap, nothing was lost here.
+				var benignRestartGap = curr.Sequence == prev.Sequence+1 &&
+					curr.FirstChange > prev.NextChange &&
+					curr.ResetlogsID == prev.ResetlogsID
+				if benignRestartGap {
+					logrus.WithFields(logrus.Fields{
+						"thread":          thread,
+						"prevName":        prev.Name,
+						"prevNextChange":  prev.NextChange,
+						"currName":        curr.Name,
+						"currFirstChange": curr.FirstChange,
+						"resetlogsID":     curr.ResetlogsID,
+					}).Warn("tolerating benign redo log SCN gap across consecutive sequences (likely a database restart)")
+					continue
+				}
 				return fmt.Errorf("redo log SCN gap in thread %d between %q (NEXT_CHANGE#=%d) and %q (FIRST_CHANGE#=%d)", thread, prev.Name, prev.NextChange, curr.Name, curr.FirstChange)
 			}
 		}
