@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"slices"
 	"strings"
 	"time"
@@ -278,6 +279,14 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 			Username:            c.Credentials.Username,
 			Password:            c.Credentials.Password,
 			APIKey:              c.Credentials.ApiKey,
+			// OpenSearch is an API-compatible fork of Elasticsearch, but the
+			// go-elasticsearch v8 client refuses to talk to it: it requires the
+			// 'X-Elastic-Product: Elasticsearch' response header on the first
+			// successful response, which OpenSearch does not send. We inject the
+			// header when it is absent so the product check passes. Genuine
+			// Elasticsearch always sends this header, so its responses are never
+			// modified and the check still validates against it.
+			Transport: productHeaderInjector{inner: http.DefaultTransport},
 			RetryOnStatus:       []int{429, 502, 503, 504},
 			RetryBackoff: func(i int) time.Duration {
 				d := min(time.Duration(1<<i)*time.Second, 5*time.Second)
@@ -296,6 +305,24 @@ func (c config) toClient(disableRetry bool) (*client, error) {
 	}
 
 	return &client{es: es}, nil
+}
+
+// productHeaderInjector forces the 'X-Elastic-Product: Elasticsearch' response
+// header when it is missing, which allows the go-elasticsearch v8 product check
+// to pass against OpenSearch. See the comment where it is installed in toClient.
+type productHeaderInjector struct {
+	inner http.RoundTripper
+}
+
+func (p productHeaderInjector) RoundTrip(req *http.Request) (*http.Response, error) {
+	res, err := p.inner.RoundTrip(req)
+	if err != nil {
+		return res, err
+	}
+	if res.Header.Get("X-Elastic-Product") == "" {
+		res.Header.Set("X-Elastic-Product", "Elasticsearch")
+	}
+	return res, nil
 }
 
 type resource struct {
@@ -388,7 +415,15 @@ func (driver) Spec(ctx context.Context, req *pm.Request_Spec) (*pm.Response_Spec
 		return nil, fmt.Errorf("generating resource schema: %w", err)
 	}
 
-	return boilerplate.RunSpec(ctx, req, "https://go.estuary.dev/materialize-elasticsearch", configSchema(), resourceSchema)
+	// Variants (e.g. materialize-opensearch) supply an alternate documentation
+	// URL via the DOCS_URL environment variable; fall back to the Elasticsearch
+	// default when it is not set.
+	docsURL := "https://go.estuary.dev/materialize-elasticsearch"
+	if fromEnv := os.Getenv("DOCS_URL"); fromEnv != "" {
+		docsURL = fromEnv
+	}
+
+	return boilerplate.RunSpec(ctx, req, docsURL, configSchema(), resourceSchema)
 }
 
 func (driver) Validate(ctx context.Context, req *pm.Request_Validate) (*pm.Response_Validated, error) {
@@ -434,6 +469,11 @@ type materialization struct {
 	metaClient   *client
 	dataClient   *client
 	featureFlags map[string]bool
+
+	// isOpenSearch is true when connected to an OpenSearch cluster rather than
+	// Elasticsearch. OpenSearch is API-compatible except for a handful of field
+	// mapping types (notably it uses 'flat_object' in place of 'flattened').
+	isOpenSearch bool
 }
 
 var _ boilerplate.Materializer[config, fieldConfig, resource, property] = &materialization{}
@@ -449,11 +489,23 @@ func newMaterialization(ctx context.Context, materializationName string, cfg con
 		return nil, fmt.Errorf("creating data client: %w", err)
 	}
 
+	// Detect whether we're talking to OpenSearch so that type mapping can adapt.
+	// This is best-effort: if the cluster is unreachable we default to
+	// Elasticsearch behavior and let CheckPrerequisites surface the connection
+	// error with a friendlier message.
+	var isOpenSearch bool
+	if info, err := metaClient.info(ctx); err != nil {
+		log.WithError(err).Debug("could not determine server distribution; assuming Elasticsearch")
+	} else {
+		isOpenSearch = info.isOpenSearch()
+	}
+
 	return &materialization{
 		cfg:          cfg,
 		metaClient:   metaClient,
 		dataClient:   dataClient,
 		featureFlags: featureFlags,
+		isOpenSearch: isOpenSearch,
 	}, nil
 }
 
@@ -539,6 +591,9 @@ func (d *materialization) NewConstraint(p pf.Projection, deltaUpdates bool, fc f
 func (d *materialization) MapType(p boilerplate.Projection, fc fieldConfig) (property, boilerplate.ElementConverter) {
 	prop := propForProjection(&p.Projection, p.Inference.Types, fc)
 	prop.IgnoreFormat = d.featureFlags["ignore_mapping_format_changes"]
+	if d.isOpenSearch {
+		prop = adaptForOpenSearch(prop)
+	}
 	return prop, nil
 }
 
@@ -552,7 +607,7 @@ func (d *materialization) CreateNamespace(ctx context.Context, ns string) (strin
 
 func (d *materialization) CreateResource(ctx context.Context, res boilerplate.MappedBinding[config, resource, property]) (string, boilerplate.ActionApplyFn, error) {
 	indexName := res.ResourcePath[0]
-	props := buildIndexProperties(res.Keys, res.Values, res.Document)
+	props := buildIndexProperties(res.Keys, res.Values, res.Document, d.isOpenSearch)
 
 	return fmt.Sprintf("create index %q", indexName), func(ctx context.Context) error {
 		return d.metaClient.createIndex(ctx, indexName, res.Config.Shards, d.cfg.Advanced.Replicas, props)
@@ -615,10 +670,11 @@ func (d *materialization) NewTransactor(
 	mappedBindings []boilerplate.MappedBinding[config, resource, property],
 	be *m.BindingEvents,
 ) (m.Transactor, error) {
-	isServerless, err := d.dataClient.isServerless(ctx)
+	info, err := d.dataClient.info(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("getting serverless status: %w", err)
+		return nil, fmt.Errorf("getting server info: %w", err)
 	}
+	isServerless := info.isServerless()
 	if isServerless {
 		log.Info("connected to a serverless elasticsearch cluster")
 	}

@@ -1,0 +1,114 @@
+Task: acmeCo/tests/materialize-elasticsearch
+
+Resource: simple_standard
+["applied.actionDescription", "create index \"simple_standard\"\ncreate index \"simple_delta\"\ncreate index \"not_simple\"\ncreate index \"data_types\""]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{"updated":{}}]
+
+{"Name":"_meta/op","Nullable":true,"Type":"text"}
+{"Name":"canary","Nullable":true,"Type":"text"}
+{"Name":"flow_document","Nullable":true,"Type":"flat_object"}
+{"Name":"flow_published_at","Nullable":true,"Type":"date"}
+{"Name":"id","Nullable":true,"Type":"long"}
+{"Name":"val","Nullable":true,"Type":"long"}
+
+Table Data:
+
+Resource: simple_delta
+["applied.actionDescription", "create index \"simple_standard\"\ncreate index \"simple_delta\"\ncreate index \"not_simple\"\ncreate index \"data_types\""]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{"updated":{}}]
+
+{"Name":"_meta/op","Nullable":true,"Type":"text"}
+{"Name":"canary","Nullable":true,"Type":"text"}
+{"Name":"flow_published_at","Nullable":true,"Type":"date"}
+{"Name":"id","Nullable":true,"Type":"long"}
+{"Name":"val","Nullable":true,"Type":"long"}
+
+Table Data:
+
+Resource: not_simple
+["applied.actionDescription", "create index \"simple_standard\"\ncreate index \"simple_delta\"\ncreate index \"not_simple\"\ncreate index \"data_types\""]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{"updated":{}}]
+
+{"Name":" ,;{}()_- problematicField � 𐀀 嶲 ","Nullable":true,"Type":"text"}
+{"Name":" ,;{}()_- problematicKey � 𐀀 嶲 ","Nullable":true,"Type":"keyword"}
+{"Name":"$dollar$signs","Nullable":true,"Type":"text"}
+{"Name":"123","Nullable":true,"Type":"text"}
+{"Name":"123startsWithDigits","Nullable":true,"Type":"text"}
+{"Name":"FIELDWITHDIFFERENTCAPS","Nullable":true,"Type":"text"}
+{"Name":"_id_flow","Nullable":true,"Type":"keyword"}
+{"Name":"a\"string`with`quote'characters","Nullable":true,"Type":"text"}
+{"Name":"binaryKey","Nullable":true,"Type":"binary"}
+{"Name":"field with separated words","Nullable":true,"Type":"text"}
+{"Name":"field-with-separated-words","Nullable":true,"Type":"text"}
+{"Name":"fieldWithDifferentCaps","Nullable":true,"Type":"text"}
+{"Name":"field_with-separated_words","Nullable":true,"Type":"text"}
+{"Name":"field_with_separated_words","Nullable":true,"Type":"text"}
+{"Name":"fieldwithdifferentcaps","Nullable":true,"Type":"text"}
+{"Name":"flow_document","Nullable":true,"Type":"flat_object"}
+{"Name":"flow_published_at","Nullable":true,"Type":"date"}
+{"Name":"longString","Nullable":true,"Type":"text"}
+{"Name":"testing (%s)","Nullable":true,"Type":"text"}
+{"Name":"unsignedBigint","Nullable":true,"Type":"unsigned_long"}
+
+Table Data:
+
+Resource: data_types
+["applied.actionDescription", "create index \"simple_standard\"\ncreate index \"simple_delta\"\ncreate index \"not_simple\"\ncreate index \"data_types\""]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{}]
+["connectorState",{"updated":{}}]
+
+{"Name":"arrayField","Nullable":true,"Type":"flat_object"}
+{"Name":"boolField","Nullable":true,"Type":"boolean"}
+{"Name":"enumField","Nullable":true,"Type":"text"}
+{"Name":"enumNullableField","Nullable":true,"Type":"text"}
+{"Name":"flow_document","Nullable":true,"Type":"flat_object"}
+{"Name":"flow_published_at","Nullable":true,"Type":"date"}
+{"Name":"id","Nullable":true,"Type":"long"}
+{"Name":"intField","Nullable":true,"Type":"long"}
+{"Name":"multipleField","Nullable":true,"Type":"flat_object"}
+{"Name":"numField","Nullable":true,"Type":"double"}
+{"Name":"stringAndIntegerField","Nullable":true,"Type":"long"}
+{"Name":"stringAndNumberField","Nullable":true,"Type":"double"}
+{"Name":"stringDateField","Nullable":true,"Type":"date"}
+{"Name":"stringDateTimeField","Nullable":true,"Type":"date"}
+{"Name":"stringDurationField","Nullable":true,"Type":"text"}
+{"Name":"stringEmailField","Nullable":true,"Type":"text"}
+{"Name":"stringField","Nullable":true,"Type":"text"}
+{"Name":"stringHostnameField","Nullable":true,"Type":"text"}
+{"Name":"stringIntegerField","Nullable":true,"Type":"long"}
+{"Name":"stringIpv4Field","Nullable":true,"Type":"ip"}
+{"Name":"stringIpv6Field","Nullable":true,"Type":"ip"}
+{"Name":"stringIriField","Nullable":true,"Type":"text"}
+{"Name":"stringIriReferenceField","Nullable":true,"Type":"text"}
+{"Name":"stringJsonPointerField","Nullable":true,"Type":"text"}
+{"Name":"stringMacAddr8Field","Nullable":true,"Type":"text"}
+{"Name":"stringMacAddrField","Nullable":true,"Type":"text"}
+{"Name":"stringNumberField","Nullable":true,"Type":"double"}
+{"Name":"stringRegexField","Nullable":true,"Type":"text"}
+{"Name":"stringRelativeJsonPointerField","Nullable":true,"Type":"text"}
+{"Name":"stringTimeField","Nullable":true,"Type":"text"}
+{"Name":"stringUint32Field","Nullable":true,"Type":"long"}
+{"Name":"stringUint64Field","Nullable":true,"Type":"unsigned_long"}
+{"Name":"stringUriField","Nullable":true,"Type":"text"}
+{"Name":"stringUriReferenceField","Nullable":true,"Type":"text"}
+{"Name":"stringUriTemplateField","Nullable":true,"Type":"text"}
+{"Name":"stringUuidField","Nullable":true,"Type":"text"}
+
+Table Data:
+
+

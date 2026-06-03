@@ -1,0 +1,8 @@
+endpoint: "http://localhost:9201"
+credentials:
+  username: "admin"
+  password: "admin"
+hardDelete: true
+advanced:
+  number_of_replicas: 0
+  feature_flags: allow_existing_tables_for_new_bindings
