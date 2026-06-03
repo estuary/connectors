@@ -14,6 +14,7 @@ from ..models import (
 )
 from .shared import (
     dt_to_str,
+    str_to_dt,
     HUB,
 )
 
@@ -24,30 +25,43 @@ async def fetch_search_objects(
     http: HTTPSession,
     since: datetime,
     until: datetime | None,
-    _: PageCursor,
+    page: PageCursor,
     last_modified_property_name: str = "hs_lastmodifieddate",
     should_crash_on_unordered_results: bool = True,
 ) -> tuple[Iterable[tuple[datetime, str]], PageCursor]:
     """
-    Retrieve all records between 'since' and 'until' (or the present time).
+    Retrieve a single chunk of records modified at or after 'since' and at or
+    before 'until' if provided, in ascending order of last-modified time.
 
-    The HubSpot Search API has an undocumented maximum offset of 10,000 items,
-    so the logic here will completely enumerate all available records, kicking
-    off new searches if needed to work around that limit. The returned
-    PageCursor is always None.
+    The HubSpot Search API has an undocumented maximum offset of 10,000 items.
+    Rather than enumerate the whole window in one call, this returns one chunk
+    that ends at the offset boundary, along with a resume PageCursor (a
+    last-modified timestamp string) to continue from on the next call. When the
+    whole window has been read, the returned PageCursor is None.
+
+    Chunks never leave gaps. A chunk contains every record in the window
+    modified at or before the chunk's newest timestamp, except records already
+    returned by an earlier chunk. The returned cursor is the first millisecond the
+    chunk does NOT cover. Records the search read at that millisecond are
+    withheld from the chunk, since the offset cap may have cut that millisecond
+    off partway. Passing the cursor back as 'page' starts a fresh search at
+    that millisecond, which re-reads it in full and continues on.
 
     Multiple records can have the same "last modified" property value, and
-    indeed large runs of these may have the same value. So a "new" search will
-    inevitably grab some records again, and deduplication is handled here via
-    the set.
+    indeed large runs of these may have the same value. When more than 10,000
+    records share a single millisecond (a "cycle"), the whole instant is drained
+    via fetch_search_objects_modified_at and the resume cursor steps forward by
+    one millisecond.
     """
+
+    if isinstance(page, str):
+        since = str_to_dt(page)
 
     url = f"{HUB}/crm/v3/objects/{object_name}/search"
     limit = 200
     output_items: set[tuple[datetime, str]] = set()
     cursor: int | None = None
     max_updated: datetime = since
-    original_since = since
     original_total: int | None = None
 
     while True:
@@ -126,60 +140,60 @@ async def fetch_search_objects(
             output_items.add((this_mod_time, str(r.id)))
 
         if not result.paging:
-            if since is not original_since:
-                log.info(
-                    "finished multi-request fetch",
-                    {
-                        "final_count": len(output_items),
-                        "total": original_total,
-                    },
-                )
-            break
+            # The whole window has been read and no more chunks remain.
+            return sorted(output_items), None
 
         cursor = int(result.paging.next.after)
-        if cursor + limit > 10_000:
-            # Further attempts to read this search result will not accepted by
-            # the search API, so a new search must be initiated to complete the
-            # request.
-            cursor = None
+        if cursor + limit <= 10_000:
+            # Still within the offset cap; keep paginating this same search.
+            continue
 
-            if since == max_updated:
-                log.info(
-                    "cycle detected for lastmodifieddate, fetching all ids for records modified at that instant",
-                    {"object_name": object_name, "instant": since},
-                )
-                output_items.update(
-                    await fetch_search_objects_modified_at(
-                        object_name, log, http, max_updated, last_modified_property_name
-                    )
-                )
-
-                # HubSpot APIs use millisecond resolution, so move the time
-                # cursor forward by that minimum amount now that we know we have
-                # all of the records modified at the common `max_updated` time.
-                max_updated = max_updated + timedelta(milliseconds=1)
-
-                if until and max_updated > until:
-                    # Unlikely edge case, but this would otherwise result in an
-                    # error from the API.
-                    break
-
-            since = max_updated
+        # Hit the 10,000-offset cap. End this chunk here and return a resume
+        # cursor so the caller can continue with a fresh search.
+        if since == max_updated:
+            # More than 10,000 records share a single millisecond, so paginating
+            # by time can't make progress. Drain every record at that instant
+            # and step the resume cursor forward by the minimum (1ms) amount.
             log.info(
-                "initiating a new search to satisfy requested time range",
-                {
-                    "object_name": object_name,
-                    "since": since,
-                    "until": until,
-                    "original_since": original_since,
-                    "count": len(output_items),
-                    "total": original_total,
-                },
+                "cycle detected for lastmodifieddate, fetching all ids for records modified at that instant",
+                {"object_name": object_name, "instant": since},
+            )
+            output_items.update(
+                await fetch_search_objects_modified_at(
+                    object_name, log, http, max_updated, last_modified_property_name
+                )
             )
 
-    # Sort newest to oldest to match the convention of most of "fetch ID"
-    # functions.
-    return sorted(list(output_items), reverse=True), None
+            # HubSpot APIs use millisecond resolution, so move the time cursor
+            # forward by that minimum amount now that we know we have all of the
+            # records modified at the common `max_updated` time.
+            max_updated = max_updated + timedelta(milliseconds=1)
+
+            chunk = sorted(output_items)
+
+            if until and max_updated > until:
+                # Unlikely edge case, but resuming past `until` would otherwise
+                # result in an error from the API. The window is fully read.
+                return chunk, None
+        else:
+            # Withhold the in-progress `max_updated` millisecond from the chunk;
+            # the offset cap may have cut it off partway, so the next call
+            # re-reads it.
+            chunk = sorted(item for item in output_items if item[0] < max_updated)
+
+        log.info(
+            "search window chunk complete; resuming with a new search",
+            {
+                "object_name": object_name,
+                "since": since,
+                "until": until,
+                "max_updated": dt_to_str(max_updated),
+                "count": len(output_items),
+                "total": original_total,
+            },
+        )
+
+        return chunk, dt_to_str(max_updated)
 
 
 async def fetch_search_objects_modified_at(
