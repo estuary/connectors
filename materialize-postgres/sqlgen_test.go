@@ -162,6 +162,44 @@ func TestJSONBContentMediaType(t *testing.T) {
 		"MULTIPLE-typed field without contentMediaType should default to JSON")
 }
 
+// TestJSONBFeatureFlagDisabled verifies that with the "jsonb" feature flag off
+// the contentMediaType is ignored entirely and every field collapses onto JSON,
+// preserving the pre-JSONB behavior.
+func TestJSONBFeatureFlagDisabled(t *testing.T) {
+	flags := map[string]bool{}
+	for k, v := range featureFlagDefaults {
+		flags[k] = v
+	}
+	flags["jsonb"] = false
+	dialect := createPgDialect(flags)
+
+	jsonbMediaType := "application/vnd.estuary.postgresql.jsonb+json"
+	mapWithMediaType := func(types []string, contentType string) string {
+		return dialect.MapType(&sql.Projection{
+			Projection: pf.Projection{
+				Inference: pf.Inference{
+					Types:            types,
+					ContentMediaType: contentType,
+					Exists:           pf.Inference_MUST,
+				},
+			},
+		}, sql.FieldConfig{}).DDL
+	}
+
+	require.Equal(t,
+		"JSON NOT NULL",
+		mapWithMediaType([]string{"object"}, jsonbMediaType),
+		"object field with jsonb contentMediaType should map to JSON when the flag is disabled")
+	require.Equal(t,
+		"JSON NOT NULL",
+		mapWithMediaType([]string{"array"}, jsonbMediaType),
+		"array field with jsonb contentMediaType should map to JSON when the flag is disabled")
+	require.Equal(t,
+		"JSON NOT NULL",
+		mapWithMediaType([]string{"object", "string", "array", "number", "boolean"}, jsonbMediaType),
+		"MULTIPLE-typed field with jsonb contentMediaType should map to JSON when the flag is disabled")
+}
+
 func TestTruncatedIdentifier(t *testing.T) {
 	tests := []struct {
 		name  string
