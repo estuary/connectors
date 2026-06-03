@@ -13,7 +13,10 @@ from ..models import (
     Names,
     OldRecentCompanies,
 )
-from .object_with_associations import fetch_changes_with_associations
+from .object_with_associations import (
+    fetch_changes_with_associations,
+    fetch_chunked_changes_with_associations,
+)
 from .search_objects import fetch_search_objects
 from .shared import (
     ms_to_dt,
@@ -62,7 +65,7 @@ def fetch_recent_companies(
 
 def fetch_delayed_companies(
     log: Logger, http: HTTPSession, with_history: bool, since: datetime, until: datetime
-) -> AsyncGenerator[tuple[datetime, str, Company], None]:
+) -> AsyncGenerator[tuple[datetime, str, Company] | datetime, None]:
 
     async def do_fetch(
         page: PageCursor, count: int
@@ -71,6 +74,6 @@ def fetch_delayed_companies(
             Names.companies, log, http, since, until, page
         )
 
-    return fetch_changes_with_associations(
+    return fetch_chunked_changes_with_associations(
         Names.companies, Company, do_fetch, log, http, with_history, since, until
     )
