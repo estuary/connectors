@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 	"text/template"
@@ -107,14 +108,11 @@ func (c *Config) SetDefaults() {
 }
 
 // ToURI converts the Config to a DSN string.
+//
+// The DSN host is always the real server address, even when tunneling. We dial localhost (the
+// tunnel) via tunnelDialer, but advertise the real server address as the LOGIN7 ServerName and
+// TLS SNI for SQL Server instances that rely on those being accurate.
 func (c *Config) ToURI() string {
-	// If SSH Tunnel is configured, we are going to create a tunnel from localhost
-	// to the target via the bastion server, so we use the tunnel's address.
-	var address = c.Address
-	if c.NetworkTunnel != nil && c.NetworkTunnel.SSHForwarding != nil && c.NetworkTunnel.SSHForwarding.SSHEndpoint != "" {
-		address = "localhost:1433"
-	}
-
 	var params = make(url.Values)
 	params.Add("app name", "Flow Batch Connector")
 	params.Add("encrypt", "true")
@@ -123,10 +121,33 @@ func (c *Config) ToURI() string {
 	var connectURL = &url.URL{
 		Scheme:   "sqlserver",
 		User:     url.UserPassword(c.User, c.Password),
-		Host:     address,
+		Host:     c.Address,
 		RawQuery: params.Encode(),
 	}
 	return connectURL.String()
+}
+
+// tunnelDialer redirects connections to the local end of the SSH tunnel while the driver keeps
+// the original hostname for its TLS SNI and TDS LOGIN7 ServerName fields, so that SQL Server
+// instances which route on the server name they receive see the real host, not "localhost".
+type tunnelDialer struct {
+	localAddr string // address of the tunnel's local listener, to which all dials are redirected
+	address   string // the server address being tunneled to
+}
+
+func (d *tunnelDialer) DialContext(ctx context.Context, network, _ string) (net.Conn, error) {
+	var dialer net.Dialer
+	return dialer.DialContext(ctx, network, d.localAddr)
+}
+
+// HostName marks this as a mssqldb.HostDialer so the driver dials the configured host through
+// this dialer instead of resolving it locally, which keeps the real hostname in the LOGIN7
+// ServerName and TLS SNI.
+func (d *tunnelDialer) HostName() string {
+	if host, _, err := net.SplitHostPort(d.address); err == nil {
+		return host
+	}
+	return d.address
 }
 
 func connectSQLServer(ctx context.Context, cfg *Config) (*sql.DB, error) {
@@ -136,17 +157,22 @@ func connectSQLServer(ctx context.Context, cfg *Config) (*sql.DB, error) {
 		"database": cfg.Database,
 	}).Info("connecting to database")
 
-	// If a network tunnel is configured, then try to start it before establishing connections.
+	connector, err := mssqldb.NewConnector(cfg.ToURI())
+	if err != nil {
+		return nil, fmt.Errorf("error creating connector: %w", err)
+	}
+
+	// If a network tunnel is configured, then try to start it before establishing connections,
+	// and redirect the driver's TCP dial to the tunnel's local listener.
 	if cfg.NetworkTunnel.InUse() {
 		if _, err := cfg.NetworkTunnel.Start(ctx, cfg.Address, "1433"); err != nil {
 			return nil, err
 		}
+		connector.Dialer = &tunnelDialer{localAddr: "localhost:1433", address: cfg.Address}
 	}
 
-	var db, err = sql.Open("sqlserver", cfg.ToURI())
-	if err != nil {
-		return nil, fmt.Errorf("error opening database connection: %w", err)
-	} else if err := db.PingContext(ctx); err != nil {
+	var db = sql.OpenDB(connector)
+	if err := db.PingContext(ctx); err != nil {
 		var mssqlErr mssqldb.Error
 		if errors.As(err, &mssqlErr) {
 			switch mssqlErr.Number {
