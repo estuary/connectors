@@ -47,10 +47,18 @@ def fetch_recent_contacts(
         result = OldRecentContacts.model_validate_json(
             await http.request(log, url, params=params)
         )
-        return (
-            (ms_to_dt(int(r.properties.lastmodifieddate.value)), str(r.vid))
-            for r in result.contacts
-        ), result.has_more and result.time_offset
+        next_page: PageCursor = result.has_more and result.time_offset
+        records: list[tuple[datetime, str]] = []
+        for r in result.contacts:
+            ts = ms_to_dt(int(r.properties.lastmodifieddate.value))
+            records.append((ts, str(r.vid)))
+            if ts <= since:
+                # This endpoint returns records newest-first, so once a page
+                # reaches one as old as `since` there's nothing older worth
+                # paging for.
+                next_page = None
+
+        return records, next_page
 
     return fetch_changes_with_associations(
         Names.contacts, Contact, do_fetch, log, http, with_history, since, until
